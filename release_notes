@@ -1,0 +1,24 @@
+RELEASE NOTES
+PerfSpect
+
+Support structure(Tested internally):
+
+| BigCores (server) |
+
+-------------------------------------------------------------
+|           Arch 	  |      OS	       |  Kernel  |
+-------------------------------------------------------------
+|         Broadwell       |  >= Ubuntu 16.04   | >=4.15   |
+|         Broadwell       |  >= centos 7       | >=3.10   |
+|         Broadwell       |  >= Ubuntu 16.04   | >=4.13   |
+|         Skylake         |  >= centos 7       | >=3.10   |
+|         Skylake         |  >= Ubuntu 16.04   | >=4.15   |
+|         Cascadelake     |  >= Ubuntu 16.04   | >=4.15   |
+|         Cascadelake     |  >= centos 7       | >=3.10   |
+|         Icelake         |  >= Ubuntu 16.04   | >=5.9    |
+|         Icelake         |  >= centos 7       | >=5.9    |
+-------------------------------------------------------------
+
+
+* v1.1.0
+PerfSpect supports BDX, SKX, CLX and ICX

@@ -1,0 +1,3 @@
+simpleeval==0.9.10
+python-dateutil
+xlsxwriter

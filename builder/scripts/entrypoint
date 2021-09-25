@@ -1,0 +1,10 @@
+if [ "$1" = "shell" ]; then    
+    echo "Starting Bash Shell"
+    /bin/bash
+elif [ "$1" = "build" ]; then
+    echo "Starting Build"
+    cd workdir && make dist
+elif [ "$1" = "test" ]; then
+    echo "Starting Tests"
+    cd workdir && make test
+fi

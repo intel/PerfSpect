@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# command to build: provide architecture(x86/arm) as a parameter to build
+
+docker image build                         \
+    --build-arg USERNAME="${USER}"         \
+    --build-arg USERID="$(id -u ${USER})"  \
+    --file builder/Dockerfile              \
+    --tag perfspect_builder:v1             \
+    .
