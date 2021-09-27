@@ -18,7 +18,8 @@ The tool has two parts
 ## Building binaries from source code
 
 ### pre-requisites
-requires docker to be installed on the system
+  1. requires docker to be installed on the system
+  2. please make sure docker commands execute without sudo (for example - `docker run hello-world` runs successfully)
 
 ### build binaries
 
