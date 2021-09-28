@@ -2,8 +2,6 @@ FROM ubuntu:16.04
 # if using proxy please uncomment and edit proxy config below
 #ENV http_proxy <http_proxy:port>
 #ENV https_proxy <https_proxy:port>
-ENV http_proxy http://proxy-us.intel.com:911
-ENV https_proxy http://proxy-us.intel.com:912
 
 ENV LANG en_US.UTF-8
 RUN rm -rf /etc/apt/sources.list.d/ubuntu-esm-infra-trusty.list
