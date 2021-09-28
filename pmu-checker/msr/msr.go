@@ -18,6 +18,15 @@ const msrPath = "/dev/cpu/%d/msr"
 var (
 	Values = sync.Map{}
 	Del    []string
+	regs   = []string{
+		"0x309",
+		"0x30a",
+		"0x30b",
+		"0xc1",
+		"0xc2",
+		"0xc3",
+		"0xc4",
+	}
 )
 
 type retMSR struct {
@@ -118,4 +127,12 @@ func ReadMSR(reg string, wg *sync.WaitGroup, thread int, cpu int) {
 	}
 	log.Debugf("Worker %d done for %s\n", thread, reg)
 
+}
+
+func Initialize() error {
+	for _, reg := range regs {
+		Values.Store(reg, uint64(0))
+	}
+
+	return nil
 }

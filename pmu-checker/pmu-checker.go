@@ -31,17 +31,6 @@ var (
 	help           = flag.Bool("help", false, "Shows the usage of pmu-checker application")
 )
 
-//globals
-var msrRegs = []string{
-	"0x309",
-	"0x30a",
-	"0x30b",
-	"0xc1",
-	"0xc2",
-	"0xc3",
-	"0xc4",
-}
-
 var CPU int
 
 type Result struct {
@@ -118,6 +107,11 @@ func initialize() error {
 
 	CPU = *cpu
 
+	err = msr.Initialize()
+	if err != nil {
+		return errors.Wrap(err, "couldn't initialize msr module")
+	}
+
 	return nil
 }
 
@@ -135,11 +129,6 @@ func main() {
 
 	log.Info("Starting the PMU Checker application...")
 	msr.ValidateMSRModule(CPU)
-
-	// initialize the map
-	for i := 0; i < len(msrRegs); i++ {
-		msr.Values.Store(msrRegs[i], uint64(0))
-	}
 
 	var wg sync.WaitGroup
 
