@@ -8,7 +8,6 @@ package main
 import (
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -21,6 +20,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -173,7 +173,7 @@ func showUsage() {
 
 }
 
-func init() {
+func initialize() error {
 	//parse the commandline arguments
 	loglevel := flag.Bool("debug", false, "set the loglevel to debug, default is info")
 	multiLogWriter := flag.Bool("no-stdout", false, "set the logwriter to write to logfile only, default is false")
@@ -190,8 +190,7 @@ func init() {
 
 	//don't allow non-sudo runs
 	if os.Geteuid() != 0 {
-		log.Fatalf("You need root privileges to run pmu-checker, please run again with sudo")
-		os.Exit(0)
+		return errors.New("you need root privileges to run pmu-checker, please run again with sudo")
 	}
 
 	validateLogFileName(*logfile)
@@ -204,12 +203,12 @@ func init() {
 	// programDir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	ex, err := os.Executable()
 	if err != nil {
-		log.Errorf("Failed to get absolute path of the program\nError:", err)
+		return errors.Wrap(err, "failed to get absolute path of the program")
 	}
 	exPath := filepath.Dir(ex)
 	file, err := os.OpenFile(filepath.Join(exPath, *logfile), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
-		log.Fatalf("Failed to open log file\nError:", err)
+		return errors.Wrap(err, "failed to open the log file")
 	}
 
 	//write to logfile and stdout at same time
@@ -228,10 +227,15 @@ func init() {
 
 	CPU = *cpu
 
+	return nil
 }
 
 func main() {
-
+	err := initialize()
+	if err != nil {
+		log.Error(errors.Wrap(err, "couldn't initialize PMU Checker"))
+		return
+	}
 	log.Info("Starting the PMU Checker application...")
 	validateMSRModule(CPU)
 
@@ -310,10 +314,10 @@ func main() {
 	}
 
 	var js []byte
-	js, err := json.Marshal(res)
+	js, err = json.Marshal(res)
 	if err != nil {
-		log.Errorf("Result could not be converted to json\nError: ", err)
-		os.Exit(3)
+		log.Error(errors.Wrap(err, "result could not be converted to json"))
+		return
 	}
 	fmt.Println(string(js))
 
