@@ -1,4 +1,3 @@
-
 //###########################################################################################################
 //# Copyright (C) 2021 Intel Corporation
 //# SPDX-License-Identifier: BSD-3-Clause
@@ -13,7 +12,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	log "github.com/Sirupsen/logrus"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -22,11 +20,13 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
-//globals 
+//globals
 var msrValues = sync.Map{}
-var msrRegs = []string {
+var msrRegs = []string{
 	"0x309",
 	"0x30a",
 	"0x30b",
@@ -39,31 +39,32 @@ var msrRegs = []string {
 var msrDel = []string{}
 var CPU int
 var logfile string
+
 type retMSR struct {
 	fd int
 }
 type Result struct {
-	Pmu_active_count int `json:"PMU(s)_active"`
-	Pmu_details map[string]string `json:"Details"`
-
+	Pmu_active_count int               `json:"PMU(s)_active"`
+	Pmu_details      map[string]string `json:"Details"`
 }
+
 const msrPath = "/dev/cpu/%d/msr"
 
 func (dpt retMSR) Read(msr int64) (uint64, error) {
 	// Reads a given MSR on the respective CPU
 
-	buf := make([]byte, 8) 
+	buf := make([]byte, 8)
 	rc, err := syscall.Pread(dpt.fd, buf, msr)
 	if err != nil {
 		log.Fatal(err)
 		panic(err)
 	}
 
-	if rc !=8 {
+	if rc != 8 {
 		log.Errorf("wrong byte count %d", rc)
 		return 0, fmt.Errorf("wrong byte count %d", rc)
 	}
-	
+
 	//assuming all x86 uses little endian format
 	msrVal := binary.LittleEndian.Uint64(buf)
 	log.Tracef("MSR %d was read successfully as %d", msr, msrVal)
@@ -77,7 +78,7 @@ func openMSRInterface(cpu int) (*retMSR, error) {
 	msrDir := fmt.Sprintf(msrPath, cpu)
 	fd, err := syscall.Open(msrDir, syscall.O_RDONLY, 777)
 	if err != nil {
-		log.Errorf("Couln't open the msr interface, Error: ",err)
+		log.Errorf("Couln't open the msr interface, Error: ", err)
 		return nil, errors.New("Couldn't open the msr interface")
 	}
 
@@ -101,7 +102,6 @@ func validateMSRModule(cpu int) {
 	}
 
 }
-
 
 func readMSR(reg string, wg *sync.WaitGroup, thread int, cpu int) {
 	// Read MSR value, update map as needed
@@ -156,7 +156,7 @@ func validateLogFileName(file string) {
 	}
 
 	if reg.MatchString(file) {
-		return 
+		return
 	} else {
 		log.Panic("The file name isn't valid for logging, The valid extensions are .log and .txt")
 	}
@@ -173,9 +173,8 @@ func showUsage() {
 
 }
 
-
 func init() {
-	//parse the commandline arguments 
+	//parse the commandline arguments
 	loglevel := flag.Bool("debug", false, "set the loglevel to debug, default is info")
 	multiLogWriter := flag.Bool("no-stdout", false, "set the logwriter to write to logfile only, default is false")
 	cpu := flag.Int("cpu", 0, "Read MSRs on respective CPU, default is 0")
@@ -198,21 +197,21 @@ func init() {
 	validateLogFileName(*logfile)
 
 	log.SetFormatter(&log.TextFormatter{
-		ForceColors: true,
-		FullTimestamp: true,
+		ForceColors:            true,
+		FullTimestamp:          true,
 		DisableLevelTruncation: true,
 	})
 	// programDir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	ex, err := os.Executable()
-	if err !=nil {
-		log.Errorf("Failed to get absolute path of the program\nError:",err)
+	if err != nil {
+		log.Errorf("Failed to get absolute path of the program\nError:", err)
 	}
 	exPath := filepath.Dir(ex)
 	file, err := os.OpenFile(filepath.Join(exPath, *logfile), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-    if err != nil {
-        log.Fatalf("Failed to open log file\nError:",err)
-    }
-	
+	if err != nil {
+		log.Fatalf("Failed to open log file\nError:", err)
+	}
+
 	//write to logfile and stdout at same time
 	mw := io.MultiWriter(os.Stdout, file)
 
@@ -221,14 +220,14 @@ func init() {
 	} else {
 		log.SetOutput(mw)
 	}
-	
+
 	log.SetLevel(log.InfoLevel)
 	if *loglevel == true {
 		log.SetLevel(log.DebugLevel)
 	}
 
 	CPU = *cpu
-	
+
 }
 
 func main() {
@@ -240,11 +239,11 @@ func main() {
 	for i := 0; i < len(msrRegs); i++ {
 		msrValues.Store(msrRegs[i], uint64(0))
 	}
-	
+
 	var wg sync.WaitGroup
 
-	for i:=1; i<=6; i++ {
-		
+	for i := 1; i <= 6; i++ {
+
 		if len(msrDel) == 7 {
 			// if all the PMUs are being used, break the loop
 
@@ -268,7 +267,7 @@ func main() {
 		log.Infof("Iteration check #%d completed\n", i)
 		//intentional sleep
 		time.Sleep(time.Second)
-	
+
 	}
 
 	res := new(Result)
@@ -283,7 +282,7 @@ func main() {
 	if len(msrDel) > 0 {
 
 		log.Info("Following PMU(s) are actively being used:")
-		for i:=0; i < len(msrDel); i++ {
+		for i := 0; i < len(msrDel); i++ {
 			pmu := msrDel[i]
 			switch pmu {
 
@@ -307,15 +306,15 @@ func main() {
 			}
 
 		}
-		res.Pmu_active_count = len(msrDel) 
+		res.Pmu_active_count = len(msrDel)
 	}
-	
+
 	var js []byte
 	js, err := json.Marshal(res)
-	if err!= nil {
+	if err != nil {
 		log.Errorf("Result could not be converted to json\nError: ", err)
 		os.Exit(3)
 	}
 	fmt.Println(string(js))
-	 
+
 }
