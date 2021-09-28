@@ -18,6 +18,7 @@ clean_dir:
 
 build_dir: clean_dir
 	mkdir -p build
+	mkdir -p dist
 
 build/pmu-checker:
 	cd pmu-checker && make
