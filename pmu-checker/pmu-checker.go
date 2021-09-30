@@ -65,9 +65,6 @@ func showUsage() {
 }
 
 func initialize() error {
-	//parse the commandline arguments
-	flag.Parse()
-
 	validateLogFileName(*logfile)
 
 	log.SetFormatter(&log.TextFormatter{
@@ -114,6 +111,13 @@ func main() {
 	if os.Geteuid() != 0 {
 		println("You need a root privileges to run.")
 		os.Exit(2)
+	}
+
+	flag.Parse()
+
+	if *help == true {
+		showUsage()
+		return
 	}
 
 	err := initialize()
