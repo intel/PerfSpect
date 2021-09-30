@@ -123,7 +123,7 @@ func main() {
 	err := initialize()
 	if err != nil {
 		log.Error(errors.Wrap(err, "couldn't initialize PMU Checker"))
-		return
+		os.Exit(2)
 	}
 
 	log.Info("Starting the PMU Checker application...")
@@ -190,7 +190,7 @@ func main() {
 			default:
 				// must not enter default case
 				log.Infof("Report this to the Developers")
-				os.Exit(0)
+				os.Exit(2)
 
 			}
 
@@ -202,7 +202,7 @@ func main() {
 	js, err = json.Marshal(res)
 	if err != nil {
 		log.Error(errors.Wrap(err, "result could not be converted to json"))
-		return
+		os.Exit(2)
 	}
 	fmt.Println(string(js))
 }
