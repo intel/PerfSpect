@@ -126,6 +126,12 @@ func main() {
 		os.Exit(2)
 	}
 
+	err = msr.ValidateMSRModule(CPU)
+	if err != nil {
+		log.Error(errors.Wrap(err, "couldn't validate MSR module"))
+		os.Exit(2)
+	}
+
 	log.Info("Starting the PMU Checker application...")
 	msr.ValidateMSRModule(CPU)
 

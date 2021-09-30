@@ -74,15 +74,12 @@ func closeMSRInterface(dpt retMSR) {
 	syscall.Close(dpt.fd)
 }
 
-func ValidateMSRModule(cpu int) {
-
+func ValidateMSRModule(cpu int) error {
 	msrDir := fmt.Sprintf(msrPath, cpu)
-	if _, err := os.Stat(msrDir); os.IsNotExist(err) {
-		// if msr modules aren't loaded
-
-		log.Panicf("MSR modules aren't loaded at %s, please load them using modprobe msr command\n", msrDir)
+	if _, err := os.Stat(msrDir); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("MSR modules aren't loaded at %s, please load them using modprobe msr command", msrDir))
 	}
-
+	return nil
 }
 
 func ReadMSR(reg string, wg *sync.WaitGroup, thread int, cpu int) {
