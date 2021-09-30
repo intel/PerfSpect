@@ -68,11 +68,6 @@ func initialize() error {
 	//parse the commandline arguments
 	flag.Parse()
 
-	//don't allow non-sudo runs
-	if os.Geteuid() != 0 {
-		return errors.New("you need root privileges to run pmu-checker, please run again with sudo")
-	}
-
 	validateLogFileName(*logfile)
 
 	log.SetFormatter(&log.TextFormatter{
@@ -116,6 +111,11 @@ func initialize() error {
 }
 
 func main() {
+	if os.Geteuid() != 0 {
+		println("You need a root privileges to run.")
+		os.Exit(2)
+	}
+
 	err := initialize()
 	if err != nil {
 		log.Error(errors.Wrap(err, "couldn't initialize PMU Checker"))
