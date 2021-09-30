@@ -117,7 +117,7 @@ func main() {
 
 	if *help == true {
 		showUsage()
-		return
+		os.Exit(0)
 	}
 
 	err := initialize()
