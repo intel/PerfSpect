@@ -23,6 +23,15 @@ import (
 	"github.com/intel/perfspect/pmu-checker/msr"
 )
 
+const (
+	description = `pmu-checker
+
+Allows us to verify if the system is running any drivers/daemons that may be programming the PMU.
+
+Options:
+`
+)
+
 var (
 	loglevel       = flag.Bool("debug", false, "set the loglevel to debug, default is info")
 	multiLogWriter = flag.Bool("no-stdout", false, "set the logwriter to write to logfile only, default is false")
@@ -51,16 +60,6 @@ func validateLogFileName(file string) {
 	} else {
 		log.Panic("The file name isn't valid for logging, The valid extensions are .log and .txt")
 	}
-
-}
-
-func showUsage() {
-	fmt.Println("pmu-checker needs to be run with sudo previlages")
-	fmt.Println("Usage:")
-	fmt.Println(" sudo ./pmu-checker [OPTION...]")
-	fmt.Println("Options:")
-	flag.PrintDefaults()
-	fmt.Println(" logfile[*.log],  cpu[int], debug, no-stdout")
 
 }
 
@@ -116,18 +115,14 @@ func main() {
 	flag.Parse()
 
 	if *help == true {
-		showUsage()
+		println(description)
+		flag.PrintDefaults()
 		os.Exit(0)
 	}
 
 	err := initialize()
 	if err != nil {
 		log.Error(errors.Wrap(err, "couldn't initialize PMU Checker"))
-		return
-	}
-
-	if *help == true {
-		showUsage()
 		return
 	}
 
