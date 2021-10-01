@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"sync"
 	"time"
 
@@ -29,6 +28,7 @@ Allows us to verify if the system is running any drivers/daemons that may be pro
 
 Options:
 `
+	iterationCompleted = "-------------All Iteration checks completed-------------"
 )
 
 var (
@@ -141,9 +141,9 @@ func main() {
 
 	}
 
-	res := new(Result)
+	log.Info(iterationCompleted)
 
-	log.Infof(strings.Repeat("-", 12) + "All Iteration checks completed" + strings.Repeat("-", 12))
+	var res msr.Result
 	res.PMUDetails = make(map[string]string)
 	err = msr.GetActivePMUs(res)
 	if err != nil {
