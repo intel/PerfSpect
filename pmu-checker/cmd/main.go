@@ -145,39 +145,10 @@ func main() {
 
 	log.Infof(strings.Repeat("-", 12) + "All Iteration checks completed" + strings.Repeat("-", 12))
 	res.PMUDetails = make(map[string]string)
-	if len(msr.Del) == 0 {
-		log.Infof("None of the PMU(s) are actively being used\n")
-		res.PMUActive = 0
-	}
-
-	if len(msr.Del) > 0 {
-
-		log.Info("Following PMU(s) are actively being used:")
-		for i := 0; i < len(msr.Del); i++ {
-			pmu := msr.Del[i]
-			switch pmu {
-
-			case "0x309":
-				res.PMUDetails[pmu] = "instructions"
-				log.Infof("%s: might be using instructions", pmu)
-			case "0x30a":
-				res.PMUDetails[pmu] = "cpu_cycles"
-				log.Infof("%s: might be using cpu_cycles (check if nmi_watchdog is running)", pmu)
-			case "0x30b":
-				res.PMUDetails[pmu] = "ref_cycles"
-				log.Infof("%s: might be using ref_cycles", pmu)
-			case "0xc1", "0xc2", "0xc3", "0xc4":
-				res.PMUDetails[pmu] = "General_purpose_programmable_PMU"
-				log.Infof("%s: might be using general programmable PMU", pmu)
-			default:
-				// must not enter default case
-				log.Infof("Report this to the Developers")
-				os.Exit(2)
-
-			}
-
-		}
-		res.PMUActive = len(msr.Del)
+	err = msr.GetActivePMUs(res)
+	if err != nil {
+		log.Error(errors.Wrap(err, "couldn't obtain active PMUs"))
+		os.Exit(2)
 	}
 
 	fmt.Println(res)

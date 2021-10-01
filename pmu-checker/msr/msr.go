@@ -12,7 +12,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const msrPath = "/dev/cpu/%d/msr"
+const (
+	msrPath           = "/dev/cpu/%d/msr"
+	generalPurposePMU = "General_purpose_programmable_PMU"
+)
 
 var (
 	Values = sync.Map{}
@@ -25,6 +28,15 @@ var (
 		"0xc2",
 		"0xc3",
 		"0xc4",
+	}
+	pmuPurpose = map[string]string{
+		"0x309": "instructions",
+		"0x30a": "cpu_cycles",
+		"0x30b": "ref_cycles",
+		"0xc1":  generalPurposePMU,
+		"0xc2":  generalPurposePMU,
+		"0xc3":  generalPurposePMU,
+		"0xc4":  generalPurposePMU,
 	}
 )
 
@@ -120,6 +132,21 @@ func ReadMSR(reg string, wg *sync.WaitGroup, thread int, cpu int) {
 func Initialize() error {
 	for _, reg := range regs {
 		Values.Store(reg, uint64(0))
+	}
+
+	return nil
+}
+
+func GetActivePMUs(res Result) error {
+	log.Info("Following PMU(s) are actively being used:")
+	for _, pmu := range Del {
+		purpose, ok := pmuPurpose[pmu]
+		if !ok {
+			return errors.New("Report this to the Developers.")
+		}
+		res.PMUDetails[pmu] = purpose
+		res.PMUActive++
+		log.Infof("%s: might be using: %s", pmu, purpose)
 	}
 
 	return nil

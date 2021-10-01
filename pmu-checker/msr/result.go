@@ -1,4 +1,4 @@
-package main
+package msr
 
 import (
 	"encoding/json"
@@ -12,7 +12,7 @@ type Result struct {
 	PMUDetails map[string]string `json:"details"`
 }
 
-func (r *Result) String() string {
+func (r Result) String() string {
 	js, err := json.MarshalIndent(r, "", "\t")
 	if err != nil {
 		log.Error(errors.Wrap(err, "result could not be converted to json"))
