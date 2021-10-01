@@ -6,7 +6,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -39,11 +38,6 @@ var (
 	logfile        = flag.String("logfile", "pmu-checker.log", "set the logfile name, default is pmu-checker.log")
 	help           = flag.Bool("help", false, "Shows the usage of pmu-checker application")
 )
-
-type Result struct {
-	Pmu_active_count int               `json:"PMU(s)_active"`
-	Pmu_details      map[string]string `json:"Details"`
-}
 
 func validateLogFileName(file string) {
 	regexString := `([a-zA-Z0-9\s_\\.\-\(\):])+(.log|.txt)$`
@@ -163,10 +157,10 @@ func main() {
 	res := new(Result)
 
 	log.Infof(strings.Repeat("-", 12) + "All Iteration checks completed" + strings.Repeat("-", 12))
-	res.Pmu_details = make(map[string]string)
+	res.PMUDetails = make(map[string]string)
 	if len(msr.Del) == 0 {
 		log.Infof("None of the PMU(s) are actively being used\n")
-		res.Pmu_active_count = 0
+		res.PMUActive = 0
 	}
 
 	if len(msr.Del) > 0 {
@@ -177,16 +171,16 @@ func main() {
 			switch pmu {
 
 			case "0x309":
-				res.Pmu_details[pmu] = "instructions"
+				res.PMUDetails[pmu] = "instructions"
 				log.Infof("%s: might be using instructions", pmu)
 			case "0x30a":
-				res.Pmu_details[pmu] = "cpu_cycles"
+				res.PMUDetails[pmu] = "cpu_cycles"
 				log.Infof("%s: might be using cpu_cycles (check if nmi_watchdog is running)", pmu)
 			case "0x30b":
-				res.Pmu_details[pmu] = "ref_cycles"
+				res.PMUDetails[pmu] = "ref_cycles"
 				log.Infof("%s: might be using ref_cycles", pmu)
 			case "0xc1", "0xc2", "0xc3", "0xc4":
-				res.Pmu_details[pmu] = "General_purpose_programmable_PMU"
+				res.PMUDetails[pmu] = "General_purpose_programmable_PMU"
 				log.Infof("%s: might be using general programmable PMU", pmu)
 			default:
 				// must not enter default case
@@ -196,14 +190,8 @@ func main() {
 			}
 
 		}
-		res.Pmu_active_count = len(msr.Del)
+		res.PMUActive = len(msr.Del)
 	}
 
-	var js []byte
-	js, err = json.Marshal(res)
-	if err != nil {
-		log.Error(errors.Wrap(err, "result could not be converted to json"))
-		os.Exit(2)
-	}
-	fmt.Println(string(js))
+	fmt.Println(res)
 }
