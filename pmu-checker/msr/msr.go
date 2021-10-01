@@ -18,17 +18,8 @@ const (
 )
 
 var (
-	Values = sync.Map{}
-	Del    []string
-	regs   = []string{
-		"0x309",
-		"0x30a",
-		"0x30b",
-		"0xc1",
-		"0xc2",
-		"0xc3",
-		"0xc4",
-	}
+	Values     = sync.Map{}
+	Del        []string
 	pmuPurpose = map[string]string{
 		"0x309": "instructions",
 		"0x30a": "cpu_cycles",
@@ -130,8 +121,8 @@ func ReadMSR(reg string, wg *sync.WaitGroup, thread int, cpu int) {
 }
 
 func Initialize() error {
-	for _, reg := range regs {
-		Values.Store(reg, uint64(0))
+	for regPMU, _ := range pmuPurpose {
+		Values.Store(regPMU, uint64(0))
 	}
 
 	return nil
