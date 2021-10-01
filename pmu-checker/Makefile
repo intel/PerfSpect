@@ -16,10 +16,10 @@ fmt:
             done
 
 pmu-checker:
-	$(GO_BIN) build -o $(BINARY_NAME) -ldflags '-X main.gVersion=$(VERSION)' ./cmd/main.go
+	$(GO_BIN) build -o $(BINARY_NAME) -ldflags '-X main.gVersion=$(VERSION)' ./cmd/
 
 pmu-checker_arm64:
-	GOOS=linux GOARCH=arm64 $(GO_BIN) build -o $(BINARY_NAME)_arm64 -ldflags '-X main.gVersion=$(VERSION)' ./cmd/main.go
+	GOOS=linux GOARCH=arm64 $(GO_BIN) build -o $(BINARY_NAME)_arm64 -ldflags '-X main.gVersion=$(VERSION)' ./cmd/
 
 .PHONY: lint
 lint:
