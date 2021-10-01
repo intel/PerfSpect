@@ -37,26 +37,13 @@ var (
 	cpu            = flag.Int("cpu", 0, "Read MSRs on respective CPU, default is 0")
 	logfile        = flag.String("logfile", "pmu-checker.log", "set the logfile name, default is pmu-checker.log")
 	help           = flag.Bool("help", false, "Shows the usage of pmu-checker application")
+	logFileRegexp  = regexp.MustCompile(`([a-zA-Z0-9\s_\\.\-():])+(.log|.txt)$`)
 )
 
-func validateLogFileName(file string) {
-	regexString := `([a-zA-Z0-9\s_\\.\-\(\):])+(.log|.txt)$`
-	reg, err := regexp.Compile(regexString)
-	if err != nil {
-		log.Fatal(err)
-		os.Exit(0)
-	}
-
-	if reg.MatchString(file) {
-		return
-	} else {
-		log.Panic("The file name isn't valid for logging, The valid extensions are .log and .txt")
-	}
-
-}
-
 func initialize() error {
-	validateLogFileName(*logfile)
+	if !logFileRegexp.MatchString(*logfile) {
+		return errors.New("the file name isn't valid for logging, the valid extensions are .log and .txt")
+	}
 
 	log.SetFormatter(&log.TextFormatter{
 		ForceColors:            true,
