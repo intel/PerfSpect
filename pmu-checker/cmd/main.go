@@ -40,8 +40,6 @@ var (
 	help           = flag.Bool("help", false, "Shows the usage of pmu-checker application")
 )
 
-var CPU int
-
 type Result struct {
 	Pmu_active_count int               `json:"PMU(s)_active"`
 	Pmu_details      map[string]string `json:"Details"`
@@ -96,8 +94,6 @@ func initialize() error {
 		log.SetLevel(log.DebugLevel)
 	}
 
-	CPU = *cpu
-
 	err = msr.Initialize()
 	if err != nil {
 		return errors.Wrap(err, "couldn't initialize msr module")
@@ -126,7 +122,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	err = msr.ValidateMSRModule(CPU)
+	err = msr.ValidateMSRModule(*cpu)
 	if err != nil {
 		log.Error(errors.Wrap(err, "couldn't validate MSR module"))
 		os.Exit(2)
@@ -153,7 +149,7 @@ func main() {
 			}
 
 			wg.Add(1)
-			go msr.ReadMSR(key.(string), &wg, i, CPU)
+			go msr.ReadMSR(key.(string), &wg, i, *cpu)
 			return true
 		})
 
