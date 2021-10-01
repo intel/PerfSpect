@@ -133,7 +133,6 @@ func main() {
 	}
 
 	log.Info("Starting the PMU Checker application...")
-	msr.ValidateMSRModule(CPU)
 
 	var wg sync.WaitGroup
 
