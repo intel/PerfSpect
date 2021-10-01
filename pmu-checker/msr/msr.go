@@ -3,7 +3,6 @@ package msr
 import (
 	"encoding/binary"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -72,14 +71,6 @@ func closeMSRInterface(dpt retMSR) {
 	// Close connection to MSR Interface
 
 	syscall.Close(dpt.fd)
-}
-
-func ValidateMSRModule(cpu int) error {
-	msrDir := fmt.Sprintf(msrPath, cpu)
-	if _, err := os.Stat(msrDir); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("MSR modules aren't loaded at %s, please load them using modprobe msr command", msrDir))
-	}
-	return nil
 }
 
 func ReadMSR(reg string, wg *sync.WaitGroup, thread int, cpu int) {
