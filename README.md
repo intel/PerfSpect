@@ -18,13 +18,13 @@ The tool has two parts
 ## Building binaries from source code
 
 ### pre-requisites
-  1. requires docker to be installed on the system
-  2. please make sure docker commands execute without sudo (for example - `docker run hello-world` runs successfully)
+  1. Install docker
+  2. Ensure docker commands execute without sudo (for example - `docker run hello-world` runs successfully)
 
 ### build binaries
 
-  1. builder/build_docker_image
-  2. builder/build
+execute build.sh
+`./build.sh`
 
 On successful build, binaries would be created in "dist" folder
 
