@@ -22,7 +22,7 @@ if [ -x "$(command -v docker)" ]; then
     then
 		validate_user 
     else
-	printf "The docker group doesn't exist, please create docker group, add "$USER " to the docker group, verify the group membership is re-evaluated and re-run build.sh; exiting...\n"
+	printf "The docker group doesn't exist, please create docker group, add $USER to the docker group, verify the group membership is re-evaluated and re-run build.sh; exiting...\n"
 	exit 1
     fi
 
