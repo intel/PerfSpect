@@ -3,7 +3,7 @@
 
 PerfSpect is a system performance characterization tool based on linux perf targeting Intel microarchitectures.
 The tool has two parts 
-1. perf collection to collect underlying PMU(Performance Monitoring Unit) counters
+1. perf collection to collect underlying PMU (Performance Monitoring Unit) counters
 2. post processing that generates csv output of performance metrics.
 
 ![PerfSpect output](images/metrics.JPG "perfspect-output")
@@ -26,7 +26,7 @@ The tool has two parts
 execute build.sh
 `./build.sh`
 
-On successful build, binaries would be created in "dist" folder
+On successful build, binaries will be created in "dist" folder
 
 ### 1. Perf collection:
 
@@ -42,7 +42,7 @@ Options:
 
   -i INTERVAL, --interval INTERVAL (interval in seconds for time series dump, default=1)
  
-  -m MUXINTERVAL, --muxinterval MUXINTERVAL (event mux interval for events in ms, default=0 i.e. will use the system default. Requires root privileges)
+  -m MUXINTERVAL, --muxinterval MUXINTERVAL (event mux interval for events in ms, default=0 i.e., will use the system default. Requires root privileges)
    
   -o OUTCSV, --outcsv OUTCSV (perf stat output in csv format, default=results/perfstat.csv)
   
@@ -50,7 +50,7 @@ Options:
   
   -p PID, --pid PID perf-collect on selected PID(s)
 	
-  -t TIMEOUT, --timeout TIMEOUT (  perf event collection time)
+  -t TIMEOUT, --timeout TIMEOUT ( perf event collection time)
   
   --percore  (Enable per core event collection)
 
@@ -69,7 +69,7 @@ Options:
 
 #### Notes
 
-1. Intel CPUs(until Cascadelake) have 3 fixed PMUs (cpu-cycles, ref-cycles, instructions) and 4 programmable PMUs. The events are grouped in event files with this assumption. However, some of the counters may not be available on some CPUs. You can check the corretness of the event file with dryrun and check the output for anamolies, Typically output will have "not counted", "unsuppported" or zero values for cpu-cycles if number of available counters are less than events in a group
+1. Intel CPUs (until Cascadelake) have 3 fixed PMUs (cpu-cycles, ref-cycles, instructions) and 4 programmable PMUs. The events are grouped in event files with this assumption. However, some of the counters may not be available on some CPUs. You can check the correctness of the event file with dryrun and check the output for anamolies. Typically output will have "not counted", "unsuppported" or zero values for cpu-cycles if number of available counters are less than events in a group.
 2. Globally pinned events can limit the number of counters available for perf event groups. On X86 systems NMI watchdog pins a fixed counter by default. NMI watchdog is disabled during perf collection if run as a sudo user. If NMI watchdog can't be disabled, event grouping will be forcefully disabled to let perf driver handle event multiplexing.
 
 ### 2. Perf Postprocessing:
@@ -115,7 +115,7 @@ required arguments:
 ## Things to note
 
 1. The tool can collect only the counters supported by underlying linux perf version. 
-2. Current version supports Intel Icelake, Cascadelake, Skylake and Broadwell microarchitecture only.
+2. Current version supports Intel Icelake, Cascadelake, Skylake and Broadwell microarchitectures only.
 3. Perf collection overhead will increase with increase in number of counters and/or dump interval. Using the right perf multiplexing (check perf-collection.py Notes for more details) interval to reduce overhead
 4. If you run into locale issues - `UnicodeDecodeError: 'ascii' codec can't decode byte 0xc2 in position 4519: ordinal not in range(128)`, more likely the locales needs to be set appropriately. You could also try running post-process step with `LC_ALL=C.UTF-8 LANG=C.UTF-8 ./perf-postprocess -r result.csv`
 
