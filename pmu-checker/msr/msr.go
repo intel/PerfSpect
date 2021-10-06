@@ -35,7 +35,7 @@ type retMSR struct {
 	fd int
 }
 
-func (dpt retMSR) Read(msr int64) (uint64, error) {
+func (dpt retMSR) read(msr int64) (uint64, error) {
 	// Reads a given MSR on the respective CPU
 
 	buf := make([]byte, 8)
@@ -93,7 +93,7 @@ func ReadMSR(reg string, wg *sync.WaitGroup, thread int, cpu int) {
 		log.Panic(err)
 	}
 
-	msrVal, err := msr.Read(regInt64)
+	msrVal, err := msr.read(regInt64)
 	if err != nil {
 		log.Panic(err)
 	}
