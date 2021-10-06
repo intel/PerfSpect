@@ -70,10 +70,9 @@ func openMSRInterface(cpu int) (*retMSR, error) {
 
 }
 
-func closeMSRInterface(dpt retMSR) {
+func closeMSRInterface(dpt retMSR) error {
 	// Close connection to MSR Interface
-
-	syscall.Close(dpt.fd)
+	return syscall.Close(dpt.fd)
 }
 
 func ReadMSR(reg string, wg *sync.WaitGroup, thread int, cpu int) {
@@ -98,7 +97,11 @@ func ReadMSR(reg string, wg *sync.WaitGroup, thread int, cpu int) {
 		log.Panic(err)
 	}
 
-	closeMSRInterface(*msr)
+	err = closeMSRInterface(*msr)
+	if err != nil {
+		log.Panic(err)
+	}
+
 	log.Debugf("New value of thread %d for %s is %d", thread, reg, msrVal)
 	currentVal, found := Values.Load(reg)
 	Values.Store(reg, msrVal)
