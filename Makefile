@@ -71,7 +71,7 @@ dist/$(PACKAGE): build_dir build/pmu-checker build/libtsc build/collect build/po
 
 
 test:
-	cp dist/$(BINARY_COLLECT) dist/$(BINARY_POSTPROCESS) test/*
+	cp dist/$(BINARY_COLLECT) dist/$(BINARY_POSTPROCESS) test/
 	cd test && pytest
 
 security_scan: src/*.py

@@ -24,7 +24,7 @@ def _run_command(command, cwd=""):
     return stdout, stderr, retcode
 
 def _test_run_regex(
-    command, expected_retcode, capsys, stdout_regex=None, stderr_regex=None, regex_flags=0, cwd="perfspect" 
+    command, expected_retcode, capsys, stdout_regex=None, stderr_regex=None, regex_flags=0, cwd="."
 ):
 
     stdout, stderr, retcode = _run_command(command, cwd)
@@ -46,7 +46,7 @@ def _test_run_output(command, expected_output_extensions):
     except:
         proc.kill()
         stdout, stderr = proc.communicate()
-    retcode = proc.returncode    
+    retcode = proc.returncode
     assert retcode == 0
     # get output dir from stdout
     matches = re.findall(r"Output archive: (.*)", stdout)
