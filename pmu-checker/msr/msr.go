@@ -128,17 +128,19 @@ func Initialize() error {
 	return nil
 }
 
-func GetActivePMUs(res Result) error {
+func GetActivePMUs() (Result, error) {
+	var res Result
+	res.PMUDetails = make(map[string]string)
 	log.Info("Following PMU(s) are actively being used:")
 	for _, pmu := range Del {
 		purpose, ok := pmuPurpose[pmu]
 		if !ok {
-			return errors.New("Report this to the Developers.")
+			return Result{}, errors.New("Report this to the Developers.")
 		}
 		res.PMUDetails[pmu] = purpose
 		res.PMUActive++
 		log.Infof("%s: might be using: %s", pmu, purpose)
 	}
 
-	return nil
+	return res, nil
 }

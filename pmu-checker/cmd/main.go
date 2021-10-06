@@ -8,15 +8,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sync"
-	"time"
-
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/intel/perfspect/pmu-checker/msr"
 )
@@ -143,9 +141,7 @@ func main() {
 
 	log.Info(iterationCompleted)
 
-	var res msr.Result
-	res.PMUDetails = make(map[string]string)
-	err = msr.GetActivePMUs(res)
+	res, err := msr.GetActivePMUs()
 	if err != nil {
 		log.Error(errors.Wrap(err, "couldn't obtain active PMUs"))
 		os.Exit(2)
