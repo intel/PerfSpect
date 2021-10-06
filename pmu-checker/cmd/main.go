@@ -27,6 +27,7 @@ Allows us to verify if the system is running any drivers/daemons that may be pro
 Options:
 `
 	iterationCompleted = "-------------All Iteration checks completed-------------"
+	iterations         = 6
 )
 
 var (
@@ -108,14 +109,23 @@ func main() {
 	}
 
 	log.Info("Starting the PMU Checker application...")
+	runIterations()
+	log.Info(iterationCompleted)
 
-	var wg sync.WaitGroup
+	res, err := msr.GetActivePMUs()
+	if err != nil {
+		log.Error(errors.Wrap(err, "couldn't obtain active PMUs"))
+		os.Exit(2)
+	}
 
-	for i := 1; i <= 6; i++ {
+	fmt.Println(res)
+}
 
+func runIterations() {
+	for i := 1; i <= iterations; i++ {
+		var wg sync.WaitGroup
 		if len(msr.Del) == 7 {
 			// if all the PMUs are being used, break the loop
-
 			log.Infof("Aborting iteration check #%d", i)
 			break
 		}
@@ -134,18 +144,5 @@ func main() {
 
 		wg.Wait()
 		log.Infof("Iteration check #%d completed\n", i)
-		//intentional sleep
-		time.Sleep(time.Second)
-
 	}
-
-	log.Info(iterationCompleted)
-
-	res, err := msr.GetActivePMUs()
-	if err != nil {
-		log.Error(errors.Wrap(err, "couldn't obtain active PMUs"))
-		os.Exit(2)
-	}
-
-	fmt.Println(res)
 }
