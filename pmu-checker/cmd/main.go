@@ -124,7 +124,7 @@ func main() {
 func runIterations() {
 	for i := 1; i <= iterations; i++ {
 		var wg sync.WaitGroup
-		if len(msr.Del) == 7 {
+		if len(msr.UsedPMUs) == 7 {
 			// if all the PMUs are being used, break the loop
 			log.Infof("Aborting iteration check #%d", i)
 			break

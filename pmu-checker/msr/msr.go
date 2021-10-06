@@ -19,7 +19,7 @@ const (
 
 var (
 	Values     = sync.Map{}
-	Del        []string
+	UsedPMUs   []string
 	pmuPurpose = map[string]string{
 		"0x309": "instructions",
 		"0x30a": "cpu_cycles",
@@ -111,7 +111,7 @@ func ReadMSR(reg string, wg *sync.WaitGroup, thread int, cpu int) {
 	if found == true && currentVal != uint64(0) && msrVal != currentVal {
 		// The key exists but value has changed, delete it
 
-		Del = append(Del, reg)
+		UsedPMUs = append(UsedPMUs, reg)
 		log.Debugf("Deleting %s in the thread %d", reg, thread)
 		Values.Delete(reg)
 
@@ -132,7 +132,7 @@ func GetActivePMUs() (Result, error) {
 	var res Result
 	res.PMUDetails = make(map[string]string)
 	log.Info("Following PMU(s) are actively being used:")
-	for _, pmu := range Del {
+	for _, pmu := range UsedPMUs {
 		purpose, ok := pmuPurpose[pmu]
 		if !ok {
 			return Result{}, errors.New("Report this to the Developers.")
