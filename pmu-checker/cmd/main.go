@@ -8,13 +8,14 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sync"
+
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/intel/perfspect/pmu-checker/msr"
 )
