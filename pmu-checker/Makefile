@@ -15,13 +15,11 @@ fmt:
                 do $(GO_FMT) -w -s "$$file"; \
             done
 
-pmu-checker: pmu-checker.go
-	$(GO_BIN) get github.com/Sirupsen/logrus
-	$(GO_BIN) build -o $(BINARY_NAME) -ldflags '-X main.gVersion=$(VERSION)' .
+pmu-checker:
+	$(GO_BIN) build -o $(BINARY_NAME) -ldflags '-X main.gVersion=$(VERSION)' ./cmd/
 
-pmu-checker_arm64: pmu-checker.go
-	$(GO_BIN) get github.com/Sirupsen/logrus
-	GOOS=linux GOARCH=arm64 $(GO_BIN) build -o $(BINARY_NAME)_arm64 -ldflags '-X main.gVersion=$(VERSION)' .
+pmu-checker_arm64:
+	GOOS=linux GOARCH=arm64 $(GO_BIN) build -o $(BINARY_NAME)_arm64 -ldflags '-X main.gVersion=$(VERSION)' ./cmd/
 
 .PHONY: lint
 lint:
