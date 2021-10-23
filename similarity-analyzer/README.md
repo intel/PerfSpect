@@ -1,4 +1,4 @@
-![Similarity Analysis](../images/sim_analyzer.JPG "Sim-analyzer")
+![Similarity Analysis](../images/sim.png "Sim-analyzer")
 
 # Similarity Analyzer
 
