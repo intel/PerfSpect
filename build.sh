@@ -7,8 +7,7 @@ user_in_group()
 
 validate_user()
 {
-	if user_in_group $USER docker;
-	then
+	if user_in_group $USER docker; then
 	    echo "The user $USER is part of docker group; continue building....."
 	else
 		printf "The user $USER isn't part of the docker group, please add, verify the group membership is re-evaluated and re-run build.sh; exiting...\n"
@@ -18,6 +17,11 @@ validate_user()
 
 #check if docker is installed; exit if otherwise
 if [ -x "$(command -v docker)" ]; then
+    #check docker engine is running
+    if ! docker info > /dev/null 2>&1; then
+        echo "This build script uses docker, and it isn't running - please start docker and try again!"
+        exit 1
+    fi
     if grep -q docker /etc/group;
     then
 		validate_user 
@@ -30,6 +34,7 @@ else
     echo "please install docker on your system and re-run build.sh; exiting....\n"
 	exit 1
 fi
+
 
 printf "\n ***** If you are behind proxies, please ensure proxy settings are configured at builder/Dockerfile *****\n "
 
