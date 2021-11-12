@@ -10,7 +10,6 @@ Support structure(Tested internally):
 -------------------------------------------------------------
 |         Broadwell       |  >= Ubuntu 16.04   | >=4.15   |
 |         Broadwell       |  >= centos 7       | >=3.10   |
-|         Broadwell       |  >= Ubuntu 16.04   | >=4.13   |
 |         Skylake         |  >= centos 7       | >=3.10   |
 |         Skylake         |  >= Ubuntu 16.04   | >=4.15   |
 |         Cascadelake     |  >= Ubuntu 16.04   | >=4.15   |
