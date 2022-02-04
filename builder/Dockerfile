@@ -22,7 +22,7 @@ VOLUME /workdir
 
 
 # USER root
-RUN apt-get update
+RUN apt-get update --fix-missing 
 RUN apt-get install -y software-properties-common curl git wget build-essential autotools-dev automake gawk zlib1g-dev libtool libaio-dev libaio1 pandoc pkgconf libcap-dev
 RUN add-apt-repository -y ppa:deadsnakes/ppa
 RUN apt-get update && apt-get install -y python3.7 python3.7-dev

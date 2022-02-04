@@ -39,9 +39,14 @@ fi
 printf "\n ***** If you are behind proxies, please ensure proxy settings are configured at builder/Dockerfile *****\n "
 
 #build docker image
-builder/build_docker_image
-
+if ! builder/build_docker_image ; then
+	echo "docker image build failed"
+	exit 1
+fi
 #build binaries
-builder/build
+if ! builder/build ; then
+	echo "build failed"
+	exit 1
+fi
 
 printf "\n ***** Build successful, the binaries are located in dist folder *****\n "
