@@ -229,7 +229,7 @@ if __name__ == "__main__":
             eventfile = "icx.txt"
         else:
             raise SystemExit(
-                "Unsupported architecture (currently supports Broadwell, Skylake, CascadeLake and Icelake)"
+                "Unsupported architecture (currently supports Broadwell, Skylake, CascadeLake and Icelake Intel Xeon processors)"
             )
 
         # Convert path of event file to relative path if being packaged by pyInstaller into a binary
@@ -336,7 +336,17 @@ if __name__ == "__main__":
 
     collection_type = "-a" if args.percore is False else "-a -A"
     # start perf stat
-    if args.pid:
+    if args.pid and args.timeout:
+        print("Info: Only CPU/core events will be enabled with pid option")
+        cmd = "perf stat -I %d -x , --pid %s -e %s -o %s sleep %d" % (
+            interval,
+            args.pid,
+            events,
+            args.outcsv,
+            args.timeout,
+        )
+
+    elif args.pid:
         print("Info: Only CPU/core events will be enabled with pid option")
         cmd = "perf stat -I %d -x , --pid %s -e %s -o %s" % (
             interval,
@@ -344,6 +354,26 @@ if __name__ == "__main__":
             events,
             args.outcsv,
         )
+
+    elif args.cgroup and args.timeout:
+        print("Info: Only CPU/core events will be enabled with cgroup option")
+        if num_cgroups == 1:
+            cmd = "perf stat -I %d -x , -e %s -G %s -a -o %s sleep %d" % (
+                interval,
+                events,
+                args.cgroup,
+                args.outcsv,
+                args.timeout,
+            )
+        else:
+            perf_format = prep_events.get_cgroup_events_format(args.cgroup, events)
+            cmd = "perf stat -I %d -x , %s -o %s sleep %d" % (
+                interval,
+                perf_format,
+                args.outcsv,
+                args.timeout,
+            )
+
     elif args.cgroup:
         print("Info: Only CPU/core events will be enabled with cgroup option")
         if num_cgroups == 1:
@@ -354,9 +384,7 @@ if __name__ == "__main__":
                 args.outcsv,
             )
         else:
-            perf_format = prep_events.get_cgroup_event_format(
-                args.cgroup, collection_events
-            )
+            perf_format = prep_events.get_cgroup_events_format(args.cgroup, events)
             cmd = "perf stat -I %d -x , %s -o %s" % (interval, perf_format, args.outcsv)
     elif args.app:
         cmd = "perf stat %s -I %d -x , -e %s -o %s %s" % (
