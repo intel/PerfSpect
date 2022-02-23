@@ -38,7 +38,9 @@ build/collect:
 					--add-data "./src/libtsc.so:." \
 					--add-data "./events/bdx.txt:." \
 					--add-data "./events/skx.txt:." \
+					--add-data "./events/skx_aws.txt:." \
 					--add-data "./events/clx.txt:." \
+					--add-data "./events/clx_aws.txt:." \
 					--add-data "./events/icx.txt:." \
 					--add-binary "../build/pmu-checker:." \
 					--runtime-tmpdir . 
