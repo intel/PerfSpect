@@ -21,3 +21,6 @@ Support structure(Tested internally):
 
 * v1.1.0
 PerfSpect supports BDX, SKX, CLX and ICX
+
+* v1.1.1
+Added support for AWS instances using cloud and cloudtype flag
