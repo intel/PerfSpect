@@ -237,11 +237,11 @@ if __name__ == "__main__":
             eventfile = "bdx.txt"
         elif arch == "skylake":
             eventfile = "skx.txt"
-            if args.cloud in ("aws","AWS") and args.cloudtype in ("VM","vm"):
+            if args.cloud in ("aws", "AWS") and args.cloudtype in ("VM", "vm"):
                 eventfile = "skx_aws.txt"
         elif arch == "cascadelake":
             eventfile = "clx.txt"
-            if args.cloud in ("aws","AWS") and args.cloudtype in ("VM", "vm"):
+            if args.cloud in ("aws", "AWS") and args.cloudtype in ("VM", "vm"):
                 eventfile = "clx_aws.txt"
         elif arch == "icelake":
             eventfile = "icx.txt"
@@ -454,7 +454,9 @@ if __name__ == "__main__":
     try:
         print("Collecting perf stat for events in : %s" % eventfilename)
         if args.cloud:
-            print("Consider using cloudtype flag to set instance type -> VM/BM; Default is VM")
+            print(
+                "Consider using cloudtype flag to set instance type -> VM/BM; Default is VM"
+            )
         subprocess.call(perfargs)  # nosec
         print("Collection complete! Calculating TSC frequency now")
     except KeyboardInterrupt:
