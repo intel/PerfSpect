@@ -191,6 +191,20 @@ if __name__ == "__main__":
         help="collect system info only, does not run perf",
         action="store_true",
     )
+    parser.add_argument(
+        "-csp",
+        "--cloud",
+        type=str,
+        default="none",
+        help="Name of the Cloud Service Provider(AWS), if collecting on cloud instances",
+    )
+    parser.add_argument(
+        "-ct",
+        "--cloudtype",
+        type=str,
+        default="VM",
+        help="Instance type: Options include - VM,BM",
+    )
 
     args = parser.parse_args()
 
@@ -223,8 +237,12 @@ if __name__ == "__main__":
             eventfile = "bdx.txt"
         elif arch == "skylake":
             eventfile = "skx.txt"
+            if args.cloud in ("aws","AWS") and args.cloudtype in ("VM","vm"):
+                eventfile = "skx_aws.txt"
         elif arch == "cascadelake":
             eventfile = "clx.txt"
+            if args.cloud in ("aws","AWS") and args.cloudtype in ("VM", "vm"):
+                eventfile = "clx_aws.txt"
         elif arch == "icelake":
             eventfile = "icx.txt"
         else:
@@ -435,6 +453,8 @@ if __name__ == "__main__":
     validate_perfargs(perfargs)
     try:
         print("Collecting perf stat for events in : %s" % eventfilename)
+        if args.cloud:
+            print("Consider using cloudtype flag to set instance type -> VM/BM; Default is VM")
         subprocess.call(perfargs)  # nosec
         print("Collection complete! Calculating TSC frequency now")
     except KeyboardInterrupt:
