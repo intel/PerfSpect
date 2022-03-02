@@ -61,6 +61,11 @@ Options:
   --dryrun (Test if Performance Monitoring Counters are in-use, and collect stats for 10sec)
   
   --metadata (collect system info only, does not run perf)
+
+  -csp CLOUD, --cloud CLOUD (Name of the Cloud Service Provider(ex- AWS), if collecting on cloud instances)
+
+  -ct CLOUDTYPE, --cloudtype CLOUDTYPE (Instance type: Options include - VM/BM depending on the instance if it's baremetal or virtual system)
+
   ```
 #### Examples
 1. sudo ./perf-collect (collect PMU counters using predefined architecture specific event file until collection is terminated)
