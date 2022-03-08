@@ -453,7 +453,7 @@ if __name__ == "__main__":
     validate_perfargs(perfargs)
     try:
         print("Collecting perf stat for events in : %s" % eventfilename)
-        if args.cloud:
+        if args.cloud != "none":
             print(
                 "Consider using cloudtype flag to set instance type -> VM/BM; Default is VM"
             )
