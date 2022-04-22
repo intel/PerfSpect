@@ -24,9 +24,11 @@ The tool has two parts
   2. Ensure docker commands execute without sudo (for example - `docker run hello-world` runs successfully)
 
 ### build binaries
-
+#### Containerized build
 execute build.sh
 `./build.sh`
+#### Non-containerized build
+`./non_container_build.sh`
 
 On successful build, binaries will be created in "dist" folder
 
