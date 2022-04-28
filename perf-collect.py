@@ -245,6 +245,8 @@ if __name__ == "__main__":
                 eventfile = "clx_aws.txt"
         elif arch == "icelake":
             eventfile = "icx.txt"
+            if args.cloud in ("aws", "AWS") and args.cloudtype in ("VM", "vm"):
+                eventfile = "icx_aws.txt"
         else:
             raise SystemExit(
                 "Unsupported architecture (currently supports Broadwell, Skylake, CascadeLake and Icelake Intel Xeon processors)"

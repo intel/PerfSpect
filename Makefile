@@ -42,6 +42,7 @@ build/collect:
 					--add-data "./events/clx.txt:." \
 					--add-data "./events/clx_aws.txt:." \
 					--add-data "./events/icx.txt:." \
+					--add-data "./events/icx_aws.txt:." \
 					--add-binary "../build/pmu-checker:." \
 					--runtime-tmpdir . 
 	cp $(TMPDIR)/dist/$(BINARY_COLLECT) build/
