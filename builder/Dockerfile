@@ -25,7 +25,7 @@ VOLUME /workdir
 RUN apt-get update --fix-missing 
 RUN apt-get install -y software-properties-common curl git wget build-essential autotools-dev automake gawk zlib1g-dev libtool libaio-dev libaio1 pandoc pkgconf libcap-dev
 RUN add-apt-repository -y ppa:deadsnakes/ppa
-RUN apt-get update && apt-get install -y python3.7 python3.7-dev
+RUN apt-get update && apt-get install -y python3.7 python3.7-dev python3-distutils
 RUN apt-get install -y netcat-openbsd
 RUN wget https://golang.org/dl/go1.13.4.linux-amd64.tar.gz
 RUN tar -C /usr/local -xzf go1.13.4.linux-amd64.tar.gz
