@@ -273,6 +273,7 @@ if __name__ == "__main__":
         # create results dir
         if not os.path.exists(result_dir):
             os.mkdir(result_dir)
+            perf_helpers.fix_path_ownership(result_dir)
     else:
         if not perf_helpers.validate_outfile(args.outcsv):
             raise SystemExit(
@@ -489,3 +490,4 @@ if __name__ == "__main__":
         perf_helpers.set_perf_event_mux_interval(True, 1, mux_intervals)
 
     print("perf stat dumped to %s" % args.outcsv)
+    perf_helpers.fix_path_ownership(result_dir, True)

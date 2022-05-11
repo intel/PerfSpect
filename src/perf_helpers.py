@@ -398,3 +398,17 @@ def get_epoch(start_time):
         time.mktime(time.strptime(timestamp_utc_format, "%Y-%m-%d %H:%M:%S %z"))
     )
     return epoch
+
+
+def fix_path_ownership(path, recursive=False):
+    """change the ownership of the results folder when executed with sudo previleges"""
+    if not recursive:
+        uid = os.environ.get("SUDO_UID")
+        gid = os.environ.get("SUDO_GID")
+        if uid:
+            os.chown(path, int(uid), int(gid))
+    else:
+        for dirpath, _, filenames in os.walk(path):
+            fix_path_ownership(dirpath)
+            for filename in filenames:
+                fix_path_ownership(os.path.join(dirpath, filename))

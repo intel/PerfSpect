@@ -1283,6 +1283,7 @@ if __name__ == "__main__":
         res_dir = script_path + "/results"
         if not os.path.exists(res_dir):
             os.mkdir(res_dir)
+            perf_helpers.fix_path_ownership(res_dir)
     if args.outfile:
         out_metric_file = args.outfile
     if args.metricfile:
@@ -1374,3 +1375,5 @@ if __name__ == "__main__":
     if EXCEL_OUT:
         OUT_WORKBOOK.close()
     print("Post processing done, result file:%s" % args.outfile)
+    if "res_dir" in locals():
+        perf_helpers.fix_path_ownership(res_dir, True)
