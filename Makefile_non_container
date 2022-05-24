@@ -35,10 +35,12 @@ build/collect:
 					--add-data "./events/bdx.txt:." \
 					--add-data "./events/skx.txt:." \
 					--add-data "./events/skx_aws.txt:." \
+					--add-data "./events/skx_oci.txt:." \
 					--add-data "./events/clx.txt:." \
 					--add-data "./events/clx_aws.txt:." \
 					--add-data "./events/icx.txt:." \
 					--add-data "./events/icx_aws.txt:." \
+					--add-data "./events/icx_oci.txt:." \
 					--add-binary "./build/pmu-checker:." \
 					--runtime-tmpdir . 
 	rm -rf build/$(BINARY_COLLECT)
