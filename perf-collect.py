@@ -233,20 +233,28 @@ if __name__ == "__main__":
     eventfilename = eventfile
 
     if not eventfile:
+        is_vm = args.cloudtype in ("VM", "vm")
+        is_aws_vm = args.cloud in ("aws", "AWS", "amazon") and is_vm
+        is_oci_vm = args.cloud in ("oci", "OCI", "oracle") and is_vm
+
         if arch == "broadwell":
             eventfile = "bdx.txt"
         elif arch == "skylake":
             eventfile = "skx.txt"
-            if args.cloud in ("aws", "AWS") and args.cloudtype in ("VM", "vm"):
+            if is_aws_vm:
                 eventfile = "skx_aws.txt"
+            elif is_oci_vm:
+                eventfile = "skx_oci.txt"
         elif arch == "cascadelake":
             eventfile = "clx.txt"
-            if args.cloud in ("aws", "AWS") and args.cloudtype in ("VM", "vm"):
+            if is_aws_vm:
                 eventfile = "clx_aws.txt"
         elif arch == "icelake":
             eventfile = "icx.txt"
-            if args.cloud in ("aws", "AWS") and args.cloudtype in ("VM", "vm"):
+            if is_aws_vm:
                 eventfile = "icx_aws.txt"
+            elif is_oci_vm:
+                eventfile = "icx_oci.txt"
         else:
             raise SystemExit(
                 "Unsupported architecture (currently supports Broadwell, Skylake, CascadeLake and Icelake Intel Xeon processors)"
