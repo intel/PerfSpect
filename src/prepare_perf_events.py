@@ -196,9 +196,12 @@ def prepare_perf_events(event_file, grouping, cpu_only):
 
     with open(event_file, "r") as fin:
         # get supported perf events
-        perf_list = subprocess.check_output(  # nosec
-            ["perf", "list"], universal_newlines=True
-        )
+        try:
+            perf_list = subprocess.check_output(  # nosec
+                ["perf", "list"], universal_newlines=True
+            )
+        except FileNotFoundError:
+            raise SystemExit("perf not found; please install linux perf utility")
         unsupported_events = []
         for line in fin:
             if (line != "\n") and (not line.startswith("#")):
