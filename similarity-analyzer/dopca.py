@@ -136,9 +136,9 @@ def dopca(dataset, colnames, n_components, cols):
     num_val = StandardScaler().fit_transform(num_val)
     logger.debug(f"Post normalizing metrics, num_val: {num_val}")
     # PCA analysis, Create PCA model
-    #pca = PCA(n_components=n_components) #Commented by Faqeer ur Rehman: 11 Aug 2022. Limitation: If the n_components(no of workloads) are greater than num_val(the number of features), it will throw error.
+    #pca = PCA(n_components=n_components) #Limitation: If the n_components(no of workloads) are greater than num_val(the number of features), it will throw error.
 
-    n_components = len(num_val[0]) # Added by Faqeer ur Rehman: 11 Aug 2022. Solution: To scale it for any number of workloads, generate PCAs equivalent to number of features/performance matrics (instead of number of workloads) we have for each workload.
+    n_components = len(num_val[0]) #Solution: To scale it for any number of workloads, generate PCAs equivalent to number of features/performance matrics (instead of number of workloads) that we have for each workload.
     pca = PCA(n_components=n_components)
 
     # transform
