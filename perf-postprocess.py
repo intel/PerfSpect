@@ -12,6 +12,7 @@ import sys
 import csv
 import json
 import collections
+import pandas as pd
 from src import perf_helpers
 from simpleeval import simple_eval
 
@@ -23,21 +24,20 @@ if "_MEI" in script_path:
 
 # temporary output :time series dump of raw events
 output_file = script_path + "/_tmp_perf_/tmp_perf_out.csv"
-
+output_files = []
 # temporary output :time series dump of raw events at socket level
 tmp_socket_file = script_path + "/_tmp_perf_/tmp_socket_out.csv"
 
 # temporary output:trasposed view of perf-collect output
 time_dump_file = script_path + "/_tmp_perf_/time_dump.csv"
-
+time_dump_files = []
 # final output of post-process
 out_metric_file = script_path + "/results/metric_out.csv"
-
-# formula file
+out_metric_files = []  # For per cgroup metrics
 metric_file = ""
+html_input = "metric_out.average.csv"
 
 
-# globals
 class workbook:
     def __init__(self):
         self.book = None
@@ -135,6 +135,8 @@ PERCORE_MODE = False
 TIME_ZONE = "UTC"
 PERF_EVENTS = []
 SOCKET_CORES = []
+CGROUPS = False
+CGROUP_HASH = {}
 
 
 # get the PMU names from metric expression
@@ -213,7 +215,7 @@ def evaluate_expression(
                     )
                 try:
                     # TODO: clean it up. quick fix for strings with /
-                    if event == "power/energy-pkg/" or event == "power/energy-ram/":
+                    if event.startswith("power/") or event.startswith("cstate"):
                         formula = formula.replace(event, str(value_list[idx]))
                     else:
                         formula = re.sub(
@@ -250,7 +252,7 @@ def evaluate_expression(
                             + 1
                         )
                     # TODO: clean it up. quick fix for strings with /
-                    if event == "power/energy-pkg/" or event == "power/energy-ram/":
+                    if event.startswith("power/") or event.startswith("cstate"):
                         formula = formula.replace(event, str(value_list[idx]))
                     else:
                         formula = re.sub(
@@ -258,13 +260,15 @@ def evaluate_expression(
                         )
                     break
     result = ""
+    global zero_division_errcount
+    global total_samples
     try:
         result = str(
             "{:.8f}".format(simple_eval(formula, functions={"min": min, "max": max}))
         )
     except ZeroDivisionError:
         if "UNC_M_PMM" not in temp_formula and "UNC_M_TAGC" not in temp_formula:
-            print("Divide by Zero evaluating", temp_formula)
+            zero_division_errcount += 1
         result = "0"
         pass
     except SyntaxError:
@@ -276,7 +280,7 @@ def evaluate_expression(
         print(temp_formula)
         print("Unknown error evaluating ", formula)
         sys.exit()
-
+    total_samples += 1
     return result
 
 
@@ -368,7 +372,8 @@ def get_extra_out_file(out_file, t, excelsheet=False):
 
 # load metrics from json file and evaluate
 # level: 0-> system, 1->socket, 2->thread
-def load_metrics(level=0):
+def load_metrics(infile, outfile, level=0):
+    global CGROUPS
     event_list, event_dict = get_perf_events(level)
     metrics = {}
     validate_file(metric_file)
@@ -400,8 +405,12 @@ def load_metrics(level=0):
             add_metrics = True
             if level == 0:
                 metric_row.append(m["name"])
-                f_out = open(out_metric_file, "w")
-                input_file = output_file
+                if CGROUPS == "enabled":
+                    input_file = infile
+                    f_out = open(outfile, "w")
+                else:
+                    input_file = output_file
+                    f_out = open(out_metric_file, "w")
                 sheet_type = "m"
             elif level == 1:
                 for s in range(int(CONST_SOCKET_COUNT)):
@@ -430,8 +439,12 @@ def load_metrics(level=0):
         OUT_WORKBOOK.writerow(0, metric_row, sheet_type)
     f_pmu = open(input_file, "r")
     pmucsv = csv.reader(f_pmu, delimiter=",")
-
-    const_TSC = CONST_TSC_FREQ * CONST_CORE_COUNT * CONST_HT_COUNT * CONST_SOCKET_COUNT
+    if CGROUPS == "enabled":
+        const_TSC = CONST_TSC_FREQ * CPUSETS[infile.rsplit("_", 1)[1].split(".")[0]]
+    else:
+        const_TSC = (
+            CONST_TSC_FREQ * CONST_CORE_COUNT * CONST_HT_COUNT * CONST_SOCKET_COUNT
+        )
     const_dict = {
         "const_tsc_freq": CONST_TSC_FREQ,
         "const_core_count": CONST_CORE_COUNT,
@@ -495,6 +508,19 @@ def load_metrics(level=0):
     f_out.close()
     f_pmu.close()
     return 1
+
+
+def write_cgroup_summary():
+    avgdf = pd.DataFrame(columns=["metrics"])
+    for file in out_metric_files:
+        df = pd.read_csv(file).iloc[:, 1:]
+        avgcol = df.mean(axis=0).to_frame().reset_index()
+        container = os.path.basename(file).split(".")[0].split("_")[-1]
+        avgcol.columns = ["metrics", container]
+        avgdf = avgdf.merge(avgcol, on="metrics", how="outer")
+    sum_file = get_extra_out_file(out_metric_file, "a")
+    avgdf.to_csv(sum_file)
+    return
 
 
 # generate summary output with averages, min, max, p95
@@ -608,9 +634,17 @@ def get_metadata():
     global PERCORE_MODE
     global SOCKET_CORES
     global TIME_ZONE
+    global CGROUP_HASH
+    global CPUSETS
 
     start_events = False
     validate_file(dat_file)
+    # check if metadata exists in raw dat file
+    with open(dat_file) as f:
+        if "### META DATA ###" not in f.read():
+            raise SystemExit(
+                "The perf raw file doesn't contain metadata, please re-collect perf raw data"
+            )
     f_dat = open(dat_file, "r")
     for line in f_dat:
         if start_events:
@@ -637,6 +671,33 @@ def get_metadata():
             CONST_ARCH = str(line.split(",")[1])
         elif line.startswith("Event grouping"):
             EVENT_GROUPING = True if (str(line.split(",")[1]) == "enabled") else False
+        elif line.startswith("cgroups"):
+            # Get cgroup status and cgroup_id to container_name conversions
+            CGROUP_HASH = dict(
+                item.split("=") for item in line.rstrip(",\n").split(",")
+            )
+            docker_HASH = []
+            docker_HASH = list(CGROUP_HASH.values())
+            CGROUPS = CGROUP_HASH.get("cgroups")
+            del CGROUP_HASH["cgroups"]
+            # No percore/socket view with CGROUP mode
+            if CGROUPS == "enabled":
+                if args.percore or args.persocket:
+                    raise SystemExit(
+                        "Percore and Persocket views not supported when perf collection with cgroups"
+                    )
+        elif line.startswith("cpusets") and CGROUPS == "enabled":
+            CPUSETS = str(line.split(",")[1])
+            docker_SETS = []
+            docker_SETS = line.split(",")
+            docker_SETS = docker_SETS[:-1]
+            CPUSETS = {}
+            for i in range(1, len(docker_SETS)):
+                docker_SET = str(docker_SETS[i])
+                docker_SET = (
+                    int(docker_SET.split("-")[1]) - int(docker_SET.split("-")[0]) + 1
+                )
+                CPUSETS[docker_HASH[i]] = docker_SET
         elif line.startswith("Percore mode"):
             PERCORE_MODE = True if (str(line.split(",")[1]) == "enabled") else False
         elif line.startswith("# started on"):
@@ -660,107 +721,131 @@ def write_perf_tmp_output(use_epoch):
     global CONST_INTERVAL
     global PERCORE_MODE
     global TIME_ZONE
+    global CGROUPS
+    global CGROUP_HASH
+    global CPUSETS
 
-    f_out = open(time_dump_file, "w")
-    outcsv = csv.writer(f_out, dialect="excel")
-
-    row0_event_name = []
-    row_data = []
-    percent_data = []
-    first_out_row = True
-    prev_sample_time = 0.0
-    prev_sample_time_row = 0.0
-    start_perf = False
-    start_time = True
-    samples = 0
+    outcsv, f_out = {}, {}
+    fkey = "default"
+    # Ready the temp files to be written
+    if CGROUPS == "enabled":
+        i = 0
+        for value in CGROUP_HASH.values():
+            time_dump_files.append(
+                script_path + "/_tmp_perf_/time_dump_" + value + ".csv"
+            )
+            f_out[value] = open(time_dump_files[i], "w")
+            outcsv[value] = csv.writer(f_out[value], dialect="excel")
+            i += 1
+    else:
+        f_out[fkey] = open(time_dump_file, "w")
+        outcsv[fkey] = csv.writer(f_out[fkey], dialect="excel")
+    # Skip header till pattern match
+    match = 0
     epoch = 0
     validate_file(dat_file)
-    with open(dat_file, "r") as f_dat:
-        incsv = csv.reader(f_dat, delimiter=",")
-        row0_event_name.append("time")
-
-        for it, row in enumerate(incsv):
-            if not start_perf:
-                if row and "PERF DATA" in row[0]:
-                    start_perf = True
-                continue
-            if use_epoch and start_time:
-                start_time = False
-                words = "".join(row).split()
+    for n, line in enumerate(open(dat_file)):
+        if "PERF DATA" in line:
+            match = n + 3
+        # If using EPOCH
+        if use_epoch:
+            if "EPOCH" in line:
+                words = "".join(line).split()
                 try:
                     epoch = int(words[-1])
                 except ValueError:
                     exit("Conversion error parsing timestamp")
                 except:
                     exit("Unkown error parsing timestamp")
-            if row and start_perf and (len(row) > 3):
-                time = float(row[0])
-                # extract data , Note: relies on the perf output format
-                if use_epoch:
-                    time = int(time) + epoch
-                # perf reports PMU parameters at slightly longer interval than the specific 1s.
-                # "accurate_time" gets more precise time interval to calculate and normalize per sec metrics
-                # Note: calculation is based on the fact that timing interval does not change for all PMU events in the groups
-                if prev_sample_time != time:
-                    accurate_time = float(row[0]) - prev_sample_time_row
-                    prev_sample_time_row = float(row[0])
+                break
+    # TO:DO remove "not_counted" and "not_supported" events from dat_file
 
-                if PERCORE_MODE:
-                    cpuid = row[1].strip()
-                    cpuid = cpuid[3:]
-                    name = row[4].strip() + "." + cpuid
-                    value_idx = 2
-                    percent_idx = 6
-                else:
-                    name = row[3].strip()
-                    value_idx = 1
-                    percent_idx = 5
+    # Read in rest of file as Pandas Dataframe
+    df = pd.read_csv(dat_file, header=None, skipinitialspace=True, skiprows=match)
+    pd.set_option("display.max_rows", None, "display.max_columns", None)
+    # Get column indexes from dataframe
+    time, value, events, percent = 0, 1, 3, 5
+    order = [time, events, value, percent]
+    header = ["time", "event", "value", "percent"]
+    if PERCORE_MODE:
+        cpuid, value, events, percent = 1, 2, 4, 6
+        order = [time, cpuid, events, value, percent]
+        header.insert(1, "cpu")
+    elif CGROUPS == "enabled":
+        cgroups, percent = 4, 6
+        order = [time, cgroups, events, value, percent]
+        header.insert(1, "cgroup")
 
-                try:
-                    # Replaced the constanct_interval (1s) with the more precious per time interval value = float(row[value_idx]) / CONST_INTERVAL
-                    value = float(row[value_idx]) / accurate_time
-                    percent = row[percent_idx]
-                except ValueError:
-                    if first_out_row:
-                        print("Conversion Error parsing ", name)
-                    value = -1.0
-                    percent = 0
-                    pass
-                except:
-                    exit("Unkown error parsing ", name)
+    # Slice DF into time chunks and process
+    group_df = df[order].groupby(time, sort=False)
+    last_sample_time, samples = 0, 0  # Set time variables for iteration
+    for key, item in group_df:  # Key is time
+        df = group_df.get_group(key)
+        df.columns = header  # Assign header
+        if use_epoch:
+            ctime = int(key) + epoch
+        else:
+            ctime = samples + 1
+        precise_time = float(key) - last_sample_time
+        # Write back header to outcsv
+        if PERCORE_MODE:
+            if last_sample_time == 0:  # Extracts header
+                eventnames = ["time"] + (
+                    df["event"] + "." + df["cpu"].str.replace("CPU", "")
+                ).tolist()
+                outcsv[fkey].writerow(eventnames)
+            eventvalues = (
+                [ctime]
+                + (
+                    pd.to_numeric(df["value"], errors="coerce").fillna(0) / precise_time
+                ).to_list()
+                + pd.to_numeric(df["percent"], errors="coerce").fillna(0).to_list()
+            )  # Extracts values
+            outcsv[fkey].writerow(eventvalues)
+        elif CGROUPS == "enabled":
+            cgroup_df = df.groupby("cgroup", sort=False)
+            for ckey, citem in cgroup_df:
+                df = cgroup_df.get_group(ckey)
+                if last_sample_time == 0:  # Extracts header
+                    eventnames = (
+                        ["time"]
+                        + df["event"].tolist()
+                        + [x + " %sample" for x in df["event"].tolist()]
+                    )
+                    outcsv[CGROUP_HASH[ckey]].writerow(eventnames)
+                eventvalues = (
+                    [ctime]
+                    + (
+                        pd.to_numeric(df["value"], errors="coerce").fillna(0)
+                        / precise_time
+                    ).to_list()
+                    + pd.to_numeric(df["percent"], errors="coerce").fillna(0).to_list()
+                )  # Format event values + percent
+                outcsv[CGROUP_HASH[ckey]].writerow(eventvalues)
+        else:
+            if last_sample_time == 0:  # Extracts header
+                eventnames = (
+                    ["time"]
+                    + df["event"].tolist()
+                    + [x + " %sample" for x in df["event"].tolist()]
+                )
+                outcsv[fkey].writerow(eventnames)
+            eventvalues = (
+                [ctime]
+                + (
+                    pd.to_numeric(df["value"], errors="coerce").fillna(0) / precise_time
+                ).to_list()
+                + pd.to_numeric(df["percent"], errors="coerce").fillna(0).to_list()
+            )  # Extracts values
+            outcsv[fkey].writerow(eventvalues)
 
-                # finished parsing one timestamp - write to output
-                if prev_sample_time != time:
-                    if (len(row_data) > 0) and first_out_row:
-                        tmp_list = row0_event_name[1:]
-                        # extend label with pecent sample
-                        if not PERCORE_MODE:
-                            for e in tmp_list:
-                                row0_event_name.append(e + " %sample")
-                        outcsv.writerow(row0_event_name)
-                        first_out_row = False
-
-                    if not PERCORE_MODE:
-                        row_data.extend(percent_data)
-                    if not first_out_row:
-                        outcsv.writerow(row_data)
-                    # prep for new row
-                    row_data = []
-                    percent_data = []
-                    row_data.append(time if use_epoch else (samples + 1))
-                    samples += 1
-
-                if first_out_row:
-                    row0_event_name.append(name)
-
-                row_data.append(value)
-                if not PERCORE_MODE:
-                    percent_data.append(percent)
-                prev_sample_time = time
-        if len(row_data) > 0:
-            outcsv.writerow(row_data)
-    f_dat.close()
-    f_out.close()
+        last_sample_time = float(key)
+        samples += 1
+    if CGROUPS == "enabled":
+        for val in CGROUP_HASH.values():
+            f_out[val].close()
+    else:
+        f_out[fkey].close()
     return samples
 
 
@@ -1054,10 +1139,10 @@ def write_socket2system():
 
 
 # combine per cha/imc counters from tmp output to systemview
-def write_system_view():
-    f_out = open(output_file, "w")
+def write_system_view(infile, outfile):
+    f_out = open(outfile, "w")
     outcsv = csv.writer(f_out, dialect="excel")
-    f_tmp = open(time_dump_file, "r")
+    f_tmp = open(infile, "r")
     tmpcsv = csv.reader(f_tmp, delimiter=",")
     row_count = 0
     out_row0 = []
@@ -1091,6 +1176,10 @@ def write_system_view():
                     # FIX ME: assumes each uncore event occur only once in the event file
                     if event[id_idx_start + 1 :].isdigit():
                         unc_event = event[:id_idx_start]
+                        # core_id=int(event[id_idx_start+1:])
+                        # FIX ME: some CPUs will have more cha than core count (if high core count die converted to gold)
+                        # if core_id >= CONST_CORE_COUNT:
+                        #   continue
                         idx = out_row0.index(unc_event)
                         out_row[idx] += float(in_row[in_row0.index(event)])
                     else:  # grouping disabled case
@@ -1108,9 +1197,9 @@ def write_system_view():
                     else:
                         out_row[out_row0.index(event)] = in_row[i]
 
+                    # out_row[out_row0.index(event)]=in_row[in_row0.index(event)]
         if row_count > 0:
             for i, val in enumerate(out_row):
-                # remove columns with invalid values and remove the headers
                 if float(val) >= 0.0:
                     final_out_row.append(val)
                     if row_count == 1:
@@ -1145,6 +1234,13 @@ def write_system_view():
             prev_out_row = final_out_row
             final_out_row = []
 
+        # if row_count==0:
+        #   outcsv.writerow(out_row0)
+        #   sum_row=[0.0]*len(out_row0)
+        # else:
+        #   outcsv.writerow(out_row)
+        #   for j in range(len(out_row0)-1):
+        #       sum_row[j+1]+=float(out_row[j+1])
         out_row = [0] * len(out_row0)
         row_count += 1
 
@@ -1175,8 +1271,12 @@ def deletefile(tempfile):
 
 # cleanup temp files
 def cleanup():
+    for file in time_dump_files:
+        deletefile(file)
     deletefile(time_dump_file)
     deletefile(output_file)
+    for file in output_files:
+        deletefile(file)
     deletefile(tmp_socket_file)
     if EXCEL_OUT:
         tempfile = get_extra_out_file(out_metric_file, "r")
@@ -1248,6 +1348,20 @@ if __name__ == "__main__":
         help="time series in epoch format, default is sample count",
         action="store_true",
     )
+    parser.add_argument(
+        "-csp",
+        "--cloud",
+        type=str,
+        default=None,
+        help="Name of Cloud Service Provider(AWS), if you're intending to postprocess on cloud instances",
+    )
+    parser.add_argument(
+        "-html",
+        "--html",
+        type=str,
+        default=None,
+        help="Static HTML report",
+    )
     required_arg = parser.add_argument_group("required arguments")
     required_arg.add_argument(
         "-r",
@@ -1276,7 +1390,11 @@ if __name__ == "__main__":
     # create tmp dir
     if not os.path.exists(temp_dir):
         os.mkdir(temp_dir)
-
+    if args.rawfile is None:
+        parser.print_usage()
+        raise SystemExit(
+            "Missing raw file, please provide raw csv generated using perf-collect"
+        )
     dat_file = args.rawfile
     # default output file
     if args.outfile == out_metric_file:
@@ -1286,10 +1404,18 @@ if __name__ == "__main__":
             perf_helpers.fix_path_ownership(res_dir)
     if args.outfile:
         out_metric_file = args.outfile
+        html_input = out_metric_file.split("/")[-1]
+        if "/" in out_metric_file:
+            res_dir = out_metric_file.rpartition("/")[0]
+            # print(res_dir)
+            # exit()
+        else:
+            res_dir = script_path
     if args.metricfile:
         metric_file = args.metricfile
-    if not os.path.isfile(dat_file):
-        raise SystemExit("perf dat file not found")
+    if dat_file and not os.path.isfile(dat_file):
+        parser.print_help()
+        raise SystemExit("perf raw data file not found, please provide valid raw file")
 
     if not perf_helpers.validate_outfile(args.outfile, True):
         raise SystemExit(
@@ -1308,12 +1434,15 @@ if __name__ == "__main__":
 
     # parse header
     get_metadata()
-
+    zero_division_errcount = 0
+    total_samples = 0
     if not metric_file:
         if CONST_ARCH == "broadwell":
             metric_file = "metric_bdx.json"
         elif CONST_ARCH == "skylake" or CONST_ARCH == "cascadelake":
             metric_file = "metric_skx_clx.json"
+        elif CONST_ARCH == "icelake" and args.cloud == "aws":
+            metric_file = "metric_icx_aws.json"
         elif CONST_ARCH == "icelake":
             metric_file = "metric_icx.json"
         else:
@@ -1355,11 +1484,11 @@ if __name__ == "__main__":
     # levels: 0->system 1->socket 2->core
     if percore_output or persocket_output:
         write_socket_view(1, samples)
-        if load_metrics(1):
+        if load_metrics(None, None, level=1):
             write_summary(1)
         if percore_output:
             write_core_view()
-            if load_metrics(2):
+            if load_metrics(None, None, level=2):
                 write_summary(2)
         write_socket2system()
     else:
@@ -1367,13 +1496,47 @@ if __name__ == "__main__":
             write_socket_view(0, samples)
             write_socket2system()
         else:
-            write_system_view()
-    if load_metrics():
-        write_summary()
+            if CGROUPS == "enabled":
+                for infile in time_dump_files:
+                    outfile = (
+                        script_path
+                        + "/_tmp_perf_/tmp_perf_out_"
+                        + infile.split("_")[-1]
+                    )
+                    output_files.append(outfile)
+                    write_system_view(infile, outfile)
+            else:
+                infile = time_dump_file
+                outfile = output_file
+                write_system_view(infile, outfile)
+    # Load metrics from raw data and summarize
+    if CGROUPS == "enabled":
+        for infile in output_files:
+            outfile = script_path + "/results/metric_out_" + infile.split("_")[-1]
+            out_metric_files.append(outfile)
+            load_metrics(infile, outfile, level=0)
+        write_cgroup_summary()
+        # if load_metrics(infile, outfile, level=0):
+        # write_summary(outfile,level=0)
+    else:
+        if load_metrics(None, None, level=0):
+            write_summary()
     if not args.keepall:
         cleanup()
     if EXCEL_OUT:
         OUT_WORKBOOK.close()
-    print("Post processing done, result file:%s" % args.outfile)
     if "res_dir" in locals():
         perf_helpers.fix_path_ownership(res_dir, True)
+    if zero_division_errcount > 0:
+        print(
+            "Warning:"
+            + str(zero_division_errcount)
+            + " samples discarded, and "
+            + str(total_samples)
+            + " samples were used"
+        )
+    print("Post processing done, result file:%s" % args.outfile)
+    if args.html:
+        from src import report
+
+        report.write_html(res_dir, html_input, CONST_ARCH, args.html)
