@@ -1,7 +1,7 @@
 FROM ubuntu:18.04
 # if using proxy please uncomment and edit proxy config below
-#ENV http_proxy <http_proxy:port>
-#ENV https_proxy <https_proxy:port>
+# ENV http_proxy <proxy-url.com:port>
+# ENV https_proxy <proxy-url.com:port>
 
 ENV LANG en_US.UTF-8
 RUN rm -rf /etc/apt/sources.list.d/ubuntu-esm-infra-trusty.list
@@ -13,7 +13,7 @@ RUN echo "LANG=en_US.UTF-8" > /etc/default/locale
 ARG USERNAME
 ARG USERID
 RUN adduser --disabled-password --uid ${USERID} --gecos '' ${USERNAME} \
-    && adduser ${USERNAME} sudo                        \
+    && adduser ${USERNAME} sudo                       \
     && echo "${USERNAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
 # set up volumes
@@ -50,7 +50,9 @@ RUN pip3 install mypy
 RUN pip3 install pytype
 RUN pip3 install pytest
 RUN pip3 install xlsxwriter
-RUN pip3 install python-dateutil 
+RUN pip3 install python-dateutil
+COPY requirements.txt /
+RUN pip3 install -r requirements.txt
 RUN pip3 install --upgrade 'setuptools<45.0.0'
 RUN apt-get update && apt-get install -y linux-tools-generic
 RUN go get github.com/markbates/pkger/cmd/pkger
