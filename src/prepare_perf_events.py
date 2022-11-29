@@ -164,16 +164,24 @@ def fix_events_for_older_kernels(eventfile, kernel_version):
                     f.write(line)
 
 
-# prepare event format for perf if multiple cgroups are supplied. -e e1,e1 -G cgrp1,cgrp2 -e e2,e2 -G cgrp1,cgrp2 ...
-def get_cgroup_event_format(cgroups, events):
-    num_cgroups = get_num_cgroups(cgroups)
-    perf_format = ""
-    for e in events:
-        event_format = ""
-        for i in range(num_cgroups):
-            event_format = event_format + e
-        event_format = event_format[:-1]
-        perf_format = perf_format + " -e " + event_format + " -G " + cgroups
+# For multiple cgroup collection we need this format : “-e e1 -e e2 -G foo,foo -G bar,bar"
+def get_cgroup_events_format(cgroups, events, num_events):
+    eventlist = ""
+    grouplist = ""
+    # Find total number of cgroups
+    num_cgroups = len(cgroups)
+    # cgroups = cgroups.split(",")
+    # "-e" flags: Create event groups as many number of cgroups
+    for i in range(num_cgroups):
+        eventlist += " -e " + events
+
+    # "-G" flags: Repeat cgroup name for as many events in each event group
+    for cgroup in cgroups:
+        grouplist = grouplist.rstrip(",") + " -G "
+        for i in range(num_events):
+            grouplist += cgroup + ","
+
+    perf_format = eventlist + grouplist.rstrip(",")
     return perf_format
 
 

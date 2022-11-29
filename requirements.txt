@@ -1,3 +1,7 @@
 simpleeval==0.9.11
 python-dateutil
 xlsxwriter
+plotly
+kaleido
+scipy
+yattag

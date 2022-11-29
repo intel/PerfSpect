@@ -11,6 +11,7 @@ import time
 import struct
 import math
 import collections
+import psutil
 import subprocess  # nosec
 from time import strptime
 from ctypes import *  # flake8: noqa
@@ -400,6 +401,45 @@ def get_epoch(start_time):
     return epoch
 
 
+# Requires cgroup-tools/libgroup-tools for ubuntu/centos
+def get_cgroups_from_cids(cids):
+    cgroups = []
+    p = subprocess.Popen(  # nosec
+        ["lscgroup"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )  # nosec
+    out, err = p.communicate()
+    if err:
+        raise SystemExit("please install prerequisites(lscgroup)")
+    cgevent = "perf_event:"
+    for cid in cids:
+        match = [cid, cgevent]
+        for s in out.split():
+            # Need to add check for incorrect CID where cgroup not found
+            if all(x in s.decode() for x in match):
+                cgroups.append((s.decode().lstrip(cgevent)))
+    if len(cgroups) == 0:
+        raise SystemExit("invalid container ID " + cid)
+    return cgroups
+
+
+# Convert cids to comm/names
+# Requires pstools python library
+def get_comm_from_cid(cids, cgroups):
+    cnamelist = ""
+    avoidpids = []
+    # pids to avoid
+    for c in psutil.Process(os.getppid()).parent().parent().children(recursive=True):
+        avoidpids.append(c.pid)
+    for index, cid in enumerate(cids):
+        for p in psutil.process_iter():
+            if cid in " ".join(p.cmdline()):
+                for c in p.children(recursive=False):
+                    if c.pid not in avoidpids:
+                        # cnamelist += cgroups[index] + "=" + c.name() + ","
+                        cnamelist += cgroups[index] + "=" + cid + ","
+    return cnamelist
+
+
 def fix_path_ownership(path, recursive=False):
     """change the ownership of the results folder when executed with sudo previleges"""
     if not recursive:
@@ -412,3 +452,11 @@ def fix_path_ownership(path, recursive=False):
             fix_path_ownership(dirpath)
             for filename in filenames:
                 fix_path_ownership(os.path.join(dirpath, filename))
+
+
+def check_os():
+    import platform
+
+    curr_os = platform.system()
+    if curr_os != "Linux":
+        raise SystemExit("PerfSpect currently supports Linux-based OS only")
