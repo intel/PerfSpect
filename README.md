@@ -3,12 +3,13 @@
 
 # PerfSpect
 
-PerfSpect is a system performance characterization tool based on linux perf targeting Intel microarchitectures.
-The tool has two parts 
+PerfSpect is a system performance characterization tool based on linux perf targeting Intel microarchitectures.  
+The tool has two parts
 1. perf collection to collect underlying PMU (Performance Monitoring Unit) counters
 2. post processing that generates csv output of performance metrics.
 
-![PerfSpect output](images/metrics.JPG "perfspect-output")
+![PerfSpect BS](images/basic_stats.JPG "perfspect-bs")
+![perfspect-demo1](https://user-images.githubusercontent.com/5321018/205159259-3654fa12-74d6-4cb5-8194-ea1b66aadb25.gif)
 
 ## Getting Started
 
