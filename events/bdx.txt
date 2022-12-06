@@ -113,6 +113,10 @@ ref-cycles:k,
 instructions:k,
 cpu-cycles:k;
 
+#C6
+cstate_core/c6-residency/;
+cstate_pkg/c6-residency/;
+
 #uops delivered from different units
 cpu/event=0x0e,umask=0x01,period=2000003,name='UOPS_ISSUED.ANY'/,
 cpu/event=0xc2,umask=0x02,period=2000003,name='UOPS_RETIRED.RETIRE_SLOTS'/,
@@ -120,7 +124,6 @@ cpu/event=0x0d,umask=0x03,cmask=1,any=1,period=2000003,name='INT_MISC.RECOVERY_C
 cpu-cycles,
 ref-cycles,
 instructions;
-
 
 cpu/event=0x3c,umask=0x2,name='CPU_CLK_THREAD_UNHALTED.ONE_THREAD_ACTIVE'/,
 cpu/event=0x3c,umask=0x1,any=1,name='CPU_CLK_THREAD_UNHALTED.REF_XCLK_ANY'/,

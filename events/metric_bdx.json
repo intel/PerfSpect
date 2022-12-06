@@ -132,6 +132,14 @@
 			"name"       : "metric_DRAM power (watts)",
 			"expression" : "[power/energy-ram/]"
 		},
+		{
+			"name"       : "metric_core c6 residency %",
+			"expression" : "100 * [cstate_core/c6-residency/] / [const_TSC]"
+		},
+		{
+			"name"       : "metric_package c6 residency %",
+			"expression" : "100 * [cstate_pkg/c6-residency/] * [const_core_count] / [const_TSC]"
+		},
 		{	
 			"name"       : "metric_memory bandwidth read (MB/sec)",
 			"expression" : "[UNC_M_CAS_COUNT.RD] * 64 / 1000000"

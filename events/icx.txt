@@ -59,6 +59,10 @@ cpu-cycles:k,
 ref-cycles:k,
 instructions:k;
 
+#C6
+cstate_core/c6-residency/;
+cstate_pkg/c6-residency/;
+
 cpu/event=0xa8,umask=0x01,period=2000003,name='LSD.UOPS'/,
 #avx related power levels
 cpu/event=0x28,umask=0x07,period=200003,name='CORE_POWER.LVL0_TURBO_LICENSE'/,
@@ -113,6 +117,11 @@ cpu/event=0xb7,umask=0x01,offcore_rsp=0x10003C0001,name='OCR.DEMAND_DATA_RD.L3_H
 cpu/event=0xb7,umask=0x01,offcore_rsp=0x8003C0001,name='OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HIT_WITH_FWD'/,
 cpu-cycles,
 ref-cycles;
+
+cpu/event=0xb7,umask=0x01,offcore_rsp=0x104000477,name='OCR.READS_TO_CORE.LOCAL_DRAM'/,
+cpu/event=0xb7,umask=0x01,offcore_rsp=0x730000477,name='OCR.READS_TO_CORE.REMOTE_DRAM'/,
+cpu/event=0xb7,umask=0x01,offcore_rsp=0x84002380,name='OCR.HWPF_L3.L3_MISS_LOCAL'/,
+cpu/event=0xb7,umask=0x01,offcore_rsp=0x90002380,name='OCR.HWPF_L3.REMOTE'/;
 
 #power related
 power/energy-pkg/,

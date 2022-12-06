@@ -72,6 +72,14 @@
         "name"       : "metric_DRAM power (watts)",
         "expression" : "[power/energy-ram/]"
     },
+    {
+        "name"       : "metric_core c6 residency %",
+        "expression" : "100 * [cstate_core/c6-residency/] / [const_TSC]"
+    },
+    {
+        "name"       : "metric_package c6 residency %",
+        "expression" : "100 * [cstate_pkg/c6-residency/] * [const_core_count] / [const_TSC]"
+    },
     {	
         "name"       : "metric_core % cycles in non AVX license",
         "expression" : "(100 * [CORE_POWER.LVL0_TURBO_LICENSE]) / ([CORE_POWER.LVL0_TURBO_LICENSE] + [CORE_POWER.LVL1_TURBO_LICENSE] + [CORE_POWER.LVL2_TURBO_LICENSE])"
@@ -83,6 +91,14 @@
     {	
         "name"       : "metric_core % cycles in AVX-512 license",
         "expression" : "(100 * [CORE_POWER.LVL2_TURBO_LICENSE]) / ([CORE_POWER.LVL0_TURBO_LICENSE] + [CORE_POWER.LVL1_TURBO_LICENSE] + [CORE_POWER.LVL2_TURBO_LICENSE])"
+    },
+    {
+        "name"		 : "metric_core initiated local dram read bandwidth(MB/sec)",
+        "expression" : "([OCR.READS_TO_CORE.LOCAL_DRAM] + [OCR.HWPF_L3.L3_MISS_LOCAL]) * 64 / 1000000"
+    },
+    {
+        "name"		 : "metric_core initiated remote dram read bandwidth(MB/sec)",
+        "expression" : "([OCR.READS_TO_CORE.REMOTE_DRAM] + [OCR.HWPF_L3.REMOTE]) * 64 / 1000000"
     },
     {	
         "name"       : "metric_memory bandwidth read (MB/sec)",

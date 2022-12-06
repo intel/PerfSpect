@@ -28,6 +28,15 @@ cpu-cycles:k,
 ref-cycles:k,
 instructions:k;
 
+#C6
+cstate_core/c6-residency/;
+cstate_pkg/c6-residency/;
+
+cpu/event=0xa8,umask=0x01,period=2000003,name='LSD.UOPS'/,
+cpu-cycles,
+ref-cycles,
+instructions;
+
 #avx related power levels
 cpu/event=0x28,umask=0x07,period=200003,name='CORE_POWER.LVL0_TURBO_LICENSE'/,
 cpu/event=0x28,umask=0x18,period=200003,name='CORE_POWER.LVL1_TURBO_LICENSE'/,
@@ -107,6 +116,10 @@ cpu/event=0x3c,umask=0x1,any=1,name='CPU_CLK_THREAD_UNHALTED.REF_XCLK_ANY'/,
 #offcore response
 cpu/event=0xb7,umask=0x01,offcore_rsp=0x103FC007F7,name='OCR.ALL_READS.L3_MISS.REMOTE_HITM'/,
 cpu/event=0xb7,umask=0x01,offcore_rsp=0x083FC007F7,name='OCR.ALL_READS.L3_MISS.REMOTE_HIT_FORWARD'/;
+
+#OCR
+cpu/event=0xb7,umask=0x01,offcore_rsp=0x3F840007F7,name='OCR.ALL_READS.L3_MISS_LOCAL_DRAM.ANY_SNOOP'/,
+cpu/event=0xb7,umask=0x01,offcore_rsp=0x3FB80007F7,name='OCR.ALL_READS.L3_MISS_LOCAL_DRAM.ANY_SNOOP_ocr_msr_3fB80007f7'/;
 
 #memory read/writes
 imc/event=0x04,umask=0x03,name='UNC_M_CAS_COUNT.RD'/,
