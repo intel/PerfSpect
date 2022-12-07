@@ -53,6 +53,8 @@ Options:
   -a APP, --app APP (Application to run with perf-collect, perf collection ends after workload completion)
   
   -p PID, --pid PID perf-collect on selected PID(s)
+
+  -c CID, --cid CID perf-collect on selected container id(s)
 	
   -t TIMEOUT, --timeout TIMEOUT ( perf event collection time)
   
@@ -97,6 +99,8 @@ Options:
   -o OUTFILE, --outcsv OUTFILE (perf stat output file, csv or xlsx format is supported, default=results/metric_out.csv)
   
   --keepall (keep all intermediate csv files)
+
+  -html HTML, --html HTML generate static HTML report
   
   --persocket (generate persocket metrics)
 
