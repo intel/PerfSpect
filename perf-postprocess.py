@@ -634,6 +634,7 @@ def get_metadata():
     global PERCORE_MODE
     global SOCKET_CORES
     global TIME_ZONE
+    global CGROUPS
     global CGROUP_HASH
     global CPUSETS
 
@@ -1431,7 +1432,11 @@ if __name__ == "__main__":
                 "xlsxwriter not found to generate excel output. Install xlsxwriter or use .csv"
             )
         EXCEL_OUT = True
-
+    if args.html:
+        if not args.html.endswith(".html"):
+            raise SystemExit(
+                args.html + " isn't a valid html file name, .html files are accepted"
+            )
     # parse header
     get_metadata()
     zero_division_errcount = 0
