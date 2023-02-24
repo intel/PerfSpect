@@ -1,3 +1,8 @@
+###########################################################################################################
+# Copyright (C) 2020-2023 Intel Corporation
+# SPDX-License-Identifier: BSD-3-Clause
+###########################################################################################################
+
 import plotly.graph_objects as go
 import plotly
 import pandas as pd

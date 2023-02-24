@@ -1,11 +1,13 @@
+###########################################################################################################
+# Copyright (C) 2020-2023 Intel Corporation
+# SPDX-License-Identifier: BSD-3-Clause
+###########################################################################################################
+
 from yattag import Doc
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
-import warnings
-from pandas.core.common import SettingWithCopyWarning
 
-warnings.simplefilter(action="ignore", category=SettingWithCopyWarning)
 doc, tag, text = Doc().tagtext()
 metric_parent = {}
 

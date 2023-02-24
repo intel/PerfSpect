@@ -1,6 +1,5 @@
-numpy>=1.16
-matplotlib==3.3.4
-pandas==1.1.5
-scikit_learn==0.24.2
-simplejson==3.17.2
-xlrd==1.2.0
+matplotlib
+pandas
+scikit_learn
+simplejson
+xlrd

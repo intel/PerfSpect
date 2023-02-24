@@ -1,5 +1,7 @@
+#!/usr/bin/env python
+
 ###########################################################################################################
-# Copyright (C) 2021 Intel Corporation
+# Copyright (C) 2020-2023 Intel Corporation
 # SPDX-License-Identifier: BSD-3-Clause
 ###########################################################################################################
 
@@ -178,7 +180,6 @@ def parse_hex(s):
 
 # detect if PMU counters are in use
 def pmu_contention_detect(iterations=6):
-
     interval = 10
     msrregs = ["0x309", "0x30a", "0x30b", "0xc1", "0xc2", "0xc3", "0xc4"]
     values = [0] * len(msrregs)
@@ -272,14 +273,7 @@ def get_lscpu():
     return cpuinfo
 
 
-def not_suported():
-    print(
-        "Current architecture not supported!\nThis version only suports Broadwell/Skylake/Cascadelake/Icelake. Exiting!"
-    )
-    sys.exit()
-
-
-# Check if arch is broadwell/skyalke/cascadelake
+# Check if arch is broadwell/skyalke/cascadelake/icelake
 def check_architecture(procinfo):
     try:
         model = int(procinfo[0]["model"].strip())
@@ -304,11 +298,19 @@ def check_architecture(procinfo):
             arch = "broadwell"
         elif model == 106 and cpufamily == 6 and stepping >= 4:
             arch = "icelake"
+        elif model == 143 and cpufamily == 6 and stepping >= 3:
+            arch = "sapphirerapids"
         else:
-            arch = "unknown"
-            not_suported()
+            print(
+                "Current architecture not supported!\nThis version only suports Broadwell/Skylake/Cascadelake/Icelake/SPR architectures. Exiting!"
+            )
+            sys.exit()
+
     else:
-        not_suported()
+        print(
+            "Current architecture not supported!\nThis version only suports Broadwell/Skylake/Cascadelake/Icelake/SapphireRapids . Exiting!"
+        )
+        sys.exit()
     return arch, modelname
 
 
@@ -323,7 +325,6 @@ def get_cpuid_info(procinfo):
         if vendor == "GenuineIntel":
             key = proc["physical id"]
         else:
-            # assuming single socket (ARM)
             key = 0
         val = proc["processor"]
         if socketinfo.get(key) is None:
@@ -340,7 +341,7 @@ def validate_outfile(filename, xlsx=False):
     outfile = os.path.basename(filename)
     if resdir and not os.path.exists(resdir):
         return False
-    regx = r"[@!#$%^&*()<>?/\|}{~:]"
+    regx = r"[@!#$%^&*()<>?\|}{~:]"
     # regex = re.compile("[@!#$%^&*()<>?/\|}{~:]")
     regex = re.compile(regx)
     if regex.search(outfile) is None:

@@ -1,5 +1,5 @@
 ###########################################################################################################
-# Copyright (C) 2021 Intel Corporation
+# Copyright (C) 2021-2023 Intel Corporation
 # SPDX-License-Identifier: BSD-3-Clause
 ###########################################################################################################
 
@@ -118,8 +118,11 @@ cpu/event=0xb7,umask=0x01,offcore_rsp=0x8003C0001,name='OCR.DEMAND_DATA_RD.L3_HI
 cpu-cycles,
 ref-cycles;
 
+# OCR group 1 (ICX PMU supports a maximum of two OCR counters per group)
 cpu/event=0xb7,umask=0x01,offcore_rsp=0x104000477,name='OCR.READS_TO_CORE.LOCAL_DRAM'/,
-cpu/event=0xb7,umask=0x01,offcore_rsp=0x730000477,name='OCR.READS_TO_CORE.REMOTE_DRAM'/,
+cpu/event=0xb7,umask=0x01,offcore_rsp=0x730000477,name='OCR.READS_TO_CORE.REMOTE_DRAM'/;
+
+# OCR group 2 (ICX PMU supports a maximum of two OCR counters per group)
 cpu/event=0xb7,umask=0x01,offcore_rsp=0x84002380,name='OCR.HWPF_L3.L3_MISS_LOCAL'/,
 cpu/event=0xb7,umask=0x01,offcore_rsp=0x90002380,name='OCR.HWPF_L3.REMOTE'/;
 

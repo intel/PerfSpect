@@ -1,3 +1,8 @@
+###########################################################################################################
+# Copyright (C) 2020-2023 Intel Corporation
+# SPDX-License-Identifier: BSD-3-Clause
+###########################################################################################################
+
 from src import basic_stats
 from src import icicle
 import os
@@ -51,8 +56,6 @@ def write_html(res_dir, base_input_file, arch, html_report_out, type="both"):
                     doc.stag("br")
                     doc.asis(fig2)
     result = indent(doc.getvalue())
-    if "/" in html_report_out:
-        html_report_out = html_report_out.rpartition("/")[-1]
     out_html = os.path.join(res_dir, html_report_out)
     with open(out_html, "w") as file:
         file.write(result)

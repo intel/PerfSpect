@@ -1,26 +1,24 @@
 RELEASE NOTES
 PerfSpect
 
-Support structure(Tested internally):
+Xeon Micro-Architectures:
+- Broadwell
+- Skylake
+- Cascadelake
+- Icelake
+- Sapphire Rapids
+Operating Systems:
+- Ubuntu 16.04 and newer
+- centos 7 and newer
+- Amazon Linux 2
+- RHEL 9
+- Debian 11
 
-| BigCores (server) |
-
--------------------------------------------------------------
-|           Arch 	  |      OS	       |  Kernel  |
--------------------------------------------------------------
-|         Broadwell       |  >= Ubuntu 16.04   | >=4.15   |
-|         Broadwell       |  >= centos 7       | >=3.10   |
-|         Skylake         |  >= centos 7       | >=3.10   |
-|         Skylake         |  >= Ubuntu 16.04   | >=4.15   |
-|         Cascadelake     |  >= Ubuntu 16.04   | >=4.15   |
-|         Cascadelake     |  >= centos 7       | >=3.10   |
-|         Icelake         |  >= Ubuntu 16.04   | >=5.9    |
-|         Icelake         |  >= centos 7       | >=5.9    |
--------------------------------------------------------------
-
-
-* v1.1.0
-PerfSpect supports BDX, SKX, CLX and ICX
+* v1.2.0
+PerfSpect supports BDX, SKX, CLX, ICX and SPR
 
 * v1.1.1
 Added support for AWS instances using cloud and cloudtype flag
+
+* v1.1.0
+PerfSpect supports BDX, SKX, CLX and ICX

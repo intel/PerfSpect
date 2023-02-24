@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 ###########################################################################################################
-# Copyright (C) 2021 Intel Corporation
+# Copyright (C) 2021-2023 Intel Corporation
 # SPDX-License-Identifier: BSD-3-Clause
 ###########################################################################################################
 
@@ -21,16 +21,14 @@ script_path = os.path.dirname(os.path.realpath(__file__))
 # fix the pyinstaller path
 if "_MEI" in script_path:
     script_path = script_path.rsplit("/", 1)[0]
-
 # temporary output :time series dump of raw events
 output_file = script_path + "/_tmp_perf_/tmp_perf_out.csv"
-output_files = []
+output_files = []  # For per cgroup tmp_perf_out files
 # temporary output :time series dump of raw events at socket level
 tmp_socket_file = script_path + "/_tmp_perf_/tmp_socket_out.csv"
-
 # temporary output:trasposed view of perf-collect output
 time_dump_file = script_path + "/_tmp_perf_/time_dump.csv"
-time_dump_files = []
+time_dump_files = []  # For per cgroup time-dump file
 # final output of post-process
 out_metric_file = script_path + "/results/metric_out.csv"
 out_metric_files = []  # For per cgroup metrics
@@ -38,6 +36,8 @@ metric_file = ""
 html_input = "metric_out.average.csv"
 
 
+# globals
+# excel output related
 class workbook:
     def __init__(self):
         self.book = None
@@ -267,6 +267,7 @@ def evaluate_expression(
             "{:.8f}".format(simple_eval(formula, functions={"min": min, "max": max}))
         )
     except ZeroDivisionError:
+        # ignore the systems with no PMEM
         if "UNC_M_PMM" not in temp_formula and "UNC_M_TAGC" not in temp_formula:
             zero_division_errcount += 1
         result = "0"
@@ -300,7 +301,7 @@ def validate_file(fname):
 
 def is_safe_file(fname, substr):
     if not fname.endswith(substr):
-        raise SystemExit(str(fname) + " not a valid file")
+        raise SystemExit(str(fname) + " not a valid file, expecting " + str(substr))
     return 1
 
 
@@ -374,6 +375,7 @@ def get_extra_out_file(out_file, t, excelsheet=False):
 # level: 0-> system, 1->socket, 2->thread
 def load_metrics(infile, outfile, level=0):
     global CGROUPS
+
     event_list, event_dict = get_perf_events(level)
     metrics = {}
     validate_file(metric_file)
@@ -439,12 +441,14 @@ def load_metrics(infile, outfile, level=0):
         OUT_WORKBOOK.writerow(0, metric_row, sheet_type)
     f_pmu = open(input_file, "r")
     pmucsv = csv.reader(f_pmu, delimiter=",")
+
     if CGROUPS == "enabled":
         const_TSC = CONST_TSC_FREQ * CPUSETS[infile.rsplit("_", 1)[1].split(".")[0]]
     else:
         const_TSC = (
             CONST_TSC_FREQ * CONST_CORE_COUNT * CONST_HT_COUNT * CONST_SOCKET_COUNT
         )
+
     const_dict = {
         "const_tsc_freq": CONST_TSC_FREQ,
         "const_core_count": CONST_CORE_COUNT,
@@ -543,7 +547,7 @@ def write_summary(level=0):
             for h in reader.fieldnames:
                 metrics.append(h)
             first_row = False
-        for (k, v) in row.items():
+        for k, v in row.items():
             columns[k].append(float(v))
 
     sheet_type = ""
@@ -587,6 +591,7 @@ def write_summary(level=0):
             if EXCEL_OUT:
                 OUT_WORKBOOK.writerow(i, [h, avg, p95, minval, maxval], sheet_type)
         elif level == 1:
+            # [metric, S0.avg, S1.avg, S0.p95, S1.p95]
             socket_id = (i - 1) % int(
                 CONST_SOCKET_COUNT
             )  # -1 for first column in metrics - time
@@ -646,6 +651,7 @@ def get_metadata():
             raise SystemExit(
                 "The perf raw file doesn't contain metadata, please re-collect perf raw data"
             )
+
     f_dat = open(dat_file, "r")
     for line in f_dat:
         if start_events:
@@ -699,6 +705,7 @@ def get_metadata():
                     int(docker_SET.split("-")[1]) - int(docker_SET.split("-")[0]) + 1
                 )
                 CPUSETS[docker_HASH[i]] = docker_SET
+
         elif line.startswith("Percore mode"):
             PERCORE_MODE = True if (str(line.split(",")[1]) == "enabled") else False
         elif line.startswith("# started on"):
@@ -1312,7 +1319,6 @@ def is_safe_path(base_dir, path, follow_symlinks=True):
 
 
 if __name__ == "__main__":
-
     from argparse import ArgumentParser
 
     parser = ArgumentParser(description="perf-postprocess: perf post process")
@@ -1408,10 +1414,9 @@ if __name__ == "__main__":
         html_input = out_metric_file.split("/")[-1]
         if "/" in out_metric_file:
             res_dir = out_metric_file.rpartition("/")[0]
-            # print(res_dir)
-            # exit()
         else:
             res_dir = script_path
+
     if args.metricfile:
         metric_file = args.metricfile
     if dat_file and not os.path.isfile(dat_file):
@@ -1437,6 +1442,7 @@ if __name__ == "__main__":
             raise SystemExit(
                 args.html + " isn't a valid html file name, .html files are accepted"
             )
+
     # parse header
     get_metadata()
     zero_division_errcount = 0
@@ -1450,6 +1456,8 @@ if __name__ == "__main__":
             metric_file = "metric_icx_aws.json"
         elif CONST_ARCH == "icelake":
             metric_file = "metric_icx.json"
+        elif CONST_ARCH == "sapphirerapids":
+            metric_file = "metric_spr.json"
         else:
             raise SystemExit("Suitable metric file not found")
 
@@ -1485,7 +1493,6 @@ if __name__ == "__main__":
         OUT_WORKBOOK.initialize(args.outfile, persocket_output, percore_output)
 
     samples = write_perf_tmp_output(args.epoch)
-
     # levels: 0->system 1->socket 2->core
     if percore_output or persocket_output:
         write_socket_view(1, samples)
@@ -1514,6 +1521,7 @@ if __name__ == "__main__":
                 infile = time_dump_file
                 outfile = output_file
                 write_system_view(infile, outfile)
+
     # Load metrics from raw data and summarize
     if CGROUPS == "enabled":
         for infile in output_files:
@@ -1530,8 +1538,11 @@ if __name__ == "__main__":
         cleanup()
     if EXCEL_OUT:
         OUT_WORKBOOK.close()
-    if "res_dir" in locals():
+    try:
+        res_dir
         perf_helpers.fix_path_ownership(res_dir, True)
+    except NameError:
+        pass
     if zero_division_errcount > 0:
         print(
             "Warning:"
@@ -1541,6 +1552,7 @@ if __name__ == "__main__":
             + " samples were used"
         )
     print("Post processing done, result file:%s" % args.outfile)
+
     if args.html:
         from src import report
 

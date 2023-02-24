@@ -15,11 +15,8 @@ fmt:
                 do $(GO_FMT) -w -s "$$file"; \
             done
 
-pmu-checker:
-	$(GO_BIN) build -o $(BINARY_NAME) -ldflags '-X main.gVersion=$(VERSION)' ./cmd/
-
-pmu-checker_arm64:
-	GOOS=linux GOARCH=arm64 $(GO_BIN) build -o $(BINARY_NAME)_arm64 -ldflags '-X main.gVersion=$(VERSION)' ./cmd/
+pmu-checker: pmu-checker.go
+	$(GO_BIN) build -o $(BINARY_NAME) -ldflags '-X main.gVersion=$(VERSION)' .
 
 .PHONY: lint
 lint:
@@ -27,6 +24,6 @@ lint:
 
 .PHONY: test
 test: pmu-checker
-		sudo ./$(BINARY_NAME) --no-stdout | jq
+		sudo ./$(BINARY_NAME) | jq
 
 .DEFAULT_GOAL := $(BINARY_NAME)
