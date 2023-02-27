@@ -15,7 +15,7 @@ Operating Systems:
 - RHEL 9
 - Debian 11
 
-Note: PerfSpect may work on other micro-architectures and Linux distributions, but has not been thoroughly tested
+Note: PerfSpect may work on other Linux distributions, but has not been thoroughly tested
 
 * v1.2.0
 PerfSpect supports BDX, SKX, CLX, ICX and SPR

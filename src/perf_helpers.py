@@ -181,7 +181,20 @@ def parse_hex(s):
 # detect if PMU counters are in use
 def pmu_contention_detect(iterations=6):
     interval = 10
-    msrregs = ["0x309", "0x30a", "0x30b", "0xc1", "0xc2", "0xc3", "0xc4"]
+    msrregs = [
+        "0x309",
+        "0x30a",
+        "0x30b",
+        "0x30c",
+        "0xc1",
+        "0xc2",
+        "0xc3",
+        "0xc4",
+        "0xc5",
+        "0xc6",
+        "0xc7",
+        "0xc8",
+    ]
     values = [0] * len(msrregs)
     prev_values = [0] * len(msrregs)
 
