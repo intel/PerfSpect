@@ -5,16 +5,14 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ###########################################################################################################
 
-import xlrd
 import csv
 import os
+import sys
+import xlrd
 
 
 def invalid_filename(filename):
-    # check if filename ends with .csv
-    if filename.endswith(".csv"):
-        return 0
-    else:
+    if not filename.endswith(".csv"):
         raise SystemError(f"{filename} isn't a csv format!")
 
 
@@ -23,9 +21,7 @@ def excel2json(filename, sheet="system view"):
     try:
         if os.access(filename, os.R_OK):
             wb = xlrd.open_workbook(filename)
-            # sh = wb.sheet_by_index(sheet)
             sh = wb.sheet_by_name(sheet)
-
             for rownum in range(1, sh.nrows):
                 row_values = sh.row_values(rownum)
                 metric = row_values[0]
@@ -33,31 +29,30 @@ def excel2json(filename, sheet="system view"):
                 data[metric] = val
         else:
             raise SystemExit(f"{filename} not accessible")
-    except Exception as e:
+    except xlrd.XLRDError as e:
         print(e)
-        exit()
+        sys.exit(1)
     return data
 
 
-def csv2json(filename, args):
+def csv2json(filename):
     data = {}
     try:
         if os.access(filename, os.R_OK):
-            if args.perfspect:
-                with open(filename, encoding="utf-8") as csvf:
-                    csvReader = csv.DictReader(csvf)
-                    for rows in csvReader:
-                        key = rows["metrics"]
-                        data[key] = float(rows["avg"])
+            with open(filename, encoding="utf-8") as csvf:
+                csvReader = csv.DictReader(csvf)
+                for rows in csvReader:
+                    key = rows["metrics"]
+                    data[key] = float(rows["avg"])
         else:
             raise SystemExit(f"{filename} not accessible")
-    except KeyError as e:
-        raise SystemError(e)
+    except KeyError as invalid_csv_key:
+        raise SystemExit() from invalid_csv_key
     return data
 
 
 def compare_metrics(metriclist, datalist, fields, out):
-    if not len(metriclist):
+    if not metriclist:
         metriclist = [
             m
             for m in datalist[0].keys()
@@ -101,8 +96,7 @@ def compare_metrics_all(datalist, fields, out):
             allkeys = []
             for data in datalist:
                 for k in data:
-                    if k.startswith("metric_"):
-                        allkeys.append(k)
+                    allkeys.append(k)
             uniquekeys = list(set(allkeys))
             for metric in uniquekeys:
                 rowlines = []
@@ -160,8 +154,8 @@ def main():
     jsondata = []
     fields = ["Metric"]
     for filename in filenames:
-        if args.perfspect or filenames[0].endswith(".csv"):
-            jsondata.append(csv2json(filename, args))
+        if args.perfspect:
+            jsondata.append(csv2json(filename))
         else:
             jsondata.append(excel2json(filename))
         fields.append(filename)
