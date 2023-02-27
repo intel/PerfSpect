@@ -287,6 +287,8 @@ if __name__ == "__main__":
                 eventfile = "icx_oci.txt"
         elif arch == "sapphirerapids":
             eventfile = "spr.txt"
+            if is_aws_vm:
+                eventfile = "spr_aws.txt"
         else:
             raise SystemExit(
                 "Unsupported architecture (currently supports IA -> Broadwell, Skylake, CascadeLake Icelake and SapphireRapids)"

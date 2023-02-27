@@ -1456,6 +1456,8 @@ if __name__ == "__main__":
             metric_file = "metric_icx_aws.json"
         elif CONST_ARCH == "icelake":
             metric_file = "metric_icx.json"
+        elif CONST_ARCH == "sapphirerapids" and args.cloud == "aws":
+            metric_file = "metric_spr_aws.json"
         elif CONST_ARCH == "sapphirerapids":
             metric_file = "metric_spr.json"
         else:

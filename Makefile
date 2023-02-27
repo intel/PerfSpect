@@ -43,6 +43,7 @@ build-public/collect:
 					--add-data "./events/icx.txt:." \
 					--add-data "./events/spr.txt:." \
 					--add-data "./events/icx_aws.txt:." \
+					--add-data "./events/spr_aws.txt:." \
 					--add-data "./events/clx_aws.txt:." \
 					--add-data "./events/skx_aws.txt:." \
 					--add-binary "../build/pmu-checker:." \
@@ -64,6 +65,7 @@ build-public/postprocess:
 					--add-data "./events/metric_icx.json:." \
 					--add-data "./events/metric_spr.json:." \
 					--add-data "./events/metric_icx_aws.json:." \
+					--add-data "./events/metric_spr_aws.json:." \
 					--runtime-tmpdir . \
 					--exclude-module readline
 	cp $(TMPDIR)/dist/perf-postprocess build/
