@@ -1,6 +1,6 @@
 # pmu-checker
 
-Allows us to verify if the system is running any drivers/daemons that may be programming the PMU. Superuseful for customers who have such instrumentations, don’t know it.
+Allows us to verify if the system is running any drivers/daemons that may be programming the PMU.
 
 pmu-checker specifically checks if the following MSRs are actively being programmed/used:
 
@@ -28,7 +28,3 @@ Options:
     -logfile, --logfile (string)    Specify the log filename to be used for logging, Default is "pmu-checker.log"
     -debug, --debug                 Set the loglevel to debug, Default is info
     -no-stdout, --no-stdout         Set the logwriter to write to log file only
-
-## Contribution
-
-If you are interested in contributing, feel free to fork this repo and create MR(Merge Requests).
