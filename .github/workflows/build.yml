@@ -10,7 +10,9 @@ jobs:
       - name: install dependencies
         run: |
           sudo apt update
-          sudo apt install -y python3 golang
+          sudo apt install -y python3
+          rm -rf /usr/local/go && tar -C /usr/local -xzf go1.20.1.linux-amd64.tar.gz
+          export PATH=$PATH:/usr/local/go/bin
           pip3 install -r requirements.txt
       - name: build
         run: |
