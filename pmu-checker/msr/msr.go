@@ -29,7 +29,7 @@ var (
 		"0x309": "instructions",
 		"0x30a": "cpu_cycles",
 		"0x30b": "ref_cycles",
-		"0x30c": "",
+		"0x30c": "topdown_slots",
 		"0xc1":  generalPurposePMU,
 		"0xc2":  generalPurposePMU,
 		"0xc3":  generalPurposePMU,
