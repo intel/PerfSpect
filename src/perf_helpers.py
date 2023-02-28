@@ -286,7 +286,14 @@ def get_lscpu():
     return cpuinfo
 
 
-# Check if arch is broadwell/skyalke/cascadelake/icelake
+def not_suported():
+    print(
+        "Current architecture not supported!\nThis version only suports Broadwell/Skylake/Cascadelake/Icelake. Exiting!"
+    )
+    sys.exit()
+
+
+# Check if arch is broadwell/skyalke/cascadelake/icelake/sapphirerapids
 def check_architecture(procinfo):
     try:
         model = int(procinfo[0]["model"].strip())
@@ -314,16 +321,10 @@ def check_architecture(procinfo):
         elif model == 143 and cpufamily == 6 and stepping >= 3:
             arch = "sapphirerapids"
         else:
-            print(
-                "Current architecture not supported!\nThis version only suports Broadwell/Skylake/Cascadelake/Icelake/SPR architectures. Exiting!"
-            )
-            sys.exit()
+            not_suported()
 
     else:
-        print(
-            "Current architecture not supported!\nThis version only suports Broadwell/Skylake/Cascadelake/Icelake/SapphireRapids . Exiting!"
-        )
-        sys.exit()
+        not_suported()
     return arch, modelname
 
 

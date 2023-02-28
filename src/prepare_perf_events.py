@@ -189,7 +189,7 @@ def prepare_perf_events(event_file, grouping, cpu_only):
             )
         if len(unsupported_events) > 0:
             print(
-                "The following events are not supported with current version of perf, will not be collected!"
+                "These events are not supported with current version of perf, will not be collected!"
             )
             for e in unsupported_events:
                 print("%s" % e)
