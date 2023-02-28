@@ -44,29 +44,26 @@ Options:
   -i INTERVAL, --interval INTERVAL
                         interval in seconds for time series dump, default=1
   -m MUXINTERVAL, --muxinterval MUXINTERVAL
-                        event mux interval in milli seconds, default=0 i.e.
-                        will use the system default
+                        event mux interval in milli seconds, default=0 i.e. will
+                        use the system default
   -o OUTCSV, --outcsv OUTCSV
                         perf stat output in csv format,
                         default=results/perfstat.csv
-  -a APP, --app APP     Application to run with perf-collect, perf collection
-                        ends after workload completion
+  -a APP, --app APP     Application to run with perf-collect, perf collection ends
+                        after workload completion
   -p PID, --pid PID     perf-collect on selected PID(s)
   -c CID, --cid CID     perf-collect on selected container ids
   -t TIMEOUT, --timeout TIMEOUT
                         perf event collection time
   --percore             Enable per core event collection
-  --nogroups            Disable perf event grouping, events are grouped by
-                        default as in the event file
-  --dryrun              Test if Performance Monitoring Counters are in-use,
-                        and collect stats for 10sec to validate event file
-                        correctness
+  --nogroups            Disable perf event grouping, events are grouped by default
+                        as in the event file
+  --dryrun              Test if Performance Monitoring Counters are in-use, and
+                        collect stats for 10sec to validate event file correctness
   --metadata            collect system info only, does not run perf
-  --tma                 collect additional TMA events on supported
-                        architectures
   -csp CLOUD, --cloud CLOUD
-                        Name of the Cloud Service Provider(AWS), if collecting
-                        on cloud instances. Currently supporting AWS and OCI
+                        Name of the Cloud Service Provider(AWS), if collecting on
+                        cloud instances. Currently supporting AWS and OCI
   -ct CLOUDTYPE, --cloudtype CLOUDTYPE
                         Instance type: Options include - VM,BM
 ```
@@ -100,12 +97,12 @@ Options:
                         default=results/metric_out.csv
   --persocket           generate per socket metrics
   --percore             generate per core metrics
-  --keepall             keep all intermediate csv files, use it for debug
-                        purpose only
+  --keepall             keep all intermediate csv files, use it for debug purpose
+                        only
   --epoch               time series in epoch format, default is sample count
   -csp CLOUD, --cloud CLOUD
-                        Name of Cloud Service Provider(AWS), if you're
-                        intending to postprocess on cloud instances
+                        Name of Cloud Service Provider(AWS), if you're intending
+                        to postprocess on cloud instances
   -html HTML, --html HTML
                         Static HTML report
 
