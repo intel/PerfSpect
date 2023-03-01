@@ -54,5 +54,3 @@ It also produces a combined CSV file comprising:
 
 * Kindly use "--debug" flag if you wish to log PCA components used for plotting.
 * Due to mathematical limitation with underlying PCA library, one can perform similarity analysis for 42 workload profiles at the same time. 
-
-Authors: Karan Kamatgi, Harshad Sane

@@ -2,18 +2,24 @@
 
 Allows us to verify if the system is running any drivers/daemons that may be programming the PMU.
 
-pmu-checker specifically checks if the following MSRs are actively being programmed/used :
+pmu-checker specifically checks if the following MSRs are actively being programmed/used:
+
 1. 0x309
 2. 0x30a
-3. 0x30b 
-4. 0xc1
-5. 0xc2 
-6. 0xc3 
-7. 0xc4
+3. 0x30b
+4. 0x30c (SPR)
+5. 0xc1
+6. 0xc2
+7. 0xc3
+8. 0xc4
+9. 0xc5 (SPR)
+10. 0xc6 (SPR)
+11. 0xc7 (SPR)
+12. 0xc8 (SPR)
 
 ## Usage
-Usage: sudo ./pmu-checker [OPTION ...]
 
+Usage: sudo ./pmu-checker [OPTION ...]
 
 Options:
 

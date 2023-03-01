@@ -1,5 +1,7 @@
+#!/usr/bin/env python3
+
 ###########################################################################################################
-# Copyright (C) 2021 Intel Corporation
+# Copyright (C) 2020-2023 Intel Corporation
 # SPDX-License-Identifier: BSD-3-Clause
 ###########################################################################################################
 
@@ -8,7 +10,6 @@ import sys
 import re
 import fnmatch
 import time
-import struct
 import math
 import collections
 import psutil
@@ -159,70 +160,6 @@ def enumerate_uncore(event, n):
     return event_list
 
 
-# read the MSR register and return the value in dec format
-def readmsr(msr, cpu=0):
-    f = os.open("/dev/cpu/%d/msr" % (cpu,), os.O_RDONLY)
-    os.lseek(f, msr, os.SEEK_SET)
-    val = struct.unpack("Q", os.read(f, 8))[0]
-    os.close(f)
-    return val
-
-
-# parse hex to int
-def parse_hex(s):
-    try:
-        return int(s, 16)
-    except ValueError:
-        raise argparse.ArgumentError("Bad hex number %s" % (s))
-
-
-# detect if PMU counters are in use
-def pmu_contention_detect(iterations=6):
-
-    interval = 10
-    msrregs = ["0x309", "0x30a", "0x30b", "0xc1", "0xc2", "0xc3", "0xc4"]
-    values = [0] * len(msrregs)
-    prev_values = [0] * len(msrregs)
-
-    for count in range(iterations):
-        for i, reg in enumerate(msrregs):
-            msrreg = parse_hex(reg)
-            values[i] = readmsr(msrreg)
-
-            in_use = 0
-        if count > 0:
-            for j, val in enumerate(values):
-                if val != prev_values[j]:
-                    in_use = 1
-                    if msrregs[j] == "0x309":
-                        print("PMU in use, hint: instructions")
-                    if msrregs[j] == "0x30a":
-                        print(
-                            "PMU in use, hint: cpu-cycles or Check NMI watchdog. Try: echo 0 > /proc/sys/kernel/nmi_watchdog as sudo"
-                        )
-                    if msrregs[j] == "0x30b":
-                        print("PMU in use, hint: ref-cycles")
-                    if (
-                        msrregs[j] == "0xc1"
-                        or msrregs[j] == "0xc2"
-                        or msrregs[j] == "0xc3"
-                        or msrregs[j] == "0xc4"
-                    ):
-                        print("Some PMUs in use")
-        if in_use != 0:
-            print("FAIL: PMUs in use")
-            return True
-
-        print(
-            "checking iteration= %d waiting for %d seconds " % ((count + 1), interval)
-        )
-        time.sleep(interval)
-        prev_values = values[:]
-
-    print("PASS: PMUs not in use")
-    return False
-
-
 # get linux kernel version
 def get_version():
     version = ""
@@ -279,7 +216,7 @@ def not_suported():
     sys.exit()
 
 
-# Check if arch is broadwell/skyalke/cascadelake
+# Check if arch is broadwell/skyalke/cascadelake/icelake/sapphirerapids
 def check_architecture(procinfo):
     try:
         model = int(procinfo[0]["model"].strip())
@@ -304,9 +241,11 @@ def check_architecture(procinfo):
             arch = "broadwell"
         elif model == 106 and cpufamily == 6 and stepping >= 4:
             arch = "icelake"
+        elif model == 143 and cpufamily == 6 and stepping >= 3:
+            arch = "sapphirerapids"
         else:
-            arch = "unknown"
             not_suported()
+
     else:
         not_suported()
     return arch, modelname
@@ -323,7 +262,6 @@ def get_cpuid_info(procinfo):
         if vendor == "GenuineIntel":
             key = proc["physical id"]
         else:
-            # assuming single socket (ARM)
             key = 0
         val = proc["processor"]
         if socketinfo.get(key) is None:
@@ -340,7 +278,7 @@ def validate_outfile(filename, xlsx=False):
     outfile = os.path.basename(filename)
     if resdir and not os.path.exists(resdir):
         return False
-    regx = r"[@!#$%^&*()<>?/\|}{~:]"
+    regx = r"[@!#$%^&*()<>?\|}{~:]"
     # regex = re.compile("[@!#$%^&*()<>?/\|}{~:]")
     regex = re.compile(regx)
     if regex.search(outfile) is None:

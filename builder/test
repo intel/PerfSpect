@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-
-docker container run                                  \
-    --volume "$(pwd)"/builder/scripts:/scripts        \
-    --volume "$(pwd)":/workdir                        \
-    --rm                                              \
-    --name build_perfspect                            \
-    perfspect_builder:v1                              \
-    test

@@ -1,3 +1,8 @@
+###########################################################################################################
+# Copyright (C) 2021-2023 Intel Corporation
+# SPDX-License-Identifier: BSD-3-Clause
+###########################################################################################################
+
 # Skylake event list for AWS instances
 
 cpu/event=0x51,umask=0x01,period=2000003,name='L1D.REPLACEMENT'/,

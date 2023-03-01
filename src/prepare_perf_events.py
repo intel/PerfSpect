@@ -1,5 +1,7 @@
+#!/usr/bin/env python3
+
 ###########################################################################################################
-# Copyright (C) 2021 Intel Corporation
+# Copyright (C) 2020-2023 Intel Corporation
 # SPDX-License-Identifier: BSD-3-Clause
 ###########################################################################################################
 
@@ -58,49 +60,9 @@ def check_cpu_event(line):
     line = line.strip()
     tmp_list = line.split("/")
     # assumes event name without a PMU qualifier is a core event
-    if len(tmp_list) == 1 or tmp_list[0] == "cpu":
+    if len(tmp_list) == 1 or tmp_list[0] == "cpu" or tmp_list[0].startswith("cstate"):
         return True
     return False
-
-
-# expand event names - deprecated
-def expand_event_name(line, grouping):
-    line = line.strip()
-    loop_imc = False
-    loop_cha = False
-    loop_cbox = False
-    loop_upi = False
-    if grouping and line.startswith("imc"):
-        line = line.replace("imc", "uncore_imc_0")
-        if "name=" in line:
-            name = (line.split("'"))[1]
-            line = line.replace(name, name + ".0")
-        loop_imc = True
-    if grouping and line.startswith("cha"):
-        if "name=" in line:
-            name = (line.split("'"))[1]
-            line = line.replace(name, name + ".0")
-        line = line.replace("cha", "uncore_cha_0")
-        loop_cha = True
-    if grouping and line.startswith("cbox"):
-        if "name=" in line:
-            name = (line.split("'"))[1]
-            line = line.replace(name, name + ".0")
-        line = line.replace("cbox", "uncore_cbox_0")
-        loop_cbox = True
-    if grouping and line.startswith("upi"):
-        if "name=" in line:
-            name = (line.split("'"))[1]
-            line = line.replace(name, name + ".0")
-        line = line.replace("upi", "uncore_upi_0")
-        loop_upi = True
-    if grouping and line.startswith("qpi"):
-        if "name=" in line:
-            name = (line.split("'"))[1]
-            line = line.replace(name, name + ".0")
-        line = line.replace("qpi", "uncore_qpi_0")
-        loop_upi = True
-    return (line, loop_imc, loop_cha, loop_cbox, loop_upi)
 
 
 # save the last group names in a list when it is cha or imc
@@ -129,11 +91,6 @@ def enumerate_uncore(group, pattern, n, default_range=True):
         group = "'".join(oldname)
         uncore_group += group
     return uncore_group
-
-
-# get number of cgroups in the list
-def get_num_cgroups(cgroups):
-    return len(cgroups.split(","))
 
 
 # fix events that aren't compatible with older kernels
@@ -186,7 +143,6 @@ def get_cgroup_events_format(cgroups, events, num_events):
 
 
 def prepare_perf_events(event_file, grouping, cpu_only):
-
     if not os.path.isfile(event_file):
         raise SystemExit("event file not found")
 
@@ -210,6 +166,10 @@ def prepare_perf_events(event_file, grouping, cpu_only):
             )
         except FileNotFoundError:
             raise SystemExit("perf not found; please install linux perf utility")
+
+        except subprocess.CalledProcessError:
+            raise SystemExit("perf not found; please install linux perf utility")
+
         unsupported_events = []
         for line in fin:
             if (line != "\n") and (not line.startswith("#")):
@@ -223,6 +183,10 @@ def prepare_perf_events(event_file, grouping, cpu_only):
                         collection_events[-1] = end_event[:-1] + ";"
                 else:
                     collection_events.append(line)
+        if any("cpu-cycles" in event for event in unsupported_events):
+            raise SystemExit(
+                "Fixed counters not supported, unable to collect PMUs on this platform"
+            )
         if len(unsupported_events) > 0:
             print(
                 "These events are not supported with current version of perf, will not be collected!"
@@ -238,11 +202,22 @@ def prepare_perf_events(event_file, grouping, cpu_only):
                     templist.append(e)
             collection_events = templist
 
+    core_event = []
+    uncore_event = []
     event_names = []
     for line in collection_events:
-        event = line + ":c" if check_cpu_event(line) else line + ":u"
+        if cpu_only:
+            if check_cpu_event(line):
+                event = line + ":c"
+                core_event.append(event)
+        else:
+            if check_cpu_event(line):
+                event = line + ":c"
+                core_event.append(event)
+            else:
+                event = line + ":u"
+                uncore_event.append(event)
         event_names.append(event)
-        # line, loop_imc, loop_cha, loop_cbox, loop_upi = expand_event_name(line, grouping)
         line, unc_count = expand_unc(line, grouping)
         if new_group:
             group += start_group
@@ -264,5 +239,11 @@ def prepare_perf_events(event_file, grouping, cpu_only):
 
     fin.close()
     group = group[:-1]
-
+    if len(event_names) == 0:
+        raise SystemExit("No supported events found on this platform.")
+    # being conservative not letting the collection to proceed if fixed counters aren't suported on the platform
+    if len(unsupported_events) >= len(core_event):
+        raise SystemExit(
+            "Most core counters aren't supported on this platform, unable to collect PMUs"
+        )
     return group, event_names

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 ###########################################################################################################
-# Copyright (C) 2021 Intel Corporation
+# Copyright (C) 2021-2023 Intel Corporation
 # SPDX-License-Identifier: BSD-3-Clause
 ###########################################################################################################
 
@@ -100,11 +100,11 @@ def write_metadata(
         modified.write("### PERF DATA ###" + ",\n")
         if time_stamp:
             zone = subprocess.check_output(  # nosec
-                ["date"], universal_newlines=True  # nosec
+                ["date", "+%Z"], universal_newlines=True  # nosec
             ).split()  # nosec
             epoch = str(perf_helpers.get_epoch(time_stamp))
             modified.write(
-                time_stamp.rstrip() + " " + zone[4] + " EPOCH " + epoch + "\n"
+                time_stamp.rstrip() + " " + zone[0] + " EPOCH " + epoch + "\n"
             )
         modified.write(data)
 
@@ -134,7 +134,6 @@ def is_safe_file(fname, substr):
 
 
 if __name__ == "__main__":
-
     script_path = os.path.dirname(os.path.realpath(__file__))
     # fix the pyinstaller path
     if "_MEI" in script_path:
@@ -218,7 +217,7 @@ if __name__ == "__main__":
         "--cloud",
         type=str,
         default=None,
-        help="Name of the Cloud Service Provider(AWS), if collecting on cloud instances",
+        help="Name of the Cloud Service Provider(AWS), if collecting on cloud instances. Currently supporting AWS and OCI",
     )
     parser.add_argument(
         "-ct",
@@ -227,7 +226,6 @@ if __name__ == "__main__":
         default="VM",
         help="Instance type: Options include - VM,BM",
     )
-
     args = parser.parse_args()
 
     if args.version:
@@ -237,9 +235,7 @@ if __name__ == "__main__":
     interval = int(args.interval * 1000)
 
     if args.app and args.timeout:
-        raise SystemExit(
-            "Please provide either time duration or application parameter but"
-        )
+        raise SystemExit("Please provide time duration or application parameter")
 
     if args.cid and args.pid:
         raise SystemExit("Cannot combine cgroup with pid in same collection")
@@ -289,9 +285,13 @@ if __name__ == "__main__":
                 eventfile = "icx_aws.txt"
             elif is_oci_vm:
                 eventfile = "icx_oci.txt"
+        elif arch == "sapphirerapids":
+            eventfile = "spr.txt"
+            if is_aws_vm:
+                eventfile = "spr_aws.txt"
         else:
             raise SystemExit(
-                "Unsupported architecture (currently supports Broadwell, Skylake, CascadeLake and Icelake Intel Xeon processors)"
+                "Unsupported architecture (currently supports IA -> Broadwell, Skylake, CascadeLake Icelake and SapphireRapids)"
             )
 
         # Convert path of event file to relative path if being packaged by pyInstaller into a binary
@@ -352,7 +352,7 @@ if __name__ == "__main__":
             print("Warning: nmi_watchdog enabled, perf grouping will be disabled")
             args.nogroups = True
 
-    # disable grouping if more than 1 cgroups are being monitored
+    # disable grouping if more than 1 cgroups are being monitored -- not relevant anymore
     cgroups = []
     if args.cid is not None:
         cgroups = perf_helpers.get_cgroups_from_cids(args.cid.split(","))
@@ -418,7 +418,6 @@ if __name__ == "__main__":
             events,
             args.outcsv,
         )
-
     elif args.cid and args.timeout:
         print("Info: Only CPU/core events will be enabled with cid option")
         perf_format = prep_events.get_cgroup_events_format(
@@ -485,6 +484,7 @@ if __name__ == "__main__":
     validate_perfargs(perfargs)
     try:
         print("Collecting perf stat for events in : %s" % eventfilename)
+        # PerfSpect isn't aware of the actual instance cloudtype
         if args.cloud and args.cloudtype != "BM":
             print(
                 "If you're on baremetal cloud instance, consider using cloudtype flag (options:VM/BM, default is VM)"

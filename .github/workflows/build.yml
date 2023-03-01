@@ -1,31 +1,23 @@
 name: Build & Test
 
-on:
-  [pull_request,push]
+on: [pull_request, push]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: [3.9]
-
+    runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+      - uses: actions/checkout@v3
+      - name: install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y python3
+          sudo snap install go --classic
+          pip3 install -r requirements.txt
+      - name: build
+        run: |
+          make dist
+      - name: upload artifact
+        uses: actions/upload-artifact@v3
         with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install flake8 pytest
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-      - name: Edit memory config
-        run: sed -i '10 i \    --memory-swap -1                                \\' builder/build
-      - name: Build binaries
-        run: ./build.sh
-      - name: Validate with pytest
-        run: |
-          builder/test
+          name: perfspect
+          path: dist/perfspect*.tgz

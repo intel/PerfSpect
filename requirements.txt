@@ -1,8 +1,11 @@
-simpleeval==0.9.11
-python-dateutil
-xlsxwriter
+black
+flake8
+simpleeval
+pandas
 plotly
-kaleido
-scipy
-yattag
 psutil
+pyinstaller
+pytest
+python-dateutil
+XlsxWriter
+yattag
