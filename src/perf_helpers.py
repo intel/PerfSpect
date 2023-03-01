@@ -10,7 +10,6 @@ import sys
 import re
 import fnmatch
 import time
-import struct
 import math
 import collections
 import psutil
