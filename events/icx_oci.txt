@@ -85,7 +85,7 @@ cpu/event=0x60,umask=0x08,cmask=0x04,period=1000003,name='OFFCORE_REQUESTS_OUTST
 cpu-cycles;
 
 #TMA related
-topdown.slots,
+cpu/event=0x00,umask=0x04,period=10000003,name='TOPDOWN.SLOTS'/,
 cpu/event=0x0d,umask=0x10,period=1000003,name='INT_MISC.UOP_DROPPING'/,
 cpu/event=0x0d,umask=0x01,cmask=0x01,edge=0x01,period=500009,name='INT_MISC.RECOVERY_CYCLES_c1_e1'/;
 

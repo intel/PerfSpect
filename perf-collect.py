@@ -144,7 +144,7 @@ if __name__ == "__main__":
 
     parser = ArgumentParser(description="perf-collect: Time series dump of PMUs")
     parser.add_argument(
-        "-v", "--version", help="display version info", action="store_true"
+        "-V", "--version", help="display version info", action="store_true"
     )
     parser.add_argument(
         "-e",
@@ -210,6 +210,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--metadata",
         help="collect system info only, does not run perf",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        help="Display debugging information",
         action="store_true",
     )
     parser.add_argument(
@@ -482,6 +488,8 @@ if __name__ == "__main__":
         )
     perfargs = shlex.split(cmd)
     validate_perfargs(perfargs)
+    if args.verbose:
+        print(cmd)
     try:
         print("Collecting perf stat for events in : %s" % eventfilename)
         # PerfSpect isn't aware of the actual instance cloudtype

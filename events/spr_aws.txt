@@ -43,16 +43,15 @@ ref-cycles,
 instructions;
 
 #TMA related
-cycles,
-slots,
-topdown-bad-spec,
-topdown-be-bound,
-topdown-fe-bound,
-topdown-retiring,
-topdown-fetch-lat,
-topdown-mem-bound,
-topdown-br-mispredict,
-topdown-heavy-ops;
+cpu/event=0x00,umask=0x04,period=10000003,name='TOPDOWN.SLOTS'/,
+cpu/event=0x00,umask=0x81,period=10000003,name='PERF_METRICS.BAD_SPECULATION'/,
+cpu/event=0x00,umask=0x83,period=10000003,name='PERF_METRICS.BACKEND_BOUND'/,
+cpu/event=0x00,umask=0x82,period=10000003,name='PERF_METRICS.FRONTEND_BOUND'/,
+cpu/event=0x00,umask=0x80,period=10000003,name='PERF_METRICS.RETIRING'/,
+cpu/event=0x00,umask=0x86,period=10000003,name='PERF_METRICS.FETCH_LATENCY'/,
+cpu/event=0x00,umask=0x87,period=10000003,name='PERF_METRICS.MEMORY_BOUND'/,
+cpu/event=0x00,umask=0x85,period=10000003,name='PERF_METRICS.BRANCH_MISPREDICTS'/,
+cpu/event=0x00,umask=0x84,period=10000003,name='PERF_METRICS.HEAVY_OPERATIONS'/;
 
 cpu/event=0xad,umask=0x10,period=1000003,name='INT_MISC.UOP_DROPPING'/,
 cpu/event=0xad,umask=0x40,frontend=0x7,period=1000003,name='INT_MISC.UNKNOWN_BRANCH_CYCLES'/,
