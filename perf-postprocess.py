@@ -1323,7 +1323,7 @@ if __name__ == "__main__":
 
     parser = ArgumentParser(description="perf-postprocess: perf post process")
     parser.add_argument(
-        "--version", "-v", help="display version information", action="store_true"
+        "--version", "-V", help="display version information", action="store_true"
     )
     parser.add_argument(
         "-m",
@@ -1346,8 +1346,9 @@ if __name__ == "__main__":
         "--percore", help="generate per core metrics", action="store_true"
     )
     parser.add_argument(
-        "--keepall",
-        help="keep all intermediate csv files, use it for debug purpose only",
+        "-v",
+        "--verbose",
+        help="include debugging information, keeps all intermediate csv files",
         action="store_true",
     )
     parser.add_argument(
@@ -1536,7 +1537,7 @@ if __name__ == "__main__":
     else:
         if load_metrics(None, None, level=0):
             write_summary()
-    if not args.keepall:
+    if not args.verbose:
         cleanup()
     if EXCEL_OUT:
         OUT_WORKBOOK.close()

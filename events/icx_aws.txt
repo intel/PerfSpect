@@ -85,11 +85,11 @@ cpu/event=0x60,umask=0x08,cmask=0x04,period=1000003,name='OFFCORE_REQUESTS_OUTST
 cpu-cycles;
 
 #TMA related
-slots,
-topdown-bad-spec,
-topdown-be-bound,
-topdown-fe-bound,
-topdown-retiring,
+cpu/event=0x00,umask=0x04,period=10000003,name='TOPDOWN.SLOTS'/,
+cpu/event=0x00,umask=0x81,period=10000003,name='PERF_METRICS.BAD_SPECULATION'/,
+cpu/event=0x00,umask=0x83,period=10000003,name='PERF_METRICS.BACKEND_BOUND'/,
+cpu/event=0x00,umask=0x82,period=10000003,name='PERF_METRICS.FRONTEND_BOUND'/,
+cpu/event=0x00,umask=0x80,period=10000003,name='PERF_METRICS.RETIRING'/,
 cpu/event=0x0d,umask=0x10,period=1000003,name='INT_MISC.UOP_DROPPING'/,
 cpu/event=0x0d,umask=0x01,cmask=0x01,edge=0x01,period=500009,name='INT_MISC.RECOVERY_CYCLES_c1_e1'/;
 

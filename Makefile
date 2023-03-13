@@ -84,7 +84,7 @@ dist/$(PACKAGE_EXTERNAL): build_dir build/pmu-checker build/libtsc build-public/
 	cd dist && md5sum $(PACKAGE_EXTERNAL) > $(PACKAGE_EXTERNAL).md5
 
 test:
-	cd dist && tar -xvf perfspect_$(VERSION_PUBLIC).tgz && cp -r $(BINARY_FINAL) ../test/.
+	cd dist && tar -xvf perfspect.tgz && cp -r $(BINARY_FINAL) ../test/.
 	cd test && pytest
 
 format:

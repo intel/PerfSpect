@@ -8,16 +8,16 @@ The tool has two parts
 
 1. perf collection to collect underlying PMU (Performance Monitoring Unit) counters
 2. post processing that generates csv output of performance metrics.
+### Quick start (requires perf installed)
+```
+wget -qO- https://github.com/intel/PerfSpect/releases/latest/download/perfspect.tgz | tar xvz
+cd perfspect
+sudo ./perf-collect --timeout 10
+sudo ./perf-postprocess -r results/perfstat.csv --html perfstat.html
+```
 
 ![PerfSpect BS](images/basic_stats.JPG "perfspect-bs")
 ![perfspect-demo1](https://user-images.githubusercontent.com/5321018/205159259-3654fa12-74d6-4cb5-8194-ea1b66aadb25.gif)
-
-## Getting Started
-
-### Prerequisites
-
-1. Linux perf
-2. Linux cgroup-tools
 
 ## Building binaries from source code
 
