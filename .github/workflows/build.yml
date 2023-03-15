@@ -5,16 +5,19 @@ on: [pull_request, push]
 jobs:
   build:
     runs-on: ubuntu-20.04
+    container:
+      image: centos:7
     steps:
       - uses: actions/checkout@v3
       - name: install dependencies
         run: |
-          sudo apt update
-          sudo apt install -y python3
-          sudo snap install go --classic
-          pip3 install -r requirements.txt
+          yum update -y
+          yum install -y make python3 epel-release
+          yum install -y golang
+          python3 -m pip install --upgrade pip
       - name: build
         run: |
+          pip3 install -r requirements.txt
           make dist
       - name: upload artifact
         uses: actions/upload-artifact@v3
