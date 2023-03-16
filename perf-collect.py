@@ -519,9 +519,11 @@ if __name__ == "__main__":
         False,
     )
 
+    # reset nmi_watchdog to what it was before running perfspect
     if (int(nmi_watchdog) != 0) and supervisor:
         f_nmi = open("/proc/sys/kernel/nmi_watchdog", "w")
         f_nmi.write(nmi_watchdog)
+        f_nmi.close()
 
     if (args.muxinterval > 0) and supervisor:
         perf_helpers.set_perf_event_mux_interval(True, 1, mux_intervals)

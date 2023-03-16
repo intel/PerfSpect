@@ -52,7 +52,7 @@ func (dpt retMSR) read(msr int64) (uint64, error) {
 	rc, err := syscall.Pread(dpt.fd, buf, msr)
 	if err != nil {
 		log.Fatal(err)
-		panic(err)
+		return 0, err
 	}
 
 	if rc != 8 {

@@ -763,8 +763,6 @@ def write_perf_tmp_output(use_epoch):
                     epoch = int(words[-1])
                 except ValueError:
                     exit("Conversion error parsing timestamp")
-                except:
-                    exit("Unkown error parsing timestamp")
                 break
     # TO:DO remove "not_counted" and "not_supported" events from dat_file
 
@@ -1433,7 +1431,7 @@ if __name__ == "__main__":
     if (args.outfile).endswith("xlsx"):
         try:
             import xlsxwriter
-        except:
+        except ImportError:
             raise SystemExit(
                 "xlsxwriter not found to generate excel output. Install xlsxwriter or use .csv"
             )
