@@ -14,8 +14,9 @@ import math
 import collections
 import psutil
 import subprocess  # nosec
+import logging
 from time import strptime
-from ctypes import *  # flake8: noqa
+from ctypes import cdll, CDLL
 from datetime import datetime
 from dateutil import tz
 
@@ -166,7 +167,7 @@ def get_version():
     try:
         fo = open("/proc/version", "r")
     except EnvironmentError as e:
-        warnings.warn(str(e), UserWarning)
+        logging.warn(str(e), UserWarning)
     else:
         version = fo.read()
         version = version.split("#")[0]
@@ -180,7 +181,7 @@ def get_cpuinfo():
     try:
         fo = open("/proc/cpuinfo", "r")
     except EnvironmentError as e:
-        warnings.warn(str(e), UserWarning)
+        logging.warn(str(e), UserWarning)
     else:
         for line in fo:
             try:

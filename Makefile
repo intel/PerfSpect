@@ -4,13 +4,13 @@ VERSION_FILE := _version.txt
 VERSION_BASE := $(COMMIT_DATE)_$(COMMIT_ID)
 VERSION_NUMBER := $(shell cat ${VERSION_FILE})
 VERSION_PUBLIC := $(VERSION_NUMBER)
-PACKAGE_EXTERNAL := perfspect_$(VERSION_NUMBER).tgz
+PACKAGE_EXTERNAL := perfspect.tgz
 BINARY_FINAL := perfspect
 BINARY_COLLECT := perf-collect
 BINARY_POSTPROCESS := perf-postprocess
-default: all
+default: dist
 
-.PHONY: all test default dist clean format format_check security_scan flakes source_check checkmake dist/version_file dist/$(SOURCE_PACKAGE)
+.PHONY: test default dist format format_check style_error_check check dist/version_file dist/$(SOURCE_PACKAGE)
 
 clean_dir:
 	rm -rf build/*
@@ -34,22 +34,9 @@ build-public/collect:
 	mkdir -p $(TMPDIR)/src
 	mkdir -p $(TMPDIR)/events
 	cp src/* $(TMPDIR)/src && cp events/* $(TMPDIR)/events && cp *.py $(TMPDIR)
-	sed -i 's/PerfSpect_DEV_VERSION/$(VERSION_PUBLIC)/g' $(TMPDIR)/src/perf_helpers.py 
-	cd $(TMPDIR) && pyinstaller -F perf-collect.py -n $(BINARY_COLLECT) \
-					--add-data "./src/libtsc.so:." \
-					--add-data "./events/bdx.txt:." \
-					--add-data "./events/skx.txt:." \
-					--add-data "./events/clx.txt:." \
-					--add-data "./events/icx.txt:." \
-					--add-data "./events/spr.txt:." \
-					--add-data "./events/icx_aws.txt:." \
-					--add-data "./events/spr_aws.txt:." \
-					--add-data "./events/clx_aws.txt:." \
-					--add-data "./events/skx_aws.txt:." \
-					--add-binary "../build/pmu-checker:." \
-					--runtime-tmpdir . \
-					--exclude-module readline
-	
+	sed -i 's/PerfSpect_DEV_VERSION/$(VERSION_PUBLIC)/g' $(TMPDIR)/src/perf_helpers.py
+	cp perf-collect.spec $(TMPDIR)
+	cd $(TMPDIR) && pyinstaller perf-collect.spec
 	cp $(TMPDIR)/dist/$(BINARY_COLLECT) build/
 	rm -rf $(TMPDIR)
 
@@ -87,18 +74,16 @@ test:
 	cd dist && tar -xvf perfspect.tgz && cp -r $(BINARY_FINAL) ../test/.
 	cd test && pytest
 
-format:
-	black src
-	black *.py
-
 format_check:
-	black --check src
-	black --check perf-collect.py perf-postprocess.py
+	black --check *.py src
 
-error_check: # ignore false positives
-	flake8 --ignore=E501,W503,F403,F405,E741 src
-	flake8 --ignore=E203,E501,E722,W503,F403,F405 *.py --exclude simpleeval.py,perfmon.py,average.py
+format:
+	black *.py src
 
-source_check: security_scan format_check error_check
+style_error_check:
+	# ignore long lines and conflicts with black, i.e., black wins
+	flake8 *.py src --ignore=E501,W503,E203
 
-dist: source_check dist/$(PACKAGE_EXTERNAL) 
+check: format_check style_error_check
+
+dist: check dist/$(PACKAGE_EXTERNAL) 

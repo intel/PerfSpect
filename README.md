@@ -25,7 +25,7 @@ Requires recent python and golang.
 
 ```
 pip3 install -r requirements.txt
-make dist
+make
 ```
 
 On successful build, binaries will be created in "dist" folder
