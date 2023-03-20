@@ -6,7 +6,6 @@
 ###########################################################################################################
 
 import os
-import sys
 import re
 import fnmatch
 import time
@@ -210,29 +209,20 @@ def get_lscpu():
     return cpuinfo
 
 
-def not_suported():
-    print(
-        "Current architecture not supported!\nThis version only suports Broadwell/Skylake/Cascadelake/Icelake. Exiting!"
-    )
-    sys.exit()
-
-
-# Check if arch is broadwell/skyalke/cascadelake/icelake/sapphirerapids
-def check_architecture(procinfo):
+def get_arch_and_name(procinfo):
+    arch = modelname = ""
     try:
         model = int(procinfo[0]["model"].strip())
         cpufamily = int(procinfo[0]["cpu family"].strip())
         stepping = int(procinfo[0]["stepping"].strip())
         vendor = str(procinfo[0]["vendor_id"].strip())
         modelname = procinfo[0]["model name"].strip()
-
     except KeyError:
         # for non-Intel architectures
         cpuinfo = get_lscpu()
         modelname = str(cpuinfo["Model name"])
         stepping = str(cpuinfo["Stepping"])
         vendor = str(cpuinfo["Vendor ID"])
-
     if vendor == "GenuineIntel":
         if model == 85 and cpufamily == 6 and stepping == 4:
             arch = "skylake"
@@ -244,11 +234,6 @@ def check_architecture(procinfo):
             arch = "icelake"
         elif model == 143 and cpufamily == 6 and stepping >= 3:
             arch = "sapphirerapids"
-        else:
-            not_suported()
-
-    else:
-        not_suported()
     return arch, modelname
 
 
@@ -343,12 +328,17 @@ def get_epoch(start_time):
 # Requires cgroup-tools/libgroup-tools for ubuntu/centos
 def get_cgroups_from_cids(cids):
     cgroups = []
-    p = subprocess.Popen(  # nosec
-        ["lscgroup"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )  # nosec
+    try:
+        p = subprocess.Popen(  # nosec
+            ["lscgroup"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )  # nosec
+    except FileNotFoundError:
+        raise SystemExit(
+            "lscgroup not found; please install the lscgroup utility for container support"
+        )
     out, err = p.communicate()
     if err:
-        raise SystemExit("please install prerequisites(lscgroup)")
+        raise SystemExit(f"error calling lscgroup: {err}")
     cgevent = "perf_event:"
     for cid in cids:
         match = [cid, cgevent]
@@ -357,7 +347,7 @@ def get_cgroups_from_cids(cids):
             if all(x in s.decode() for x in match):
                 cgroups.append((s.decode().lstrip(cgevent)))
     if len(cgroups) == 0:
-        raise SystemExit("invalid container ID " + cid)
+        raise SystemExit(f"invalid container ID: {cid}")
     return cgroups
 
 
@@ -391,11 +381,3 @@ def fix_path_ownership(path, recursive=False):
             fix_path_ownership(dirpath)
             for filename in filenames:
                 fix_path_ownership(os.path.join(dirpath, filename))
-
-
-def check_os():
-    import platform
-
-    curr_os = platform.system()
-    if curr_os != "Linux":
-        raise SystemExit("PerfSpect currently supports Linux-based OS only")
