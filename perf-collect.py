@@ -7,6 +7,7 @@
 
 from __future__ import print_function
 import os
+import platform
 import sys
 import subprocess  # nosec
 import shlex  # nosec
@@ -15,6 +16,14 @@ from src import prepare_perf_events as prep_events
 
 
 from subprocess import PIPE, run  # nosec
+
+SUPPORTED_ARCHITECTURES = [
+    "Broadwell",
+    "Skylake",
+    "Cascadelake",
+    "Icelake",
+    "SapphireRapids",
+]
 
 
 # meta data gathering
@@ -46,10 +55,7 @@ def write_metadata(
         modified.write("TSC Frequency(MHz)," + tsc_freq + ",\n")
         modified.write("CPU count," + str(perf_helpers.get_cpu_count()) + ",\n")
         modified.write("SOCKET count," + str(perf_helpers.get_socket_count()) + ",\n")
-        if args.pid or args.cid:
-            modified.write("HT count," + str(1) + ",\n")
-        else:
-            modified.write("HT count," + str(perf_helpers.get_ht_count()) + ",\n")
+        modified.write("HT count," + str(perf_helpers.get_ht_count()) + ",\n")
         imc, cha, upi = perf_helpers.get_imc_cacheagent_count()
         modified.write("IMC count," + str(imc) + ",\n")
         modified.write("CHA count," + str(cha) + ",\n")
@@ -134,6 +140,9 @@ def is_safe_file(fname, substr):
 
 
 if __name__ == "__main__":
+    if platform.system() != "Linux":
+        raise SystemExit("PerfSpect currently supports Linux only")
+
     script_path = os.path.dirname(os.path.realpath(__file__))
     # fix the pyinstaller path
     if "_MEI" in script_path:
@@ -257,17 +266,19 @@ if __name__ == "__main__":
         raise SystemExit(
             "Input argument dump interval is too large or too small, range is [0.1 to 300s]!"
         )
-
-    # select architecture default event file if not supplied
-    procinfo = perf_helpers.get_cpuinfo()
-    arch, cpuname = perf_helpers.check_architecture(procinfo)
-    eventfile = args.eventfile
-    eventfilename = eventfile
-    perf_helpers.check_os()
     if args.cloud and args.cloud not in ("AWS", "aws", "OCI", "oci", "oracle"):
         parser.print_help()
         raise SystemExit("Invalid csp/cloud")
 
+    # select architecture default event file if not supplied
+    procinfo = perf_helpers.get_cpuinfo()
+    arch, cpuname = perf_helpers.get_arch_and_name(procinfo)
+    if not arch:
+        raise SystemExit(
+            f"Unrecognized CPU architecture. Supported architectures: {', '.join(SUPPORTED_ARCHITECTURES)}"
+        )
+    eventfile = args.eventfile
+    eventfilename = eventfile
     if not eventfile:
         is_vm = args.cloudtype in ("VM", "vm")
         is_aws_vm = args.cloud in ("aws", "AWS", "amazon") and is_vm
@@ -295,10 +306,9 @@ if __name__ == "__main__":
             eventfile = "spr.txt"
             if is_aws_vm:
                 eventfile = "spr_aws.txt"
-        else:
-            raise SystemExit(
-                "Unsupported architecture (currently supports IA -> Broadwell, Skylake, CascadeLake Icelake and SapphireRapids)"
-            )
+
+        if not eventfile:
+            raise SystemExit(f"Event file for arch ({arch}) not found.")
 
         # Convert path of event file to relative path if being packaged by pyInstaller into a binary
         if getattr(sys, "frozen", False):
@@ -312,7 +322,7 @@ if __name__ == "__main__":
             eventfile = script_path + "/events/" + eventfile
             eventfilename = eventfile
         else:
-            raise SystemExit("Unknow application type")
+            raise SystemExit("Unknown application type")
 
     if not os.path.isfile(eventfile):
         parser.print_usage()

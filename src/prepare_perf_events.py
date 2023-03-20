@@ -165,10 +165,10 @@ def prepare_perf_events(event_file, grouping, cpu_only):
                 ["perf", "list"], universal_newlines=True
             )
         except FileNotFoundError:
-            raise SystemExit("perf not found; please install linux perf utility")
+            raise SystemExit("perf not found; please install the Linux perf utility")
 
-        except subprocess.CalledProcessError:
-            raise SystemExit("perf not found; please install linux perf utility")
+        except subprocess.CalledProcessError as e:
+            raise SystemExit(f"error calling Linux perf, error code: {e.returncode}")
 
         unsupported_events = []
         for line in fin:

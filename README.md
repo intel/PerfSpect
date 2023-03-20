@@ -1,14 +1,14 @@
-[![Build](https://github.com/intel/PerfSpect/actions/workflows/build.yml/badge.svg)](https://github.com/intel/PerfSpect/actions/workflows/build.yml)
-[![License](https://img.shields.io/badge/License-BSD--3-blue)](https://github.com/intel/PerfSpect/blob/master/LICENSE)
+# PerfSpect &middot; [![Build](https://github.com/intel/PerfSpect/actions/workflows/build.yml/badge.svg)](https://github.com/intel/PerfSpect/actions/workflows/build.yml)[![License](https://img.shields.io/badge/License-BSD--3-blue)](https://github.com/intel/PerfSpect/blob/master/LICENSE)
 
-# PerfSpect
+[Quick Start](#quick-start-requires-perf-installed) | [Requirements](#requirements) | [Build from source](#build-from-source) | [Collection](#collection) | [Post-processing](#post-processing) | [Caveats](#caveats) | [How to contribute](#how-to-contribute)
 
 PerfSpect is a system performance characterization tool based on linux perf targeting Intel microarchitectures.  
 The tool has two parts
 
 1. perf collection to collect underlying PMU (Performance Monitoring Unit) counters
 2. post processing that generates csv output of performance metrics.
-### Quick start (requires perf installed)
+
+## Quick start (requires perf installed)
 ```
 wget -qO- https://github.com/intel/PerfSpect/releases/latest/download/perfspect.tgz | tar xvz
 cd perfspect
@@ -19,7 +19,31 @@ sudo ./perf-postprocess -r results/perfstat.csv --html perfstat.html
 ![PerfSpect BS](images/basic_stats.JPG "perfspect-bs")
 ![perfspect-demo1](https://user-images.githubusercontent.com/5321018/205159259-3654fa12-74d6-4cb5-8194-ea1b66aadb25.gif)
 
-## Building binaries from source code
+## Requirements
+### Packages:
+- **perf** - PerfSpect uses the Linux perf tool to collect PMU counters
+- **lscgroup** - Perfspect needs lscgroup from the cgroup-tools (libcgroup on RHEL/CentOS) package when collecting data for containers
+
+### Supported kernels
+
+| Xeon Generation | Minimum Kernel |
+| - | - |
+| Broadwell | kernel 4.15 |
+| Skylake | kernel 4.15 |
+| Cascadelake | kernel 4.15 |
+| Icelake | kernel 5.9 |
+| Sapphire Rapids | kernel 5.12 |
+
+### Supported Operating Systems:
+- Ubuntu 16.04 and newer
+- centos 7 and newer
+- Amazon Linux 2
+- RHEL 9
+- Debian 11
+
+*Note: PerfSpect may work on other Linux distributions, but has not been thoroughly tested*
+
+## Build from source
 
 Requires recent python and golang.
 
@@ -30,7 +54,7 @@ make
 
 On successful build, binaries will be created in "dist" folder
 
-### 1. Perf collection:
+## Collection:
 
 ```
 (sudo) ./perf-collect (options)  -- Some options can be used only with root privileges
@@ -68,7 +92,7 @@ Options:
                         Instance type: Options include - VM,BM
 ```
 
-#### Examples
+### Examples
 
 1. sudo ./perf-collect (collect PMU counters using predefined architecture specific event file until collection is terminated)
 2. sudo ./perf-collect -m 10 -t 30 (sets event multiplexing interval to 10ms and collects PMU counters for 30 seconds using default architecture specific event file)
@@ -77,12 +101,12 @@ Options:
 5. sudo ./perf-collect --metadata (collect system info and PMU event info without running perf, uses default outputfile if -o option is not used)
 6. sudo ./perf-collect --cid "one or more container IDs from docker or kubernetes seperated by semicolon"
 
-#### Notes
+### Notes
 
 1. Intel CPUs (until Cascadelake) have 3 fixed PMUs (cpu-cycles, ref-cycles, instructions) and 4 programmable PMUs. The events are grouped in event files with this assumption. However, some of the counters may not be available on some CPUs. You can check the correctness of the event file with dryrun and check the output for anamolies. Typically output will have "not counted", "unsuppported" or zero values for cpu-cycles if number of available counters are less than events in a group.
 2. Globally pinned events can limit the number of counters available for perf event groups. On X86 systems NMI watchdog pins a fixed counter by default. NMI watchdog is disabled during perf collection if run as a sudo user. If NMI watchdog can't be disabled, event grouping will be forcefully disabled to let perf driver handle event multiplexing.
 
-### 2. Perf Post Processing:
+## Post-processing:
 
 ```
 ./perf-postprocess (options)
@@ -111,13 +135,13 @@ required arguments:
                         Raw CSV output from perf-collect
 ```
 
-#### Examples
+### Examples
 
 ./perf-postprocess -r results/perfstat.csv (post processes perfstat.csv and creates metric_out.csv, metric_out.average.csv, metric_out.raw.csv)
 
 ./perf-postprocess -r results/perfstat.csv --html perfstat.html (creates a report for TMA analysis and system level metric charts.)
 
-#### Notes
+### Notes
 
 1. metric_out.csv : Time series dump of the metrics. The metrics are defined in events/metric.json
 2. metric_out.averags.csv: Average of metrics over the collection period
