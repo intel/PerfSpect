@@ -12,7 +12,7 @@ jobs:
       - name: install dependencies
         run: |
           yum update -y
-          yum install -y make python3
+          yum install -y make python3 gcc
           python3 -m pip install --upgrade pip
       - name: build
         run: |
