@@ -22,7 +22,6 @@ sudo ./perf-postprocess -r results/perfstat.csv --html perfstat.html
 ## Requirements
 ### Packages:
 - **perf** - PerfSpect uses the Linux perf tool to collect PMU counters
-- **lscgroup** - Perfspect needs lscgroup from the cgroup-tools (libcgroup on RHEL/CentOS) package when collecting data for containers
 
 ### Supported kernels
 
@@ -45,7 +44,7 @@ sudo ./perf-postprocess -r results/perfstat.csv --html perfstat.html
 
 ## Build from source
 
-Requires recent python and golang.
+Requires recent python
 
 ```
 pip3 install -r requirements.txt
