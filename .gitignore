@@ -1,5 +1,4 @@
 build/*
 dist/*
-pmu-checker/pmu-checker
 src/libtsc.so
 __pycache__

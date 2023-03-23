@@ -990,7 +990,11 @@ def write_socket_view(level, samples):
                                     m.append(core_to_idx)
                                     present = True
                                     break
-                        if not present:
+                        # add to mapping if not present, or it is the last uncore event (assuming all core events come before the uncore events)
+                        if (not present) or (
+                            name.startswith("UNC")
+                            and not prev_event_name.startswith("UNC")
+                        ):
                             mapping = persocket_idx(prev_event_name, core_to_idx)
                             mappings.append(mapping)
                             ename = mapping.getname()

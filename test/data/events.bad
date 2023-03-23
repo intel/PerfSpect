@@ -1,8 +1,0 @@
-
-# Example target file improperlly formatted
-
-xyz/event=xyz,umask=abc,period=abc,name='abc'/,
-abc/event=abc,umask=abc,period=abc,name='xyz'/,
-testzyxdata,
-testabcdata,
-xyzdata;

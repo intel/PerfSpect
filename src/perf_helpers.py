@@ -9,6 +9,7 @@ import os
 import re
 import fnmatch
 import time
+import struct
 import math
 import collections
 import psutil
@@ -160,13 +161,58 @@ def enumerate_uncore(event, n):
     return event_list
 
 
+# read the MSR register and return the value in dec format
+def readmsr(msr, cpu=0):
+    f = os.open("/dev/cpu/%d/msr" % (cpu,), os.O_RDONLY)
+    os.lseek(f, msr, os.SEEK_SET)
+    val = struct.unpack("Q", os.read(f, 8))[0]
+    os.close(f)
+    return val
+
+
+# detect if PMU counters are in use
+def pmu_contention_detect(iterations=2):
+    interval = 1
+    msrs = {
+        "0x309": {"name": "instructions", "value": None},
+        "0x30a": {"name": "cpu cycles", "value": None},
+        "0x30b": {"name": "ref cycles", "value": None},
+        "0x30c": {"name": "topdown slots", "value": None},
+        "0xc1": {"name": "general purpose PMU 1", "value": None},
+        "0xc2": {"name": "general purpose PMU 2", "value": None},
+        "0xc3": {"name": "general purpose PMU 3", "value": None},
+        "0xc4": {"name": "general purpose PMU 4", "value": None},
+        "0xc5": {"name": "general purpose PMU 5", "value": None},
+        "0xc6": {"name": "general purpose PMU 6", "value": None},
+        "0xc7": {"name": "general purpose PMU 7", "value": None},
+        "0xc8": {"name": "general purpose PMU 8", "value": None},
+    }
+    warn = False
+    for _ in range(iterations):
+        for r in msrs:
+            try:
+                value = readmsr(int(r, 16))
+                if msrs[r]["value"] is not None and value != msrs[r]["value"]:
+                    print("PMU in use: " + msrs[r]["name"])
+                    warn = True
+                msrs[r]["value"] = value
+            except IOError:
+                pass
+        time.sleep(interval)
+    if warn:
+        print("output could be inaccurate")
+    else:
+        print("PMUs not in use")
+    return False
+
+
 # get linux kernel version
 def get_version():
     version = ""
     try:
         fo = open("/proc/version", "r")
     except EnvironmentError as e:
-        logging.warn(str(e), UserWarning)
+        logging.warning(str(e), UserWarning)
     else:
         version = fo.read()
         version = version.split("#")[0]
@@ -180,7 +226,7 @@ def get_cpuinfo():
     try:
         fo = open("/proc/cpuinfo", "r")
     except EnvironmentError as e:
-        logging.warn(str(e), UserWarning)
+        logging.warning(str(e), UserWarning)
     else:
         for line in fo:
             try:
@@ -325,29 +371,37 @@ def get_epoch(start_time):
     return epoch
 
 
-# Requires cgroup-tools/libgroup-tools for ubuntu/centos
+# get cgroup names by container ids
 def get_cgroups_from_cids(cids):
     cgroups = []
     try:
-        p = subprocess.Popen(  # nosec
-            ["lscgroup"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )  # nosec
-    except FileNotFoundError:
-        raise SystemExit(
-            "lscgroup not found; please install the lscgroup utility for container support"
+        p = subprocess.Popen(
+            ["sudo", "ps", "-e", "-o", "cgroup"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
-    out, err = p.communicate()
+        p2 = subprocess.Popen(
+            ["grep", "docker-"],
+            stdin=p.stdout,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        p.stdout.close()
+
+    except subprocess.SubprocessError as e:
+        raise SystemExit("failed to open ps subprocess: " + e.output)
+    out, err = p2.communicate()
     if err:
-        raise SystemExit(f"error calling lscgroup: {err}")
-    cgevent = "perf_event:"
+        raise SystemExit(f"error reading cgroups: {err}")
+    lines = out.decode("utf-8").split("\n")
     for cid in cids:
-        match = [cid, cgevent]
-        for s in out.split():
-            # Need to add check for incorrect CID where cgroup not found
-            if all(x in s.decode() for x in match):
-                cgroups.append((s.decode().lstrip(cgevent)))
-    if len(cgroups) == 0:
-        raise SystemExit(f"invalid container ID: {cid}")
+        found = False
+        for line in lines:
+            if ("docker-" + cid) in line:
+                found = True
+                cgroups.append(line.split(":")[-1])
+        if not found:
+            raise SystemExit("invalid container ID: " + cid)
     return cgroups
 
 

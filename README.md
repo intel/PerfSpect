@@ -16,8 +16,8 @@ sudo ./perf-collect --timeout 10
 sudo ./perf-postprocess -r results/perfstat.csv --html perfstat.html
 ```
 
-![PerfSpect BS](images/basic_stats.JPG "perfspect-bs")
-![perfspect-demo1](https://user-images.githubusercontent.com/5321018/205159259-3654fa12-74d6-4cb5-8194-ea1b66aadb25.gif)
+![basic_stats](https://raw.githubusercontent.com/wiki/intel/PerfSpect/basic_stats.JPG)
+![perfspect-demo1](https://raw.githubusercontent.com/wiki/intel/PerfSpect/demo.gif)
 
 ## Requirements
 ### Packages:

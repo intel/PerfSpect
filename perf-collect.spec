@@ -7,7 +7,6 @@ block_cipher = None
 a = Analysis(
     ['perf-collect.py'],
     pathex=[],
-    binaries=[('../build/pmu-checker', '.')],
     datas=[('./src/libtsc.so', '.'), ('./events/bdx.txt', '.'), ('./events/skx.txt', '.'), ('./events/clx.txt', '.'), ('./events/icx.txt', '.'), ('./events/spr.txt', '.'), ('./events/icx_aws.txt', '.'), ('./events/spr_aws.txt', '.'), ('./events/clx_aws.txt', '.'), ('./events/skx_aws.txt', '.')],
     hiddenimports=[],
     hookspath=[],
