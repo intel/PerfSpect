@@ -12,7 +12,6 @@ import time
 import struct
 import math
 import collections
-import psutil
 import subprocess  # nosec
 import logging
 from time import strptime
@@ -409,17 +408,8 @@ def get_cgroups_from_cids(cids):
 # Requires pstools python library
 def get_comm_from_cid(cids, cgroups):
     cnamelist = ""
-    avoidpids = []
-    # pids to avoid
-    for c in psutil.Process(os.getppid()).parent().parent().children(recursive=True):
-        avoidpids.append(c.pid)
     for index, cid in enumerate(cids):
-        for p in psutil.process_iter():
-            if cid in " ".join(p.cmdline()):
-                for c in p.children(recursive=False):
-                    if c.pid not in avoidpids:
-                        # cnamelist += cgroups[index] + "=" + c.name() + ","
-                        cnamelist += cgroups[index] + "=" + cid + ","
+        cnamelist += cgroups[index] + "=" + cid + ","
     return cnamelist
 
 

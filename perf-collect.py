@@ -84,23 +84,30 @@ def write_metadata(
         cpusets = ""
         if args.cid is not None:
             for cgroup in cgroups:
-                try:
-                    cpu_set_file = open(
-                        "/sys/fs/cgroup/cpuset/" + cgroup + "/cpuset.cpus", "r"
-                    )
-                    cgroup_version = 1
-                except FileNotFoundError:
-                    # try cgroup v2 location
-                    cpu_set_file = open(
-                        "/sys/fs/cgroup/" + cgroup + "/cpuset.cpus", "r"
-                    )
-                    cgroup_version = 2
+                cgroup_paths = [
+                    "/sys/fs/cgroup/cpuset/" + cgroup + "/cpuset.cpus",  # cgroup v1
+                    "/sys/fs/cgroup/" + cgroup + "/cpuset.cpus",  # cgroup v2
+                ]
+                cg_path_found = False
+                for cg_path in cgroup_paths:
+                    try:
+                        cpu_set_file = open(
+                            "/sys/fs/cgroup/cpuset/" + cgroup + "/cpuset.cpus", "r"
+                        )
+                        cg_path_found = True
+                        # no need to check other paths
+                        break
+                    except FileNotFoundError:
+                        # check next path
+                        continue
 
-                cpu_set = cpu_set_file.read()
-                cpu_set_file.close()
-                cpu_set = cpu_set.strip()
-                if cpu_set == "" and cgroup_version == 2:
-                    # An empty cpu-set in v2 indicates that the container is running on all CPUs
+                if cg_path_found:
+                    cpu_set = cpu_set_file.read()
+                    cpu_set_file.close()
+                    cpu_set = cpu_set.strip()
+
+                if not cg_path_found or cpu_set == "":
+                    # A missing path or an empty cpu-set in v2 indicates that the container is running on all CPUs
                     cpu_set = "0-" + str(
                         int(
                             perf_helpers.get_cpu_count()
