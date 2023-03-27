@@ -16,13 +16,12 @@ sudo ./perf-collect --timeout 10
 sudo ./perf-postprocess -r results/perfstat.csv --html perfstat.html
 ```
 
-![PerfSpect BS](images/basic_stats.JPG "perfspect-bs")
-![perfspect-demo1](https://user-images.githubusercontent.com/5321018/205159259-3654fa12-74d6-4cb5-8194-ea1b66aadb25.gif)
+![basic_stats](https://raw.githubusercontent.com/wiki/intel/PerfSpect/basic_stats.JPG)
+![perfspect-demo1](https://raw.githubusercontent.com/wiki/intel/PerfSpect/demo.gif)
 
 ## Requirements
 ### Packages:
 - **perf** - PerfSpect uses the Linux perf tool to collect PMU counters
-- **lscgroup** - Perfspect needs lscgroup from the cgroup-tools (libcgroup on RHEL/CentOS) package when collecting data for containers
 
 ### Supported kernels
 
@@ -45,7 +44,7 @@ sudo ./perf-postprocess -r results/perfstat.csv --html perfstat.html
 
 ## Build from source
 
-Requires recent python and golang.
+Requires recent python
 
 ```
 pip3 install -r requirements.txt

@@ -514,16 +514,33 @@ def load_metrics(infile, outfile, level=0):
     return 1
 
 
+# generate summary output with averages, min, max, p95 for cgroups
 def write_cgroup_summary():
     avgdf = pd.DataFrame(columns=["metrics"])
     for file in out_metric_files:
         df = pd.read_csv(file).iloc[:, 1:]
+        # extract avg, p95, min, and max columns
         avgcol = df.mean(axis=0).to_frame().reset_index()
+        p95col = df.quantile(q=0.95, axis=0).to_frame().reset_index()
+        mincol = df.min(axis=0).to_frame().reset_index()
+        maxcol = df.max(axis=0).to_frame().reset_index()
+        # get container id
         container = os.path.basename(file).split(".")[0].split("_")[-1]
-        avgcol.columns = ["metrics", container]
+        # define columns headers
+        avgcol.columns = ["metrics", "avg"]
+        p95col.columns = ["metrics", "p95"]
+        mincol.columns = ["metrics", "min"]
+        maxcol.columns = ["metrics", "max"]
+        # merge columns
         avgdf = avgdf.merge(avgcol, on="metrics", how="outer")
-    sum_file = get_extra_out_file(out_metric_file, "a")
-    avgdf.to_csv(sum_file)
+        avgdf = avgdf.merge(p95col, on="metrics", how="outer")
+        avgdf = avgdf.merge(mincol, on="metrics", how="outer")
+        avgdf = avgdf.merge(maxcol, on="metrics", how="outer")
+        # generate output file, one for each container id
+        sum_file = get_extra_out_file(
+            out_metric_file.replace(".csv", "_" + container + ".csv"), "a"
+        )
+        avgdf.to_csv(sum_file, index=False)
     return
 
 
@@ -990,7 +1007,11 @@ def write_socket_view(level, samples):
                                     m.append(core_to_idx)
                                     present = True
                                     break
-                        if not present:
+                        # add to mapping if not present, or it is the last uncore event (assuming all core events come before the uncore events)
+                        if (not present) or (
+                            name.startswith("UNC")
+                            and not prev_event_name.startswith("UNC")
+                        ):
                             mapping = persocket_idx(prev_event_name, core_to_idx)
                             mappings.append(mapping)
                             ename = mapping.getname()

@@ -15,8 +15,6 @@ from src import perf_helpers
 from src import prepare_perf_events as prep_events
 
 
-from subprocess import PIPE, run  # nosec
-
 SUPPORTED_ARCHITECTURES = [
     "Broadwell",
     "Skylake",
@@ -86,13 +84,40 @@ def write_metadata(
         cpusets = ""
         if args.cid is not None:
             for cgroup in cgroups:
-                set = open("/sys/fs/cgroup/cpuset/" + cgroup + "/cpuset.cpus", "r")
-                cpu_set = set.read()
-                set.close()
-                cpu_set = cpu_set.strip()
-                cpu_set = str("," + cpu_set)
-                cpusets += cpu_set
-                cpusets = str(cpusets)
+                cgroup_paths = [
+                    "/sys/fs/cgroup/cpuset/" + cgroup + "/cpuset.cpus",  # cgroup v1
+                    "/sys/fs/cgroup/" + cgroup + "/cpuset.cpus",  # cgroup v2
+                ]
+                cg_path_found = False
+                for cg_path in cgroup_paths:
+                    try:
+                        cpu_set_file = open(
+                            "/sys/fs/cgroup/cpuset/" + cgroup + "/cpuset.cpus", "r"
+                        )
+                        cg_path_found = True
+                        # no need to check other paths
+                        break
+                    except FileNotFoundError:
+                        # check next path
+                        continue
+
+                if cg_path_found:
+                    cpu_set = cpu_set_file.read()
+                    cpu_set_file.close()
+                    cpu_set = cpu_set.strip()
+
+                if not cg_path_found or cpu_set == "":
+                    # A missing path or an empty cpu-set in v2 indicates that the container is running on all CPUs
+                    cpu_set = "0-" + str(
+                        int(
+                            perf_helpers.get_cpu_count()
+                            * perf_helpers.get_socket_count()
+                            * perf_helpers.get_ht_count()
+                            - 1
+                        )
+                    )
+
+                cpusets += "," + cpu_set
         else:
             cpusets = "disabled"
 
@@ -468,21 +493,6 @@ if __name__ == "__main__":
             args.timeout,
         )
     elif args.dryrun:
-        with open("results/pmu-checker.log", "w") as fw:
-            print("Checking if PMU counters are in-use already...")
-            pmuargs = resource_path("pmu-checker")
-            try:
-                run_result = run(  # nosec
-                    shlex.split(pmuargs),
-                    stdout=PIPE,
-                    stderr=PIPE,
-                    universal_newlines=True,
-                )
-                fw.write(str(run_result.stdout))
-
-            except Exception as e:
-                print(e)
-
         cmd = "perf stat %s -I %d -x , -e %s -o %s sleep 10" % (
             collection_type,
             interval,
@@ -498,6 +508,7 @@ if __name__ == "__main__":
         )
     perfargs = shlex.split(cmd)
     validate_perfargs(perfargs)
+    perf_helpers.pmu_contention_detect()
     if args.verbose:
         print(cmd)
     try:

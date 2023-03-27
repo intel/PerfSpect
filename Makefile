@@ -21,11 +21,6 @@ clean_dir:
 build_dir: clean_dir
 	mkdir -p build
 
-build/pmu-checker:
-	cd pmu-checker && make
-	cp pmu-checker/pmu-checker build/
-	strip -s -p --strip-unneeded build/pmu-checker
-
 build/libtsc:
 	gcc -fno-strict-overflow -fno-delete-null-pointer-checks -fwrapv -fPIC -shared -o src/libtsc.so src/calibrate.c
 
@@ -58,7 +53,7 @@ build-public/postprocess:
 	cp $(TMPDIR)/dist/perf-postprocess build/
 	rm -rf $(TMPDIR)
 
-dist/$(PACKAGE_EXTERNAL): build_dir build/pmu-checker build/libtsc build-public/collect build-public/postprocess
+dist/$(PACKAGE_EXTERNAL): build_dir build/libtsc build-public/collect build-public/postprocess
 	rm -rf dist/$(BINARY_FINAL)/
 	mkdir -p dist/$(BINARY_FINAL)
 	cp build/$(BINARY_COLLECT) dist/$(BINARY_FINAL)/$(BINARY_COLLECT)

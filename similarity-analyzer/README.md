@@ -1,4 +1,4 @@
-![Similarity Analysis](../images/sim.png "Sim-analyzer")
+![sim](https://raw.githubusercontent.com/wiki/intel/PerfSpect/sim.png)
 
 # Similarity Analyzer
 
