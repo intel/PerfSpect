@@ -21,6 +21,7 @@ from dateutil import tz
 
 
 version = "PerfSpect_DEV_VERSION"
+log = logging.getLogger(__name__)
 
 
 # get tool version info
@@ -170,9 +171,8 @@ def readmsr(msr, cpu=0):
 
 
 # detect if PMU counters are in use
-def pmu_contention_detect(iterations=2):
-    interval = 1
-    msrs = {
+def pmu_contention_detect(
+    msrs={
         "0x309": {"name": "instructions", "value": None},
         "0x30a": {"name": "cpu cycles", "value": None},
         "0x30b": {"name": "ref cycles", "value": None},
@@ -185,36 +185,36 @@ def pmu_contention_detect(iterations=2):
         "0xc6": {"name": "general purpose PMU 6", "value": None},
         "0xc7": {"name": "general purpose PMU 7", "value": None},
         "0xc8": {"name": "general purpose PMU 8", "value": None},
-    }
+    },
+    detect=False,
+):
     warn = False
-    for _ in range(iterations):
-        for r in msrs:
-            try:
-                value = readmsr(int(r, 16))
-                if msrs[r]["value"] is not None and value != msrs[r]["value"]:
-                    print("PMU in use: " + msrs[r]["name"])
-                    warn = True
-                msrs[r]["value"] = value
-            except IOError:
-                pass
-        time.sleep(interval)
-    if warn:
-        print("output could be inaccurate")
-    else:
-        print("PMUs not in use")
-    return False
+    for r in msrs:
+        try:
+            value = readmsr(int(r, 16))
+            if msrs[r]["value"] is not None and value != msrs[r]["value"]:
+                log.info("PMU in use: " + msrs[r]["name"])
+                warn = True
+            msrs[r]["value"] = value
+        except IOError:
+            pass
+    if detect:
+        if warn:
+            log.info("output could be inaccurate")
+        else:
+            log.info("PMUs not in use")
+    return msrs
 
 
 # get linux kernel version
 def get_version():
     version = ""
     try:
-        fo = open("/proc/version", "r")
+        with open("/proc/version", "r") as f:
+            version = f.read()
+            version = version.split("#")[0]
     except EnvironmentError as e:
-        logging.warning(str(e), UserWarning)
-    else:
-        version = fo.read()
-        version = version.split("#")[0]
+        log.warning(str(e), UserWarning)
     return version
 
 
@@ -225,7 +225,7 @@ def get_cpuinfo():
     try:
         fo = open("/proc/cpuinfo", "r")
     except EnvironmentError as e:
-        logging.warning(str(e), UserWarning)
+        log.warning(str(e), UserWarning)
     else:
         for line in fo:
             try:
@@ -352,7 +352,6 @@ def percentile(N, percent):
 # convert time to epoch
 def get_epoch(start_time):
     words = "".join(start_time).split()
-    print(start_time)
     month = words[4]
     date = words[5]
     year = words[7]
@@ -372,10 +371,11 @@ def get_epoch(start_time):
 
 # get cgroup names by container ids
 def get_cgroups_from_cids(cids):
-    cgroups = []
+    # cgroups is a set to exclude duplicate cids
+    cgroups = set()
     try:
         p = subprocess.Popen(
-            ["sudo", "ps", "-e", "-o", "cgroup"],
+            ["ps", "-e", "-o", "cgroup"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -398,10 +398,11 @@ def get_cgroups_from_cids(cids):
         for line in lines:
             if ("docker-" + cid) in line:
                 found = True
-                cgroups.append(line.split(":")[-1])
+                cgroups.add(line.split(":")[-1])
         if not found:
             raise SystemExit("invalid container ID: " + cid)
-    return cgroups
+    # change cgroups back to list brefore returning
+    return list(cgroups)
 
 
 # Convert cids to comm/names

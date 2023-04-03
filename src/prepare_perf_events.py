@@ -5,10 +5,14 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ###########################################################################################################
 
+import logging
 import os
 import re
+import sys
 import subprocess  # nosec
 import src.perf_helpers as helper
+
+log = logging.getLogger(__name__)
 
 
 # test if the event can be collected, check supported events in perf list
@@ -39,7 +43,7 @@ def filter_func(event, perf_list):
 
 
 # expand uncore event names
-def expand_unc(line, grouping):
+def expand_unc(line):
     line = line.strip()
     name = line.split("/")[0]
     unc_name = "uncore_" + name
@@ -47,7 +51,7 @@ def expand_unc(line, grouping):
     sys_devs = helper.get_sys_devices()
     if unc_name in sys_devs:
         unc_count = int(sys_devs[unc_name])
-    if grouping and (unc_count > 1):
+    if unc_count > 1:
         line = line.replace(name, unc_name + "_0")
         if "name=" in line:
             prettyname = (line.split("'"))[1].strip()
@@ -60,7 +64,11 @@ def check_cpu_event(line):
     line = line.strip()
     tmp_list = line.split("/")
     # assumes event name without a PMU qualifier is a core event
-    if len(tmp_list) == 1 or tmp_list[0] == "cpu" or tmp_list[0].startswith("cstate"):
+    if (
+        (len(tmp_list) == 1 or tmp_list[0] == "cpu" or tmp_list[0].startswith("cstate"))
+        and "OCR." not in line
+        and "power/" not in line
+    ):
         return True
     return False
 
@@ -93,34 +101,6 @@ def enumerate_uncore(group, pattern, n, default_range=True):
     return uncore_group
 
 
-# fix events that aren't compatible with older kernels
-def fix_events_for_older_kernels(eventfile, kernel_version):
-    reg = r".*?\-(\d*)(\.|\-).*"
-    match = re.match(reg, kernel_version)
-    kernel_part_number = match.group(1)
-    if int(kernel_part_number) >= 1000:
-        if not os.path.isfile(eventfile):
-            raise SystemExit("event file not found")
-
-        with open(eventfile, "r") as fin:
-            lines = fin.readlines()
-        with open(eventfile, "w") as f:
-            for line in lines:
-                if (
-                    line.strip("\n")
-                    == "cpu/event=0x80,umask=0x4,cmask=0x1,edge=0x1,name='ICACHE_16B.c1_e1_IFDATA_STALL'/,"
-                ):
-                    f.write(
-                        "cpu/event=0x80,umask=0x4,cmask=0x1,edge=0x1,name='ICACHE_16B_c1_e1_IFDATA_STALL'/,\n"
-                    )
-                    continue
-                if (
-                    line.strip("\n")
-                    != "cstate_pkg/c6-residency,name='FREERUN_CORE_C6_RESIDENCY'/;"
-                ):
-                    f.write(line)
-
-
 # For multiple cgroup collection we need this format : “-e e1 -e e2 -G foo,foo -G bar,bar"
 def get_cgroup_events_format(cgroups, events, num_events):
     eventlist = ""
@@ -142,19 +122,16 @@ def get_cgroup_events_format(cgroups, events, num_events):
     return perf_format
 
 
-def prepare_perf_events(event_file, grouping, cpu_only):
+def prepare_perf_events(event_file, cpu_only):
     if not os.path.isfile(event_file):
-        raise SystemExit("event file not found")
+        log.error("event file not found")
+        sys.exit(1)
 
     start_group = "'{"
     end_group = "}'"
     group = ""
     prev_group = ""
     new_group = True
-
-    if not grouping:
-        start_group = ""
-        end_group = ""
 
     collection_events = []
 
@@ -165,10 +142,12 @@ def prepare_perf_events(event_file, grouping, cpu_only):
                 ["perf", "list"], universal_newlines=True
             )
         except FileNotFoundError:
-            raise SystemExit("perf not found; please install the Linux perf utility")
+            log.error("Please install Linux perf and re-run")
+            sys.exit(1)
 
         except subprocess.CalledProcessError as e:
-            raise SystemExit(f"error calling Linux perf, error code: {e.returncode}")
+            log.error(f"Error calling Linux perf, error code: {e.returncode}")
+            sys.exit(1)
 
         unsupported_events = []
         for line in fin:
@@ -184,23 +163,12 @@ def prepare_perf_events(event_file, grouping, cpu_only):
                 else:
                     collection_events.append(line)
         if any("cpu-cycles" in event for event in unsupported_events):
-            raise SystemExit(
-                "Fixed counters not supported, unable to collect PMUs on this platform"
-            )
+            log.error("PMU's not available. Run in a full socket VM or baremetal")
+            sys.exit(1)
         if len(unsupported_events) > 0:
-            print(
-                "These events are not supported with current version of perf, will not be collected!"
+            log.warning(
+                str("Perf unsupported events not counted: " + str(unsupported_events))
             )
-            for e in unsupported_events:
-                print("%s" % e)
-        if not grouping:
-            templist = []
-            for e in collection_events:
-                # remove any ';' at the end that indicates end of group
-                e = e.strip()[:-1] + ","
-                if e not in templist:
-                    templist.append(e)
-            collection_events = templist
 
     core_event = []
     uncore_event = []
@@ -218,7 +186,7 @@ def prepare_perf_events(event_file, grouping, cpu_only):
                 event = line + ":u"
                 uncore_event.append(event)
         event_names.append(event)
-        line, unc_count = expand_unc(line, grouping)
+        line, unc_count = expand_unc(line)
         if new_group:
             group += start_group
             prev_group = start_group
@@ -240,10 +208,12 @@ def prepare_perf_events(event_file, grouping, cpu_only):
     fin.close()
     group = group[:-1]
     if len(event_names) == 0:
-        raise SystemExit("No supported events found on this platform.")
+        log.error("No supported events found on this platform.")
+        sys.exit(1)
     # being conservative not letting the collection to proceed if fixed counters aren't suported on the platform
     if len(unsupported_events) >= len(core_event):
-        raise SystemExit(
+        log.error(
             "Most core counters aren't supported on this platform, unable to collect PMUs"
         )
+        sys.exit(1)
     return group, event_names

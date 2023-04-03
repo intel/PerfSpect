@@ -5,9 +5,13 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ###########################################################################################################
 
+import logging
+import os
 from src import basic_stats
 from src import icicle
-import os
+from yattag import Doc, indent
+
+log = logging.getLogger(__name__)
 
 
 def write_html(res_dir, base_input_file, arch, html_report_out, type="both"):
@@ -16,7 +20,6 @@ def write_html(res_dir, base_input_file, arch, html_report_out, type="both"):
     tma_inp = base_input_file.split(".")[0] + ".average.csv"
     basic_inp = os.path.join(res_dir, base_input_file)
     tma_inp = os.path.join(res_dir, tma_inp)
-    from yattag import Doc, indent
 
     doc, tag, text = Doc().tagtext()
     with tag("html"):
@@ -61,4 +64,4 @@ def write_html(res_dir, base_input_file, arch, html_report_out, type="both"):
     out_html = os.path.join(res_dir, html_report_out)
     with open(out_html, "w") as file:
         file.write(result)
-    print(f"static HTML file written at {out_html}")
+    log.info(f"static HTML file written at {out_html}")

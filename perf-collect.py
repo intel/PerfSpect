@@ -6,14 +6,24 @@
 ###########################################################################################################
 
 from __future__ import print_function
+import logging
 import os
 import platform
+import re
 import sys
 import subprocess  # nosec
 import shlex  # nosec
+from argparse import ArgumentParser
 from src import perf_helpers
 from src import prepare_perf_events as prep_events
 
+logging.basicConfig(
+    format="%(asctime)s %(levelname)s: %(message)s",
+    datefmt="%H:%M:%S",
+    level=logging.NOTSET,
+    handlers=[logging.FileHandler("debug.log"), logging.StreamHandler(sys.stdout)],
+)
+log = logging.getLogger(__name__)
 
 SUPPORTED_ARCHITECTURES = [
     "Broadwell",
@@ -33,9 +43,8 @@ def write_metadata(
     cpuid_info,
     interval,
     muxinterval,
-    nogroups,
-    percore,
-    supervisor,
+    thread,
+    socket,
     metadata_only=False,
 ):
     tsc_freq = str(perf_helpers.get_tsc_freq())
@@ -45,7 +54,7 @@ def write_metadata(
     with open(outcsv, "r") as original:
         time_stamp = original.readline()
         if metadata_only and time_stamp.startswith("### META DATA ###"):
-            print("Not prepending metadata, already present in %s " % (outcsv))
+            log.warning("Not prepending metadata, already present in %s " % (outcsv))
             return
         data = original.read()
     with open(outcsv, "w") as modified:
@@ -68,11 +77,8 @@ def write_metadata(
                 modified.write(str(c) + ";")
             modified.write("\n")
         modified.write("Perf event mux Interval ms," + str(muxinterval) + ",\n")
-        grouping = "disabled" if nogroups else "enabled"
-        supervisor = "sudo" if supervisor else "non root"
-        percoremode = "enabled" if percore else "disabled"
-        modified.write("Event grouping," + grouping + ",\n")
-        modified.write("User mode," + supervisor + ",\n")
+        threadmode = "enabled" if thread else "disabled"
+        socketmode = "enabled" if socket else "disabled"
         if args.cid is not None:
             cgname = "enabled," + perf_helpers.get_comm_from_cid(
                 args.cid.split(","), cgroups
@@ -89,7 +95,7 @@ def write_metadata(
                     "/sys/fs/cgroup/" + cgroup + "/cpuset.cpus",  # cgroup v2
                 ]
                 cg_path_found = False
-                for cg_path in cgroup_paths:
+                for _ in cgroup_paths:
                     try:
                         cpu_set_file = open(
                             "/sys/fs/cgroup/cpuset/" + cgroup + "/cpuset.cpus", "r"
@@ -119,10 +125,11 @@ def write_metadata(
 
                 cpusets += "," + cpu_set
         else:
-            cpusets = "disabled"
+            cpusets = ",disabled"
 
         modified.write("cpusets" + cpusets + ",\n")
-        modified.write("Percore mode," + percoremode + ",\n")
+        modified.write("Percore mode," + threadmode + ",\n")
+        modified.write("Persocket mode," + socketmode + ",\n")
         modified.write("PerfSpect version," + perf_helpers.get_tool_version() + ",\n")
         modified.write("### PERF EVENTS ###" + ",\n")
         for e in collection_events:
@@ -168,24 +175,44 @@ if __name__ == "__main__":
     if platform.system() != "Linux":
         raise SystemExit("PerfSpect currently supports Linux only")
 
-    script_path = os.path.dirname(os.path.realpath(__file__))
     # fix the pyinstaller path
+    script_path = os.path.dirname(os.path.realpath(__file__))
     if "_MEI" in script_path:
         script_path = script_path.rsplit("/", 1)[0]
     result_dir = script_path + "/results"
     default_output_file = result_dir + "/perfstat.csv"
-    from argparse import ArgumentParser
 
     parser = ArgumentParser(description="perf-collect: Time series dump of PMUs")
-    parser.add_argument(
-        "-V", "--version", help="display version info", action="store_true"
+    duration = parser.add_mutually_exclusive_group()
+    runmode = parser.add_mutually_exclusive_group()
+    duration.add_argument(
+        "-t", "--timeout", type=int, default=None, help="perf event collection time"
     )
-    parser.add_argument(
-        "-e",
-        "--eventfile",
+    duration.add_argument(
+        "-a",
+        "--app",
         type=str,
         default=None,
-        help="Event file containing events to collect, default=events/<architecture specific file>",
+        help="Application to run with perf-collect, perf collection ends after workload completion",
+    )
+    runmode.add_argument(
+        "-p", "--pid", type=str, default=None, help="perf-collect on selected PID(s)"
+    )
+    runmode.add_argument(
+        "-c",
+        "--cid",
+        type=str,
+        default=None,
+        help="perf-collect on selected container ids",
+    )
+    runmode.add_argument(
+        "--thread", help="Collect for thread metrics", action="store_true"
+    )
+    runmode.add_argument(
+        "--socket", help="Collect for socket metrics", action="store_true"
+    )
+    parser.add_argument(
+        "-V", "--version", help="display version info", action="store_true"
     )
     parser.add_argument(
         "-i",
@@ -209,62 +236,10 @@ if __name__ == "__main__":
         help="perf stat output in csv format, default=results/perfstat.csv",
     )
     parser.add_argument(
-        "-a",
-        "--app",
-        type=str,
-        default=None,
-        help="Application to run with perf-collect, perf collection ends after workload completion",
-    )
-    parser.add_argument(
-        "-p", "--pid", type=str, default=None, help="perf-collect on selected PID(s)"
-    )
-    parser.add_argument(
-        "-c",
-        "--cid",
-        type=str,
-        default=None,
-        help="perf-collect on selected container ids",
-    )
-    parser.add_argument(
-        "-t", "--timeout", type=int, default=None, help="perf event collection time"
-    )
-    parser.add_argument(
-        "--percore", help="Enable per core event collection", action="store_true"
-    )
-    parser.add_argument(
-        "--nogroups",
-        help="Disable perf event grouping, events are grouped by default as in the event file",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--dryrun",
-        help="Test if Performance Monitoring Counters are in-use, and collect stats for 10sec to validate event file correctness",
-        action="store_true",
-    )
-    parser.add_argument(
-        "--metadata",
-        help="collect system info only, does not run perf",
-        action="store_true",
-    )
-    parser.add_argument(
         "-v",
         "--verbose",
         help="Display debugging information",
         action="store_true",
-    )
-    parser.add_argument(
-        "-csp",
-        "--cloud",
-        type=str,
-        default=None,
-        help="Name of the Cloud Service Provider(AWS), if collecting on cloud instances. Currently supporting AWS and OCI",
-    )
-    parser.add_argument(
-        "-ct",
-        "--cloudtype",
-        type=str,
-        default="VM",
-        help="Instance type: Options include - VM,BM",
     )
     args = parser.parse_args()
 
@@ -272,28 +247,32 @@ if __name__ == "__main__":
         print(perf_helpers.get_tool_version())
         sys.exit(0)
 
+    if os.geteuid() != 0:
+        log.error("Must run PerfSpect as root, please re-run")
+        sys.exit(1)
+
+    # disable nmi watchdog before collecting perf
+    nmi_watchdog = 0
+    try:
+        with open("/proc/sys/kernel/nmi_watchdog", "r+") as f_nmi:
+            nmi_watchdog = f_nmi.read()
+            if int(nmi_watchdog) != 0:
+                f_nmi.write("0")
+                log.info("nmi_watchdog disabled")
+    except FileNotFoundError:
+        pass
+
+    initial_pmus = perf_helpers.pmu_contention_detect()
     interval = int(args.interval * 1000)
 
-    if args.app and args.timeout:
-        raise SystemExit("Please provide time duration or application parameter")
-
-    if args.cid and args.pid:
-        raise SystemExit("Cannot combine cgroup with pid in same collection")
-    if args.cid and args.percore:
-        raise SystemExit("Cannot combine cgroup with percore in same collection")
-    if args.dryrun and (args.app or args.pid or args.cid or args.cloud):
-        raise SystemExit("Cannot use dryrun with cloud/csp or pid or cid or app")
     if args.muxinterval > 1000:
-        raise SystemExit(
-            "Input argument muxinterval is too large, max is [1s or 1000ms]"
-        )
+        log.error("Input argument muxinterval is too large, max is [1s or 1000ms]")
+        sys.exit(1)
     if args.interval < 0.1 or args.interval > 300:
-        raise SystemExit(
-            "Input argument dump interval is too large or too small, range is [0.1 to 300s]!"
+        log.error(
+            "Input argument dump interval is too large or too small, range is [0.1 to 300s]"
         )
-    if args.cloud and args.cloud not in ("AWS", "aws", "OCI", "oci", "oracle"):
-        parser.print_help()
-        raise SystemExit("Invalid csp/cloud")
+        sys.exit(1)
 
     # select architecture default event file if not supplied
     procinfo = perf_helpers.get_cpuinfo()
@@ -302,56 +281,29 @@ if __name__ == "__main__":
         raise SystemExit(
             f"Unrecognized CPU architecture. Supported architectures: {', '.join(SUPPORTED_ARCHITECTURES)}"
         )
-    eventfile = args.eventfile
-    eventfilename = eventfile
-    if not eventfile:
-        is_vm = args.cloudtype in ("VM", "vm")
-        is_aws_vm = args.cloud in ("aws", "AWS", "amazon") and is_vm
-        is_oci_vm = args.cloud in ("oci", "OCI", "oracle") and is_vm
+    eventfile = None
+    if arch == "broadwell":
+        eventfile = "bdx.txt"
+    elif arch == "skylake":
+        eventfile = "skx.txt"
+    elif arch == "cascadelake":
+        eventfile = "clx.txt"
+    elif arch == "icelake":
+        eventfile = "icx.txt"
+    elif arch == "sapphirerapids":
+        eventfile = "spr.txt"
 
-        if arch == "broadwell":
-            eventfile = "bdx.txt"
-        elif arch == "skylake":
-            eventfile = "skx.txt"
-            if is_aws_vm:
-                eventfile = "skx_aws.txt"
-            elif is_oci_vm:
-                eventfile = "skx_oci.txt"
-        elif arch == "cascadelake":
-            eventfile = "clx.txt"
-            if is_aws_vm:
-                eventfile = "clx_aws.txt"
-        elif arch == "icelake":
-            eventfile = "icx.txt"
-            if is_aws_vm:
-                eventfile = "icx_aws.txt"
-            elif is_oci_vm:
-                eventfile = "icx_oci.txt"
-        elif arch == "sapphirerapids":
-            eventfile = "spr.txt"
-            if is_aws_vm:
-                eventfile = "spr_aws.txt"
-
-        if not eventfile:
-            raise SystemExit(f"Event file for arch ({arch}) not found.")
-
-        # Convert path of event file to relative path if being packaged by pyInstaller into a binary
-        if getattr(sys, "frozen", False):
-            basepath = getattr(
-                sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__))
-            )
-            eventfilename = eventfile
-            is_safe_file(eventfile, ".txt")
-            eventfile = os.path.join(basepath, eventfile)
-        elif __file__:
-            eventfile = script_path + "/events/" + eventfile
-            eventfilename = eventfile
-        else:
-            raise SystemExit("Unknown application type")
-
-    if not os.path.isfile(eventfile):
-        parser.print_usage()
-        raise SystemExit("event file not found")
+    # Convert path of event file to relative path if being packaged by pyInstaller into a binary
+    if getattr(sys, "frozen", False):
+        basepath = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+        eventfilename = eventfile
+        is_safe_file(eventfile, ".txt")
+        eventfile = os.path.join(basepath, eventfile)
+    elif __file__:
+        eventfile = script_path + "/events/" + eventfile
+        eventfilename = eventfile
+    else:
+        raise SystemExit("Unknown application type")
 
     if args.outcsv == default_output_file:
         # create results dir
@@ -364,85 +316,45 @@ if __name__ == "__main__":
                 "Output filename not accepted. Filename should be a .csv without special characters"
             )
 
-    supervisor = False
-    if os.geteuid() == 0:
-        supervisor = True
-
     mux_intervals = perf_helpers.get_perf_event_mux_interval()
     if args.muxinterval > 0:
-        if supervisor:
-            perf_helpers.set_perf_event_mux_interval(
-                False, args.muxinterval, mux_intervals
-            )
-        else:
-            print(
-                "Warning: perf event mux interval can't be set without sudo permission"
-            )
+        perf_helpers.set_perf_event_mux_interval(False, args.muxinterval, mux_intervals)
 
-    # disable nmi watchdog before collecting perf
-    f_nmi = open("/proc/sys/kernel/nmi_watchdog", "r")
-    nmi_watchdog = f_nmi.read()
-    f_nmi.close()
-
-    if int(nmi_watchdog) != 0:
-        if supervisor:
-            f_nmi = open("/proc/sys/kernel/nmi_watchdog", "w")
-            f_nmi.write("0")
-            f_nmi.close()
-        else:
-            print("Warning: nmi_watchdog enabled, perf grouping will be disabled")
-            args.nogroups = True
-
-    # disable grouping if more than 1 cgroups are being monitored -- not relevant anymore
+    # parse cgroups
     cgroups = []
     if args.cid is not None:
         cgroups = perf_helpers.get_cgroups_from_cids(args.cid.split(","))
         num_cgroups = len(cgroups)
 
     try:
-        import re
-
         reg = r"^[0-9]*\.[0-9][0-9]*"
         kernel = perf_helpers.get_version().split("Linux version")[1].lstrip()
-        significant_kernel_version = float(re.match(reg, kernel).group(0))
+        significant_kernel_version = re.match(reg, kernel).group(0)
         full_kernel_version = kernel
-
     except Exception as e:
-        print(e)
-        raise SystemExit("Unable to get kernel version")
-
-    # Fix events not compatible with older kernel versions only
-    if significant_kernel_version == 3.10 and arch != "broadwell":
-        kernel_version = full_kernel_version.split(" ")[0]
-        prep_events.fix_events_for_older_kernels(eventfile, kernel_version)
+        log.exception(e)
+        log.info("Unable to get kernel version")
+        sys.exit(1)
 
     # get perf events to collect
     collection_events = []
+    imc, cha, upi = perf_helpers.get_imc_cacheagent_count()
+    have_uncore = True
+    if imc == 0 and cha == 0 and upi == 0:
+        log.info("disabling uncore (possibly in a vm?)")
+        have_uncore = False
     events, collection_events = prep_events.prepare_perf_events(
-        eventfile, (args.nogroups is False), ((args.pid or args.cid) is not None)
+        eventfile,
+        (
+            (args.pid or args.cid or args.thread or args.socket) is not None
+            or not have_uncore
+        ),
     )
 
-    if args.metadata:
-        cpuid_info = perf_helpers.get_cpuid_info(procinfo)
-        write_metadata(
-            args.outcsv,
-            collection_events,
-            arch,
-            cpuname,
-            cpuid_info,
-            args.interval,
-            args.muxinterval,
-            args.nogroups,
-            args.percore,
-            supervisor,
-            True,
-        )
-        sys.exit("Output with metadata in  %s" % args.outcsv)
-
-    collection_type = "-a" if args.percore is False else "-a -A"
+    collection_type = "-a" if args.thread is False and args.socket is False else "-a -A"
     # start perf stat
     if args.pid and args.timeout:
-        print("Info: Only CPU/core events will be enabled with pid option")
+        log.info("Only CPU/core events will be enabled with pid option")
         cmd = "perf stat -I %d -x , --pid %s -e %s -o %s sleep %d" % (
             interval,
             args.pid,
@@ -452,7 +364,7 @@ if __name__ == "__main__":
         )
 
     elif args.pid:
-        print("Info: Only CPU/core events will be enabled with pid option")
+        log.info("Only CPU/core events will be enabled with pid option")
         cmd = "perf stat -I %d -x , --pid %s -e %s -o %s" % (
             interval,
             args.pid,
@@ -460,7 +372,7 @@ if __name__ == "__main__":
             args.outcsv,
         )
     elif args.cid and args.timeout:
-        print("Info: Only CPU/core events will be enabled with cid option")
+        log.info("Only CPU/core events will be enabled with cid option")
         perf_format = prep_events.get_cgroup_events_format(
             cgroups, events, len(collection_events)
         )
@@ -471,7 +383,7 @@ if __name__ == "__main__":
             args.timeout,
         )
     elif args.cid:
-        print("Info: Only CPU/core events will be enabled with cid option")
+        log.info("Only CPU/core events will be enabled with cid option")
         perf_format = prep_events.get_cgroup_events_format(
             cgroups, events, len(collection_events)
         )
@@ -508,22 +420,18 @@ if __name__ == "__main__":
         )
     perfargs = shlex.split(cmd)
     validate_perfargs(perfargs)
-    perf_helpers.pmu_contention_detect()
+    perf_helpers.pmu_contention_detect(msrs=initial_pmus, detect=True)
     if args.verbose:
-        print(cmd)
+        log.info(cmd)
     try:
-        print("Collecting perf stat for events in : %s" % eventfilename)
-        # PerfSpect isn't aware of the actual instance cloudtype
-        if args.cloud and args.cloudtype != "BM":
-            print(
-                "If you're on baremetal cloud instance, consider using cloudtype flag (options:VM/BM, default is VM)"
-            )
+        log.info("Collecting perf stat for events in : %s" % eventfilename)
         subprocess.call(perfargs)  # nosec
-        print("Collection complete! Calculating TSC frequency now")
+        log.info("Collection complete! Calculating TSC frequency now")
     except KeyboardInterrupt:
-        print("Collection stopped! Caculating TSC frequency now")
+        log.info("Collection stopped! Caculating TSC frequency now")
     except Exception:
-        print("perf encountered errors")
+        log.error("perf encountered errors")
+        sys.exit(1)
 
     cpuid_info = perf_helpers.get_cpuid_info(procinfo)
     write_metadata(
@@ -534,20 +442,18 @@ if __name__ == "__main__":
         cpuid_info,
         args.interval,
         args.muxinterval,
-        args.nogroups,
-        args.percore,
-        supervisor,
+        args.thread,
+        args.socket,
         False,
     )
 
     # reset nmi_watchdog to what it was before running perfspect
-    if (int(nmi_watchdog) != 0) and supervisor:
-        f_nmi = open("/proc/sys/kernel/nmi_watchdog", "w")
-        f_nmi.write(nmi_watchdog)
-        f_nmi.close()
+    with open("/proc/sys/kernel/nmi_watchdog", "w") as f_nmi:
+        if int(nmi_watchdog) != 0:
+            f_nmi.write(nmi_watchdog)
+            log.info("nmi_watchdog re-enabled")
 
-    if (args.muxinterval > 0) and supervisor:
-        perf_helpers.set_perf_event_mux_interval(True, 1, mux_intervals)
+    perf_helpers.set_perf_event_mux_interval(True, 1, mux_intervals)
 
-    print("perf stat dumped to %s" % args.outcsv)
+    log.info("perf stat dumped to %s" % args.outcsv)
     perf_helpers.fix_path_ownership(result_dir, True)
