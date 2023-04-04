@@ -156,24 +156,28 @@ def resource_path(relative_path):
 def validate_perfargs(perf):
     """validate perf command before executing"""
     if perf[0] != "perf":
-        raise SystemExit("Not a perf command, exiting!")
+        log.error("Not a perf command, exiting!")
+        sys.exit(1)
 
 
 def validate_file(fname):
     """validate if file is accessible"""
     if not os.access(fname, os.R_OK):
-        raise SystemExit(str(fname) + " not accessible")
+        log.error(str(fname) + " not accessible")
+        sys.exit(1)
 
 
 def is_safe_file(fname, substr):
     """verify if file name/format is accurate"""
     if not fname.endswith(substr):
-        raise SystemExit(str(fname) + " isn't appropriate format")
+        log.error(str(fname) + " isn't appropriate format")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
     if platform.system() != "Linux":
-        raise SystemExit("PerfSpect currently supports Linux only")
+        log.error("PerfSpect currently supports Linux only")
+        sys.exit(1)
 
     # fix the pyinstaller path
     script_path = os.path.dirname(os.path.realpath(__file__))
@@ -278,9 +282,10 @@ if __name__ == "__main__":
     procinfo = perf_helpers.get_cpuinfo()
     arch, cpuname = perf_helpers.get_arch_and_name(procinfo)
     if not arch:
-        raise SystemExit(
+        log.error(
             f"Unrecognized CPU architecture. Supported architectures: {', '.join(SUPPORTED_ARCHITECTURES)}"
         )
+        sys.exit(1)
     eventfile = None
     if arch == "broadwell":
         eventfile = "bdx.txt"
@@ -303,7 +308,8 @@ if __name__ == "__main__":
         eventfile = script_path + "/events/" + eventfile
         eventfilename = eventfile
     else:
-        raise SystemExit("Unknown application type")
+        log.error("Unknown application type")
+        sys.exit(1)
 
     if args.outcsv == default_output_file:
         # create results dir
@@ -312,9 +318,10 @@ if __name__ == "__main__":
             perf_helpers.fix_path_ownership(result_dir)
     else:
         if not perf_helpers.validate_outfile(args.outcsv):
-            raise SystemExit(
+            log.error(
                 "Output filename not accepted. Filename should be a .csv without special characters"
             )
+            sys.exit(1)
 
     mux_intervals = perf_helpers.get_perf_event_mux_interval()
     if args.muxinterval > 0:
@@ -403,13 +410,6 @@ if __name__ == "__main__":
             events,
             args.outcsv,
             args.timeout,
-        )
-    elif args.dryrun:
-        cmd = "perf stat %s -I %d -x , -e %s -o %s sleep 10" % (
-            collection_type,
-            interval,
-            events,
-            args.outcsv,
         )
     else:
         cmd = "perf stat %s -I %d -x , -e %s -o %s" % (
