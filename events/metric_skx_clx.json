@@ -138,7 +138,7 @@
 	},
 	{
 		"name": "metric_UPI Transmit utilization_% (includes control)",
-		"expression": "100 * (([UNC_UPI_TxL_FLITS.ALL_DATA] + [UNC_UPI_TxL_FLITS.NON_DATA]) / 3) / ((((([const_tsc_freq] / ([const_cha_count] * [const_thread_count])) / (([const_tsc_freq] / ([const_cha_count] * [const_thread_count])) - [FREERUN_CORE_C6_RESIDENCY])) * ([UNC_UPI_CLOCKTICKS] - [UNC_UPI_L1_POWER_CYCLES])) * 5 / 6))"
+		"expression": "100 * (([UNC_UPI_TxL_FLITS.ALL_DATA] + [UNC_UPI_TxL_FLITS.NON_DATA]) / 3) / ((((([const_tsc_freq] / ([const_cha_count] * [const_thread_count])) / (([const_tsc_freq] / ([const_cha_count] * [const_thread_count])) - [cstate_pkg/c6-residency/])) * ([UNC_UPI_CLOCKTICKS] - [UNC_UPI_L1_POWER_CYCLES])) * 5 / 6))"
 	},
 	{
 		"name": "metric_uncore frequency GHz",
@@ -242,7 +242,7 @@
 	},
 	{
 		"name": "metric_TMAM_....ICache_Misses(%)",
-		"expression": "100 * ([ICACHE_16B.IFDATA_STALL] + 2 * [ICACHE_16B.c1_e1_IFDATA_STALL]) /  [cpu-cycles]"
+		"expression": "100 * ([ICACHE_16B.IFDATA_STALL] + 2 * [ICACHE_16B_c1_e1_IFDATA_STALL]) /  [cpu-cycles]"
 	},
 	{
 		"name": "metric_TMAM_....ITLB_Misses(%)",

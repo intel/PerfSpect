@@ -6,16 +6,25 @@
 ###########################################################################################################
 
 from __future__ import print_function
+import csv
+import collections
+import json
+import logging
 import os
+import pandas as pd
 import re
 import sys
-import csv
-import json
-import collections
-import pandas as pd
 from src import perf_helpers
 from simpleeval import simple_eval
+from argparse import ArgumentParser
 
+logging.basicConfig(
+    format="%(asctime)s %(levelname)s: %(message)s",
+    datefmt="%H:%M:%S",
+    level=logging.NOTSET,
+    handlers=[logging.FileHandler("debug.log"), logging.StreamHandler(sys.stdout)],
+)
+log = logging.getLogger(__name__)
 script_path = os.path.dirname(os.path.realpath(__file__))
 
 # fix the pyinstaller path
@@ -222,8 +231,8 @@ def evaluate_expression(
                             r"\b" + event + r"\b", str(value_list[idx]), formula
                         )
                 except IndexError:
-                    print("Index Error while evaluating expression")
-                    print(formula, event, idx, len(value_list))
+                    log.error("Index Error while evaluating expression")
+                    log.error(formula, event, idx, len(value_list))
                     exit()
 
             break
@@ -273,13 +282,13 @@ def evaluate_expression(
         result = "0"
         pass
     except SyntaxError:
-        print("Syntax error evaluating ", formula)
-        print(temp_formula)
+        log.error("Syntax error evaluating ", formula)
+        log.error(temp_formula)
         sys.exit()
     except Exception as e:
-        print(e)
-        print(temp_formula)
-        print("Unknown error evaluating ", formula)
+        log.exception(e)
+        log.exception(temp_formula)
+        log.exception("Unknown error evaluating ", formula)
         sys.exit()
     total_samples += 1
     return result
@@ -677,6 +686,7 @@ def get_metadata():
             PERF_EVENTS.append(line)
             continue
 
+        EVENT_GROUPING = True
         if line.startswith("TSC"):
             CONST_TSC_FREQ = float(line.split(",")[1]) * 1000000
         elif line.startswith("CPU"):
@@ -693,8 +703,6 @@ def get_metadata():
             CONST_INTERVAL = float(line.split(",")[1])
         elif line.startswith("Architecture"):
             CONST_ARCH = str(line.split(",")[1])
-        elif line.startswith("Event grouping"):
-            EVENT_GROUPING = True if (str(line.split(",")[1]) == "enabled") else False
         elif line.startswith("cgroups"):
             # Get cgroup status and cgroup_id to container_name conversions
             CGROUP_HASH = dict(
@@ -938,8 +946,8 @@ class persocket_idx:
         self.idx = idx
 
     def display(self):
-        print(self.name)
-        print(self.idx)
+        log.info(self.name)
+        log.info(self.idx)
 
     def getidx(self):
         return self.idx
@@ -1033,7 +1041,7 @@ def write_socket_view(level, samples):
 
             row_count = row_count + 1
             if len(outrow0) != (len(mappings) * socket_count + 1):
-                print(
+                log.error(
                     "something wrong in socket view processing %d %d"
                     % (len(outrow0), len(mappings))
                 )
@@ -1240,7 +1248,7 @@ def write_system_view(infile, outfile):
                         if len(disabled_events) and (out_row0[i] in disabled_events):
                             val = 0
                         else:
-                            print(
+                            log.error(
                                 "Warning: Invalid value found for %s counter at interval %d (defaults to previous count)"
                                 % (out_row0[i], row_count + 1)
                             )
@@ -1254,7 +1262,7 @@ def write_system_view(infile, outfile):
                 try:
                     sum_row[j + 1] += float(final_out_row[j + 1])
                 except IndexError:
-                    print(
+                    log.error(
                         "event=%s, j=%d, len=%d "
                         % (final_out_row0[j], j, len(final_out_row))
                     )
@@ -1338,8 +1346,6 @@ def is_safe_path(base_dir, path, follow_symlinks=True):
 
 
 if __name__ == "__main__":
-    from argparse import ArgumentParser
-
     parser = ArgumentParser(description="perf-postprocess: perf post process")
     parser.add_argument(
         "--version", "-V", help="display version information", action="store_true"
@@ -1374,13 +1380,6 @@ if __name__ == "__main__":
         "--epoch",
         help="time series in epoch format, default is sample count",
         action="store_true",
-    )
-    parser.add_argument(
-        "-csp",
-        "--cloud",
-        type=str,
-        default=None,
-        help="Name of Cloud Service Provider(AWS), if you're intending to postprocess on cloud instances",
     )
     parser.add_argument(
         "-html",
@@ -1472,12 +1471,8 @@ if __name__ == "__main__":
             metric_file = "metric_bdx.json"
         elif CONST_ARCH == "skylake" or CONST_ARCH == "cascadelake":
             metric_file = "metric_skx_clx.json"
-        elif CONST_ARCH == "icelake" and args.cloud == "aws":
-            metric_file = "metric_icx_aws.json"
         elif CONST_ARCH == "icelake":
             metric_file = "metric_icx.json"
-        elif CONST_ARCH == "sapphirerapids" and args.cloud == "aws":
-            metric_file = "metric_spr_aws.json"
         elif CONST_ARCH == "sapphirerapids":
             metric_file = "metric_spr.json"
         else:
@@ -1507,8 +1502,8 @@ if __name__ == "__main__":
             if args.percore:
                 percore_output = True
         else:
-            print(
-                "Warning: Generating system level data only. Run perf-collect with --percore to generate socket/core level data."
+            log.warning(
+                "Generating system level data only. Run perf-collect with --percore to generate socket/core level data."
             )
 
     if EXCEL_OUT:
@@ -1566,14 +1561,13 @@ if __name__ == "__main__":
     except NameError:
         pass
     if zero_division_errcount > 0:
-        print(
-            "Warning:"
-            + str(zero_division_errcount)
+        log.warning(
+            str(zero_division_errcount)
             + " samples discarded, and "
             + str(total_samples)
             + " samples were used"
         )
-    print("Post processing done, result file:%s" % args.outfile)
+    log.info("Post processing done, result file:%s" % args.outfile)
 
     if args.html:
         from src import report

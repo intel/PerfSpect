@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: intel
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: perfspect
+  name: perfspect
+  namespace: intel
+spec:
+  selector:
+    matchLabels:
+      app: perfspect
+  template:
+    metadata:
+      labels:
+        app: perfspect
+    spec:
+      containers:
+        - image: <your perfspect image>
+          name: perfspect
+          securityContext:
+            privileged: true
+      hostPID: true
+      restartPolicy: Always

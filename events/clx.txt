@@ -43,11 +43,11 @@ cpu/event=0x28,umask=0x18,period=200003,name='CORE_POWER.LVL1_TURBO_LICENSE'/,
 cpu/event=0x28,umask=0x20,period=200003,name='CORE_POWER.LVL2_TURBO_LICENSE'/,
 cpu/event=0x0e,umask=0x01,period=2000003,name='UOPS_ISSUED.ANY'/;
 
-cpu/event=0x3c,umask=0x0,any=1,period=2000003,name='CPU_CLK_UNHALTED.THREAD_ANY'/,
+cpu/event=0x3c,umask=0x0,period=2000003,name='CPU_CLK_UNHALTED.THREAD_ANY'/,
 cpu/event=0x9c,umask=0x01,period=2000003,name='IDQ_UOPS_NOT_DELIVERED.CORE'/,
 cpu/event=0xc2,umask=0x02,period=2000003,name='UOPS_RETIRED.RETIRE_SLOTS'/,
 #INT_MISC.RECOVERY_CYCLES_ANY
-cpu/event=0x0d,umask=0x01,any=1,period=2000003,name='INT_MISC.RECOVERY_CYCLES_ANY'/;
+cpu/event=0x0d,umask=0x01,period=2000003,name='INT_MISC.RECOVERY_CYCLES_ANY'/;
 
 cpu/event=0x79,umask=0x30,period=2000003,name='IDQ.MS_UOPS'/,
 cpu/event=0x60,umask=0x10,period=2000003,name='OFFCORE_REQUESTS_OUTSTANDING.L3_MISS_DEMAND_DATA_RD'/,
@@ -112,7 +112,8 @@ cpu/event=0xb1,umask=0x02,cmask=0x4,period=2000003,name='UOPS_EXECUTED.CORE_CYCL
 cpu-cycles;
 
 cpu/event=0x3c,umask=0x2,name='CPU_CLK_THREAD_UNHALTED.ONE_THREAD_ACTIVE'/,
-cpu/event=0x3c,umask=0x1,any=1,name='CPU_CLK_THREAD_UNHALTED.REF_XCLK_ANY'/,
+cpu/event=0x3c,umask=0x1,name='CPU_CLK_THREAD_UNHALTED.REF_XCLK_ANY'/;
+
 #offcore response
 cpu/event=0xb7,umask=0x01,offcore_rsp=0x103FC007F7,name='OCR.ALL_READS.L3_MISS.REMOTE_HITM'/,
 cpu/event=0xb7,umask=0x01,offcore_rsp=0x083FC007F7,name='OCR.ALL_READS.L3_MISS.REMOTE_HIT_FORWARD'/;
