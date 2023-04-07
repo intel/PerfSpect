@@ -6,7 +6,6 @@
 ###########################################################################################################
 
 import logging
-import os
 from src import basic_stats
 from src import icicle
 from yattag import Doc, indent
@@ -14,46 +13,35 @@ from yattag import Doc, indent
 log = logging.getLogger(__name__)
 
 
-def write_html(res_dir, base_input_file, arch, html_report_out, type="both"):
-    if type not in ("tma", "basic", "both"):
-        type = "both"
-    tma_inp = base_input_file.split(".")[0] + ".average.csv"
-    basic_inp = os.path.join(res_dir, base_input_file)
-    tma_inp = os.path.join(res_dir, tma_inp)
+def write_html(tma_inp, perf_mode, arch, html_report_out, data_type="both"):
+    if data_type not in ("tma", "basic", "both"):
+        data_type = "both"
+    if str(perf_mode) == "Mode.System":
+        tma_inp = tma_inp.replace(".csv", ".sys.average.csv")
+    elif str(perf_mode) == "Mode.Socket":
+        tma_inp = tma_inp.replace(".csv", ".socket.average.csv")
+    elif str(perf_mode) == "Mode.Core":
+        tma_inp = tma_inp.replace(".csv", ".core.average.csv")
 
     doc, tag, text = Doc().tagtext()
     with tag("html"):
-        # ToDO: add navigation later
-        # with doc.tag('div'):
-        #     doc.attr(klass='navbar')
-        #     with tag('a', href="#tma", klass="active"):
-        #             text("TMA")
-        #     with tag('a', href="#basic_stats"):
-        #             text("Basic Stats")
-
         with tag("style"):
             text("h1{text-align: center;background-color: #00ccff;}")
             text("h2{text-align: center;background-color: #e6faff;}")
-        #     text('.navbar {background-color: #333;overflow: hidden;position: fixed;bottom: 0;width: 100%;}')
-        #     text('.navbar a {float: left;display: block;color: #f2f2f2;text-align: center;padding: 14px 16px;text-decoration: none;font-size: 17px;}')
-        #     text('.navbar a:hover {background-color: #ddd;color: black;}')
-        #     text('.navbar a.active {background-color: #04AA6D;color: white;}')
-        # text('input{position: fixed;}')
-
         with tag("head"):
             doc.asis('<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>')
             with tag("h1"):
                 text("Intel® PerfSpect Report")
         with tag("body"):
-            if type in ("both", "tma"):
+            if data_type in ("both", "tma"):
                 fig1 = icicle.get_icicle(tma_inp)
                 with tag("h2", align="center"):
                     text("TopDown Microarchitecture Analysis (TMA)")
                 with doc.tag("div"):
                     doc.attr(id="tma")
                     doc.asis(fig1.to_html(full_html=False, include_plotlyjs="cdn"))
-            if type in ("both", "basic"):
-                fig2 = basic_stats.get_stats_plot(basic_inp, arch)
+            if data_type in ("both", "basic"):
+                fig2 = basic_stats.get_stats_plot(tma_inp, arch)
                 with tag("h2", align="center"):
                     text("Basic Statistics")
                 with doc.tag("div"):
@@ -61,7 +49,6 @@ def write_html(res_dir, base_input_file, arch, html_report_out, type="both"):
                     doc.stag("br")
                     doc.asis(fig2)
     result = indent(doc.getvalue())
-    out_html = os.path.join(res_dir, html_report_out)
-    with open(out_html, "w") as file:
+    with open(html_report_out, "w") as file:
         file.write(result)
-    log.info(f"static HTML file written at {out_html}")
+    log.info(f"static HTML file written at {html_report_out}")

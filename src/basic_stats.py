@@ -5,12 +5,13 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ###########################################################################################################
 
-import plotly.graph_objects as go
-import plotly
-import pandas as pd
 import os
-from yattag import Doc
+import pandas as pd
+import plotly
+import plotly.graph_objects as go
 import tempfile
+from yattag import Doc
+from src.common import crash
 
 
 os.environ["MPLCONFIGDIR"] = tempfile.mkdtemp()
@@ -77,7 +78,7 @@ def get_stats_plot(input, arch):
     try:
         df = pd.read_csv(input, keep_default_na=False)
     except FileNotFoundError:
-        raise SystemExit(f"{input} file not found")
+        crash(f"{input} file not found")
     fig_list = []
     if "metric_CPU operating frequency (in GHz)" in df.columns:
         fig1 = get_fig(

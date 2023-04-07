@@ -5,19 +5,20 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ###########################################################################################################
 
+import collections
+import fnmatch
+import logging
+import math
 import os
 import re
-import fnmatch
-import time
 import struct
-import math
-import collections
 import subprocess  # nosec
-import logging
-from time import strptime
+import time
 from ctypes import cdll, CDLL
 from datetime import datetime
 from dateutil import tz
+from src.common import crash
+from time import strptime
 
 
 version = "PerfSpect_DEV_VERSION"
@@ -45,7 +46,7 @@ def get_ht_count():
 def get_cpu_count():
     cpu_count = 0
     if not os.path.isfile("/sys/devices/system/cpu/online"):
-        raise SystemExit("/sys/devices/system/cpu/online not found to get core count")
+        crash("/sys/devices/system/cpu/online not found to get core count")
     with open("/sys/devices/system/cpu/online", "r") as f_online_cpu:
         content = f_online_cpu.read()
         cpu_list = content.split(",")
@@ -63,7 +64,7 @@ def get_tsc_freq():
     tsc = CDLL(tsclib)
     tsc_freq = str(tsc.Calibrate())
     if tsc_freq == 0:
-        raise SystemExit("can't calculate TSC frequency")
+        crash("can't calculate TSC frequency")
     return tsc_freq
 
 
@@ -250,7 +251,7 @@ def get_lscpu():
             value = value.lstrip()
             cpuinfo[key] = value
     except subprocess.CalledProcessError as e:
-        raise SystemExit(e.output + "\nFailed to get CPUInfo")
+        crash(e.output + "\nFailed to get CPUInfo")
     return cpuinfo
 
 
@@ -388,10 +389,10 @@ def get_cgroups_from_cids(cids):
         p.stdout.close()
 
     except subprocess.SubprocessError as e:
-        raise SystemExit("failed to open ps subprocess: " + e.output)
+        crash("failed to open ps subprocess: " + e.output)
     out, err = p2.communicate()
     if err:
-        raise SystemExit(f"error reading cgroups: {err}")
+        crash(f"error reading cgroups: {err}")
     lines = out.decode("utf-8").split("\n")
     for cid in cids:
         found = False
@@ -400,7 +401,7 @@ def get_cgroups_from_cids(cids):
                 found = True
                 cgroups.add(line.split(":")[-1])
         if not found:
-            raise SystemExit("invalid container ID: " + cid)
+            crash("invalid container ID: " + cid)
     # change cgroups back to list brefore returning
     return list(cgroups)
 

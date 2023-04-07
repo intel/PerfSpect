@@ -151,6 +151,13 @@ upi/event=0x2,umask=0xf,name='UNC_UPI_TxL_FLITS.ALL_DATA'/,
 upi/event=0x2,umask=0x97,name='UNC_UPI_TxL_FLITS.NON_DATA'/,
 upi/event=0x1,umask=0x0,name='UNC_UPI_CLOCKTICKS'/;
 
+cha/event=0x35,umask=0xc88ffe01,name='UNC_CHA_TOR_INSERTS.IA_MISS_CRD_PREF'/,
+cha/event=0x35,umask=0xc80ffe01,name='UNC_CHA_TOR_INSERTS.IA_MISS_CRD'/;
+
+cha/event=0x35,umask=0xc897fe01,name='UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF'/,
+cha/event=0x35,umask=0xc817fe01,name='UNC_CHA_TOR_INSERTS.IA_MISS_DRD'/,
+cha/event=0x35,umask=0xccd7fe01,name='UNC_CHA_TOR_INSERTS.IA_MISS_LLCPREFDATA'/;
+
 cha/event=0x35,umask=0xC816FE01,name='UNC_CHA_TOR_INSERTS.IA_MISS_DRD_LOCAL'/,
 cha/event=0x35,umask=0xC8177E01,name='UNC_CHA_TOR_INSERTS.IA_MISS_DRD_REMOTE'/,
 cha/event=0x35,umask=0xC896FE01,name='UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF_LOCAL'/,
