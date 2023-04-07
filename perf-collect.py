@@ -16,6 +16,7 @@ import shlex  # nosec
 from argparse import ArgumentParser
 from src import perf_helpers
 from src import prepare_perf_events as prep_events
+from src.common import crash
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)s: %(message)s",
@@ -41,7 +42,6 @@ def write_metadata(
     arch,
     cpuname,
     cpuid_info,
-    interval,
     muxinterval,
     thread,
     socket,
@@ -67,13 +67,12 @@ def write_metadata(
         modified.write("IMC count," + str(imc) + ",\n")
         modified.write("CHA count," + str(cha) + ",\n")
         modified.write("UPI count," + str(upi) + ",\n")
-        modified.write("Sampling Interval," + str(interval) + ",\n")
         modified.write("Architecture," + str(arch) + ",\n")
         modified.write("Model," + str(cpuname) + ",\n")
         modified.write("kernel version," + perf_helpers.get_version() + "\n")
-        for socket, cpus in cpuid_info.items():
-            modified.write("Socket:" + str(socket) + ",")
-            for c in cpus:
+        for _socket, _cpus in cpuid_info.items():
+            modified.write("Socket:" + str(_socket) + ",")
+            for c in _cpus:
                 modified.write(str(c) + ";")
             modified.write("\n")
         modified.write("Perf event mux Interval ms," + str(muxinterval) + ",\n")
@@ -156,28 +155,24 @@ def resource_path(relative_path):
 def validate_perfargs(perf):
     """validate perf command before executing"""
     if perf[0] != "perf":
-        log.error("Not a perf command, exiting!")
-        sys.exit(1)
+        crash("Not a perf command, exiting!")
 
 
 def validate_file(fname):
     """validate if file is accessible"""
     if not os.access(fname, os.R_OK):
-        log.error(str(fname) + " not accessible")
-        sys.exit(1)
+        crash(str(fname) + " not accessible")
 
 
 def is_safe_file(fname, substr):
     """verify if file name/format is accurate"""
     if not fname.endswith(substr):
-        log.error(str(fname) + " isn't appropriate format")
-        sys.exit(1)
+        crash(str(fname) + " isn't appropriate format")
 
 
 if __name__ == "__main__":
     if platform.system() != "Linux":
-        log.error("PerfSpect currently supports Linux only")
-        sys.exit(1)
+        crash("PerfSpect currently supports Linux only")
 
     # fix the pyinstaller path
     script_path = os.path.dirname(os.path.realpath(__file__))
@@ -219,13 +214,6 @@ if __name__ == "__main__":
         "-V", "--version", help="display version info", action="store_true"
     )
     parser.add_argument(
-        "-i",
-        "--interval",
-        type=float,
-        default=1,
-        help="interval in seconds for time series dump, default=1",
-    )
-    parser.add_argument(
         "-m",
         "--muxinterval",
         type=int,
@@ -252,8 +240,7 @@ if __name__ == "__main__":
         sys.exit(0)
 
     if os.geteuid() != 0:
-        log.error("Must run PerfSpect as root, please re-run")
-        sys.exit(1)
+        crash("Must run PerfSpect as root, please re-run")
 
     # disable nmi watchdog before collecting perf
     nmi_watchdog = 0
@@ -267,25 +254,18 @@ if __name__ == "__main__":
         pass
 
     initial_pmus = perf_helpers.pmu_contention_detect()
-    interval = int(args.interval * 1000)
+    interval = 1000
 
     if args.muxinterval > 1000:
-        log.error("Input argument muxinterval is too large, max is [1s or 1000ms]")
-        sys.exit(1)
-    if args.interval < 0.1 or args.interval > 300:
-        log.error(
-            "Input argument dump interval is too large or too small, range is [0.1 to 300s]"
-        )
-        sys.exit(1)
+        crash("Input argument muxinterval is too large, max is [1s or 1000ms]")
 
     # select architecture default event file if not supplied
     procinfo = perf_helpers.get_cpuinfo()
     arch, cpuname = perf_helpers.get_arch_and_name(procinfo)
     if not arch:
-        log.error(
+        crash(
             f"Unrecognized CPU architecture. Supported architectures: {', '.join(SUPPORTED_ARCHITECTURES)}"
         )
-        sys.exit(1)
     eventfile = None
     if arch == "broadwell":
         eventfile = "bdx.txt"
@@ -308,8 +288,7 @@ if __name__ == "__main__":
         eventfile = script_path + "/events/" + eventfile
         eventfilename = eventfile
     else:
-        log.error("Unknown application type")
-        sys.exit(1)
+        crash("Unknown application type")
 
     if args.outcsv == default_output_file:
         # create results dir
@@ -318,10 +297,9 @@ if __name__ == "__main__":
             perf_helpers.fix_path_ownership(result_dir)
     else:
         if not perf_helpers.validate_outfile(args.outcsv):
-            log.error(
+            crash(
                 "Output filename not accepted. Filename should be a .csv without special characters"
             )
-            sys.exit(1)
 
     mux_intervals = perf_helpers.get_perf_event_mux_interval()
     if args.muxinterval > 0:
@@ -340,8 +318,7 @@ if __name__ == "__main__":
         full_kernel_version = kernel
     except Exception as e:
         log.exception(e)
-        log.info("Unable to get kernel version")
-        sys.exit(1)
+        crash("Unable to get kernel version")
 
     # get perf events to collect
     collection_events = []
@@ -353,12 +330,15 @@ if __name__ == "__main__":
     events, collection_events = prep_events.prepare_perf_events(
         eventfile,
         (
-            (args.pid or args.cid or args.thread or args.socket) is not None
+            args.pid is not None
+            or args.cid is not None
+            or args.thread
+            or args.socket
             or not have_uncore
         ),
     )
 
-    collection_type = "-a" if args.thread is False and args.socket is False else "-a -A"
+    collection_type = "-a" if not args.thread and not args.socket else "-a -A"
     # start perf stat
     if args.pid and args.timeout:
         log.info("Only CPU/core events will be enabled with pid option")
@@ -430,8 +410,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         log.info("Collection stopped! Caculating TSC frequency now")
     except Exception:
-        log.error("perf encountered errors")
-        sys.exit(1)
+        crash("perf encountered errors")
 
     cpuid_info = perf_helpers.get_cpuid_info(procinfo)
     write_metadata(
@@ -440,7 +419,6 @@ if __name__ == "__main__":
         arch,
         cpuname,
         cpuid_info,
-        args.interval,
         args.muxinterval,
         args.thread,
         args.socket,

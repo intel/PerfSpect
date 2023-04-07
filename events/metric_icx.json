@@ -130,7 +130,7 @@
     },
     {
         "name": "metric_LLC code read MPI (demand+prefetch)",
-        "expression": "([UNC_CHA_TOR_INSERTS.IA_MISS_LLCPREFCODE] + [UNC_CHA_TOR_INSERTS.IA_MISS_CRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_CRD_PREF]) / [instructions]"
+        "expression": "([UNC_CHA_TOR_INSERTS.IA_MISS_CRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_CRD_PREF]) / [instructions]"
     },
     {
         "name": "metric_LLC data read MPI (demand+prefetch)",

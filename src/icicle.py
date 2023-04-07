@@ -5,10 +5,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ###########################################################################################################
 
-from yattag import Doc
-import plotly.graph_objects as go
-import pandas as pd
 import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+from yattag import Doc
+from src.common import crash
 
 doc, tag, text = Doc().tagtext()
 metric_parent = {}
@@ -23,7 +24,7 @@ def get_icicle(input_csv):
     try:
         df = pd.read_csv(input_csv, keep_default_na=False)
     except FileNotFoundError:
-        raise SystemExit(f"{input_csv} File not found")
+        crash(f"{input_csv} File not found")
     unwanted = ["%", "metric_TMA_", ".", "(", ")", "metric_TMAM_"]
     df = df.replace("N/A", np.nan)
 
