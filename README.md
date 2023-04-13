@@ -19,7 +19,7 @@ perf-collect: Collects harware events
 
 perf-postprocess: Calculates high level metrics from hardware events
 
-- `perf-postprocess -r results/perfstat.csv`
+- `./perf-postprocess`
 
 ## Quick start (requires perf installed)
 
@@ -27,7 +27,7 @@ perf-postprocess: Calculates high level metrics from hardware events
 wget -qO- https://github.com/intel/PerfSpect/releases/latest/download/perfspect.tgz | tar xvz
 cd perfspect
 sudo ./perf-collect --timeout 10
-sudo ./perf-postprocess -r results/perfstat.csv --html perfstat.html
+./perf-postprocess
 ```
 
 ## Deploy in Kubernetes

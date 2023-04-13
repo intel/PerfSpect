@@ -10,8 +10,6 @@ from src import basic_stats
 from src import icicle
 from yattag import Doc, indent
 
-log = logging.getLogger(__name__)
-
 
 def write_html(tma_inp, perf_mode, arch, html_report_out, data_type="both"):
     if data_type not in ("tma", "basic", "both"):
@@ -51,4 +49,4 @@ def write_html(tma_inp, perf_mode, arch, html_report_out, data_type="both"):
     result = indent(doc.getvalue())
     with open(html_report_out, "w") as file:
         file.write(result)
-    log.info(f"static HTML file written at {html_report_out}")
+    logging.info(f"static HTML file written at {html_report_out}")
