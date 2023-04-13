@@ -8,15 +8,12 @@
 import logging
 import os
 import re
-import sys
 import subprocess  # nosec
 import src.perf_helpers as helper
-
-log = logging.getLogger(__name__)
+from src.common import crash
 
 
 # test if the event can be collected, check supported events in perf list
-# def filter_func(event, imc_count, cha_count, cbox_count, upi_count, perf_list):
 def filter_func(event, perf_list):
     tmp_list = event.split("/")
     name = helper.get_dev_name(tmp_list[0])
@@ -124,8 +121,7 @@ def get_cgroup_events_format(cgroups, events, num_events):
 
 def prepare_perf_events(event_file, cpu_only):
     if not os.path.isfile(event_file):
-        log.error("event file not found")
-        sys.exit(1)
+        crash("event file not found")
 
     start_group = "'{"
     end_group = "}'"
@@ -142,12 +138,10 @@ def prepare_perf_events(event_file, cpu_only):
                 ["perf", "list"], universal_newlines=True
             )
         except FileNotFoundError:
-            log.error("Please install Linux perf and re-run")
-            sys.exit(1)
+            crash("Please install Linux perf and re-run")
 
         except subprocess.CalledProcessError as e:
-            log.error(f"Error calling Linux perf, error code: {e.returncode}")
-            sys.exit(1)
+            crash(f"Error calling Linux perf, error code: {e.returncode}")
 
         unsupported_events = []
         for line in fin:
@@ -163,10 +157,9 @@ def prepare_perf_events(event_file, cpu_only):
                 else:
                     collection_events.append(line)
         if any("cpu-cycles" in event for event in unsupported_events):
-            log.error("PMU's not available. Run in a full socket VM or baremetal")
-            sys.exit(1)
+            crash("PMU's not available. Run in a full socket VM or baremetal")
         if len(unsupported_events) > 0:
-            log.warning(
+            logging.warning(
                 str("Perf unsupported events not counted: " + str(unsupported_events))
             )
 
@@ -208,12 +201,10 @@ def prepare_perf_events(event_file, cpu_only):
     fin.close()
     group = group[:-1]
     if len(event_names) == 0:
-        log.error("No supported events found on this platform.")
-        sys.exit(1)
+        crash("No supported events found on this platform.")
     # being conservative not letting the collection to proceed if fixed counters aren't suported on the platform
     if len(unsupported_events) >= len(core_event):
-        log.error(
+        crash(
             "Most core counters aren't supported on this platform, unable to collect PMUs"
         )
-        sys.exit(1)
     return group, event_names

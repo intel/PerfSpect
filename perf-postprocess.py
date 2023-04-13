@@ -6,8 +6,8 @@
 ###########################################################################################################
 
 import json
-import logging
 import numpy as np
+import logging
 import os
 import pandas as pd
 import re
@@ -16,16 +16,9 @@ from argparse import ArgumentParser
 from enum import Enum
 from simpleeval import simple_eval
 from src.common import crash
+from src import common
 from src import perf_helpers
 from src import report
-
-logging.basicConfig(
-    format="%(asctime)s %(levelname)s: %(message)s",
-    datefmt="%H:%M:%S",
-    level=logging.NOTSET,
-    handlers=[logging.FileHandler("debug.log"), logging.StreamHandler(sys.stdout)],
-)
-log = logging.getLogger(__name__)
 
 
 class Mode(Enum):
@@ -73,8 +66,8 @@ def get_args(script_path):
         "-r",
         "--rawfile",
         type=str,
-        default=None,
-        help="Raw CSV output from perf-collect",
+        default="perfstat.csv",
+        help="Raw CSV output from perf-collect, default=perfstat.csv",
     )
     parser.add_argument(
         "--version", "-V", help="display version information", action="store_true"
@@ -83,8 +76,8 @@ def get_args(script_path):
         "-o",
         "--outfile",
         type=str,
-        default=script_path + "/results/metric_out.csv",
-        help="perf stat outputs in csv format, default=results/metric_out.csv",
+        default=script_path + "/metric_out.csv",
+        help="perf stat outputs in csv format, default=metric_out.csv",
     )
     parser.add_argument(
         "-v",
@@ -560,7 +553,7 @@ def generate_metrics_averages(time_series_df, perf_mode, out_file_path):
 
 
 def log_skip_metric(metric, instance, msg):
-    log.warning(
+    logging.warning(
         msg
         + ': metric "'
         + metric["name"]
@@ -583,6 +576,13 @@ def generate_metrics(
 ):
     time_slice_groups = perf_data_df.groupby("ts", sort=False)
     time_metrics_result = {}
+    errors = {
+        "MISSING DATA": 0,
+        "ZERO DIVISION": 0,
+        "MISSING EVENTS": 0,
+        "MULTIPLE GROUPS": 0,
+    }
+    missing_events = set()
     for time_slice, item in time_slice_groups:
         time_slice_df = time_slice_groups.get_group(time_slice)
         current_group_indx = 0
@@ -640,6 +640,7 @@ def generate_metrics(
                             or "]" in expressions_to_evaluate[instance]
                         ):
                             if verbose:
+                                errors["MISSING DATA"] += 1
                                 log_skip_metric(
                                     m,
                                     expressions_to_evaluate[instance],
@@ -657,6 +658,7 @@ def generate_metrics(
                             )
                         except ZeroDivisionError:
                             if verbose:
+                                errors["ZERO DIVISION"] += 1
                                 log_skip_metric(
                                     m,
                                     expressions_to_evaluate[instance],
@@ -668,7 +670,8 @@ def generate_metrics(
                     break  # no need to check other groups
             if not single_group:
                 if verbose:
-                    log.warning('MULTIPLE GROUPS: metric "' + m["name"] + '"')
+                    errors["MULTIPLE GROUPS"] += 1
+                    logging.warning('MULTIPLE GROUPS: metric "' + m["name"] + '"')
                 # get events from multiple groups
                 remaining_events_to_find = list(non_constant_mertics)
                 expressions_to_evaluate = {}
@@ -697,6 +700,7 @@ def generate_metrics(
                             or "]" in expressions_to_evaluate[instance]
                         ):
                             if verbose:
+                                errors["MISSING DATA"] += 1
                                 log_skip_metric(
                                     m,
                                     expressions_to_evaluate[instance],
@@ -714,6 +718,7 @@ def generate_metrics(
                             )
                         except ZeroDivisionError:
                             if verbose:
+                                errors["ZERO DIVISION"] += 1
                                 log_skip_metric(
                                     m,
                                     expressions_to_evaluate[instance],
@@ -724,17 +729,22 @@ def generate_metrics(
                         metrics_results[m["name"] + sub_txt] = float(result)
                 else:  # some events are missing
                     if verbose:
-                        log.warning(
+                        errors["MISSING EVENTS"] += 1
+                        logging.warning(
                             'MISSING EVENTS: metric "'
                             + m["name"]
                             + '" events "'
                             + str(remaining_events_to_find)
                             + '"'
                         )
+                        missing_events.update(remaining_events_to_find)
                     continue  # skip metric
         time_metrics_result[time_slice] = metrics_results
     time_series_df = pd.DataFrame(time_metrics_result)
-
+    if verbose:
+        for error in errors:
+            logging.warning("Total " + error + ": " + str(errors[error]))
+        logging.warning("Missing events: " + str(missing_events))
     generate_metrics_time_series(time_series_df, perf_mode, out_file_path)
     generate_metrics_averages(time_series_df, perf_mode, out_file_path)
     return
@@ -812,7 +822,7 @@ def generate_raw_events_percore(perf_data_df, out_file_path):
             to_drop.append(metric)
     metric_per_cpu_frame.drop(to_drop, inplace=True)
 
-    core_raw_file_name = get_extra_out_file(out_file_path, "cr", excelsheet=False)
+    core_raw_file_name = get_extra_out_file(out_file_path, "cr")
     metric_per_cpu_frame.to_csv(core_raw_file_name)
 
     return
@@ -828,6 +838,7 @@ def generate_raw_events(perf_data_df, out_file_path, perf_mode):
 
 
 if __name__ == "__main__":
+    common.configure_logging(".")
     script_path = os.path.dirname(os.path.realpath(__file__))
     if "_MEI" in script_path:
         script_path = script_path.rsplit("/", 1)[0]
@@ -884,7 +895,9 @@ if __name__ == "__main__":
                 perf_mode,
                 args.verbose,
             )
-            log.info("Generated results file(s) in: " + out_file_path.rsplit("/", 1)[0])
+            logging.info(
+                "Generated results file(s) in: " + out_file_path.rsplit("/", 1)[0]
+            )
             if args.html:
                 report.write_html(
                     cid_out_file_path,
@@ -905,7 +918,7 @@ if __name__ == "__main__":
             perf_mode,
             args.verbose,
         )
-        log.info("Generated results file(s) in: " + out_file_path.rsplit("/", 1)[0])
+        logging.info("Generated results file(s) in: " + out_file_path.rsplit("/", 1)[0])
         if args.html:
             report.write_html(
                 out_file_path,
@@ -913,4 +926,4 @@ if __name__ == "__main__":
                 meta_data["constants"]["CONST_ARCH"],
                 args.html,
             )
-    log.info("Done!")
+    logging.info("Done!")

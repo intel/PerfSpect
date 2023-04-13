@@ -22,7 +22,6 @@ from time import strptime
 
 
 version = "PerfSpect_DEV_VERSION"
-log = logging.getLogger(__name__)
 
 
 # get tool version info
@@ -153,15 +152,6 @@ def set_perf_event_mux_interval(reset, interval_ms, mux_interval):
                         f_mux.write(str(val))
 
 
-# extend uncore events to all cores
-def enumerate_uncore(event, n):
-    event_list = []
-    for i in range(n):
-        tmp = event + "_" + str(i)
-        event_list.append(tmp)
-    return event_list
-
-
 # read the MSR register and return the value in dec format
 def readmsr(msr, cpu=0):
     f = os.open("/dev/cpu/%d/msr" % (cpu,), os.O_RDONLY)
@@ -194,16 +184,16 @@ def pmu_contention_detect(
         try:
             value = readmsr(int(r, 16))
             if msrs[r]["value"] is not None and value != msrs[r]["value"]:
-                log.info("PMU in use: " + msrs[r]["name"])
+                logging.warning("PMU in use: " + msrs[r]["name"])
                 warn = True
             msrs[r]["value"] = value
         except IOError:
             pass
     if detect:
         if warn:
-            log.info("output could be inaccurate")
+            logging.warning("output could be inaccurate")
         else:
-            log.info("PMUs not in use")
+            logging.info("PMUs not in use")
     return msrs
 
 
@@ -215,7 +205,7 @@ def get_version():
             version = f.read()
             version = version.split("#")[0]
     except EnvironmentError as e:
-        log.warning(str(e), UserWarning)
+        logging.warning(str(e), UserWarning)
     return version
 
 
@@ -226,7 +216,7 @@ def get_cpuinfo():
     try:
         fo = open("/proc/cpuinfo", "r")
     except EnvironmentError as e:
-        log.warning(str(e), UserWarning)
+        logging.warning(str(e), UserWarning)
     else:
         for line in fo:
             try:
@@ -389,7 +379,7 @@ def get_cgroups_from_cids(cids):
         p.stdout.close()
 
     except subprocess.SubprocessError as e:
-        crash("failed to open ps subprocess: " + e.output)
+        crash("failed to open ps subprocess: " + str(e))
     out, err = p2.communicate()
     if err:
         crash(f"error reading cgroups: {err}")
@@ -413,17 +403,3 @@ def get_comm_from_cid(cids, cgroups):
     for index, cid in enumerate(cids):
         cnamelist += cgroups[index] + "=" + cid + ","
     return cnamelist
-
-
-def fix_path_ownership(path, recursive=False):
-    """change the ownership of the results folder when executed with sudo previleges"""
-    if not recursive:
-        uid = os.environ.get("SUDO_UID")
-        gid = os.environ.get("SUDO_GID")
-        if uid:
-            os.chown(path, int(uid), int(gid))
-    else:
-        for dirpath, _, filenames in os.walk(path):
-            fix_path_ownership(dirpath)
-            for filename in filenames:
-                fix_path_ownership(os.path.join(dirpath, filename))

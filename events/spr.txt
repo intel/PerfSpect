@@ -58,7 +58,7 @@ cpu/event=0x00,umask=0x85,period=10000003,name='PERF_METRICS.BRANCH_MISPREDICTS'
 cpu/event=0x00,umask=0x84,period=10000003,name='PERF_METRICS.HEAVY_OPERATIONS'/;
 
 cpu/event=0xad,umask=0x10,period=1000003,name='INT_MISC.UOP_DROPPING'/,
-cpu/event=0xad,umask=0x40,frontend=0x7,period=1000003,name='INT_MISC.UNKNOWN_BRANCH_CYCLES'/,
+cpu/event=0xad,umask=0x40,period=1000003,name='INT_MISC.UNKNOWN_BRANCH_CYCLES'/,
 cpu/event=0xa6,umask=0x21,cmask=0x05,period=2000003,name='EXE_ACTIVITY.BOUND_ON_LOADS'/,
 cpu-cycles;
 
@@ -89,7 +89,7 @@ cpu/event=0x48,umask=0x01,period=1000003,name='L1D_PEND_MISS.PENDING'/,
 cpu/event=0x03,umask=0x88,period=100003,name='LD_BLOCKS.NO_SR'/,
 cpu-cycles;
 
-cpu/event=0xc2,umask=0x04,frontend=0x8,period=2000003,name='UOPS_RETIRED.MS'/,
+cpu/event=0xc2,umask=0x04,period=2000003,name='UOPS_RETIRED.MS'/,
 cpu/event=0xec,umask=0x02,period=2000003,name='CPU_CLK_UNHALTED.DISTRIBUTED'/,
 cpu-cycles;
 

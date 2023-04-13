@@ -5,11 +5,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ###########################################################################################################
 
-from __future__ import print_function
 import logging
 import os
 import platform
-import re
 import sys
 import subprocess  # nosec
 import shlex  # nosec
@@ -17,14 +15,8 @@ from argparse import ArgumentParser
 from src import perf_helpers
 from src import prepare_perf_events as prep_events
 from src.common import crash
+from src import common
 
-logging.basicConfig(
-    format="%(asctime)s %(levelname)s: %(message)s",
-    datefmt="%H:%M:%S",
-    level=logging.NOTSET,
-    handlers=[logging.FileHandler("debug.log"), logging.StreamHandler(sys.stdout)],
-)
-log = logging.getLogger(__name__)
 
 SUPPORTED_ARCHITECTURES = [
     "Broadwell",
@@ -54,7 +46,9 @@ def write_metadata(
     with open(outcsv, "r") as original:
         time_stamp = original.readline()
         if metadata_only and time_stamp.startswith("### META DATA ###"):
-            log.warning("Not prepending metadata, already present in %s " % (outcsv))
+            logging.warning(
+                "Not prepending metadata, already present in %s " % (outcsv)
+            )
             return
         data = original.read()
     with open(outcsv, "w") as modified:
@@ -164,13 +158,8 @@ def validate_file(fname):
         crash(str(fname) + " not accessible")
 
 
-def is_safe_file(fname, substr):
-    """verify if file name/format is accurate"""
-    if not fname.endswith(substr):
-        crash(str(fname) + " isn't appropriate format")
-
-
 if __name__ == "__main__":
+    common.configure_logging(".")
     if platform.system() != "Linux":
         crash("PerfSpect currently supports Linux only")
 
@@ -178,8 +167,7 @@ if __name__ == "__main__":
     script_path = os.path.dirname(os.path.realpath(__file__))
     if "_MEI" in script_path:
         script_path = script_path.rsplit("/", 1)[0]
-    result_dir = script_path + "/results"
-    default_output_file = result_dir + "/perfstat.csv"
+    default_output_file = "perfstat.csv"
 
     parser = ArgumentParser(description="perf-collect: Time series dump of PMUs")
     duration = parser.add_mutually_exclusive_group()
@@ -225,7 +213,7 @@ if __name__ == "__main__":
         "--outcsv",
         type=str,
         default=default_output_file,
-        help="perf stat output in csv format, default=results/perfstat.csv",
+        help="perf stat output in csv format, default=perfstat.csv",
     )
     parser.add_argument(
         "-v",
@@ -237,7 +225,7 @@ if __name__ == "__main__":
 
     if args.version:
         print(perf_helpers.get_tool_version())
-        sys.exit(0)
+        sys.exit()
 
     if os.geteuid() != 0:
         crash("Must run PerfSpect as root, please re-run")
@@ -249,7 +237,7 @@ if __name__ == "__main__":
             nmi_watchdog = f_nmi.read()
             if int(nmi_watchdog) != 0:
                 f_nmi.write("0")
-                log.info("nmi_watchdog disabled")
+                logging.info("nmi_watchdog disabled")
     except FileNotFoundError:
         pass
 
@@ -278,11 +266,13 @@ if __name__ == "__main__":
     elif arch == "sapphirerapids":
         eventfile = "spr.txt"
 
+    if eventfile is None:
+        crash(f"failed to match architecture ({arch}) to event file name.")
+
     # Convert path of event file to relative path if being packaged by pyInstaller into a binary
     if getattr(sys, "frozen", False):
         basepath = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
         eventfilename = eventfile
-        is_safe_file(eventfile, ".txt")
         eventfile = os.path.join(basepath, eventfile)
     elif __file__:
         eventfile = script_path + "/events/" + eventfile
@@ -290,16 +280,10 @@ if __name__ == "__main__":
     else:
         crash("Unknown application type")
 
-    if args.outcsv == default_output_file:
-        # create results dir
-        if not os.path.exists(result_dir):
-            os.mkdir(result_dir)
-            perf_helpers.fix_path_ownership(result_dir)
-    else:
-        if not perf_helpers.validate_outfile(args.outcsv):
-            crash(
-                "Output filename not accepted. Filename should be a .csv without special characters"
-            )
+    if not perf_helpers.validate_outfile(args.outcsv):
+        crash(
+            "Output filename not accepted. Filename should be a .csv without special characters"
+        )
 
     mux_intervals = perf_helpers.get_perf_event_mux_interval()
     if args.muxinterval > 0:
@@ -311,22 +295,21 @@ if __name__ == "__main__":
         cgroups = perf_helpers.get_cgroups_from_cids(args.cid.split(","))
         num_cgroups = len(cgroups)
 
-    try:
-        reg = r"^[0-9]*\.[0-9][0-9]*"
-        kernel = perf_helpers.get_version().split("Linux version")[1].lstrip()
-        significant_kernel_version = re.match(reg, kernel).group(0)
-        full_kernel_version = kernel
-    except Exception as e:
-        log.exception(e)
-        crash("Unable to get kernel version")
-
     # get perf events to collect
     collection_events = []
     imc, cha, upi = perf_helpers.get_imc_cacheagent_count()
     have_uncore = True
     if imc == 0 and cha == 0 and upi == 0:
-        log.info("disabling uncore (possibly in a vm?)")
+        logging.info("disabling uncore (possibly in a vm?)")
         have_uncore = False
+        if arch == "icelake":
+            logging.warning(
+                "Due to lack of vPMU support, TMA L1 events will not be collected"
+            )
+        if arch == "sapphirerapids":
+            logging.warning(
+                "Due to lack of vPMU support, TMA L1 & L2 events will not be collected"
+            )
     events, collection_events = prep_events.prepare_perf_events(
         eventfile,
         (
@@ -341,7 +324,7 @@ if __name__ == "__main__":
     collection_type = "-a" if not args.thread and not args.socket else "-a -A"
     # start perf stat
     if args.pid and args.timeout:
-        log.info("Only CPU/core events will be enabled with pid option")
+        logging.info("Only CPU/core events will be enabled with pid option")
         cmd = "perf stat -I %d -x , --pid %s -e %s -o %s sleep %d" % (
             interval,
             args.pid,
@@ -351,7 +334,7 @@ if __name__ == "__main__":
         )
 
     elif args.pid:
-        log.info("Only CPU/core events will be enabled with pid option")
+        logging.info("Only CPU/core events will be enabled with pid option")
         cmd = "perf stat -I %d -x , --pid %s -e %s -o %s" % (
             interval,
             args.pid,
@@ -359,7 +342,7 @@ if __name__ == "__main__":
             args.outcsv,
         )
     elif args.cid and args.timeout:
-        log.info("Only CPU/core events will be enabled with cid option")
+        logging.info("Only CPU/core events will be enabled with cid option")
         perf_format = prep_events.get_cgroup_events_format(
             cgroups, events, len(collection_events)
         )
@@ -370,7 +353,7 @@ if __name__ == "__main__":
             args.timeout,
         )
     elif args.cid:
-        log.info("Only CPU/core events will be enabled with cid option")
+        logging.info("Only CPU/core events will be enabled with cid option")
         perf_format = prep_events.get_cgroup_events_format(
             cgroups, events, len(collection_events)
         )
@@ -402,13 +385,13 @@ if __name__ == "__main__":
     validate_perfargs(perfargs)
     perf_helpers.pmu_contention_detect(msrs=initial_pmus, detect=True)
     if args.verbose:
-        log.info(cmd)
+        logging.info(cmd)
     try:
-        log.info("Collecting perf stat for events in : %s" % eventfilename)
+        logging.info("Collecting perf stat for events in : %s" % eventfilename)
         subprocess.call(perfargs)  # nosec
-        log.info("Collection complete! Calculating TSC frequency now")
+        logging.info("Collection complete! Calculating TSC frequency now")
     except KeyboardInterrupt:
-        log.info("Collection stopped! Caculating TSC frequency now")
+        logging.info("Collection stopped! Caculating TSC frequency now")
     except Exception:
         crash("perf encountered errors")
 
@@ -425,13 +408,14 @@ if __name__ == "__main__":
         False,
     )
 
+    os.chmod(args.outcsv, 0o666)  # nosec
+
     # reset nmi_watchdog to what it was before running perfspect
     with open("/proc/sys/kernel/nmi_watchdog", "w") as f_nmi:
         if int(nmi_watchdog) != 0:
             f_nmi.write(nmi_watchdog)
-            log.info("nmi_watchdog re-enabled")
+            logging.info("nmi_watchdog re-enabled")
 
     perf_helpers.set_perf_event_mux_interval(True, 1, mux_intervals)
 
-    log.info("perf stat dumped to %s" % args.outcsv)
-    perf_helpers.fix_path_ownership(result_dir, True)
+    logging.info("perf stat dumped to %s" % args.outcsv)
