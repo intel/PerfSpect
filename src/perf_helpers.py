@@ -41,6 +41,12 @@ def get_ht_count():
     return int(any([core["siblings"] != core["cpu cores"] for core in cpuinfo])) + 1
 
 
+# get hyperthreading status
+def get_ht_status():
+    cpuinfo = get_cpuinfo()
+    return any([core["siblings"] != core["cpu cores"] for core in cpuinfo])
+
+
 # get cpu count
 def get_cpu_count():
     cpu_count = 0
@@ -52,7 +58,7 @@ def get_cpu_count():
         for c in cpu_list:
             limit = c.split("-")
             cpu_count += int(limit[1]) - int(limit[0]) + 1
-    return cpu_count / (get_socket_count() * get_ht_count())
+    return int(cpu_count / (get_socket_count() * get_ht_count()))
 
 
 # compute tsc frequency
@@ -90,28 +96,37 @@ def get_sys_devices():
 
 # get imc and uncore counts
 # TODO:fix for memory config with some channels populated
-def get_imc_cacheagent_count():
+def get_imc_upi_count():
     sys_devs = get_sys_devices()
-    cha_count = 0
     imc_count = 0
     upi_count = 0
-    if "uncore_cha" in sys_devs:
-        cha_count = int(sys_devs["uncore_cha"])
-    if "uncore_cbox" in sys_devs:
-        cha_count = int(sys_devs["uncore_cbox"])
     if "uncore_upi" in sys_devs:
         upi_count = int(sys_devs["uncore_upi"])
     if "uncore_qpi" in sys_devs:
         upi_count = int(sys_devs["uncore_qpi"])
     if "uncore_imc" in sys_devs:
         imc_count = int(sys_devs["uncore_imc"])
-    return imc_count, cha_count, upi_count
+    return imc_count, upi_count
+
+
+# get CHA count
+def get_cha_count():
+    cha_msrs = {
+        "0x396": "uncore client cha count",
+        "0x702": "uncore cha count",
+        "0x2FFE": "uncore cha count spr",
+    }
+    for msr in cha_msrs.keys():
+        result = read_msr(int(msr, 16))
+        if result is not None and result != 0:
+            return result
+    return 0
 
 
 # get imc channel ids, channel ids are not consecutive in some cases (observed on bdw)
 def get_channel_ids():
     sysdevices = os.listdir("/sys/bus/event_source/devices")
-    imc = "uncore_imc_*"
+    imc = "uncore_imc_[0-9]*"
     ids = []
     for entry in sysdevices:
         if fnmatch.fnmatch(entry, imc):
@@ -153,12 +168,15 @@ def set_perf_event_mux_interval(reset, interval_ms, mux_interval):
 
 
 # read the MSR register and return the value in dec format
-def readmsr(msr, cpu=0):
-    f = os.open("/dev/cpu/%d/msr" % (cpu,), os.O_RDONLY)
-    os.lseek(f, msr, os.SEEK_SET)
-    val = struct.unpack("Q", os.read(f, 8))[0]
-    os.close(f)
-    return val
+def read_msr(msr, cpu=0):
+    fName = f"/dev/cpu/{cpu}/msr"
+    try:
+        with open(fName, "rb") as f:
+            f.seek(msr)
+            result = struct.unpack("Q", f.read(8))[0]
+    except OSError:
+        result = None
+    return result
 
 
 # detect if PMU counters are in use
@@ -182,7 +200,7 @@ def pmu_contention_detect(
     warn = False
     for r in msrs:
         try:
-            value = readmsr(int(r, 16))
+            value = read_msr(int(r, 16))
             if msrs[r]["value"] is not None and value != msrs[r]["value"]:
                 logging.warning("PMU in use: " + msrs[r]["name"])
                 warn = True
@@ -243,6 +261,19 @@ def get_lscpu():
     except subprocess.CalledProcessError as e:
         crash(e.output + "\nFailed to get CPUInfo")
     return cpuinfo
+
+
+# get supported perf events
+def get_perf_list():
+    try:
+        perf_list = subprocess.check_output(  # nosec
+            ["perf", "list"], universal_newlines=True
+        )
+    except FileNotFoundError:
+        crash("Please install Linux perf and re-run")
+    except subprocess.CalledProcessError as e:
+        crash(f"Error calling Linux perf, error code: {e.returncode}")
+    return perf_list
 
 
 def get_arch_and_name(procinfo):
@@ -366,9 +397,7 @@ def get_cgroups_from_cids(cids):
     cgroups = set()
     try:
         p = subprocess.Popen(
-            ["ps", "-e", "-o", "cgroup"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            ["ps", "-e", "-o", "cgroup"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
         p2 = subprocess.Popen(
             ["grep", "docker-"],

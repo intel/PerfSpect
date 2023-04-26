@@ -1,15 +1,15 @@
 [
     {
         "name": "metric_CPU operating frequency (in GHz)",
-        "expression": "([cpu-cycles] / [ref-cycles]) * ([const_tsc_freq] / 1000000000)"
+        "expression": "([cpu-cycles] / [ref-cycles]) * ([SYSTEM_TSC_FREQ] / 1000000000)"
     },
     {
         "name": "metric_CPU utilization %",
-        "expression": "100 * [ref-cycles] / [const_TSC]"
+        "expression": "100 * [ref-cycles] / [TSC]"
     },
     {
         "name": "metric_CPU utilization% in kernel mode",
-        "expression": "100 * [ref-cycles:k] / [const_TSC]"
+        "expression": "100 * [ref-cycles:k] / [TSC]"
     },
     {
         "name": "metric_CPI",
@@ -74,11 +74,11 @@
     },
     {
         "name": "metric_core c6 residency %",
-        "expression": "100 * [cstate_core/c6-residency/] / [const_TSC]"
+        "expression": "100 * [cstate_core/c6-residency/] / [TSC]"
     },
     {
         "name": "metric_package c6 residency %",
-        "expression": "100 * [cstate_pkg/c6-residency/] * [const_core_count] / [const_TSC]"
+        "expression": "100 * [cstate_pkg/c6-residency/] * [CORES_PER_SOCKET] / [TSC]"
     },
     {
         "name": "metric_core % cycles in non AVX license",
@@ -113,22 +113,6 @@
         "expression": "([UNC_M_CAS_COUNT.RD] + [UNC_M_CAS_COUNT.WR]) * 64 / 1000000"
     },
     {
-        "name": "metric_DCPMEM_memory_mode near memory cache read miss rate%",
-        "expression": "100 * ([UNC_M_TAGCHK.MISS_CLEAN] + [UNC_M_TAGCHK.MISS_DIRTY]) / ([UNC_M_TAGCHK.HIT] + [UNC_M_TAGCHK.MISS_CLEAN] + [UNC_M_TAGCHK.MISS_DIRTY])"
-    },
-    {
-        "name": "metric_3DXP_memory bandwidth read (MB/sec)",
-        "expression": "[UNC_M_PMM_RPQ_INSERTS] * 64 / 1000000"
-    },
-    {
-        "name": "metric_3DXP_memory bandwidth write (MB/sec)",
-        "expression": "[UNC_M_PMM_WPQ_INSERTS] * 64 / 1000000"
-    },
-    {
-        "name": "metric_3DXP_memory bandwidth total (MB/sec)",
-        "expression": "([UNC_M_PMM_RPQ_INSERTS] + [UNC_M_PMM_WPQ_INSERTS]) * 64 / 1000000"
-    },
-    {
         "name": "metric_LLC code read MPI (demand+prefetch)",
         "expression": "([UNC_CHA_TOR_INSERTS.IA_MISS_CRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_CRD_PREF]) / [instructions]"
     },
@@ -146,15 +130,15 @@
     },
     {
         "name": "metric_Average LLC demand data read miss latency (in ns)",
-        "expression": "(1000000000 * [UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD] / [UNC_CHA_TOR_INSERTS.IA_MISS_DRD]) / ([UNC_CHA_CLOCKTICKS] / ([const_cha_count] * [const_socket_count]))"
+        "expression": "(1000000000 * [UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD] / [UNC_CHA_TOR_INSERTS.IA_MISS_DRD]) / ([UNC_CHA_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]))"
     },
     {
         "name": "metric_Average LLC demand data read miss latency for LOCAL requests (in ns)",
-        "expression": "(1000000000 * [UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD_LOCAL] / [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_LOCAL]) / ([UNC_CHA_CLOCKTICKS] / ([const_cha_count] * [const_socket_count]))"
+        "expression": "(1000000000 * [UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD_LOCAL] / [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_LOCAL]) / ([UNC_CHA_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]))"
     },
     {
         "name": "metric_Average LLC demand data read miss latency for REMOTE requests (in ns)",
-        "expression": "(1000000000 * [UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD_REMOTE] / [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_REMOTE]) / ([UNC_CHA_CLOCKTICKS] / ([const_cha_count] * [const_socket_count]))"
+        "expression": "(1000000000 * [UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD_REMOTE] / [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_REMOTE]) / ([UNC_CHA_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]))"
     },
     {
         "name": "metric_ITLB (2nd level) MPI",
@@ -182,7 +166,7 @@
     },
     {
         "name": "metric_uncore frequency GHz",
-        "expression": "[UNC_CHA_CLOCKTICKS] / ([const_cha_count] * [const_socket_count]) / 1000000000"
+        "expression": "[UNC_CHA_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]) / 1000000000"
     },
     {
         "name": "metric_TMA_Frontend_Bound(%)",
@@ -262,15 +246,15 @@
     },
     {
         "name": "metric_TMA_......Contested_Accesses(%)",
-        "expression": "100 * ((((48 * (([cpu-cycles] / [ref-cycles]) * [const_tsc_freq] / 1000000000)) -(4 * (([cpu-cycles] / [ref-cycles]) * [const_tsc_freq] / 1000000000))) * ([MEM_LOAD_L3_HIT_RETIRED.XSNP_FWD] * ([OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HITM] / ([OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HITM] + [OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HIT_WITH_FWD]))) + ((47.5 * (([cpu-cycles] / [ref-cycles]) * [const_tsc_freq] / 1000000000)) - (4 * (([cpu-cycles] / [ref-cycles]) * [const_tsc_freq] / 1000000000))) * [MEM_LOAD_L3_HIT_RETIRED.XSNP_MISS]) * (1 + ([MEM_LOAD_RETIRED.FB_HIT] / [MEM_LOAD_RETIRED.L1_MISS]) / 2) / [cpu-cycles])"
+        "expression": "100 * ((((48 * (([cpu-cycles] / [ref-cycles]) * [SYSTEM_TSC_FREQ] / 1000000000)) -(4 * (([cpu-cycles] / [ref-cycles]) * [SYSTEM_TSC_FREQ] / 1000000000))) * ([MEM_LOAD_L3_HIT_RETIRED.XSNP_FWD] * ([OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HITM] / ([OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HITM] + [OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HIT_WITH_FWD]))) + ((47.5 * (([cpu-cycles] / [ref-cycles]) * [SYSTEM_TSC_FREQ] / 1000000000)) - (4 * (([cpu-cycles] / [ref-cycles]) * [SYSTEM_TSC_FREQ] / 1000000000))) * [MEM_LOAD_L3_HIT_RETIRED.XSNP_MISS]) * (1 + ([MEM_LOAD_RETIRED.FB_HIT] / [MEM_LOAD_RETIRED.L1_MISS]) / 2) / [cpu-cycles])"
     },
     {
         "name": "metric_TMA_......Data_Sharing(%)",
-        "expression": "100 * (((47.5 * (([cpu-cycles] / [ref-cycles]) * [const_tsc_freq] / 1000000000)) - (4 * (([cpu-cycles] / [ref-cycles]) * [const_tsc_freq] / 1000000000))) * ([MEM_LOAD_L3_HIT_RETIRED.XSNP_NO_FWD] + [MEM_LOAD_L3_HIT_RETIRED.XSNP_FWD] * (1 - ([OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HITM] / ([OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HITM] + [OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HIT_WITH_FWD])))) * (1 + ([MEM_LOAD_RETIRED.FB_HIT] / [MEM_LOAD_RETIRED.L1_MISS]) / 2) / [cpu-cycles])"
+        "expression": "100 * (((47.5 * (([cpu-cycles] / [ref-cycles]) * [SYSTEM_TSC_FREQ] / 1000000000)) - (4 * (([cpu-cycles] / [ref-cycles]) * [SYSTEM_TSC_FREQ] / 1000000000))) * ([MEM_LOAD_L3_HIT_RETIRED.XSNP_NO_FWD] + [MEM_LOAD_L3_HIT_RETIRED.XSNP_FWD] * (1 - ([OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HITM] / ([OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HITM] + [OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HIT_WITH_FWD])))) * (1 + ([MEM_LOAD_RETIRED.FB_HIT] / [MEM_LOAD_RETIRED.L1_MISS]) / 2) / [cpu-cycles])"
     },
     {
         "name": "metric_TMA_......L3_Hit_Latency(%)",
-        "expression": "100 * (((23 * (([cpu-cycles] / [ref-cycles]) * [const_tsc_freq] / 1000000000)) - (4 * (([cpu-cycles] / [ref-cycles]) * [const_tsc_freq] / 1000000000))) * [MEM_LOAD_RETIRED.L3_HIT] * (1 + ([MEM_LOAD_RETIRED.FB_HIT] / [MEM_LOAD_RETIRED.L1_MISS]) / 2) / [cpu-cycles])"
+        "expression": "100 * (((23 * (([cpu-cycles] / [ref-cycles]) * [SYSTEM_TSC_FREQ] / 1000000000)) - (4 * (([cpu-cycles] / [ref-cycles]) * [SYSTEM_TSC_FREQ] / 1000000000))) * [MEM_LOAD_RETIRED.L3_HIT] * (1 + ([MEM_LOAD_RETIRED.FB_HIT] / [MEM_LOAD_RETIRED.L1_MISS]) / 2) / [cpu-cycles])"
     },
     {
         "name": "metric_TMA_......SQ_Full(%)",
@@ -330,7 +314,7 @@
     },
     {
         "name": "metric_TMA_....Microcode_Sequencer(%)",
-        "expression": "100 * (((([PERF_METRICS.RETIRING] / (([PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [topdown-be-found]))) * [TOPDOWN.SLOTS]) / [UOPS_ISSUED.ANY]) * [IDQ.MS_UOPS] / [TOPDOWN.SLOTS])"
+        "expression": "100 * (((([PERF_METRICS.RETIRING] / (([PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND]))) * [TOPDOWN.SLOTS]) / [UOPS_ISSUED.ANY]) * [IDQ.MS_UOPS] / [TOPDOWN.SLOTS])"
     },
     {
         "name": "metric_TMA_Info_CoreIPC",
@@ -338,6 +322,6 @@
     },
     {
         "name": "metric_TMA_Info_System_SMT_2T_Utilization",
-        "expression": "(1 - [CPU_CLK_UNHALTED.ONE_THREAD_ACTIVE] / [CPU_CLK_UNHALTED.REF_DISTRIBUTED]) if [const_socket_count] > 1 else 0"
+        "expression": "(1 - [CPU_CLK_UNHALTED.ONE_THREAD_ACTIVE] / [CPU_CLK_UNHALTED.REF_DISTRIBUTED]) if [SOCKET_COUNT] > 1 else 0"
     }
 ]

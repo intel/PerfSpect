@@ -91,6 +91,7 @@ cpu-cycles;
 
 cpu/event=0xc2,umask=0x04,period=2000003,name='UOPS_RETIRED.MS'/,
 cpu/event=0xec,umask=0x02,period=2000003,name='CPU_CLK_UNHALTED.DISTRIBUTED'/,
+cpu/event=0x47,umask=0x02,cmask=0x02,period=1000003,name='MEMORY_ACTIVITY.CYCLES_L1D_MISS'/,
 cpu-cycles;
 
 cpu/event=0x3c,umask=0x02,period=25003,name='CPU_CLK_UNHALTED.ONE_THREAD_ACTIVE'/,
@@ -138,11 +139,6 @@ cha/event=0x35,umask=0xc8f3ff04,name='UNC_CHA_TOR_INSERTS.IO_PCIRDCUR'/,
 cha/event=0x35,umask=0xCC43FF04,name='UNC_CHA_TOR_INSERTS.IO_ITOM'/,
 cha/event=0x35,umask=0xCD43FF04,name='UNC_CHA_TOR_INSERTS.IO_ITOMCACHENEAR'/,
 cha/event=0x01,umask=0x00,name='UNC_CHA_CLOCKTICKS'/;
-
-#PMEM
-imc/event=0xd3,umask=0x01,name='UNC_M_TAGCHK.HIT'/,
-imc/event=0xd3,umask=0x02,name='UNC_M_TAGCHK.MISS_CLEAN'/,
-imc/event=0xd3,umask=0x04,name='UNC_M_TAGCHK.MISS_DIRTY'/;
 
 #memory read/writes
 imc/event=0x05,umask=0xcf,name='UNC_M_CAS_COUNT.RD'/,

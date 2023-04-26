@@ -86,16 +86,10 @@ def get_args(script_path):
         action="store_true",
     )
     parser.add_argument(
-        "--rawevents",
-        help="save raw events in .csv format",
-        action="store_true",
+        "--rawevents", help="save raw events in .csv format", action="store_true"
     )
     parser.add_argument(
-        "-html",
-        "--html",
-        type=str,
-        default=None,
-        help="Static HTML report",
+        "-html", "--html", type=str, default=None, help="Static HTML report"
     )
 
     args = parser.parse_args()
@@ -126,6 +120,43 @@ def get_args(script_path):
         crash("Output file %s not writeable " % args.outfile)
 
     return args
+
+
+# fix c6-residency data lines
+# for system: multiply value by number of HyperThreads
+# for socket or thread: add rows for each 2nd hyper thread with same values as 1st thread
+def get_fixed_c6_residency_fields(perf_data_lines, perf_mode):
+    # handle special case events: c6-residency
+    new_perf_data_lines = []
+    if meta_data["constants"]["CONST_THREAD_COUNT"] == 2:
+        for fields in perf_data_lines:
+            if perf_mode == Mode.System and fields[3] == "cstate_core/c6-residency/":
+                # since "cstate_core/c6-residency/" is collected for only one thread
+                # we double the value for the system wide collection (assign same value to the 2nd thread)
+                try:
+                    fields[1] = int(fields[1]) * 2  # fields[1] -> event value
+                except ValueError:
+                    # value can be <not supported> or <not counted>
+                    logging.warning(
+                        "Failed to convert cstate_core/c6-residency/ metric value: "
+                        + str(fields[1])
+                        + " to integer. Skipping"
+                    )
+                    pass
+                new_perf_data_lines.append(fields)
+            elif fields[4] == "cstate_core/c6-residency/":
+                new_fields = fields.copy()
+                cpuID = int(fields[1].replace("CPU", ""))
+                HT_cpuID = cpuID + int(
+                    meta_data["constants"]["CONST_THREAD_COUNT"]
+                    * meta_data["constants"]["CORES_PER_SOCKET"]
+                )
+                new_fields[1] = "CPU" + str(HT_cpuID)
+                new_perf_data_lines.append(fields)
+                new_perf_data_lines.append(new_fields)
+            else:
+                new_perf_data_lines.append(fields)
+    return new_perf_data_lines
 
 
 # get metadata lines and perf events' lines in three separate lists
@@ -192,25 +223,23 @@ def get_metadata_as_dict(meta_data_lines):
     meta_data = {}
     meta_data["constants"] = {}
     for line in meta_data_lines:
-        if line.startswith("TSC"):
-            meta_data["constants"]["CONST_TSC_FREQ"] = (
+        if line.startswith("SYSTEM_TSC_FREQ"):
+            meta_data["constants"]["SYSTEM_TSC_FREQ"] = (
                 float(line.split(",")[1]) * 1000000
             )
-        elif line.startswith("CPU"):
-            meta_data["constants"]["CONST_CORE_COUNT"] = float(line.split(",")[1])
-        elif line.startswith("HT"):
-            meta_data["constants"]["CONST_HT_COUNT"] = float(line.split(",")[1])
-            meta_data["constants"]["CONST_THREAD_COUNT"] = float(
-                line.split(",")[1]
-            )  # we use both constants interchangeably
-        elif line.startswith("SOCKET"):
-            meta_data["constants"]["CONST_SOCKET_COUNT"] = float(line.split(",")[1])
-        elif line.startswith("IMC"):
-            meta_data["constants"]["CONST_IMC_COUNT"] = float(line.split(",")[1])
-        elif line.startswith("CHA") or line.startswith("CBOX"):
-            meta_data["constants"]["CONST_CHA_COUNT"] = float(line.split(",")[1])
-        elif line.startswith("Sampling"):
-            meta_data["constants"]["CONST_INTERVAL"] = float(line.split(",")[1])
+        elif line.startswith("CORES_PER_SOCKET"):
+            meta_data["constants"]["CORES_PER_SOCKET"] = int(line.split(",")[1])
+        elif line.startswith("HYPERTHREADING_ON"):
+            meta_data["constants"]["HYPERTHREADING_ON"] = int(
+                line.split(",")[1] == "True"
+            )
+            meta_data["constants"]["CONST_THREAD_COUNT"] = (
+                int(line.split(",")[1] == "True") + 1
+            )
+        elif line.startswith("SOCKET_COUNT"):
+            meta_data["constants"]["SOCKET_COUNT"] = int(line.split(",")[1])
+        elif line.startswith("CHAS_PER_SOCKET") or line.startswith("CBOX"):
+            meta_data["constants"]["CHAS_PER_SOCKET"] = int(line.split(",")[1])
         elif line.startswith("Architecture"):
             meta_data["constants"]["CONST_ARCH"] = str(line.split(",")[1])
 
@@ -239,15 +268,19 @@ def get_metadata_as_dict(meta_data_lines):
             docker_SETS = []
             docker_SETS = line.split(",")
             docker_SETS = docker_SETS[:-1]
-            # here lognth of docker_HASH should be exactly len(docker_SETS)
+            # here length of docker_HASH should be exactly len(docker_SETS)
             assert len(docker_HASH) == len(docker_SETS)
             meta_data["CPUSETS"] = {}
-            for i in range(1, len(docker_SETS)):
-                docker_SET = str(docker_SETS[i])
-                docker_SET = (
-                    int(docker_SET.split("-")[1]) - int(docker_SET.split("-")[0]) + 1
-                )
-                meta_data["CPUSETS"][docker_HASH[i]] = docker_SET
+            for i, docker_SET in enumerate(docker_SETS):
+                if "-" in docker_SET:  # range of cpus
+                    num_of_cpus = (
+                        int(docker_SET.split("-")[1])
+                        - int(docker_SET.split("-")[0])
+                        + 1
+                    )
+                else:  # either one cpu, or a list of cpus separated by + sign
+                    num_of_cpus = len(docker_SET.split("+"))
+                meta_data["CPUSETS"][docker_HASH[i]] = num_of_cpus
 
         elif line.startswith("Percore mode"):
             meta_data["PERCORE_MODE"] = (
@@ -273,24 +306,25 @@ def get_metadata_as_dict(meta_data_lines):
 
 def set_CONST_TSC(meta_data, perf_mode, num_cpus=0):
     if perf_mode == Mode.System:
-        meta_data["constants"]["CONST_TSC"] = (
-            meta_data["constants"]["CONST_TSC_FREQ"]
-            * meta_data["constants"]["CONST_CORE_COUNT"]
-            * meta_data["constants"]["CONST_HT_COUNT"]
-            * meta_data["constants"]["CONST_SOCKET_COUNT"]
-        )
+        if meta_data["CGROUPS"] == "enabled" and num_cpus > 0:
+            meta_data["constants"]["TSC"] = (
+                meta_data["constants"]["SYSTEM_TSC_FREQ"] * num_cpus
+            )
+        else:
+            meta_data["constants"]["TSC"] = (
+                meta_data["constants"]["SYSTEM_TSC_FREQ"]
+                * meta_data["constants"]["CORES_PER_SOCKET"]
+                * meta_data["constants"]["CONST_THREAD_COUNT"]
+                * meta_data["constants"]["SOCKET_COUNT"]
+            )
     elif perf_mode == Mode.Socket:
-        meta_data["constants"]["CONST_TSC"] = (
-            meta_data["constants"]["CONST_TSC_FREQ"]
-            * meta_data["constants"]["CONST_CORE_COUNT"]
-            * meta_data["constants"]["CONST_HT_COUNT"]
+        meta_data["constants"]["TSC"] = (
+            meta_data["constants"]["SYSTEM_TSC_FREQ"]
+            * meta_data["constants"]["CORES_PER_SOCKET"]
+            * meta_data["constants"]["CONST_THREAD_COUNT"]
         )
     elif perf_mode == Mode.Core:  # Core should be changed to thread
-        meta_data["constants"]["CONST_TSC"] = meta_data["constants"]["CONST_TSC_FREQ"]
-    elif meta_data["CGROUPS"] == "enabled":
-        meta_data["constants"]["CONST_TSC"] = (
-            meta_data["constants"]["CONST_TSC_FREQ"] * num_cpus
-        )
+        meta_data["constants"]["TSC"] = meta_data["constants"]["SYSTEM_TSC_FREQ"]
     return
 
 
@@ -386,15 +420,7 @@ def extract_dataframe(perf_data_lines, meta_data, perf_mode):
     if "CGROUPS" in meta_data and meta_data["CGROUPS"] == "enabled":
         # 1.001044566,6261968509,,L1D.REPLACEMENT,/system.slice/docker-826c1c9de0bde13b0c3de7c4d96b38710cfb67c2911f30622508905ece7e0a16.scope,6789274819,5.39,,
         assert len(perf_data_df.columns) >= 7
-        columns = [
-            "ts",
-            "value",
-            "col0",
-            "metric",
-            "cgroup",
-            "col1",
-            "percentage",
-        ]
+        columns = ["ts", "value", "col0", "metric", "cgroup", "col1", "percentage"]
         # add dummy col names for remaining columns
         for col in range(7, len(perf_data_df.columns)):
             columns.append("col" + str(col))
@@ -402,29 +428,14 @@ def extract_dataframe(perf_data_lines, meta_data, perf_mode):
     elif perf_mode == Mode.System:
         # Ubuntu 16.04 returns 6 columns, later Ubuntu's and other OS's return 8 columns
         assert len(perf_data_df.columns) >= 6
-        columns = [
-            "ts",
-            "value",
-            "col0",
-            "metric",
-            "value2",
-            "percentage",
-        ]
+        columns = ["ts", "value", "col0", "metric", "value2", "percentage"]
         # add dummy col names for remaining columns
         for col in range(6, len(perf_data_df.columns)):
             columns.append("col" + str(col))
         perf_data_df.columns = columns
     elif perf_mode == Mode.Core or perf_mode == Mode.Socket:
         assert len(perf_data_df.columns) >= 7
-        columns = [
-            "ts",
-            "cpu",
-            "value",
-            "col0",
-            "metric",
-            "value2",
-            "percentage",
-        ]
+        columns = ["ts", "cpu", "value", "col0", "metric", "value2", "percentage"]
         # add dummy col names for remaining columns
         for col in range(7, len(perf_data_df.columns)):
             columns.append("col" + str(col))
@@ -444,12 +455,9 @@ def extract_dataframe(perf_data_lines, meta_data, perf_mode):
     )
 
     # set data frame types
-    # perf_data_df = perf_data_df.astype({'value': 'float'})
     perf_data_df["value"] = pd.to_numeric(
         perf_data_df["value"], errors="coerce"
     ).fillna(0)
-    # perf_data_df = perf_data_df.astype({'value2': 'float'})
-    # perf_data_df = perf_data_df.astype({"percentage":"float"})
 
     return perf_data_df
 
@@ -521,7 +529,9 @@ def generate_metrics_time_series(time_series_df, perf_mode, out_file_path):
     return
 
 
-def generate_metrics_averages(time_series_df, perf_mode, out_file_path):
+def generate_metrics_averages(
+    time_series_df: pd.DataFrame, perf_mode: Mode, out_file_path: str
+) -> None:
     average_metric_file_name = ""
     if perf_mode == Mode.System:
         average_metric_file_name = get_extra_out_file(out_file_path, "a")
@@ -531,6 +541,9 @@ def generate_metrics_averages(time_series_df, perf_mode, out_file_path):
         average_metric_file_name = get_extra_out_file(out_file_path, "ca")
 
     time_series_df.index.name = "metrics"
+    # throw out 1st and last datapoints since they tend to be significantly off norm
+    if len(time_series_df) > 2:
+        time_series_df = time_series_df.iloc[:, 1:-1]
     avgcol = time_series_df.mean(numeric_only=True, axis=1).to_frame().reset_index()
     p95col = time_series_df.quantile(q=0.95, axis=1).to_frame().reset_index()
     mincol = time_series_df.min(axis=1).to_frame().reset_index()
@@ -577,12 +590,12 @@ def generate_metrics(
     time_slice_groups = perf_data_df.groupby("ts", sort=False)
     time_metrics_result = {}
     errors = {
-        "MISSING DATA": 0,
-        "ZERO DIVISION": 0,
-        "MISSING EVENTS": 0,
-        "MULTIPLE GROUPS": 0,
+        "MISSING DATA": set(),
+        "ZERO DIVISION": set(),
+        "MISSING EVENTS": set(),
+        "MULTIPLE GROUPS": set(),
     }
-    missing_events = set()
+
     for time_slice, item in time_slice_groups:
         time_slice_df = time_slice_groups.get_group(time_slice)
         current_group_indx = 0
@@ -640,11 +653,9 @@ def generate_metrics(
                             or "]" in expressions_to_evaluate[instance]
                         ):
                             if verbose:
-                                errors["MISSING DATA"] += 1
+                                errors["MISSING DATA"].add(m["name"])
                                 log_skip_metric(
-                                    m,
-                                    expressions_to_evaluate[instance],
-                                    "MISSING DATA",
+                                    m, expressions_to_evaluate[instance], "MISSING DATA"
                                 )
                             continue  # cannot evaluate expression, skipping
                         try:
@@ -658,7 +669,7 @@ def generate_metrics(
                             )
                         except ZeroDivisionError:
                             if verbose:
-                                errors["ZERO DIVISION"] += 1
+                                errors["ZERO DIVISION"].add(m["name"])
                                 log_skip_metric(
                                     m,
                                     expressions_to_evaluate[instance],
@@ -670,7 +681,7 @@ def generate_metrics(
                     break  # no need to check other groups
             if not single_group:
                 if verbose:
-                    errors["MULTIPLE GROUPS"] += 1
+                    errors["MULTIPLE GROUPS"].add(m["name"])
                     logging.warning('MULTIPLE GROUPS: metric "' + m["name"] + '"')
                 # get events from multiple groups
                 remaining_events_to_find = list(non_constant_mertics)
@@ -700,11 +711,9 @@ def generate_metrics(
                             or "]" in expressions_to_evaluate[instance]
                         ):
                             if verbose:
-                                errors["MISSING DATA"] += 1
+                                errors["MISSING DATA"].add(m["name"])
                                 log_skip_metric(
-                                    m,
-                                    expressions_to_evaluate[instance],
-                                    "MISSING DATA",
+                                    m, expressions_to_evaluate[instance], "MISSING DATA"
                                 )
                             continue
                         try:
@@ -718,7 +727,7 @@ def generate_metrics(
                             )
                         except ZeroDivisionError:
                             if verbose:
-                                errors["ZERO DIVISION"] += 1
+                                errors["ZERO DIVISION"].add(m["name"])
                                 log_skip_metric(
                                     m,
                                     expressions_to_evaluate[instance],
@@ -729,7 +738,6 @@ def generate_metrics(
                         metrics_results[m["name"] + sub_txt] = float(result)
                 else:  # some events are missing
                     if verbose:
-                        errors["MISSING EVENTS"] += 1
                         logging.warning(
                             'MISSING EVENTS: metric "'
                             + m["name"]
@@ -737,14 +745,15 @@ def generate_metrics(
                             + str(remaining_events_to_find)
                             + '"'
                         )
-                        missing_events.update(remaining_events_to_find)
+                        errors["MISSING EVENTS"].update(remaining_events_to_find)
                     continue  # skip metric
         time_metrics_result[time_slice] = metrics_results
     time_series_df = pd.DataFrame(time_metrics_result)
     if verbose:
         for error in errors:
-            logging.warning("Total " + error + ": " + str(errors[error]))
-        logging.warning("Missing events: " + str(missing_events))
+            logging.warning(
+                str(len(errors[error])) + " " + error + ": " + str(errors[error])
+            )
     generate_metrics_time_series(time_series_df, perf_mode, out_file_path)
     generate_metrics_averages(time_series_df, perf_mode, out_file_path)
     return
@@ -861,6 +870,9 @@ if __name__ == "__main__":
     elif "PERCORE_MODE" in meta_data and meta_data["PERCORE_MODE"]:
         perf_mode = Mode.Core
 
+    # fix c6 residency values
+    perf_data_lines = get_fixed_c6_residency_fields(perf_data_lines, perf_mode)
+
     # set const TSC accoding to perf_mode
     set_CONST_TSC(meta_data, perf_mode)
 
@@ -878,17 +890,19 @@ if __name__ == "__main__":
 
     # generate metrics for each cgroup
     if "CGROUPS" in meta_data and meta_data["CGROUPS"] == "enabled":
-        for cid in meta_data["CGROUP_HASH"]:
-            cid_perf_data_df = perf_data_df[perf_data_df["cgroup"] == cid]
-            cid_out_file_path = (
+        for cgroup_id in meta_data["CGROUP_HASH"]:
+            container_id = meta_data["CGROUP_HASH"][cgroup_id]
+            set_CONST_TSC(meta_data, perf_mode, meta_data["CPUSETS"][container_id])
+            cgroup_id_perf_data_df = perf_data_df[perf_data_df["cgroup"] == cgroup_id]
+            cgroup_id_out_file_path = (
                 out_file_path.rsplit(".csv", 1)[0]
                 + "_"
-                + meta_data["CGROUP_HASH"][cid]
+                + meta_data["CGROUP_HASH"][cgroup_id]
                 + ".csv"
             )
             generate_metrics(
-                cid_perf_data_df,
-                cid_out_file_path,
+                cgroup_id_perf_data_df,
+                cgroup_id_out_file_path,
                 event_groups,
                 meta_data,
                 metrics,
@@ -900,11 +914,11 @@ if __name__ == "__main__":
             )
             if args.html:
                 report.write_html(
-                    cid_out_file_path,
+                    cgroup_id_out_file_path,
                     perf_mode,
                     meta_data["constants"]["CONST_ARCH"],
                     args.html.replace(
-                        ".html", "_" + meta_data["CGROUP_HASH"][cid] + ".html"
+                        ".html", "_" + meta_data["CGROUP_HASH"][cgroup_id] + ".html"
                     ),
                 )
     # generate metrics for system, persocket or percore

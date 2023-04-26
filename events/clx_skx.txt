@@ -13,6 +13,8 @@ cpu-cycles,
 ref-cycles,
 instructions;
 
+
+cpu/event=0x85,umask=0x04,period=100003,name='ITLB_MISSES.WALK_COMPLETED_2M_4M'/,
 cpu/event=0xf1,umask=0x1f,period=100003,name='L2_LINES_IN.ALL'/,
 cpu/event=0xd1,umask=0x10,period=50021,name='MEM_LOAD_RETIRED.L2_MISS'/,
 cpu/event=0x24,umask=0x24,period=200003,name='L2_RQSTS.CODE_RD_MISS'/,
@@ -32,6 +34,7 @@ instructions:k;
 cstate_core/c6-residency/;
 cstate_pkg/c6-residency/;
 
+cpu/event=0xb0,umask=0x10,period=100003,name='OFFCORE_REQUESTS.L3_MISS_DEMAND_DATA_RD'/,
 cpu/event=0xa8,umask=0x01,period=2000003,name='LSD.UOPS'/,
 cpu-cycles,
 ref-cycles,

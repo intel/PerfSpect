@@ -11,15 +11,18 @@ from src import icicle
 from yattag import Doc, indent
 
 
-def write_html(tma_inp, perf_mode, arch, html_report_out, data_type="both"):
+def write_html(in_file, perf_mode, arch, html_report_out, data_type="both"):
     if data_type not in ("tma", "basic", "both"):
         data_type = "both"
     if str(perf_mode) == "Mode.System":
-        tma_inp = tma_inp.replace(".csv", ".sys.average.csv")
+        tma_inp = in_file.replace(".csv", ".sys.csv")
+        tma_inp_avg = in_file.replace(".csv", ".sys.average.csv")
     elif str(perf_mode) == "Mode.Socket":
-        tma_inp = tma_inp.replace(".csv", ".socket.average.csv")
+        tma_inp = in_file.replace(".csv", ".socket.csv")
+        tma_inp_avg = in_file.replace(".csv", ".socket.average.csv")
     elif str(perf_mode) == "Mode.Core":
-        tma_inp = tma_inp.replace(".csv", ".core.average.csv")
+        tma_inp = in_file.replace(".csv", ".core.csv")
+        tma_inp_avg = in_file.replace(".csv", ".core.average.csv")
 
     doc, tag, text = Doc().tagtext()
     with tag("html"):
@@ -32,7 +35,7 @@ def write_html(tma_inp, perf_mode, arch, html_report_out, data_type="both"):
                 text("Intel® PerfSpect Report")
         with tag("body"):
             if data_type in ("both", "tma"):
-                fig1 = icicle.get_icicle(tma_inp)
+                fig1 = icicle.get_icicle(tma_inp_avg)
                 with tag("h2", align="center"):
                     text("TopDown Microarchitecture Analysis (TMA)")
                 with doc.tag("div"):
