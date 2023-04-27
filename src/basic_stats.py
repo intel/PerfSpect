@@ -12,6 +12,7 @@ import plotly.graph_objects as go
 import tempfile
 from yattag import Doc
 from src.common import crash
+from collections import OrderedDict
 
 
 os.environ["MPLCONFIGDIR"] = tempfile.mkdtemp()
@@ -74,113 +75,110 @@ def row_of_1(html_list):
     return get_row_header() + get_col(html_list) + get_row_footer()
 
 
-def get_stats_plot(input, arch):
+def get_stats_plot(input_file, arch):
     try:
-        df = pd.read_csv(input, keep_default_na=False)
+        df = pd.read_csv(input_file, keep_default_na=False)
+
     except FileNotFoundError:
         crash(f"{input} file not found")
-    fig_list = []
-    if "metric_CPU operating frequency (in GHz)" in df.columns:
-        fig1 = get_fig(
-            df,
-            y=["metric_CPU operating frequency (in GHz)"],
-            title="CPU Operating Frequency",
-            title_text="Freq (GHz)",
-            name=["Frequency"],
-        )
-        fig_list.append(fig1)
-    if "metric_CPU utilization %" in df.columns:
-        fig2 = get_fig(
-            df,
-            y=["metric_CPU utilization %", "metric_CPU utilization% in kernel mode"],
-            title="CPU Utilization",
-            title_text="Percentage",
-            name=["User", "Kernel"],
-        )
-        fig_list.append(fig2)
-    if "metric_CPI" in df.columns:
-        fig3 = get_fig(
-            df,
-            y=["metric_CPI", "metric_kernel_CPI"],
-            title="CPI",
-            title_text="CPI",
-            name=["CPI", "Kernel CPI"],
-        )
-        fig_list.append(fig3)
-    if "metric_package power (watts)" in df.columns:
-        fig4 = get_fig(
-            df,
-            y=["metric_package power (watts)", "metric_DRAM power (watts)"],
-            title="Power",
-            title_text="Watts",
-            name=["Package", "DRAM"],
-        )
-        fig_list.append(fig4)
-    if "metric_memory bandwidth read (MB/sec)" in df.columns:
-        fig5 = get_fig(
-            df,
-            y=[
-                "metric_memory bandwidth read (MB/sec)",
-                "metric_memory bandwidth write (MB/sec)",
-                "metric_memory bandwidth total (MB/sec)",
-            ],
-            title="Memory Bandwidth",
-            title_text="MB/sec",
-            name=["Read", "Write", "Total"],
-        )
-        fig_list.append(fig5)
-    if "metric_core % cycles in non AVX license" in df.columns and arch != "broadwell":
-        fig6 = get_fig(
-            df,
-            y=[
-                "metric_core % cycles in non AVX license",
-                "metric_core % cycles in AVX2 license",
-                "metric_core % cycles in AVX-512 license",
-            ],
-            title="AVX Percentage",
-            title_text="Percentage",
-            name=["AVX", "AVX2", "AVX512"],
-        )
-        fig_list.append(fig6)
-    if "metric_NUMA %_Reads addressed to local DRAM" in df.columns:
-        fig7 = get_fig(
-            df,
-            y=[
-                "metric_NUMA %_Reads addressed to local DRAM",
-                "metric_NUMA %_Reads addressed to remote DRAM",
-            ],
-            title="NUMA Locality DRAM Reads %",
-            title_text="Percentage",
-            name=["Local", "Remote"],
-        )
-        fig_list.append(fig7)
-    if "metric_TMAM_Frontend_Bound(%)" in df.columns:
-        fig8 = get_fig(
-            df,
-            y=["metric_TMAM_Frontend_Bound(%)", "metric_TMAM_Backend_bound(%)"],
-            title="TMA",
-            title_text="Percentage",
-            name=["TMA_Frontend", "TMA_Backend"],
-        )
-        fig_list.append(fig8)
+    figure_to_column_dict = OrderedDict()
+    figure_to_column_dict["CPU Operating Frequency"] = {
+        "metrics_prefixes": ["metric_CPU operating frequency (in GHz)"],
+        "Y_axis_text": "Freq (GHz)",
+        "name_prefix": ["Frequency"],
+    }
+    figure_to_column_dict["CPU Utilization"] = {
+        "metrics_prefixes": [
+            "metric_CPU utilization %",
+            "metric_CPU utilization% in kernel mode",
+        ],
+        "Y_axis_text": "Percentage",
+        "name_prefix": ["User", "Kernel"],
+    }
+    figure_to_column_dict["CPI"] = {
+        "metrics_prefixes": ["metric_CPI", "metric_kernel_CPI"],
+        "Y_axis_text": "CPI",
+        "name_prefix": ["CPI", "Kernel CPI"],
+    }
+    figure_to_column_dict["Power"] = {
+        "metrics_prefixes": [
+            "metric_package power (watts)",
+            "metric_DRAM power (watts)",
+        ],
+        "Y_axis_text": "Watts",
+        "name_prefix": ["Package", "DRAM"],
+    }
+    figure_to_column_dict["Memory Bandwidth"] = {
+        "metrics_prefixes": [
+            "metric_memory bandwidth read (MB/sec)",
+            "metric_memory bandwidth write (MB/sec)",
+            "metric_memory bandwidth total (MB/sec)",
+        ],
+        "Y_axis_text": "MB/sec",
+        "name_prefix": ["Read", "Write", "Total"],
+    }
+    figure_to_column_dict["AVX Percentage"] = {
+        "metrics_prefixes": [
+            "metric_core % cycles in non AVX license",
+            "metric_core % cycles in AVX2 license",
+            "metric_core % cycles in AVX-512 license",
+        ],
+        "Y_axis_text": "Percentage",
+        "name_prefix": ["AVX", "AVX2", "AVX512"],
+    }
+    figure_to_column_dict["NUMA Locality DRAM Reads %"] = {
+        "metrics_prefixes": [
+            "metric_NUMA %_Reads addressed to local DRAM",
+            "metric_NUMA %_Reads addressed to remote DRAM",
+        ],
+        "Y_axis_text": "Percentage",
+        "name_prefix": ["Local", "Remote"],
+    }
+    figure_to_column_dict["TMA"] = {
+        "metrics_prefixes": [
+            "metric_TMA_Frontend_Bound(%)",
+            "metric_TMA_Backend_bound(%)",
+        ],
+        "Y_axis_text": "Percentage",
+        "name_prefix": ["TMA_Frontend", "TMA_Backend"],
+    }
+    figure_to_column_dict["Cache MPI"] = {
+        "metrics_prefixes": [
+            "metric_L1D MPI (includes data+rfo w/ prefetches)",
+            "metric_L2 MPI (includes code+data+rfo w/ prefetches)",
+            "metric_LLC data read MPI (demand+prefetch)",
+        ],
+        "Y_axis_text": "MPI",
+        "name_prefix": ["L1D MPI", "L2 MPI", "LLC MPI"],
+    }
 
-    cache_mpi = [
-        "metric_L1D MPI (includes data+rfo w/ prefetches)",
-        "metric_L2 MPI (includes code+data+rfo w/ prefetches)",
-        "metric_LLC data read MPI (demand+prefetch)",
-    ]
+    figure_list = []
+    for figure_title in figure_to_column_dict:
+        figure_data = figure_to_column_dict[figure_title]
+        for metric_index, metric_prefix in enumerate(figure_data["metrics_prefixes"]):
+            for column in df.columns:
+                if metric_prefix in column:
+                    if "cols" not in figure_data:
+                        figure_data["cols"] = []
+                    if "names" not in figure_data:
+                        figure_data["names"] = []
+                    figure_data["cols"].append(column)
+                    series_name = (
+                        figure_data["name_prefix"][metric_index]
+                        + "_"
+                        + column.replace(metric_prefix, "")
+                    )
+                    figure_data["names"].append(series_name)
+        if "cols" in figure_data:
+            fig = get_fig(
+                df,
+                y=figure_data["cols"],
+                title=figure_title,
+                title_text=figure_data["Y_axis_text"],
+                name=figure_data["names"],
+            )
+            figure_list.append(fig)
 
-    if "metric_L1D MPI (includes data+rfo w/ prefetches)" in df.columns:
-        fig9 = get_fig(
-            df,
-            y=cache_mpi,
-            title="Cache MPI",
-            title_text="MPI",
-            name=["L1D MPI", "L2 MPI", "LLC MPI"],
-        )
-        fig_list.append(fig9)
-
-    figure_list = fig_list
     for fig in figure_list:
         # update layout
         fig.update_layout(

@@ -1,15 +1,15 @@
 [
 	{
 		"name": "metric_CPU operating frequency (in GHz)",
-		"expression": "([cpu-cycles] / [ref-cycles]) * ([const_tsc_freq] / 1000000000)"
+		"expression": "([cpu-cycles] / [ref-cycles]) * ([SYSTEM_TSC_FREQ] / 1000000000)"
 	},
 	{
 		"name": "metric_CPU utilization %",
-		"expression": "100 * [ref-cycles] / [const_TSC]"
+		"expression": "100 * [ref-cycles] / [TSC]"
 	},
 	{
 		"name": "metric_CPU utilization% in kernel mode",
-		"expression": "100 * [ref-cycles:k] / [const_TSC]"
+		"expression": "100 * [ref-cycles:k] / [TSC]"
 	},
 	{
 		"name": "metric_CPI",
@@ -74,15 +74,15 @@
 	},
 	{
 		"name": "metric_Average LLC data read miss latency (in ns)",
-		"expression": "(1000000000 * [UNC_CHA_TOR_OCCUPANCY.IA_MISS.0x40433] / [UNC_CHA_TOR_INSERTS.IA_MISS.0x40433]) / ( [UNC_CHA_CLOCKTICKS] / ([const_cha_count] * [const_socket_count]) )"
+		"expression": "(1000000000 * [UNC_CHA_TOR_OCCUPANCY.IA_MISS.0x40433] / [UNC_CHA_TOR_INSERTS.IA_MISS.0x40433]) / ( [UNC_CHA_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]) )"
 	},
 	{
 		"name": "metric_Average LLC data read miss latency for LOCAL requests (in ns)",
-		"expression": "(1000000000 * [UNC_CHA_TOR_OCCUPANCY.IA_MISS.0x40432] / [UNC_CHA_TOR_INSERTS.IA_MISS.0x40432]) / ( [UNC_CHA_CLOCKTICKS] / ([const_cha_count] * [const_socket_count]) )"
+		"expression": "(1000000000 * [UNC_CHA_TOR_OCCUPANCY.IA_MISS.0x40432] / [UNC_CHA_TOR_INSERTS.IA_MISS.0x40432]) / ( [UNC_CHA_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]) )"
 	},
 	{
 		"name": "metric_Average LLC data read miss latency for REMOTE requests (in ns)",
-		"expression": "(1000000000 * [UNC_CHA_TOR_OCCUPANCY.IA_MISS.0x40431] / [UNC_CHA_TOR_INSERTS.IA_MISS.0x40431]) / ( [UNC_CHA_CLOCKTICKS] / ([const_cha_count] * [const_socket_count]) )"
+		"expression": "(1000000000 * [UNC_CHA_TOR_OCCUPANCY.IA_MISS.0x40431] / [UNC_CHA_TOR_INSERTS.IA_MISS.0x40431]) / ( [UNC_CHA_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]) )"
 	},
 	{
 		"name": "metric_ITLB MPI",
@@ -138,11 +138,11 @@
 	},
 	{
 		"name": "metric_UPI Transmit utilization_% (includes control)",
-		"expression": "100 * (([UNC_UPI_TxL_FLITS.ALL_DATA] + [UNC_UPI_TxL_FLITS.NON_DATA]) / 3) / ((((([const_tsc_freq] / ([const_cha_count] * [const_thread_count])) / (([const_tsc_freq] / ([const_cha_count] * [const_thread_count])) - [cstate_pkg/c6-residency/])) * ([UNC_UPI_CLOCKTICKS] - [UNC_UPI_L1_POWER_CYCLES])) * 5 / 6))"
+		"expression": "100 * (([UNC_UPI_TxL_FLITS.ALL_DATA] + [UNC_UPI_TxL_FLITS.NON_DATA]) / 3) / ((((([SYSTEM_TSC_FREQ] / ([CHAS_PER_SOCKET] * [const_thread_count])) / (([SYSTEM_TSC_FREQ] / ([CHAS_PER_SOCKET] * [const_thread_count])) - [cstate_pkg/c6-residency/])) * ([UNC_UPI_CLOCKTICKS] - [UNC_UPI_L1_POWER_CYCLES])) * 5 / 6))"
 	},
 	{
 		"name": "metric_uncore frequency GHz",
-		"expression": "[UNC_CHA_CLOCKTICKS] / ([const_cha_count] * [const_socket_count]) / 1000000000"
+		"expression": "[UNC_CHA_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]) / 1000000000"
 	},
 	{
 		"name": "metric_package power (watts)",
@@ -154,11 +154,11 @@
 	},
 	{
 		"name": "metric_core c6 residency %",
-		"expression": "100 * [cstate_core/c6-residency/] / [const_TSC]"
+		"expression": "100 * [cstate_core/c6-residency/] / [TSC]"
 	},
 	{
 		"name": "metric_package c6 residency %",
-		"expression": "100 * [cstate_pkg/c6-residency/] * [const_core_count] / [const_TSC]"
+		"expression": "100 * [cstate_pkg/c6-residency/] * [CORES_PER_SOCKET] / [TSC]"
 	},
 	{
 		"name": "metric_core % cycles in non AVX license",
@@ -191,30 +191,6 @@
 	{
 		"name": "metric_memory bandwidth total (MB/sec)",
 		"expression": "([UNC_M_CAS_COUNT.RD] + [UNC_M_CAS_COUNT.WR]) * 64 / 1000000"
-	},
-	{
-		"name": "metric_DCPMEM_memory_mode near memory cache read miss rate%",
-		"expression": "100 * ([UNC_M_PMM_RPQ_INSERTS] / ([UNC_M2M_TAG_HIT.NM_RD_HIT_CLEAN] + [UNC_M2M_TAG_HIT.NM_RD_HIT_DIRTY] + [UNC_M_PMM_RPQ_INSERTS]))"
-	},
-	{
-		"name": "metric_3DXP_memory bandwidth read (MB/sec)",
-		"expression": "[UNC_M_PMM_RPQ_INSERTS] * 64 / 1000000"
-	},
-	{
-		"name": "metric_3DXP_memory bandwidth write (MB/sec)",
-		"expression": "[UNC_M_PMM_WPQ_INSERTS] * 64 / 1000000"
-	},
-	{
-		"name": "metric_3DXP_memory bandwidth total (MB/sec)",
-		"expression": "([UNC_M_PMM_RPQ_INSERTS] + [UNC_M_PMM_WPQ_INSERTS]) * 64 / 1000000"
-	},
-	{
-		"name": "metric_3DXP memory RPQ read latency (ns)",
-		"expression": "(([UNC_M_PMM_RPQ_OCCUPANCY.ALL] / [UNC_M_PMM_RPQ_INSERTS]) / ([UNC_M_CLOCKTICKS] / ([const_socket_count] * 6))) * 1000000000"
-	},
-	{
-		"name": "metric_3DXP memory WPQ write latency (ns)",
-		"expression": "(([UNC_M_PMM_WPQ_OCCUPANCY.ALL] / [UNC_M_PMM_WPQ_INSERTS]) / ([UNC_M_CLOCKTICKS] / ([const_socket_count] * 6))) * 1000000000"
 	},
 	{
 		"name": "metric_IO_bandwidth_disk_or_network_writes (MB/sec)",

@@ -8,13 +8,12 @@
 import logging
 import os
 import re
-import subprocess  # nosec
 import src.perf_helpers as helper
 from src.common import crash
 
 
 # test if the event can be collected, check supported events in perf list
-def filter_func(event, perf_list):
+def is_collectable_event(event, perf_list):
     tmp_list = event.split("/")
     name = helper.get_dev_name(tmp_list[0])
     unc_name = "uncore_" + name
@@ -57,7 +56,7 @@ def expand_unc(line):
 
 
 # check if CPU/core event
-def check_cpu_event(line):
+def is_cpu_event(line):
     line = line.strip()
     tmp_list = line.split("/")
     # assumes event name without a PMU qualifier is a core event
@@ -73,8 +72,6 @@ def check_cpu_event(line):
 # save the last group names in a list when it is cha or imc
 # test for cha or imc event. append with count value
 # once reaches new group, start looping through all imc/cha counts to finish up
-
-
 def enumerate_uncore(group, pattern, n, default_range=True):
     uncore_group = ""
     ids = []
@@ -119,60 +116,57 @@ def get_cgroup_events_format(cgroups, events, num_events):
     return perf_format
 
 
-def prepare_perf_events(event_file, cpu_only):
+def filter_events(event_file, cpu_only):
     if not os.path.isfile(event_file):
         crash("event file not found")
+    collection_events = []
+    unsupported_events = []
+    perf_list = helper.get_perf_list()
+    with open(event_file, "r") as fin:
+        for line in fin:
+            line = line.strip()
+            if (
+                line == ""
+                or line.startswith("#")
+                or (cpu_only and not is_cpu_event(line))
+            ):
+                continue
+            if not is_collectable_event(line, perf_list):
+                # not a collectable event
+                unsupported_events.append(line)
+                # if this is the last event in the group, mark the previous event as the last (with a ';')
+                if line.endswith(";") and len(collection_events) > 1:
+                    end_event = collection_events[-1]
+                    collection_events[-1] = end_event[:-1] + ";"
+            else:
+                collection_events.append(line)
+        if any("cpu-cycles" in event for event in unsupported_events):
+            crash("PMU's not available. Run in a full socket VM or baremetal")
+        if len(unsupported_events) > 0:
+            logging.warning(
+                f"Perf unsupported events not counted: {unsupported_events}"
+            )
+    return collection_events, unsupported_events
 
+
+def prepare_perf_events(event_file, cpu_only):
     start_group = "'{"
     end_group = "}'"
     group = ""
     prev_group = ""
     new_group = True
 
-    collection_events = []
-
-    with open(event_file, "r") as fin:
-        # get supported perf events
-        try:
-            perf_list = subprocess.check_output(  # nosec
-                ["perf", "list"], universal_newlines=True
-            )
-        except FileNotFoundError:
-            crash("Please install Linux perf and re-run")
-
-        except subprocess.CalledProcessError as e:
-            crash(f"Error calling Linux perf, error code: {e.returncode}")
-
-        unsupported_events = []
-        for line in fin:
-            if (line != "\n") and (not line.startswith("#")):
-                line = line.strip()
-                if cpu_only and (not check_cpu_event(line)):
-                    continue
-                if not filter_func(line, perf_list):
-                    unsupported_events.append(line)
-                    if line.endswith(";") and (len(collection_events) > 1):
-                        end_event = str(collection_events[-1])
-                        collection_events[-1] = end_event[:-1] + ";"
-                else:
-                    collection_events.append(line)
-        if any("cpu-cycles" in event for event in unsupported_events):
-            crash("PMU's not available. Run in a full socket VM or baremetal")
-        if len(unsupported_events) > 0:
-            logging.warning(
-                str("Perf unsupported events not counted: " + str(unsupported_events))
-            )
-
+    collection_events, unsupported_events = filter_events(event_file, cpu_only)
     core_event = []
     uncore_event = []
     event_names = []
     for line in collection_events:
         if cpu_only:
-            if check_cpu_event(line):
+            if is_cpu_event(line):
                 event = line + ":c"
                 core_event.append(event)
         else:
-            if check_cpu_event(line):
+            if is_cpu_event(line):
                 event = line + ":c"
                 core_event.append(event)
             else:
@@ -198,7 +192,6 @@ def prepare_perf_events(event_file, cpu_only):
             default_range = name != "uncore_imc"
             group += enumerate_uncore(prev_group, name + "_", unc_count, default_range)
 
-    fin.close()
     group = group[:-1]
     if len(event_names) == 0:
         crash("No supported events found on this platform.")

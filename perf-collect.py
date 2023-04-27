@@ -53,13 +53,14 @@ def write_metadata(
         data = original.read()
     with open(outcsv, "w") as modified:
         modified.write("### META DATA ###,\n")
-        modified.write("TSC Frequency(MHz)," + tsc_freq + ",\n")
-        modified.write("CPU count," + str(perf_helpers.get_cpu_count()) + ",\n")
-        modified.write("SOCKET count," + str(perf_helpers.get_socket_count()) + ",\n")
-        modified.write("HT count," + str(perf_helpers.get_ht_count()) + ",\n")
-        imc, cha, upi = perf_helpers.get_imc_cacheagent_count()
+        modified.write("SYSTEM_TSC_FREQ (MHz)," + tsc_freq + ",\n")
+        modified.write("CORES_PER_SOCKET," + str(perf_helpers.get_cpu_count()) + ",\n")
+        modified.write("SOCKET_COUNT," + str(perf_helpers.get_socket_count()) + ",\n")
+        modified.write("HYPERTHREADING_ON," + str(perf_helpers.get_ht_status()) + ",\n")
+        imc, upi = perf_helpers.get_imc_upi_count()
+        cha = perf_helpers.get_cha_count()
         modified.write("IMC count," + str(imc) + ",\n")
-        modified.write("CHA count," + str(cha) + ",\n")
+        modified.write("CHAS_PER_SOCKET," + str(cha) + ",\n")
         modified.write("UPI count," + str(upi) + ",\n")
         modified.write("Architecture," + str(arch) + ",\n")
         modified.write("Model," + str(cpuname) + ",\n")
@@ -88,11 +89,9 @@ def write_metadata(
                     "/sys/fs/cgroup/" + cgroup + "/cpuset.cpus",  # cgroup v2
                 ]
                 cg_path_found = False
-                for _ in cgroup_paths:
+                for path in cgroup_paths:
                     try:
-                        cpu_set_file = open(
-                            "/sys/fs/cgroup/cpuset/" + cgroup + "/cpuset.cpus", "r"
-                        )
+                        cpu_set_file = open(path, "r")
                         cg_path_found = True
                         # no need to check other paths
                         break
@@ -104,6 +103,7 @@ def write_metadata(
                     cpu_set = cpu_set_file.read()
                     cpu_set_file.close()
                     cpu_set = cpu_set.strip()
+                    cpu_set = cpu_set.replace(",", "+")
 
                 if not cg_path_found or cpu_set == "":
                     # A missing path or an empty cpu-set in v2 indicates that the container is running on all CPUs
@@ -216,10 +216,7 @@ if __name__ == "__main__":
         help="perf stat output in csv format, default=perfstat.csv",
     )
     parser.add_argument(
-        "-v",
-        "--verbose",
-        help="Display debugging information",
-        action="store_true",
+        "-v", "--verbose", help="Display debugging information", action="store_true"
     )
     args = parser.parse_args()
 
@@ -257,10 +254,8 @@ if __name__ == "__main__":
     eventfile = None
     if arch == "broadwell":
         eventfile = "bdx.txt"
-    elif arch == "skylake":
-        eventfile = "skx.txt"
-    elif arch == "cascadelake":
-        eventfile = "clx.txt"
+    elif arch == "skylake" or arch == "cascadelake":
+        eventfile = "clx_skx.txt"
     elif arch == "icelake":
         eventfile = "icx.txt"
     elif arch == "sapphirerapids":
@@ -297,7 +292,8 @@ if __name__ == "__main__":
 
     # get perf events to collect
     collection_events = []
-    imc, cha, upi = perf_helpers.get_imc_cacheagent_count()
+    imc, upi = perf_helpers.get_imc_upi_count()
+    cha = perf_helpers.get_cha_count()
     have_uncore = True
     if imc == 0 and cha == 0 and upi == 0:
         logging.info("disabling uncore (possibly in a vm?)")

@@ -1,15 +1,15 @@
 [
 	{
 		"name": "metric_CPU operating frequency (in GHz)",
-		"expression": "([cpu-cycles] / [ref-cycles]) * ([const_tsc_freq] / 1000000000)"
+		"expression": "([cpu-cycles] / [ref-cycles]) * ([SYSTEM_TSC_FREQ] / 1000000000)"
 	},
 	{
 		"name": "metric_CPU utilization %",
-		"expression": "100 * [ref-cycles] / [const_TSC]"
+		"expression": "100 * [ref-cycles] / [TSC]"
 	},
 	{
 		"name": "metric_CPU utilization% in kernel mode",
-		"expression": "100 * [ref-cycles:k] / [const_TSC]"
+		"expression": "100 * [ref-cycles:k] / [TSC]"
 	},
 	{
 		"name": "metric_CPI",
@@ -74,15 +74,15 @@
 	},
 	{
 		"name": "metric_Average LLC data read miss latency (in ns)",
-		"expression": "(1000000000 * [UNC_C_TOR_OCCUPANCY.MISS_OPCODE.0x182] / [UNC_C_TOR_INSERTS.MISS_OPCODE.0x182]) / ([UNC_C_CLOCKTICKS] / ([const_cha_count] * [const_socket_count]) )"
+		"expression": "(1000000000 * [UNC_C_TOR_OCCUPANCY.MISS_OPCODE.0x182] / [UNC_C_TOR_INSERTS.MISS_OPCODE.0x182]) / ([UNC_C_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]) )"
 	},
 	{
 		"name": "metric_Average LLC data read miss latency for LOCAL requests (in ns)",
-		"expression": "(1000000000 * [UNC_C_TOR_OCCUPANCY.MISS_LOCAL_OPCODE.0x182] / [UNC_C_TOR_INSERTS.MISS_LOCAL_OPCODE.0x182]) / ([UNC_C_CLOCKTICKS] / ([const_cha_count] * [const_socket_count]))"
+		"expression": "(1000000000 * [UNC_C_TOR_OCCUPANCY.MISS_LOCAL_OPCODE.0x182] / [UNC_C_TOR_INSERTS.MISS_LOCAL_OPCODE.0x182]) / ([UNC_C_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]))"
 	},
 	{
 		"name": "metric_Average LLC data read miss latency for REMOTE requests (in ns)",
-		"expression": "(1000000000 * [UNC_C_TOR_OCCUPANCY.MISS_REMOTE_OPCODE.0x182] / [UNC_C_TOR_INSERTS.MISS_REMOTE_OPCODE.0x182]) / ([UNC_C_CLOCKTICKS] / ([const_cha_count] * [const_socket_count]))"
+		"expression": "(1000000000 * [UNC_C_TOR_OCCUPANCY.MISS_REMOTE_OPCODE.0x182] / [UNC_C_TOR_INSERTS.MISS_REMOTE_OPCODE.0x182]) / ([UNC_C_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]))"
 	},
 	{
 		"name": "metric_ITLB MPI",
@@ -122,7 +122,7 @@
 	},
 	{
 		"name": "metric_uncore frequency GHz",
-		"expression": "[UNC_C_CLOCKTICKS] / ([const_core_count] * [const_socket_count]) / 1000000000"
+		"expression": "[UNC_C_CLOCKTICKS] / ([CORES_PER_SOCKET] * [SOCKET_COUNT]) / 1000000000"
 	},
 	{
 		"name": "metric_package power (watts)",
@@ -134,11 +134,11 @@
 	},
 	{
 		"name": "metric_core c6 residency %",
-		"expression": "100 * [cstate_core/c6-residency/] / [const_TSC]"
+		"expression": "100 * [cstate_core/c6-residency/] / [TSC]"
 	},
 	{
 		"name": "metric_package c6 residency %",
-		"expression": "100 * [cstate_pkg/c6-residency/] * [const_core_count] / [const_TSC]"
+		"expression": "100 * [cstate_pkg/c6-residency/] * [CORES_PER_SOCKET] / [TSC]"
 	},
 	{
 		"name": "metric_memory bandwidth read (MB/sec)",

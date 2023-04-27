@@ -22,7 +22,7 @@ ref-cycles,
 instructions;
 
 cpu/event=0x85,umask=0x0e,period=100003,name='ITLB_MISSES.WALK_COMPLETED'/,
-cpu/event=0x85,umask=0x04,period=100003,name='ITLB_MISSES.ITLB_MISSES.WALK_COMPLETED_2M_4M'/,
+cpu/event=0x85,umask=0x04,period=100003,name='ITLB_MISSES.WALK_COMPLETED_2M_4M'/,
 cpu/event=0x85,umask=0x10,cmask=1,period=100003,name='ITLB_MISSES.WALK_DURATION_c1'/,
 cpu/event=0x85,umask=0x60,period=100003,name='ITLB_MISSES.STLB_HIT'/,
 cpu-cycles,
@@ -92,6 +92,7 @@ cpu/event=0x79,umask=0x30,name='IDQ.MS_SWITCHES'/,
 cpu-cycles,
 instructions;
 
+cpu/event=0x14,umask=0x01,period=2000003,name='ARITH.FPU_DIV_ACTIVE'/,
 cpu/event=0xc5,umask=0x00,name='BR_MISP_RETIRED.ALL_BRANCHES'/,
 cpu/event=0xc3,umask=0x01,name='MACHINE_CLEARS.COUNT'/,
 cpu/event=0xe6,umask=0x1f,name='BACLEARS.ANY'/,
@@ -106,6 +107,7 @@ cpu-cycles,
 ref-cycles,
 instructions;
 
+cpu/event=0x49,umask=0x60,period=100003,name='DTLB_STORE_MISSES.STLB_HIT'/,
 cpu/event=0x08,umask=0x0e,period=100003,name='DTLB_LOAD_MISSES.WALK_COMPLETED'/,
 cpu/event=0x08,umask=0x10,period=100003,name='DTLB_LOAD_MISSES.WALK_DURATION'/,
 cpu/event=0x08,umask=0x04,period=2000003,name='DTLB_LOAD_MISSES.WALK_COMPLETED_2M_4M'/,
