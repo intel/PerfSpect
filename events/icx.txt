@@ -28,8 +28,8 @@ cpu-cycles;
 
 cpu/event=0xa3,umask=0x0C,cmask=0x0C,period=1000003,name='CYCLE_ACTIVITY.STALLS_L1D_MISS'/,
 cpu/event=0xa3,umask=0x05,cmask=0x05,period=1000003,name='CYCLE_ACTIVITY.STALLS_L2_MISS'/,
-cpu/event=0xa3,umask=0x04,cmask=0x04,period=1000003,name='CYCLE_ACTIVITY.STALLS_Total'/,
-cpu/event=0xa3,umask=0x06,cmask=0x06,period=1000003,name='CYCLE_ACTIVITY.STALLS_L3_Miss'/,
+cpu/event=0xa3,umask=0x04,cmask=0x04,period=1000003,name='CYCLE_ACTIVITY.STALLS_TOTAL'/,
+cpu/event=0xa3,umask=0x06,cmask=0x06,period=1000003,name='CYCLE_ACTIVITY.STALLS_L3_MISS'/,
 cpu-cycles;
 
 cpu/event=0xa3,umask=0x08,cmask=0x08,period=1000003,name='CYCLE_ACTIVITY.CYCLES_L1D_MISS'/,
@@ -74,6 +74,8 @@ instructions;
 
 cpu/event=0x9c,umask=0x01,period=1000003,name='IDQ_UOPS_NOT_DELIVERED.CORE'/,
 cpu/event=0x9c,umask=0x01,cmask=0x05,period=1000003,name='IDQ_UOPS_NOT_DELIVERED.CYCLES_0_UOPS_DELIV.CORE'/,
+cpu/event=0xd2,umask=0x02,period=1000003,name='MEM_LOAD_L3_HIT_RETIRED.XSNP_HIT'/,
+cpu/event=0xd2,umask=0x04,period=1000003,name='MEM_LOAD_L3_HIT_RETIRED.XSNP_HITM'/,
 cpu-cycles;
 
 cpu/event=0x60,umask=0x10,period=2000003,name='OFFCORE_REQUESTS_OUTSTANDING.L3_MISS_DEMAND_DATA_RD'/,
@@ -85,7 +87,7 @@ ref-cycles,
 instructions;
 
 cpu/event=0x60,umask=0x08,cmask=0x01,period=1000003,name='OFFCORE_REQUESTS_OUTSTANDING.CYCLES_WITH_DATA_RD'/,
-cpu/event=0x60,umask=0x08,cmask=0x04,period=1000003,name='OFFCORE_REQUESTS_OUTSTANDING.ALL_DATA_RD_c4'/,
+cpu/event=0x60,umask=0x08,cmask=0x04,period=1000003,name='OFFCORE_REQUESTS_OUTSTANDING.ALL_DATA_RD:c4'/,
 cpu-cycles;
 
 #TMA related
@@ -95,10 +97,12 @@ cpu/event=0x00,umask=0x83,period=10000003,name='PERF_METRICS.BACKEND_BOUND'/,
 cpu/event=0x00,umask=0x82,period=10000003,name='PERF_METRICS.FRONTEND_BOUND'/,
 cpu/event=0x00,umask=0x80,period=10000003,name='PERF_METRICS.RETIRING'/,
 cpu/event=0x0d,umask=0x10,period=1000003,name='INT_MISC.UOP_DROPPING'/,
-cpu/event=0x0d,umask=0x01,cmask=0x01,edge=0x01,period=500009,name='INT_MISC.RECOVERY_CYCLES_c1_e1'/;
+cpu/event=0x0d,umask=0x01,cmask=0x01,edge=0x01,period=500009,name='INT_MISC.RECOVERY_CYCLES:c1:e1'/;
 
 
 cpu/event=0xec,umask=0x02,period=2000003,name='CPU_CLK_UNHALTED.DISTRIBUTED'/,
+cpu/event=0xa6,umask=0x80,period=2000003,name='EXE_ACTIVITY.3_PORTS_UTIL:u0x80'/,
+cpu/event=0xa2,umask=0x02,period=2000003,name='RESOURCE_STALLS.SCOREBOARD'/,
 instructions;
 
 cpu/event=0x0d,umask=0x80,period=500009,name='INT_MISC.CLEAR_RESTEER_CYCLES'/,
@@ -136,16 +140,19 @@ power/energy-ram/;
 cpu/event=0xa6,umask=0x40,cmask=0x02,period=1000003,name='EXE_ACTIVITY.BOUND_ON_STORES'/,
 cpu/event=0xa6,umask=0x02,period=2000003,name='EXE_ACTIVITY.1_PORTS_UTIL'/,
 cpu/event=0xa6,umask=0x04,period=2000003,name='EXE_ACTIVITY.2_PORTS_UTIL'/,
+cpu/event=0x79,umask=0x04,period=100003,name='IDQ.MITE_UOPS'/,
 cpu-cycles,
 instructions;
 
 cpu/event=0xb1,umask=0x01,cmask=0x03,period=2000003,name='UOPS_EXECUTED.CYCLES_GE_3'/,
 cpu/event=0x79,umask=0x30,period=100003,name='IDQ.MS_UOPS'/,
+cpu/event=0x56,umask=0x01,period=100003,name='UOPS_DECODED.DEC0'/,
+cpu/event=0x56,umask=0x01,cmask=0x01,period=100003,name='UOPS_DECODED.DEC0:c1'/,
 cpu-cycles;
 
 cpu/event=0xa3,umask=0x14,cmask=0x14,period=2000003,name='CYCLE_ACTIVITY.STALLS_MEM_ANY'/,
 cpu/event=0xa3,umask=0x0c,cmask=0x0c,period=1000003,name='CYCLE_ACTIVITY.STALLS_L1D_MISS'/,
-cpu/event=0x08,umask=0x20,period=100003,name='DTLB_LOAD_MISSES.STLB_HIT'/,
+cpu/event=0x08,umask=0x20,cmask=0x01,period=100003,name='DTLB_LOAD_MISSES.STLB_HIT:c1'/,
 cpu/event=0x08,umask=0x10,cmask=0x01,period=100003,name='DTLB_LOAD_MISSES.WALK_ACTIVE'/,
 cpu-cycles;
 
@@ -163,7 +170,7 @@ cha/event=0x35,umask=0xc80ffe01,name='UNC_CHA_TOR_INSERTS.IA_MISS_CRD'/;
 cha/event=0x35,umask=0xC816FE01,name='UNC_CHA_TOR_INSERTS.IA_MISS_DRD_LOCAL'/,
 cha/event=0x36,umask=0xC816FE01,name='UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD_LOCAL'/;
 
-cha/event=0x35,umask=0xccd7fe01,name='UNC_CHA_TOR_INSERTS.IA_MISS_LLCPREFDATA'/,
+cha/event=0x35,umask=0xccd7fe01,name='UNC_CHA_TOR_INSERTS.IA_MISS_LLCPREFDRD'/,
 cha/event=0x35,umask=0xc817fe01,name='UNC_CHA_TOR_INSERTS.IA_MISS_DRD'/,
 cha/event=0x35,umask=0xc897fe01,name='UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF'/,
 cha/event=0x36,umask=0xC817FE01,name='UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD'/;

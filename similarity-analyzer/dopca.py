@@ -138,7 +138,7 @@ def dopca(dataset, colnames, n_components, cols):
     # PCA analysis, Create PCA model
     #pca = PCA(n_components=n_components) #Limitation: If the n_components(no of workloads) are greater than num_val(the number of features), it will throw error.
 
-    n_components = len(num_val[0]) #Solution: To scale it for any number of workloads, generate PCAs equivalent to number of features/performance matrics (instead of number of workloads) that we have for each workload.
+    n_components = min(len(num_val), len(colnames)) #Solution: To scale it for any number of workloads, generate PCAs equivalent to number of features/performance matrics (instead of number of workloads) that we have for each workload.
     pca = PCA(n_components=n_components)
 
     # transform

@@ -149,6 +149,44 @@ def get_perf_event_mux_interval():
     return mux_interval
 
 
+# disable nmi watchdog and return its initial status
+# to restore it after collection
+def disable_nmi_watchdog():
+    try:
+        proc_output = subprocess.check_output(["cat", "/proc/sys/kernel/nmi_watchdog"])
+        nmi_watchdog_status = int(proc_output.decode().strip())
+        if nmi_watchdog_status == 1:
+            proc_output = subprocess.check_output(["sysctl", "kernel.nmi_watchdog=0"])
+            new_watchdog_status = int(
+                proc_output.decode().strip().replace("kernel.nmi_watchdog = ", "")
+            )
+            if new_watchdog_status != 0:
+                crash("Failed to disable nmi watchdog!")
+            logging.info(
+                "nmi_watchdog is temporary disabled. Will enable after collection."
+            )
+        else:
+            logging.info("nmi_watchdog disabled!")
+        return nmi_watchdog_status
+    except (subprocess.CalledProcessError, ValueError) as e:
+        crash(e.output + "\nFailed to disable nmi_watchdog.")
+
+
+# enable nmi watchdog
+def enable_nmi_watchdog():
+    try:
+        proc_output = subprocess.check_output(["sysctl", "kernel.nmi_watchdog=1"])
+        new_watchdog_status = int(
+            proc_output.decode().strip().replace("kernel.nmi_watchdog = ", "")
+        )
+        if new_watchdog_status != 1:
+            logging.warning("Failed to re-enable nmi_watchdog!")
+        else:
+            logging.info("nmi_watchdog enabled!")
+    except (subprocess.CalledProcessError, ValueError) as e:
+        logging.warning(e.output + "\nFailed to re-enable nmi_watchdog!")
+
+
 # set/reset perf event mux interval for pmu events
 def set_perf_event_mux_interval(reset, interval_ms, mux_interval):
     for f in os.listdir("/sys/devices"):
