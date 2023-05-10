@@ -137,7 +137,7 @@ def get_stats_plot(input_file, arch):
     figure_to_column_dict["TMA"] = {
         "metrics_prefixes": [
             "metric_TMA_Frontend_Bound(%)",
-            "metric_TMA_Backend_bound(%)",
+            "metric_TMA_Backend_Bound(%)",
         ],
         "Y_axis_text": "Percentage",
         "name_prefix": ["TMA_Frontend", "TMA_Backend"],

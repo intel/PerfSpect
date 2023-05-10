@@ -300,7 +300,6 @@ def get_metadata_as_dict(meta_data_lines):
                 meta_data["SOCKET_CORES"] = []
             cores = ((line.split("\n")[0]).split(",")[1]).split(";")[:-1]
             meta_data["SOCKET_CORES"].append(cores)
-
     return meta_data
 
 
@@ -595,9 +594,17 @@ def generate_metrics(
         "MISSING EVENTS": set(),
         "MULTIPLE GROUPS": set(),
     }
-
+    prev_time_slice = 0
     for time_slice, item in time_slice_groups:
-        time_slice_df = time_slice_groups.get_group(time_slice)
+        time_slice_df = time_slice_groups.get_group(time_slice).copy()
+        # normalize by difference between current time slice and previous time slice
+        # this ensures that all our events are per-second, even if perf is collecting
+        # over a longer time slice
+        time_slice_float = float(time_slice)
+        time_slice_df["value"] = time_slice_df["value"] / (
+            time_slice_float - prev_time_slice
+        )
+        prev_time_slice = time_slice_float
         current_group_indx = 0
         group_to_df = {}
         start_index = 0
@@ -620,133 +627,97 @@ def generate_metrics(
 
         metrics_results = {}
         for m in metrics:
-            non_constant_mertics = []
+            non_constant_events = []
             exp_to_evaluate = m["expression"]
             # substitute constants
             for event in m["events"]:
-                if (
-                    event.upper() in metadata["constants"]
-                ):  # all constants are save in metadata in Uppercase
+                # replace constants
+                if event.upper() in metadata["constants"]:
                     exp_to_evaluate = exp_to_evaluate.replace(
                         "[" + event + "]", str(metadata["constants"][event.upper()])
                     )
                 else:
-                    non_constant_mertics.append(event)
-
-            # find a single group with the events
-            single_group = False
-            for g in group_to_event:
-                if set(non_constant_mertics) <= set(
-                    group_to_event[g]
-                ):  # if all events in metric m exist in group g
-                    single_group = True
-                    g_df = group_to_df[g]
-                    expressions_to_evaluate = {}
-                    for event in non_constant_mertics:
+                    non_constant_events.append(event)
+            # find non-constant events in groups
+            remaining_events_to_find = list(non_constant_events)
+            expressions_to_evaluate = {}
+            passes = 0
+            while len(remaining_events_to_find) > 0:
+                if (
+                    passes == 1
+                    and verbose
+                    and m["name"] not in errors["MULTIPLE GROUPS"]
+                ):
+                    errors["MULTIPLE GROUPS"].add(m["name"])
+                    logging.warning(
+                        f'MULTIPLE GROUPS: metric "{m["name"]}", events "{set(non_constant_events)}"'
+                    )
+                passes += 1
+                # find best group for remaining events
+                diff_size = sys.maxsize  # big number
+                best_group = None
+                for group, events in group_to_event.items():
+                    ds = len(set(remaining_events_to_find) - set(events))
+                    if ds < diff_size and ds < len(set(remaining_events_to_find)):
+                        diff_size = ds
+                        best_group = group
+                        if diff_size == 0:
+                            break
+                if best_group is None:
+                    break
+                for event in remaining_events_to_find[:]:
+                    if event in group_to_event[best_group]:
+                        remaining_events_to_find.remove(event)
+                        g_df = group_to_df[best_group]
                         event_df = g_df.loc[event]
                         get_event_expression_from_group(
-                            expressions_to_evaluate, event_df, exp_to_evaluate, event
+                            expressions_to_evaluate,
+                            event_df,
+                            exp_to_evaluate,
+                            event,
                         )
-                    for instance in expressions_to_evaluate:
-                        if (
-                            "[" in expressions_to_evaluate[instance]
-                            or "]" in expressions_to_evaluate[instance]
-                        ):
-                            if verbose:
-                                errors["MISSING DATA"].add(m["name"])
-                                log_skip_metric(
-                                    m, expressions_to_evaluate[instance], "MISSING DATA"
-                                )
-                            continue  # cannot evaluate expression, skipping
-                        try:
-                            result = str(
-                                "{:.8f}".format(
-                                    simple_eval(
-                                        expressions_to_evaluate[instance],
-                                        functions={"min": min, "max": max},
-                                    )
-                                )
+            if len(remaining_events_to_find) == 0:  # all events are found
+                # instance is either system, specific core, or specific socket
+                for instance in expressions_to_evaluate:
+                    if (
+                        "[" in expressions_to_evaluate[instance]
+                        or "]" in expressions_to_evaluate[instance]
+                    ):
+                        if verbose and m["name"] not in errors["MISSING DATA"]:
+                            errors["MISSING DATA"].add(m["name"])
+                            log_skip_metric(
+                                m, expressions_to_evaluate[instance], "MISSING DATA"
                             )
-                        except ZeroDivisionError:
-                            if verbose:
-                                errors["ZERO DIVISION"].add(m["name"])
-                                log_skip_metric(
-                                    m,
-                                    expressions_to_evaluate[instance],
-                                    "ZERO DIVISION",
-                                )
-                            result = 0
-                        sub_txt = "" if instance == "sys" else "." + instance
-                        metrics_results[m["name"] + sub_txt] = float(result)
-                    break  # no need to check other groups
-            if not single_group:
-                if verbose:
-                    errors["MULTIPLE GROUPS"].add(m["name"])
-                    logging.warning('MULTIPLE GROUPS: metric "' + m["name"] + '"')
-                # get events from multiple groups
-                remaining_events_to_find = list(non_constant_mertics)
-                expressions_to_evaluate = {}
-                for event in non_constant_mertics:
-                    for g in group_to_event:
-                        if event in group_to_event[g]:
-                            remaining_events_to_find.remove(event)
-                            g_df = group_to_df[g]
-                            event_df = g_df.loc[event]
-                            get_event_expression_from_group(
-                                expressions_to_evaluate,
-                                event_df,
-                                exp_to_evaluate,
-                                event,
+                        continue
+                    try:
+                        result = "{:.8f}".format(
+                            simple_eval(
+                                expressions_to_evaluate[instance],
+                                functions={"min": min, "max": max},
                             )
-                            break  # no need to check in other groups
-
-                if len(remaining_events_to_find) == 0:  # all events are found
-                    for (
-                        instance
-                    ) in (
-                        expressions_to_evaluate
-                    ):  # instance is either system, specific core, or specific socket
-                        if (
-                            "[" in expressions_to_evaluate[instance]
-                            or "]" in expressions_to_evaluate[instance]
-                        ):
-                            if verbose:
-                                errors["MISSING DATA"].add(m["name"])
-                                log_skip_metric(
-                                    m, expressions_to_evaluate[instance], "MISSING DATA"
-                                )
-                            continue
-                        try:
-                            result = str(
-                                "{:.8f}".format(
-                                    simple_eval(
-                                        expressions_to_evaluate[instance],
-                                        functions={"min": min, "max": max},
-                                    )
-                                )
-                            )
-                        except ZeroDivisionError:
-                            if verbose:
-                                errors["ZERO DIVISION"].add(m["name"])
-                                log_skip_metric(
-                                    m,
-                                    expressions_to_evaluate[instance],
-                                    "ZERO DIVISION",
-                                )
-                            result = 0
-                        sub_txt = "" if instance == "sys" else "." + instance
-                        metrics_results[m["name"] + sub_txt] = float(result)
-                else:  # some events are missing
-                    if verbose:
-                        logging.warning(
-                            'MISSING EVENTS: metric "'
-                            + m["name"]
-                            + '" events "'
-                            + str(remaining_events_to_find)
-                            + '"'
                         )
-                        errors["MISSING EVENTS"].update(remaining_events_to_find)
-                    continue  # skip metric
+                    except ZeroDivisionError:
+                        if verbose and m["name"] not in errors["ZERO DIVISION"]:
+                            errors["ZERO DIVISION"].add(m["name"])
+                            log_skip_metric(
+                                m,
+                                expressions_to_evaluate[instance],
+                                "ZERO DIVISION",
+                            )
+                        result = 0
+                    sub_txt = "" if instance == "sys" else "." + instance
+                    metrics_results[m["name"] + sub_txt] = float(result)
+            else:  # some events are missing
+                if verbose and m["name"] not in errors["MISSING EVENTS"]:
+                    logging.warning(
+                        'MISSING EVENTS: metric "'
+                        + m["name"]
+                        + '" events "'
+                        + str(remaining_events_to_find)
+                        + '"'
+                    )
+                    errors["MISSING EVENTS"].add(m["name"])
+                continue  # skip metric
         time_metrics_result[time_slice] = metrics_results
     time_series_df = pd.DataFrame(time_metrics_result)
     if verbose:

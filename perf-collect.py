@@ -199,14 +199,11 @@ if __name__ == "__main__":
         "--socket", help="Collect for socket metrics", action="store_true"
     )
     parser.add_argument(
-        "-V", "--version", help="display version info", action="store_true"
-    )
-    parser.add_argument(
         "-m",
         "--muxinterval",
         type=int,
         default=10,
-        help="event mux interval in milli seconds, default=0 i.e. will use the system default",
+        help="event mux interval in milli seconds, default=10",
     )
     parser.add_argument(
         "-o",
@@ -218,6 +215,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "-v", "--verbose", help="Display debugging information", action="store_true"
     )
+    parser.add_argument(
+        "-V", "--version", help="display version info", action="store_true"
+    )
     args = parser.parse_args()
 
     if args.version:
@@ -228,16 +228,7 @@ if __name__ == "__main__":
         crash("Must run PerfSpect as root, please re-run")
 
     # disable nmi watchdog before collecting perf
-    nmi_watchdog = 0
-    try:
-        with open("/proc/sys/kernel/nmi_watchdog", "r+") as f_nmi:
-            nmi_watchdog = f_nmi.read()
-            if int(nmi_watchdog) != 0:
-                f_nmi.write("0")
-                logging.info("nmi_watchdog disabled")
-    except FileNotFoundError:
-        pass
-
+    nmi_watchdog = perf_helpers.disable_nmi_watchdog()
     initial_pmus = perf_helpers.pmu_contention_detect()
     interval = 1000
 
@@ -315,6 +306,7 @@ if __name__ == "__main__":
             or args.socket
             or not have_uncore
         ),
+        args.pid is not None or args.cid is not None,
     )
 
     collection_type = "-a" if not args.thread and not args.socket else "-a -A"
@@ -407,10 +399,8 @@ if __name__ == "__main__":
     os.chmod(args.outcsv, 0o666)  # nosec
 
     # reset nmi_watchdog to what it was before running perfspect
-    with open("/proc/sys/kernel/nmi_watchdog", "w") as f_nmi:
-        if int(nmi_watchdog) != 0:
-            f_nmi.write(nmi_watchdog)
-            logging.info("nmi_watchdog re-enabled")
+    if nmi_watchdog != 0:
+        perf_helpers.enable_nmi_watchdog()
 
     perf_helpers.set_perf_event_mux_interval(True, 1, mux_intervals)
 
