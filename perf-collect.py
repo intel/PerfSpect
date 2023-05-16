@@ -73,6 +73,7 @@ def write_metadata(
         modified.write("Perf event mux Interval ms," + str(muxinterval) + ",\n")
         threadmode = "enabled" if thread else "disabled"
         socketmode = "enabled" if socket else "disabled"
+        cpumode = "enabled" if args.cpu else "disabled"
         if args.cid is not None:
             cgname = "enabled," + perf_helpers.get_comm_from_cid(
                 args.cid.split(","), cgroups
@@ -123,6 +124,11 @@ def write_metadata(
         modified.write("cpusets" + cpusets + ",\n")
         modified.write("Percore mode," + threadmode + ",\n")
         modified.write("Persocket mode," + socketmode + ",\n")
+        modified.write("Percpu mode," + cpumode + ",\n")
+        if cpumode == "enabled":
+            modified.write("Cpu count," + get_cpu_count_from_range(args.cpu) + ",\n")
+        elif cpumode == "disabled":
+            modified.write("Cpu count," + "0" + ",\n")
         modified.write("PerfSpect version," + perf_helpers.get_tool_version() + ",\n")
         modified.write("### PERF EVENTS ###" + ",\n")
         for e in collection_events:
@@ -139,11 +145,21 @@ def write_metadata(
             )
         modified.write(data)
 
-
 def resource_path(relative_path):
     """Get absolute path to resource, works for dev and for PyInstaller"""
     base_path = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base_path, relative_path)
+
+
+def get_cpu_count_from_range(cpu_range):
+    cpu_count = 0
+    for cpu_range in cpu_range.split(","):
+        if "-" in cpu_range:
+            start, end = cpu_range.split("-")
+            cpu_count += int(end) - int(start) + 1
+        else:
+            cpu_count += 1
+    return str(cpu_count)
 
 
 def validate_perfargs(perf):
@@ -198,6 +214,13 @@ if __name__ == "__main__":
     runmode.add_argument(
         "--socket", help="Collect for socket metrics", action="store_true"
     )
+    runmode.add_argument(
+        "-C",
+        "--cpu",
+        type=str,
+        default=None,
+        help="perf-collect on selected cpu(s)",
+    )
     parser.add_argument(
         "-m",
         "--muxinterval",
@@ -218,6 +241,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-V", "--version", help="display version info", action="store_true"
     )
+
     args = parser.parse_args()
 
     if args.version:
@@ -304,6 +328,7 @@ if __name__ == "__main__":
             or args.cid is not None
             or args.thread
             or args.socket
+            or args.cpu
             or not have_uncore
         ),
         args.pid is not None or args.cid is not None,
@@ -337,6 +362,17 @@ if __name__ == "__main__":
         cmd = "perf stat -I %d -x , %s -a -o %s sleep %d" % (
             interval,
             perf_format,
+            args.outcsv,
+            args.timeout,
+        )
+    elif args.cpu and args.timeout:
+        logging.info(
+            "Only CPU/core %s events will be enabled with cpu option", args.cpu
+        )
+        cmd = "perf stat -I %d -x , --cpu %s -e %s -o %s sleep %d" % (
+            interval,
+            args.cpu,
+            events,
             args.outcsv,
             args.timeout,
         )

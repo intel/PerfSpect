@@ -25,6 +25,7 @@ class Mode(Enum):
     System = 1
     Socket = 2
     Core = 3
+    Cpu = 4
 
 
 # get the filenames for miscellaneous outputs
@@ -286,7 +287,12 @@ def get_metadata_as_dict(meta_data_lines):
             meta_data["PERCORE_MODE"] = (
                 True if (str(line.split(",")[1]) == "enabled") else False
             )
-
+        elif line.startswith("Percpu mode"):
+            meta_data["PERCPU_MODE"] = (
+                True if (str(line.split(",")[1]) == "enabled") else False
+            )
+        elif line.startswith("Cpu count"):
+            meta_data["CPU_COUNT"] = int(line.split(",")[1])
         elif line.startswith("Persocket mode"):
             meta_data["PERSOCKET_MODE"] = (
                 True if (str(line.split(",")[1]) == "enabled") else False
@@ -324,6 +330,10 @@ def set_CONST_TSC(meta_data, perf_mode, num_cpus=0):
         )
     elif perf_mode == Mode.Core:  # Core should be changed to thread
         meta_data["constants"]["TSC"] = meta_data["constants"]["SYSTEM_TSC_FREQ"]
+    elif perf_mode == Mode.Cpu:
+        meta_data["constants"]["TSC"] = (
+            meta_data["constants"]["SYSTEM_TSC_FREQ"] * meta_data["CPU_COUNT"]
+        )
     return
 
 
@@ -432,7 +442,7 @@ def extract_dataframe(perf_data_lines, meta_data, perf_mode):
         for col in range(6, len(perf_data_df.columns)):
             columns.append("col" + str(col))
         perf_data_df.columns = columns
-    elif perf_mode == Mode.Core or perf_mode == Mode.Socket:
+    elif perf_mode == Mode.Core or perf_mode == Mode.Socket or perf_mode == Mode.Cpu:
         assert len(perf_data_df.columns) >= 7
         columns = ["ts", "cpu", "value", "col0", "metric", "value2", "percentage"]
         # add dummy col names for remaining columns
@@ -840,10 +850,11 @@ if __name__ == "__main__":
         perf_mode = Mode.Socket
     elif "PERCORE_MODE" in meta_data and meta_data["PERCORE_MODE"]:
         perf_mode = Mode.Core
+    elif "PERCPU_MODE" in meta_data and meta_data["CPU_COUNT"] != 0:
+        perf_mode = Mode.Cpu
 
     # fix c6 residency values
     perf_data_lines = get_fixed_c6_residency_fields(perf_data_lines, perf_mode)
-
     # set const TSC accoding to perf_mode
     set_CONST_TSC(meta_data, perf_mode)
 
