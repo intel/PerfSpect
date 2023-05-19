@@ -961,5 +961,18 @@ if __name__ == "__main__":
             args.verbose,
             args.fail_postprocessing,
         )
+        if perf_mode != Mode.System:  # always generate metrics on system level
+            set_CONST_TSC(meta_data, Mode.System)
+            generate_metrics(
+                perf_data_df,
+                out_file_path,
+                event_groups,
+                meta_data,
+                metrics,
+                Mode.System,
+                args.verbose,
+                args.fail_postprocessing,
+            )
+
         logging.info("Generated results file(s) in: " + out_file_path.rsplit("/", 1)[0])
     logging.info("Done!")
