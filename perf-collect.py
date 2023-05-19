@@ -24,6 +24,7 @@ SUPPORTED_ARCHITECTURES = [
     "Cascadelake",
     "Icelake",
     "SapphireRapids",
+    "EmeraldRapids",
 ]
 
 
@@ -236,6 +237,7 @@ if __name__ == "__main__":
         crash("Input argument muxinterval is too large, max is [1s or 1000ms]")
 
     # select architecture default event file if not supplied
+    have_uncore = True
     procinfo = perf_helpers.get_cpuinfo()
     arch, cpuname = perf_helpers.get_arch_and_name(procinfo)
     if not arch:
@@ -251,6 +253,9 @@ if __name__ == "__main__":
         eventfile = "icx.txt"
     elif arch == "sapphirerapids":
         eventfile = "spr.txt"
+    elif arch == "emeraldrapids":
+        eventfile = "spr.txt"
+        have_uncore = False
 
     if eventfile is None:
         crash(f"failed to match architecture ({arch}) to event file name.")
@@ -283,17 +288,21 @@ if __name__ == "__main__":
 
     # get perf events to collect
     collection_events = []
-    imc, upi = perf_helpers.get_imc_upi_count()
-    cha = perf_helpers.get_cha_count()
-    have_uncore = True
-    if imc == 0 and cha == 0 and upi == 0:
+    sys_devs = perf_helpers.get_sys_devices()
+    if (
+        "uncore_cha" not in sys_devs
+        and "uncore_cbox" not in sys_devs
+        and "uncore_upi" not in sys_devs
+        and "uncore_qpi" not in sys_devs
+        and "uncore_imc" not in sys_devs
+    ):
         logging.info("disabling uncore (possibly in a vm?)")
         have_uncore = False
         if arch == "icelake":
             logging.warning(
                 "Due to lack of vPMU support, TMA L1 events will not be collected"
             )
-        if arch == "sapphirerapids":
+        if arch == "sapphirerapids" or arch == "emeraldrapids":
             logging.warning(
                 "Due to lack of vPMU support, TMA L1 & L2 events will not be collected"
             )

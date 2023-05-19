@@ -18,7 +18,6 @@ from simpleeval import simple_eval
 from src.common import crash
 from src import common
 from src import perf_helpers
-from src import report
 
 
 class Mode(Enum):
@@ -86,10 +85,13 @@ def get_args(script_path):
         action="store_true",
     )
     parser.add_argument(
-        "--rawevents", help="save raw events in .csv format", action="store_true"
+        "-f",
+        "--fail-postprocessing",
+        help="gives exit code 1 when postprocessing detects missing event or zero division errors",
+        action="store_true",
     )
     parser.add_argument(
-        "-html", "--html", type=str, default=None, help="Static HTML report"
+        "--rawevents", help="save raw events in .csv format", action="store_true"
     )
 
     args = parser.parse_args()
@@ -367,7 +369,7 @@ def get_metric_file_name(microarchitecture):
         metric_file = "metric_skx_clx.json"
     elif microarchitecture == "icelake":
         metric_file = "metric_icx.json"
-    elif microarchitecture == "sapphirerapids":
+    elif microarchitecture == "sapphirerapids" or microarchitecture == "emeraldrapids":
         metric_file = "metric_spr.json"
     else:
         crash("Suitable metric file not found")
@@ -564,6 +566,62 @@ def generate_metrics_averages(
     return
 
 
+def row(df, name):
+    if name in df.index:
+        return json.dumps(df.loc[name, :].values.flatten().tolist())
+    else:
+        return "[]"
+
+
+def write_html(time_series_df, perf_mode, out_file_path):
+    html_file = "base.html"
+    if getattr(sys, "frozen", False):
+        basepath = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+        html_file = os.path.join(basepath, html_file)
+    elif __file__:
+        html_file = script_path + "/src/" + html_file
+    else:
+        crash("Unknown application type")
+
+    html = ""
+    with open(html_file, "r") as f_html:
+        html = f_html.read()
+
+    # only show TMA if system-wide mode
+    if perf_mode == Mode.System:
+        time_series_df.index.name = "metrics"
+        for metric in [
+            ["CPUUTIL", "metric_CPU utilization %"],
+            ["CPIDATA", "metric_CPI"],
+            ["CPUFREQ", "metric_CPU operating frequency (in GHz)"],
+            ["CPIDATA", "metric_CPI"],
+            ["PKGPOWER", "metric_package power (watts)"],
+            ["DRAMPOWER", "metric_DRAM power (watts)"],
+            ["L1DATA", "metric_L1D MPI (includes data+rfo w/ prefetches)"],
+            ["L2DATA", "metric_L2 MPI (includes code+data+rfo w/ prefetches)"],
+            ["LLCDATA", "metric_LLC data read MPI (demand+prefetch)"],
+            ["READDATA", "metric_memory bandwidth read (MB/sec)"],
+            ["WRITEDATA", "metric_memory bandwidth write (MB/sec)"],
+            ["TOTALDATA", "metric_memory bandwidth total (MB/sec)"],
+            ["REMOTENUMA", "metric_NUMA %_Reads addressed to remote DRAM"],
+        ]:
+            html = html.replace(metric[0], row(time_series_df, metric[1]))
+
+        avg = time_series_df.mean(numeric_only=True, axis=1).to_frame()
+        for number in [
+            ["FRONTEND", "metric_TMA_Frontend_Bound(%)"],
+            ["BACKEND", "metric_TMA_Backend_Bound(%)"],
+            ["CORE", "metric_TMA_..Core_Bound(%)"],
+            ["MEMORY", "metric_TMA_..Memory_Bound(%)"],
+            ["BADSPECULATION", "metric_TMA_Bad_Speculation(%)"],
+            ["RETIRING", "metric_TMA_Retiring(%)"],
+        ]:
+            html = html.replace(number[0], str(avg.loc[number[1], 0]))
+
+    with open(os.path.splitext(out_file_path)[0] + ".html", "w") as file:
+        file.write(html)
+
+
 def log_skip_metric(metric, instance, msg):
     logging.warning(
         msg
@@ -585,6 +643,7 @@ def generate_metrics(
     metrics,
     perf_mode,
     verbose=False,
+    fail_postprocessing=False,
 ):
     time_slice_groups = perf_data_df.groupby("ts", sort=False)
     time_metrics_result = {}
@@ -725,8 +784,14 @@ def generate_metrics(
             logging.warning(
                 str(len(errors[error])) + " " + error + ": " + str(errors[error])
             )
+    if fail_postprocessing and (
+        len(errors["MISSING EVENTS"]) > 0 or len(errors["ZERO DIVISION"]) > 0
+    ):
+        crash("Failing due to postprocessing errors")
     generate_metrics_time_series(time_series_df, perf_mode, out_file_path)
     generate_metrics_averages(time_series_df, perf_mode, out_file_path)
+    if perf_mode == Mode.System:
+        write_html(time_series_df, perf_mode, out_file_path)
     return
 
 
@@ -879,19 +944,11 @@ if __name__ == "__main__":
                 metrics,
                 perf_mode,
                 args.verbose,
+                args.fail_postprocessing,
             )
             logging.info(
                 "Generated results file(s) in: " + out_file_path.rsplit("/", 1)[0]
             )
-            if args.html:
-                report.write_html(
-                    cgroup_id_out_file_path,
-                    perf_mode,
-                    meta_data["constants"]["CONST_ARCH"],
-                    args.html.replace(
-                        ".html", "_" + meta_data["CGROUP_HASH"][cgroup_id] + ".html"
-                    ),
-                )
     # generate metrics for system, persocket or percore
     else:
         generate_metrics(
@@ -902,13 +959,7 @@ if __name__ == "__main__":
             metrics,
             perf_mode,
             args.verbose,
+            args.fail_postprocessing,
         )
         logging.info("Generated results file(s) in: " + out_file_path.rsplit("/", 1)[0])
-        if args.html:
-            report.write_html(
-                out_file_path,
-                perf_mode,
-                meta_data["constants"]["CONST_ARCH"],
-                args.html,
-            )
     logging.info("Done!")

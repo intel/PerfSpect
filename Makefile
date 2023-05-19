@@ -46,6 +46,7 @@ build-public/postprocess:
 					--add-data "./events/metric_bdx.json:." \
 					--add-data "./events/metric_icx.json:." \
 					--add-data "./events/metric_spr.json:." \
+					--add-data "./src/base.html:." \
 					--runtime-tmpdir . \
 					--exclude-module readline
 	cp $(TMPDIR)/dist/perf-postprocess build/

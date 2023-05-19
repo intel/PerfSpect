@@ -35,10 +35,24 @@ cstate_core/c6-residency/;
 cstate_pkg/c6-residency/;
 
 cpu/event=0xb0,umask=0x10,period=100003,name='OFFCORE_REQUESTS.L3_MISS_DEMAND_DATA_RD'/,
-cpu/event=0xa8,umask=0x01,period=2000003,name='LSD.UOPS'/,
 cpu-cycles,
 ref-cycles,
 instructions;
+
+cpu/event=0xd1,umask=0x40,period=100007,name='MEM_LOAD_RETIRED.FB_HIT'/,
+cpu/event=0xd1,umask=0x08,period=100003,name='MEM_LOAD_RETIRED.L1_MISS'/,
+cpu/event=0x48,umask=0x02,cmask=0x01,period=2000003,name='L1D_PEND_MISS.FB_FULL:c1'/,
+cpu/event=0xa3,umask=0x04,cmask=0x04,period=2000003,name='CYCLE_ACTIVITY.STALLS_TOTAL'/,
+cpu-cycles,
+ref-cycles,
+instructions;
+
+cpu/event=0xa3,umask=0x10,cmask=0x16,period=2000003,name='CYCLE_ACTIVITY.CYCLES_MEM_ANY'/,
+cpu/event=0xa3,umask=0x08,cmask=0x08,period=2000003,name='CYCLE_ACTIVITY.CYCLES_L1D_MISS'/,
+cpu-cycles,
+ref-cycles,
+instructions;
+
 
 #avx related power levels
 cpu/event=0x28,umask=0x07,period=200003,name='CORE_POWER.LVL0_TURBO_LICENSE'/,
@@ -48,9 +62,10 @@ cpu/event=0x0e,umask=0x01,period=2000003,name='UOPS_ISSUED.ANY'/;
 
 cpu/event=0x3c,umask=0x0,period=2000003,name='CPU_CLK_UNHALTED.THREAD_ANY'/,
 cpu/event=0x9c,umask=0x01,period=2000003,name='IDQ_UOPS_NOT_DELIVERED.CORE'/,
-cpu/event=0xc2,umask=0x02,period=2000003,name='UOPS_RETIRED.RETIRE_SLOTS'/,
+cpu/event=0xc2,umask=0x02,period=2000003,name='UOPS_RETIRED.RETIRE_SLOTS'/;
 #INT_MISC.RECOVERY_CYCLES_ANY
-cpu/event=0x0d,umask=0x01,period=2000003,name='INT_MISC.RECOVERY_CYCLES_ANY'/;
+cpu/event=0x0d,umask=0x01,period=2000003,name='INT_MISC.RECOVERY_CYCLES_ANY'/,
+cpu/event=0x0d,umask=0x01,period=2000003,name='INT_MISC.RECOVERY_CYCLES'/;
 
 cpu/event=0x79,umask=0x30,period=2000003,name='IDQ.MS_UOPS'/,
 cpu/event=0x60,umask=0x10,period=2000003,name='OFFCORE_REQUESTS_OUTSTANDING.L3_MISS_DEMAND_DATA_RD'/,
@@ -67,7 +82,7 @@ cpu-cycles;
 
 cpu/event=0xa3,umask=0x14,cmask=0x14,period=2000003,name='CYCLE_ACTIVITY.STALLS_MEM_ANY'/,
 cpu/event=0xa3,umask=0x0c,cmask=0x0c,period=2000003,name='CYCLE_ACTIVITY.STALLS_L1D_MISS'/,
-cpu/event=0x08,umask=0x20,period=2000003,name='DTLB_LOAD_MISSES.STLB_HIT'/,
+cpu/event=0x08,umask=0x20,cmask=0x01,period=2000003,name='DTLB_LOAD_MISSES.STLB_HIT:c1'/,
 cpu/event=0x08,umask=0x10,cmask=0x01,period=100003,name='DTLB_LOAD_MISSES.WALK_ACTIVE'/,
 cpu-cycles;
 
@@ -90,18 +105,17 @@ cpu/event=0x60,umask=0x10,cmask=0x01,period=2000003,name='OFFCORE_REQUESTS_OUTST
 cpu/event=0x49,umask=0x0e,period=100003,name='DTLB_STORE_MISSES.WALK_COMPLETED'/,
 cpu-cycles;
 
-cpu/event=0x60,umask=0x01,period=2000003,name='OFFCORE_REQUESTS_OUTSTANDING.DEMAND_DATA_RD'/,
 cpu/event=0x60,umask=0x01,cmask=0x01,period=2000003,name='OFFCORE_REQUESTS_OUTSTANDING.CYCLES_WITH_DEMAND_DATA_RD'/,
 cpu-cycles;
 
 cpu/event=0x80,umask=0x4,name='ICACHE_16B.IFDATA_STALL'/,
-cpu/event=0x80,umask=0x4,cmask=0x1,edge=0x1,name='ICACHE_16B_c1_e1_IFDATA_STALL'/,
+cpu/event=0x80,umask=0x4,cmask=0x1,edge=0x1,name='ICACHE_16B.IFDATA_STALL:c1:e1'/,
 cpu/event=0x85,umask=0x0e,period=100003,name='ITLB_MISSES.WALK_COMPLETED'/,
 cpu/event=0x85,umask=0x10,period=100003,name='ITLB_MISSES.WALK_ACTIVE'/,
 instructions,
 cpu-cycles;
 
-cpu/event=0x49,umask=0x20,period=100003,name='DTLB_STORE_MISSES.STLB_HIT'/,
+cpu/event=0x49,umask=0x20,cmask=0x01,period=100003,name='DTLB_STORE_MISSES.STLB_HIT:c1'/,
 cpu/event=0x49,umask=0x10,period=100003,name='DTLB_STORE_MISSES.WALK_ACTIVE'/,
 cpu/event=0x14,umask=0x01,period=2000003,name='ARITH.DIVIDER_ACTIVE'/,
 cpu/event=0xb1,umask=0x02,inv=0x1,cmask=0x1,period=2000003,name='UOPS_EXECUTED.CORE_CYCLES_NONE'/,
@@ -111,7 +125,6 @@ cpu-cycles;
 cpu/event=0xb1,umask=0x02,cmask=0x1,period=2000003,name='UOPS_EXECUTED.CORE_CYCLES_GE_1'/,
 cpu/event=0xb1,umask=0x02,cmask=0x2,period=2000003,name='UOPS_EXECUTED.CORE_CYCLES_GE_2'/,
 cpu/event=0xb1,umask=0x02,cmask=0x3,period=2000003,name='UOPS_EXECUTED.CORE_CYCLES_GE_3'/,
-cpu/event=0xb1,umask=0x02,cmask=0x4,period=2000003,name='UOPS_EXECUTED.CORE_CYCLES_GE_4'/,
 cpu-cycles;
 
 cpu/event=0x3c,umask=0x2,name='CPU_CLK_THREAD_UNHALTED.ONE_THREAD_ACTIVE'/,
@@ -129,11 +142,6 @@ cpu/event=0xb7,umask=0x01,offcore_rsp=0x3FB80007F7,name='OCR.ALL_READS.L3_MISS_L
 imc/event=0x04,umask=0x03,name='UNC_M_CAS_COUNT.RD'/,
 imc/event=0x04,umask=0x0c,name='UNC_M_CAS_COUNT.WR'/;
 
-#UNC_M_RPQ_INSERTS/OCCUPANCY
-imc/event=0x10,umask=0x0,name='UNC_M_RPQ_INSERTS'/,
-imc/event=0x80,umask=0x0,name='UNC_M_RPQ_OCCUPANCY'/,
-imc/event=0,umask=0,name='UNC_M_CLOCKTICKS'/;
-
 #demand reads local and remote collected separately 
 cha/event=0x35,umask=0x21,config1=0x4043200000000,name='UNC_CHA_TOR_INSERTS.IA_MISS.0x40432'/,
 cha/event=0x36,umask=0x21,config1=0x4043200000000,name='UNC_CHA_TOR_OCCUPANCY.IA_MISS.0x40432'/;
@@ -141,16 +149,10 @@ cha/event=0x35,umask=0x21,config1=0x4043100000000,name='UNC_CHA_TOR_INSERTS.IA_M
 cha/event=0x36,umask=0x21,config1=0x4043100000000,name='UNC_CHA_TOR_OCCUPANCY.IA_MISS.0x40431'/;
 
 #UNC_CHA_TOR_INSERTS.IA_MISS_CRD,UNC_CHA_TOR_OCCUPANCY.IA_MISS_CRD
-cha/event=0x35,umask=0x21,config1=0x12CC023300000000,name='UNC_CHA_TOR_INSERTS.IA_MISS.0x12CC0233'/,
-cha/event=0x36,umask=0x21,config1=0x12CC023300000000,name='UNC_CHA_TOR_OCCUPANCY.IA_MISS.0x12CC0233'/;
+cha/event=0x35,umask=0x21,config1=0x12CC023300000000,name='UNC_CHA_TOR_INSERTS.IA_MISS.0x12CC0233'/;
 
 #UNC_CHA_TOR_INSERTS.IA_MISS_RFO,UNC_CHA_TOR_OCCUPANCY.IA_MISS_RFO
-cha/event=0x35,umask=0x21,config1=0x12C4003300000000,name='UNC_CHA_TOR_INSERTS.IA_MISS.0x12C40033'/,
-cha/event=0x36,umask=0x21,config1=0x12C4003300000000,name='UNC_CHA_TOR_OCCUPANCY.IA_MISS.0x12C40033'/;
-
-#UNC_CHA_TOR_INSERTS.IA_HIT_DRD,UNC_CHA_TOR_OCCUPANCY.IA_HIT_DRD
-cha/event=0x35,umask=0x11,config1=0x4043300000000,name='UNC_CHA_TOR_INSERTS.IA_HIT.0x40433'/,
-cha/event=0x36,umask=0x11,config1=0x4043300000000,name='UNC_CHA_TOR_OCCUPANCY.IA_HIT.0x40433'/;
+cha/event=0x35,umask=0x21,config1=0x12C4003300000000,name='UNC_CHA_TOR_INSERTS.IA_MISS.0x12C40033'/;
 
 #UNC_CHA_TOR_INSERTS.IA_MISS_DEMAND_RD,UNC_CHA_TOR_OCCUPANCY.IA_MISS_DEMAND_RD (demand data only - both local and remote)
 cha/event=0x35,umask=0x21,config1=0x4043300000000,name='UNC_CHA_TOR_INSERTS.IA_MISS.0x40433'/,
@@ -158,9 +160,7 @@ cha/event=0x36,umask=0x21,config1=0x4043300000000,name='UNC_CHA_TOR_OCCUPANCY.IA
 cha/event=0x0,umask=0x0,name='UNC_CHA_CLOCKTICKS'/;
 
 #UNC_CHA_TOR_INSERTS.IA_MISS_DRD,UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD
-cha/event=0x35,umask=0x21,config1=0x12D4043300000000,name='UNC_CHA_TOR_INSERTS.IA_MISS.0x12D40433'/,
-cha/event=0x36,umask=0x21,config1=0x12D4043300000000,name='UNC_CHA_TOR_OCCUPANCY.IA_MISS.0x12D40433'/;
-#cha/event=0xa5,umask=0x02,name='UNC_CHA_FAST_ASSERTED.HORZ'/;
+cha/event=0x35,umask=0x21,config1=0x12D4043300000000,name='UNC_CHA_TOR_INSERTS.IA_MISS.0x12D40433'/;
 
 #IO bandwidth
 iio/event=0x83,umask=0x04,ch_mask=0x00,fc_mask=0x07,name='UNC_IIO_DATA_REQ_OF_CPU.MEM_READ.PART0'/,
@@ -179,7 +179,6 @@ upi/event=0x2,umask=0x97,name='UNC_UPI_TxL_FLITS.NON_DATA'/,
 upi/event=0x1,umask=0x0,name='UNC_UPI_CLOCKTICKS'/;
 
 upi/event=0x21,umask=0x0,name='UNC_UPI_L1_POWER_CYCLES'/;
-
 
 #power related
 power/energy-pkg/,

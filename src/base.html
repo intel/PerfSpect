@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>PerfSpect</title>
+  <link rel="icon" type="image/x-icon" href="https://www.intel.com/favicon.ico" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="initial-scale=1, width=device-width" />
+  <script src="https://unpkg.com/react@latest/umd/react.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@latest/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@mui/material@latest/umd/material-ui.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/babel-standalone@latest/babel.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.3.3/echarts.min.js"
+    integrity="sha512-2L0h0GhoIHQEjti/1KwfjcbyaTHy+hPPhE1o5wTCmviYcPO/TD9oZvUxFQtWvBkCSTIpt+fjsx1CCx6ekb51gw=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- Fonts to support Material Design -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
+  <!-- Icons to support Material Design -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const {
+      colors,
+      CssBaseline,
+      ThemeProvider,
+      Container,
+      createTheme,
+      Typography,
+      Button,
+      ButtonGroup,
+      Slider,
+      Grid,
+      Box,
+      Tab,
+      Dialog,
+      Alert,
+      Tabs,
+    } = MaterialUI;
+
+    // Create a theme instance.
+    const theme = createTheme({
+      typography: {
+        fontSize: 14,
+        h2: {
+          fontSize: "2.5rem",
+        },
+        fontFamily: [
+          "-apple-system",
+          "BlinkMacSystemFont",
+          '"Segoe UI"',
+          "Roboto",
+          '"Helvetica Neue"',
+          "Arial",
+          "sans-serif",
+          '"Apple Color Emoji"',
+          '"Segoe UI Emoji"',
+          '"Segoe UI Symbol"',
+        ].join(","),
+      },
+      palette: {
+        primary: {
+          main: "#556cd6",
+        },
+        secondary: {
+          main: "#19857b",
+        },
+        error: {
+          main: colors.red.A400,
+        },
+      },
+    });
+
+    function ReactECharts({ option, style, settings, loading, theme }) {
+      const chartRef = React.useRef("null");
+
+      React.useEffect(() => {
+        // Initialize chart
+        let chart;
+        if (chartRef.current !== null) {
+          chart = echarts.init(chartRef.current, theme);
+        }
+
+        // Add chart resize listener
+        // ResizeObserver is leading to a bit janky UX
+        function resizeChart() {
+          chart.resize();
+        }
+        window.addEventListener("resize", resizeChart);
+
+        // Return cleanup function
+        return () => {
+          chart.dispose();
+          window.removeEventListener("resize", resizeChart);
+        };
+      }, [theme]);
+
+      React.useEffect(() => {
+        // Update chart
+        if (chartRef.current !== null) {
+          const chart = echarts.getInstanceByDom(chartRef.current);
+          chart.setOption(option, settings);
+        }
+      }, [option, settings, theme]); // Whenever theme changes we need to add option and setting due to it being deleted in cleanup function
+
+      React.useEffect(() => {
+        // Update chart
+        if (chartRef.current !== null) {
+          const chart = echarts.getInstanceByDom(chartRef.current);
+          // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+          loading === true ? chart.showLoading() : chart.hideLoading();
+        }
+      }, [loading, theme]);
+
+      return (
+        <div
+          ref={chartRef}
+          style={{ width: "100%", height: "100%", ...style }}
+        />
+      );
+    }
+
+    function TabPanel(props) {
+      const { children, value, index, ...other } = props;
+
+      return (
+        <div
+          role="tabpanel"
+          hidden={value !== index}
+          id={`simple-tabpanel-${index}`}
+          aria-labelledby={`simple-tab-${index}`}
+          {...other}
+        >
+          {value === index && (
+            <div style={{ height: "100%" }}>{children}</div>
+          )}
+        </div>
+      );
+    }
+
+    function App() {
+      const [systemTabs, setSystemTabs] = React.useState(0);
+      const [open, setOpen] = React.useState(true);
+
+      const handleChange = (event, newSystemTabs) => {
+        setSystemTabs(newSystemTabs);
+      };
+      const handleClose = () => {
+        setOpen(false)
+      };
+
+      const base_line = {
+        xAxis: {
+          name: "time (s)"
+        },
+        yAxis: {},
+        tooltip: {
+          trigger: 'axis'
+        },
+        legend: {},
+      }
+
+      let cpu_util = {
+        ...base_line,
+        series: [
+          {
+            type: 'line',
+            data: CPUUTIL.map((e, i) => [i, e]),
+          }
+        ]
+      }
+
+      let cpi = {
+        ...base_line,
+        series: [
+          {
+            type: 'line',
+            data: CPIDATA.map((e, i) => [i, e]),
+          }
+        ]
+      }
+
+      let cpu_freq = {
+        ...base_line,
+        series: [
+          {
+            type: 'line',
+            data: CPUFREQ.map((e, i) => [i, e]),
+          }
+        ]
+      }
+
+      let numa = {
+        ...base_line,
+        series: [
+          {
+            type: 'line',
+            data: REMOTENUMA.map((e, i) => [i, e]),
+          }
+        ]
+      }
+
+      let cache = {
+        ...base_line,
+        series: [
+          {
+            name: "L1D",
+            type: 'line',
+            data: L1DATA.map((e, i) => [i, e]),
+          },
+          {
+            name: "L2",
+            type: 'line',
+            data: L2DATA.map((e, i) => [i, e]),
+          },
+          {
+            name: "LLC Data",
+            type: 'line',
+            data: LLCDATA.map((e, i) => [i, e]),
+          },
+        ]
+      }
+
+      let memory = {
+        ...base_line,
+        series: [
+          {
+            name: "Read",
+            type: 'line',
+            data: READDATA.map((e, i) => [i, e]),
+          },
+          {
+            name: "Write",
+            type: 'line',
+            data: WRITEDATA.map((e, i) => [i, e]),
+          },
+          {
+            name: "Total",
+            type: 'line',
+            data: TOTALDATA.map((e, i) => [i, e]),
+          },
+        ]
+      }
+
+      let package_power = {
+        ...base_line,
+        series: [
+          {
+            type: 'line',
+            data: PKGPOWER.map((e, i) => [i, e]),
+          }
+        ]
+      }
+
+      let dram_power = {
+        ...base_line,
+        series: [
+          {
+            type: 'line',
+            data: DRAMPOWER.map((e, i) => [i, e]),
+          }
+        ]
+      }
+
+      return (
+        <div>
+          <Dialog onClose={handleClose} open={open}>
+            <Alert severity="info">For the full list of metrics please see the csv output files. This contains explanations of a few key metrics to help get you started.</Alert>
+          </Dialog>
+          <Box display="flex" justifyContent="center" width="100%" sx={{ zIndex: 10, borderBottom: 1, borderColor: "divider", position: 'fixed', bgcolor: 'background.paper' }}>
+            <Tabs
+              value={systemTabs}
+              onChange={handleChange}
+              variant="scrollable"
+            >
+              <Tab label="TMA" />
+              <Tab label="CPU" />
+              <Tab label="Memory" />
+              <Tab label="Power" />
+            </Tabs>
+          </Box>
+          <div style={{ padding: "80px 24px 0px 24px" }}>
+            <TabPanel
+              value={systemTabs}
+              index={0}
+            >
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    Top-down Microarchitecture Analysis Method (TMAM)
+                  </Typography>
+                  <ul>
+                    <li>
+                      <Typography variant="body1">
+                        The Front-end is responsible for fetching the program code
+                        represented in architectural instructions and decoding
+                        them into one or more low-level hardware operations called
+                        micro-ops (uOps).
+                      </Typography>
+                    </li>
+                    <li>
+                      <Typography variant="body1">
+                        The Back-end is responsible for monitoring when uOp’s data
+                        operands are available and executing the uOp in an
+                        available execution unit.
+                      </Typography>
+                    </li>
+                    <li>
+                      <Typography variant="body1">
+                        Retirement is where results of the uOp are committed to
+                        the architectural state (CPU registers or written back to
+                        memory).
+                      </Typography>
+                    </li>
+                    <li>
+                      <Typography variant="body1">
+                        Usually, most uOps pass completely through the pipeline
+                        and retire, but sometimes speculatively fetched uOps may
+                        get cancelled before retirement – like in the case of
+                        mis-predicted branches.
+                      </Typography>
+                    </li>
+                    <li>
+                      <a href="https://www.intel.com/content/www/us/en/develop/documentation/vtune-cookbook/top/methodologies/top-down-microarchitecture-analysis-method.html">
+                        Learn more here
+                      </a>
+                    </li>
+                  </ul>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "400px" }} option={{
+                    tooltip: {},
+                    series: {
+                      nodeClick: false,
+                      type: "sunburst",
+                      radius: [60, "90%"],
+                      itemStyle: {
+                        borderRadius: 7,
+                        borderWidth: 2,
+                      },
+                      data: [
+                        {
+                          name: "Bad Speculation",
+                          value: BADSPECULATION,
+                        },
+                        {
+                          name: "Retiring",
+                          value: RETIRING,
+                        },
+                        {
+                          name: "Frontend",
+                          value: FRONTEND,
+                        },
+                        {
+                          name: "Backend",
+                          value: BACKEND,
+                          children: [
+                            {
+                              name: "Core",
+                              value: CORE,
+                            },
+                            {
+                              name: "Memory",
+                              value: MEMORY,
+                            },
+                          ],
+                        },
+                      ],
+                      radius: [20, "100%"],
+                      label: {
+                        rotate: "radial",
+                      },
+                    },
+                  }} />
+                </Grid>
+              </Grid>
+            </TabPanel>
+            <TabPanel
+              value={systemTabs}
+              index={1}
+            >
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    CPU utilization
+                  </Typography>
+                  <Typography variant="body1">
+                    Percentage of time spent in the active CPU power state C0. When a core is not being utilized it can go into lower power states to reduce idle energy consumption.
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={cpu_util} />
+                </Grid>
+              </Grid>
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    CPI
+                  </Typography>
+                  <Typography variant="body1">
+                    Cycles per instruction retired; indicating how much time each executed instruction took; in units of cycles. Often this metric shows how efficiently applications are using the underlying hardware. A lower CPI could indicate that instructions are not hitting bottlenecks and retiring quickly.
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={cpi} />
+                </Grid>
+              </Grid>
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    CPU operating frequency (in GHz)
+                  </Typography>
+                  <Typography variant="body1">
+                    This is the speed of the CPU clock. Higher frequencies allow faster execution. Usually servers are able to change their frequency based on utilization to conserve energy or turbo for short periods of time to boost performance.
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={cpu_freq} />
+                </Grid>
+              </Grid>
+            </TabPanel>
+            <TabPanel
+              value={systemTabs}
+              index={2}
+            >
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    Memory Bandwidth
+                  </Typography>
+                  <Typography variant="body1">
+                    Here, DDR memory bandwidth is broken down into reads, writes and total (read + write) in MB/sec.
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={memory} />
+                </Grid>
+              </Grid>
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    Remote DRAM reads %
+                  </Typography>
+                  <Typography variant="body1">
+                    The memory reads that miss the last level cache (LLC) and are addressed to another socket's DRAM (remote DRAM) as a percentage of total memory read accesses. This does not include LLC prefetches.
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={numa} />
+                </Grid>
+              </Grid>
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    Cache MPI (misses per instruction)
+                  </Typography>
+                  <Typography variant="body1">
+                    The ratio of the number of requests missing cache to the total number of completed instructions, at each level of cache (L1, L2 and LLC)
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={cache} />
+                </Grid>
+              </Grid>
+            </TabPanel>
+            <TabPanel
+              value={systemTabs}
+              index={3}
+            >
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    Package Power
+                  </Typography>
+                  <Typography variant="body1">
+                    The amount of power, in watts, consumed by the CPU package on the system. We provide this metric primarily for determining if system performance is being adversely affected by power throttling, although it can also be used to calculate energy consumption.
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={package_power} />
+                </Grid>
+              </Grid>
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    DRAM Power
+                  </Typography>
+                  <Typography variant="body1">
+                    The amount of power, in watts, consumed by the DRAM on the system. We provide this metric primarily for determining if system performance is being adversely affected by power throttling, although it can also be used to calculate energy consumption.
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={dram_power} />
+                </Grid>
+              </Grid>
+            </TabPanel>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(
+      <ThemeProvider theme={theme}>
+        {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
+        <CssBaseline />
+        <App />
+      </ThemeProvider>
+    );
+  </script>
+</body>
+
+</html>
