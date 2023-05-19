@@ -208,6 +208,14 @@
         "expression": "100 * ( max( 0 , ( [PERF_METRICS.FRONTEND_BOUND] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) - [INT_MISC.UOP_DROPPING] / ( [TOPDOWN.SLOTS] ) ) - ( ( [PERF_METRICS.FETCH_LATENCY] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) - [INT_MISC.UOP_DROPPING] / ( [TOPDOWN.SLOTS] ) ) ) ) )"
     },
     {
+        "name": "metric_TMA_....MITE(%)",
+        "expression": "100 * ( ( [IDQ.MITE_CYCLES_ANY] - [IDQ.MITE_CYCLES_OK] ) / ( [CPU_CLK_UNHALTED.DISTRIBUTED] ) / 2 )"
+    },
+    {
+        "name": "metric_TMA_....DSB(%)",
+        "expression": "100 * ( ( [IDQ.DSB_CYCLES_ANY] - [IDQ.DSB_CYCLES_OK] ) / ( [CPU_CLK_UNHALTED.DISTRIBUTED] ) / 2 )"
+    },
+    {
         "name": "metric_TMA_Bad_Speculation(%)",
         "expression": "100 * ( max( 1 - ( ( [PERF_METRICS.FRONTEND_BOUND] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) - [INT_MISC.UOP_DROPPING] / ( [TOPDOWN.SLOTS] ) ) + ( [PERF_METRICS.BACKEND_BOUND] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) + ( [PERF_METRICS.RETIRING] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) ) , 0 ) )"
     },
@@ -236,8 +244,8 @@
         "expression": "100 * ( min( ( 7 ) * [DTLB_LOAD_MISSES.STLB_HIT:c1] + [DTLB_LOAD_MISSES.WALK_ACTIVE] , max( [CYCLE_ACTIVITY.CYCLES_MEM_ANY] - [MEMORY_ACTIVITY.CYCLES_L1D_MISS] , 0 ) ) / ( [cpu-cycles] ) )"
     },
     {
-        "name": "metric_TMA_......Split_Loads(%)",
-        "expression": "100 * ( min( ( ( [L1D_PEND_MISS.PENDING] / [MEM_LOAD_COMPLETED.L1_MISS_ANY] ) * [LD_BLOCKS.NO_SR] / ( [cpu-cycles] ) ) , ( 1 ) ) )"
+        "name": "metric_TMA_......Lock_Latency(%)",
+        "expression": "100 * ( min( ( ( 16 * max( 0 , [MEM_INST_RETIRED.LOCK_LOADS] - [L2_RQSTS.ALL_RFO] ) + ( [MEM_INST_RETIRED.LOCK_LOADS] / [MEM_INST_RETIRED.ALL_STORES] ) * ( ( 10 ) * [L2_RQSTS.RFO_HIT] + ( min( [cpu-cycles] , [OFFCORE_REQUESTS_OUTSTANDING.CYCLES_WITH_DEMAND_RFO] ) ) ) ) / ( [cpu-cycles] ) ) , ( 1 ) ) )"
     },
     {
         "name": "metric_TMA_....L2_Bound(%)",
@@ -246,6 +254,14 @@
     {
         "name": "metric_TMA_....L3_Bound(%)",
         "expression": "100 * ( ( [MEMORY_ACTIVITY.STALLS_L2_MISS] - [MEMORY_ACTIVITY.STALLS_L3_MISS] ) / ( [cpu-cycles] ) )"
+    },
+    {
+        "name": "metric_TMA_......Data_Sharing(%)",
+        "expression": "100 * ( min( ( ( ( 79.5 * ( ( ( [cpu-cycles] ) / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( 1000 / 1000 ) ) ) - ( 4 * ( ( ( [cpu-cycles] ) / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( 1000 / 1000 ) ) ) ) * ( [MEM_LOAD_L3_HIT_RETIRED.XSNP_NO_FWD] + [MEM_LOAD_L3_HIT_RETIRED.XSNP_FWD] * ( 1 - ( [OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HITM] / ( [OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HITM] + [OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HIT_WITH_FWD] ) ) ) ) * ( 1 + ( [MEM_LOAD_RETIRED.FB_HIT] / [MEM_LOAD_RETIRED.L1_MISS] ) / 2 ) / ( [cpu-cycles] ) ) , ( 1 ) ) )"
+    },
+    {
+        "name": "metric_TMA_....DRAM_Bound(%)",
+        "expression": "100 * ( min( ( ( ( [MEMORY_ACTIVITY.STALLS_L3_MISS] / ( [cpu-cycles] ) ) - ( min( ( ( ( ( 1 - ( ( ( 19 * ( [MEM_LOAD_L3_MISS_RETIRED.REMOTE_DRAM] * ( 1 + ( [MEM_LOAD_RETIRED.FB_HIT] / [MEM_LOAD_RETIRED.L1_MISS] ) ) ) + 10 * ( ( [MEM_LOAD_L3_MISS_RETIRED.LOCAL_DRAM] * ( 1 + ( [MEM_LOAD_RETIRED.FB_HIT] / [MEM_LOAD_RETIRED.L1_MISS] ) ) ) + ( [MEM_LOAD_L3_MISS_RETIRED.REMOTE_FWD] * ( 1 + ( [MEM_LOAD_RETIRED.FB_HIT] / [MEM_LOAD_RETIRED.L1_MISS] ) ) ) + ( [MEM_LOAD_L3_MISS_RETIRED.REMOTE_HITM] * ( 1 + ( [MEM_LOAD_RETIRED.FB_HIT] / [MEM_LOAD_RETIRED.L1_MISS] ) ) ) ) ) / ( ( 19 * ( [MEM_LOAD_L3_MISS_RETIRED.REMOTE_DRAM] * ( 1 + ( [MEM_LOAD_RETIRED.FB_HIT] / [MEM_LOAD_RETIRED.L1_MISS] ) ) ) + 10 * ( ( [MEM_LOAD_L3_MISS_RETIRED.LOCAL_DRAM] * ( 1 + ( [MEM_LOAD_RETIRED.FB_HIT] / [MEM_LOAD_RETIRED.L1_MISS] ) ) ) + ( [MEM_LOAD_L3_MISS_RETIRED.REMOTE_FWD] * ( 1 + ( [MEM_LOAD_RETIRED.FB_HIT] / [MEM_LOAD_RETIRED.L1_MISS] ) ) ) + ( [MEM_LOAD_L3_MISS_RETIRED.REMOTE_HITM] * ( 1 + ( [MEM_LOAD_RETIRED.FB_HIT] / [MEM_LOAD_RETIRED.L1_MISS] ) ) ) ) ) + ( 25 * ( ( [MEM_LOAD_RETIRED.LOCAL_PMM] * ( 1 + ( [MEM_LOAD_RETIRED.FB_HIT] / [MEM_LOAD_RETIRED.L1_MISS] ) ) ) ) + 33 * ( ( [MEM_LOAD_L3_MISS_RETIRED.REMOTE_PMM] * ( 1 + ( [MEM_LOAD_RETIRED.FB_HIT] / [MEM_LOAD_RETIRED.L1_MISS] ) ) ) ) ) ) ) ) ) * ( [MEMORY_ACTIVITY.STALLS_L3_MISS] / ( [cpu-cycles] ) ) ) if ( ( 1000000 ) * ( [MEM_LOAD_L3_MISS_RETIRED.REMOTE_PMM] + [MEM_LOAD_RETIRED.LOCAL_PMM] ) > [MEM_LOAD_RETIRED.L1_MISS] ) else 0 ) ) , ( 1 ) ) ) ) ) , ( 1 ) ) )"
     },
     {
         "name": "metric_TMA_......MEM_Bandwidth(%)",
@@ -260,12 +276,12 @@
         "expression": "100 * ( [EXE_ACTIVITY.BOUND_ON_STORES] / ( [cpu-cycles] ) )"
     },
     {
-        "name": "metric_TMA_..Core_Bound(%)",
-        "expression": "100 * ( max( 0 , ( [PERF_METRICS.BACKEND_BOUND] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) - ( [PERF_METRICS.MEMORY_BOUND] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) ) )"
+        "name": "metric_TMA_......False_Sharing(%)",
+        "expression": "100 * ( min( ( ( 80 * ( ( ( [cpu-cycles] ) / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( 1000 / 1000 ) ) ) * [OCR.DEMAND_RFO.L3_HIT.SNOOP_HITM] / ( [cpu-cycles] ) ) , ( 1 ) ) )"
     },
     {
-        "name": "metric_TMA_....Divider(%)",
-        "expression": "100 * ( [ARITH.DIV_ACTIVE] / ( [cpu-cycles] ) )"
+        "name": "metric_TMA_..Core_Bound(%)",
+        "expression": "100 * ( max( 0 , ( [PERF_METRICS.BACKEND_BOUND] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) - ( [PERF_METRICS.MEMORY_BOUND] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) ) )"
     },
     {
         "name": "metric_TMA_....Ports_Utilization(%)",
@@ -296,6 +312,10 @@
         "expression": "100 * ( max( 0 , ( [PERF_METRICS.RETIRING] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) - ( [PERF_METRICS.HEAVY_OPERATIONS] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) ) )"
     },
     {
+        "name": "metric_TMA_....FP_Arith(%)",
+        "expression": "100 * ( ( ( [PERF_METRICS.RETIRING] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) * [UOPS_EXECUTED.X87] / [UOPS_EXECUTED.THREAD] ) + ( ( [FP_ARITH_INST_RETIRED.SCALAR_SINGLE:u0x03] + [FP_ARITH_INST_RETIRED2.SCALAR] ) / ( ( [PERF_METRICS.RETIRING] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) * ( [TOPDOWN.SLOTS] ) ) ) + ( min( ( ( [FP_ARITH_INST_RETIRED.128B_PACKED_DOUBLE:u0x3c] + [FP_ARITH_INST_RETIRED2.VECTOR] ) / ( ( [PERF_METRICS.RETIRING] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) * ( [TOPDOWN.SLOTS] ) ) ) , ( 1 ) ) ) + ( [AMX_OPS_RETIRED.BF16:c1] / ( ( [PERF_METRICS.RETIRING] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) * ( [TOPDOWN.SLOTS] ) ) ) )"
+    },
+    {
         "name": "metric_TMA_..Heavy_Operations(%)",
         "expression": "100 * ( [PERF_METRICS.HEAVY_OPERATIONS] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) )"
     },
@@ -306,11 +326,6 @@
     {
         "name": "metric_TMA_Info_Thread_IPC",
         "expression": "[instructions] / [cpu-cycles]",
-        "origin": "perfspect"
-    },
-    {
-        "name": "metric_TMA_Info_Core_ILP",
-        "expression": "[instructions] / [CPU_CLK_UNHALTED.DISTRIBUTED]",
         "origin": "perfspect"
     },
     {

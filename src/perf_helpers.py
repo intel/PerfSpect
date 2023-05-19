@@ -339,6 +339,8 @@ def get_arch_and_name(procinfo):
             arch = "icelake"
         elif model == 143 and cpufamily == 6 and stepping >= 3:
             arch = "sapphirerapids"
+        elif model == 207 and cpufamily == 6:
+            arch = "emeraldrapids"
     return arch, modelname
 
 

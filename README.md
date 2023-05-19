@@ -1,6 +1,6 @@
 # PerfSpect &middot; [![Build](https://github.com/intel/PerfSpect/actions/workflows/build.yml/badge.svg)](https://github.com/intel/PerfSpect/actions/workflows/build.yml)[![License](https://img.shields.io/badge/License-BSD--3-blue)](https://github.com/intel/PerfSpect/blob/master/LICENSE)
 
-[Quick Start](#quick-start-requires-perf-installed) | [Requirements](#requirements) | [Build from source](#build-from-source) | [Caveats](#caveats) | [How to contribute](#how-to-contribute)
+[Quick Start](#quick-start-requires-perf-installed) | [Output](#output) | [Requirements](#requirements) | [Build from source](#build-from-source) | [Caveats](#caveats) | [How to contribute](#how-to-contribute)
 
 PerfSpect is a system performance characterization tool built on top of linux perf. It contains two parts
 
@@ -30,12 +30,21 @@ sudo ./perf-collect --timeout 10
 ./perf-postprocess
 ```
 
+## Output
+
+perf-collect outputs:
+1. `perfstat.csv`: raw event counts with system metadata
+
+perf-postprocess outputs:
+1. `metric_out.sys.average.csv`: average metrics
+2. `metric_out.sys.csv`: metric values at every interval
+3. `metric_out.html`: html view of a few select metrics
+
+![basic_stats](https://raw.githubusercontent.com/wiki/intel/PerfSpect/newhtml.gif)
+
 ## Deploy in Kubernetes
 
 Modify the template [deamonset.yml](docs/daemonset.yml) to deploy in kubernetes
-
-![basic_stats](https://raw.githubusercontent.com/wiki/intel/PerfSpect/basic_stats.JPG)
-![perfspect-demo1](https://raw.githubusercontent.com/wiki/intel/PerfSpect/demo.gif)
 
 ## Requirements
 
@@ -75,8 +84,6 @@ make
 ## Caveats
 
 1. The tool can collect only the counters supported by underlying linux perf version.
-2. If you run into locale issues - `UnicodeDecodeError: 'ascii' codec can't decode byte 0xc2 in position 4519: ordinal not in range(128)`, more than likely the locales needs to be set appropriately. You could also try running post-process step with `LC_ALL=C.UTF-8 LANG=C.UTF-8 ./perf-postprocess -r result.csv`
-3. The html report creation is not yet supported for cid collection.
 
 ## How to contribute
 

@@ -3,3 +3,5 @@ pandas
 scikit_learn
 simplejson
 xlrd
+pca
+scipy
