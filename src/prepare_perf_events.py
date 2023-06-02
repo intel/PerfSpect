@@ -99,17 +99,14 @@ def enumerate_uncore(group, pattern, n, default_range=True):
 def get_cgroup_events_format(cgroups, events, num_events):
     eventlist = ""
     grouplist = ""
-    # Find total number of cgroups
-    num_cgroups = len(cgroups)
-    # cgroups = cgroups.split(",")
     # "-e" flags: Create event groups as many number of cgroups
-    for i in range(num_cgroups):
+    for _ in range(len(cgroups)):
         eventlist += " -e " + events
 
     # "-G" flags: Repeat cgroup name for as many events in each event group
     for cgroup in cgroups:
         grouplist = grouplist.rstrip(",") + " -G "
-        for i in range(num_events):
+        for _ in range(num_events):
             grouplist += cgroup + ","
 
     perf_format = eventlist + grouplist.rstrip(",")

@@ -447,14 +447,15 @@ def extract_dataframe(perf_data_lines, meta_data, perf_mode):
             axis=1,
         )
 
-    # fix metric name X.1, X.2, etc -> just X
-    perf_data_df["metric"] = perf_data_df.apply(
-        lambda x: ".".join(x["metric"].split(".")[:-1])
-        if len(re.findall(r"^[0-9]*$", x["metric"].split(".")[-1])) > 0
-        else x["metric"],
-        axis=1,
-    )
-
+    if perf_mode != Mode.Core and perf_mode != Mode.Socket:
+        # fix metric name X.1, X.2, etc -> just X
+        # we don't need this in thread/socket modes
+        perf_data_df["metric"] = perf_data_df.apply(
+            lambda x: ".".join(x["metric"].split(".")[:-1])
+            if len(re.findall(r"^[0-9]*$", x["metric"].split(".")[-1])) > 0
+            else x["metric"],
+            axis=1,
+        )
     # set data frame types
     perf_data_df["value"] = pd.to_numeric(
         perf_data_df["value"], errors="coerce"
@@ -505,11 +506,13 @@ def get_event_expression_from_group(
                 "[" + event + "]", str(event_df[0])
             )
     else:
-        for index, value in event_df.iterrows():
+        for index in event_df.index:
+            value = event_df["value"][index]
             if index not in expressions_to_evaluate:
                 expressions_to_evaluate[index] = exp_to_evaluate
             expressions_to_evaluate[index] = expressions_to_evaluate[index].replace(
-                "[" + event + "]", str(value[0])
+                "[" + event + "]",
+                str(value),
             )
     return
 
@@ -542,9 +545,6 @@ def generate_metrics_averages(
         average_metric_file_name = get_extra_out_file(out_file_path, "ca")
 
     time_series_df.index.name = "metrics"
-    # throw out 1st and last datapoints since they tend to be significantly off norm
-    if len(time_series_df) > 2:
-        time_series_df = time_series_df.iloc[:, 1:-1]
     avgcol = time_series_df.mean(numeric_only=True, axis=1).to_frame().reset_index()
     p95col = time_series_df.quantile(q=0.95, axis=1).to_frame().reset_index()
     mincol = time_series_df.min(axis=1).to_frame().reset_index()
@@ -654,36 +654,59 @@ def generate_metrics(
         "MULTIPLE GROUPS": set(),
     }
     prev_time_slice = 0
+    group_to_start_end_indexes = {}
     for time_slice, item in time_slice_groups:
+        time_slice_float = float(time_slice)
+        if time_slice_float - prev_time_slice < 5:
+            logging.warning("throwing out last sample because it was too short")
+            continue
         time_slice_df = time_slice_groups.get_group(time_slice).copy()
         # normalize by difference between current time slice and previous time slice
         # this ensures that all our events are per-second, even if perf is collecting
         # over a longer time slice
-        time_slice_float = float(time_slice)
         time_slice_df["value"] = time_slice_df["value"] / (
             time_slice_float - prev_time_slice
         )
-        prev_time_slice = time_slice_float
         current_group_indx = 0
         group_to_df = {}
-        start_index = 0
+        start_of_group_index = 0
         end_of_group_index = 0
-        for index, row in time_slice_df.iterrows():
-            if row["metric"] in event_groups["group_" + str(current_group_indx)]:
-                end_of_group_index += 1
-                continue
-            else:  # move to next group
-                group_to_df["group_" + str(current_group_indx)] = get_group_df(
-                    time_slice_df, start_index, end_of_group_index, perf_mode
+        if prev_time_slice == 0:  # first time slice
+            for index, row in time_slice_df.iterrows():
+                if row["metric"] in event_groups["group_" + str(current_group_indx)]:
+                    end_of_group_index += 1
+                    continue
+                else:  # move to next group
+                    group_to_df["group_" + str(current_group_indx)] = get_group_df(
+                        time_slice_df,
+                        start_of_group_index,
+                        end_of_group_index,
+                        perf_mode,
+                    )
+                    group_to_start_end_indexes["group_" + str(current_group_indx)] = (
+                        start_of_group_index,
+                        end_of_group_index,
+                    )
+                    start_of_group_index = end_of_group_index
+                    end_of_group_index += 1
+                    current_group_indx += 1
+            # add last group
+            group_to_df["group_" + str(current_group_indx)] = get_group_df(
+                time_slice_df, start_of_group_index, time_slice_df.shape[0], perf_mode
+            )
+            group_to_start_end_indexes["group_" + str(current_group_indx)] = (
+                start_of_group_index,
+                time_slice_df.shape[0],
+            )
+        else:  # use same start & end indexes from first time slice
+            for group_id in group_to_start_end_indexes:
+                start_of_group_index = group_to_start_end_indexes[group_id][0]
+                end_of_group_index = group_to_start_end_indexes[group_id][1]
+                group_to_df[group_id] = get_group_df(
+                    time_slice_df, start_of_group_index, end_of_group_index, perf_mode
                 )
-                start_index = end_of_group_index
-                end_of_group_index += 1
-                current_group_indx += 1
-        # add last group
-        group_to_df["group_" + str(current_group_indx)] = get_group_df(
-            time_slice_df, start_index, time_slice_df.shape[0], perf_mode
-        )
 
+        prev_time_slice = time_slice_float
         metrics_results = {}
         for m in metrics:
             non_constant_events = []
@@ -776,9 +799,12 @@ def generate_metrics(
                         + '"'
                     )
                     errors["MISSING EVENTS"].add(m["name"])
-                continue  # skip metric
+                continue
         time_metrics_result[time_slice] = metrics_results
-    time_series_df = pd.DataFrame(time_metrics_result)
+    time_series_df = pd.DataFrame(time_metrics_result).reindex(
+        index=list(time_metrics_result[list(time_metrics_result.keys())[0]].keys())
+    )
+
     if verbose:
         for error in errors:
             logging.warning(
