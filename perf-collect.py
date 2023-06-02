@@ -11,6 +11,7 @@ import platform
 import sys
 import subprocess  # nosec
 import shlex  # nosec
+import time
 from argparse import ArgumentParser
 from src import perf_helpers
 from src import prepare_perf_events as prep_events
@@ -75,9 +76,9 @@ def write_metadata(
         threadmode = "enabled" if thread else "disabled"
         socketmode = "enabled" if socket else "disabled"
         if args.cid is not None:
-            cgname = "enabled," + perf_helpers.get_comm_from_cid(
-                args.cid.split(","), cgroups
-            )
+            cgname = "enabled,"
+            for cgroup in cgroups:
+                cgname += cgroup + "=" + cgroup.replace("/", "-") + ","
         else:
             cgname = "disabled"
         modified.write("cgroups=" + str(cgname) + "\n")
@@ -189,9 +190,10 @@ if __name__ == "__main__":
     runmode.add_argument(
         "-c",
         "--cid",
+        help="perf-collect on up to 5 cgroups. Provide comma separated cids like e19f4fb59,6edca29db (by default, selects the 5 containers using the most CPU)",
         type=str,
-        default=None,
-        help="perf-collect on selected container ids",
+        nargs="?",
+        const="",
     )
     runmode.add_argument(
         "--thread", help="Collect for thread metrics", action="store_true"
@@ -203,8 +205,8 @@ if __name__ == "__main__":
         "-m",
         "--muxinterval",
         type=int,
-        default=10,
-        help="event mux interval in milli seconds, default=10",
+        default=125,
+        help="event mux interval in milli seconds, default=125. Lower numbers can cause higher overhead",
     )
     parser.add_argument(
         "-o",
@@ -231,7 +233,18 @@ if __name__ == "__main__":
     # disable nmi watchdog before collecting perf
     nmi_watchdog = perf_helpers.disable_nmi_watchdog()
     initial_pmus = perf_helpers.pmu_contention_detect()
-    interval = 1000
+    interval = 5000
+
+    if args.thread:
+        logging.info("Run mode: thread")
+    elif args.socket:
+        logging.info("Run mode: socket")
+    elif args.pid is not None:
+        logging.info("Run mode: pid")
+    elif args.cid is not None:
+        logging.info("Run mode: cid")
+    else:
+        logging.info("Run mode: system")
 
     if args.muxinterval > 1000:
         crash("Input argument muxinterval is too large, max is [1s or 1000ms]")
@@ -283,8 +296,7 @@ if __name__ == "__main__":
     # parse cgroups
     cgroups = []
     if args.cid is not None:
-        cgroups = perf_helpers.get_cgroups_from_cids(args.cid.split(","))
-        num_cgroups = len(cgroups)
+        cgroups = perf_helpers.get_cgroups(args.cid)
 
     # get perf events to collect
     collection_events = []
@@ -318,66 +330,28 @@ if __name__ == "__main__":
         args.pid is not None or args.cid is not None,
     )
 
-    collection_type = "-a" if not args.thread and not args.socket else "-a -A"
-    # start perf stat
-    if args.pid and args.timeout:
-        logging.info("Only CPU/core events will be enabled with pid option")
-        cmd = "perf stat -I %d -x , --pid %s -e %s -o %s sleep %d" % (
-            interval,
-            args.pid,
-            events,
-            args.outcsv,
-            args.timeout,
-        )
+    if args.thread or args.socket or args.pid is not None or args.cid is not None:
+        logging.info("Not collecting uncore events in this run mode")
 
-    elif args.pid:
-        logging.info("Only CPU/core events will be enabled with pid option")
-        cmd = "perf stat -I %d -x , --pid %s -e %s -o %s" % (
-            interval,
-            args.pid,
-            events,
-            args.outcsv,
-        )
-    elif args.cid and args.timeout:
-        logging.info("Only CPU/core events will be enabled with cid option")
+    # build perf stat command
+    collection_type = "-a" if not args.thread and not args.socket else "-a -A"
+    cmd = f"perf stat -I {interval} -x , {collection_type} -o {args.outcsv}"
+    if args.pid:
+        cmd += f" --pid {args.pid}"
+
+    if args.cid is not None:
         perf_format = prep_events.get_cgroup_events_format(
             cgroups, events, len(collection_events)
         )
-        cmd = "perf stat -I %d -x , %s -a -o %s sleep %d" % (
-            interval,
-            perf_format,
-            args.outcsv,
-            args.timeout,
-        )
-    elif args.cid:
-        logging.info("Only CPU/core events will be enabled with cid option")
-        perf_format = prep_events.get_cgroup_events_format(
-            cgroups, events, len(collection_events)
-        )
-        cmd = "perf stat -I %d -x , %s -o %s" % (interval, perf_format, args.outcsv)
-    elif args.app:
-        cmd = "perf stat %s -I %d -x , -e %s -o %s %s" % (
-            collection_type,
-            interval,
-            events,
-            args.outcsv,
-            args.app,
-        )
-    elif args.timeout:
-        cmd = "perf stat %s -I %d -x , -e %s -o %s sleep %d" % (
-            collection_type,
-            interval,
-            events,
-            args.outcsv,
-            args.timeout,
-        )
+        cmd += f" {perf_format}"
     else:
-        cmd = "perf stat %s -I %d -x , -e %s -o %s" % (
-            collection_type,
-            interval,
-            events,
-            args.outcsv,
-        )
+        cmd += f" -e {events}"
+
+    if args.timeout:
+        cmd += f" sleep {args.timeout}"
+    elif args.app:
+        cmd += f" {args.app}"
+
     perfargs = shlex.split(cmd)
     validate_perfargs(perfargs)
     perf_helpers.pmu_contention_detect(msrs=initial_pmus, detect=True)
@@ -385,7 +359,13 @@ if __name__ == "__main__":
         logging.info(cmd)
     try:
         logging.info("Collecting perf stat for events in : %s" % eventfilename)
+        start = time.time()
         subprocess.call(perfargs)  # nosec
+        end = time.time()
+        if end - start < 5:
+            logging.warning(
+                "PerfSpect was run for less than 5 seconds, some events make be zero because they didn't get scheduled"
+            )
         logging.info("Collection complete! Calculating TSC frequency now")
     except KeyboardInterrupt:
         logging.info("Collection stopped! Caculating TSC frequency now")

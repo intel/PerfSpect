@@ -273,6 +273,14 @@
         "origin": "perfspect"
     },
     {
+        "name": "metric_TMA_....MITE(%)",
+        "expression": "100 * ( ( [IDQ.ALL_MITE_CYCLES_ANY_UOPS] - [IDQ.ALL_MITE_CYCLES_4_UOPS] ) / ( ( [CPU_CLK_UNHALTED.THREAD_ANY] / 2 ) if [HYPERTHREADING_ON] else ( [cpu-cycles] ) ) / 2 )"
+    },
+    {
+        "name": "metric_TMA_....DSB(%)",
+        "expression": "100 * ( ( [IDQ.ALL_DSB_CYCLES_ANY_UOPS] - [IDQ.ALL_DSB_CYCLES_4_UOPS] ) / ( ( [CPU_CLK_UNHALTED.THREAD_ANY] / 2 ) if [HYPERTHREADING_ON] else ( [cpu-cycles] ) ) / 2 )"
+    },
+    {
         "name": "metric_TMA_Bad_Speculation(%)",
         "expression": "100 * ( ( [UOPS_ISSUED.ANY] - ( [UOPS_RETIRED.RETIRE_SLOTS] ) + ( 4 ) * ( ( [INT_MISC.RECOVERY_CYCLES_ANY] / 2 ) if [HYPERTHREADING_ON] else [INT_MISC.RECOVERY_CYCLES] ) ) / ( ( 4 ) * ( ( [CPU_CLK_UNHALTED.THREAD_ANY] / 2 ) if [HYPERTHREADING_ON] else ( [cpu-cycles] ) ) ) )"
     },
@@ -301,8 +309,8 @@
         "expression": "100 * ( min( ( 9 ) * [DTLB_LOAD_MISSES.STLB_HIT:c1] + [DTLB_LOAD_MISSES.WALK_ACTIVE] , max( [CYCLE_ACTIVITY.CYCLES_MEM_ANY] - [CYCLE_ACTIVITY.CYCLES_L1D_MISS] , 0 ) ) / ( [cpu-cycles] ) )"
     },
     {
-        "name": "metric_TMA_......Store_Fwd_Blk(%)",
-        "expression": "100 * ( min( ( 13 * [LD_BLOCKS.STORE_FORWARD] / ( [cpu-cycles] ) ) , ( 1 ) ) )"
+        "name": "metric_TMA_......Lock_Latency(%)",
+        "expression": "100 * ( min( ( ( 12 * max( 0 , [MEM_INST_RETIRED.LOCK_LOADS] - [L2_RQSTS.ALL_RFO] ) + ( [MEM_INST_RETIRED.LOCK_LOADS] / [MEM_INST_RETIRED.ALL_STORES] ) * ( ( 11 ) * [L2_RQSTS.RFO_HIT] + ( min( [cpu-cycles] , [OFFCORE_REQUESTS_OUTSTANDING.CYCLES_WITH_DEMAND_RFO] ) ) ) ) / ( [cpu-cycles] ) ) , ( 1 ) ) )"
     },
     {
         "name": "metric_TMA_....L2_Bound(%)",
@@ -313,18 +321,8 @@
         "expression": "100 * ( ( [CYCLE_ACTIVITY.STALLS_L2_MISS] - [CYCLE_ACTIVITY.STALLS_L3_MISS] ) / ( [cpu-cycles] ) )"
     },
     {
-        "name": "metric_TMA_......L3_Latency(%)",
-        "expression": "100 * (((min([OFFCORE_REQUESTS_OUTSTANDING.CYCLES_WITH_DEMAND_DATA_RD], [cpu-cycles]) - min([OFFCORE_REQUESTS_OUTSTANDING.CYCLES_WITH_L3_MISS_DEMAND_DATA_RD], [cpu-cycles])) / [cpu-cycles]) - ((min([OFFCORE_REQUESTS_OUTSTANDING.DEMAND_DATA_RD_GE_6], [cpu-cycles]) - min([OFFCORE_REQUESTS_OUTSTANDING.L3_MISS_DEMAND_DATA_RD_GE_6] , [cpu-cycles])) / [cpu-cycles]))",
-        "origin": "perfspect"
-    },
-    {
-        "name": "metric_TMA_......L3_Bandwidth(%)",
-        "expression": "100 * (min([OFFCORE_REQUESTS_OUTSTANDING.DEMAND_DATA_RD_GE_6], [cpu-cycles]) - min([OFFCORE_REQUESTS_OUTSTANDING.L3_MISS_DEMAND_DATA_RD_GE_6], [cpu-cycles])) / [cpu-cycles]",
-        "origin": "perfspect"
-    },
-    {
-        "name": "metric_TMA_......SQ_Full(%)",
-        "expression": "100 * ( ( ( [OFFCORE_REQUESTS_BUFFER.SQ_FULL] / 2 ) if [HYPERTHREADING_ON] else [OFFCORE_REQUESTS_BUFFER.SQ_FULL] ) / ( ( [CPU_CLK_UNHALTED.THREAD_ANY] / 2 ) if [HYPERTHREADING_ON] else ( [cpu-cycles] ) ) )"
+        "name": "metric_TMA_......Data_Sharing(%)",
+        "expression": "100 * ( min( ( ( ( 47.5 * ( ( ( [cpu-cycles] ) / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( 1000 / 1000 ) ) ) - ( 3.5 * ( ( ( [cpu-cycles] ) / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( 1000 / 1000 ) ) ) ) * ( [MEM_LOAD_L3_HIT_RETIRED.XSNP_HIT] + [MEM_LOAD_L3_HIT_RETIRED.XSNP_HITM] * ( 1 - ( [OCR.DEMAND_DATA_RD.L3_HIT.HITM_OTHER_CORE] / ( [OCR.DEMAND_DATA_RD.L3_HIT.HITM_OTHER_CORE] + [OCR.DEMAND_DATA_RD.L3_HIT.HIT_OTHER_CORE_FWD] ) ) ) ) * ( 1 + ( [MEM_LOAD_RETIRED.FB_HIT] / [MEM_LOAD_RETIRED.L1_MISS] ) / 2 ) / ( [cpu-cycles] ) ) , ( 1 ) ) )"
     },
     {
         "name": "metric_TMA_....MEM_Bound(%)",
@@ -346,16 +344,12 @@
         "expression": "100 * ( [EXE_ACTIVITY.BOUND_ON_STORES] / ( [cpu-cycles] ) )"
     },
     {
-        "name": "metric_TMA_......DTLB_Store(%)",
-        "expression": "100 * ( min( ( ( ( 9 ) * [DTLB_STORE_MISSES.STLB_HIT:c1] + [DTLB_STORE_MISSES.WALK_ACTIVE] ) / ( ( [CPU_CLK_UNHALTED.THREAD_ANY] / 2 ) if [HYPERTHREADING_ON] else ( [cpu-cycles] ) ) ) , ( 1 ) ) )"
+        "name": "metric_TMA_......False_Sharing(%)",
+        "expression": "100 * ( min( ( ( ( 110 * ( ( ( [cpu-cycles] ) / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( 1000 / 1000 ) ) ) * ( [OCR.DEMAND_RFO.L3_MISS.REMOTE_HITM] + [OCR.PF_L2_RFO.L3_MISS.REMOTE_HITM] ) + ( 47.5 * ( ( ( [cpu-cycles] ) / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( 1000 / 1000 ) ) ) * ( [OCR.DEMAND_RFO.L3_HIT.HITM_OTHER_CORE] + [OCR.PF_L2_RFO.L3_HIT.HITM_OTHER_CORE] ) ) / ( [cpu-cycles] ) ) , ( 1 ) ) )"
     },
     {
         "name": "metric_TMA_..Core_Bound(%)",
         "expression": "100 * ( ( 1 - ( [IDQ_UOPS_NOT_DELIVERED.CORE] / ( ( 4 ) * ( ( [CPU_CLK_UNHALTED.THREAD_ANY] / 2 ) if [HYPERTHREADING_ON] else ( [cpu-cycles] ) ) ) ) - ( [UOPS_ISSUED.ANY] + ( 4 ) * ( ( [INT_MISC.RECOVERY_CYCLES_ANY] / 2 ) if [HYPERTHREADING_ON] else [INT_MISC.RECOVERY_CYCLES] ) ) / ( ( 4 ) * ( ( [CPU_CLK_UNHALTED.THREAD_ANY] / 2 ) if [HYPERTHREADING_ON] else ( [cpu-cycles] ) ) ) ) - ( ( ( [CYCLE_ACTIVITY.STALLS_MEM_ANY] + [EXE_ACTIVITY.BOUND_ON_STORES] ) / ( [CYCLE_ACTIVITY.STALLS_TOTAL] + ( [EXE_ACTIVITY.1_PORTS_UTIL] + ( ( [UOPS_RETIRED.RETIRE_SLOTS] ) / ( ( 4 ) * ( ( [CPU_CLK_UNHALTED.THREAD_ANY] / 2 ) if [HYPERTHREADING_ON] else ( [cpu-cycles] ) ) ) ) * [EXE_ACTIVITY.2_PORTS_UTIL] ) + [EXE_ACTIVITY.BOUND_ON_STORES] ) ) * ( 1 - ( [IDQ_UOPS_NOT_DELIVERED.CORE] / ( ( 4 ) * ( ( [CPU_CLK_UNHALTED.THREAD_ANY] / 2 ) if [HYPERTHREADING_ON] else ( [cpu-cycles] ) ) ) ) - ( [UOPS_ISSUED.ANY] + ( 4 ) * ( ( [INT_MISC.RECOVERY_CYCLES_ANY] / 2 ) if [HYPERTHREADING_ON] else [INT_MISC.RECOVERY_CYCLES] ) ) / ( ( 4 ) * ( ( [CPU_CLK_UNHALTED.THREAD_ANY] / 2 ) if [HYPERTHREADING_ON] else ( [cpu-cycles] ) ) ) ) ) )"
-    },
-    {
-        "name": "metric_TMA_....Divider(%)",
-        "expression": "100 * ( [ARITH.DIVIDER_ACTIVE] / ( [cpu-cycles] ) )"
     },
     {
         "name": "metric_TMA_....Ports_Utilization(%)",
@@ -386,9 +380,24 @@
         "expression": "100 * ( ( [UOPS_RETIRED.RETIRE_SLOTS] ) / ( ( 4 ) * ( ( [CPU_CLK_UNHALTED.THREAD_ANY] / 2 ) if [HYPERTHREADING_ON] else ( [cpu-cycles] ) ) ) )"
     },
     {
-        "name": "metric_TMA_..Base(%)",
-        "expression": "100 * (([UOPS_RETIRED.RETIRE_SLOTS] / (4 * ([CPU_CLK_UNHALTED.THREAD_ANY] / [const_thread_count]))) - (([UOPS_RETIRED.RETIRE_SLOTS] / [UOPS_ISSUED.ANY]) * [IDQ.MS_UOPS] / (4 * ([CPU_CLK_UNHALTED.THREAD_ANY]  / [const_thread_count]))))",
-        "origin": "perfspect"
+        "name": "metric_TMA_..Light_Operations(%)",
+        "expression": "100 * ( ( ( [UOPS_RETIRED.RETIRE_SLOTS] ) / ( ( 4 ) * ( ( [CPU_CLK_UNHALTED.THREAD_ANY] / 2 ) if [HYPERTHREADING_ON] else ( [cpu-cycles] ) ) ) ) - ( ( ( [UOPS_RETIRED.RETIRE_SLOTS] ) + [UOPS_RETIRED.MACRO_FUSED] - [instructions] ) / ( ( 4 ) * ( ( [CPU_CLK_UNHALTED.THREAD_ANY] / 2 ) if [HYPERTHREADING_ON] else ( [cpu-cycles] ) ) ) ) )"
+    },
+    {
+        "name": "metric_TMA_....FP_Arith(%)",
+        "expression": "100 * ( ( ( ( [UOPS_RETIRED.RETIRE_SLOTS] ) / ( ( 4 ) * ( ( [CPU_CLK_UNHALTED.THREAD_ANY] / 2 ) if [HYPERTHREADING_ON] else ( [cpu-cycles] ) ) ) ) * [UOPS_EXECUTED.X87] / [UOPS_EXECUTED.THREAD] ) + ( ( [FP_ARITH_INST_RETIRED.SCALAR_SINGLE:u0x03] ) / ( [UOPS_RETIRED.RETIRE_SLOTS] ) ) + ( min( ( ( [FP_ARITH_INST_RETIRED.128B_PACKED_DOUBLE:u0xfc] ) / ( [UOPS_RETIRED.RETIRE_SLOTS] ) ) , ( 1 ) ) ) )"
+    },
+    {
+        "name": "metric_TMA_......FP_Scalar(%)",
+        "expression": "100 * ( ( [FP_ARITH_INST_RETIRED.SCALAR_SINGLE:u0x03] ) / ( [UOPS_RETIRED.RETIRE_SLOTS] ) )"
+    },
+    {
+        "name": "metric_TMA_......FP_Vector(%)",
+        "expression": "100 * ( min( ( ( [FP_ARITH_INST_RETIRED.128B_PACKED_DOUBLE:u0xfc] ) / ( [UOPS_RETIRED.RETIRE_SLOTS] ) ) , ( 1 ) ) )"
+    },
+    {
+        "name": "metric_TMA_..Heavy_Operations(%)",
+        "expression": "100 * ( ( ( [UOPS_RETIRED.RETIRE_SLOTS] ) + [UOPS_RETIRED.MACRO_FUSED] - [instructions] ) / ( ( 4 ) * ( ( [CPU_CLK_UNHALTED.THREAD_ANY] / 2 ) if [HYPERTHREADING_ON] else ( [cpu-cycles] ) ) ) )"
     },
     {
         "name": "metric_TMA_..Microcode_Sequencer(%)",

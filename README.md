@@ -11,7 +11,7 @@ perf-collect: Collects harware events
   - `sudo ./perf-collect --socket`
   - `sudo ./perf-collect --thread`
   - `sudo ./perf-collect --pid <process-id>`
-  - `sudo ./perf-collect --cid <container-id1>;<container-id2>`
+  - `sudo ./perf-collect --cid` _by default, selects the 5 containers using the most CPU at start of perf-collect. To monitor specific containers provide up to 5 comma separated cids i.e. <cid_1>,<cid_2>_
 - Duration:
   - `sudo ./perf-collect` _default run until terminated_
   - `sudo ./perf-collect --timeout 10` _run for 10 seconds_
@@ -37,7 +37,7 @@ perf-collect outputs:
 
 perf-postprocess outputs:
 1. `metric_out.sys.average.csv`: average metrics
-2. `metric_out.sys.csv`: metric values at every interval
+2. `metric_out.sys.csv`: metric values at every 5 second interval
 3. `metric_out.html`: html view of a few select metrics
 
 ![basic_stats](https://raw.githubusercontent.com/wiki/intel/PerfSpect/newhtml.gif)

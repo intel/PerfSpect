@@ -133,8 +133,8 @@ cpu/event=0xd3,umask=0x08,cmask=0x00,period=100007,name='MEM_LOAD_L3_MISS_RETIRE
 cpu/event=0xd3,umask=0x04,cmask=0x00,period=100007,name='MEM_LOAD_L3_MISS_RETIRED.REMOTE_HITM'/,
 cpu/event=0xb1,umask=0x10,cmask=0x00,period=2000003,name='UOPS_EXECUTED.X87'/,
 cpu/event=0xb1,umask=0x01,cmask=0x00,period=2000003,name='UOPS_EXECUTED.THREAD'/,
-cpu/event=0xc7,umask=0x02,umask=0x03,period=100003,name='FP_ARITH_INST_RETIRED.SCALAR_SINGLE:u0x03'/,
-cpu/event=0xc7,umask=0x04,umask=0xfc,period=100003,name='FP_ARITH_INST_RETIRED.128B_PACKED_DOUBLE:u0xfc'/,
+cpu/event=0xc7,umask=0x03,period=100003,name='FP_ARITH_INST_RETIRED.SCALAR_SINGLE:u0x03'/,
+cpu/event=0xc7,umask=0xfc,period=100003,name='FP_ARITH_INST_RETIRED.128B_PACKED_DOUBLE:u0xfc'/,
 cpu-cycles,
 ref-cycles,
 instructions;

@@ -8,7 +8,6 @@
 import collections
 import fnmatch
 import logging
-import math
 import os
 import re
 import struct
@@ -289,8 +288,7 @@ def get_cpuinfo():
 def get_lscpu():
     cpuinfo = {}
     try:
-        lscpu = subprocess.check_output(["lscpu"], universal_newlines=True)  # nosec
-        # print(lscpu.split("\n"))
+        lscpu = subprocess.check_output(["lscpu"]).decode()  # nosec
         lscpu = [i for i in lscpu.split("\n") if i]
         for prop in lscpu:
             key, value = prop.split(":")
@@ -304,9 +302,7 @@ def get_lscpu():
 # get supported perf events
 def get_perf_list():
     try:
-        perf_list = subprocess.check_output(  # nosec
-            ["perf", "list"], universal_newlines=True
-        )
+        perf_list = subprocess.check_output(["perf", "list"]).decode()  # nosec
     except FileNotFoundError:
         crash("Please install Linux perf and re-run")
     except subprocess.CalledProcessError as e:
@@ -395,22 +391,6 @@ def check_file_writeable(outfile):
     return os.access(dirname, os.W_OK)
 
 
-# Find the percentile of a list of values
-# parameter percent - a float value from 0.0 to 1.0
-def percentile(N, percent):
-    if not N:
-        return None
-    N.sort()
-    k = (len(N) - 1) * percent
-    f = math.floor(k)
-    c = math.ceil(k)
-    if f == c:
-        return N[int(k)]
-    d0 = N[int(f)] * (c - k)
-    d1 = N[int(c)] * (k - f)
-    return d0 + d1
-
-
 # convert time to epoch
 def get_epoch(start_time):
     words = "".join(start_time).split()
@@ -431,44 +411,67 @@ def get_epoch(start_time):
     return epoch
 
 
-# get cgroup names by container ids
-def get_cgroups_from_cids(cids):
-    # cgroups is a set to exclude duplicate cids
-    cgroups = set()
+# get cgroups
+def get_cgroups(cid):
+    cids = cid.split(",")
     try:
-        p = subprocess.Popen(
-            ["ps", "-e", "-o", "cgroup"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        p2 = subprocess.Popen(
-            ["grep", "docker-"],
-            stdin=p.stdout,
+        stat = subprocess.Popen(
+            ["stat", "-fc", "%T", "/sys/fs/cgroup/"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        p.stdout.close()
+    except subprocess.SubprocessError as e:
+        crash(
+            "Cannot determine cgroup version. failed to open stat subprocess: " + str(e)
+        )
+    out, err = stat.communicate()
+    out = out.decode("utf-8").strip()
+    if out == "tmpfs":
+        logging.info("cgroup v1 detected")
+    elif out == "cgroup2fs":
+        logging.info("cgroup v2 detected")
+    else:
+        logging.info("unknown cgroup version " + out)
 
+    try:
+        p = subprocess.Popen(
+            ["ps", "-a", "-x", "-o", "cgroup", "--sort=-%cpu"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
     except subprocess.SubprocessError as e:
         crash("failed to open ps subprocess: " + str(e))
-    out, err = p2.communicate()
+    out, err = p.communicate()
     if err:
         crash(f"error reading cgroups: {err}")
-    lines = out.decode("utf-8").split("\n")
-    for cid in cids:
-        found = False
-        for line in lines:
-            if ("docker-" + cid) in line:
-                found = True
-                cgroups.add(line.split(":")[-1])
-        if not found:
-            crash("invalid container ID: " + cid)
-    # change cgroups back to list brefore returning
-    return list(cgroups)
 
-
-# Convert cids to comm/names
-# Requires pstools python library
-def get_comm_from_cid(cids, cgroups):
-    cnamelist = ""
-    for index, cid in enumerate(cids):
-        cnamelist += cgroups[index] + "=" + cid + ","
-    return cnamelist
+    cgroups = [
+        *dict.fromkeys(
+            filter(
+                lambda x: (  # must be container runtime
+                    "docker" in x or "containerd" in x
+                )
+                and x.endswith(".scope")  # don't include services
+                and (  # select all or provided cids
+                    len(cids) == 0 or any(map(lambda y: y in x, cids))
+                ),
+                map(
+                    lambda x: x.split(":")[-1],  # get trailing cgroup name
+                    filter(  # remove extraneous lines
+                        lambda x: x != "" and x != "CGROUP" and x != "-",
+                        out.decode("utf-8").split("\n"),
+                    ),
+                ),
+            )
+        )
+    ]
+    if len(cgroups) == 0:
+        crash("no matching cgroups found")
+    elif len(cgroups) > 5:
+        logging.warning(
+            "more than 5 matching cgroups found removing: " + str(cgroups[5:])
+        )
+        cgroups = cgroups[:5]
+    for c in cgroups:
+        logging.info("attaching to cgroup: " + c)
+    return cgroups
