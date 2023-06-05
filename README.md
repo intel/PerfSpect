@@ -2,7 +2,7 @@
 
 [Quick Start](#quick-start-requires-perf-installed) | [Output](#output) | [Requirements](#requirements) | [Build from source](#build-from-source) | [Caveats](#caveats) | [How to contribute](#how-to-contribute)
 
-PerfSpect is a system performance characterization tool built on top of linux perf. It contains two parts
+PerfSpect is a system performance characterization tool built on top of linux perf. Most metrics and events come from [perfmon](https://github.com/intel/perfmon) and [TMA v4.5](https://www.intel.com/content/www/us/en/docs/vtune-profiler/cookbook/2023-1/top-down-microarchitecture-analysis-method.html). It contains two parts:
 
 perf-collect: Collects harware events
 
