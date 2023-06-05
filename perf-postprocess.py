@@ -584,7 +584,7 @@ def write_html(time_series_df, perf_mode, out_file_path):
         crash("Unknown application type")
 
     html = ""
-    with open(html_file, "r") as f_html:
+    with open(html_file, "r", encoding="utf-8") as f_html:
         html = f_html.read()
 
     # only show TMA if system-wide mode
@@ -618,7 +618,9 @@ def write_html(time_series_df, perf_mode, out_file_path):
         ]:
             html = html.replace(number[0], str(avg.loc[number[1], 0]))
 
-    with open(os.path.splitext(out_file_path)[0] + ".html", "w") as file:
+    with open(
+        os.path.splitext(out_file_path)[0] + ".html", "w", encoding="utf-8"
+    ) as file:
         file.write(html)
 
 
@@ -657,7 +659,7 @@ def generate_metrics(
     group_to_start_end_indexes = {}
     for time_slice, item in time_slice_groups:
         time_slice_float = float(time_slice)
-        if time_slice_float - prev_time_slice < 5:
+        if time_slice_float - prev_time_slice < 4.5:
             logging.warning("throwing out last sample because it was too short")
             continue
         time_slice_df = time_slice_groups.get_group(time_slice).copy()

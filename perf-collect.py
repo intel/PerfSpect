@@ -362,7 +362,7 @@ if __name__ == "__main__":
         start = time.time()
         subprocess.call(perfargs)  # nosec
         end = time.time()
-        if end - start < 5:
+        if end - start < 5.2:
             logging.warning(
                 "PerfSpect was run for less than 5 seconds, some events make be zero because they didn't get scheduled"
             )
