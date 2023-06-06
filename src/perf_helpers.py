@@ -269,19 +269,17 @@ def get_cpuinfo():
     cpuinfo = []
     temp_dict = {}
     try:
-        fo = open("/proc/cpuinfo", "r")
+        with open("/proc/cpuinfo", "r") as fo:
+            for line in fo:
+                try:
+                    key, value = list(map(str.strip, line.split(":", 1)))
+                except ValueError:
+                    cpuinfo.append(temp_dict)
+                    temp_dict = {}
+                else:
+                    temp_dict[key] = value
     except EnvironmentError as e:
         logging.warning(str(e), UserWarning)
-    else:
-        for line in fo:
-            try:
-                key, value = list(map(str.strip, line.split(":", 1)))
-            except ValueError:
-                cpuinfo.append(temp_dict)
-                temp_dict = {}
-            else:
-                temp_dict[key] = value
-        fo.close()
     return cpuinfo
 
 

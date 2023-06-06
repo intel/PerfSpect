@@ -129,6 +129,10 @@ def get_args(script_path):
 # for socket or thread: add rows for each 2nd hyper thread with same values as 1st thread
 def get_fixed_c6_residency_fields(perf_data_lines, perf_mode):
     # handle special case events: c6-residency
+    # if hyperthreading is disabled, no fixing is required
+    if meta_data["constants"]["HYPERTHREADING_ON"] == 0:
+        return perf_data_lines
+
     new_perf_data_lines = []
     if meta_data["constants"]["CONST_THREAD_COUNT"] == 2:
         for fields in perf_data_lines:
@@ -216,8 +220,11 @@ def get_all_data_lines(input_file_path):
                     fields = line.split(",")
                     perf_data_lines.append(fields)
 
-        infile.close()
-        return meta_data_lines, perf_events_lines, perf_data_lines
+    if len(perf_data_lines) == 0:
+        crash(
+            "perfstat.csv contains no perf event data, try collecting for a longer time"
+        )
+    return meta_data_lines, perf_events_lines, perf_data_lines
 
 
 # get_metadata
@@ -416,6 +423,7 @@ def get_socket_number(sockets_dict, core):
 
 
 def extract_dataframe(perf_data_lines, meta_data, perf_mode):
+    logging.info("Formatting event data")
     # parse event data into dataframe and set header names
     perf_data_df = pd.DataFrame(perf_data_lines)
     if "CGROUPS" in meta_data and meta_data["CGROUPS"] == "enabled":
@@ -657,10 +665,13 @@ def generate_metrics(
     }
     prev_time_slice = 0
     group_to_start_end_indexes = {}
+    logging.info("processing " + str(time_slice_groups.ngroups) + " samples")
     for time_slice, item in time_slice_groups:
         time_slice_float = float(time_slice)
         if time_slice_float - prev_time_slice < 4.5:
             logging.warning("throwing out last sample because it was too short")
+            if time_slice_groups.ngroups == 1:
+                crash("no remaining samples")
             continue
         time_slice_df = time_slice_groups.get_group(time_slice).copy()
         # normalize by difference between current time slice and previous time slice
