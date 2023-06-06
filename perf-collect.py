@@ -93,19 +93,14 @@ def write_metadata(
                 cg_path_found = False
                 for path in cgroup_paths:
                     try:
-                        cpu_set_file = open(path, "r")
-                        cg_path_found = True
-                        # no need to check other paths
-                        break
+                        with open(path, "r") as cpu_set_file:
+                            cg_path_found = True
+                            cpu_set = cpu_set_file.read()
+                            cpu_set = cpu_set.strip()
+                            cpu_set = cpu_set.replace(",", "+")
+                            break
                     except FileNotFoundError:
-                        # check next path
                         continue
-
-                if cg_path_found:
-                    cpu_set = cpu_set_file.read()
-                    cpu_set_file.close()
-                    cpu_set = cpu_set.strip()
-                    cpu_set = cpu_set.replace(",", "+")
 
                 if not cg_path_found or cpu_set == "":
                     # A missing path or an empty cpu-set in v2 indicates that the container is running on all CPUs
@@ -284,6 +279,18 @@ if __name__ == "__main__":
     else:
         crash("Unknown application type")
 
+    events, collection_events = prep_events.prepare_perf_events(
+        eventfile,
+        (
+            args.pid is not None
+            or args.cid is not None
+            or args.thread
+            or args.socket
+            or not have_uncore
+        ),
+        args.pid is not None or args.cid is not None,
+    )
+
     if not perf_helpers.validate_outfile(args.outcsv):
         crash(
             "Output filename not accepted. Filename should be a .csv without special characters"
@@ -299,7 +306,6 @@ if __name__ == "__main__":
         cgroups = perf_helpers.get_cgroups(args.cid)
 
     # get perf events to collect
-    collection_events = []
     sys_devs = perf_helpers.get_sys_devices()
     if (
         "uncore_cha" not in sys_devs
@@ -318,20 +324,23 @@ if __name__ == "__main__":
             logging.warning(
                 "Due to lack of vPMU support, TMA L1 & L2 events will not be collected"
             )
-    events, collection_events = prep_events.prepare_perf_events(
-        eventfile,
-        (
-            args.pid is not None
-            or args.cid is not None
-            or args.thread
-            or args.socket
-            or not have_uncore
-        ),
-        args.pid is not None or args.cid is not None,
-    )
 
     if args.thread or args.socket or args.pid is not None or args.cid is not None:
         logging.info("Not collecting uncore events in this run mode")
+
+    # log some metadata
+    logging.info("Architecture: " + arch)
+    logging.info("Model: " + cpuname)
+    logging.info("Kernel version: " + perf_helpers.get_version())
+    logging.info("Cores per socket: " + str(perf_helpers.get_cpu_count()))
+    logging.info("Socket: " + str(perf_helpers.get_socket_count()))
+    logging.info("Hyperthreading on: " + str(perf_helpers.get_ht_status()))
+    imc, upi = perf_helpers.get_imc_upi_count()
+    logging.info("IMC count: " + str(imc))
+    logging.info("CHA per socket: " + str(perf_helpers.get_cha_count()))
+    logging.info("UPI count: " + str(upi))
+    logging.info("PerfSpect version: " + perf_helpers.get_tool_version())
+    logging.info("/sys/devices/: " + str(sys_devs))
 
     # build perf stat command
     collection_type = "-a" if not args.thread and not args.socket else "-a -A"
@@ -358,13 +367,12 @@ if __name__ == "__main__":
     if args.verbose:
         logging.info(cmd)
     try:
-        logging.info("Collecting perf stat for events in : %s" % eventfilename)
         start = time.time()
         subprocess.call(perfargs)  # nosec
         end = time.time()
-        if end - start < 5.2:
+        if end - start < 7:
             logging.warning(
-                "PerfSpect was run for less than 5 seconds, some events make be zero because they didn't get scheduled"
+                "PerfSpect was run for a short duration, some events might be zero or blank because they never got scheduled"
             )
         logging.info("Collection complete! Calculating TSC frequency now")
     except KeyboardInterrupt:

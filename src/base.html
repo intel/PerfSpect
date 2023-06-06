@@ -167,7 +167,7 @@
         series: [
           {
             type: 'line',
-            data: CPUUTIL.map((e, i) => [i, e]),
+            data: CPUUTIL.map((e, i) => [i * 5, e]),
           }
         ]
       }
@@ -177,7 +177,7 @@
         series: [
           {
             type: 'line',
-            data: CPIDATA.map((e, i) => [i, e]),
+            data: CPIDATA.map((e, i) => [i * 5, e]),
           }
         ]
       }
@@ -187,7 +187,7 @@
         series: [
           {
             type: 'line',
-            data: CPUFREQ.map((e, i) => [i, e]),
+            data: CPUFREQ.map((e, i) => [i * 5, e]),
           }
         ]
       }
@@ -197,7 +197,7 @@
         series: [
           {
             type: 'line',
-            data: REMOTENUMA.map((e, i) => [i, e]),
+            data: REMOTENUMA.map((e, i) => [i * 5, e]),
           }
         ]
       }
@@ -208,17 +208,17 @@
           {
             name: "L1D",
             type: 'line',
-            data: L1DATA.map((e, i) => [i, e]),
+            data: L1DATA.map((e, i) => [i * 5, e]),
           },
           {
             name: "L2",
             type: 'line',
-            data: L2DATA.map((e, i) => [i, e]),
+            data: L2DATA.map((e, i) => [i * 5, e]),
           },
           {
             name: "LLC Data",
             type: 'line',
-            data: LLCDATA.map((e, i) => [i, e]),
+            data: LLCDATA.map((e, i) => [i * 5, e]),
           },
         ]
       }
@@ -229,17 +229,17 @@
           {
             name: "Read",
             type: 'line',
-            data: READDATA.map((e, i) => [i, e]),
+            data: READDATA.map((e, i) => [i * 5, e]),
           },
           {
             name: "Write",
             type: 'line',
-            data: WRITEDATA.map((e, i) => [i, e]),
+            data: WRITEDATA.map((e, i) => [i * 5, e]),
           },
           {
             name: "Total",
             type: 'line',
-            data: TOTALDATA.map((e, i) => [i, e]),
+            data: TOTALDATA.map((e, i) => [i * 5, e]),
           },
         ]
       }
@@ -249,7 +249,7 @@
         series: [
           {
             type: 'line',
-            data: PKGPOWER.map((e, i) => [i, e]),
+            data: PKGPOWER.map((e, i) => [i * 5, e]),
           }
         ]
       }
@@ -259,7 +259,7 @@
         series: [
           {
             type: 'line',
-            data: DRAMPOWER.map((e, i) => [i, e]),
+            data: DRAMPOWER.map((e, i) => [i * 5, e]),
           }
         ]
       }

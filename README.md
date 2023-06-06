@@ -4,7 +4,7 @@
 
 PerfSpect is a system performance characterization tool built on top of linux perf. Most metrics and events come from [perfmon](https://github.com/intel/perfmon) and [TMA v4.5](https://www.intel.com/content/www/us/en/docs/vtune-profiler/cookbook/2023-1/top-down-microarchitecture-analysis-method.html). It contains two parts:
 
-perf-collect: Collects harware events
+perf-collect: Collects harware events at a 5 second output interval with practically zero overhead since PMU's run in counting  mode.
 
 - Collection mode:
   - `sudo ./perf-collect` _default system wide_
