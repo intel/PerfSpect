@@ -276,6 +276,7 @@
               variant="scrollable"
             >
               <Tab label="TMA" />
+              <Tab label="PSI" />
               <Tab label="CPU" />
               <Tab label="Memory" />
               <Tab label="Power" />
@@ -384,6 +385,84 @@
               <Grid container>
                 <Grid item xs={5}>
                   <Typography variant="h2">
+                    Pressure Stall Information (PSI)
+                  </Typography>
+                  <Typography variant="body1">
+                    Your workload spent an average of {(PSI_MEM + PSI_CPU + PSI_IO) / 50000}% of time stalled waiting on a hardware resource.
+                  </Typography>
+                  <ul>
+                    <li>
+                      <Typography variant="body1">
+                        Stall is the amount of time in (in microseconds) that any task was waiting on a given resource.
+                      </Typography>
+                    </li>
+                    <li>
+                      <Typography variant="body1">
+                        When CPU, memory or IO devices are contended, workloads experience latency spikes, throughput losses, and run the risk of OOM kills.
+                      </Typography>
+                    </li>
+                    <li>
+                      <Typography variant="body1">
+                        Low or zero PSI means you are paying for capacity you don't use. You might be able to downsize your server.
+                      </Typography>
+                    </li>
+                    <li>
+                      <Typography variant="body1">
+                        High PSI means you should optimize your code or upgrade your server in whichever category is the largest.
+                      </Typography>
+                    </li>
+                    <li>
+                      <a href="https://docs.kernel.org/accounting/psi.html">
+                        Learn more here
+                      </a>
+                    </li>
+                  </ul>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "400px" }} option={{
+                    tooltip: {},
+                    series: {
+                      nodeClick: false,
+                      type: "sunburst",
+                      radius: [60, "90%"],
+                      itemStyle: {
+                        borderRadius: 7,
+                        borderWidth: 2,
+                      },
+                      data: [
+                        {
+                          name: "CPU stall",
+                          value: PSI_CPU,
+                        },
+                        {
+                          name: "Memory stall",
+                          value: PSI_MEM,
+                        },
+                        {
+                          name: "IO stall",
+                          value: PSI_IO,
+                        },
+                        {
+                          name: "Not stalled",
+                          value: 5000000 - (PSI_MEM + PSI_CPU + PSI_IO),
+                        },
+                      ],
+                      radius: [20, "100%"],
+                      label: {
+                        rotate: "radial",
+                      },
+                    },
+                  }} />
+                </Grid>
+              </Grid>
+            </TabPanel>
+            <TabPanel
+              value={systemTabs}
+              index={2}
+            >
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
                     CPU utilization
                   </Typography>
                   <Typography variant="body1">
@@ -423,7 +502,7 @@
             </TabPanel>
             <TabPanel
               value={systemTabs}
-              index={2}
+              index={3}
             >
               <Grid container>
                 <Grid item xs={5}>
@@ -467,7 +546,7 @@
             </TabPanel>
             <TabPanel
               value={systemTabs}
-              index={3}
+              index={4}
             >
               <Grid container>
                 <Grid item xs={5}>

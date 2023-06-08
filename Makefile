@@ -10,7 +10,7 @@ BINARY_COLLECT := perf-collect
 BINARY_POSTPROCESS := perf-postprocess
 default: dist
 
-.PHONY: test default dist format format_check style_error_check check dist/version_file dist/$(SOURCE_PACKAGE)
+.PHONY: test default dist format format_check style_error_check pytype check dist/version_file dist/$(SOURCE_PACKAGE)
 
 clean_dir:
 	rm -rf build/*
@@ -78,6 +78,9 @@ style_error_check:
 	# ignore long lines and conflicts with black, i.e., black wins
 	flake8 *.py src --ignore=E501,W503,E203
 
-check: format_check style_error_check
+pytype: *.py src/*.py
+	pytype ./*.py
+
+check: format_check style_error_check pytype
 
 dist: check dist/$(PACKAGE_EXTERNAL) 

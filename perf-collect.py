@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ###########################################################################################################
 
+import json
 import logging
 import os
 import platform
@@ -39,7 +40,7 @@ def write_metadata(
     muxinterval,
     thread,
     socket,
-    metadata_only=False,
+    psi,
 ):
     tsc_freq = str(perf_helpers.get_tsc_freq())
     data = ""
@@ -47,11 +48,6 @@ def write_metadata(
     validate_file(outcsv)
     with open(outcsv, "r") as original:
         time_stamp = original.readline()
-        if metadata_only and time_stamp.startswith("### META DATA ###"):
-            logging.warning(
-                "Not prepending metadata, already present in %s " % (outcsv)
-            )
-            return
         data = original.read()
     with open(outcsv, "w") as modified:
         modified.write("### META DATA ###,\n")
@@ -120,6 +116,7 @@ def write_metadata(
         modified.write("cpusets" + cpusets + ",\n")
         modified.write("Percore mode," + threadmode + ",\n")
         modified.write("Persocket mode," + socketmode + ",\n")
+        modified.write("PSI," + json.dumps(psi) + "\n")
         modified.write("PerfSpect version," + perf_helpers.get_tool_version() + ",\n")
         modified.write("### PERF EVENTS ###" + ",\n")
         for e in collection_events:
@@ -135,6 +132,30 @@ def write_metadata(
                 time_stamp.rstrip() + " " + zone[0] + " EPOCH " + epoch + "\n"
             )
         modified.write(data)
+
+
+def get_psi():
+    psi = []
+    for resource in ["cpu", "memory", "io"]:
+        with open("/proc/pressure/" + resource) as f:
+            psi.append(f.readline().split()[4].split("=")[1])
+    return psi
+
+
+def supports_psi():
+    psi = []
+    for resource in ["cpu", "memory", "io"]:
+        try:
+            with open("/proc/pressure/" + resource) as _:
+                psi.append(resource)
+        except Exception:
+            pass
+    if len(psi) == 3:
+        logging.info("PSI metrics supported")
+        return True
+    else:
+        logging.info("PSI metrics not supported")
+        return False
 
 
 def resource_path(relative_path):
@@ -229,17 +250,21 @@ if __name__ == "__main__":
     nmi_watchdog = perf_helpers.disable_nmi_watchdog()
     initial_pmus = perf_helpers.pmu_contention_detect()
     interval = 5000
+    collect_psi = False
 
     if args.thread:
         logging.info("Run mode: thread")
+        collect_psi = supports_psi()
     elif args.socket:
         logging.info("Run mode: socket")
+        collect_psi = supports_psi()
     elif args.pid is not None:
         logging.info("Run mode: pid")
     elif args.cid is not None:
         logging.info("Run mode: cid")
     else:
         logging.info("Run mode: system")
+        collect_psi = supports_psi()
 
     if args.muxinterval > 1000:
         crash("Input argument muxinterval is too large, max is [1s or 1000ms]")
@@ -279,6 +304,25 @@ if __name__ == "__main__":
     else:
         crash("Unknown application type")
 
+    # get perf events to collect
+    sys_devs = perf_helpers.get_sys_devices()
+    if (
+        "uncore_cha" not in sys_devs
+        and "uncore_cbox" not in sys_devs
+        and "uncore_upi" not in sys_devs
+        and "uncore_qpi" not in sys_devs
+        and "uncore_imc" not in sys_devs
+    ):
+        logging.info("disabling uncore (possibly in a vm?)")
+        have_uncore = False
+        if arch == "icelake":
+            logging.warning(
+                "Due to lack of vPMU support, TMA L1 events will not be collected"
+            )
+        if arch == "sapphirerapids" or arch == "emeraldrapids":
+            logging.warning(
+                "Due to lack of vPMU support, TMA L1 & L2 events will not be collected"
+            )
     events, collection_events = prep_events.prepare_perf_events(
         eventfile,
         (
@@ -304,26 +348,6 @@ if __name__ == "__main__":
     cgroups = []
     if args.cid is not None:
         cgroups = perf_helpers.get_cgroups(args.cid)
-
-    # get perf events to collect
-    sys_devs = perf_helpers.get_sys_devices()
-    if (
-        "uncore_cha" not in sys_devs
-        and "uncore_cbox" not in sys_devs
-        and "uncore_upi" not in sys_devs
-        and "uncore_qpi" not in sys_devs
-        and "uncore_imc" not in sys_devs
-    ):
-        logging.info("disabling uncore (possibly in a vm?)")
-        have_uncore = False
-        if arch == "icelake":
-            logging.warning(
-                "Due to lack of vPMU support, TMA L1 events will not be collected"
-            )
-        if arch == "sapphirerapids" or arch == "emeraldrapids":
-            logging.warning(
-                "Due to lack of vPMU support, TMA L1 & L2 events will not be collected"
-            )
 
     if args.thread or args.socket or args.pid is not None or args.cid is not None:
         logging.info("Not collecting uncore events in this run mode")
@@ -367,20 +391,33 @@ if __name__ == "__main__":
     if args.verbose:
         logging.info(cmd)
     try:
+        psi = []
         start = time.time()
-        subprocess.call(perfargs)  # nosec
+        perf = subprocess.Popen(perfargs)  # nosec
+        while perf.poll() is None:
+            if collect_psi:
+                psi.append(get_psi())
+            time.sleep(interval / 1000)
         end = time.time()
         if end - start < 7:
             logging.warning(
                 "PerfSpect was run for a short duration, some events might be zero or blank because they never got scheduled"
             )
-        logging.info("Collection complete! Calculating TSC frequency now")
+
+    except subprocess.SubprocessError as e:
+        perf.kill()
+        crash("Failed to start perf\n" + str(e))
     except KeyboardInterrupt:
-        logging.info("Collection stopped! Caculating TSC frequency now")
-    except Exception:
-        crash("perf encountered errors")
+        perf.kill()
+    except Exception as e:
+        perf.kill()
+        crash(str(e) + "\nperf encountered errors")
+
+    logging.info("Collection complete!")
 
     cpuid_info = perf_helpers.get_cpuid_info(procinfo)
+    if collect_psi:
+        psi.append(get_psi())
     write_metadata(
         args.outcsv,
         collection_events,
@@ -390,7 +427,7 @@ if __name__ == "__main__":
         args.muxinterval,
         args.thread,
         args.socket,
-        False,
+        list(map(list, zip(*psi))),
     )
 
     os.chmod(args.outcsv, 0o666)  # nosec

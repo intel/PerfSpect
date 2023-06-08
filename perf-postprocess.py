@@ -309,6 +309,8 @@ def get_metadata_as_dict(meta_data_lines):
                 meta_data["SOCKET_CORES"] = []
             cores = ((line.split("\n")[0]).split(",")[1]).split(";")[:-1]
             meta_data["SOCKET_CORES"].append(cores)
+        elif line.startswith("PSI"):
+            meta_data["PSI"] = json.loads(line.split("PSI,")[1])
     return meta_data
 
 
@@ -623,8 +625,14 @@ def write_html(time_series_df, perf_mode, out_file_path):
             ["MEMORY", "metric_TMA_..Memory_Bound(%)"],
             ["BADSPECULATION", "metric_TMA_Bad_Speculation(%)"],
             ["RETIRING", "metric_TMA_Retiring(%)"],
+            ["PSI_CPU", "cpu stall (us)"],
+            ["PSI_MEM", "memory stall (us)"],
+            ["PSI_IO", "io stall (us)"],
         ]:
-            html = html.replace(number[0], str(avg.loc[number[1], 0]))
+            try:
+                html = html.replace(number[0], str(avg.loc[number[1], 0]))
+            except Exception:
+                html = html.replace(number[0], "0")
 
     with open(
         os.path.splitext(out_file_path)[0] + ".html", "w", encoding="utf-8"
@@ -827,6 +835,23 @@ def generate_metrics(
         len(errors["MISSING EVENTS"]) > 0 or len(errors["ZERO DIVISION"]) > 0
     ):
         crash("Failing due to postprocessing errors")
+
+    # add psi
+    if len(meta_data["PSI"]) > 0 and perf_mode == Mode.System:
+        psi_len = range(len(time_series_df.columns))
+        time_series_df.loc["cpu stall (us)"] = [
+            int(meta_data["PSI"][0][x + 1]) - int(meta_data["PSI"][0][x])
+            for x in psi_len
+        ]
+        time_series_df.loc["memory stall (us)"] = [
+            int(meta_data["PSI"][1][x + 1]) - int(meta_data["PSI"][1][x])
+            for x in psi_len
+        ]
+        time_series_df.loc["io stall (us)"] = [
+            int(meta_data["PSI"][2][x + 1]) - int(meta_data["PSI"][2][x])
+            for x in psi_len
+        ]
+
     generate_metrics_time_series(time_series_df, perf_mode, out_file_path)
     generate_metrics_averages(time_series_df, perf_mode, out_file_path)
     if perf_mode == Mode.System:
