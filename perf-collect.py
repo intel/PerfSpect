@@ -405,12 +405,12 @@ if __name__ == "__main__":
             )
 
     except subprocess.SubprocessError as e:
-        perf.kill()
+        perf.kill()  # type: ignore
         crash("Failed to start perf\n" + str(e))
     except KeyboardInterrupt:
-        perf.kill()
+        perf.kill()  # type: ignore
     except Exception as e:
-        perf.kill()
+        perf.kill()  # type: ignore
         crash(str(e) + "\nperf encountered errors")
 
     logging.info("Collection complete!")
