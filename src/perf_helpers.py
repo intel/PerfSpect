@@ -167,8 +167,10 @@ def disable_nmi_watchdog():
         else:
             logging.info("nmi_watchdog disabled!")
         return nmi_watchdog_status
-    except (subprocess.CalledProcessError, ValueError) as e:
+    except subprocess.CalledProcessError as e:
         crash(e.output + "\nFailed to disable nmi_watchdog.")
+    except ValueError as e:
+        crash(f"Failed to disable watchdog: {e}")
 
 
 # enable nmi watchdog
@@ -182,8 +184,10 @@ def enable_nmi_watchdog():
             logging.warning("Failed to re-enable nmi_watchdog!")
         else:
             logging.info("nmi_watchdog enabled!")
-    except (subprocess.CalledProcessError, ValueError) as e:
+    except subprocess.CalledProcessError as e:
         logging.warning(e.output + "\nFailed to re-enable nmi_watchdog!")
+    except ValueError as e:
+        logging.warning(f"Failed to re-enable nmi_watchdog: {e}")
 
 
 # set/reset perf event mux interval for pmu events
