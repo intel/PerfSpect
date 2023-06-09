@@ -364,7 +364,8 @@ if __name__ == "__main__":
     logging.info("CHA per socket: " + str(perf_helpers.get_cha_count()))
     logging.info("UPI count: " + str(upi))
     logging.info("PerfSpect version: " + perf_helpers.get_tool_version())
-    logging.info("/sys/devices/: " + str(sys_devs))
+    if args.verbose:
+        logging.info("/sys/devices/: " + str(sys_devs))
 
     # build perf stat command
     collection_type = "-a" if not args.thread and not args.socket else "-a -A"
@@ -390,29 +391,26 @@ if __name__ == "__main__":
     perf_helpers.pmu_contention_detect(msrs=initial_pmus, detect=True)
     if args.verbose:
         logging.info(cmd)
+    psi = []
+    start = time.time()
     try:
-        psi = []
-        start = time.time()
         perf = subprocess.Popen(perfargs)  # nosec
-        while perf.poll() is None:
-            if collect_psi:
-                psi.append(get_psi())
-            time.sleep(interval / 1000)
-        end = time.time()
-        if end - start < 7:
-            logging.warning(
-                "PerfSpect was run for a short duration, some events might be zero or blank because they never got scheduled"
-            )
-
-    except subprocess.SubprocessError as e:
-        perf.kill()  # type: ignore
-        crash("Failed to start perf\n" + str(e))
+        try:
+            while perf.poll() is None:
+                if collect_psi:
+                    psi.append(get_psi())
+                time.sleep(interval / 1000)
+        except KeyboardInterrupt:
+            perf.kill()
     except KeyboardInterrupt:
-        perf.kill()  # type: ignore
-    except Exception as e:
-        perf.kill()  # type: ignore
-        crash(str(e) + "\nperf encountered errors")
-
+        logging.info("Perfspect was interrupted by the user.")
+    except subprocess.SubprocessError as e:
+        crash("Failed to start perf\n" + str(e))
+    end = time.time()
+    if end - start < 7:
+        logging.warning(
+            "PerfSpect was run for a short duration, some events might be zero or blank because they never got scheduled"
+        )
     logging.info("Collection complete!")
 
     cpuid_info = perf_helpers.get_cpuid_info(procinfo)

@@ -37,7 +37,10 @@
       Tab,
       Dialog,
       Alert,
+      Snackbar,
+      Link,
       Tabs,
+      Icon,
     } = MaterialUI;
 
     // Create a theme instance.
@@ -143,12 +146,17 @@
     function App() {
       const [systemTabs, setSystemTabs] = React.useState(0);
       const [open, setOpen] = React.useState(true);
+      const [openlink, setOpenlink] = React.useState(false);
 
       const handleChange = (event, newSystemTabs) => {
         setSystemTabs(newSystemTabs);
       };
       const handleClose = () => {
         setOpen(false)
+        setOpenlink(true)
+      };
+      const handleCloselink = () => {
+        setOpenlink(false)
       };
 
       const base_line = {
@@ -270,6 +278,11 @@
             <Alert severity="info">For the full list of metrics please see the csv output files. This contains explanations of a few key metrics to help get you started.</Alert>
           </Dialog>
           <Box display="flex" justifyContent="center" width="100%" sx={{ zIndex: 10, borderBottom: 1, borderColor: "divider", position: 'fixed', bgcolor: 'background.paper' }}>
+            <Snackbar open={openlink}>
+              <Alert onClose={handleCloselink} severity="info" sx={{ width: '100%' }} iconMapping={{ info: <Icon>star</Icon> }}>
+                If you like PerfSpect, give it a star on <Link href="https://github.com/intel/PerfSpect">GitHub</Link>
+              </Alert>
+            </Snackbar>
             <Tabs
               value={systemTabs}
               onChange={handleChange}
@@ -388,12 +401,12 @@
                     Pressure Stall Information (PSI)
                   </Typography>
                   <Typography variant="body1">
-                    Your workload spent an average of {(PSI_MEM + PSI_CPU + PSI_IO) / 50000}% of time stalled waiting on a hardware resource.
+                    Your workload spent an average of {PSI_MEM + PSI_CPU + PSI_IO}% of time stalled waiting on a hardware resource.
                   </Typography>
                   <ul>
                     <li>
                       <Typography variant="body1">
-                        Stall is the amount of time in (in microseconds) that any task was waiting on a given resource.
+                        Stall is the amount of time that any task was waiting on a given resource.
                       </Typography>
                     </li>
                     <li>
@@ -433,18 +446,30 @@
                         {
                           name: "CPU stall",
                           value: PSI_CPU,
+                          itemStyle: {
+                            color: "#ee6666"
+                          }
                         },
                         {
                           name: "Memory stall",
                           value: PSI_MEM,
+                          itemStyle: {
+                            color: "#fac858"
+                          }
                         },
                         {
                           name: "IO stall",
                           value: PSI_IO,
+                          itemStyle: {
+                            color: "#73c0de"
+                          }
                         },
                         {
                           name: "Not stalled",
-                          value: 5000000 - (PSI_MEM + PSI_CPU + PSI_IO),
+                          value: 100 - (PSI_MEM + PSI_CPU + PSI_IO),
+                          itemStyle: {
+                            color: "#91cc75"
+                          }
                         },
                       ],
                       radius: [20, "100%"],

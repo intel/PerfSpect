@@ -625,9 +625,9 @@ def write_html(time_series_df, perf_mode, out_file_path):
             ["MEMORY", "metric_TMA_..Memory_Bound(%)"],
             ["BADSPECULATION", "metric_TMA_Bad_Speculation(%)"],
             ["RETIRING", "metric_TMA_Retiring(%)"],
-            ["PSI_CPU", "cpu stall (us)"],
-            ["PSI_MEM", "memory stall (us)"],
-            ["PSI_IO", "io stall (us)"],
+            ["PSI_CPU", "cpu stall %"],
+            ["PSI_MEM", "memory stall %"],
+            ["PSI_IO", "io stall %"],
         ]:
             try:
                 html = html.replace(number[0], str(avg.loc[number[1], 0]))
@@ -839,16 +839,16 @@ def generate_metrics(
     # add psi
     if len(meta_data["PSI"]) > 0 and perf_mode == Mode.System:
         psi_len = range(len(time_series_df.columns))
-        time_series_df.loc["cpu stall (us)"] = [
-            int(meta_data["PSI"][0][x + 1]) - int(meta_data["PSI"][0][x])
+        time_series_df.loc["cpu stall %"] = [
+            (int(meta_data["PSI"][0][x + 1]) - int(meta_data["PSI"][0][x])) / 50000
             for x in psi_len
         ]
-        time_series_df.loc["memory stall (us)"] = [
-            int(meta_data["PSI"][1][x + 1]) - int(meta_data["PSI"][1][x])
+        time_series_df.loc["memory stall %"] = [
+            (int(meta_data["PSI"][1][x + 1]) - int(meta_data["PSI"][1][x])) / 50000
             for x in psi_len
         ]
-        time_series_df.loc["io stall (us)"] = [
-            int(meta_data["PSI"][2][x + 1]) - int(meta_data["PSI"][2][x])
+        time_series_df.loc["io stall %"] = [
+            (int(meta_data["PSI"][2][x + 1]) - int(meta_data["PSI"][2][x])) / 50000
             for x in psi_len
         ]
 
