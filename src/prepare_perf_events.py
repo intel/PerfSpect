@@ -113,7 +113,7 @@ def get_cgroup_events_format(cgroups, events, num_events):
     return perf_format
 
 
-def filter_events(event_file, cpu_only, PID_CID_mode):
+def filter_events(event_file, cpu_only, PID_CID_mode, TMA_supported):
     if not os.path.isfile(event_file):
         crash("event file not found")
     collection_events = []
@@ -129,6 +129,10 @@ def filter_events(event_file, cpu_only, PID_CID_mode):
             ):
                 continue
             if PID_CID_mode and line.startswith("cstate_"):
+                continue
+            if not TMA_supported and (
+                "name='TOPDOWN.SLOTS'" in line or "name='PERF_METRICS." in line
+            ):
                 continue
             if not is_collectable_event(line, perf_list):
                 # not a collectable event
@@ -148,7 +152,7 @@ def filter_events(event_file, cpu_only, PID_CID_mode):
     return collection_events, unsupported_events
 
 
-def prepare_perf_events(event_file, cpu_only, PID_CID_mode):
+def prepare_perf_events(event_file, cpu_only, PID_CID_mode, TMA_supported):
     start_group = "'{"
     end_group = "}'"
     group = ""
@@ -156,7 +160,7 @@ def prepare_perf_events(event_file, cpu_only, PID_CID_mode):
     new_group = True
 
     collection_events, unsupported_events = filter_events(
-        event_file, cpu_only, PID_CID_mode
+        event_file, cpu_only, PID_CID_mode, TMA_supported
     )
     core_event = []
     uncore_event = []
@@ -196,7 +200,7 @@ def prepare_perf_events(event_file, cpu_only, PID_CID_mode):
     group = group[:-1]
     if len(event_names) == 0:
         crash("No supported events found on this platform.")
-    # being conservative not letting the collection to proceed if fixed counters aren't suported on the platform
+    # being conservative not letting the collection to proceed if fixed counters aren't supported on the platform
     if len(unsupported_events) >= len(core_event):
         crash(
             "Most core counters aren't supported on this platform, unable to collect PMUs"

@@ -142,6 +142,7 @@ instructions;
 cpu/event=0xd1,umask=0x80,cmask=0x00,period=100003,name='MEM_LOAD_RETIRED.LOCAL_PMM'/,
 cpu/event=0xd3,umask=0x10,cmask=0x00,period=100007,name='MEM_LOAD_L3_MISS_RETIRED.REMOTE_PMM'/,
 cpu/event=0xa3,umask=0x06,cmask=0x06,period=1000003,name='CYCLE_ACTIVITY.STALLS_L3_MISS'/,
+cpu/event=0xa3,umask=0x0c,cmask=0x0c,period=1000003,name='CYCLE_ACTIVITY.STALLS_L1D_MISS'/,
 cpu-cycles,
 ref-cycles,
 instructions;
@@ -160,7 +161,8 @@ instructions:k;
 
 cpu/event=0x60,umask=0x04,cmask=0x01,period=1000003,name='OFFCORE_REQUESTS_OUTSTANDING.CYCLES_WITH_DEMAND_RFO'/,
 cpu/event=0xb7,umask=0x01,cmask=0x00,offcore_rsp=0x10003C0002,name='OCR.DEMAND_RFO.L3_HIT.SNOOP_HITM'/,
-cpu/event=0xa3,umask=0x0c,cmask=0x0c,period=1000003,name='CYCLE_ACTIVITY.STALLS_L1D_MISS'/,
+cpu/event=0x79,umask=0x08,cmask=0x00,period=2000003,name='IDQ.DSB_UOPS'/,
+cpu/event=0xa8,umask=0x01,cmask=0x00,period=2000003,name='LSD.UOPS'/,
 cpu-cycles,
 ref-cycles,
 instructions;

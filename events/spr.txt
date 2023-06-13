@@ -133,6 +133,14 @@ cpu-cycles,
 ref-cycles,
 instructions;
 
+cpu/event=0x79,umask=0x08,cmask=0x00,period=2000003,name='IDQ.DSB_UOPS'/,
+cpu/event=0x79,umask=0x04,period=100003,name='IDQ.MITE_UOPS'/,
+cpu/event=0x79,umask=0x20,period=100003,name='IDQ.MS_UOPS'/,
+cpu/event=0xa8,umask=0x01,cmask=0x00,period=2000003,name='LSD.UOPS'/,
+cpu-cycles,
+ref-cycles,
+instructions;
+
 cpu/event=0xd3,umask=0x08,cmask=0x00,period=100007,name='MEM_LOAD_L3_MISS_RETIRED.REMOTE_FWD'/,
 cpu/event=0xd3,umask=0x04,cmask=0x00,period=100007,name='MEM_LOAD_L3_MISS_RETIRED.REMOTE_HITM'/,
 cpu/event=0x2a,umask=0x01,offcore_rsp=0x1030004477,name='OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HITM'/,

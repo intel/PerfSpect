@@ -132,6 +132,14 @@ cpu-cycles:k,
 ref-cycles:k,
 instructions:k;
 
+cpu/event=0xd0,umask=0x21,cmask=0x00,period=100007,name='MEM_INST_RETIRED.LOCK_LOADS'/,
+cpu/event=0x79,umask=0x08,cmask=0x00,period=2000003,name='IDQ.DSB_UOPS'/,
+cpu/event=0x79,umask=0x04,cmask=0x00,period=2000003,name='IDQ.MITE_UOPS'/,
+cpu/event=0xa8,umask=0x01,cmask=0x00,period=2000003,name='LSD.UOPS'/,
+cpu-cycles,
+ref-cycles,
+instructions;
+
 #C6
 cstate_core/c6-residency/;
 cstate_pkg/c6-residency/;
@@ -145,7 +153,7 @@ cbox/event=0x35,umask=0x3,filter_opc=0x180,name='UNC_C_TOR_INSERTS.MISS_OPCODE.0
 cbox/event=0x35,umask=0x3,filter_opc=0x181,name='UNC_C_TOR_INSERTS.MISS_OPCODE.0x181'/;
 cbox/event=0x35,umask=0x3,filter_opc=0x182,name='UNC_C_TOR_INSERTS.MISS_OPCODE.0x182'/;
 cbox/event=0x35,umask=0x3,filter_opc=0x190,name='UNC_C_TOR_INSERTS.MISS_OPCODE.0x190'/;
-cbox/event=0x35,umask=0x3,filter_opc=0x191,name='UNC_C_TOR_INSERTS.MISS_OPCODE.0x191'/,
+cbox/event=0x35,umask=0x3,filter_opc=0x191,name='UNC_C_TOR_INSERTS.MISS_OPCODE.0x191'/;
 cbox/event=0x35,umask=0x3,filter_opc=0x192,name='UNC_C_TOR_INSERTS.MISS_OPCODE.0x192'/;
 cbox/event=0x35,umask=0x3,filter_opc=0x180,tid_en=1,filter_tid=0x3e,name='UNC_C_TOR_INSERTS.MISS_OPCODE.tid.0x180'/;
 cbox/event=0x36,umask=0x3,filter_opc=0x182,name='UNC_C_TOR_OCCUPANCY.MISS_OPCODE.0x182'/;
