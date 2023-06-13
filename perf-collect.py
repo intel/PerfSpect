@@ -38,7 +38,7 @@ def write_metadata(
     cpuname,
     cpuid_info,
     muxinterval,
-    thread,
+    cpu,
     socket,
     psi,
 ):
@@ -69,7 +69,7 @@ def write_metadata(
                 modified.write(str(c) + ";")
             modified.write("\n")
         modified.write("Perf event mux Interval ms," + str(muxinterval) + ",\n")
-        threadmode = "enabled" if thread else "disabled"
+        cpumode = "enabled" if cpu else "disabled"
         socketmode = "enabled" if socket else "disabled"
         if args.cid is not None:
             cgname = "enabled,"
@@ -114,7 +114,7 @@ def write_metadata(
             cpusets = ",disabled"
 
         modified.write("cpusets" + cpusets + ",\n")
-        modified.write("Percore mode," + threadmode + ",\n")
+        modified.write("Percpu mode," + cpumode + ",\n")
         modified.write("Persocket mode," + socketmode + ",\n")
         modified.write("PSI," + json.dumps(psi) + "\n")
         modified.write("PerfSpect version," + perf_helpers.get_tool_version() + ",\n")
@@ -204,7 +204,6 @@ if __name__ == "__main__":
         "-p", "--pid", type=str, default=None, help="perf-collect on selected PID(s)"
     )
     runmode.add_argument(
-        "-c",
         "--cid",
         help="perf-collect on up to 5 cgroups. Provide comma separated cids like e19f4fb59,6edca29db (by default, selects the 5 containers using the most CPU)",
         type=str,
@@ -212,10 +211,10 @@ if __name__ == "__main__":
         const="",
     )
     runmode.add_argument(
-        "--thread", help="Collect for thread metrics", action="store_true"
+        "-c", "--cpu", help="Collect for cpu metrics", action="store_true"
     )
     runmode.add_argument(
-        "--socket", help="Collect for socket metrics", action="store_true"
+        "-s", "--socket", help="Collect for socket metrics", action="store_true"
     )
     parser.add_argument(
         "-m",
@@ -252,8 +251,8 @@ if __name__ == "__main__":
     interval = 5000
     collect_psi = False
 
-    if args.thread:
-        logging.info("Run mode: thread")
+    if args.cpu:
+        logging.info("Run mode: cpu")
         collect_psi = supports_psi()
     elif args.socket:
         logging.info("Run mode: socket")
@@ -315,11 +314,13 @@ if __name__ == "__main__":
     ):
         logging.info("disabling uncore (possibly in a vm?)")
         have_uncore = False
-        if arch == "icelake":
+        if arch == "icelake" and initial_pmus["0x30c"]["value"] is None:
             logging.warning(
                 "Due to lack of vPMU support, TMA L1 events will not be collected"
             )
-        if arch == "sapphirerapids" or arch == "emeraldrapids":
+        if (arch == "sapphirerapids" or arch == "emeraldrapids") and initial_pmus[
+            "0x30c"
+        ]["value"] is None:
             logging.warning(
                 "Due to lack of vPMU support, TMA L1 & L2 events will not be collected"
             )
@@ -328,11 +329,12 @@ if __name__ == "__main__":
         (
             args.pid is not None
             or args.cid is not None
-            or args.thread
+            or args.cpu
             or args.socket
             or not have_uncore
         ),
         args.pid is not None or args.cid is not None,
+        initial_pmus["0x30c"]["value"] is not None,
     )
 
     if not perf_helpers.validate_outfile(args.outcsv):
@@ -349,7 +351,7 @@ if __name__ == "__main__":
     if args.cid is not None:
         cgroups = perf_helpers.get_cgroups(args.cid)
 
-    if args.thread or args.socket or args.pid is not None or args.cid is not None:
+    if args.cpu or args.socket or args.pid is not None or args.cid is not None:
         logging.info("Not collecting uncore events in this run mode")
 
     # log some metadata
@@ -368,7 +370,7 @@ if __name__ == "__main__":
         logging.info("/sys/devices/: " + str(sys_devs))
 
     # build perf stat command
-    collection_type = "-a" if not args.thread and not args.socket else "-a -A"
+    collection_type = "-a" if not args.cpu and not args.socket else "-a -A"
     cmd = f"perf stat -I {interval} -x , {collection_type} -o {args.outcsv}"
     if args.pid:
         cmd += f" --pid {args.pid}"
@@ -392,6 +394,7 @@ if __name__ == "__main__":
     if args.verbose:
         logging.info(cmd)
     psi = []
+    logging.info("Collection started!")
     start = time.time()
     try:
         perf = subprocess.Popen(perfargs)  # nosec
@@ -423,7 +426,7 @@ if __name__ == "__main__":
         cpuname,
         cpuid_info,
         args.muxinterval,
-        args.thread,
+        args.cpu,
         args.socket,
         list(map(list, zip(*psi))),
     )

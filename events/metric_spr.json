@@ -32,6 +32,11 @@
         "origin": "perfspect"
     },
     {
+        "name": "metric_locks retired per instr",
+        "expression": "[MEM_INST_RETIRED.LOCK_LOADS] / [instructions]",
+        "origin": "perfmon website"
+    },
+    {
         "name": "metric_L1D MPI (includes data+rfo w/ prefetches)",
         "expression": "[L1D.REPLACEMENT] / [instructions]"
     },
@@ -82,6 +87,16 @@
         "name": "metric_package c6 residency %",
         "expression": "100 * [cstate_pkg/c6-residency/] * [CORES_PER_SOCKET] / [TSC]",
         "origin": "perfspect"
+    },
+	{
+        "name": "metric_% Uops delivered from decoded Icache (DSB)",
+        "expression1": "1",
+        "expression": "100 * ([IDQ.DSB_UOPS] / ([IDQ.DSB_UOPS] + [IDQ.MITE_UOPS] + [IDQ.MS_UOPS] + [LSD.UOPS]) )"
+    },
+    {
+        "name": "metric_% Uops delivered from legacy decode pipeline (MITE)",
+        "expression1": "1",
+        "expression": "100 * ([IDQ.MITE_UOPS] / ([IDQ.DSB_UOPS] + [IDQ.MITE_UOPS] + [IDQ.MS_UOPS] + [LSD.UOPS]) )"
     },
     {
         "name": "metric_core initiated local dram read bandwidth (MB/sec)",

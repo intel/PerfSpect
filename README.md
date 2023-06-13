@@ -1,15 +1,15 @@
 # PerfSpect &middot; [![Build](https://github.com/intel/PerfSpect/actions/workflows/build.yml/badge.svg)](https://github.com/intel/PerfSpect/actions/workflows/build.yml)[![License](https://img.shields.io/badge/License-BSD--3-blue)](https://github.com/intel/PerfSpect/blob/master/LICENSE)
 
-[Quick Start](#quick-start-requires-perf-installed) | [Output](#output) | [Requirements](#requirements) | [Build from source](#build-from-source) | [Caveats](#caveats) | [How to contribute](#how-to-contribute)
+[Quick Start](#quick-start-requires-perf-installed) | [Output](#output) | [Requirements](#requirements) | [Build from source](#build-from-source)
 
 PerfSpect is a system performance characterization tool built on top of linux perf. Most metrics and events come from [perfmon](https://github.com/intel/perfmon) and [TMA v4.5](https://www.intel.com/content/www/us/en/docs/vtune-profiler/cookbook/2023-1/top-down-microarchitecture-analysis-method.html). It contains two parts:
 
-perf-collect: Collects harware events at a 5 second output interval with practically zero overhead since PMU's run in counting  mode.
+perf-collect: Collects hardware events at a 5 second output interval with practically zero overhead since PMU's run in counting  mode.
 
 - Collection mode:
   - `sudo ./perf-collect` _default system wide_
   - `sudo ./perf-collect --socket`
-  - `sudo ./perf-collect --thread`
+  - `sudo ./perf-collect --cpu`
   - `sudo ./perf-collect --pid <process-id>`
   - `sudo ./perf-collect --cid` _by default, selects the 5 containers using the most CPU at start of perf-collect. To monitor specific containers provide up to 5 comma separated cids i.e. <cid_1>,<cid_2>_
 - Duration:
@@ -80,11 +80,3 @@ Requires recent python. On successful build, binaries will be created in `dist` 
 pip3 install -r requirements.txt
 make
 ```
-
-## Caveats
-
-1. The tool can collect only the counters supported by underlying linux perf version.
-
-## How to contribute
-
-Create a pull request on github.com/intel/PerfSpect with your patch. Please make sure your patch is building without errors. A maintainer will contact you if there are questions or concerns.

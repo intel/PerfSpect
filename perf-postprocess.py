@@ -23,7 +23,7 @@ from src import perf_helpers
 class Mode(Enum):
     System = 1
     Socket = 2
-    Core = 3
+    CPU = 3
 
 
 # get the filenames for miscellaneous outputs
@@ -42,11 +42,11 @@ def get_extra_out_file(out_file, t):
     elif t == "sr":
         text = "socket.raw"
     elif t == "c":
-        text = "core"
+        text = "cpu"
     elif t == "ca":
-        text = "core.average"
+        text = "cpu.average"
     elif t == "cr":
-        text = "core.raw"
+        text = "cpu.raw"
     elif t == "m":
         text = "sys"
 
@@ -126,7 +126,7 @@ def get_args(script_path):
 
 # fix c6-residency data lines
 # for system: multiply value by number of HyperThreads
-# for socket or thread: add rows for each 2nd hyper thread with same values as 1st thread
+# for socket or cpu: add rows for each 2nd HyperThread with same values as 1st CPU
 def get_fixed_c6_residency_fields(perf_data_lines, perf_mode):
     # handle special case events: c6-residency
     # if hyperthreading is disabled, no fixing is required
@@ -137,8 +137,8 @@ def get_fixed_c6_residency_fields(perf_data_lines, perf_mode):
     if meta_data["constants"]["CONST_THREAD_COUNT"] == 2:
         for fields in perf_data_lines:
             if perf_mode == Mode.System and fields[3] == "cstate_core/c6-residency/":
-                # since "cstate_core/c6-residency/" is collected for only one thread
-                # we double the value for the system wide collection (assign same value to the 2nd thread)
+                # since "cstate_core/c6-residency/" is collected for only one cpu per core
+                # we double the value for the system wide collection (assign same value to the 2nd cpu)
                 try:
                     fields[1] = int(fields[1]) * 2  # fields[1] -> event value
                 except ValueError:
@@ -291,8 +291,8 @@ def get_metadata_as_dict(meta_data_lines):
                     num_of_cpus = len(docker_SET.split("+"))
                 meta_data["CPUSETS"][docker_HASH[i]] = num_of_cpus
 
-        elif line.startswith("Percore mode"):
-            meta_data["PERCORE_MODE"] = (
+        elif line.startswith("Percpu mode"):
+            meta_data["PERCPU_MODE"] = (
                 True if (str(line.split(",")[1]) == "enabled") else False
             )
 
@@ -307,8 +307,8 @@ def get_metadata_as_dict(meta_data_lines):
         elif line.startswith("Socket"):
             if "SOCKET_CORES" not in meta_data:
                 meta_data["SOCKET_CORES"] = []
-            cores = ((line.split("\n")[0]).split(",")[1]).split(";")[:-1]
-            meta_data["SOCKET_CORES"].append(cores)
+            CPUs = ((line.split("\n")[0]).split(",")[1]).split(";")[:-1]
+            meta_data["SOCKET_CORES"].append(CPUs)
         elif line.startswith("PSI"):
             meta_data["PSI"] = json.loads(line.split("PSI,")[1])
     return meta_data
@@ -333,7 +333,7 @@ def set_CONST_TSC(meta_data, perf_mode, num_cpus=0):
             * meta_data["constants"]["CORES_PER_SOCKET"]
             * meta_data["constants"]["CONST_THREAD_COUNT"]
         )
-    elif perf_mode == Mode.Core:  # Core should be changed to thread
+    elif perf_mode == Mode.CPU:
         meta_data["constants"]["TSC"] = meta_data["constants"]["SYSTEM_TSC_FREQ"]
     return
 
@@ -407,8 +407,8 @@ def get_metrics_formula(architecture):
     with open(metric_file, "r") as f_metric:
         try:
             metrics = json.load(f_metric)
-            for m in metrics:
-                m["events"] = re.findall(r"\[(.*?)\]", m["expression"])
+            for metric in metrics:
+                metric["events"] = re.findall(r"\[(.*?)\]", metric["expression"])
 
             return metrics
         except json.decoder.JSONDecodeError:
@@ -416,10 +416,10 @@ def get_metrics_formula(architecture):
     return
 
 
-def get_socket_number(sockets_dict, core):
-    core_index = core.replace("CPU", "")
+def get_socket_number(sockets_dict, CPU):
+    CPU_index = CPU.replace("CPU", "")
     for s in range(len(sockets_dict)):
-        if core_index in sockets_dict[s]:
+        if CPU_index in sockets_dict[s]:
             return s
     return
 
@@ -431,7 +431,15 @@ def extract_dataframe(perf_data_lines, meta_data, perf_mode):
     if "CGROUPS" in meta_data and meta_data["CGROUPS"] == "enabled":
         # 1.001044566,6261968509,,L1D.REPLACEMENT,/system.slice/docker-826c1c9de0bde13b0c3de7c4d96b38710cfb67c2911f30622508905ece7e0a16.scope,6789274819,5.39,,
         assert len(perf_data_df.columns) >= 7
-        columns = ["ts", "value", "col0", "metric", "cgroup", "col1", "percentage"]
+        columns = [
+            "ts",
+            "value",
+            "col0",
+            "metric",
+            "cgroup",
+            "perf_group_id",
+            "percentage",
+        ]
         # add dummy col names for remaining columns
         for col in range(7, len(perf_data_df.columns)):
             columns.append("col" + str(col))
@@ -439,14 +447,22 @@ def extract_dataframe(perf_data_lines, meta_data, perf_mode):
     elif perf_mode == Mode.System:
         # Ubuntu 16.04 returns 6 columns, later Ubuntu's and other OS's return 8 columns
         assert len(perf_data_df.columns) >= 6
-        columns = ["ts", "value", "col0", "metric", "value2", "percentage"]
+        columns = ["ts", "value", "col0", "metric", "perf_group_id", "percentage"]
         # add dummy col names for remaining columns
         for col in range(6, len(perf_data_df.columns)):
             columns.append("col" + str(col))
         perf_data_df.columns = columns
-    elif perf_mode == Mode.Core or perf_mode == Mode.Socket:
+    elif perf_mode == Mode.CPU or perf_mode == Mode.Socket:
         assert len(perf_data_df.columns) >= 7
-        columns = ["ts", "cpu", "value", "col0", "metric", "value2", "percentage"]
+        columns = [
+            "ts",
+            "cpu",
+            "value",
+            "col0",
+            "metric",
+            "perf_group_id",
+            "percentage",
+        ]
         # add dummy col names for remaining columns
         for col in range(7, len(perf_data_df.columns)):
             columns.append("col" + str(col))
@@ -457,9 +473,9 @@ def extract_dataframe(perf_data_lines, meta_data, perf_mode):
             axis=1,
         )
 
-    if perf_mode != Mode.Core and perf_mode != Mode.Socket:
+    if perf_mode != Mode.CPU and perf_mode != Mode.Socket:
         # fix metric name X.1, X.2, etc -> just X
-        # we don't need this in thread/socket modes
+        # we don't need this in cpu/socket modes
         perf_data_df["metric"] = perf_data_df.apply(
             lambda x: ".".join(x["metric"].split(".")[:-1])
             if len(re.findall(r"^[0-9]*$", x["metric"].split(".")[-1])) > 0
@@ -475,7 +491,9 @@ def extract_dataframe(perf_data_lines, meta_data, perf_mode):
 
 
 # get group data frame after grouping
-def get_group_df(time_slice_df, start_index, end_of_group_index, perf_mode):
+def get_group_df_from_full_frame(
+    time_slice_df, start_index, end_of_group_index, perf_mode
+):
     g_df = time_slice_df[start_index:end_of_group_index]
     if perf_mode == Mode.System:
         g_df = g_df[["metric", "value"]].groupby("metric")["value"].sum().to_frame()
@@ -489,7 +507,7 @@ def get_group_df(time_slice_df, start_index, end_of_group_index, perf_mode):
             )
         else:
             crash("No socket information found, exiting...")
-    elif perf_mode == Mode.Core:  # check dataframe has cpu colmn, otherwise raise error
+    elif perf_mode == Mode.CPU:  # check dataframe has cpu column, otherwise raise error
         if "cpu" in g_df:
             g_df = (
                 g_df[["metric", "cpu", "value"]]
@@ -503,30 +521,6 @@ def get_group_df(time_slice_df, start_index, end_of_group_index, perf_mode):
     return g_df
 
 
-def get_event_expression_from_group(
-    expressions_to_evaluate, event_df, exp_to_evaluate, event
-):
-    if event_df.shape == (1,):  # system wide
-        if "sys" not in expressions_to_evaluate:
-            expressions_to_evaluate["sys"] = exp_to_evaluate.replace(
-                "[" + event + "]", str(event_df[0])
-            )
-        else:
-            expressions_to_evaluate["sys"] = expressions_to_evaluate["sys"].replace(
-                "[" + event + "]", str(event_df[0])
-            )
-    else:
-        for index in event_df.index:
-            value = event_df["value"][index]
-            if index not in expressions_to_evaluate:
-                expressions_to_evaluate[index] = exp_to_evaluate
-            expressions_to_evaluate[index] = expressions_to_evaluate[index].replace(
-                "[" + event + "]",
-                str(value),
-            )
-    return
-
-
 def generate_metrics_time_series(time_series_df, perf_mode, out_file_path):
     time_series_df_T = time_series_df.T
     time_series_df_T.index.name = "time"
@@ -536,7 +530,7 @@ def generate_metrics_time_series(time_series_df, perf_mode, out_file_path):
     if perf_mode == Mode.Socket:
         metric_file_name = get_extra_out_file(out_file_path, "s")
 
-    if perf_mode == Mode.Core:
+    if perf_mode == Mode.CPU:
         metric_file_name = get_extra_out_file(out_file_path, "c")
     # generate metrics with time indexes
     time_series_df_T.to_csv(metric_file_name)
@@ -551,7 +545,7 @@ def generate_metrics_averages(
         average_metric_file_name = get_extra_out_file(out_file_path, "a")
     if perf_mode == Mode.Socket:
         average_metric_file_name = get_extra_out_file(out_file_path, "sa")
-    if perf_mode == Mode.Core:
+    if perf_mode == Mode.CPU:
         average_metric_file_name = get_extra_out_file(out_file_path, "ca")
 
     time_series_df.index.name = "metrics"
@@ -653,6 +647,223 @@ def log_skip_metric(metric, instance, msg):
     )
 
 
+# group_start_end_index_dict is both an input and output argument
+# if empty, the start and end indexes for each geroup will be added
+# if not, the start and end indexes for each group will be read from it
+def get_groups_to_dataframes(
+    time_slice_df, group_to_event, group_start_end_index_dict, perf_mode
+):
+    group_to_df = {}
+    if len(group_start_end_index_dict) == 0:
+        current_group_indx = 0
+        group_name = "group_" + str(current_group_indx)
+        event_list = group_to_event[group_name]
+        start_index = 0
+        end_index = 0
+        for i in time_slice_df.index:
+            row = time_slice_df.loc[i]
+            if row["metric"] in event_list:
+                end_index += 1
+            else:
+                group_to_df[group_name] = get_group_df_from_full_frame(
+                    time_slice_df, start_index, end_index, perf_mode
+                )
+                group_start_end_index_dict[group_name] = (start_index, end_index)
+                start_index = end_index
+                current_group_indx += 1
+                group_name = "group_" + str(current_group_indx)
+                event_list = group_to_event[group_name]
+                end_index += 1
+        group_to_df[group_name] = get_group_df_from_full_frame(
+            time_slice_df, start_index, time_slice_df.shape[0], perf_mode
+        )
+        group_start_end_index_dict[group_name] = (start_index, time_slice_df.shape[0])
+    else:
+        for group_name in group_start_end_index_dict:
+            start_index = group_start_end_index_dict[group_name][0]
+            end_index = group_start_end_index_dict[group_name][1]
+            group_to_df[group_name] = get_group_df_from_full_frame(
+                time_slice_df, start_index, end_index, perf_mode
+            )
+    return group_to_df
+
+
+def substitute_constants(expression, constants):
+    returned_expression = expression
+    for constant in constants:
+        returned_expression = returned_expression.replace(
+            "[" + constant + "]", str(constants[constant])
+        )
+    return returned_expression
+
+
+# Find the best group to use to evalaute a set of events
+# The best group is the one that has the majority of the events
+# For example, to evaluate events [ev1, ev2, ev3, ev4]
+# If group 1 has [ev1,ev2] and group 2 has [ev1, ev2, ev3]
+# Then group 2 is better than group 1
+def find_best_group(remaining_events, group_to_event):
+    diff_size = sys.maxsize
+    best_group = None
+    for group, events in group_to_event.items():
+        ds = len(set(remaining_events) - set(events))
+        if ds < diff_size and ds < len(set(remaining_events)):
+            diff_size = ds
+            best_group = group
+            if diff_size == 0:
+                break
+    return best_group
+
+
+# substitute the value of an event in the given expression
+# "exp_to_evaluate" is modified by the function and added to "evaluated_expressions"
+# detected errors are added to "errors"
+# in arguments: verbose, best_group, group_to_df, event,exp_to_evaluate,
+# out arguments: errors, evaluated_expressions,
+def substitute_event_in_expression(
+    verbose,
+    best_group,
+    group_to_df,
+    event,
+    exp_to_evaluate,
+    errors,
+    evaluated_expressions,
+):
+    if best_group in group_to_df:
+        g_df = group_to_df[best_group]
+        event_df = g_df.loc[event]
+        if event_df.shape == (1,):  # system wide
+            if "sys" not in evaluated_expressions:
+                evaluated_expressions["sys"] = exp_to_evaluate.replace(
+                    "[" + event + "]", str(event_df[0])
+                )
+            else:
+                evaluated_expressions["sys"] = evaluated_expressions["sys"].replace(
+                    "[" + event + "]", str(event_df[0])
+                )
+        else:
+            for index in event_df.index:
+                value = event_df["value"][index]
+                if index not in evaluated_expressions:
+                    evaluated_expressions[index] = exp_to_evaluate
+                evaluated_expressions[index] = evaluated_expressions[index].replace(
+                    "[" + event + "]",
+                    str(value),
+                )
+    else:  # group was not counted
+        if verbose and best_group not in errors["NOT COUNTED GROUPS"]:
+            errors["NOT COUNTED GROUPS"].add(best_group)
+            logging.warning("Event group:" + best_group + "Not counted")
+        return
+
+
+# evaluate the expression of a given metric
+# returns the metric name (and subname) and the evaluation result
+# detected errors will be appended to "errors"
+def evaluate_metric_expression(
+    expressions_to_evaluate, verbose, metric, instance, errors
+):
+    if (
+        "[" in expressions_to_evaluate[instance]
+        or "]" in expressions_to_evaluate[instance]
+    ):
+        if verbose and metric["name"] not in errors["MISSING DATA"]:
+            errors["MISSING DATA"].add(metric["name"])
+            log_skip_metric(metric, expressions_to_evaluate[instance], "MISSING DATA")
+        return None
+    try:
+        result = "{:.8f}".format(
+            simple_eval(
+                expressions_to_evaluate[instance],
+                functions={"min": min, "max": max},
+            )
+        )
+    except ZeroDivisionError:
+        if verbose and metric["name"] not in errors["ZERO DIVISION"]:
+            errors["ZERO DIVISION"].add(metric["name"])
+            log_skip_metric(metric, expressions_to_evaluate[instance], "ZERO DIVISION")
+        result = 0
+    sub_txt = "" if instance == "sys" else "." + str(instance)
+    return metric["name"] + sub_txt, float(result)
+
+
+# evaluate all metrics from dataframes in group_to_df
+# for each metric, we find the best group to use to evaluate the metric's expression from
+def evaluate_metrics(verbose, metrics, metadata, group_to_event, group_to_df, errors):
+    metrics_results = {}
+    best_groups_for_events = {}
+    for metric in metrics:
+        non_constant_events = []
+        exp_to_evaluate = substitute_constants(
+            metric["expression"], metadata["constants"]
+        )
+        for event in metric["events"]:
+            if event.upper() in metadata["constants"]:
+                exp_to_evaluate = substitute_constants(
+                    exp_to_evaluate,
+                    {event.upper(): metadata["constants"][event.upper()]},
+                )
+            else:
+                non_constant_events.append(event)
+
+        remaining_events_to_find = list(non_constant_events)
+        evaluated_expressions = {}
+        passes = 0
+
+        while len(remaining_events_to_find) > 0:
+            if (
+                passes == 1
+                and verbose
+                and metric["name"] not in errors["MULTIPLE GROUPS"]
+            ):
+                errors["MULTIPLE GROUPS"].add(metric["name"])
+                logging.warning(
+                    f'MULTIPLE GROUPS: metric "{metric["name"]}", events "{set(non_constant_events)}"'
+                )
+            passes += 1
+            remaining_events_txt = str(remaining_events_to_find)
+            if remaining_events_txt in best_groups_for_events:
+                best_group = best_groups_for_events[remaining_events_txt]
+            else:
+                best_group = find_best_group(remaining_events_to_find, group_to_event)
+                best_groups_for_events[remaining_events_txt] = best_group
+
+            if best_group is None:
+                break
+            for event in remaining_events_to_find[:]:
+                if event in group_to_event[best_group]:
+                    remaining_events_to_find.remove(event)
+                    substitute_event_in_expression(
+                        verbose,
+                        best_group,
+                        group_to_df,
+                        event,
+                        exp_to_evaluate,
+                        errors,
+                        evaluated_expressions,
+                    )
+
+        if len(remaining_events_to_find) == 0:
+            for instance in evaluated_expressions:
+                metric_result = evaluate_metric_expression(
+                    evaluated_expressions, verbose, metric, instance, errors
+                )
+                if metric_result is not None:
+                    metrics_results[metric_result[0]] = metric_result[1]
+        else:
+            if verbose and metric["name"] not in errors["MISSING EVENTS"]:
+                logging.warning(
+                    'MISSING EVENTS: metric "'
+                    + metric["name"]
+                    + '" events "'
+                    + str(remaining_events_to_find)
+                    + '"'
+                )
+                errors["MISSING EVENTS"].add(metric["name"])
+            continue
+    return metrics_results
+
+
 def generate_metrics(
     perf_data_df,
     out_file_path,
@@ -670,10 +881,11 @@ def generate_metrics(
         "ZERO DIVISION": set(),
         "MISSING EVENTS": set(),
         "MULTIPLE GROUPS": set(),
+        "NOT COUNTED GROUPS": set(),
     }
     prev_time_slice = 0
-    group_to_start_end_indexes = {}
     logging.info("processing " + str(time_slice_groups.ngroups) + " samples")
+    group_start_end_index_dict = {}
     for time_slice, item in time_slice_groups:
         time_slice_float = float(time_slice)
         if time_slice_float - prev_time_slice < 4.5:
@@ -688,140 +900,18 @@ def generate_metrics(
         time_slice_df["value"] = time_slice_df["value"] / (
             time_slice_float - prev_time_slice
         )
-        current_group_indx = 0
-        group_to_df = {}
-        start_of_group_index = 0
-        end_of_group_index = 0
-        if prev_time_slice == 0:  # first time slice
-            for index, row in time_slice_df.iterrows():
-                if row["metric"] in event_groups["group_" + str(current_group_indx)]:
-                    end_of_group_index += 1
-                    continue
-                else:  # move to next group
-                    group_to_df["group_" + str(current_group_indx)] = get_group_df(
-                        time_slice_df,
-                        start_of_group_index,
-                        end_of_group_index,
-                        perf_mode,
-                    )
-                    group_to_start_end_indexes["group_" + str(current_group_indx)] = (
-                        start_of_group_index,
-                        end_of_group_index,
-                    )
-                    start_of_group_index = end_of_group_index
-                    end_of_group_index += 1
-                    current_group_indx += 1
-            # add last group
-            group_to_df["group_" + str(current_group_indx)] = get_group_df(
-                time_slice_df, start_of_group_index, time_slice_df.shape[0], perf_mode
-            )
-            group_to_start_end_indexes["group_" + str(current_group_indx)] = (
-                start_of_group_index,
-                time_slice_df.shape[0],
-            )
-        else:  # use same start & end indexes from first time slice
-            for group_id in group_to_start_end_indexes:
-                start_of_group_index = group_to_start_end_indexes[group_id][0]
-                end_of_group_index = group_to_start_end_indexes[group_id][1]
-                group_to_df[group_id] = get_group_df(
-                    time_slice_df, start_of_group_index, end_of_group_index, perf_mode
-                )
-
         prev_time_slice = time_slice_float
-        metrics_results = {}
-        for m in metrics:
-            non_constant_events = []
-            exp_to_evaluate = m["expression"]
-            # substitute constants
-            for event in m["events"]:
-                # replace constants
-                if event.upper() in metadata["constants"]:
-                    exp_to_evaluate = exp_to_evaluate.replace(
-                        "[" + event + "]", str(metadata["constants"][event.upper()])
-                    )
-                else:
-                    non_constant_events.append(event)
-            # find non-constant events in groups
-            remaining_events_to_find = list(non_constant_events)
-            expressions_to_evaluate = {}
-            passes = 0
-            while len(remaining_events_to_find) > 0:
-                if (
-                    passes == 1
-                    and verbose
-                    and m["name"] not in errors["MULTIPLE GROUPS"]
-                ):
-                    errors["MULTIPLE GROUPS"].add(m["name"])
-                    logging.warning(
-                        f'MULTIPLE GROUPS: metric "{m["name"]}", events "{set(non_constant_events)}"'
-                    )
-                passes += 1
-                # find best group for remaining events
-                diff_size = sys.maxsize  # big number
-                best_group = None
-                for group, events in group_to_event.items():
-                    ds = len(set(remaining_events_to_find) - set(events))
-                    if ds < diff_size and ds < len(set(remaining_events_to_find)):
-                        diff_size = ds
-                        best_group = group
-                        if diff_size == 0:
-                            break
-                if best_group is None:
-                    break
-                for event in remaining_events_to_find[:]:
-                    if event in group_to_event[best_group]:
-                        remaining_events_to_find.remove(event)
-                        g_df = group_to_df[best_group]
-                        event_df = g_df.loc[event]
-                        get_event_expression_from_group(
-                            expressions_to_evaluate,
-                            event_df,
-                            exp_to_evaluate,
-                            event,
-                        )
-            if len(remaining_events_to_find) == 0:  # all events are found
-                # instance is either system, specific core, or specific socket
-                for instance in expressions_to_evaluate:
-                    if (
-                        "[" in expressions_to_evaluate[instance]
-                        or "]" in expressions_to_evaluate[instance]
-                    ):
-                        if verbose and m["name"] not in errors["MISSING DATA"]:
-                            errors["MISSING DATA"].add(m["name"])
-                            log_skip_metric(
-                                m, expressions_to_evaluate[instance], "MISSING DATA"
-                            )
-                        continue
-                    try:
-                        result = "{:.8f}".format(
-                            simple_eval(
-                                expressions_to_evaluate[instance],
-                                functions={"min": min, "max": max},
-                            )
-                        )
-                    except ZeroDivisionError:
-                        if verbose and m["name"] not in errors["ZERO DIVISION"]:
-                            errors["ZERO DIVISION"].add(m["name"])
-                            log_skip_metric(
-                                m,
-                                expressions_to_evaluate[instance],
-                                "ZERO DIVISION",
-                            )
-                        result = 0
-                    sub_txt = "" if instance == "sys" else "." + instance
-                    metrics_results[m["name"] + sub_txt] = float(result)
-            else:  # some events are missing
-                if verbose and m["name"] not in errors["MISSING EVENTS"]:
-                    logging.warning(
-                        'MISSING EVENTS: metric "'
-                        + m["name"]
-                        + '" events "'
-                        + str(remaining_events_to_find)
-                        + '"'
-                    )
-                    errors["MISSING EVENTS"].add(m["name"])
-                continue
-        time_metrics_result[time_slice] = metrics_results
+        # get dictionary with group_ids as keys and group dataframes as values
+        # We save the start and end indexes for each group in the first iteration and use it in the following iterations
+        # group_start_end_index_dict is an out argument in the first iteration, and an input argument for following iterations
+        group_to_df = get_groups_to_dataframes(
+            time_slice_df, group_to_event, group_start_end_index_dict, perf_mode
+        )
+
+        time_metrics_result[time_slice] = evaluate_metrics(
+            verbose, metrics, metadata, group_to_event, group_to_df, errors
+        )
+
     time_series_df = pd.DataFrame(time_metrics_result).reindex(
         index=list(time_metrics_result[list(time_metrics_result.keys())[0]].keys())
     )
@@ -859,7 +949,7 @@ def generate_metrics(
     return
 
 
-def generate_raw_events_system_wide(perf_data_df, out_file_path):
+def generate_raw_events_system(perf_data_df, out_file_path):
     perf_data_df_system_raw = (
         perf_data_df[["metric", "value"]].groupby("metric")["value"].sum().to_frame()
     )
@@ -906,44 +996,48 @@ def generate_raw_events_socket(perf_data_df, out_file_path):
     return
 
 
-def generate_raw_events_percore(perf_data_df, out_file_path):
-    # print raw values percore
-    perf_data_df_core_raw = (
+def generate_raw_events_cpu(perf_data_df, out_file_path):
+    # print raw values per CPU
+    perf_data_df_CPU_raw = (
         perf_data_df[["metric", "cpu", "value"]]
         .groupby(["metric", "cpu"])["value"]
         .sum()
         .to_frame()
     )
     last_time_stamp = float(perf_data_df["ts"].tail(1).values[0])
-    perf_data_df_core_raw["avg"] = np.where(
-        perf_data_df_core_raw["value"] > 0,
-        perf_data_df_core_raw["value"] / last_time_stamp,
+    perf_data_df_CPU_raw["avg"] = np.where(
+        perf_data_df_CPU_raw["value"] > 0,
+        perf_data_df_CPU_raw["value"] / last_time_stamp,
         0,
     )
 
-    metric_per_cpu_frame = pd.pivot_table(
-        perf_data_df_core_raw, index="metric", columns="cpu", values="avg", fill_value=0
+    metric_per_CPU_frame = pd.pivot_table(
+        perf_data_df_CPU_raw,
+        index="metric",
+        columns="cpu",
+        values="avg",
+        fill_value=0,
     )
     # drop uncore and power metrics
     to_drop = []
-    for metric in metric_per_cpu_frame.index:
+    for metric in metric_per_CPU_frame.index:
         if metric.startswith("UNC_") or metric.startswith("power/"):
             to_drop.append(metric)
-    metric_per_cpu_frame.drop(to_drop, inplace=True)
+    metric_per_CPU_frame.drop(to_drop, inplace=True)
 
-    core_raw_file_name = get_extra_out_file(out_file_path, "cr")
-    metric_per_cpu_frame.to_csv(core_raw_file_name)
+    CPU_raw_file_name = get_extra_out_file(out_file_path, "cr")
+    metric_per_CPU_frame.to_csv(CPU_raw_file_name)
 
     return
 
 
 def generate_raw_events(perf_data_df, out_file_path, perf_mode):
     if perf_mode.System:
-        generate_raw_events_system_wide(perf_data_df, out_file_path)
+        generate_raw_events_system(perf_data_df, out_file_path)
     elif perf_mode.Socket:
         generate_raw_events_socket(perf_data_df, out_file_path)
-    elif perf_mode.Core:
-        generate_raw_events_percore(perf_data_df, out_file_path)
+    elif perf_mode.CPU:
+        generate_raw_events_cpu(perf_data_df, out_file_path)
 
 
 if __name__ == "__main__":
@@ -962,30 +1056,29 @@ if __name__ == "__main__":
         input_file_path
     )
 
-    # parse metadata and get mode (system, socket, or core)
+    # parse metadata and get mode (system, socket, or CPU)
     meta_data = get_metadata_as_dict(meta_data_lines)
     perf_mode = Mode.System
     if "PERSOCKET_MODE" in meta_data and meta_data["PERSOCKET_MODE"]:
         perf_mode = Mode.Socket
-    elif "PERCORE_MODE" in meta_data and meta_data["PERCORE_MODE"]:
-        perf_mode = Mode.Core
+    elif "PERCPU_MODE" in meta_data and meta_data["PERCPU_MODE"]:
+        perf_mode = Mode.CPU
 
     # fix c6 residency values
     perf_data_lines = get_fixed_c6_residency_fields(perf_data_lines, perf_mode)
 
-    # set const TSC accoding to perf_mode
+    # set const TSC according to perf_mode
     set_CONST_TSC(meta_data, perf_mode)
 
     # parse event groups
     event_groups = get_event_groups(perf_event_lines)
-
     # extract data frame
     perf_data_df = extract_dataframe(perf_data_lines, meta_data, perf_mode)
 
     # parse metrics expressions
     metrics = get_metrics_formula(meta_data["constants"]["CONST_ARCH"])
 
-    if args.rawevents:  # generate raw events for system, persocket and percore
+    if args.rawevents:  # generate raw events for system, socket and CPU
         generate_raw_events(perf_data_df, out_file_path, perf_mode)
 
     # generate metrics for each cgroup
@@ -1013,7 +1106,6 @@ if __name__ == "__main__":
             logging.info(
                 "Generated results file(s) in: " + out_file_path.rsplit("/", 1)[0]
             )
-    # generate metrics for system, persocket or percore
     else:
         generate_metrics(
             perf_data_df,

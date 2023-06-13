@@ -25,7 +25,7 @@ instructions;
 cpu/event=0x0e,umask=0x01,period=2000003,name='UOPS_ISSUED.ANY'/,
 cpu/event=0xc2,umask=0x02,period=2000003,name='UOPS_RETIRED.RETIRE_SLOTS'/,
 cpu/event=0x0d,umask=0x01,period=2000003,name='INT_MISC.RECOVERY_CYCLES_ANY'/,
-cpu/event=0x0d,umask=0x01,period=2000003,name='INT_MISC.RECOVERY_CYCLES'/;
+cpu/event=0x0d,umask=0x01,period=2000003,name='INT_MISC.RECOVERY_CYCLES'/,
 cpu-cycles,
 ref-cycles,
 instructions;
@@ -156,6 +156,13 @@ cpu-cycles:k,
 ref-cycles:k,
 instructions:k;
 
+cpu/event=0x79,umask=0x08,cmask=0x00,period=2000003,name='IDQ.DSB_UOPS'/,
+cpu/event=0x79,umask=0x04,cmask=0x00,period=2000003,name='IDQ.MITE_UOPS'/,
+cpu/event=0xa8,umask=0x01,cmask=0x00,period=2000003,name='LSD.UOPS'/,
+cpu-cycles,
+ref-cycles,
+instructions;
+
 cpu/event=0x79,umask=0x24,cmask=0x01,period=2000003,name='IDQ.ALL_MITE_CYCLES_ANY_UOPS'/,
 cpu/event=0x79,umask=0x24,cmask=0x04,period=2000003,name='IDQ.ALL_MITE_CYCLES_4_UOPS'/,
 cpu/event=0xb7,umask=0x01,offcore_rsp=0x10003C0002,period=100003,name='OCR.DEMAND_RFO.L3_HIT.HITM_OTHER_CORE'/,
@@ -175,7 +182,7 @@ instructions;
 cpu/event=0xd2,umask=0x02,cmask=0x00,period=20011,name='MEM_LOAD_L3_HIT_RETIRED.XSNP_HIT'/,
 cpu/event=0xd2,umask=0x04,cmask=0x00,period=20011,name='MEM_LOAD_L3_HIT_RETIRED.XSNP_HITM'/,
 cpu/event=0xb7,umask=0x01,offcore_rsp=0x3F840007F7,name='OCR.ALL_READS.L3_MISS_LOCAL_DRAM.ANY_SNOOP'/,
-cpu/event=0xb7,umask=0x01,offcore_rsp=0x3FB80007F7,name='OCR.ALL_READS.L3_MISS_LOCAL_DRAM.ANY_SNOOP_ocr_msr_3fB80007f7'/;
+cpu/event=0xb7,umask=0x01,offcore_rsp=0x3FB80007F7,name='OCR.ALL_READS.L3_MISS_LOCAL_DRAM.ANY_SNOOP_ocr_msr_3fB80007f7'/,
 cpu-cycles,
 ref-cycles,
 instructions;
@@ -183,7 +190,7 @@ instructions;
 cpu/event=0xb1,umask=0x10,cmask=0x00,period=2000003,name='UOPS_EXECUTED.X87'/,
 cpu/event=0xb1,umask=0x01,cmask=0x00,period=2000003,name='UOPS_EXECUTED.THREAD'/,
 cpu/event=0xb7,umask=0x01,offcore_rsp=0x103FC007F7,name='OCR.ALL_READS.L3_MISS.REMOTE_HITM'/,
-cpu/event=0xb7,umask=0x01,offcore_rsp=0x083FC007F7,name='OCR.ALL_READS.L3_MISS.REMOTE_HIT_FORWARD'/;
+cpu/event=0xb7,umask=0x01,offcore_rsp=0x083FC007F7,name='OCR.ALL_READS.L3_MISS.REMOTE_HIT_FORWARD'/,
 cpu-cycles,
 ref-cycles,
 instructions;
