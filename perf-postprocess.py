@@ -231,6 +231,7 @@ def get_all_data_lines(input_file_path):
 def get_metadata_as_dict(meta_data_lines):
     meta_data = {}
     meta_data["constants"] = {}
+    meta_data["metadata"] = {}
     for line in meta_data_lines:
         if line.startswith("SYSTEM_TSC_FREQ"):
             meta_data["constants"]["SYSTEM_TSC_FREQ"] = (
@@ -311,6 +312,26 @@ def get_metadata_as_dict(meta_data_lines):
             meta_data["SOCKET_CORES"].append(CPUs)
         elif line.startswith("PSI"):
             meta_data["PSI"] = json.loads(line.split("PSI,")[1])
+
+    for line in meta_data_lines:
+        for info in [
+            "SYSTEM_TSC_FREQ (MHz)",
+            "CORES_PER_SOCKET",
+            "SOCKET_COUNT",
+            "HYPERTHREADING_ON",
+            "IMC count",
+            "CHAS_PER_SOCKET",
+            "UPI count",
+            "Architecture",
+            "Model",
+            "kernel version",
+            "PerfSpect version",
+        ]:
+            if info in line:
+                meta_data["metadata"][info] = line.split(",", 1)[1]
+                if meta_data["metadata"][info][-1] == ",":
+                    meta_data["metadata"][info] = meta_data["metadata"][info][:-1]
+
     return meta_data
 
 
@@ -577,7 +598,7 @@ def row(df, name):
         return "[]"
 
 
-def write_html(time_series_df, perf_mode, out_file_path):
+def write_html(time_series_df, perf_mode, out_file_path, meta_data):
     html_file = "base.html"
     if getattr(sys, "frozen", False):
         basepath = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -612,10 +633,14 @@ def write_html(time_series_df, perf_mode, out_file_path):
             html = html.replace(metric[0], row(time_series_df, metric[1]))
 
         avg = time_series_df.mean(numeric_only=True, axis=1).to_frame()
+        html = html.replace(
+            "ALLMETRICS", json.dumps(avg.reset_index().to_dict("records"))
+        )
+        html = html.replace("METADATA", json.dumps(list(meta_data["metadata"].items())))
         for number in [
             ["FRONTEND", "metric_TMA_Frontend_Bound(%)"],
             ["BACKEND", "metric_TMA_Backend_Bound(%)"],
-            ["CORE", "metric_TMA_..Core_Bound(%)"],
+            ["COREDATA", "metric_TMA_..Core_Bound(%)"],
             ["MEMORY", "metric_TMA_..Memory_Bound(%)"],
             ["BADSPECULATION", "metric_TMA_Bad_Speculation(%)"],
             ["RETIRING", "metric_TMA_Retiring(%)"],
@@ -945,7 +970,7 @@ def generate_metrics(
     generate_metrics_time_series(time_series_df, perf_mode, out_file_path)
     generate_metrics_averages(time_series_df, perf_mode, out_file_path)
     if perf_mode == Mode.System:
-        write_html(time_series_df, perf_mode, out_file_path)
+        write_html(time_series_df, perf_mode, out_file_path, meta_data)
     return
 
 

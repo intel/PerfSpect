@@ -185,12 +185,10 @@
     },
     {
         "name": "metric_% Uops delivered from decoded Icache (DSB)",
-        "expression1": "1",
         "expression": "100 * ([IDQ.DSB_UOPS] / ([IDQ.DSB_UOPS] + [IDQ.MITE_UOPS] + [IDQ.MS_UOPS] + [LSD.UOPS]) )"
     },
     {
         "name": "metric_% Uops delivered from legacy decode pipeline (MITE)",
-        "expression1": "1",
         "expression": "100 * ([IDQ.MITE_UOPS] / ([IDQ.DSB_UOPS] + [IDQ.MITE_UOPS] + [IDQ.MS_UOPS] + [LSD.UOPS]) )"
     },
     {
@@ -371,22 +369,22 @@
         "expression": "100 * ( ( [EXE_ACTIVITY.EXE_BOUND_0_PORTS] + ( [EXE_ACTIVITY.1_PORTS_UTIL] + ( ( [UOPS_RETIRED.RETIRE_SLOTS] ) / ( ( 4 ) * ( ( [CPU_CLK_UNHALTED.THREAD_ANY] / 2 ) if [HYPERTHREADING_ON] else ( [cpu-cycles] ) ) ) ) * [EXE_ACTIVITY.2_PORTS_UTIL] ) ) / ( [cpu-cycles] ) if ( [ARITH.DIVIDER_ACTIVE] < ( [CYCLE_ACTIVITY.STALLS_TOTAL] - [CYCLE_ACTIVITY.STALLS_MEM_ANY] ) ) else ( [EXE_ACTIVITY.1_PORTS_UTIL] + ( ( [UOPS_RETIRED.RETIRE_SLOTS] ) / ( ( 4 ) * ( ( [CPU_CLK_UNHALTED.THREAD_ANY] / 2 ) if [HYPERTHREADING_ON] else ( [cpu-cycles] ) ) ) ) * [EXE_ACTIVITY.2_PORTS_UTIL] ) / ( [cpu-cycles] ) )"
     },
     {
-        "name": "metric_TMA_......0_Port_Utilized(%)",
+        "name": "metric_TMA_......Ports_Utilized_0(%)",
         "expression": "100 * (([UOPS_EXECUTED.CORE_CYCLES_NONE] / 2) if ([const_thread_count] > 1) else [EXE_ACTIVITY.EXE_BOUND_0_PORTS]) / ([CPU_CLK_UNHALTED.THREAD_ANY] / [const_thread_count])",
         "origin": "perfspect"
     },
     {
-        "name": "metric_TMA_......1_Port_Utilized(%)",
+        "name": "metric_TMA_......Ports_Utilized_1(%)",
         "expression": "100 * ((([UOPS_EXECUTED.CORE_CYCLES_GE_1] - [UOPS_EXECUTED.CORE_CYCLES_GE_2]) / 2) if ([const_thread_count] > 1) else [EXE_ACTIVITY.1_PORTS_UTIL]) / ([CPU_CLK_UNHALTED.THREAD_ANY] / [const_thread_count])",
         "origin": "perfspect"
     },
     {
-        "name": "metric_TMA_......2_Port_Utilized(%)",
+        "name": "metric_TMA_......Ports_Utilized_2(%)",
         "expression": "100 * ((([UOPS_EXECUTED.CORE_CYCLES_GE_2] - [UOPS_EXECUTED.CORE_CYCLES_GE_3]) / 2) if ([const_thread_count] > 1) else [EXE_ACTIVITY.2_PORTS_UTIL]) / ([CPU_CLK_UNHALTED.THREAD_ANY] / [const_thread_count])",
         "origin": "perfspect"
     },
     {
-        "name": "metric_TMA_......3m_Ports_Utilized(%)",
+        "name": "metric_TMA_......Ports_Utilized_3m(%)",
         "expression": "100 * [UOPS_EXECUTED.CORE_CYCLES_GE_3] / [CPU_CLK_UNHALTED.THREAD_ANY]",
         "origin": "perfspect"
     },

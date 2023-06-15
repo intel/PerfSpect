@@ -143,8 +143,6 @@ def filter_events(event_file, cpu_only, PID_CID_mode, TMA_supported):
                     collection_events[-1] = end_event[:-1] + ";"
             else:
                 collection_events.append(line)
-        if any("cpu-cycles" in event for event in unsupported_events):
-            crash("PMU's not available. Run in a full socket VM or baremetal")
         if len(unsupported_events) > 0:
             logging.warning(
                 f"Perf unsupported events not counted: {unsupported_events}"

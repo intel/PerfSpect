@@ -10,7 +10,6 @@ import fnmatch
 import logging
 import os
 import re
-import struct
 import subprocess  # nosec
 import time
 from ctypes import cdll, CDLL
@@ -95,31 +94,22 @@ def get_sys_devices():
 
 # get imc and uncore counts
 # TODO:fix for memory config with some channels populated
-def get_imc_upi_count():
+def get_imc_cha_upi_count():
     sys_devs = get_sys_devices()
+    cha_count = 0
     imc_count = 0
     upi_count = 0
+    if "uncore_cha" in sys_devs:
+        cha_count = int(sys_devs["uncore_cha"])
+    if "uncore_cbox" in sys_devs:
+        cha_count = int(sys_devs["uncore_cbox"])
     if "uncore_upi" in sys_devs:
         upi_count = int(sys_devs["uncore_upi"])
     if "uncore_qpi" in sys_devs:
         upi_count = int(sys_devs["uncore_qpi"])
     if "uncore_imc" in sys_devs:
         imc_count = int(sys_devs["uncore_imc"])
-    return imc_count, upi_count
-
-
-# get CHA count
-def get_cha_count():
-    cha_msrs = {
-        "0x396": "uncore client cha count",
-        "0x702": "uncore cha count",
-        "0x2FFE": "uncore cha count spr",
-    }
-    for msr in cha_msrs.keys():
-        result = read_msr(int(msr, 16))
-        if result is not None and result != 0:
-            return result
-    return 0
+    return imc_count, cha_count, upi_count
 
 
 # get imc channel ids, channel ids are not consecutive in some cases (observed on bdw)
@@ -206,54 +196,6 @@ def set_perf_event_mux_interval(reset, interval_ms, mux_interval):
                             val = int(interval_ms)
                     if val:
                         f_mux.write(str(val))
-
-
-# read the MSR register and return the value in dec format
-def read_msr(msr, cpu=0):
-    fName = f"/dev/cpu/{cpu}/msr"
-    try:
-        with open(fName, "rb") as f:
-            f.seek(msr)
-            result = struct.unpack("Q", f.read(8))[0]
-    except OSError:
-        result = None
-    return result
-
-
-# detect if PMU counters are in use
-def pmu_contention_detect(
-    msrs={
-        "0x309": {"name": "instructions", "value": None},
-        "0x30a": {"name": "cpu cycles", "value": None},
-        "0x30b": {"name": "ref cycles", "value": None},
-        "0x30c": {"name": "topdown slots", "value": None},
-        "0xc1": {"name": "general purpose PMU 1", "value": None},
-        "0xc2": {"name": "general purpose PMU 2", "value": None},
-        "0xc3": {"name": "general purpose PMU 3", "value": None},
-        "0xc4": {"name": "general purpose PMU 4", "value": None},
-        "0xc5": {"name": "general purpose PMU 5", "value": None},
-        "0xc6": {"name": "general purpose PMU 6", "value": None},
-        "0xc7": {"name": "general purpose PMU 7", "value": None},
-        "0xc8": {"name": "general purpose PMU 8", "value": None},
-    },
-    detect=False,
-):
-    warn = False
-    for r in msrs:
-        try:
-            value = read_msr(int(r, 16))
-            if msrs[r]["value"] is not None and value != msrs[r]["value"]:
-                logging.warning("PMU in use: " + msrs[r]["name"])
-                warn = True
-            msrs[r]["value"] = value
-        except IOError:
-            pass
-    if detect:
-        if warn:
-            logging.warning("output could be inaccurate")
-        else:
-            logging.info("PMUs not in use")
-    return msrs
 
 
 # get linux kernel version
