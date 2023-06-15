@@ -55,8 +55,7 @@ def write_metadata(
         modified.write("CORES_PER_SOCKET," + str(perf_helpers.get_cpu_count()) + ",\n")
         modified.write("SOCKET_COUNT," + str(perf_helpers.get_socket_count()) + ",\n")
         modified.write("HYPERTHREADING_ON," + str(perf_helpers.get_ht_status()) + ",\n")
-        imc, upi = perf_helpers.get_imc_upi_count()
-        cha = perf_helpers.get_cha_count()
+        imc, cha, upi = perf_helpers.get_imc_cha_upi_count()
         modified.write("IMC count," + str(imc) + ",\n")
         modified.write("CHAS_PER_SOCKET," + str(cha) + ",\n")
         modified.write("UPI count," + str(upi) + ",\n")
@@ -158,6 +157,38 @@ def supports_psi():
         return False
 
 
+def tma_supported():
+    perf_out = ""
+    try:
+        perf = subprocess.Popen(
+            shlex.split(
+                "perf stat -a -e '{cpu/event=0x00,umask=0x04,period=10000003,name='TOPDOWN.SLOTS'/,cpu/event=0x00,umask=0x81,period=10000003,name='PERF_METRICS.BAD_SPECULATION'/}' sleep .1"
+            ),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        perf_out = perf.communicate()[0].decode()
+    except subprocess.CalledProcessError:
+        return False
+
+    try:
+        events = {
+            a.split()[1]: int(a.split()[0].replace(",", ""))
+            for a in filter(
+                lambda x: "TOPDOWN.SLOTS" in x or "PERF_METRICS.BAD_SPECULATION" in x,
+                perf_out.split("\n"),
+            )
+        }
+    except Exception:
+        return False
+
+    # This is a perf artifact of no vPMU support
+    if events["TOPDOWN.SLOTS"] == events["PERF_METRICS.BAD_SPECULATION"]:
+        return False
+
+    return True
+
+
 def resource_path(relative_path):
     """Get absolute path to resource, works for dev and for PyInstaller"""
     base_path = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -247,7 +278,6 @@ if __name__ == "__main__":
 
     # disable nmi watchdog before collecting perf
     nmi_watchdog = perf_helpers.disable_nmi_watchdog()
-    initial_pmus = perf_helpers.pmu_contention_detect()
     interval = 5000
     collect_psi = False
 
@@ -303,7 +333,14 @@ if __name__ == "__main__":
     else:
         crash("Unknown application type")
 
+    # check if pmu available
+    if "cpu-cycles" not in perf_helpers.get_perf_list():
+        crash(
+            "PMU's not available. Run baremetal or in a VM which exposes PMUs (sometimes full socket)"
+        )
+
     # get perf events to collect
+    include_tma = True
     sys_devs = perf_helpers.get_sys_devices()
     if (
         "uncore_cha" not in sys_devs
@@ -314,13 +351,16 @@ if __name__ == "__main__":
     ):
         logging.info("disabling uncore (possibly in a vm?)")
         have_uncore = False
-        if arch == "icelake" and initial_pmus["0x30c"]["value"] is None:
+
+    if arch == "icelake":
+        include_tma = tma_supported()
+        if not include_tma:
             logging.warning(
                 "Due to lack of vPMU support, TMA L1 events will not be collected"
             )
-        if (arch == "sapphirerapids" or arch == "emeraldrapids") and initial_pmus[
-            "0x30c"
-        ]["value"] is None:
+    if arch == "sapphirerapids" or arch == "emeraldrapids":
+        include_tma = tma_supported()
+        if not include_tma:
             logging.warning(
                 "Due to lack of vPMU support, TMA L1 & L2 events will not be collected"
             )
@@ -334,7 +374,7 @@ if __name__ == "__main__":
             or not have_uncore
         ),
         args.pid is not None or args.cid is not None,
-        initial_pmus["0x30c"]["value"] is not None,
+        include_tma,
     )
 
     if not perf_helpers.validate_outfile(args.outcsv):
@@ -361,9 +401,9 @@ if __name__ == "__main__":
     logging.info("Cores per socket: " + str(perf_helpers.get_cpu_count()))
     logging.info("Socket: " + str(perf_helpers.get_socket_count()))
     logging.info("Hyperthreading on: " + str(perf_helpers.get_ht_status()))
-    imc, upi = perf_helpers.get_imc_upi_count()
+    imc, cha, upi = perf_helpers.get_imc_cha_upi_count()
     logging.info("IMC count: " + str(imc))
-    logging.info("CHA per socket: " + str(perf_helpers.get_cha_count()))
+    logging.info("CHA per socket: " + str(cha))
     logging.info("UPI count: " + str(upi))
     logging.info("PerfSpect version: " + perf_helpers.get_tool_version())
     if args.verbose:
@@ -390,7 +430,6 @@ if __name__ == "__main__":
 
     perfargs = shlex.split(cmd)
     validate_perfargs(perfargs)
-    perf_helpers.pmu_contention_detect(msrs=initial_pmus, detect=True)
     if args.verbose:
         logging.info(cmd)
     psi = []

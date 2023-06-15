@@ -88,14 +88,12 @@
         "expression": "100 * [cstate_pkg/c6-residency/] * [CORES_PER_SOCKET] / [TSC]",
         "origin": "perfspect"
     },
-	{
+    {
         "name": "metric_% Uops delivered from decoded Icache (DSB)",
-        "expression1": "1",
         "expression": "100 * ([IDQ.DSB_UOPS] / ([IDQ.DSB_UOPS] + [IDQ.MITE_UOPS] + [IDQ.MS_UOPS] + [LSD.UOPS]) )"
     },
     {
         "name": "metric_% Uops delivered from legacy decode pipeline (MITE)",
-        "expression1": "1",
         "expression": "100 * ([IDQ.MITE_UOPS] / ([IDQ.DSB_UOPS] + [IDQ.MITE_UOPS] + [IDQ.MS_UOPS] + [LSD.UOPS]) )"
     },
     {
