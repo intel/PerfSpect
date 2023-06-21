@@ -44,6 +44,7 @@
       Snackbar,
       Link,
       Tabs,
+      TextField,
       Icon,
       Table,
       TableBody,
@@ -168,6 +169,7 @@
       };
 
       const all_metrics = ALLMETRICS
+      const [current_metrics, setCurrent_metrics] = React.useState(JSON.parse(JSON.stringify(all_metrics)));
       const meta_data = METADATA
       const description = {
         "metric_CPU operating frequency (in GHz)": "CPU operating frequency (in GHz)",
@@ -182,6 +184,16 @@
         "metric_L2 demand code MPI": "Ratio of number of code read request missing L2 cache to the total number of completed instructions",
         "metric_LLC code read MPI (demand+prefetch)": "Ratio of number of code read requests missing last level core cache (includes demand w/ prefetches) to the total number of completed instructions",
         "metric_LLC data read MPI (demand+prefetch)": "Ratio of number of data read requests missing last level core cache (includes demand w/ prefetches) to the total number of completed instructions",
+        "metric_cycles per txn": "Cycles per transaction retired; indicating how much time each executed transaction took; in units of cycles.",
+        "metric_L1D misses per txn (includes data+rfo w/ prefetches)": "Ratio of number of requests missing L1 data cache (includes data+rfo w/ prefetches) to the total number of completed transactions",
+        "metric_L1D demand data read hits per txn": "Ratio of number of demand load requests hitting in L1 data cache to the total number of completed transactions",
+        "metric_L1-I code read misses (w/ prefetches) per txn": "Ratio of number of code read requests missing in L1 instruction cache (includes prefetches) to the total number of completed transactions",
+        "metric_L2 demand data read hits per txn": "Ratio of number of completed demand load requests hitting in L2 cache to the total number of completed transactions",
+        "metric_L2 misses per txn (includes code+data+rfo w/ prefetches)": "Ratio of number of requests missing L2 cache (includes code+data+rfo w/ prefetches) to the total number of completed transactions",
+        "metric_L2 demand data read misses per txn": "Ratio of number of completed data read request missing L2 cache to the total number of completed transactions",
+        "metric_L2 demand code misses per txn": "Ratio of number of code read request missing L2 cache to the total number of completed transactions",
+        "metric_LLC code read misses per txn (demand+prefetch)": "Ratio of number of code read requests missing last level core cache (includes demand w/ prefetches) to the total number of completed transactions",
+        "metric_LLC data read misses per txn (demand+prefetch)": "Ratio of number of data read requests missing last level core cache (includes demand w/ prefetches) to the total number of completed transactions",
         "metric_NUMA %_Reads addressed to local DRAM": "Memory read that miss the last level cache (LLC) addressed to local DRAM as a percentage of total memory read accesses, does not include LLC prefetches.",
         "metric_NUMA %_Reads addressed to remote DRAM": "Memory reads that miss the last level cache (LLC) addressed to remote DRAM as a percentage of total memory read accesses, does not include LLC prefetches.",
         "metric_uncore frequency GHz": "Uncore operating frequency in GHz",
@@ -250,6 +262,8 @@
         "metric_TMA_....Microcode_Sequencer(%)": "This metric represents fraction of slots the CPU was retiring uops fetched by the Microcode Sequencer (MS) unit.  The MS is used for CISC instructions not supported by the default decoders (like repeat move strings; or CPUID); or by microcode assists used to address some operation modes (like in Floating Point assists). These cases can often be avoided.",
         "metric_TMA_Info_System_SMT_2T_Utilization": "Fraction of cycles where both hardware Logical Processors were active",
       }
+
+      const transactions = TRANSACTIONS;
 
       const base_line = {
         xAxis: {
@@ -362,6 +376,28 @@
             data: DRAMPOWER.map((e, i) => [i * 5, e]),
           }
         ]
+      }
+
+      const diffreport = (e) => {
+        console.log(e)
+        var reader = new FileReader();
+
+        reader.onload = (e) => {
+          let new_metrics = JSON.parse(e.target.result.split("\n").filter(e => e.includes("const all_metrics ="))[0].split("const all_metrics =")[1])
+          let copy = JSON.parse(JSON.stringify(current_metrics))
+          for (const metric of copy) {
+            for (const other_metric of new_metrics) {
+              if (metric.metrics === other_metric.metrics) {
+                console.log(metric)
+                console.log(current_metrics)
+                metric.other = other_metric["0"]
+              }
+            }
+          }
+          setCurrent_metrics(copy)
+        };
+
+        reader.readAsText(e.target.files[0]);
       }
 
       return (
@@ -492,7 +528,7 @@
                     Pressure Stall Information (PSI)
                   </Typography>
                   <Typography variant="body1">
-                    Your workload spent an average of {PSI_MEM + PSI_CPU + PSI_IO}% of time stalled waiting on a hardware resource.
+                    Your workload spent an average of {(PSI_MEM + PSI_CPU + PSI_IO).toFixed(2)}% of time stalled waiting on a hardware resource.
                   </Typography>
                   <ul>
                     <li>
@@ -592,10 +628,11 @@
               <Grid container>
                 <Grid item xs={5}>
                   <Typography variant="h2">
-                    CPI
+                    {transactions ? "Cycles per transaction" : "CPI"}
                   </Typography>
                   <Typography variant="body1">
-                    Cycles per instruction retired; indicating how much time each executed instruction took; in units of cycles. Often this metric shows how efficiently applications are using the underlying hardware. A lower CPI could indicate that instructions are not hitting bottlenecks and retiring quickly.
+                    {transactions ? "Cycles per transaction retired; indicating how much time each executed transaction took; in units of cycles. Often this metric shows how efficiently applications are using the underlying hardware. A lower \"Cycles per TXN\" could indicate that transactions are not hitting bottlenecks and retiring quickly." : "Cycles per instruction retired; indicating how much time each executed instruction took; in units of cycles. Often this metric shows how efficiently applications are using the underlying hardware. A lower CPI could indicate that instructions are not hitting bottlenecks and retiring quickly."}
+
                   </Typography>
                 </Grid>
                 <Grid item xs={7}>
@@ -649,10 +686,10 @@
               <Grid container>
                 <Grid item xs={5}>
                   <Typography variant="h2">
-                    Cache MPI (misses per instruction)
+                    {transactions ? "Cache misses per transaction" : "Cache MPI (misses per instruction)"}
                   </Typography>
                   <Typography variant="body1">
-                    The ratio of the number of requests missing cache to the total number of completed instructions, at each level of cache (L1, L2 and LLC)
+                    {transactions ? "The ratio of the number of requests missing cache to the total number of completed transactions, at each level of cache (L1, L2 and LLC)" : "The ratio of the number of requests missing cache to the total number of completed instructions, at each level of cache (L1, L2 and LLC)"}
                   </Typography>
                 </Grid>
                 <Grid item xs={7}>
@@ -723,16 +760,18 @@
               value={systemTabs}
               index={6}
             >
+              <TextField id="outlined-basic" onChange={diffreport} inputProps={{ accept: '.html' }} fullWidth label="Diff with other metrics" InputLabelProps={{ shrink: true }} sx={{ paddingBottom: "24px" }} type="file" variant="outlined" />
               <TableContainer component={Paper}>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Value</TableCell>
-                      <TableCell>Metric</TableCell>
+                      <TableCell><Typography variant="body1">Value</Typography></TableCell>
+                      <TableCell><Typography variant="body1">Metric</Typography></TableCell>
+                      {current_metrics[0].hasOwnProperty("other") && <TableCell><Typography variant="body1">Other</Typography></TableCell>}
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {all_metrics.map((row) => (
+                    {current_metrics.map((row) => (
                       <TableRow
                         hover={true}
                         key={row.metrics}
@@ -747,9 +786,14 @@
                         </TableCell>
                         <TableCell align="right">
                           <Typography variant="body1">
-                            {Math.round(Number(row["0"]) * 100) / 100}
+                            {Number(row["0"]).toFixed(2)}
                           </Typography>
                         </TableCell>
+                        {row.hasOwnProperty("other") && <TableCell align="right" sx={{ backgroundColor: "rgba(255,0,0," + Math.abs(Number(row["other"]) / Number(row["0"]) - 1) + ")" }}>
+                          <Typography variant="body1">
+                            {Number(row["other"]).toFixed(2)}
+                          </Typography>
+                        </TableCell>}
                       </TableRow>
                     ))}
                   </TableBody>

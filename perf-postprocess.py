@@ -93,6 +93,11 @@ def get_args(script_path):
     parser.add_argument(
         "--rawevents", help="save raw events in .csv format", action="store_true"
     )
+    parser.add_argument(
+        "--pertxn",
+        type=int,
+        help="Generate per-transaction metrics using the provided transactions/sec.",
+    )
 
     args = parser.parse_args()
 
@@ -100,6 +105,13 @@ def get_args(script_path):
     if args.version:
         print(perf_helpers.get_tool_version())
         sys.exit()
+
+    # check number of transactions > 1
+    if args.pertxn is not None:
+        if args.pertxn < 1:
+            crash("Number of transactions cannot be < 1" % args.outfile)
+        else:
+            args.outfile = args.outfile.replace(".csv", "_txn.csv")
 
     # check rawfile argument is given
     if args.rawfile is None:
@@ -228,10 +240,13 @@ def get_all_data_lines(input_file_path):
 
 
 # get_metadata
-def get_metadata_as_dict(meta_data_lines):
+def get_metadata_as_dict(meta_data_lines, txns=None):
     meta_data = {}
     meta_data["constants"] = {}
     meta_data["metadata"] = {}
+    if txns is not None:
+        meta_data["constants"]["TXN"] = txns
+
     for line in meta_data_lines:
         if line.startswith("SYSTEM_TSC_FREQ"):
             meta_data["constants"]["SYSTEM_TSC_FREQ"] = (
@@ -420,7 +435,7 @@ def validate_file(fname):
         crash(str(fname) + " not accessible")
 
 
-def get_metrics_formula(architecture):
+def get_metrics_formula(architecture, txns=None):
     # get the metric file name based on architecture
     metric_file = get_metric_file_name(architecture)
     validate_file(metric_file)
@@ -429,8 +444,12 @@ def get_metrics_formula(architecture):
         try:
             metrics = json.load(f_metric)
             for metric in metrics:
+                if txns is not None:
+                    if "name-txn" in metric:
+                        metric["name"] = metric["name-txn"]
+                    if "expression-txn" in metric:
+                        metric["expression"] = metric["expression-txn"]
                 metric["events"] = re.findall(r"\[(.*?)\]", metric["expression"])
-
             return metrics
         except json.decoder.JSONDecodeError:
             crash("Invalid JSON, please provide a valid JSON as metrics file")
@@ -598,7 +617,7 @@ def row(df, name):
         return "[]"
 
 
-def write_html(time_series_df, perf_mode, out_file_path, meta_data):
+def write_html(time_series_df, perf_mode, out_file_path, meta_data, pertxn=None):
     html_file = "base.html"
     if getattr(sys, "frozen", False):
         basepath = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -614,6 +633,7 @@ def write_html(time_series_df, perf_mode, out_file_path, meta_data):
 
     # only show TMA if system-wide mode
     if perf_mode == Mode.System:
+        html = html.replace("TRANSACTIONS", str(pertxn is not None).lower())
         time_series_df.index.name = "metrics"
         for metric in [
             ["CPUUTIL", "metric_CPU utilization %"],
@@ -630,7 +650,13 @@ def write_html(time_series_df, perf_mode, out_file_path, meta_data):
             ["TOTALDATA", "metric_memory bandwidth total (MB/sec)"],
             ["REMOTENUMA", "metric_NUMA %_Reads addressed to remote DRAM"],
         ]:
-            html = html.replace(metric[0], row(time_series_df, metric[1]))
+            new_metric = metric[1]
+            if pertxn is not None:
+                if "_CPI" in new_metric:
+                    new_metric = new_metric.replace("_CPI", "_cycles per txn")
+                if " MPI" in new_metric:
+                    new_metric = new_metric.replace(" MPI", " misses per txn")
+            html = html.replace(metric[0], row(time_series_df, new_metric))
 
         avg = time_series_df.mean(numeric_only=True, axis=1).to_frame()
         html = html.replace(
@@ -896,6 +922,7 @@ def generate_metrics(
     metadata,
     metrics,
     perf_mode,
+    pertxn=None,
     verbose=False,
     fail_postprocessing=False,
 ):
@@ -970,7 +997,7 @@ def generate_metrics(
     generate_metrics_time_series(time_series_df, perf_mode, out_file_path)
     generate_metrics_averages(time_series_df, perf_mode, out_file_path)
     if perf_mode == Mode.System:
-        write_html(time_series_df, perf_mode, out_file_path, meta_data)
+        write_html(time_series_df, perf_mode, out_file_path, meta_data, pertxn)
     return
 
 
@@ -1074,7 +1101,6 @@ if __name__ == "__main__":
     args = get_args(script_path)
     input_file_path = args.rawfile
     out_file_path = args.outfile
-
     # read all metadata, perf evernts, and perf data lines
     # Note: this might not be feasible for very large files
     meta_data_lines, perf_event_lines, perf_data_lines = get_all_data_lines(
@@ -1082,7 +1108,7 @@ if __name__ == "__main__":
     )
 
     # parse metadata and get mode (system, socket, or CPU)
-    meta_data = get_metadata_as_dict(meta_data_lines)
+    meta_data = get_metadata_as_dict(meta_data_lines, args.pertxn)
     perf_mode = Mode.System
     if "PERSOCKET_MODE" in meta_data and meta_data["PERSOCKET_MODE"]:
         perf_mode = Mode.Socket
@@ -1101,7 +1127,7 @@ if __name__ == "__main__":
     perf_data_df = extract_dataframe(perf_data_lines, meta_data, perf_mode)
 
     # parse metrics expressions
-    metrics = get_metrics_formula(meta_data["constants"]["CONST_ARCH"])
+    metrics = get_metrics_formula(meta_data["constants"]["CONST_ARCH"], args.pertxn)
 
     if args.rawevents:  # generate raw events for system, socket and CPU
         generate_raw_events(perf_data_df, out_file_path, perf_mode)
@@ -1125,6 +1151,7 @@ if __name__ == "__main__":
                 meta_data,
                 metrics,
                 perf_mode,
+                args.pertxn,
                 args.verbose,
                 args.fail_postprocessing,
             )
@@ -1139,6 +1166,7 @@ if __name__ == "__main__":
             meta_data,
             metrics,
             perf_mode,
+            args.pertxn,
             args.verbose,
             args.fail_postprocessing,
         )
@@ -1151,6 +1179,7 @@ if __name__ == "__main__":
                 meta_data,
                 metrics,
                 Mode.System,
+                args.pertxn,
                 args.verbose,
                 args.fail_postprocessing,
             )
