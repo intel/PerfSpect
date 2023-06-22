@@ -14,67 +14,97 @@
     },
     {
         "name": "metric_CPI",
-        "expression": "[cpu-cycles] / [instructions]"
+		"name-txn": "metric_cycles per txn",
+        "expression": "[cpu-cycles] / [instructions]",
+		"expression-txn": "[cpu-cycles] / [TXN]"
     },
     {
         "name": "metric_kernel_CPI",
+		"name-txn": "metric_kernel_cycles per txn",
         "expression": "[cpu-cycles:k] / [instructions:k]",
+		"expression-txn": "[cpu-cycles:k] / [TXN]",
         "origin": "perfspect"
     },
     {
         "name": "metric_locks retired per instr",
+		"name-txn": "metric_locks retired per txn",
         "expression": "[MEM_INST_RETIRED.LOCK_LOADS] / [instructions]",
+		"expression-txn": "[MEM_INST_RETIRED.LOCK_LOADS] / [TXN]",
         "origin": "perfmon website"
     },
     {
         "name": "metric_L1D MPI (includes data+rfo w/ prefetches)",
-        "expression": "[L1D.REPLACEMENT] / [instructions]"
+		"name-txn": "metric_L1D misses per txn (includes data+rfo w/ prefetches)",
+        "expression": "[L1D.REPLACEMENT] / [instructions]",
+		"expression-txn": "[L1D.REPLACEMENT] / [TXN]"
     },
     {
         "name": "metric_L1D demand data read hits per instr",
-        "expression": "[MEM_LOAD_RETIRED.L1_HIT] / [instructions]"
+		"name-txn": "metric_L1D demand data read hits per txn",
+        "expression": "[MEM_LOAD_RETIRED.L1_HIT] / [instructions]",
+		"expression-txn": "[MEM_LOAD_RETIRED.L1_HIT] / [TXN]"
     },
     {
         "name": "metric_L1-I code read misses (w/ prefetches) per instr",
-        "expression": "[L2_RQSTS.ALL_CODE_RD] / [instructions]"
+		"name-txn": "metric_L1I code read misses (includes prefetches) per txn",
+        "expression": "[L2_RQSTS.ALL_CODE_RD] / [instructions]",
+		"expression-txn": "[L2_RQSTS.ALL_CODE_RD] / [TXN]"
     },
     {
         "name": "metric_L2 demand data read hits per instr",
-        "expression": "[MEM_LOAD_RETIRED.L2_HIT] / [instructions]"
+		"name-txn": "metric_L2 demand data read hits per txn",
+        "expression": "[MEM_LOAD_RETIRED.L2_HIT] / [instructions]",
+        "expression-txn": "[MEM_LOAD_RETIRED.L2_HIT] / [TXN]"
     },
     {
         "name": "metric_L2 MPI (includes code+data+rfo w/ prefetches)",
-        "expression": "[L2_LINES_IN.ALL] / [instructions]"
+		"name-txn": "metric_L2 misses per txn (includes code+data+rfo w/ prefetches)",
+        "expression": "[L2_LINES_IN.ALL] / [instructions]",
+		"expression-txn": "[L2_LINES_IN.ALL] / [TXN]"
     },
     {
         "name": "metric_L2 demand data read MPI",
-        "expression": "[MEM_LOAD_RETIRED.L2_MISS] / [instructions]"
+		"name-txn": "metric_L2 demand data read misses per txn",
+        "expression": "[MEM_LOAD_RETIRED.L2_MISS] / [instructions]",
+		"exression-txn": "[MEM_LOAD_RETIRED.L2_MISS] / [TXN]"
     },
     {
         "name": "metric_L2 demand code MPI",
-        "expression": "[L2_RQSTS.CODE_RD_MISS] / [instructions]"
+		"name-txn": "metric_L2 demand code misses per txn",
+        "expression": "[L2_RQSTS.CODE_RD_MISS] / [instructions]",
+	    "expression-txn": "[L2_RQSTS.CODE_RD_MISS] / [TXN]"
     },
     {
         "name": "metric_LLC MPI (includes code+data+rfo w/ prefetches)",
+	    "name-txn": "metric_LLC misses per txn (includes code+data+rfo w/ prefetches)",
         "expression": "([UNC_CHA_TOR_INSERTS.IA_MISS.0x12CC0233] + [UNC_CHA_TOR_INSERTS.IA_MISS.0x12D40433] + [UNC_CHA_TOR_INSERTS.IA_MISS.0x12C40033]) / [instructions]",
+	    "expression-txn": "([UNC_CHA_TOR_INSERTS.IA_MISS.0x12CC0233] + [UNC_CHA_TOR_INSERTS.IA_MISS.0x12D40433] + [UNC_CHA_TOR_INSERTS.IA_MISS.0x12C40033]) / [TXN]",
         "origin": "perfspect"
     },
     {
         "name": "metric_LLC code read MPI (demand+prefetch)",
-        "expression": "[UNC_CHA_TOR_INSERTS.IA_MISS.0x12CC0233] / [instructions]"
+	    "name-txn": "metric_LLC code read (demand+prefetch) misses per txn",
+	    "expression": "[UNC_CHA_TOR_INSERTS.IA_MISS.0x12CC0233] / [instructions]",
+	    "expression-txn": "[UNC_CHA_TOR_INSERTS.IA_MISS.0x12CC0233] / [TXN]"
     },
     {
         "name": "metric_LLC data read MPI (demand+prefetch)",
-        "expression": "[UNC_CHA_TOR_INSERTS.IA_MISS.0x12D40433] / [instructions]"
+	    "name-txn": "metric_LLC data read (demand+prefetch) misses per txn",
+        "expression": "[UNC_CHA_TOR_INSERTS.IA_MISS.0x12D40433] / [instructions]",
+	    "expression-txn": "[UNC_CHA_TOR_INSERTS.IA_MISS.0x12D40433] / [TXN]"
     },
     {
         "name": "metric_LLC total HITM (per instr)",
+        "name-txn": "metric_LLC total HITM per txn (excludes LLC prefetches)",
         "expression": "[OCR.ALL_READS.L3_MISS.REMOTE_HITM] / [instructions]",
+		"expression-txn": "[OCR.ALL_READS.L3_MISS.REMOTE_HITM] / [TXN]",
         "origin": "perfspect"
     },
     {
         "name": "metric_LLC total HIT clean line forwards (per instr)",
+		"name-txn": "metric_LLC total HIT clean line forwards per txn (excludes LLC prefetches)",
         "expression": "[OCR.ALL_READS.L3_MISS.REMOTE_HIT_FORWARD] / [instructions]",
+		"expression-txn": "[OCR.ALL_READS.L3_MISS.REMOTE_HIT_FORWARD] / [TXN]",
         "origin": "perfspect"
     },
     {
@@ -99,33 +129,47 @@
     },
     {
         "name": "metric_ITLB MPI",
-        "expression": "[ITLB_MISSES.WALK_COMPLETED] / [instructions]"
+		"name-txn": "metric_ITLB misses per txn",
+        "expression": "[ITLB_MISSES.WALK_COMPLETED] / [instructions]",
+		"expression-txn": "[ITLB_MISSES.WALK_COMPLETED] / [TXN]"
     },
     {
         "name": "metric_ITLB large page MPI",
-        "expression": "[ITLB_MISSES.WALK_COMPLETED_2M_4M] / [instructions]"
+		"name-txn": "metric_ITLB large page misses per txn",
+        "expression": "[ITLB_MISSES.WALK_COMPLETED_2M_4M] / [instructions]",
+		"expression-txn": "[ITLB_MISSES.WALK_COMPLETED_2M_4M] / [TXN]"
     },
     {
         "name": "metric_DTLB load MPI",
-        "expression": "[DTLB_LOAD_MISSES.WALK_COMPLETED] / [instructions]"
+		"name-txn": "metric_DTLB load misses per txn",
+        "expression": "[DTLB_LOAD_MISSES.WALK_COMPLETED] / [instructions]",
+		"expression-txn": "[DTLB_LOAD_MISSES.WALK_COMPLETED] / [TXN]"
     },
     {
         "name": "metric_DTLB 4KB page load MPI",
+		"name-txn": "metric_DTLB 4KB page load misses per txn",
         "expression": "[DTLB_LOAD_MISSES.WALK_COMPLETED_4K] / [instructions]",
+		"expression-txn": "[DTLB_LOAD_MISSES.WALK_COMPLETED_4K] / [TXN]",
         "origin": "perfspect"
     },
     {
         "name": "metric_DTLB 2MB large page load MPI",
-        "expression": "[DTLB_LOAD_MISSES.WALK_COMPLETED_2M_4M] / [instructions]"
+		"name-txn": "metric_DTLB 2MB large page load misses per txn",
+        "expression": "[DTLB_LOAD_MISSES.WALK_COMPLETED_2M_4M] / [instructions]",
+		"expression-txn": "[DTLB_LOAD_MISSES.WALK_COMPLETED_2M_4M] / [TXN]"
     },
     {
         "name": "metric_DTLB 1GB large page load MPI",
+        "name-txn": "metric_DTLB 1GB large page load misses per txn",
         "expression": "[DTLB_LOAD_MISSES.WALK_COMPLETED_1G] / [instructions]",
+		"expression-txn": "[DTLB_LOAD_MISSES.WALK_COMPLETED_1G] / [TXN]",
         "origin": "perfspect"
     },
     {
         "name": "metric_DTLB store MPI",
-        "expression": "[DTLB_STORE_MISSES.WALK_COMPLETED] / [instructions]"
+		"name-txn": "metric_DTLB store misses per txn",
+        "expression": "[DTLB_STORE_MISSES.WALK_COMPLETED] / [instructions]",
+		"expression-txn": "[DTLB_STORE_MISSES.WALK_COMPLETED] / [TXN]"
     },
     {
         "name": "metric_DTLB load miss latency (in core clks)",
