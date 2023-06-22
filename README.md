@@ -40,6 +40,8 @@ perf-postprocess outputs:
 2. `metric_out.sys.csv`: metric values at every 5 second interval
 3. `metric_out.html`: html view of a few select metrics
 
+[live example report](https://intel.github.io/PerfSpect/)
+
 ![basic_stats](https://raw.githubusercontent.com/wiki/intel/PerfSpect/newhtml.gif)
 
 ## Deploy in Kubernetes
