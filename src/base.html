@@ -34,6 +34,7 @@
       createTheme,
       Typography,
       Button,
+      IconButton,
       ButtonGroup,
       Slider,
       Grid,
@@ -77,15 +78,7 @@
         ].join(","),
       },
       palette: {
-        primary: {
-          main: "#556cd6",
-        },
-        secondary: {
-          main: "#19857b",
-        },
-        error: {
-          main: colors.red.A400,
-        },
+        mode: 'light',
       },
     });
 
@@ -159,6 +152,8 @@
     function App() {
       const [systemTabs, setSystemTabs] = React.useState(0);
       const [openlink, setOpenlink] = React.useState(true);
+      const [maxdiff, set_maxdiff] = React.useState(0)
+      const [mindiff, set_mindiff] = React.useState(0)
 
       const handleChange = (event, newSystemTabs) => {
         setSystemTabs(newSystemTabs);
@@ -267,11 +262,14 @@
 
       const base_line = {
         xAxis: {
-          name: "time (s)"
+          name: "time (s)",
+          min: "dataMin",
+          max: "dataMax",
         },
         yAxis: {},
         tooltip: {
-          trigger: 'axis'
+          trigger: 'axis',
+          valueFormatter: (value) => value.toFixed(2),
         },
         legend: {},
       }
@@ -281,7 +279,7 @@
         series: [
           {
             type: 'line',
-            data: CPUUTIL.map((e, i) => [i * 5, e]),
+            data: CPUUTIL,
           }
         ]
       }
@@ -291,7 +289,7 @@
         series: [
           {
             type: 'line',
-            data: CPIDATA.map((e, i) => [i * 5, e]),
+            data: CPIDATA,
           }
         ]
       }
@@ -301,7 +299,7 @@
         series: [
           {
             type: 'line',
-            data: CPUFREQ.map((e, i) => [i * 5, e]),
+            data: CPUFREQ,
           }
         ]
       }
@@ -311,7 +309,7 @@
         series: [
           {
             type: 'line',
-            data: REMOTENUMA.map((e, i) => [i * 5, e]),
+            data: REMOTENUMA,
           }
         ]
       }
@@ -322,17 +320,17 @@
           {
             name: "L1D",
             type: 'line',
-            data: L1DATA.map((e, i) => [i * 5, e]),
+            data: L1DATA,
           },
           {
             name: "L2",
             type: 'line',
-            data: L2DATA.map((e, i) => [i * 5, e]),
+            data: L2DATA,
           },
           {
             name: "LLC Data",
             type: 'line',
-            data: LLCDATA.map((e, i) => [i * 5, e]),
+            data: LLCDATA,
           },
         ]
       }
@@ -343,17 +341,17 @@
           {
             name: "Read",
             type: 'line',
-            data: READDATA.map((e, i) => [i * 5, e]),
+            data: READDATA,
           },
           {
             name: "Write",
             type: 'line',
-            data: WRITEDATA.map((e, i) => [i * 5, e]),
+            data: WRITEDATA,
           },
           {
             name: "Total",
             type: 'line',
-            data: TOTALDATA.map((e, i) => [i * 5, e]),
+            data: TOTALDATA,
           },
         ]
       }
@@ -363,7 +361,7 @@
         series: [
           {
             type: 'line',
-            data: PKGPOWER.map((e, i) => [i * 5, e]),
+            data: PKGPOWER,
           }
         ]
       }
@@ -373,27 +371,38 @@
         series: [
           {
             type: 'line',
-            data: DRAMPOWER.map((e, i) => [i * 5, e]),
+            data: DRAMPOWER,
           }
         ]
       }
 
       const diffreport = (e) => {
-        console.log(e)
-        var reader = new FileReader();
-
+        let reader = new FileReader();
         reader.onload = (e) => {
           let new_metrics = JSON.parse(e.target.result.split("\n").filter(e => e.includes("const all_metrics ="))[0].split("const all_metrics =")[1])
           let copy = JSON.parse(JSON.stringify(current_metrics))
+          let temp_mindiff = 0
+          let temp_maxdiff = 0
           for (const metric of copy) {
             for (const other_metric of new_metrics) {
               if (metric.metrics === other_metric.metrics) {
-                console.log(metric)
-                console.log(current_metrics)
                 metric.other = other_metric["0"]
+                if (other_metric["0"] < metric["0"]) {
+                  metric.diff = ((other_metric["0"] / metric["0"]) - 1) * 100
+                } else {
+                  metric.diff = ((metric["0"] / other_metric["0"]) - 1) * -100
+                }
+                if (temp_maxdiff == 0 || temp_maxdiff < metric.diff) {
+                  temp_maxdiff = metric.diff
+                }
+                if (temp_mindiff == 0 || temp_mindiff > metric.diff) {
+                  temp_mindiff = metric.diff
+                }
               }
             }
           }
+          set_maxdiff(temp_maxdiff)
+          set_mindiff(temp_mindiff)
           setCurrent_metrics(copy)
         };
 
@@ -413,8 +422,7 @@
               onChange={handleChange}
               variant="scrollable"
             >
-              <Tab label="TMA" />
-              <Tab label="PSI" />
+              <Tab label="Bottlenecks" />
               <Tab label="CPU" />
               <Tab label="Memory" />
               <Tab label="Power" />
@@ -427,7 +435,7 @@
               value={systemTabs}
               index={0}
             >
-              <Grid container>
+              <Grid container style={{ padding: "0px 0px 24px 0px" }}>
                 <Grid item xs={5}>
                   <Typography variant="h2">
                     Top-down Microarchitecture Analysis Method (TMAM)
@@ -484,27 +492,27 @@
                       data: [
                         {
                           name: "Bad Speculation",
-                          value: BADSPECULATION,
+                          value: Math.round(BADSPECULATION * 10) / 10,
                         },
                         {
                           name: "Retiring",
-                          value: RETIRING,
+                          value: Math.round(RETIRING * 10) / 10,
                         },
                         {
                           name: "Frontend",
-                          value: FRONTEND,
+                          value: Math.round(FRONTEND * 10) / 10,
                         },
                         {
                           name: "Backend",
-                          value: BACKEND,
+                          value: Math.round(BACKEND * 10) / 10,
                           children: [
                             {
                               name: "Core",
-                              value: COREDATA,
+                              value: Math.round(COREDATA * 10) / 10,
                             },
                             {
                               name: "Memory",
-                              value: MEMORY,
+                              value: Math.round(MEMORY * 10) / 10,
                             },
                           ],
                         },
@@ -517,18 +525,13 @@
                   }} />
                 </Grid>
               </Grid>
-            </TabPanel>
-            <TabPanel
-              value={systemTabs}
-              index={1}
-            >
               <Grid container>
                 <Grid item xs={5}>
                   <Typography variant="h2">
                     Pressure Stall Information (PSI)
                   </Typography>
                   <Typography variant="body1">
-                    Your workload spent an average of {(PSI_MEM + PSI_CPU + PSI_IO).toFixed(2)}% of time stalled waiting on a hardware resource.
+                    Your workload spent an average of {(PSI_MEM + PSI_CPU + PSI_IO).toFixed(1)}% of time stalled waiting on a hardware resource.
                   </Typography>
                   <ul>
                     <li>
@@ -572,28 +575,28 @@
                       data: [
                         {
                           name: "CPU stall",
-                          value: PSI_CPU,
+                          value: Math.round(PSI_CPU * 10) / 10,
                           itemStyle: {
                             color: "#ee6666"
                           }
                         },
                         {
                           name: "Memory stall",
-                          value: PSI_MEM,
+                          value: Math.round(PSI_MEM * 10) / 10,
                           itemStyle: {
                             color: "#fac858"
                           }
                         },
                         {
                           name: "IO stall",
-                          value: PSI_IO,
+                          value: Math.round(PSI_IO * 10) / 10,
                           itemStyle: {
                             color: "#73c0de"
                           }
                         },
                         {
                           name: "Not stalled",
-                          value: 100 - (PSI_MEM + PSI_CPU + PSI_IO),
+                          value: Math.round((100 - (PSI_MEM + PSI_CPU + PSI_IO)) * 10) / 10,
                           itemStyle: {
                             color: "#91cc75"
                           }
@@ -610,7 +613,7 @@
             </TabPanel>
             <TabPanel
               value={systemTabs}
-              index={2}
+              index={1}
             >
               <Grid container>
                 <Grid item xs={5}>
@@ -632,7 +635,6 @@
                   </Typography>
                   <Typography variant="body1">
                     {transactions ? "Cycles per transaction retired; indicating how much time each executed transaction took; in units of cycles. Often this metric shows how efficiently applications are using the underlying hardware. A lower \"Cycles per TXN\" could indicate that transactions are not hitting bottlenecks and retiring quickly." : "Cycles per instruction retired; indicating how much time each executed instruction took; in units of cycles. Often this metric shows how efficiently applications are using the underlying hardware. A lower CPI could indicate that instructions are not hitting bottlenecks and retiring quickly."}
-
                   </Typography>
                 </Grid>
                 <Grid item xs={7}>
@@ -655,7 +657,7 @@
             </TabPanel>
             <TabPanel
               value={systemTabs}
-              index={3}
+              index={2}
             >
               <Grid container>
                 <Grid item xs={5}>
@@ -699,7 +701,7 @@
             </TabPanel>
             <TabPanel
               value={systemTabs}
-              index={4}
+              index={3}
             >
               <Grid container>
                 <Grid item xs={5}>
@@ -730,10 +732,10 @@
             </TabPanel>
             <TabPanel
               value={systemTabs}
-              index={5}
+              index={4}
             >
-              <TableContainer component={Paper}>
-                <Table>
+              <TableContainer component={Paper} sx={{ width: "fit-content" }}>
+                <Table style={{ tableLayout: 'auto' }}>
                   <TableHead>
                     <TableRow>
                       <TableCell>Metadata</TableCell>
@@ -749,7 +751,9 @@
                         <TableCell component="th" scope="row">
                           {row[0]}
                         </TableCell>
-                        <TableCell>{row[1]}</TableCell>
+                        <TableCell>
+                          {row[1]}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -758,16 +762,20 @@
             </TabPanel>
             <TabPanel
               value={systemTabs}
-              index={6}
+              index={5}
             >
-              <TextField id="outlined-basic" onChange={diffreport} inputProps={{ accept: '.html' }} fullWidth label="Diff with other metrics" InputLabelProps={{ shrink: true }} sx={{ paddingBottom: "24px" }} type="file" variant="outlined" />
-              <TableContainer component={Paper}>
-                <Table size="small">
+              <TextField id="outlined-basic" onChange={diffreport} inputProps={{ accept: '.html' }} fullWidth label="Diff with other metric_out.html" InputLabelProps={{ shrink: true }} sx={{ paddingBottom: "24px" }} type="file" variant="outlined" />
+              <Alert severity="info" sx={{ marginBottom: "24px" }}>
+                TMA metrics are a hierarchy where each sub-metric contains more periods "..." to designate its depth in the tree
+              </Alert>
+              <TableContainer component={Paper} sx={{ width: "fit-content" }}>
+                <Table style={{ tableLayout: 'auto' }}>
                   <TableHead>
                     <TableRow>
-                      <TableCell><Typography variant="body1">Value</Typography></TableCell>
-                      <TableCell><Typography variant="body1">Metric</Typography></TableCell>
-                      {current_metrics[0].hasOwnProperty("other") && <TableCell><Typography variant="body1">Other</Typography></TableCell>}
+                      <TableCell>Value</TableCell>
+                      <TableCell>Metric</TableCell>
+                      {current_metrics[0].hasOwnProperty("other") && <TableCell>Other</TableCell>}
+                      {current_metrics[0].hasOwnProperty("other") && <TableCell>Diff</TableCell>}
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -778,21 +786,24 @@
                         sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
                       >
                         <TableCell component="th" scope="row" >
-                          <Tooltip followCursor title={description.hasOwnProperty(row.metrics) ? description[row.metrics] : ""}>
-                            <Typography variant="body1">
-                              {row.metrics}
-                            </Typography>
+                          <Tooltip title={description.hasOwnProperty(row.metrics) ? description[row.metrics] : ""}>
+                            {description.hasOwnProperty(row.metrics) && <IconButton>
+                              <Icon>help</Icon>
+                            </IconButton>}
+                            {!description.hasOwnProperty(row.metrics) && <IconButton disabled>
+                              <Icon>help</Icon>
+                            </IconButton>}
                           </Tooltip>
+                          {row.metrics}
                         </TableCell>
                         <TableCell align="right">
-                          <Typography variant="body1">
-                            {Number(row["0"]).toFixed(2)}
-                          </Typography>
+                          {Number(row["0"]).toFixed(1)}
                         </TableCell>
-                        {row.hasOwnProperty("other") && <TableCell align="right" sx={{ backgroundColor: "rgba(255,0,0," + Math.abs(Number(row["other"]) / Number(row["0"]) - 1) + ")" }}>
-                          <Typography variant="body1">
-                            {Number(row["other"]).toFixed(2)}
-                          </Typography>
+                        {row.hasOwnProperty("other") && <TableCell align="right">
+                          {Number(row["other"]).toFixed(1)}
+                        </TableCell>}
+                        {row.hasOwnProperty("other") && <TableCell align="right" sx={{ backgroundColor: (row.diff > 0 ? "rgba(255,0,0," + (row.diff / maxdiff * .5) + ")" : "rgba(0,0,255," + (row.diff / mindiff * .5) + ")") }}>
+                          {Math.round(Number(row["diff"]))}%
                         </TableCell>}
                       </TableRow>
                     ))}

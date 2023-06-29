@@ -612,7 +612,9 @@ def generate_metrics_averages(
 
 def row(df, name):
     if name in df.index:
-        return json.dumps(df.loc[name, :].values.flatten().tolist())
+        timeseries = df.loc[[name]].to_dict("split")
+        timeseries["columns"] = map(lambda x: round(float(x), 1), timeseries["columns"])
+        return json.dumps(list(zip(timeseries["columns"], timeseries["data"][0])))
     else:
         return "[]"
 
