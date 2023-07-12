@@ -65,18 +65,18 @@ Modify the template [deamonset.yml](docs/daemonset.yml) to deploy in kubernetes
 
 ### Minimum supported kernels
 
-| Xeon Generation | centos 7+ | ubuntu 16.04+ |
+| Xeon Generation | CentOS 7+ | Ubuntu 16.04+ |
 | --------------- | --------- | ------------- |
 | Broadwell       | 3.10      | 4.15          |
 | Skylake         | 3.10      | 4.15          |
-| Cascadelake     | 3.10      | 4.15          |
-| Icelake         | 3.10      | 4.15          |
+| Cascade Lake    | 3.10      | 4.15          |
+| Ice Lake        | 3.10      | 4.15          |
 | Sapphire Rapids | 5.12      | 5.12          |
 
 ### Supported Operating Systems:
 
 - Ubuntu 16.04 and newer
-- centos 7 and newer
+- CentOS 7 and newer
 - Amazon Linux 2
 - RHEL 9
 - Debian 11
