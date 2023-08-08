@@ -14,22 +14,22 @@
     },
     {
         "name": "metric_CPI",
-		"name-txn": "metric_cycles per txn",
+        "name-txn": "metric_cycles per txn",
         "expression": "[cpu-cycles] / [instructions]",
-		"expression-txn": "[cpu-cycles] / [TXN]"
+        "expression-txn": "[cpu-cycles] / [TXN]"
     },
     {
         "name": "metric_kernel_CPI",
-		"name-txn": "metric_kernel_cycles per txn",
+        "name-txn": "metric_kernel_cycles per txn",
         "expression": "[cpu-cycles:k] / [instructions:k]",
-		"expression-txn": "[cpu-cycles:k] / [TXN]",
+        "expression-txn": "[cpu-cycles:k] / [TXN]",
         "origin": "perfspect"
     },
     {
         "name": "metric_IPC",
-		"name-txn": "metric_txn per cycles",
+        "name-txn": "metric_txn per cycles",
         "expression": "[instructions] / [cpu-cycles]",
-		"expression-txn": "[instructions] / [TXN]",
+        "expression-txn": "[instructions] / [TXN]",
         "origin": "perfspect"
     },
     {
@@ -39,52 +39,52 @@
     },
     {
         "name": "metric_locks retired per instr",
-		"name-txn": "metric_locks retired per txn",
+        "name-txn": "metric_locks retired per txn",
         "expression": "[MEM_INST_RETIRED.LOCK_LOADS] / [instructions]",
-		"expression-txn": "[MEM_INST_RETIRED.LOCK_LOADS] / [TXN]",
+        "expression-txn": "[MEM_INST_RETIRED.LOCK_LOADS] / [TXN]",
         "origin": "perfmon website"
     },
     {
         "name": "metric_L1D MPI (includes data+rfo w/ prefetches)",
-		"name-txn": "metric_L1D misses per txn (includes data+rfo w/ prefetches)",
+        "name-txn": "metric_L1D misses per txn (includes data+rfo w/ prefetches)",
         "expression": "[L1D.REPLACEMENT] / [instructions]",
-		"expression-txn": "[L1D.REPLACEMENT] / [TXN]"
+        "expression-txn": "[L1D.REPLACEMENT] / [TXN]"
     },
     {
         "name": "metric_L1D demand data read hits per instr",
-		"name-txn": "metric_L1D demand data read hits per txn",
+        "name-txn": "metric_L1D demand data read hits per txn",
         "expression": "[MEM_LOAD_RETIRED.L1_HIT] / [instructions]",
-		"expression-txn": "[MEM_LOAD_RETIRED.L1_HIT] / [TXN]"
+        "expression-txn": "[MEM_LOAD_RETIRED.L1_HIT] / [TXN]"
     },
     {
         "name": "metric_L1-I code read misses (w/ prefetches) per instr",
-		"name-txn": "metric_L1I code read misses (includes prefetches) per txn",
+        "name-txn": "metric_L1I code read misses (includes prefetches) per txn",
         "expression": "[L2_RQSTS.ALL_CODE_RD] / [instructions]",
-		"expression-txn": "[L2_RQSTS.ALL_CODE_RD] / [TXN]"
+        "expression-txn": "[L2_RQSTS.ALL_CODE_RD] / [TXN]"
     },
     {
         "name": "metric_L2 demand data read hits per instr",
-		"name-txn": "metric_L2 demand data read hits per txn",
+        "name-txn": "metric_L2 demand data read hits per txn",
         "expression": "[MEM_LOAD_RETIRED.L2_HIT] / [instructions]",
-		"expression-txn": "[MEM_LOAD_RETIRED.L2_HIT] / [TXN]"
+        "expression-txn": "[MEM_LOAD_RETIRED.L2_HIT] / [TXN]"
     },
     {
         "name": "metric_L2 MPI (includes code+data+rfo w/ prefetches)",
-		"name-txn": "metric_L2 misses per txn (includes code+data+rfo w/ prefetches)",
+        "name-txn": "metric_L2 misses per txn (includes code+data+rfo w/ prefetches)",
         "expression": "[L2_LINES_IN.ALL] / [instructions]",
-		"expression-txn": "[L2_LINES_IN.ALL] / [TXN]"
+        "expression-txn": "[L2_LINES_IN.ALL] / [TXN]"
     },
     {
         "name": "metric_L2 demand data read MPI",
-		"name-txn": "metric_L2 demand data read misses per txn",
+        "name-txn": "metric_L2 demand data read misses per txn",
         "expression": "[MEM_LOAD_RETIRED.L2_MISS] / [instructions]",
-		"expression-txn": "[MEM_LOAD_RETIRED.L2_MISS] / [TXN]"
+        "expression-txn": "[MEM_LOAD_RETIRED.L2_MISS] / [TXN]"
     },
     {
         "name": "metric_L2 demand code MPI",
-		"name-txn": "metric_L2 demand code misses per txn",
+        "name-txn": "metric_L2 demand code misses per txn",
         "expression": "[L2_RQSTS.CODE_RD_MISS] / [instructions]",
-		"expression-txn": "[L2_RQSTS.CODE_RD_MISS] / [TXN]"
+        "expression-txn": "[L2_RQSTS.CODE_RD_MISS] / [TXN]"
     },
     {
         "name": "metric_Average LLC data read miss latency (in clks)",
@@ -160,27 +160,27 @@
     },
     {
         "name": "metric_LLC code read MPI (demand+prefetch)",
-		"name-txn": "metric_LLC code read (demand+prefetch) misses per txn",
+        "name-txn": "metric_LLC code read (demand+prefetch) misses per txn",
         "expression": "([UNC_CHA_TOR_INSERTS.IA_MISS_CRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_CRD_PREF]) / [instructions]",
-		"expression-txn": "([UNC_CHA_TOR_INSERTS.IA_MISS_CRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_CRD_PREF]) / [TXN]"
+        "expression-txn": "([UNC_CHA_TOR_INSERTS.IA_MISS_CRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_CRD_PREF]) / [TXN]"
     },
     {
         "name": "metric_LLC data read MPI (demand+prefetch)",
-		"name-txn": "metric_LLC data read (demand+prefetch) misses per txn",
+        "name-txn": "metric_LLC data read (demand+prefetch) misses per txn",
         "expression": "([UNC_CHA_TOR_INSERTS.IA_MISS_LLCPREFDRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF]) / [instructions]",
-		"expression-txn": "([UNC_CHA_TOR_INSERTS.IA_MISS_LLCPREFDRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF]) / [TXN]"
+        "expression-txn": "([UNC_CHA_TOR_INSERTS.IA_MISS_LLCPREFDRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF]) / [TXN]"
     },
     {
         "name": "metric_LLC total HITM (per instr) (excludes LLC prefetches)",
-		"name-txn": "metric_LLC total HITM per txn (excludes LLC prefetches)",
+        "name-txn": "metric_LLC total HITM per txn (excludes LLC prefetches)",
         "expression": "[OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HITM] / [instructions]",
-		"expression-txn": "[OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HITM] / [TXN]"
+        "expression-txn": "[OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HITM] / [TXN]"
     },
     {
         "name": "metric_LLC total HIT clean line forwards (per instr) (excludes LLC prefetches)",
-		"name-txn": "metric_LLC total HIT clean line forwards per txn (excludes LLC prefetches)",
+        "name-txn": "metric_LLC total HIT clean line forwards per txn (excludes LLC prefetches)",
         "expression": "[OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HIT_WITH_FWD] / [instructions]",
-		"expression-txn": "[OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HIT_WITH_FWD] / [TXN]"
+        "expression-txn": "[OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HIT_WITH_FWD] / [TXN]"
     },
     {
         "name": "metric_Average LLC demand data read miss latency (in ns)",
@@ -196,27 +196,27 @@
     },
     {
         "name": "metric_ITLB (2nd level) MPI",
-		"name-txn": "metric_ITLB (2nd level) misses per txn",
+        "name-txn": "metric_ITLB (2nd level) misses per txn",
         "expression": "[ITLB_MISSES.WALK_COMPLETED] / [instructions]",
-		"expression-txn": "[ITLB_MISSES.WALK_COMPLETED] / [TXN]"
+        "expression-txn": "[ITLB_MISSES.WALK_COMPLETED] / [TXN]"
     },
     {
         "name": "metric_DTLB (2nd level) load MPI",
-		"name-txn": "metric_DTLB (2nd level) load misses per txn",
+        "name-txn": "metric_DTLB (2nd level) load misses per txn",
         "expression": "[DTLB_LOAD_MISSES.WALK_COMPLETED] / [instructions]",
-		"expression-txn": "[DTLB_LOAD_MISSES.WALK_COMPLETED] / [TXN]"
+        "expression-txn": "[DTLB_LOAD_MISSES.WALK_COMPLETED] / [TXN]"
     },
     {
         "name": "metric_DTLB (2nd level) 2MB large page load MPI",
-		"name-txn": "metric_DTLB (2nd level) 2MB large page load misses per txn",
+        "name-txn": "metric_DTLB (2nd level) 2MB large page load misses per txn",
         "expression": "[DTLB_LOAD_MISSES.WALK_COMPLETED_2M_4M] / [instructions]",
-		"expression-txn": "[DTLB_LOAD_MISSES.WALK_COMPLETED_2M_4M] / [TXN]"
+        "expression-txn": "[DTLB_LOAD_MISSES.WALK_COMPLETED_2M_4M] / [TXN]"
     },
     {
         "name": "metric_DTLB (2nd level) store MPI",
-		"name-txn": "metric_DTLB (2nd level) store misses per txn",
+        "name-txn": "metric_DTLB (2nd level) store misses per txn",
         "expression": "[DTLB_STORE_MISSES.WALK_COMPLETED] / [instructions]",
-		"expression-txn": "[DTLB_STORE_MISSES.WALK_COMPLETED] / [TXN]"
+        "expression-txn": "[DTLB_STORE_MISSES.WALK_COMPLETED] / [TXN]"
     },
     {
         "name": "metric_NUMA %_Reads addressed to local DRAM",
