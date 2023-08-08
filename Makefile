@@ -58,7 +58,6 @@ dist/$(PACKAGE_EXTERNAL): build_dir build/libtsc build-public/collect build-publ
 	cp build/$(BINARY_COLLECT) dist/$(BINARY_FINAL)/$(BINARY_COLLECT)
 	cp build/$(BINARY_POSTPROCESS) dist/$(BINARY_FINAL)/$(BINARY_POSTPROCESS)
 	cp LICENSE dist/$(BINARY_FINAL)/
-	cp README.md dist/$(BINARY_FINAL)/README.md
 	cd dist && tar -czf $(PACKAGE_EXTERNAL) $(BINARY_FINAL)
 	cd dist && cp -r $(BINARY_FINAL) ../build/  
 	rm -rf dist/$(BINARY_FINAL)/

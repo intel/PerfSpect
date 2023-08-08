@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ###########################################################################################################
 
-# SapphireRapids event list (default)
+# SapphireRapids event list
 
 cpu/event=0x51,umask=0x01,period=100003,name='L1D.REPLACEMENT'/,
 cpu/event=0x24,umask=0xe4,period=200003,name='L2_RQSTS.ALL_CODE_RD'/,
