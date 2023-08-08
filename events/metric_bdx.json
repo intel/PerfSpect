@@ -29,7 +29,7 @@
         "name": "metric_locks retired per instr",
         "name-txn": "metric_locks retired per txn",
         "expression": "[MEM_INST_RETIRED.LOCK_LOADS] / [instructions]",
-        "expression-txn": "[MEM_INST_RETIRED.LOCK_LOADS] / [TXN]", 
+        "expression-txn": "[MEM_INST_RETIRED.LOCK_LOADS] / [TXN]",
         "origin": "perfmon website"
     },
     {

@@ -3,8 +3,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ###########################################################################################################
 
-# Broadwell event list (default, with extensive TMA collection)
-
+# Broadwell event list
 cpu/event=0xc2,umask=0x02,period=2000003,name='UOPS_RETIRED.RETIRE_SLOTS'/,
 cpu/event=0xc5,umask=0x00,name='BR_MISP_RETIRED.ALL_BRANCHES'/,
 cpu/event=0xc3,umask=0x01,name='MACHINE_CLEARS.COUNT'/,
@@ -173,4 +172,3 @@ imc/event=0x04,umask=0x0c,name='UNC_M_CAS_COUNT.WR'/;
 #power related
 power/energy-pkg/,
 power/energy-ram/;
-

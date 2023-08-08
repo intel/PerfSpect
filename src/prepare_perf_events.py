@@ -63,6 +63,8 @@ def is_cpu_event(line):
     if (
         (len(tmp_list) == 1 or tmp_list[0] == "cpu" or tmp_list[0].startswith("cstate"))
         and "OCR." not in line
+        and "uops_retired.ms" not in line
+        and "int_misc.unknown_branch_cycles" not in line
         and "power/" not in line
     ):
         return True
@@ -119,30 +121,43 @@ def filter_events(event_file, cpu_only, PID_CID_mode, TMA_supported):
     collection_events = []
     unsupported_events = []
     perf_list = helper.get_perf_list()
+    seperate_cycles = []
+    if cpu_only:
+        # since most CSP's hide cycles fixed PMU inside their VM's we put it in its own group
+        seperate_cycles = [
+            "cpu-cycles,",
+            "cpu-cycles:k,",
+            "ref-cycles,",
+            "instructions;",
+        ]
+
+    def process(line):
+        line = line.strip()
+        if line == "" or line.startswith("#") or (cpu_only and not is_cpu_event(line)):
+            return
+        if PID_CID_mode and line.startswith("cstate_"):
+            return
+        if not TMA_supported and (
+            "name='TOPDOWN.SLOTS'" in line or "name='PERF_METRICS." in line
+        ):
+            return
+        if not is_collectable_event(line, perf_list):
+            # not a collectable event
+            unsupported_events.append(line)
+            # if this is the last event in the group, mark the previous event as the last (with a ';')
+            if line.endswith(";") and len(collection_events) > 1:
+                end_event = collection_events[-1]
+                collection_events[-1] = end_event[:-1] + ";"
+        else:
+            collection_events.append(line)
+
     with open(event_file, "r") as fin:
         for line in fin:
-            line = line.strip()
-            if (
-                line == ""
-                or line.startswith("#")
-                or (cpu_only and not is_cpu_event(line))
-            ):
+            if cpu_only and "cpu-cycles" in line:
                 continue
-            if PID_CID_mode and line.startswith("cstate_"):
-                continue
-            if not TMA_supported and (
-                "name='TOPDOWN.SLOTS'" in line or "name='PERF_METRICS." in line
-            ):
-                continue
-            if not is_collectable_event(line, perf_list):
-                # not a collectable event
-                unsupported_events.append(line)
-                # if this is the last event in the group, mark the previous event as the last (with a ';')
-                if line.endswith(";") and len(collection_events) > 1:
-                    end_event = collection_events[-1]
-                    collection_events[-1] = end_event[:-1] + ";"
-            else:
-                collection_events.append(line)
+            process(line)
+        for line in seperate_cycles:
+            process(line)
         if len(unsupported_events) > 0:
             logging.warning(
                 f"Perf unsupported events not counted: {unsupported_events}"

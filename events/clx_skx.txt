@@ -3,8 +3,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 ###########################################################################################################
 
-# Cascadelake event list (default, with extensive TMA collection)
-
+# Cascadelake event list
 #avx related power levels
 cpu/event=0x28,umask=0x07,period=200003,name='CORE_POWER.LVL0_TURBO_LICENSE'/,
 cpu/event=0x28,umask=0x18,period=200003,name='CORE_POWER.LVL1_TURBO_LICENSE'/,
