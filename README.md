@@ -13,7 +13,7 @@
 [Quick Start](#quick-start-requires-perf-installed) | [Output](#output) | [Deploy in Kubernetes](#deploy-in-kubernetes) | [Requirements](#requirements) | [Build from source](#build-from-source)
 </div>
 
-PerfSpect is a system performance characterization tool built on top of linux perf. Most metrics and events come from [perfmon](https://github.com/intel/perfmon) and [TMA v4.5](https://www.intel.com/content/www/us/en/docs/vtune-profiler/cookbook/2023-1/top-down-microarchitecture-analysis-method.html). It contains two parts:
+PerfSpect is a system performance characterization tool built on top of linux perf. It contains two parts:
 
 perf-collect: Collects hardware events at a 5 second output interval with practically zero overhead since PMU's run in counting  mode.
 
@@ -91,3 +91,5 @@ Requires recent python. On successful build, binaries will be created in `dist` 
 pip3 install -r requirements.txt
 make
 ```
+
+_Note: Most metrics and events come from [perfmon](https://github.com/intel/perfmon) and [TMA v4.5](https://www.intel.com/content/www/us/en/docs/vtune-profiler/cookbook/2023-1/top-down-microarchitecture-analysis-method.html)_
