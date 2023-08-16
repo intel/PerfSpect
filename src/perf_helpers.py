@@ -158,7 +158,8 @@ def disable_nmi_watchdog():
             logging.info("nmi_watchdog disabled!")
         return nmi_watchdog_status
     except subprocess.CalledProcessError as e:
-        crash(e.output + "\nFailed to disable nmi_watchdog.")
+        logging.warning(e)
+        logging.warning("Failed to disable nmi_watchdog.")
     except ValueError as e:
         crash(f"Failed to disable watchdog: {e}")
 
@@ -175,7 +176,8 @@ def enable_nmi_watchdog():
         else:
             logging.info("nmi_watchdog enabled!")
     except subprocess.CalledProcessError as e:
-        logging.warning(e.output + "\nFailed to re-enable nmi_watchdog!")
+        logging.warning(e.output)
+        logging.warning("Failed to re-enable nmi_watchdog!")
     except ValueError as e:
         logging.warning(f"Failed to re-enable nmi_watchdog: {e}")
 
@@ -281,6 +283,8 @@ def get_arch_and_name(procinfo):
             arch = "sapphirerapids"
         elif model == 207 and cpufamily == 6:
             arch = "emeraldrapids"
+        elif model == 175 and cpufamily == 6:
+            arch = "sierraforest"
     return arch, modelname
 
 

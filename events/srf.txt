@@ -1,0 +1,22 @@
+###########################################################################################################
+# Copyright (C) 2021-2023 Intel Corporation
+# SPDX-License-Identifier: BSD-3-Clause
+###########################################################################################################
+
+# SierraForest event list
+
+cpu-cycles,
+ref-cycles,
+instructions;
+
+cpu-cycles:k,
+ref-cycles:k,
+instructions:k;
+
+#C6
+cstate_core/c6-residency/;
+cstate_pkg/c6-residency/;
+
+#power
+power/energy-pkg/,
+power/energy-ram/;
