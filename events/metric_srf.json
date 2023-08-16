@@ -1,0 +1,40 @@
+[
+    {
+        "name": "metric_CPU operating frequency (in GHz)",
+        "expression": "(([cpu-cycles] / [ref-cycles] * [SYSTEM_TSC_FREQ]) / 1000000000)"
+    },
+    {
+        "name": "metric_CPU utilization %",
+        "expression": "100 * [ref-cycles] / [TSC]"
+    },
+    {
+        "name": "metric_CPU utilization% in kernel mode",
+        "expression": "100 * [ref-cycles:k] / [TSC]",
+        "origin": "perfspect"
+    },
+    {
+        "name": "metric_CPI",
+        "name-txn": "metric_cycles per txn",
+        "expression": "[cpu-cycles] / [instructions]",
+        "expression-txn": "[cpu-cycles] / [TXN]"
+    },
+    {
+        "name": "metric_kernel_CPI",
+        "name-txn": "metric_kernel_cycles per txn",
+        "expression": "[cpu-cycles:k] / [instructions:k]",
+        "expression-txn": "[cpu-cycles:k] / [TXN]",
+        "origin": "perfspect"
+    },
+    {
+        "name": "metric_IPC",
+        "name-txn": "metric_txn per cycle",
+        "expression": "[instructions] / [cpu-cycles]",
+        "expression-txn": "[TXN] / [cpu-cycles]",
+        "origin": "perfspect"
+    },
+    {
+        "name": "metric_giga_instructions_per_sec",
+        "expression": "[instructions] / 1000000000",
+        "origin": "perfspect"
+    }
+]

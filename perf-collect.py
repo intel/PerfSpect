@@ -27,6 +27,7 @@ SUPPORTED_ARCHITECTURES = [
     "Icelake",
     "SapphireRapids",
     "EmeraldRapids",
+    "SierraForest",
 ]
 
 
@@ -318,6 +319,8 @@ if __name__ == "__main__":
     elif arch == "emeraldrapids":
         eventfile = "spr.txt"
         have_uncore = False
+    elif arch == "sierraforest":
+        eventfile = "srf.txt"
 
     if eventfile is None:
         crash(f"failed to match architecture ({arch}) to event file name.")
