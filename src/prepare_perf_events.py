@@ -115,14 +115,14 @@ def get_cgroup_events_format(cgroups, events, num_events):
     return perf_format
 
 
-def filter_events(event_file, cpu_only, PID_CID_mode, TMA_supported):
+def filter_events(event_file, cpu_only, PID_CID_mode, TMA_supported, in_vm):
     if not os.path.isfile(event_file):
         crash("event file not found")
     collection_events = []
     unsupported_events = []
     perf_list = helper.get_perf_list()
     seperate_cycles = []
-    if cpu_only:
+    if in_vm:
         # since most CSP's hide cycles fixed PMU inside their VM's we put it in its own group
         seperate_cycles = [
             "cpu-cycles,",
@@ -153,7 +153,7 @@ def filter_events(event_file, cpu_only, PID_CID_mode, TMA_supported):
 
     with open(event_file, "r") as fin:
         for line in fin:
-            if cpu_only and "cpu-cycles" in line:
+            if in_vm and "cpu-cycles" in line:
                 continue
             process(line)
         for line in seperate_cycles:
@@ -165,7 +165,7 @@ def filter_events(event_file, cpu_only, PID_CID_mode, TMA_supported):
     return collection_events, unsupported_events
 
 
-def prepare_perf_events(event_file, cpu_only, PID_CID_mode, TMA_supported):
+def prepare_perf_events(event_file, cpu_only, PID_CID_mode, TMA_supported, in_vm):
     start_group = "'{"
     end_group = "}'"
     group = ""
@@ -173,7 +173,7 @@ def prepare_perf_events(event_file, cpu_only, PID_CID_mode, TMA_supported):
     new_group = True
 
     collection_events, unsupported_events = filter_events(
-        event_file, cpu_only, PID_CID_mode, TMA_supported
+        event_file, cpu_only, PID_CID_mode, TMA_supported, in_vm
     )
     core_event = []
     uncore_event = []

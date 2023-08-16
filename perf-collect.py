@@ -378,6 +378,7 @@ if __name__ == "__main__":
         ),
         args.pid is not None or args.cid is not None,
         include_tma,
+        not have_uncore,
     )
 
     if not perf_helpers.validate_outfile(args.outcsv):
