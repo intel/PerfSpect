@@ -27,15 +27,12 @@ static __inline__ uint64_t rdtsc_e(void)
 }
 
 unsigned Calibrate(void){
-	unsigned ROUNDUP=100;
-
 	uint64_t start=rdtsc_s();
 	sleep(1);
 	uint64_t end=rdtsc_e();
 
 	uint64_t clocks_mhz= (end-start)/1000000;
-	unsigned tsc_mhz= ((clocks_mhz/ROUNDUP) + ((clocks_mhz%ROUNDUP) != 0))*ROUNDUP;
+	unsigned tsc_mhz = clocks_mhz;
 	return tsc_mhz;
-        
 }
 
