@@ -18,8 +18,6 @@ instructions;
 
 cpu/event=0xf1,umask=0x1f,period=100003,name='L2_LINES_IN.ALL'/,
 cpu/event=0xd1,umask=0x10,period=100021,name='MEM_LOAD_RETIRED.L2_MISS'/,
-cpu/event=0x60,umask=0x10,period=2000003,name='OFFCORE_REQUESTS_OUTSTANDING.L3_MISS_DEMAND_DATA_RD'/,
-cpu/event=0xb0,umask=0x10,period=100003,name='OFFCORE_REQUESTS.L3_MISS_DEMAND_DATA_RD'/,
 cpu-cycles,
 ref-cycles,
 instructions;
