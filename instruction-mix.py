@@ -12,10 +12,11 @@ import shlex
 import subprocess
 import sys
 
-from iced_x86 import Decoder, Formatter, FormatterSyntax_  # type: ignore
+from iced_x86 import Decoder, Formatter, FormatterSyntax  # type: ignore
 from src.common import configure_logging, crash
+from src.perf_helpers import get_perf_list
 
-formatter = Formatter(FormatterSyntax_.NASM)
+formatter = Formatter(FormatterSyntax.NASM)
 
 
 def get_insn(insn):
@@ -40,12 +41,13 @@ if __name__ == "__main__":
     configure_logging(".")
 
     if len(sys.argv) != 2 or not sys.argv[1].isdigit():
-        print('usage: "sudo ./cpi-flame 3  # run for 3 seconds"')
+        print('usage: "sudo ./instruction-mix 3  # run for 3 seconds"')
         sys.exit()
     if os.geteuid() != 0:
         crash("Must run as root, please re-run")
     if platform.system() != "Linux":
         crash("PerfSpect currently supports Linux only")
+    get_perf_list()
 
     logging.info("collecting...")
 
