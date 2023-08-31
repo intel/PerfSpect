@@ -87,11 +87,6 @@
         "expression-txn": "[L2_RQSTS.CODE_RD_MISS] / [TXN]"
     },
     {
-        "name": "metric_Average LLC data read miss latency (in clks)",
-        "expression": "[OFFCORE_REQUESTS_OUTSTANDING.L3_MISS_DEMAND_DATA_RD] / [OFFCORE_REQUESTS.L3_MISS_DEMAND_DATA_RD]",
-        "origin": "perfspect"
-    },
-    {
         "name": "metric_UPI Data transmit BW (MB/sec) (only data)",
         "expression": "([UNC_UPI_TxL_FLITS.ALL_DATA] * (64 / 9.0) / 1000000) / 1"
     },

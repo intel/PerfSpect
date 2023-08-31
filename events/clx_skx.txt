@@ -125,7 +125,6 @@ cpu-cycles,
 ref-cycles,
 instructions;
 
-cpu/event=0xb0,umask=0x10,period=100003,name='OFFCORE_REQUESTS.L3_MISS_DEMAND_DATA_RD'/,
 cpu/event=0xd1,umask=0x40,period=100007,name='MEM_LOAD_RETIRED.FB_HIT'/,
 cpu/event=0xa3,umask=0x10,cmask=0x16,period=2000003,name='CYCLE_ACTIVITY.CYCLES_MEM_ANY'/,
 cpu/event=0xa3,umask=0x08,cmask=0x08,period=2000003,name='CYCLE_ACTIVITY.CYCLES_L1D_MISS'/,
@@ -134,7 +133,6 @@ ref-cycles,
 instructions;
 
 cpu/event=0x79,umask=0x30,period=2000003,name='IDQ.MS_UOPS'/,
-cpu/event=0x60,umask=0x10,period=2000003,name='OFFCORE_REQUESTS_OUTSTANDING.L3_MISS_DEMAND_DATA_RD'/,
 cpu/event=0x83,umask=0x04,period=200003,name='ICACHE_64B.IFTAG_STALL'/,
 cpu/event=0x08,umask=0x20,cmask=0x01,period=2000003,name='DTLB_LOAD_MISSES.STLB_HIT:c1'/,
 cpu-cycles,

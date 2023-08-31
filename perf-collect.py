@@ -432,10 +432,11 @@ if __name__ == "__main__":
     elif args.app:
         cmd += f" {args.app}"
 
-    perfargs = shlex.split(cmd)
-    validate_perfargs(perfargs)
     if args.verbose:
         logging.info(cmd)
+    perfargs = shlex.split(cmd)
+    validate_perfargs(perfargs)
+
     psi = []
     logging.info("Collection started!")
     start = time.time()
