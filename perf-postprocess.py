@@ -515,15 +515,14 @@ def extract_dataframe(perf_data_lines, meta_data, perf_mode):
             axis=1,
         )
 
-    if perf_mode != Mode.CPU and perf_mode != Mode.Socket:
-        # fix metric name X.1, X.2, etc -> just X
-        # we don't need this in cpu/socket modes
-        perf_data_df["metric"] = perf_data_df.apply(
-            lambda x: ".".join(x["metric"].split(".")[:-1])
-            if len(re.findall(r"^[0-9]*$", x["metric"].split(".")[-1])) > 0
-            else x["metric"],
-            axis=1,
-        )
+    # fix metric name X.1, X.2, etc -> just X
+    perf_data_df["metric"] = perf_data_df.apply(
+        lambda x: ".".join(x["metric"].split(".")[:-1])
+        if len(re.findall(r"^[0-9]*$", x["metric"].split(".")[-1])) > 0
+        else x["metric"],
+        axis=1,
+    )
+
     # set data frame types
     perf_data_df["value"] = pd.to_numeric(
         perf_data_df["value"], errors="coerce"
@@ -930,6 +929,21 @@ def generate_metrics(
     verbose=False,
     fail_postprocessing=False,
 ):
+    # filter out uncore metrics if in cpu or socket mode
+    filtered_metrics = []
+    for m in metrics:
+        if perf_mode == Mode.CPU or perf_mode == Mode.Socket:
+            if any(
+                [
+                    e.startswith("power/")
+                    or e.startswith("cstate_")
+                    or e.startswith("UNC_")
+                    for e in m["events"]
+                ]
+            ):
+                continue
+        filtered_metrics.append(m)
+
     time_slice_groups = perf_data_df.groupby("ts", sort=False)
     time_metrics_result = {}
     errors = {
@@ -940,7 +954,19 @@ def generate_metrics(
         "NOT COUNTED GROUPS": set(),
     }
     prev_time_slice = 0
-    logging.info("processing " + str(time_slice_groups.ngroups) + " samples")
+    logging.info(
+        "processing "
+        + str(time_slice_groups.ngroups)
+        + " samples in "
+        + (
+            "System"
+            if perf_mode == Mode.System
+            else "CPU"
+            if perf_mode == Mode.CPU
+            else "Socket"
+        )
+        + " mode"
+    )
     group_start_end_index_dict = {}
     for time_slice, item in time_slice_groups:
         time_slice_float = float(time_slice)
@@ -965,7 +991,7 @@ def generate_metrics(
         )
 
         time_metrics_result[time_slice] = evaluate_metrics(
-            verbose, metrics, metadata, group_to_event, group_to_df, errors
+            verbose, filtered_metrics, metadata, group_to_event, group_to_df, errors
         )
 
     time_series_df = pd.DataFrame(time_metrics_result).reindex(
@@ -1159,9 +1185,6 @@ if __name__ == "__main__":
                 args.verbose,
                 args.fail_postprocessing,
             )
-            logging.info(
-                "Generated results file(s) in: " + out_file_path.rsplit("/", 1)[0]
-            )
     else:
         generate_metrics(
             perf_data_df,
@@ -1188,5 +1211,5 @@ if __name__ == "__main__":
                 args.fail_postprocessing,
             )
 
-        logging.info("Generated results file(s) in: " + out_file_path.rsplit("/", 1)[0])
+    logging.info("Generated results file(s) in: " + out_file_path.rsplit("/", 1)[0])
     logging.info("Done!")
