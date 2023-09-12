@@ -59,29 +59,16 @@ Modify the template [deamonset.yml](docs/daemonset.yml) to deploy in kubernetes
 
 ## Requirements
 
-### Packages:
+**perf** - PerfSpect uses the Linux perf tool to collect PMU counters
 
-- **perf** - PerfSpect uses the Linux perf tool to collect PMU counters
-
-### Minimum supported kernels
-
-| Xeon Generation | CentOS 7+ | Ubuntu 16.04+ |
-| --------------- | --------- | ------------- |
-| Broadwell       | 3.10      | 4.15          |
-| Skylake         | 3.10      | 4.15          |
-| Cascade Lake    | 3.10      | 4.15          |
-| Ice Lake        | 3.10      | 4.15          |
-| Sapphire Rapids | 5.12      | 5.12          |
-
-### Supported Operating Systems:
-
-- Ubuntu 16.04 and newer
-- CentOS 7 and newer
-- Amazon Linux 2
-- RHEL 9
-- Debian 11
-
-_Note: PerfSpect may work on other Linux distributions, but has not been thoroughly tested_
+Different events require different minimum kernels (PerfSpect will automatically collect only supported events)
+1. Base (CPU util, CPI, Cache misses, etc.)
+    - 3.10
+2. Uncore (NUMA traffic, DRAM traffic, etc.)
+    - 4.9
+3. TMA (Micro-architecture boundness breakdown)
+    - ICX, SPR: 5.10
+    - BDX, SKX, CLX: 3.10
 
 ## Build from source
 

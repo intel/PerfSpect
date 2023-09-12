@@ -115,7 +115,7 @@ def get_cgroup_events_format(cgroups, events, num_events):
     return perf_format
 
 
-def filter_events(event_file, cpu_only, PID_CID_mode, TMA_supported, in_vm):
+def filter_events(event_file, cpu_only, TMA_supported, in_vm):
     if not os.path.isfile(event_file):
         crash("event file not found")
     collection_events = []
@@ -134,8 +134,6 @@ def filter_events(event_file, cpu_only, PID_CID_mode, TMA_supported, in_vm):
     def process(line):
         line = line.strip()
         if line == "" or line.startswith("#") or (cpu_only and not is_cpu_event(line)):
-            return
-        if PID_CID_mode and line.startswith("cstate_"):
             return
         if not TMA_supported and (
             "name='TOPDOWN.SLOTS'" in line or "name='PERF_METRICS." in line
@@ -165,7 +163,7 @@ def filter_events(event_file, cpu_only, PID_CID_mode, TMA_supported, in_vm):
     return collection_events, unsupported_events
 
 
-def prepare_perf_events(event_file, cpu_only, PID_CID_mode, TMA_supported, in_vm):
+def prepare_perf_events(event_file, cpu_only, TMA_supported, in_vm):
     start_group = "'{"
     end_group = "}'"
     group = ""
@@ -173,7 +171,7 @@ def prepare_perf_events(event_file, cpu_only, PID_CID_mode, TMA_supported, in_vm
     new_group = True
 
     collection_events, unsupported_events = filter_events(
-        event_file, cpu_only, PID_CID_mode, TMA_supported, in_vm
+        event_file, cpu_only, TMA_supported, in_vm
     )
     core_event = []
     uncore_event = []

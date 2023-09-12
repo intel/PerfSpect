@@ -104,7 +104,7 @@ def handle_nan(data, comp_size):
             if len(deleted_row_indices) in (comp_size, comp_size - 1):
                 # too many workload profiles have NaN greater than threshold, must quit similarity analysis
                 logger.error(
-                    "Attempted dropping of NaNs resulted in fewer #input profiles without NaN....quiting similarity analysis"
+                    "Attempted dropping of NaNs resulted in fewer #input profiles without NaN....quitting similarity analysis"
                 )
                 sys.exit(1)
             logger.warning(

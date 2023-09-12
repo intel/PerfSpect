@@ -369,14 +369,7 @@ if __name__ == "__main__":
             )
     events, collection_events = prep_events.prepare_perf_events(
         eventfile,
-        (
-            args.pid is not None
-            or args.cid is not None
-            or args.cpu
-            or args.socket
-            or not have_uncore
-        ),
-        args.pid is not None or args.cid is not None,
+        (args.pid is not None or args.cid is not None or not have_uncore),
         include_tma,
         not have_uncore,
     )
@@ -388,6 +381,9 @@ if __name__ == "__main__":
 
     mux_intervals = perf_helpers.get_perf_event_mux_interval()
     if args.muxinterval > 0:
+        logging.info(
+            "changing default perf mux interval to " + str(args.muxinterval) + "ms"
+        )
         perf_helpers.set_perf_event_mux_interval(False, args.muxinterval, mux_intervals)
 
     # parse cgroups
@@ -395,7 +391,7 @@ if __name__ == "__main__":
     if args.cid is not None:
         cgroups = perf_helpers.get_cgroups(args.cid)
 
-    if args.cpu or args.socket or args.pid is not None or args.cid is not None:
+    if args.pid is not None or args.cid is not None:
         logging.info("Not collecting uncore events in this run mode")
 
     # log some metadata
@@ -481,6 +477,7 @@ if __name__ == "__main__":
     if nmi_watchdog != 0:
         perf_helpers.enable_nmi_watchdog()
 
+    logging.info("changing perf mux interval back to default")
     perf_helpers.set_perf_event_mux_interval(True, 1, mux_intervals)
 
     logging.info("perf stat dumped to %s" % args.outcsv)
