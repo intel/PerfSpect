@@ -190,6 +190,26 @@ def tma_supported():
     return True
 
 
+def ref_cycles_supported():
+    perf_out = ""
+    try:
+        perf = subprocess.Popen(
+            shlex.split("perf stat -a -e ref-cycles sleep .1"),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        perf_out = perf.communicate()[0].decode()
+    except subprocess.CalledProcessError:
+        return False
+
+    if "<not supported>" in perf_out:
+        logging.warning(
+            "ref-cycles not enabled in VM driver. Contact system owner to enable. Collecting reduced metrics"
+        )
+        return False
+    return True
+
+
 def resource_path(relative_path):
     """Get absolute path to resource, works for dev and for PyInstaller"""
     base_path = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -372,12 +392,12 @@ if __name__ == "__main__":
         (args.pid is not None or args.cid is not None or not have_uncore),
         include_tma,
         not have_uncore,
+        ref_cycles_supported(),
     )
 
-    if not perf_helpers.validate_outfile(args.outcsv):
-        crash(
-            "Output filename not accepted. Filename should be a .csv without special characters"
-        )
+    # check output file is writable
+    if not perf_helpers.check_file_writeable(args.outcsv):
+        crash("Output file %s not writeable " % args.outcsv)
 
     mux_intervals = perf_helpers.get_perf_event_mux_interval()
     if args.muxinterval > 0:

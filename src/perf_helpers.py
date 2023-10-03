@@ -150,18 +150,15 @@ def disable_nmi_watchdog():
                 proc_output.decode().strip().replace("kernel.nmi_watchdog = ", "")
             )
             if new_watchdog_status != 0:
-                crash("Failed to disable nmi watchdog!")
+                crash("Failed to disable nmi watchdog.")
             logging.info(
-                "nmi_watchdog is temporary disabled. Will enable after collection."
+                "nmi_watchdog temporarily disabled. Will re-enable after collection."
             )
         else:
-            logging.info("nmi_watchdog disabled!")
+            logging.info("nmi_watchdog already disabled. No change needed.")
         return nmi_watchdog_status
-    except subprocess.CalledProcessError as e:
-        logging.warning(e)
-        logging.warning("Failed to disable nmi_watchdog.")
-    except ValueError as e:
-        crash(f"Failed to disable watchdog: {e}")
+    except (ValueError, FileNotFoundError, subprocess.CalledProcessError) as e:
+        crash(f"Failed to disable nmi_watchdog: {e}")
 
 
 # enable nmi watchdog
@@ -172,13 +169,10 @@ def enable_nmi_watchdog():
             proc_output.decode().strip().replace("kernel.nmi_watchdog = ", "")
         )
         if new_watchdog_status != 1:
-            logging.warning("Failed to re-enable nmi_watchdog!")
+            logging.warning("Failed to re-enable nmi_watchdog.")
         else:
-            logging.info("nmi_watchdog enabled!")
-    except subprocess.CalledProcessError as e:
-        logging.warning(e.output)
-        logging.warning("Failed to re-enable nmi_watchdog!")
-    except ValueError as e:
+            logging.info("nmi_watchdog re-enabled.")
+    except (ValueError, FileNotFoundError, subprocess.CalledProcessError) as e:
         logging.warning(f"Failed to re-enable nmi_watchdog: {e}")
 
 
@@ -308,25 +302,7 @@ def get_cpuid_info(procinfo):
     return socketinfo
 
 
-# check for special characters in output filename
-def validate_outfile(filename, xlsx=False):
-    valid = False
-    resdir = os.path.dirname(filename)
-    outfile = os.path.basename(filename)
-    if resdir and not os.path.exists(resdir):
-        return False
-    regx = r"[@!#$%^&*()<>?\|}{~:]"
-    # regex = re.compile("[@!#$%^&*()<>?/\|}{~:]")
-    regex = re.compile(regx)
-    if regex.search(outfile) is None:
-        if filename.endswith(".csv"):
-            return True
-        if xlsx and filename.endswith(".xlsx"):
-            return True
-    return valid
-
-
-# check write permissions
+# check write permissions on file, or directory if file doesn't exist
 def check_file_writeable(outfile):
     if os.path.exists(outfile):
         if os.path.isfile(outfile):

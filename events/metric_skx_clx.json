@@ -26,6 +26,13 @@
         "origin": "perfspect"
     },
     {
+        "name": "metric_IPC",
+        "name-txn": "metric_txn per cycle",
+        "expression": "[instructions] / [cpu-cycles]",
+        "expression-txn": "[TXN] / [cpu-cycles]",
+        "origin": "perfspect"
+    },
+    {
         "name": "metric_locks retired per instr",
         "name-txn": "metric_locks retired per txn",
         "expression": "[MEM_INST_RETIRED.LOCK_LOADS] / [instructions]",

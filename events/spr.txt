@@ -153,10 +153,6 @@ instructions:k;
 cstate_core/c6-residency/;
 cstate_pkg/c6-residency/;
 
-#power
-power/energy-pkg/,
-power/energy-ram/;
-
 #UPI
 upi/event=0x02,umask=0x0f,name='UNC_UPI_TxL_FLITS.ALL_DATA'/;
 
@@ -184,3 +180,7 @@ cha/event=0x01,umask=0x00,name='UNC_CHA_CLOCKTICKS'/;
 #IMC (memory read/writes)
 imc/event=0x05,umask=0xcf,name='UNC_M_CAS_COUNT.RD'/,
 imc/event=0x05,umask=0xf0,name='UNC_M_CAS_COUNT.WR'/;
+
+#power
+power/energy-pkg/,
+power/energy-ram/;
