@@ -785,24 +785,24 @@
                         key={row.metrics}
                         sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
                       >
-                        <TableCell component="th" scope="row" >
+                        <TableCell sx={{ fontFamily: 'Monospace' }} component="th" scope="row" >
                           <Tooltip title={description.hasOwnProperty(row.metrics) ? description[row.metrics] : ""}>
-                            {description.hasOwnProperty(row.metrics) && <IconButton>
+                            {description.hasOwnProperty(row.metrics) && <IconButton sx={{ padding: "0 8px 0 0" }}>
                               <Icon>help</Icon>
                             </IconButton>}
-                            {!description.hasOwnProperty(row.metrics) && <IconButton disabled>
+                            {!description.hasOwnProperty(row.metrics) && <IconButton sx={{ padding: "0 8px 0 0" }} disabled>
                               <Icon>help</Icon>
                             </IconButton>}
                           </Tooltip>
-                          {row.metrics}
+                          {(row.metrics.startsWith("metric_") ? row.metrics.replace("metric_", "") : row.metrics).replaceAll("_", " ")}
                         </TableCell>
-                        <TableCell align="right">
-                          {Number(row["0"]).toFixed(1)}
+                        <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
+                          {Number(row["0"]).toFixed(4)}
                         </TableCell>
-                        {row.hasOwnProperty("other") && <TableCell align="right">
-                          {Number(row["other"]).toFixed(1)}
+                        {row.hasOwnProperty("other") && <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
+                          {Number(row["other"]).toFixed(4)}
                         </TableCell>}
-                        {row.hasOwnProperty("other") && <TableCell align="right" sx={{ backgroundColor: (row.diff > 0 ? "rgba(255,0,0," + (row.diff / maxdiff * .5) + ")" : "rgba(0,0,255," + (row.diff / mindiff * .5) + ")") }}>
+                        {row.hasOwnProperty("other") && <TableCell align="right" sx={{ fontFamily: 'Monospace', backgroundColor: (row.diff > 0 ? "rgba(255,0,0," + (row.diff / maxdiff * .5) + ")" : "rgba(0,0,255," + (row.diff / mindiff * .5) + ")") }}>
                           {Math.round(Number(row["diff"]))}%
                         </TableCell>}
                       </TableRow>
