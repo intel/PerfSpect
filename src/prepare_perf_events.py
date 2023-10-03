@@ -115,7 +115,7 @@ def get_cgroup_events_format(cgroups, events, num_events):
     return perf_format
 
 
-def filter_events(event_file, cpu_only, TMA_supported, in_vm):
+def filter_events(event_file, cpu_only, TMA_supported, in_vm, supports_ref_cycles):
     if not os.path.isfile(event_file):
         crash("event file not found")
     collection_events = []
@@ -124,12 +124,19 @@ def filter_events(event_file, cpu_only, TMA_supported, in_vm):
     seperate_cycles = []
     if in_vm:
         # since most CSP's hide cycles fixed PMU inside their VM's we put it in its own group
-        seperate_cycles = [
-            "cpu-cycles,",
-            "cpu-cycles:k,",
-            "ref-cycles,",
-            "instructions;",
-        ]
+        if supports_ref_cycles:
+            seperate_cycles = [
+                "cpu-cycles,",
+                "cpu-cycles:k,",
+                "ref-cycles,",
+                "instructions;",
+            ]
+        else:
+            seperate_cycles = [
+                "cpu-cycles,",
+                "cpu-cycles:k,",
+                "instructions;",
+            ]
 
     def process(line):
         line = line.strip()
@@ -153,6 +160,8 @@ def filter_events(event_file, cpu_only, TMA_supported, in_vm):
         for line in fin:
             if in_vm and "cpu-cycles" in line:
                 continue
+            if not supports_ref_cycles and "ref-cycles" in line:
+                continue
             process(line)
         for line in seperate_cycles:
             process(line)
@@ -163,7 +172,9 @@ def filter_events(event_file, cpu_only, TMA_supported, in_vm):
     return collection_events, unsupported_events
 
 
-def prepare_perf_events(event_file, cpu_only, TMA_supported, in_vm):
+def prepare_perf_events(
+    event_file, cpu_only, TMA_supported, in_vm, supports_ref_cycles
+):
     start_group = "'{"
     end_group = "}'"
     group = ""
@@ -171,7 +182,7 @@ def prepare_perf_events(event_file, cpu_only, TMA_supported, in_vm):
     new_group = True
 
     collection_events, unsupported_events = filter_events(
-        event_file, cpu_only, TMA_supported, in_vm
+        event_file, cpu_only, TMA_supported, in_vm, supports_ref_cycles
     )
     core_event = []
     uncore_event = []

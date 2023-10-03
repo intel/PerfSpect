@@ -50,6 +50,7 @@ build-public/postprocess:
 					--add-data "./src/base.html:." \
 					--runtime-tmpdir . \
 					--exclude-module readline
+					--bootloader-ignore-signals
 	cp $(TMPDIR)/dist/perf-postprocess build/
 	rm -rf $(TMPDIR)
 

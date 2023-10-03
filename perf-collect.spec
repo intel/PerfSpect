@@ -34,7 +34,7 @@ exe = EXE(
     [],
     name='perf-collect',
     debug=False,
-    bootloader_ignore_signals=False,
+    bootloader_ignore_signals=True,
     strip=False,
     upx=True,
     upx_exclude=[],

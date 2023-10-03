@@ -121,14 +121,6 @@ def get_args(script_path):
     if args.rawfile and not os.path.isfile(args.rawfile):
         crash("perf raw data file not found, please provide valid raw file")
 
-    # check output file is valid
-    if not perf_helpers.validate_outfile(args.outfile, True):
-        crash(
-            "Output filename: "
-            + args.outfile
-            + " not accepted. Filename should be a .csv without special characters"
-        )
-
     # check output file is writable
     if not perf_helpers.check_file_writeable(args.outfile):
         crash("Output file %s not writeable " % args.outfile)
@@ -725,8 +717,16 @@ def get_groups_to_dataframes(
                 group_start_end_index_dict[group_name] = (start_index, end_index)
                 start_index = end_index
                 current_group_indx += 1
-                group_name = "group_" + str(current_group_indx)
-                event_list = group_to_event[group_name]
+                try:
+                    group_name = "group_" + str(current_group_indx)
+                    event_list = group_to_event[group_name]
+                except KeyError:
+                    crash(
+                        "could not find "
+                        + str(row)
+                        + " in event grouping: "
+                        + str(group_to_event)
+                    )
                 end_index += 1
         group_to_df[group_name] = get_group_df_from_full_frame(
             time_slice_df, start_index, time_slice_df.shape[0], perf_mode
