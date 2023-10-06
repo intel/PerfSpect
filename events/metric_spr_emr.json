@@ -343,6 +343,10 @@
         "expression": "100 * ( [EXE_ACTIVITY.3_PORTS_UTIL:u0x80] / ( [cpu-cycles] ) + ( [RESOURCE_STALLS.SCOREBOARD] / ( [cpu-cycles] ) ) * ( [CYCLE_ACTIVITY.STALLS_TOTAL] - [EXE_ACTIVITY.BOUND_ON_LOADS] ) / ( [cpu-cycles] ) )"
     },
     {
+        "name": "metric_TMA_........AMX_Busy(%)",
+        "expression": "100 * ( [EXE.AMX_BUSY] / ( [CPU_CLK_UNHALTED.DISTRIBUTED] ) )"
+    },
+    {
         "name": "metric_TMA_......Ports_Utilized_1(%)",
         "expression": "100 * ( [EXE_ACTIVITY.1_PORTS_UTIL] / ( [cpu-cycles] ) )"
     },

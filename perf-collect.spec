@@ -7,7 +7,7 @@ block_cipher = None
 a = Analysis(
     ['perf-collect.py'],
     pathex=[],
-    datas=[('./src/libtsc.so', '.'), ('./events/bdx.txt', '.'), ('./events/clx_skx.txt', '.'), ('./events/icx.txt', '.'), ('./events/spr.txt', '.'), ('./events/srf.txt', '.')],
+    datas=[('./src/libtsc.so', '.'), ('./events/bdx.txt', '.'), ('./events/clx_skx.txt', '.'), ('./events/icx.txt', '.'), ('./events/spr_emr.txt', '.'), ('./events/srf.txt', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

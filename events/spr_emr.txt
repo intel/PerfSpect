@@ -105,6 +105,8 @@ cpu/event=0x79,umask=0x04,cmask=0x01,period=2000003,name='IDQ.MITE_CYCLES_ANY'/,
 cpu/event=0x79,umask=0x04,cmask=0x06,period=2000003,name='IDQ.MITE_CYCLES_OK'/,
 cpu/event=0x79,umask=0x08,cmask=0x01,period=2000003,name='IDQ.DSB_CYCLES_ANY'/,
 cpu/event=0x79,umask=0x08,cmask=0x06,period=2000003,name='IDQ.DSB_CYCLES_OK'/,
+cpu/event=0xec,umask=0x02,period=2000003,name='CPU_CLK_UNHALTED.DISTRIBUTED'/,
+cpu/event=0xb7,umask=0x02,period=2000003,name='EXE.AMX_BUSY'/,
 cpu-cycles,
 ref-cycles,
 instructions;
