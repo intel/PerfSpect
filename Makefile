@@ -45,7 +45,7 @@ build-public/postprocess:
 					--add-data "./events/metric_skx_clx.json:." \
 					--add-data "./events/metric_bdx.json:." \
 					--add-data "./events/metric_icx.json:." \
-					--add-data "./events/metric_spr.json:." \
+					--add-data "./events/metric_spr_emr.json:." \
 					--add-data "./events/metric_srf.json:." \
 					--add-data "./src/base.html:." \
 					--runtime-tmpdir . \

@@ -407,7 +407,7 @@ def get_metric_file_name(microarchitecture):
     elif microarchitecture == "icelake":
         metric_file = "metric_icx.json"
     elif microarchitecture == "sapphirerapids" or microarchitecture == "emeraldrapids":
-        metric_file = "metric_spr.json"
+        metric_file = "metric_spr_emr.json"
     elif microarchitecture == "sierraforest":
         metric_file = "metric_srf.json"
     else:

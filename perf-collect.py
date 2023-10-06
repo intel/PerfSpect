@@ -334,11 +334,8 @@ if __name__ == "__main__":
         eventfile = "clx_skx.txt"
     elif arch == "icelake":
         eventfile = "icx.txt"
-    elif arch == "sapphirerapids":
-        eventfile = "spr.txt"
-    elif arch == "emeraldrapids":
-        eventfile = "spr.txt"
-        have_uncore = False
+    elif arch == "sapphirerapids" or arch == "emeraldrapids":
+        eventfile = "spr_emr.txt"
     elif arch == "sierraforest":
         eventfile = "srf.txt"
 
