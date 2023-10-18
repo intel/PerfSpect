@@ -43,9 +43,9 @@ jobs:
           cd perf-map-agent
           cmake .
           make
-          pip3 install -r requirements.txt
       - name: build
         run: |
+          pip3 install -r requirements.txt
           pyinstaller -F hotspot.py -n hotspot --bootloader-ignore-signals --add-data "perf-map-agent/out/*:." --add-data "flamegraph.pl:." --add-data "difffolded.pl:." --add-data "stackcollapse-perf.pl:." --runtime-tmpdir . --exclude-module readline
       - name: upload artifact
         uses: actions/upload-artifact@v3
