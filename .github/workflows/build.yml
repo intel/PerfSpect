@@ -33,7 +33,7 @@ jobs:
       - name: install dependencies
         run: |
           yum update -y
-          yum install -y make python3 gcc cmake gcc-c++ java-1.8.0-openjdk-devel.x86_64
+          yum install -y make python3 gcc cmake gcc-c++ java-1.8.0-openjdk-devel.x86_64 git
           python3 -m pip install --upgrade pip
           curl -LJO https://raw.githubusercontent.com/brendangregg/FlameGraph/master/flamegraph.pl
           curl -LJO https://raw.githubusercontent.com/brendangregg/FlameGraph/master/difffolded.pl
@@ -52,4 +52,3 @@ jobs:
         with:
           name: hotspot
           path: dist/hotspot
-          
