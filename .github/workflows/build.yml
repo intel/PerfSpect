@@ -23,3 +23,32 @@ jobs:
         with:
           name: perfspect
           path: dist/perfspect*.tgz
+
+  build-hotspot:
+    runs-on: ubuntu-20.04
+    container:
+      image: centos:7
+    steps:
+      - uses: actions/checkout@v3
+      - name: install dependencies
+        run: |
+          yum update -y
+          yum install -y make python3 gcc cmake gcc-c++ java-1.8.0-openjdk-devel.x86_64 git
+          python3 -m pip install --upgrade pip
+          curl -LJO https://raw.githubusercontent.com/brendangregg/FlameGraph/master/flamegraph.pl
+          curl -LJO https://raw.githubusercontent.com/brendangregg/FlameGraph/master/difffolded.pl
+          curl -LJO https://raw.githubusercontent.com/brendangregg/FlameGraph/master/stackcollapse-perf.pl
+          chmod +x *.pl
+          git clone https://github.com/jvm-profiling-tools/perf-map-agent.git
+          cd perf-map-agent
+          cmake .
+          make
+      - name: build
+        run: |
+          pip3 install -r requirements.txt
+          pyinstaller -F hotspot.py -n hotspot --bootloader-ignore-signals --add-data "perf-map-agent/out/*:." --add-data "flamegraph.pl:." --add-data "difffolded.pl:." --add-data "stackcollapse-perf.pl:." --runtime-tmpdir . --exclude-module readline
+      - name: upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: hotspot
+          path: dist/hotspot

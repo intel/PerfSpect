@@ -1,13 +1,7 @@
 black
 flake8
-iced-x86
 pytype
 simpleeval
 pandas
-plotly
-psutil
 pyinstaller
 pytest
-python-dateutil
-XlsxWriter
-yattag
