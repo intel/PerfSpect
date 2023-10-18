@@ -52,3 +52,4 @@ jobs:
         with:
           name: hotspot
           path: dist/hotspot
+          
