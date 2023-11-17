@@ -30,7 +30,6 @@ cpu-cycles,
 ref-cycles,
 instructions;
 
-# OCR group 1 (ICX PMU supports a maximum of two OCR counters per group)
 cpu/event=0xb7,umask=0x01,offcore_rsp=0x104000477,name='OCR.READS_TO_CORE.LOCAL_DRAM'/,
 cpu/event=0xb7,umask=0x01,offcore_rsp=0x84002380,name='OCR.HWPF_L3.L3_MISS_LOCAL'/,
 cpu/event=0x85,umask=0x0e,period=100003,name='ITLB_MISSES.WALK_COMPLETED'/,
@@ -39,7 +38,6 @@ cpu-cycles,
 ref-cycles,
 instructions;
 
-# OCR group 2 (ICX PMU supports a maximum of two OCR counters per group)
 cpu/event=0xb7,umask=0x01,offcore_rsp=0x730000477,name='OCR.READS_TO_CORE.REMOTE_DRAM'/,
 cpu/event=0xb7,umask=0x01,offcore_rsp=0x90002380,name='OCR.HWPF_L3.REMOTE'/,
 cpu/event=0x08,umask=0x04,period=100003,name='DTLB_LOAD_MISSES.WALK_COMPLETED_2M_4M'/,
@@ -65,6 +63,17 @@ cpu/event=0x00,umask=0x80,period=10000003,name='PERF_METRICS.RETIRING'/,
 cpu/event=0x9c,umask=0x01,cmask=0x05,period=1000003,name='IDQ_UOPS_NOT_DELIVERED.CYCLES_0_UOPS_DELIV.CORE'/,
 cpu/event=0x0d,umask=0x10,period=1000003,name='INT_MISC.UOP_DROPPING'/,
 cpu/event=0x0d,umask=0x01,cmask=0x01,edge=0x01,period=500009,name='INT_MISC.RECOVERY_CYCLES:c1:e1'/,
+cpu-cycles,
+ref-cycles,
+instructions;
+
+#TMA AVX512 related
+cpu/event=0xc7,umask=0x80,cmask=0x00,period=100003,name='FP_ARITH_INST_RETIRED.512B_PACKED_SINGLE'/,
+cpu/event=0xc7,umask=0x40,cmask=0x00,period=100003,name='FP_ARITH_INST_RETIRED.512B_PACKED_DOUBLE'/,
+cpu/event=0xc7,umask=0x20,cmask=0x00,period=100003,name='FP_ARITH_INST_RETIRED.256B_PACKED_SINGLE'/,
+cpu/event=0xc7,umask=0x10,cmask=0x00,period=100003,name='FP_ARITH_INST_RETIRED.256B_PACKED_DOUBLE'/,
+cpu/event=0xc7,umask=0x08,cmask=0x00,period=100003,name='FP_ARITH_INST_RETIRED.128B_PACKED_SINGLE'/,
+cpu/event=0xc7,umask=0x04,cmask=0x00,period=100003,name='FP_ARITH_INST_RETIRED.128B_PACKED_DOUBLE'/,
 cpu-cycles,
 ref-cycles,
 instructions;
@@ -129,10 +138,6 @@ cpu/event=0xd3,umask=0x02,cmask=0x00,period=100007,name='MEM_LOAD_L3_MISS_RETIRE
 cpu/event=0xd3,umask=0x01,cmask=0x00,period=100007,name='MEM_LOAD_L3_MISS_RETIRED.LOCAL_DRAM'/,
 cpu/event=0xd3,umask=0x08,cmask=0x00,period=100007,name='MEM_LOAD_L3_MISS_RETIRED.REMOTE_FWD'/,
 cpu/event=0xd3,umask=0x04,cmask=0x00,period=100007,name='MEM_LOAD_L3_MISS_RETIRED.REMOTE_HITM'/,
-cpu/event=0xb1,umask=0x10,cmask=0x00,period=2000003,name='UOPS_EXECUTED.X87'/,
-cpu/event=0xb1,umask=0x01,cmask=0x00,period=2000003,name='UOPS_EXECUTED.THREAD'/,
-cpu/event=0xc7,umask=0x03,period=100003,name='FP_ARITH_INST_RETIRED.SCALAR_SINGLE:u0x03'/,
-cpu/event=0xc7,umask=0xfc,period=100003,name='FP_ARITH_INST_RETIRED.128B_PACKED_DOUBLE:u0xfc'/,
 cpu-cycles,
 ref-cycles,
 instructions;
