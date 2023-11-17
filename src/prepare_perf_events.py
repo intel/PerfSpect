@@ -71,17 +71,11 @@ def is_cpu_event(line):
     return False
 
 
-# save the last group names in a list when it is cha or imc
-# test for cha or imc event. append with count value
-# once reaches new group, start looping through all imc/cha counts to finish up
-def enumerate_uncore(group, pattern, n, default_range=True):
+# enumerate uncore events across all devices
+def enumerate_uncore(group, pattern, count):
     uncore_group = ""
-    ids = []
-    if default_range:
-        ids = range(n)
-    else:
-        ids = helper.get_channel_ids()
-    for i in range(n - 1):
+    ids = helper.get_channel_ids(pattern)
+    for i in range(count - 1):
         old = pattern + str(ids[i])
         new = pattern + str(ids[i + 1])
         group = group.replace(old, new)
@@ -216,8 +210,7 @@ def prepare_perf_events(
         # enumerate all uncore units
         if new_group and (unc_count > 1):
             name = helper.get_dev_name(line.split("/")[0].strip())
-            default_range = name != "uncore_imc"
-            group += enumerate_uncore(prev_group, name + "_", unc_count, default_range)
+            group += enumerate_uncore(prev_group, name + "_", unc_count)
 
     group = group[:-1]
     if len(event_names) == 0:

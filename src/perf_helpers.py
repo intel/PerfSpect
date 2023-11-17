@@ -112,13 +112,13 @@ def get_imc_cha_upi_count():
     return imc_count, cha_count, upi_count
 
 
-# get imc channel ids, channel ids are not consecutive in some cases (observed on bdw)
-def get_channel_ids():
+# device ids are not consecutive in some cases
+def get_channel_ids(pattern):
     sysdevices = os.listdir("/sys/bus/event_source/devices")
-    imc = "uncore_imc_[0-9]*"
+    devices = pattern + "[0-9]*"
     ids = []
     for entry in sysdevices:
-        if fnmatch.fnmatch(entry, imc):
+        if fnmatch.fnmatch(entry, devices):
             words = entry.split("_")
             ids.append(int(words[-1]))
     ids = sorted(ids)

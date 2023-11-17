@@ -119,21 +119,6 @@
         "expression": "100 * ([IDQ.MITE_UOPS] / ([IDQ.DSB_UOPS] + [IDQ.MITE_UOPS] + [IDQ.MS_UOPS] + [LSD.UOPS]) )"
     },
     {
-        "name": "metric_core % cycles in non AVX license",
-        "expression": "(100 * [CORE_POWER.LVL0_TURBO_LICENSE]) / ([CORE_POWER.LVL0_TURBO_LICENSE] + [CORE_POWER.LVL1_TURBO_LICENSE] + [CORE_POWER.LVL2_TURBO_LICENSE])",
-        "origin": "perfspect"
-    },
-    {
-        "name": "metric_core % cycles in AVX2 license",
-        "expression": "(100 * [CORE_POWER.LVL1_TURBO_LICENSE]) / ([CORE_POWER.LVL0_TURBO_LICENSE] + [CORE_POWER.LVL1_TURBO_LICENSE] + [CORE_POWER.LVL2_TURBO_LICENSE])",
-        "origin": "perfspect"
-    },
-    {
-        "name": "metric_core % cycles in AVX-512 license",
-        "expression": "(100 * [CORE_POWER.LVL2_TURBO_LICENSE]) / ([CORE_POWER.LVL0_TURBO_LICENSE] + [CORE_POWER.LVL1_TURBO_LICENSE] + [CORE_POWER.LVL2_TURBO_LICENSE])",
-        "origin": "perfspect"
-    },
-    {
         "name": "metric_core initiated local dram read bandwidth (MB/sec)",
         "expression": "(([OCR.READS_TO_CORE.LOCAL_DRAM] + [OCR.HWPF_L3.L3_MISS_LOCAL]) * 64 / 1000000) / 1"
     },
@@ -366,16 +351,16 @@
         "expression": "100 * ( max( 0 , ( [PERF_METRICS.RETIRING] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) - ( ( ( ( ( [PERF_METRICS.RETIRING] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) * ( [TOPDOWN.SLOTS] ) ) / [UOPS_ISSUED.ANY] ) * [IDQ.MS_UOPS] / ( [TOPDOWN.SLOTS] ) ) + ( [PERF_METRICS.RETIRING] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) * ( [UOPS_DECODED.DEC0] - [UOPS_DECODED.DEC0:c1] ) / [IDQ.MITE_UOPS] ) ) )"
     },
     {
-        "name": "metric_TMA_....FP_Arith(%)",
-        "expression": "100 * ( ( ( [PERF_METRICS.RETIRING] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) * [UOPS_EXECUTED.X87] / [UOPS_EXECUTED.THREAD] ) + ( ( [FP_ARITH_INST_RETIRED.SCALAR_SINGLE:u0x03] ) / ( ( [PERF_METRICS.RETIRING] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) * ( [TOPDOWN.SLOTS] ) ) ) + ( min( ( ( [FP_ARITH_INST_RETIRED.128B_PACKED_DOUBLE:u0xfc] ) / ( ( [PERF_METRICS.RETIRING] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) * ( [TOPDOWN.SLOTS] ) ) ) , ( 1 ) ) ) )"
+        "name": "metric_TMA_........FP_Vector_128b(%)",
+        "expression": "100 * ( min( ( ( [FP_ARITH_INST_RETIRED.128B_PACKED_DOUBLE] + [FP_ARITH_INST_RETIRED.128B_PACKED_SINGLE] ) / ( ( [PERF_METRICS.RETIRING] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) * ( [TOPDOWN.SLOTS] ) ) ) , ( 1 ) ) )"
     },
     {
-        "name": "metric_TMA_......FP_Scalar(%)",
-        "expression": "100 * ( ( [FP_ARITH_INST_RETIRED.SCALAR_SINGLE:u0x03] ) / ( ( [PERF_METRICS.RETIRING] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) * ( [TOPDOWN.SLOTS] ) ) )"
+        "name": "metric_TMA_........FP_Vector_256b(%)",
+        "expression": "100 * ( min( ( ( [FP_ARITH_INST_RETIRED.256B_PACKED_DOUBLE] + [FP_ARITH_INST_RETIRED.256B_PACKED_SINGLE] ) / ( ( [PERF_METRICS.RETIRING] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) * ( [TOPDOWN.SLOTS] ) ) ) , ( 1 ) ) )"
     },
     {
-        "name": "metric_TMA_......FP_Vector(%)",
-        "expression": "100 * ( min( ( ( [FP_ARITH_INST_RETIRED.128B_PACKED_DOUBLE:u0xfc] ) / ( ( [PERF_METRICS.RETIRING] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) * ( [TOPDOWN.SLOTS] ) ) ) , ( 1 ) ) )"
+        "name": "metric_TMA_........FP_Vector_512b(%)",
+        "expression": "100 * ( min( ( ( [FP_ARITH_INST_RETIRED.512B_PACKED_DOUBLE] + [FP_ARITH_INST_RETIRED.512B_PACKED_SINGLE] ) / ( ( [PERF_METRICS.RETIRING] / ( [PERF_METRICS.FRONTEND_BOUND] + [PERF_METRICS.BAD_SPECULATION] + [PERF_METRICS.RETIRING] + [PERF_METRICS.BACKEND_BOUND] ) ) * ( [TOPDOWN.SLOTS] ) ) ) , ( 1 ) ) )"
     },
     {
         "name": "metric_TMA_..Heavy_Operations(%)",
