@@ -87,6 +87,42 @@
         "expression-txn": "[L2_RQSTS.CODE_RD_MISS] / [TXN]"
     },
     {
+        "name": "metric_LLC code read MPI (demand+prefetch)",
+        "name-txn": "metric_LLC code read (demand+prefetch) misses per txn",
+        "expression": "([UNC_CHA_TOR_INSERTS.IA_MISS_CRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_CRD_PREF]) / [instructions]",
+        "expression-txn": "([UNC_CHA_TOR_INSERTS.IA_MISS_CRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_CRD_PREF]) / [TXN]"
+    },
+    {
+        "name": "metric_LLC data read MPI (demand+prefetch)",
+        "name-txn": "metric_LLC data read (demand+prefetch) misses per txn",
+        "expression": "([UNC_CHA_TOR_INSERTS.IA_MISS_LLCPREFDRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF]) / [instructions]",
+        "expression-txn": "([UNC_CHA_TOR_INSERTS.IA_MISS_LLCPREFDRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF]) / [TXN]"
+    },
+    {
+        "name": "metric_LLC total HITM (per instr) (excludes LLC prefetches)",
+        "name-txn": "metric_LLC total HITM per txn (excludes LLC prefetches)",
+        "expression": "[OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HITM] / [instructions]",
+        "expression-txn": "[OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HITM] / [TXN]"
+    },
+    {
+        "name": "metric_LLC total HIT clean line forwards (per instr) (excludes LLC prefetches)",
+        "name-txn": "metric_LLC total HIT clean line forwards per txn (excludes LLC prefetches)",
+        "expression": "[OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HIT_WITH_FWD] / [instructions]",
+        "expression-txn": "[OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HIT_WITH_FWD] / [TXN]"
+    },
+    {
+        "name": "metric_Average LLC demand data read miss latency (in ns)",
+        "expression": "( 1000000000 * ([UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD] / [UNC_CHA_TOR_INSERTS.IA_MISS_DRD]) / ([UNC_CHA_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]) ) ) * 1"
+    },
+    {
+        "name": "metric_Average LLC demand data read miss latency for LOCAL requests (in ns)",
+        "expression": "( 1000000000 * ([UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD_LOCAL] / [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_LOCAL]) / ([UNC_CHA_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]) ) ) * 1"
+    },
+    {
+        "name": "metric_Average LLC demand data read miss latency for REMOTE requests (in ns)",
+        "expression": "( 1000000000 * ([UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD_REMOTE] / [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_REMOTE]) / ([UNC_CHA_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]) ) ) * 1"
+    },
+    {
         "name": "metric_UPI Data transmit BW (MB/sec) (only data)",
         "expression": "([UNC_UPI_TxL_FLITS.ALL_DATA] * (64 / 9.0) / 1000000) / 1"
     },
@@ -137,42 +173,6 @@
     {
         "name": "metric_memory bandwidth total (MB/sec)",
         "expression": "(([UNC_M_CAS_COUNT.RD] + [UNC_M_CAS_COUNT.WR]) * 64 / 1000000) / 1"
-    },
-    {
-        "name": "metric_LLC code read MPI (demand+prefetch)",
-        "name-txn": "metric_LLC code read (demand+prefetch) misses per txn",
-        "expression": "([UNC_CHA_TOR_INSERTS.IA_MISS_CRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_CRD_PREF]) / [instructions]",
-        "expression-txn": "([UNC_CHA_TOR_INSERTS.IA_MISS_CRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_CRD_PREF]) / [TXN]"
-    },
-    {
-        "name": "metric_LLC data read MPI (demand+prefetch)",
-        "name-txn": "metric_LLC data read (demand+prefetch) misses per txn",
-        "expression": "([UNC_CHA_TOR_INSERTS.IA_MISS_LLCPREFDRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF]) / [instructions]",
-        "expression-txn": "([UNC_CHA_TOR_INSERTS.IA_MISS_LLCPREFDRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF]) / [TXN]"
-    },
-    {
-        "name": "metric_LLC total HITM (per instr) (excludes LLC prefetches)",
-        "name-txn": "metric_LLC total HITM per txn (excludes LLC prefetches)",
-        "expression": "[OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HITM] / [instructions]",
-        "expression-txn": "[OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HITM] / [TXN]"
-    },
-    {
-        "name": "metric_LLC total HIT clean line forwards (per instr) (excludes LLC prefetches)",
-        "name-txn": "metric_LLC total HIT clean line forwards per txn (excludes LLC prefetches)",
-        "expression": "[OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HIT_WITH_FWD] / [instructions]",
-        "expression-txn": "[OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HIT_WITH_FWD] / [TXN]"
-    },
-    {
-        "name": "metric_Average LLC demand data read miss latency (in ns)",
-        "expression": "( 1000000000 * ([UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD] / [UNC_CHA_TOR_INSERTS.IA_MISS_DRD]) / ([UNC_CHA_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]) ) ) * 1"
-    },
-    {
-        "name": "metric_Average LLC demand data read miss latency for LOCAL requests (in ns)",
-        "expression": "( 1000000000 * ([UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD_LOCAL] / [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_LOCAL]) / ([UNC_CHA_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]) ) ) * 1"
-    },
-    {
-        "name": "metric_Average LLC demand data read miss latency for REMOTE requests (in ns)",
-        "expression": "( 1000000000 * ([UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD_REMOTE] / [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_REMOTE]) / ([UNC_CHA_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]) ) ) * 1"
     },
     {
         "name": "metric_ITLB (2nd level) MPI",
