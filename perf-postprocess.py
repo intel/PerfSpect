@@ -39,12 +39,28 @@ def get_extra_out_file(out_file, t):
         text = "socket"
     elif t == "sa":
         text = "socket.average"
+    elif t == "savg":
+        text = "socket.avg.pivot"
+    elif t == "smax":
+        text = "socket.max.pivot"
+    elif t == "smin":
+        text = "socket.min.pivot"
+    elif t == "sp95":
+        text = "socket.p95.pivot"
     elif t == "sr":
         text = "socket.raw"
     elif t == "c":
         text = "cpu"
     elif t == "ca":
         text = "cpu.average"
+    elif t == "cavg":
+        text = "cpu.avg.pivot"
+    elif t == "cmax":
+        text = "cpu.max.pivot"
+    elif t == "cmin":
+        text = "cpu.min.pivot"
+    elif t == "cp95":
+        text = "cpu.p95.pivot"
     elif t == "cr":
         text = "cpu.raw"
     elif t == "m":
@@ -571,16 +587,8 @@ def generate_metrics_time_series(time_series_df, perf_mode, out_file_path):
 
 
 def generate_metrics_averages(
-    time_series_df: pd.DataFrame, perf_mode: Mode, out_file_path: str
+    time_series_df: pd.DataFrame, perf_mode: Mode, out_file_path: str, metrics
 ) -> None:
-    average_metric_file_name = ""
-    if perf_mode == Mode.System:
-        average_metric_file_name = get_extra_out_file(out_file_path, "a")
-    if perf_mode == Mode.Socket:
-        average_metric_file_name = get_extra_out_file(out_file_path, "sa")
-    if perf_mode == Mode.CPU:
-        average_metric_file_name = get_extra_out_file(out_file_path, "ca")
-
     time_series_df.index.name = "metrics"
     avgcol = time_series_df.mean(numeric_only=True, axis=1).to_frame().reset_index()
     p95col = time_series_df.quantile(q=0.95, axis=1).to_frame().reset_index()
@@ -591,15 +599,45 @@ def generate_metrics_averages(
     p95col.columns = ["metrics", "p95"]
     mincol.columns = ["metrics", "min"]
     maxcol.columns = ["metrics", "max"]
+
     # merge columns
     time_series_df = time_series_df.merge(avgcol, on="metrics", how="outer")
     time_series_df = time_series_df.merge(p95col, on="metrics", how="outer")
     time_series_df = time_series_df.merge(mincol, on="metrics", how="outer")
     time_series_df = time_series_df.merge(maxcol, on="metrics", how="outer")
 
+    average_metric_file_name = ""
+    if perf_mode == Mode.System:
+        average_metric_file_name = get_extra_out_file(out_file_path, "a")
+    elif perf_mode == Mode.CPU:
+        average_metric_file_name = get_extra_out_file(out_file_path, "ca")
+    elif perf_mode == Mode.Socket:
+        average_metric_file_name = get_extra_out_file(out_file_path, "sa")
+
     time_series_df[["metrics", "avg", "p95", "min", "max"]].to_csv(
         average_metric_file_name, index=False
     )
+    if perf_mode != Mode.System:
+        for table, type in [
+            [avgcol, "avg"],
+            [p95col, "p95"],
+            [mincol, "min"],
+            [maxcol, "max"],
+        ]:
+            table["part"] = table["metrics"].map(
+                lambda x: int("".join(filter(str.isdigit, x.split(".")[-1])))
+            )
+            table["metrics"] = table["metrics"].map(lambda x: x.rsplit(".", 1)[0])
+            table = table.pivot_table(
+                index=["metrics"], columns=["part"], values=table.columns[1]
+            )
+            table = table.reindex(index=metrics)
+            table = table.reindex(sorted(table.columns), axis=1)
+
+            average_metric_file_name = get_extra_out_file(
+                out_file_path, ("s" if perf_mode == Mode.Socket else "c") + type
+            )
+            table.to_csv(average_metric_file_name)
     return
 
 
@@ -994,9 +1032,9 @@ def generate_metrics(
             verbose, filtered_metrics, metadata, group_to_event, group_to_df, errors
         )
 
-    time_series_df = pd.DataFrame(time_metrics_result).reindex(
-        index=list(time_metrics_result[list(time_metrics_result.keys())[0]].keys())
-    )
+    metrics = list(time_metrics_result[list(time_metrics_result.keys())[0]].keys())
+
+    time_series_df = pd.DataFrame(time_metrics_result).reindex(index=metrics)
 
     if verbose:
         for error in errors:
@@ -1025,7 +1063,12 @@ def generate_metrics(
         ]
 
     generate_metrics_time_series(time_series_df, perf_mode, out_file_path)
-    generate_metrics_averages(time_series_df, perf_mode, out_file_path)
+    generate_metrics_averages(
+        time_series_df,
+        perf_mode,
+        out_file_path,
+        [*dict.fromkeys([e.rsplit(".", 1)[0] for e in metrics])],
+    )
     if perf_mode == Mode.System:
         write_html(time_series_df, perf_mode, out_file_path, meta_data, pertxn)
     return
