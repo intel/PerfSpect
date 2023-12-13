@@ -47,6 +47,8 @@ build-public/postprocess:
 					--add-data "./events/metric_icx.json:." \
 					--add-data "./events/metric_spr_emr.json:." \
 					--add-data "./events/metric_srf.json:." \
+					--add-data "./events/metric_genoa.json:." \
+					--add-data "./events/metric_bergamo.json:." \
 					--add-data "./src/base.html:." \
 					--runtime-tmpdir . \
 					--exclude-module readline

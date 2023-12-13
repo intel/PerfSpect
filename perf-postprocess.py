@@ -426,6 +426,10 @@ def get_metric_file_name(microarchitecture):
         metric_file = "metric_spr_emr.json"
     elif microarchitecture == "sierraforest":
         metric_file = "metric_srf.json"
+    elif microarchitecture == "genoa":
+        metric_file = "metric_genoa.json"
+    elif microarchitecture == "bergamo":
+        metric_file = "metric_bergamo.json"
     else:
         crash("Suitable metric file not found")
 
