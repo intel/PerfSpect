@@ -28,6 +28,8 @@ SUPPORTED_ARCHITECTURES = [
     "SapphireRapids",
     "EmeraldRapids",
     "SierraForest",
+    "Genoa",
+    "Bergamo",
 ]
 
 
@@ -347,6 +349,8 @@ if __name__ == "__main__":
         eventfile = "spr_emr.txt"
     elif arch == "sierraforest":
         eventfile = "srf.txt"
+    elif arch == "genoa" or arch == "bergamo":
+        eventfile = "genoa_bergamo.txt"
 
     if eventfile is None:
         crash(f"failed to match architecture ({arch}) to event file name.")
@@ -397,6 +401,8 @@ if __name__ == "__main__":
             logging.warning(
                 "Due to lack of vPMU support, TMA L1 & L2 events will not be collected"
             )
+    if arch == "genoa" or arch == "bergamo":
+        include_tma = False
     events, collection_events = prep_events.prepare_perf_events(
         eventfile,
         (args.pid is not None or args.cid is not None or not have_uncore),

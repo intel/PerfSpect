@@ -283,6 +283,12 @@ def get_arch_and_name(procinfo):
             arch = "emeraldrapids"
         elif model == 175 and cpufamily == 6:
             arch = "sierraforest"
+    elif vendor == "AuthenticAMD":
+        if cpufamily == 25:
+            if model >= 16 and model <= 31:
+                arch = "genoa"
+            elif model >= 160 and model <= 175:
+                arch = "bergamo"
     return arch, modelname
 
 
@@ -294,7 +300,7 @@ def get_cpuid_info(procinfo):
         vendor = "Non-Intel"
     socketinfo = collections.OrderedDict()
     for proc in procinfo:
-        if vendor == "GenuineIntel":
+        if vendor == "GenuineIntel" or vendor == "AuthenticAMD":
             key = proc["physical id"]
         else:
             key = 0
