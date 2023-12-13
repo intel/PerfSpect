@@ -976,6 +976,9 @@ def generate_metrics(
                     e.startswith("power/")
                     or e.startswith("cstate_")
                     or e.startswith("UNC_")
+                    or e.startswith("l3_")
+                    or e.startswith("local_")
+                    or e.startswith("remote_")
                     for e in m["events"]
                 ]
             ):
@@ -1146,7 +1149,13 @@ def generate_raw_events_cpu(perf_data_df, out_file_path):
     # drop uncore and power metrics
     to_drop = []
     for metric in metric_per_CPU_frame.index:
-        if metric.startswith("UNC_") or metric.startswith("power/"):
+        if (
+            metric.startswith("UNC_")
+            or metric.startswith("power/")
+            or metric.startswith("l3_")
+            or metric.startswith("local_")
+            or metric.startswith("remote_")
+        ):
             to_drop.append(metric)
     metric_per_CPU_frame.drop(to_drop, inplace=True)
 
