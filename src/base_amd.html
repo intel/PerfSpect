@@ -1,0 +1,900 @@
+<!--
+ * Copyright (C) 2023 Advanced Micro Devices
+ * SPDX-License-Identifier: MIT
+-->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <title>PerfSpect</title>
+  <link rel="icon" type="image/x-icon" href="https://www.amd.com/content/dam/code/images/header/amd-header-logo.svg" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="initial-scale=1, width=device-width" />
+  <script src="https://unpkg.com/react@latest/umd/react.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@latest/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@mui/material@latest/umd/material-ui.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/babel-standalone@latest/babel.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.3.3/echarts.min.js"
+    integrity="sha512-2L0h0GhoIHQEjti/1KwfjcbyaTHy+hPPhE1o5wTCmviYcPO/TD9oZvUxFQtWvBkCSTIpt+fjsx1CCx6ekb51gw=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- Fonts to support Material Design -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
+  <!-- Icons to support Material Design -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const {
+      colors,
+      CssBaseline,
+      ThemeProvider,
+      Container,
+      createTheme,
+      Typography,
+      Button,
+      IconButton,
+      ButtonGroup,
+      Slider,
+      Grid,
+      Box,
+      Tab,
+      Dialog,
+      Alert,
+      Snackbar,
+      Link,
+      Tabs,
+      TextField,
+      Icon,
+      Table,
+      TableBody,
+      TableCell,
+      TableContainer,
+      TableHead,
+      TableRow,
+      Tooltip,
+      Paper,
+    } = MaterialUI;
+
+    // Create a theme instance.
+    const theme = createTheme({
+      typography: {
+        fontSize: 14,
+        h2: {
+          fontSize: "2.5rem",
+        },
+        fontFamily: [
+          "-apple-system",
+          "BlinkMacSystemFont",
+          '"Segoe UI"',
+          "Roboto",
+          '"Helvetica Neue"',
+          "Arial",
+          "sans-serif",
+          '"Apple Color Emoji"',
+          '"Segoe UI Emoji"',
+          '"Segoe UI Symbol"',
+        ].join(","),
+      },
+      palette: {
+        mode: 'light',
+      },
+    });
+
+    function ReactECharts({ option, style, settings, loading, theme }) {
+      const chartRef = React.useRef("null");
+
+      React.useEffect(() => {
+        // Initialize chart
+        let chart;
+        if (chartRef.current !== null) {
+          chart = echarts.init(chartRef.current, theme);
+        }
+
+        // Add chart resize listener
+        // ResizeObserver is leading to a bit janky UX
+        function resizeChart() {
+          chart.resize();
+        }
+        window.addEventListener("resize", resizeChart);
+
+        // Return cleanup function
+        return () => {
+          chart.dispose();
+          window.removeEventListener("resize", resizeChart);
+        };
+      }, [theme]);
+
+      React.useEffect(() => {
+        // Update chart
+        if (chartRef.current !== null) {
+          const chart = echarts.getInstanceByDom(chartRef.current);
+          chart.setOption(option, settings);
+        }
+      }, [option, settings, theme]); // Whenever theme changes we need to add option and setting due to it being deleted in cleanup function
+
+      React.useEffect(() => {
+        // Update chart
+        if (chartRef.current !== null) {
+          const chart = echarts.getInstanceByDom(chartRef.current);
+          // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+          loading === true ? chart.showLoading() : chart.hideLoading();
+        }
+      }, [loading, theme]);
+
+      return (
+        <div
+          ref={chartRef}
+          style={{ width: "100%", height: "100%", ...style }}
+        />
+      );
+    }
+
+    function TabPanel(props) {
+      const { children, value, index, ...other } = props;
+
+      return (
+        <div
+          role="tabpanel"
+          hidden={value !== index}
+          id={`simple-tabpanel-${index}`}
+          aria-labelledby={`simple-tab-${index}`}
+          {...other}
+        >
+          {value === index && (
+            <div style={{ height: "100%" }}>{children}</div>
+          )}
+        </div>
+      );
+    }
+
+    function App() {
+      const [systemTabs, setSystemTabs] = React.useState(0);
+      const [openlink, setOpenlink] = React.useState(true);
+      const [maxdiff, set_maxdiff] = React.useState(0)
+      const [mindiff, set_mindiff] = React.useState(0)
+
+      const handleChange = (event, newSystemTabs) => {
+        setSystemTabs(newSystemTabs);
+      };
+
+      const handleCloselink = () => {
+        setOpenlink(false)
+      };
+
+      const all_metrics = ALLMETRICS
+      const [current_metrics, setCurrent_metrics] = React.useState(JSON.parse(JSON.stringify(all_metrics)));
+      const meta_data = METADATA
+      const description = {
+        "metric_CPU operating frequency (in GHz)": "CPU operating frequency (in GHz)",
+        "metric_CPU utilization %": "Percentage of time spent in the active CPU power state C0",
+        "metric_CPI": "Cycles per instruction retired; indicating how much time each executed instruction took; in units of cycles.",
+        "metric_Pipeline Utilization - Frontend Bound (%)": "Fraction of dispatch slots that remained unused because the frontend did not supply enough instructions/ops.",
+        "metric_Pipeline Utilization - Frontend Bound - Latency (%)": "Fraction of dispatch slots that remained unused because of a latency bottleneck in the frontend, such as Instruction Cache or ITLB misses.",
+        "metric_Pipeline Utilization - Frontend Bound - Bandwidth (%)": "Fraction of dispatch slots that remained unused because of a bandwidth bottleneck in the frontend, such as decode bandwidth or Op Cache fetch bandwidth.",
+        "metric_Pipeline Utilization - Bad Speculation (%)": "Fraction of dispatched ops that did not retire.",
+        "metric_Pipeline Utilization - Bad Speculation - Mispredicts (%)": "Fraction of dispatched ops that were flushed due to branch mispredicts.",
+        "metric_Pipeline Utilization - Bad Speculation - Pipeline Restarts (%)": "Fraction of dispatched ops that were flushed due to pipeline restarts (resyncs).",
+        "metric_Pipeline Utilization - Backend Bound (%)": "Fraction of dispatch slots that remained unused because of backend stalls.",
+        "metric_Pipeline Utilization - Backend Bound - Memory (%)": "Fraction of dispatched slots that remained unused because of stalls due to the memory subsystem.",
+        "metric_Pipeline Utilization - Backend Bound - CPU (%)": "Fraction of dispatched slots that remained unused because of stalls not related to the memory subsystem.",
+        "metric_Pipeline Utilization - SMT Contention (%)": "Fraction of unused dispatch slots because the other thread was selected.",
+        "metric_Pipeline Utilization - Retiring (%)": "Fraction of dispatch slots used by ops that retired.",
+        "metric_Pipeline Utilization - Retiring - Fastpath (%)": "Fraction of dispatch slots used by fastpath ops that retired.",
+        "metric_Pipeline Utilization - Retiring - Microcode (%)": "Fraction of dispatch slots used by microcode ops that retired.",
+      }
+
+      const transactions = TRANSACTIONS;
+
+      const base_line = {
+        xAxis: {
+          name: "time (s)",
+          min: "dataMin",
+          max: "dataMax",
+        },
+        yAxis: {},
+        tooltip: {
+          trigger: 'axis',
+          valueFormatter: (value) => value.toFixed(2),
+        },
+        legend: {},
+      }
+
+      let cpu_util = {
+        ...base_line,
+        series: [
+          {
+            type: 'line',
+            data: CPUUTIL,
+          }
+        ]
+      }
+
+      let cpi = {
+        ...base_line,
+        series: [
+          {
+            type: 'line',
+            data: CPIDATA,
+          }
+        ]
+      }
+
+      let cpu_freq = {
+        ...base_line,
+        series: [
+          {
+            type: 'line',
+            data: CPUFREQ,
+          }
+        ]
+      }
+
+      let cache_miss = {
+        ...base_line,
+        series: [
+          {
+            name: "L2",
+            type: 'line',
+            data: L2_MISS,
+          },
+          {
+            name: "L3",
+            type: 'line',
+            data: L3_MISS,
+          },
+        ]
+      }
+
+      let cache_latency = {
+        ...base_line,
+        series: [
+          {
+            name: "L3",
+            type: 'line',
+            data: L3_READ_LATENCY,
+          },
+        ]
+      }
+
+      let memory_local = {
+        ...base_line,
+        series: [
+          {
+            name: "Read",
+            type: 'line',
+            data: DRAM_LOCAL_READ_BYTES,
+          },
+          {
+            name: "Write",
+            type: 'line',
+            data: DRAM_LOCAL_WRITE_BYTES,
+          },
+        ]
+      }
+
+      let memory_remote = {
+        ...base_line,
+        series: [
+          {
+            name: "Read",
+            type: 'line',
+            data: DRAM_REMOTE_READ_BYTES,
+          },
+          {
+            name: "Write",
+            type: 'line',
+            data: DRAM_REMOTE_WRITE_BYTES,
+          },
+        ]
+      }
+
+      let dma_local = {
+        ...base_line,
+        series: [
+          {
+            name: "Read",
+            type: 'line',
+            data: DMA_LOCAL_READ_BYTES,
+          },
+          {
+            name: "Write",
+            type: 'line',
+            data: DMA_LOCAL_WRITE_BYTES,
+          },
+        ]
+      }
+
+      let dma_remote = {
+        ...base_line,
+        series: [
+          {
+            name: "Read",
+            type: 'line',
+            data: DMA_REMOTE_READ_BYTES,
+          },
+          {
+            name: "Write",
+            type: 'line',
+            data: DMA_REMOTE_WRITE_BYTES,
+          },
+        ]
+      }
+
+      let ccm_local = {
+        ...base_line,
+        series: [
+          {
+            name: "Read",
+            type: 'line',
+            data: CCM_LOCAL_READ_BYTES,
+          },
+          {
+            name: "Write",
+            type: 'line',
+            data: CCM_LOCAL_WRITE_BYTES,
+          },
+        ]
+      }
+
+      let ccm_remote = {
+        ...base_line,
+        series: [
+          {
+            name: "Read",
+            type: 'line',
+            data: CCM_REMOTE_READ_BYTES,
+          },
+          {
+            name: "Write",
+            type: 'line',
+            data: CCM_REMOTE_WRITE_BYTES,
+          },
+        ]
+      }
+
+      let link = {
+        ...base_line,
+        series: [
+          {
+            type: 'line',
+            data: LINK_LOCAL_OUTBOUND_BYTES,
+          },
+        ]
+      }
+
+      let package_power = {
+        ...base_line,
+        series: [
+          {
+            type: 'line',
+            data: PKGPOWER,
+          }
+        ]
+      }
+
+      const diffreport = (e) => {
+        let reader = new FileReader();
+        reader.onload = (e) => {
+          let new_metrics = JSON.parse(e.target.result.split("\n").filter(e => e.includes("const all_metrics ="))[0].split("const all_metrics =")[1])
+          let copy = JSON.parse(JSON.stringify(current_metrics))
+          let temp_mindiff = 0
+          let temp_maxdiff = 0
+          for (const metric of copy) {
+            for (const other_metric of new_metrics) {
+              if (metric.metrics === other_metric.metrics) {
+                metric.other = other_metric["0"]
+                if (other_metric["0"] < metric["0"]) {
+                  metric.diff = ((other_metric["0"] / metric["0"]) - 1) * 100
+                } else {
+                  metric.diff = ((metric["0"] / other_metric["0"]) - 1) * -100
+                }
+                if (temp_maxdiff == 0 || temp_maxdiff < metric.diff) {
+                  temp_maxdiff = metric.diff
+                }
+                if (temp_mindiff == 0 || temp_mindiff > metric.diff) {
+                  temp_mindiff = metric.diff
+                }
+              }
+            }
+          }
+          set_maxdiff(temp_maxdiff)
+          set_mindiff(temp_mindiff)
+          setCurrent_metrics(copy)
+        };
+
+        reader.readAsText(e.target.files[0]);
+      }
+
+      return (
+        <div>
+          <Box display="flex" justifyContent="center" width="100%" sx={{ zIndex: 10, borderBottom: 1, borderColor: "divider", position: 'fixed', bgcolor: 'background.paper' }}>
+            <Snackbar open={openlink}>
+              <Alert onClose={handleCloselink} severity="info" sx={{ width: '100%' }} iconMapping={{ info: <Icon>star</Icon> }}>
+                If you like PerfSpect, give it a star on <Link href="https://github.com/intel/PerfSpect">GitHub</Link>
+              </Alert>
+            </Snackbar>
+            <Tabs
+              value={systemTabs}
+              onChange={handleChange}
+              variant="scrollable"
+            >
+              <Tab label="Bottlenecks" />
+              <Tab label="CPU" />
+              <Tab label="Memory" />
+              <Tab label="Uncore" />
+              <Tab label="Power" />
+              <Tab label="Metadata" />
+              <Tab label="All" />
+            </Tabs>
+          </Box>
+          <div style={{ padding: "80px 24px 24px 24px" }}>
+            <TabPanel
+              value={systemTabs}
+              index={0}
+            >
+              <Grid container style={{ padding: "0px 0px 24px 0px" }}>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    Pipeline Utilization Analysis
+                  </Typography>
+                  <ul>
+                    <li>
+                      <Typography variant="body1">
+                        The Front-end is responsible for fetching the program code
+                        represented in architectural instructions and decoding
+                        them into one or more low-level hardware operations called
+                        micro-ops (uOps).
+                      </Typography>
+                    </li>
+                    <li>
+                      <Typography variant="body1">
+                        The Back-end is responsible for monitoring when uOp’s data
+                        operands are available and executing the uOp in an
+                        available execution unit.
+                      </Typography>
+                    </li>
+                    <li>
+                      <Typography variant="body1">
+                        Retirement is where results of the uOp are committed to
+                        the architectural state (CPU registers or written back to
+                        memory).
+                      </Typography>
+                    </li>
+                    <li>
+                      <Typography variant="body1">
+                        Usually, most uOps pass completely through the pipeline
+                        and retire, but sometimes speculatively fetched uOps may
+                        get cancelled before retirement – like in the case of
+                        mis-predicted branches.
+                      </Typography>
+                    </li>
+                    <li>
+                      <a href="https://www.intel.com/content/www/us/en/develop/documentation/vtune-cookbook/top/methodologies/top-down-microarchitecture-analysis-method.html">
+                        Learn more here
+                      </a>
+                    </li>
+                  </ul>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "400px" }} option={{
+                    tooltip: {},
+                    series: {
+                      nodeClick: false,
+                      type: "sunburst",
+                      radius: [60, "90%"],
+                      itemStyle: {
+                        borderRadius: 7,
+                        borderWidth: 2,
+                      },
+                      data: [
+                        {
+                          name: "Bad Speculation",
+                          value: Math.round(PIPELINE_L1_BAD_SPECULATION * 10) / 10,
+                        },
+                        {
+                          name: "Retiring",
+                          value: Math.round(PIPELINE_L1_RETIRING * 10) / 10,
+                        },
+                        {
+                          name: "SMT Contention",
+                          value: Math.round(PIPELINE_L1_SMT_CONTENTION * 10) / 10,
+                        },
+                        {
+                          name: "Frontend Bound",
+                          value: Math.round(PIPELINE_L1_FRONTEND_BOUND * 10) / 10,
+                        },
+                        {
+                          name: "Backend Bound",
+                          value: Math.round(PIPELINE_L1_BACKEND_BOUND * 10) / 10,
+                          children: [
+                            {
+                              name: "CPU",
+                              value: Math.round(PIPELINE_L2_BACKEND_BOUND_CPU * 10) / 10,
+                            },
+                            {
+                              name: "Memory",
+                              value: Math.round(PIPELINE_L2_BACKEND_BOUND_MEMORY * 10) / 10,
+                            },
+                          ],
+                        },
+                      ],
+                      radius: [20, "100%"],
+                      label: {
+                        rotate: "radial",
+                      },
+                    },
+                  }} />
+                </Grid>
+              </Grid>
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    Pressure Stall Information (PSI)
+                  </Typography>
+                  <Typography variant="body1">
+                    Your workload spent an average of {(PSI_MEM + PSI_CPU + PSI_IO).toFixed(1)}% of time stalled waiting on a hardware resource.
+                  </Typography>
+                  <ul>
+                    <li>
+                      <Typography variant="body1">
+                        Stall is the amount of time that any task was waiting on a given resource.
+                      </Typography>
+                    </li>
+                    <li>
+                      <Typography variant="body1">
+                        When CPU, memory or IO devices are contended, workloads experience latency spikes, throughput losses, and run the risk of OOM kills.
+                      </Typography>
+                    </li>
+                    <li>
+                      <Typography variant="body1">
+                        Low or zero PSI means you are paying for capacity you don't use. You might be able to downsize your server.
+                      </Typography>
+                    </li>
+                    <li>
+                      <Typography variant="body1">
+                        High PSI means you should optimize your code or upgrade your server in whichever category is the largest.
+                      </Typography>
+                    </li>
+                    <li>
+                      <a href="https://docs.kernel.org/accounting/psi.html">
+                        Learn more here
+                      </a>
+                    </li>
+                  </ul>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "400px" }} option={{
+                    tooltip: {},
+                    series: {
+                      nodeClick: false,
+                      type: "sunburst",
+                      radius: [60, "90%"],
+                      itemStyle: {
+                        borderRadius: 7,
+                        borderWidth: 2,
+                      },
+                      data: [
+                        {
+                          name: "CPU stall",
+                          value: Math.round(PSI_CPU * 10) / 10,
+                          itemStyle: {
+                            color: "#ee6666"
+                          }
+                        },
+                        {
+                          name: "Memory stall",
+                          value: Math.round(PSI_MEM * 10) / 10,
+                          itemStyle: {
+                            color: "#fac858"
+                          }
+                        },
+                        {
+                          name: "IO stall",
+                          value: Math.round(PSI_IO * 10) / 10,
+                          itemStyle: {
+                            color: "#73c0de"
+                          }
+                        },
+                        {
+                          name: "Not stalled",
+                          value: Math.round((100 - (PSI_MEM + PSI_CPU + PSI_IO)) * 10) / 10,
+                          itemStyle: {
+                            color: "#91cc75"
+                          }
+                        },
+                      ],
+                      radius: [20, "100%"],
+                      label: {
+                        rotate: "radial",
+                      },
+                    },
+                  }} />
+                </Grid>
+              </Grid>
+            </TabPanel>
+            <TabPanel
+              value={systemTabs}
+              index={1}
+            >
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    CPU utilization
+                  </Typography>
+                  <Typography variant="body1">
+                    Percentage of time spent in the active CPU power state C0. When a core is not being utilized it can go into lower power states to reduce idle energy consumption.
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={cpu_util} />
+                </Grid>
+              </Grid>
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    {transactions ? "Cycles per transaction" : "CPI"}
+                  </Typography>
+                  <Typography variant="body1">
+                    {transactions ? "Cycles per transaction retired; indicating how much time each executed transaction took; in units of cycles. Often this metric shows how efficiently applications are using the underlying hardware. A lower \"Cycles per TXN\" could indicate that transactions are not hitting bottlenecks and retiring quickly." : "Cycles per instruction retired; indicating how much time each executed instruction took; in units of cycles. Often this metric shows how efficiently applications are using the underlying hardware. A lower CPI could indicate that instructions are not hitting bottlenecks and retiring quickly."}
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={cpi} />
+                </Grid>
+              </Grid>
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    CPU operating frequency (in GHz)
+                  </Typography>
+                  <Typography variant="body1">
+                    This is the speed of the CPU clock. Higher frequencies allow faster execution. Usually servers are able to change their frequency based on utilization to conserve energy or turbo for short periods of time to boost performance.
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={cpu_freq} />
+                </Grid>
+              </Grid>
+            </TabPanel>
+            <TabPanel
+              value={systemTabs}
+              index={2}
+            >
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    Local Memory Bandwidth
+                  </Typography>
+                  <Typography variant="body1">
+                    DRAM bandwidth is broken down into reads and writes (in MB/sec).
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={memory_local} />
+                </Grid>
+              </Grid>
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    Remote Memory Bandwidth
+                  </Typography>
+                  <Typography variant="body1">
+                    DRAM bandwidth is broken down into reads and writes (in MB/sec).
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={memory_remote} />
+                </Grid>
+              </Grid>
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    Cache Misses
+                  </Typography>
+                  <Typography variant="body1">
+                    Requests missing L2 and L3 caches.
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={cache_miss} />
+                </Grid>
+              </Grid>
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    Cache Read Miss Latency
+                  </Typography>
+                  <Typography variant="body1">
+                    Average L3 cache read miss latency (in ns).
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={cache_latency} />
+                </Grid>
+              </Grid>
+            </TabPanel>
+            <TabPanel
+              value={systemTabs}
+              index={3}
+            >
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    Local DMA Bandwidth
+                  </Typography>
+                  <Typography variant="body1">
+                    Upstream DMA bandwidth is broken down into reads and writes (in MB/sec).
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={dma_local} />
+                </Grid>
+              </Grid>
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    Remote DMA Bandwidth
+                  </Typography>
+                  <Typography variant="body1">
+                    Upstream DMA bandwidth is broken down into reads and writes (in MB/sec).
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={dma_remote} />
+                </Grid>
+              </Grid>
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    Local Core Bandwidth
+                  </Typography>
+                  <Typography variant="body1">
+                    Inbound data bandwidth to cores is broken down into reads and writes (in MB/sec).
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={ccm_local} />
+                </Grid>
+              </Grid>
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    Remote Core Bandwidth
+                  </Typography>
+                  <Typography variant="body1">
+                    Inbound data bandwidth to cores is broken down into reads and writes (in MB/sec).
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={ccm_remote} />
+                </Grid>
+              </Grid>
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    Socket Outbound Link Bandwidth
+                  </Typography>
+                  <Typography variant="body1">
+                    Combined outbound data bandwidth for inter-socket links (in MB/sec).
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={link} />
+                </Grid>
+              </Grid>
+            </TabPanel>
+            <TabPanel
+              value={systemTabs}
+              index={4}
+            >
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    Package Power
+                  </Typography>
+                  <Typography variant="body1">
+                    The amount of power, in watts, consumed by the CPU package on the system. We provide this metric primarily for determining if system performance is being adversely affected by power throttling, although it can also be used to calculate energy consumption.
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={package_power} />
+                </Grid>
+              </Grid>
+            </TabPanel>
+            <TabPanel
+              value={systemTabs}
+              index={5}
+            >
+              <TableContainer component={Paper} sx={{ width: "fit-content" }}>
+                <Table style={{ tableLayout: 'auto' }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Metadata</TableCell>
+                      <TableCell>Value</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {meta_data.map((row) => (
+                      <TableRow
+                        key={row[0]}
+                        sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                      >
+                        <TableCell component="th" scope="row">
+                          {row[0]}
+                        </TableCell>
+                        <TableCell>
+                          {row[1]}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </TabPanel>
+            <TabPanel
+              value={systemTabs}
+              index={6}
+            >
+              <TextField id="outlined-basic" onChange={diffreport} inputProps={{ accept: '.html' }} fullWidth label="Diff with other metric_out.html" InputLabelProps={{ shrink: true }} sx={{ paddingBottom: "24px" }} type="file" variant="outlined" />
+              <TableContainer component={Paper} sx={{ width: "fit-content" }}>
+                <Table size="small" style={{ tableLayout: 'auto' }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Value</TableCell>
+                      <TableCell>Metric</TableCell>
+                      {current_metrics[0].hasOwnProperty("other") && <TableCell>Other</TableCell>}
+                      {current_metrics[0].hasOwnProperty("other") && <TableCell>Diff</TableCell>}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {current_metrics.map((row) => (
+                      <TableRow
+                        hover={true}
+                        key={row.metrics}
+                        sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                      >
+                        <TableCell sx={{ fontFamily: 'Monospace' }} component="th" scope="row" >
+                          <Tooltip title={description.hasOwnProperty(row.metrics) ? description[row.metrics] : ""}>
+                            {description.hasOwnProperty(row.metrics) && <IconButton sx={{ padding: "0 8px 0 0" }}>
+                              <Icon>help</Icon>
+                            </IconButton>}
+                            {!description.hasOwnProperty(row.metrics) && <IconButton sx={{ padding: "0 8px 0 0" }} disabled>
+                              <Icon>help</Icon>
+                            </IconButton>}
+                          </Tooltip>
+                          {(row.metrics.startsWith("metric_") ? row.metrics.replace("metric_", "") : row.metrics).replaceAll("_", " ")}
+                        </TableCell>
+                        <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
+                          {Number(row["0"]).toFixed(4)}
+                        </TableCell>
+                        {row.hasOwnProperty("other") && <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
+                          {Number(row["other"]).toFixed(4)}
+                        </TableCell>}
+                        {row.hasOwnProperty("other") && <TableCell align="right" sx={{ fontFamily: 'Monospace', backgroundColor: (row.diff > 0 ? "rgba(255,0,0," + (row.diff / maxdiff * .5) + ")" : "rgba(0,0,255," + (row.diff / mindiff * .5) + ")") }}>
+                          {Math.round(Number(row["diff"]))}%
+                        </TableCell>}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </TabPanel>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(
+      <ThemeProvider theme={theme}>
+        {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
+        <CssBaseline />
+        <App />
+      </ThemeProvider>
+    );
+  </script>
+</body>
+
+</html>
