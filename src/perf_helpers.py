@@ -94,22 +94,26 @@ def get_sys_devices():
 
 # get imc and uncore counts
 # TODO:fix for memory config with some channels populated
-def get_imc_cha_upi_count():
+def get_uncore_count():
+    unc_count = {}
     sys_devs = get_sys_devices()
-    cha_count = 0
-    imc_count = 0
-    upi_count = 0
     if "uncore_cha" in sys_devs:
-        cha_count = int(sys_devs["uncore_cha"])
+        unc_count["cha"] = int(sys_devs["uncore_cha"])
     if "uncore_cbox" in sys_devs:
-        cha_count = int(sys_devs["uncore_cbox"])
+        unc_count["cha"] = int(sys_devs["uncore_cbox"])
     if "uncore_upi" in sys_devs:
-        upi_count = int(sys_devs["uncore_upi"])
+        unc_count["upi"] = int(sys_devs["uncore_upi"])
     if "uncore_qpi" in sys_devs:
-        upi_count = int(sys_devs["uncore_qpi"])
+        unc_count["upi"] = int(sys_devs["uncore_qpi"])
     if "uncore_imc" in sys_devs:
-        imc_count = int(sys_devs["uncore_imc"])
-    return imc_count, cha_count, upi_count
+        unc_count["imc"] = int(sys_devs["uncore_imc"])
+    if "amd_l3" in sys_devs:
+        unc_count["l3"] = int(sys_devs["amd_l3"])
+    if "amd_df" in sys_devs:
+        unc_count["df"] = int(sys_devs["amd_df"])
+    if "amd_umc" in sys_devs:
+        unc_count["umc"] = int(sys_devs["amd_umc"])
+    return unc_count
 
 
 # device ids are not consecutive in some cases
