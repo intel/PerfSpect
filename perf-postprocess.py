@@ -655,7 +655,19 @@ def row(df, name):
 
 
 def write_html(time_series_df, perf_mode, out_file_path, meta_data, pertxn=None):
-    html_file = "base.html"
+    microarchitecture = meta_data["constants"]["CONST_ARCH"]
+    if microarchitecture in [
+        "broadwell",
+        "skylake",
+        "cascadelake",
+        "icelake",
+        "sapphirerapids",
+        "emeraldrapids",
+        "sierraforest",
+    ]:
+        html_file = "base_intel.html"
+    else:
+        crash("Suitable html file not found")
     if getattr(sys, "frozen", False):
         basepath = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
         html_file = os.path.join(basepath, html_file)
