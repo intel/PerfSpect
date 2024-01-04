@@ -403,6 +403,17 @@ if __name__ == "__main__":
             )
     if arch == "genoa" or arch == "bergamo":
         include_tma = False
+        if have_uncore and "amd_df" in sys_devs:
+            with open("/sys/devices/amd_df/format/event", "r") as f_event:
+                if f_event.readline().strip() != "config:0-7,32-37":
+                    have_uncore = False
+            with open("/sys/devices/amd_df/format/umask", "r") as f_umask:
+                if f_umask.readline().strip() != "config:8-15,24-27":
+                    have_uncore = False
+            if not have_uncore:
+                logging.info(
+                    "disabling uncore (possibly running on an incompatible kernel?)"
+                )
     events, collection_events = prep_events.prepare_perf_events(
         eventfile,
         (args.pid is not None or args.cid is not None or not have_uncore),
