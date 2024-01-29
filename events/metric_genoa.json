@@ -241,55 +241,55 @@
     },
     {
         "name": "metric_Pipeline Utilization - Frontend Bound (%)",
-        "expression": "([de_no_dispatch_per_slot.no_ops_from_frontend] / (6 * [cpu-cycles])) * 100"
+        "expression": "([de_no_dispatch_per_slot.no_ops_from_frontend] / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
         "name": "metric_Pipeline Utilization - Frontend Bound - Latency (%)",
-        "expression": "((6 * [de_no_dispatch_per_cycle.no_ops_from_frontend]) / (6 * [cpu-cycles])) * 100"
+        "expression": "((6 * [de_no_dispatch_per_cycle.no_ops_from_frontend]) / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
         "name": "metric_Pipeline Utilization - Frontend Bound - Bandwidth (%)",
-        "expression": "((([de_no_dispatch_per_slot.no_ops_from_frontend] / 6) - ([de_no_dispatch_per_cycle.no_ops_from_frontend])) / (6 * [cpu-cycles])) * 100"
+        "expression": "((([de_no_dispatch_per_slot.no_ops_from_frontend] / 6) - ([de_no_dispatch_per_cycle.no_ops_from_frontend])) / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
         "name": "metric_Pipeline Utilization - Bad Speculation (%)",
-        "expression": "(([de_src_op_disp.all] - [ex_ret_ops]) / (6 * [cpu-cycles])) * 100"
+        "expression": "(([de_src_op_disp.all] - [ex_ret_ops]) / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
         "name": "metric_Pipeline Utilization - Bad Speculation - Mispredicts (%)",
-        "expression": "((([de_src_op_disp.all] - [ex_ret_ops]) * ([ex_ret_brn_misp] / ([ex_ret_brn_misp] + [resyncs_or_nc_redirects]))) / (6 * [cpu-cycles])) * 100"
+        "expression": "((([de_src_op_disp.all] - [ex_ret_ops]) * ([ex_ret_brn_misp] / ([ex_ret_brn_misp] + [resyncs_or_nc_redirects]))) / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
         "name": "metric_Pipeline Utilization - Bad Speculation - Pipeline Restarts (%)",
-        "expression": "((([de_src_op_disp.all] - [ex_ret_ops]) * ([resyncs_or_nc_redirects] / ([ex_ret_brn_misp] + [resyncs_or_nc_redirects]))) / (6 * [cpu-cycles])) * 100"
+        "expression": "((([de_src_op_disp.all] - [ex_ret_ops]) * ([resyncs_or_nc_redirects] / ([ex_ret_brn_misp] + [resyncs_or_nc_redirects]))) / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
         "name": "metric_Pipeline Utilization - Backend Bound (%)",
-        "expression": "([de_no_dispatch_per_slot.backend_stalls] / (6 * [cpu-cycles])) * 100"
+        "expression": "([de_no_dispatch_per_slot.backend_stalls] / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
         "name": "metric_Pipeline Utilization - Backend Bound - Memory (%)",
-        "expression": "(([de_no_dispatch_per_slot.backend_stalls] * ([ex_no_retire.load_not_complete] / [ex_no_retire.not_complete])) / (6 * [cpu-cycles])) * 100"
+        "expression": "(([de_no_dispatch_per_slot.backend_stalls] * ([ex_no_retire.load_not_complete] / [ex_no_retire.not_complete])) / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
         "name": "metric_Pipeline Utilization - Backend Bound - CPU (%)",
-        "expression": "(([de_no_dispatch_per_slot.backend_stalls] * (1 - ([ex_no_retire.load_not_complete] / [ex_no_retire.not_complete]))) / (6 * [cpu-cycles])) * 100"
+        "expression": "(([de_no_dispatch_per_slot.backend_stalls] * (1 - ([ex_no_retire.load_not_complete] / [ex_no_retire.not_complete]))) / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
         "name": "metric_Pipeline Utilization - SMT Contention (%)",
-        "expression": "([de_no_dispatch_per_slot.smt_contention] / (6 * [cpu-cycles])) * 100"
+        "expression": "([de_no_dispatch_per_slot.smt_contention] / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
         "name": "metric_Pipeline Utilization - Retiring (%)",
-        "expression": "([ex_ret_ops] / (6 * [cpu-cycles])) * 100"
+        "expression": "([ex_ret_ops] / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
         "name": "metric_Pipeline Utilization - Retiring - Fastpath (%)",
-        "expression": "(([ex_ret_ops] - [ex_ret_ucode_ops]) / (6 * [cpu-cycles])) * 100"
+        "expression": "(([ex_ret_ops] - [ex_ret_ucode_ops]) / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
         "name": "metric_Pipeline Utilization - Retiring - Microcode (%)",
-        "expression": "([ex_ret_ucode_ops] / (6 * [cpu-cycles])) * 100"
+        "expression": "([ex_ret_ucode_ops] / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
         "name": "metric_package power (watts)",

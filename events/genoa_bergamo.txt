@@ -416,7 +416,7 @@ df/event=0xd1f,umask=0xf3e,name='local_socket_outbound_data_beats_link7'/;
 # Pipeline Utilization - Frontend Bound - Bandwidth (%)
 cpu/event=0x1a0,umask=0x1,name='de_no_dispatch_per_slot.no_ops_from_frontend'/,
 cpu/event=0x1a0,umask=0x1,cmask=0x6,name='de_no_dispatch_per_cycle.no_ops_from_frontend'/,
-cpu-cycles;
+cpu/event=0x76,name='ls_not_halted_cyc'/;
 
 # Pipeline Utilization - Bad Speculation (%)
 # Pipeline Utilization - Bad Speculation - Pipeline Restarts (%)
@@ -425,7 +425,7 @@ cpu/event=0xaa,umask=0x7,name='de_src_op_disp.all'/,
 cpu/event=0xc1,name='ex_ret_ops'/,
 cpu/event=0xc3,name='ex_ret_brn_misp'/,
 cpu/event=0x96,name='resyncs_or_nc_redirects'/,
-cpu-cycles;
+cpu/event=0x76,name='ls_not_halted_cyc'/;
 
 # Pipeline Utilization - Backend Bound (%)
 # Pipeline Utilization - Backend Bound - Memory (%)
@@ -433,18 +433,18 @@ cpu-cycles;
 cpu/event=0x1a0,umask=0x1e,name='de_no_dispatch_per_slot.backend_stalls'/,
 cpu/event=0xd6,umask=0xa2,name='ex_no_retire.load_not_complete'/,
 cpu/event=0xd6,umask=0x2,name='ex_no_retire.not_complete'/,
-cpu-cycles;
+cpu/event=0x76,name='ls_not_halted_cyc'/;
 
 # Pipeline Utilization - SMT Contention (%)
 cpu/event=0x1a0,umask=0x60,name='de_no_dispatch_per_slot.smt_contention'/,
-cpu-cycles;
+cpu/event=0x76,name='ls_not_halted_cyc'/;
 
 # Pipeline Utilization - Retiring (%)
 # Pipeline Utilization - Retiring - Microcode (%)
 # Pipeline Utilization - Retiring - Fastpath (%)
 cpu/event=0xc1,name='ex_ret_ops'/,
 cpu/event=0x1c2,name='ex_ret_ucode_ops'/,
-cpu-cycles;
+cpu/event=0x76,name='ls_not_halted_cyc'/;
 
 # Power
 power/energy-pkg/;
