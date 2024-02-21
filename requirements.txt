@@ -1,4 +1,4 @@
-black
+black==23.12.1
 flake8
 pytype
 simpleeval
