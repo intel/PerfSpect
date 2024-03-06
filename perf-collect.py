@@ -28,6 +28,8 @@ SUPPORTED_ARCHITECTURES = [
     "SapphireRapids",
     "EmeraldRapids",
     "SierraForest",
+    "Genoa",
+    "Bergamo",
 ]
 
 
@@ -56,10 +58,19 @@ def write_metadata(
         modified.write("CORES_PER_SOCKET," + str(perf_helpers.get_cpu_count()) + ",\n")
         modified.write("SOCKET_COUNT," + str(perf_helpers.get_socket_count()) + ",\n")
         modified.write("HYPERTHREADING_ON," + str(perf_helpers.get_ht_status()) + ",\n")
-        imc, cha, upi = perf_helpers.get_imc_cha_upi_count()
-        modified.write("IMC count," + str(imc) + ",\n")
-        modified.write("CHAS_PER_SOCKET," + str(cha) + ",\n")
-        modified.write("UPI count," + str(upi) + ",\n")
+        unc_count = perf_helpers.get_uncore_count()
+        if "imc" in unc_count:
+            modified.write("IMC count," + str(unc_count["imc"]) + ",\n")
+        if "cha" in unc_count:
+            modified.write("CHAS_PER_SOCKET," + str(unc_count["cha"]) + ",\n")
+        if "upi" in unc_count:
+            modified.write("UPI count," + str(unc_count["upi"]) + ",\n")
+        if "l3" in unc_count:
+            modified.write("L3 count," + str(unc_count["l3"]) + ",\n")
+        if "df" in unc_count:
+            modified.write("DF count," + str(unc_count["df"]) + ",\n")
+        if "umc" in unc_count:
+            modified.write("UMC count," + str(unc_count["umc"]) + ",\n")
         modified.write("Architecture," + str(arch) + ",\n")
         modified.write("Model," + str(cpuname) + ",\n")
         modified.write("kernel version," + perf_helpers.get_version() + "\n")
@@ -338,6 +349,8 @@ if __name__ == "__main__":
         eventfile = "spr_emr.txt"
     elif arch == "sierraforest":
         eventfile = "srf.txt"
+    elif arch == "genoa" or arch == "bergamo":
+        eventfile = "genoa_bergamo.txt"
 
     if eventfile is None:
         crash(f"failed to match architecture ({arch}) to event file name.")
@@ -368,6 +381,10 @@ if __name__ == "__main__":
         and "uncore_upi" not in sys_devs
         and "uncore_qpi" not in sys_devs
         and "uncore_imc" not in sys_devs
+    ) and (
+        "amd_l3" not in sys_devs
+        and "amd_df" not in sys_devs
+        and "amd_umc" not in sys_devs
     ):
         logging.info("disabling uncore (possibly in a vm?)")
         have_uncore = False
@@ -384,6 +401,19 @@ if __name__ == "__main__":
             logging.warning(
                 "Due to lack of vPMU support, TMA L1 & L2 events will not be collected"
             )
+    if arch == "genoa" or arch == "bergamo":
+        include_tma = False
+        if have_uncore and "amd_df" in sys_devs:
+            with open("/sys/devices/amd_df/format/event", "r") as f_event:
+                if f_event.readline().strip() != "config:0-7,32-37":
+                    have_uncore = False
+            with open("/sys/devices/amd_df/format/umask", "r") as f_umask:
+                if f_umask.readline().strip() != "config:8-15,24-27":
+                    have_uncore = False
+            if not have_uncore:
+                logging.info(
+                    "disabling uncore (possibly running on an incompatible kernel?)"
+                )
     events, collection_events = prep_events.prepare_perf_events(
         eventfile,
         (args.pid is not None or args.cid is not None or not have_uncore),
@@ -418,10 +448,19 @@ if __name__ == "__main__":
     logging.info("Cores per socket: " + str(perf_helpers.get_cpu_count()))
     logging.info("Socket: " + str(perf_helpers.get_socket_count()))
     logging.info("Hyperthreading on: " + str(perf_helpers.get_ht_status()))
-    imc, cha, upi = perf_helpers.get_imc_cha_upi_count()
-    logging.info("IMC count: " + str(imc))
-    logging.info("CHA per socket: " + str(cha))
-    logging.info("UPI count: " + str(upi))
+    unc_count = perf_helpers.get_uncore_count()
+    if "imc" in unc_count:
+        logging.info("IMC count: " + str(unc_count["imc"]))
+    if "cha" in unc_count:
+        logging.info("CHA per socket: " + str(unc_count["cha"]))
+    if "upi" in unc_count:
+        logging.info("UPI count: " + str(unc_count["upi"]))
+    if "l3" in unc_count:
+        logging.info("L3 count: " + str(unc_count["l3"]))
+    if "df" in unc_count:
+        logging.info("DF count: " + str(unc_count["df"]))
+    if "umc" in unc_count:
+        logging.info("UMC count: " + str(unc_count["umc"]))
     logging.info("PerfSpect version: " + perf_helpers.get_tool_version())
     if args.verbose:
         logging.info("/sys/devices/: " + str(sys_devs))

@@ -16,11 +16,9 @@ from src.common import crash
 def is_collectable_event(event, perf_list):
     tmp_list = event.split("/")
     name = helper.get_dev_name(tmp_list[0])
-    unc_name = "uncore_" + name
+    unc_regex = re.compile("^((uncore|amd)_)?" + name + "$")
     sys_devs = helper.get_sys_devices()
-    dev_support = False
-    if name in sys_devs or unc_name in sys_devs:
-        dev_support = True
+    dev_support = next(filter(unc_regex.match, sys_devs), None) is not None
     if (
         dev_support
         and len(tmp_list) > 1
@@ -42,16 +40,18 @@ def is_collectable_event(event, perf_list):
 def expand_unc(line):
     line = line.strip()
     name = line.split("/")[0]
-    unc_name = "uncore_" + name
+    unc_regex = re.compile("^(uncore|amd)_" + name + "$")
     unc_count = 0
     sys_devs = helper.get_sys_devices()
-    if unc_name in sys_devs:
+    unc_name = next(filter(unc_regex.match, sys_devs), None)
+    if unc_name:
         unc_count = int(sys_devs[unc_name])
-    if unc_count > 1:
-        line = line.replace(name, unc_name + "_0")
-        if "name=" in line:
-            prettyname = (line.split("'"))[1].strip()
-            line = line.replace(prettyname, prettyname + ".0")
+        if unc_count > 1:
+            unc_name = unc_name + "_0"
+            if "name=" in line:
+                prettyname = (line.split("'"))[1].strip()
+                line = line.replace(prettyname, prettyname + ".0")
+        line = unc_name + "/" + line.split("/", 1)[1]
     return line, unc_count
 
 

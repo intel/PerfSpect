@@ -426,6 +426,10 @@ def get_metric_file_name(microarchitecture):
         metric_file = "metric_spr_emr.json"
     elif microarchitecture == "sierraforest":
         metric_file = "metric_srf.json"
+    elif microarchitecture == "genoa":
+        metric_file = "metric_genoa.json"
+    elif microarchitecture == "bergamo":
+        metric_file = "metric_bergamo.json"
     else:
         crash("Suitable metric file not found")
 
@@ -651,7 +655,24 @@ def row(df, name):
 
 
 def write_html(time_series_df, perf_mode, out_file_path, meta_data, pertxn=None):
-    html_file = "base.html"
+    microarchitecture = meta_data["constants"]["CONST_ARCH"]
+    if microarchitecture in [
+        "broadwell",
+        "skylake",
+        "cascadelake",
+        "icelake",
+        "sapphirerapids",
+        "emeraldrapids",
+        "sierraforest",
+    ]:
+        html_file = "base_intel.html"
+    elif microarchitecture in [
+        "genoa",
+        "bergamo",
+    ]:
+        html_file = "base_amd.html"
+    else:
+        crash("Suitable html file not found")
     if getattr(sys, "frozen", False):
         basepath = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
         html_file = os.path.join(basepath, html_file)
@@ -682,6 +703,52 @@ def write_html(time_series_df, perf_mode, out_file_path, meta_data, pertxn=None)
             ["WRITEDATA", "metric_memory bandwidth write (MB/sec)"],
             ["TOTALDATA", "metric_memory bandwidth total (MB/sec)"],
             ["REMOTENUMA", "metric_NUMA %_Reads addressed to remote DRAM"],
+            ["L2_MISS", "metric_All L2 Cache Misses"],
+            ["L3_MISS", "metric_L3 Cache Misses"],
+            ["L3_READ_LATENCY", "metric_Average L3 Cache Read Miss Latency (in ns)"],
+            ["DRAM_LOCAL_READ_BYTES", "metric_DRAM read bandwidth for local processor"],
+            [
+                "DRAM_LOCAL_WRITE_BYTES",
+                "metric_DRAM write bandwidth for local processor",
+            ],
+            [
+                "DRAM_REMOTE_READ_BYTES",
+                "metric_DRAM read bandwidth for remote processor",
+            ],
+            [
+                "DRAM_REMOTE_WRITE_BYTES",
+                "metric_DRAM write bandwidth for remote processor",
+            ],
+            ["DMA_LOCAL_READ_BYTES", "metric_Local socket upstream DMA read bandwidth"],
+            [
+                "DMA_LOCAL_WRITE_BYTES",
+                "metric_Local socket upstream DMA write bandwidth",
+            ],
+            [
+                "DMA_REMOTE_READ_BYTES",
+                "metric_Remote socket upstream DMA read bandwidth",
+            ],
+            [
+                "DMA_REMOTE_WRITE_BYTES",
+                "metric_Remote socket upstream DMA write bandwidth",
+            ],
+            [
+                "CCM_LOCAL_READ_BYTES",
+                "metric_Local socket inbound bandwidth to the CPU",
+            ],
+            [
+                "CCM_LOCAL_WRITE_BYTES",
+                "metric_Local socket outbound bandwidth from the CPU",
+            ],
+            [
+                "CCM_REMOTE_READ_BYTES",
+                "metric_Remote socket inbound bandwidth to the CPU",
+            ],
+            [
+                "CCM_REMOTE_WRITE_BYTES",
+                "metric_Remote socket outbound bandwidth from the CPU",
+            ],
+            ["LINK_LOCAL_OUTBOUND_BYTES", "metric_Outbound bandwidth from all links"],
         ]:
             new_metric = metric[1]
             if pertxn is not None:
@@ -697,6 +764,31 @@ def write_html(time_series_df, perf_mode, out_file_path, meta_data, pertxn=None)
         )
         html = html.replace("METADATA", json.dumps(list(meta_data["metadata"].items())))
         for number in [
+            [
+                "PIPELINE_L1_FRONTEND_BOUND",
+                "metric_Pipeline Utilization - Frontend Bound (%)",
+            ],
+            [
+                "PIPELINE_L1_BAD_SPECULATION",
+                "metric_Pipeline Utilization - Bad Speculation (%)",
+            ],
+            [
+                "PIPELINE_L1_BACKEND_BOUND",
+                "metric_Pipeline Utilization - Backend Bound (%)",
+            ],
+            [
+                "PIPELINE_L2_BACKEND_BOUND_MEMORY",
+                "metric_Pipeline Utilization - Backend Bound - Memory (%)",
+            ],
+            [
+                "PIPELINE_L2_BACKEND_BOUND_CPU",
+                "metric_Pipeline Utilization - Backend Bound - CPU (%)",
+            ],
+            [
+                "PIPELINE_L1_SMT_CONTENTION",
+                "metric_Pipeline Utilization - SMT Contention (%)",
+            ],
+            ["PIPELINE_L1_RETIRING", "metric_Pipeline Utilization - Retiring (%)"],
             ["FRONTEND", "metric_TMA_Frontend_Bound(%)"],
             ["BACKEND", "metric_TMA_Backend_Bound(%)"],
             ["COREDATA", "metric_TMA_..Core_Bound(%)"],
@@ -976,6 +1068,9 @@ def generate_metrics(
                     e.startswith("power/")
                     or e.startswith("cstate_")
                     or e.startswith("UNC_")
+                    or e.startswith("l3_")
+                    or e.startswith("local_")
+                    or e.startswith("remote_")
                     for e in m["events"]
                 ]
             ):
@@ -1146,7 +1241,13 @@ def generate_raw_events_cpu(perf_data_df, out_file_path):
     # drop uncore and power metrics
     to_drop = []
     for metric in metric_per_CPU_frame.index:
-        if metric.startswith("UNC_") or metric.startswith("power/"):
+        if (
+            metric.startswith("UNC_")
+            or metric.startswith("power/")
+            or metric.startswith("l3_")
+            or metric.startswith("local_")
+            or metric.startswith("remote_")
+        ):
             to_drop.append(metric)
     metric_per_CPU_frame.drop(to_drop, inplace=True)
 
