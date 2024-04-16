@@ -295,7 +295,9 @@ if __name__ == "__main__":
         sys.exit()
 
     if os.geteuid() != 0:
-        crash("Must run PerfSpect as root, please re-run")
+        logging.warning(
+            "PerfSpect requires elevated permissions to run. User is not root. Proceeding anyway..."
+        )
 
     # disable nmi watchdog before collecting perf
     nmi_watchdog = perf_helpers.disable_nmi_watchdog()

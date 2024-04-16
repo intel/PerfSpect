@@ -145,7 +145,9 @@ def disable_nmi_watchdog():
         proc_output = subprocess.check_output(["cat", "/proc/sys/kernel/nmi_watchdog"])
         nmi_watchdog_status = int(proc_output.decode().strip())
         if nmi_watchdog_status == 1:
-            proc_output = subprocess.check_output(["sysctl", "kernel.nmi_watchdog=0"])
+            proc_output = subprocess.check_output(
+                ["sysctl", "kernel.nmi_watchdog=0"], stderr=subprocess.STDOUT
+            )
             new_watchdog_status = int(
                 proc_output.decode().strip().replace("kernel.nmi_watchdog = ", "")
             )
@@ -158,7 +160,7 @@ def disable_nmi_watchdog():
             logging.info("nmi_watchdog already disabled. No change needed.")
         return nmi_watchdog_status
     except (ValueError, FileNotFoundError, subprocess.CalledProcessError) as e:
-        crash(f"Failed to disable nmi_watchdog: {e}")
+        logging.warning(f"Failed to disable nmi_watchdog: {e}")
 
 
 # enable nmi watchdog
@@ -183,15 +185,19 @@ def set_perf_event_mux_interval(reset, interval_ms, mux_interval):
         if os.path.isdir(dirpath):
             muxfile = os.path.join(dirpath, "perf_event_mux_interval_ms")
             if os.path.isfile(muxfile):
-                with open(muxfile, "w") as f_mux:
-                    val = 0
-                    if reset:
-                        val = int(mux_interval[f])
-                    else:
-                        if int(mux_interval[f]):
-                            val = int(interval_ms)
-                    if val:
-                        f_mux.write(str(val))
+                try:
+                    with open(muxfile, "w") as f_mux:
+                        val = 0
+                        if reset:
+                            val = int(mux_interval[f])
+                        else:
+                            if int(mux_interval[f]):
+                                val = int(interval_ms)
+                        if val:
+                            f_mux.write(str(val))
+                except OSError as e:
+                    logging.warning(f"Failed to write mux interval: {e}")
+                    break
 
 
 # get linux kernel version
