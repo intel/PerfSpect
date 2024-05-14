@@ -63,8 +63,8 @@ def is_cpu_event(line):
     if (
         (len(tmp_list) == 1 or tmp_list[0] == "cpu" or tmp_list[0].startswith("cstate"))
         and "OCR." not in line
-        and "uops_retired.ms" not in line
-        and "int_misc.unknown_branch_cycles" not in line
+        and "uops_retired.ms" not in line.lower()
+        and "int_misc.unknown_branch_cycles" not in line.lower()
         and "power/" not in line
     ):
         return True
