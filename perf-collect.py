@@ -161,6 +161,7 @@ def supports_psi():
 def tma_supported():
     perf_out = ""
     try:
+        # run perf stat briefly to determine if these two events are supported
         perf = subprocess.Popen(
             shlex.split(
                 "perf stat -a -e '{cpu/event=0x00,umask=0x04,period=10000003,name='TOPDOWN.SLOTS'/,cpu/event=0x00,umask=0x81,period=10000003,name='PERF_METRICS.BAD_SPECULATION'/}' sleep .1"
@@ -170,9 +171,11 @@ def tma_supported():
         )
         perf_out = perf.communicate()[0].decode()
     except subprocess.CalledProcessError:
+        logging.info("perf stat exited with error while checking for TMA support")
         return False
 
     try:
+        # create a dictionary of perf events and their counts from perf stat output
         events = {
             a.split()[1]: int(a.split()[0].replace(",", ""))
             for a in filter(
@@ -181,10 +184,17 @@ def tma_supported():
             )
         }
     except Exception:
+        logging.info("error parsing perf stat output while checking for TMA support")
         return False
 
     # This is a perf artifact of no vPMU support
     if events["TOPDOWN.SLOTS"] == events["PERF_METRICS.BAD_SPECULATION"]:
+        logging.info("TOPDOWN.SLOTS and PERF_METRICS.BAD_SPECULATION counts are equal")
+        return False
+
+    # A zero value on either of these metrics is an indication that the TMA events are not supported
+    if events["TOPDOWN.SLOTS"] == 0 or events["PERF_METRICS.BAD_SPECULATION"] == 0:
+        logging.info("TOPDOWN.SLOTS or PERF_METRICS.BAD_SPECULATION count is zero")
         return False
 
     return True
