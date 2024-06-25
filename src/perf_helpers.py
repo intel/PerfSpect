@@ -112,8 +112,9 @@ def get_imc_cha_upi_count():
     return imc_count, cha_count, upi_count
 
 
-# device ids are not consecutive in some cases
-def get_channel_ids(pattern):
+# return a sorted list of device ids for a given device type pattern, e.g., uncore_cha_, uncore_imc_, etc.
+# note: this is necessary because device ids are not always consecutive
+def get_device_ids(pattern):
     sysdevices = os.listdir("/sys/bus/event_source/devices")
     devices = pattern + "[0-9]*"
     ids = []
@@ -138,14 +139,33 @@ def get_perf_event_mux_interval():
     return mux_interval
 
 
+# Returns true/false depending on state of the NMI watchdog timer, or None on error.
+def nmi_watchdog_enabled():
+    try:
+        proc_output = subprocess.check_output(["cat", "/proc/sys/kernel/nmi_watchdog"])
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        logging.warning(f"Failed to get nmi_watchdog status: {e}")
+        return None
+    try:
+        nmi_watchdog_status = int(proc_output.decode().strip())
+    except (ValueError) as e:
+        logging.warning(f"Failed to interpret nmi_watchdog status: {e}")
+        return None
+    return nmi_watchdog_status == 1
+
+
 # disable nmi watchdog and return its initial status
 # to restore it after collection
 def disable_nmi_watchdog():
+    nmi_watchdog_status = nmi_watchdog_enabled()
+    if nmi_watchdog_status is None:
+        logging.error("Failed to get nmi_watchdog status.")
+        return None
     try:
-        proc_output = subprocess.check_output(["cat", "/proc/sys/kernel/nmi_watchdog"])
-        nmi_watchdog_status = int(proc_output.decode().strip())
-        if nmi_watchdog_status == 1:
-            proc_output = subprocess.check_output(["sysctl", "kernel.nmi_watchdog=0"])
+        if nmi_watchdog_status:
+            proc_output = subprocess.check_output(
+                ["sysctl", "kernel.nmi_watchdog=0"], stderr=subprocess.STDOUT
+            )
             new_watchdog_status = int(
                 proc_output.decode().strip().replace("kernel.nmi_watchdog = ", "")
             )
@@ -158,7 +178,16 @@ def disable_nmi_watchdog():
             logging.info("nmi_watchdog already disabled. No change needed.")
         return nmi_watchdog_status
     except (ValueError, FileNotFoundError, subprocess.CalledProcessError) as e:
-        crash(f"Failed to disable nmi_watchdog: {e}")
+        logging.warning(f"Failed to disable nmi_watchdog: {e}")
+
+
+def check_perf_event_paranoid():
+    try:
+        return int(
+            subprocess.check_output(["cat", "/proc/sys/kernel/perf_event_paranoid"])
+        )
+    except (ValueError, FileNotFoundError, subprocess.CalledProcessError) as e:
+        logging.warning(f"Failed to check perf_event_paranoid: {e}")
 
 
 # enable nmi watchdog
@@ -183,15 +212,19 @@ def set_perf_event_mux_interval(reset, interval_ms, mux_interval):
         if os.path.isdir(dirpath):
             muxfile = os.path.join(dirpath, "perf_event_mux_interval_ms")
             if os.path.isfile(muxfile):
-                with open(muxfile, "w") as f_mux:
-                    val = 0
-                    if reset:
-                        val = int(mux_interval[f])
-                    else:
-                        if int(mux_interval[f]):
-                            val = int(interval_ms)
-                    if val:
-                        f_mux.write(str(val))
+                try:
+                    with open(muxfile, "w") as f_mux:
+                        val = 0
+                        if reset:
+                            val = int(mux_interval[f])
+                        else:
+                            if int(mux_interval[f]):
+                                val = int(interval_ms)
+                        if val:
+                            f_mux.write(str(val))
+                except OSError as e:
+                    logging.warning(f"Failed to write mux interval: {e}")
+                    break
 
 
 # get linux kernel version
@@ -399,3 +432,13 @@ def get_cgroups(cid):
     for c in cgroups:
         logging.info("attaching to cgroup: " + c)
     return cgroups
+
+
+def get_pmu_driver_version():
+    command = "dmesg | grep -A 1 'Intel PMU driver' | tail -1 | awk '{print $NF}'"
+    try:
+        version_number = subprocess.check_output(command, shell=True).decode().strip()
+        return version_number
+    except subprocess.CalledProcessError as e:
+        print(f"Error executing command: {e}")
+        return None

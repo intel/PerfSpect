@@ -38,6 +38,8 @@ def write_metadata(
     arch,
     cpuname,
     cpuid_info,
+    pmu_driver_version,
+    fixed_tma_supported,
     muxinterval,
     cpu,
     socket,
@@ -68,6 +70,8 @@ def write_metadata(
             for c in _cpus:
                 modified.write(str(c) + ";")
             modified.write("\n")
+        modified.write("PMUDriverVersion," + str(pmu_driver_version) + ",\n")
+        modified.write("FixedTMASupported," + str(fixed_tma_supported) + ",\n")
         modified.write("Perf event mux Interval ms," + str(muxinterval) + ",\n")
         cpumode = "enabled" if cpu else "disabled"
         socketmode = "enabled" if socket else "disabled"
@@ -158,7 +162,8 @@ def supports_psi():
         return False
 
 
-def tma_supported():
+# fixed_tma_supported returns true if the fixed-purpose PMU counters for TMA events are supported on the target platform
+def fixed_tma_supported():
     perf_out = ""
     try:
         perf = subprocess.Popen(
@@ -180,14 +185,66 @@ def tma_supported():
                 perf_out.split("\n"),
             )
         }
-    except Exception:
+    except (IndexError, ValueError):
+        logging.debug("Failed to parse perf output in fixed_tma_supported()")
+        return False
+    try:
+        if events["TOPDOWN.SLOTS"] == events["PERF_METRICS.BAD_SPECULATION"]:
+            return False
+    except KeyError:
+        logging.debug("Failed to find required events in fixed_tma_supported()")
         return False
 
-    # This is a perf artifact of no vPMU support
-    if events["TOPDOWN.SLOTS"] == events["PERF_METRICS.BAD_SPECULATION"]:
+    if events["TOPDOWN.SLOTS"] == 0 or events["PERF_METRICS.BAD_SPECULATION"] == 0:
         return False
 
     return True
+
+
+# fixed_event_supported returns true if the fixed-purpose PMU counter for the given event (cpu-cycles or instructions) event is supported on the target platform
+# it makes this determination by filling all the general purpose counters with the given events, then adding one more
+def fixed_event_supported(arch, event):
+    num_gp_counters = 0
+    if arch == "broadwell" or arch == "skylake" or arch == "cascadelake":
+        num_gp_counters = 4
+    elif (
+        arch == "icelake"
+        or arch == "sapphirerapids"
+        or arch == "emeraldrapids"
+        or arch == "sierraforest"
+    ):
+        num_gp_counters = 8
+    else:
+        crash(f"Unsupported architecture: {arch}")
+
+    perf_out = ""
+    events = ",".join([event] * (num_gp_counters + 1))
+    try:
+        perf = subprocess.Popen(
+            shlex.split("perf stat -a -e '{" + events + "}' sleep .1"),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        perf_out = perf.communicate()[0].decode()
+    except subprocess.CalledProcessError:
+        return False
+    # on some VMs we see "<not counted>" or "<not supported>" in the perf output
+    if "<not counted>" in perf_out or "<not supported>" in perf_out:
+        return False
+    # on some VMs we get a count of 0
+    for line in perf_out.split("\n"):
+        tokens = line.split()
+        if len(tokens) == 2 and tokens[0] == "0":
+            return False
+    return True
+
+
+def fixed_cycles_supported(arch):
+    return fixed_event_supported(arch, "cpu-cycles")
+
+
+def fixed_instructions_supported(arch):
+    return fixed_event_supported(arch, "instructions")
 
 
 def ref_cycles_supported():
@@ -226,6 +283,38 @@ def validate_file(fname):
     """validate if file is accessible"""
     if not os.access(fname, os.R_OK):
         crash(str(fname) + " not accessible")
+
+
+def get_eventfile_path(arch, script_path, supports_tma_fixed_events):
+    eventfile = None
+    if arch == "broadwell":
+        eventfile = "bdx.txt"
+    elif arch == "skylake" or arch == "cascadelake":
+        eventfile = "clx_skx.txt"
+    elif arch == "icelake":
+        if supports_tma_fixed_events:
+            eventfile = "icx.txt"
+        else:
+            eventfile = "icx_nofixedtma.txt"
+    elif arch == "sapphirerapids" or arch == "emeraldrapids":
+        if supports_tma_fixed_events:
+            eventfile = "spr_emr.txt"
+        else:
+            eventfile = "spr_emr_nofixedtma.txt"
+    elif arch == "sierraforest":
+        eventfile = "srf.txt"
+
+    if eventfile is None:
+        return None
+
+    # Convert path of event file to relative path if being packaged by pyInstaller into a binary
+    if getattr(sys, "frozen", False):
+        basepath = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+        return os.path.join(basepath, eventfile)
+    elif __file__:
+        return script_path + "/events/" + eventfile
+    else:
+        crash("Unknown application type")
 
 
 if __name__ == "__main__":
@@ -288,17 +377,46 @@ if __name__ == "__main__":
     parser.add_argument(
         "-V", "--version", help="display version info", action="store_true"
     )
+    parser.add_argument(
+        "-e", "--eventfile", default=None, help="Relative path to eventfile"
+    )
     args = parser.parse_args()
 
     if args.version:
         print(perf_helpers.get_tool_version())
         sys.exit()
 
-    if os.geteuid() != 0:
-        crash("Must run PerfSpect as root, please re-run")
+    is_root = os.geteuid() == 0
+    if not is_root:
+        logging.warning(
+            "User is not root. See README.md for requirements and instructions on how to run as non-root user."
+        )
+        try:
+            input("Press Enter to continue as non-root user or Ctrl-c to exit...")
+        except KeyboardInterrupt:
+            print("\nExiting...")
+            sys.exit()
+
+    if not is_root:
+        # check kernel.perf_event_paranoid. It needs to be zero for non-root users.
+        paranoid = perf_helpers.check_perf_event_paranoid()
+        if paranoid is None:
+            crash("kernel.perf_event_paranoid could not be determined")
+        if paranoid != 0:
+            crash(
+                "kernel.perf_event_paranoid is set to "
+                + str(paranoid)
+                + ". Run as root or set it to 0"
+            )
 
     # disable nmi watchdog before collecting perf
-    nmi_watchdog = perf_helpers.disable_nmi_watchdog()
+    nmi_watchdog_status = perf_helpers.nmi_watchdog_enabled()
+    if nmi_watchdog_status is None:
+        crash("NMI watchdog status could not be determined")
+
+    if is_root and nmi_watchdog_status:
+        perf_helpers.disable_nmi_watchdog()
+
     interval = 5000
     collect_psi = False
 
@@ -319,48 +437,47 @@ if __name__ == "__main__":
     if args.muxinterval > 1000:
         crash("Input argument muxinterval is too large, max is [1s or 1000ms]")
 
-    # select architecture default event file if not supplied
-    have_uncore = True
-    procinfo = perf_helpers.get_cpuinfo()
-    arch, cpuname = perf_helpers.get_arch_and_name(procinfo)
-    if not arch:
-        crash(
-            f"Unrecognized CPU architecture. Supported architectures: {', '.join(SUPPORTED_ARCHITECTURES)}"
-        )
-    eventfile = None
-    if arch == "broadwell":
-        eventfile = "bdx.txt"
-    elif arch == "skylake" or arch == "cascadelake":
-        eventfile = "clx_skx.txt"
-    elif arch == "icelake":
-        eventfile = "icx.txt"
-    elif arch == "sapphirerapids" or arch == "emeraldrapids":
-        eventfile = "spr_emr.txt"
-    elif arch == "sierraforest":
-        eventfile = "srf.txt"
-
-    if eventfile is None:
-        crash(f"failed to match architecture ({arch}) to event file name.")
-
-    # Convert path of event file to relative path if being packaged by pyInstaller into a binary
-    if getattr(sys, "frozen", False):
-        basepath = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
-        eventfilename = eventfile
-        eventfile = os.path.join(basepath, eventfile)
-    elif __file__:
-        eventfile = script_path + "/events/" + eventfile
-        eventfilename = eventfile
-    else:
-        crash("Unknown application type")
-
     # check if pmu available
     if "cpu-cycles" not in perf_helpers.get_perf_list():
         crash(
             "PMU's not available. Run baremetal or in a VM which exposes PMUs (sometimes full socket)"
         )
 
-    # get perf events to collect
-    include_tma = True
+    procinfo = perf_helpers.get_cpuinfo()
+    arch, cpuname = perf_helpers.get_arch_and_name(procinfo)
+    if not arch:
+        crash(
+            f"Unrecognized CPU architecture. Supported architectures: {', '.join(SUPPORTED_ARCHITECTURES)}"
+        )
+
+    # Can we use the fixed purpose PMU counters for TMA events?
+    # The fixed-purpose PMU counters for TMA events are not supported on architectures older than Icelake
+    # They are also not supported on some VMs, e.g., AWS ICX and SPR VMs
+    supports_tma_fixed_events = False
+    if arch == "icelake" or arch == "sapphirerapids" or arch == "emeraldrapids":
+        supports_tma_fixed_events = fixed_tma_supported()
+        if not supports_tma_fixed_events:
+            logging.warning(
+                "Due to lack of vPMU support, some TMA events will not be collected"
+            )
+
+    # Can we use the fixed-purpose PMU counter for the cpu-cycles event?
+    supports_cycles_fixed_event = fixed_cycles_supported(arch)
+
+    # Can we use the fixed-purpose PMU counter for the instructions event?
+    supports_instructions_fixed_event = fixed_instructions_supported(arch)
+
+    # select architecture default event file if not supplied
+    if args.eventfile is not None:
+        eventfile = args.eventfile
+    else:
+        eventfile = get_eventfile_path(arch, script_path, supports_tma_fixed_events)
+    if eventfile is None:
+        crash(f"failed to match architecture ({arch}) to event file name.")
+
+    logging.info("Event file: " + eventfile)
+
+    supports_uncore_events = True
     sys_devs = perf_helpers.get_sys_devices()
     if (
         "uncore_cha" not in sys_devs
@@ -369,39 +486,50 @@ if __name__ == "__main__":
         and "uncore_qpi" not in sys_devs
         and "uncore_imc" not in sys_devs
     ):
-        logging.info("disabling uncore (possibly in a vm?)")
-        have_uncore = False
+        logging.info("uncore devices not found (possibly in a vm?)")
+        supports_uncore_events = False
 
-    if arch == "icelake":
-        include_tma = tma_supported()
-        if not include_tma:
-            logging.warning(
-                "Due to lack of vPMU support, TMA L1 events will not be collected"
-            )
-    if arch == "sapphirerapids" or arch == "emeraldrapids":
-        include_tma = tma_supported()
-        if not include_tma:
-            logging.warning(
-                "Due to lack of vPMU support, TMA L1 & L2 events will not be collected"
-            )
+    supports_ref_cycles_event = ref_cycles_supported()
+
     events, collection_events = prep_events.prepare_perf_events(
         eventfile,
-        (args.pid is not None or args.cid is not None or not have_uncore),
-        include_tma,
-        not have_uncore,
-        ref_cycles_supported(),
+        (args.pid is not None or args.cid is not None or not supports_uncore_events),
+        supports_tma_fixed_events,
+        supports_uncore_events,
+        supports_ref_cycles_event,
     )
 
     # check output file is writable
     if not perf_helpers.check_file_writeable(args.outcsv):
         crash("Output file %s not writeable " % args.outcsv)
 
+    # adjust mux interval
     mux_intervals = perf_helpers.get_perf_event_mux_interval()
     if args.muxinterval > 0:
-        logging.info(
-            "changing default perf mux interval to " + str(args.muxinterval) + "ms"
-        )
-        perf_helpers.set_perf_event_mux_interval(False, args.muxinterval, mux_intervals)
+        if is_root:
+            logging.info(
+                "changing perf mux interval to " + str(args.muxinterval) + "ms"
+            )
+            perf_helpers.set_perf_event_mux_interval(
+                False, args.muxinterval, mux_intervals
+            )
+        else:
+            for device, mux in mux_intervals.items():
+                mux_int = -1
+                try:
+                    mux_int = int(mux)
+                except ValueError:
+                    crash("Failed to parse mux interval on " + device)
+                if mux_int != args.muxinterval:
+                    crash(
+                        "mux interval on "
+                        + device
+                        + " is set to "
+                        + str(mux_int)
+                        + ". Run as root or set it to "
+                        + str(args.muxinterval)
+                        + "."
+                    )
 
     # parse cgroups
     cgroups = []
@@ -411,10 +539,25 @@ if __name__ == "__main__":
     if args.pid is not None or args.cid is not None:
         logging.info("Not collecting uncore events in this run mode")
 
+    pmu_driver_version = perf_helpers.get_pmu_driver_version()
+
     # log some metadata
     logging.info("Architecture: " + arch)
     logging.info("Model: " + cpuname)
     logging.info("Kernel version: " + perf_helpers.get_version())
+    logging.info("PMU driver version: " + pmu_driver_version)
+    logging.info("Uncore events supported: " + str(supports_uncore_events))
+    logging.info(
+        "Fixed counter TMA events supported: " + str(supports_tma_fixed_events)
+    )
+    logging.info(
+        "Fixed counter cpu-cycles event supported: " + str(supports_cycles_fixed_event)
+    )
+    logging.info(
+        "Fixed counter instructions event supported: "
+        + str(supports_instructions_fixed_event)
+    )
+    logging.info("ref-cycles event supported: " + str(supports_ref_cycles_event))
     logging.info("Cores per socket: " + str(perf_helpers.get_cpu_count()))
     logging.info("Socket: " + str(perf_helpers.get_socket_count()))
     logging.info("Hyperthreading on: " + str(perf_helpers.get_ht_status()))
@@ -482,6 +625,8 @@ if __name__ == "__main__":
         arch,
         cpuname,
         cpuid_info,
+        pmu_driver_version,
+        supports_tma_fixed_events,
         args.muxinterval,
         args.cpu,
         args.socket,
@@ -491,10 +636,11 @@ if __name__ == "__main__":
     os.chmod(args.outcsv, 0o666)  # nosec
 
     # reset nmi_watchdog to what it was before running perfspect
-    if nmi_watchdog != 0:
+    if is_root and nmi_watchdog_status is True:
         perf_helpers.enable_nmi_watchdog()
 
-    logging.info("changing perf mux interval back to default")
-    perf_helpers.set_perf_event_mux_interval(True, 1, mux_intervals)
+    if is_root:
+        logging.info("changing perf mux interval back to default")
+        perf_helpers.set_perf_event_mux_interval(True, 1, mux_intervals)
 
     logging.info("perf stat dumped to %s" % args.outcsv)

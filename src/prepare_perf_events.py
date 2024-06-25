@@ -43,15 +43,13 @@ def expand_unc(line):
     line = line.strip()
     name = line.split("/")[0]
     unc_name = "uncore_" + name
-    unc_count = 0
-    sys_devs = helper.get_sys_devices()
-    if unc_name in sys_devs:
-        unc_count = int(sys_devs[unc_name])
+    ids = helper.get_device_ids(unc_name + "_")
+    unc_count = len(ids)
     if unc_count > 1:
-        line = line.replace(name, unc_name + "_0")
+        line = line.replace(name, unc_name + "_" + str(ids[0]))
         if "name=" in line:
             prettyname = (line.split("'"))[1].strip()
-            line = line.replace(prettyname, prettyname + ".0")
+            line = line.replace(prettyname, prettyname + "." + str(ids[0]))
     return line, unc_count
 
 
@@ -63,8 +61,8 @@ def is_cpu_event(line):
     if (
         (len(tmp_list) == 1 or tmp_list[0] == "cpu" or tmp_list[0].startswith("cstate"))
         and "OCR." not in line
-        and "uops_retired.ms" not in line
-        and "int_misc.unknown_branch_cycles" not in line
+        and "uops_retired.ms" not in line.lower()
+        and "int_misc.unknown_branch_cycles" not in line.lower()
         and "power/" not in line
     ):
         return True
@@ -74,7 +72,7 @@ def is_cpu_event(line):
 # enumerate uncore events across all devices
 def enumerate_uncore(group, pattern, count):
     uncore_group = ""
-    ids = helper.get_channel_ids(pattern)
+    ids = helper.get_device_ids(pattern)
     for i in range(count - 1):
         old = pattern + str(ids[i])
         new = pattern + str(ids[i + 1])
@@ -109,34 +107,40 @@ def get_cgroup_events_format(cgroups, events, num_events):
     return perf_format
 
 
-def filter_events(event_file, cpu_only, TMA_supported, in_vm, supports_ref_cycles):
+def filter_events(
+    event_file,
+    cpu_only,
+    supports_tma_fixed_events,
+    supports_uncore_events,
+    supports_ref_cycles,
+):
     if not os.path.isfile(event_file):
         crash("event file not found")
     collection_events = []
     unsupported_events = []
     perf_list = helper.get_perf_list()
-    seperate_cycles = []
-    if in_vm:
-        # since most CSP's hide cycles fixed PMU inside their VM's we put it in its own group
-        if supports_ref_cycles:
-            seperate_cycles = [
-                "cpu-cycles,",
-                "cpu-cycles:k,",
-                "ref-cycles,",
-                "instructions;",
-            ]
-        else:
-            seperate_cycles = [
-                "cpu-cycles,",
-                "cpu-cycles:k,",
-                "instructions;",
-            ]
+    # seperate_cycles = []
+    # if not supports_uncore_events:
+    #     # since most CSP's hide cycles fixed PMU inside their VM's we put it in its own group
+    #     if supports_ref_cycles:
+    #         seperate_cycles = [
+    #             "cpu-cycles,",
+    #             "cpu-cycles:k,",
+    #             "ref-cycles,",
+    #             "instructions;",
+    #         ]
+    #     else:
+    #         seperate_cycles = [
+    #             "cpu-cycles,",
+    #             "cpu-cycles:k,",
+    #             "instructions;",
+    #         ]
 
     def process(line):
         line = line.strip()
         if line == "" or line.startswith("#") or (cpu_only and not is_cpu_event(line)):
             return
-        if not TMA_supported and (
+        if not supports_tma_fixed_events and (
             "name='TOPDOWN.SLOTS'" in line or "name='PERF_METRICS." in line
         ):
             return
@@ -152,13 +156,13 @@ def filter_events(event_file, cpu_only, TMA_supported, in_vm, supports_ref_cycle
 
     with open(event_file, "r") as fin:
         for line in fin:
-            if in_vm and "cpu-cycles" in line:
-                continue
+            # if in_vm and "cpu-cycles" in line:
+            #     continue
             if not supports_ref_cycles and "ref-cycles" in line:
                 continue
             process(line)
-        for line in seperate_cycles:
-            process(line)
+        # for line in seperate_cycles:
+        #     process(line)
         if len(unsupported_events) > 0:
             logging.warning(
                 f"Perf unsupported events not counted: {unsupported_events}"
@@ -167,7 +171,11 @@ def filter_events(event_file, cpu_only, TMA_supported, in_vm, supports_ref_cycle
 
 
 def prepare_perf_events(
-    event_file, cpu_only, TMA_supported, in_vm, supports_ref_cycles
+    event_file,
+    cpu_only,
+    supports_tma_fixed_events,
+    supports_uncore_events,
+    supports_ref_cycles,
 ):
     start_group = "'{"
     end_group = "}'"
@@ -176,7 +184,11 @@ def prepare_perf_events(
     new_group = True
 
     collection_events, unsupported_events = filter_events(
-        event_file, cpu_only, TMA_supported, in_vm, supports_ref_cycles
+        event_file,
+        cpu_only,
+        supports_tma_fixed_events,
+        supports_uncore_events,
+        supports_ref_cycles,
     )
     core_event = []
     uncore_event = []

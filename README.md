@@ -41,6 +41,16 @@ sudo ./perf-collect --timeout 10
 ./perf-postprocess
 ```
 
+## Running perf-collect as a non-root user
+As seen in the examples above, `sudo` is the standard approach to running perf-collect with elevated privileges. If `sudo` is not possible and running as the root user is not possible, then a user may request the following changes be made to the system by an administrator:
+- sysctl -w kernel.perf_event_paranoid=0
+- sysctl -w kernel.nmi_watchdog=0
+- write '125' to all perf_event_mux_interval_ms files found under /sys/devices/*.
+
+`for i in $(find /sys/devices -name perf_event_mux_interval_ms); do echo 125 > $i; done`
+
+Recommend returning these settings to their prior values when analysis with PerfSpect is complete.
+
 ## Output
 
 perf-collect outputs:
