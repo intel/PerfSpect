@@ -114,6 +114,13 @@ def get_args(script_path):
         type=int,
         help="Generate per-transaction metrics using the provided transactions/sec.",
     )
+    parser.add_argument(
+        "-m",
+        "--metricfile",
+        default=None,
+        help="Relative path to metrics file in json format",
+        dest="metric_file",
+    )
 
     args = parser.parse_args()
 
@@ -349,6 +356,8 @@ def get_metadata_as_dict(meta_data_lines, txns=None):
             "Model",
             "kernel version",
             "PerfSpect version",
+            "PMUDriverVersion",
+            "FixedTMASupported",
         ]:
             if info in line:
                 meta_data["metadata"][info] = line.split(",", 1)[1]
@@ -414,16 +423,22 @@ def get_event_groups(event_lines):
     return groups
 
 
-def get_metric_file_name(microarchitecture):
+def get_metric_file_name(microarchitecture, fixed_tma_supported):
     metric_file = ""
     if microarchitecture == "broadwell":
         metric_file = "metric_bdx.json"
     elif microarchitecture == "skylake" or microarchitecture == "cascadelake":
         metric_file = "metric_skx_clx.json"
     elif microarchitecture == "icelake":
-        metric_file = "metric_icx.json"
+        if fixed_tma_supported:
+            metric_file = "metric_icx.json"
+        else:
+            metric_file = "metric_icx_nofixedtma.json"
     elif microarchitecture == "sapphirerapids" or microarchitecture == "emeraldrapids":
-        metric_file = "metric_spr_emr.json"
+        if fixed_tma_supported:
+            metric_file = "metric_spr_emr.json"
+        else:
+            metric_file = "metric_spr_emr_nofixedtma.json"
     elif microarchitecture == "sierraforest":
         metric_file = "metric_srf.json"
     else:
@@ -445,9 +460,11 @@ def validate_file(fname):
         crash(str(fname) + " not accessible")
 
 
-def get_metrics_formula(architecture, txns=None):
+def get_metrics_formula(architecture, fixed_tma_supported, metric_file=None, txns=None):
     # get the metric file name based on architecture
-    metric_file = get_metric_file_name(architecture)
+    if metric_file is None:
+        metric_file = get_metric_file_name(architecture, fixed_tma_supported)
+    logging.info("Metric file: " + metric_file)
     validate_file(metric_file)
 
     with open(metric_file, "r") as f_metric:
@@ -475,7 +492,7 @@ def get_socket_number(sockets_dict, CPU):
 
 
 def extract_dataframe(perf_data_lines, meta_data, perf_mode):
-    logging.info("Formatting event data")
+    logging.info("Parsing event data")
     # parse event data into dataframe and set header names
     perf_data_df = pd.DataFrame(perf_data_lines)
     if "CGROUPS" in meta_data and meta_data["CGROUPS"] == "enabled":
@@ -732,7 +749,7 @@ def log_skip_metric(metric, instance, msg):
 
 
 # group_start_end_index_dict is both an input and output argument
-# if empty, the start and end indexes for each geroup will be added
+# if empty, the start and end indexes for each group will be added
 # if not, the start and end indexes for each group will be read from it
 def get_groups_to_dataframes(
     time_slice_df, group_to_event, group_start_end_index_dict, perf_mode
@@ -1027,7 +1044,6 @@ def generate_metrics(
         group_to_df = get_groups_to_dataframes(
             time_slice_df, group_to_event, group_start_end_index_dict, perf_mode
         )
-
         time_metrics_result[time_slice] = evaluate_metrics(
             verbose, filtered_metrics, metadata, group_to_event, group_to_df, errors
         )
@@ -1174,7 +1190,7 @@ if __name__ == "__main__":
     args = get_args(script_path)
     input_file_path = args.rawfile
     out_file_path = args.outfile
-    # read all metadata, perf evernts, and perf data lines
+    # read all metadata, perf events, and perf data lines
     # Note: this might not be feasible for very large files
     meta_data_lines, perf_event_lines, perf_data_lines = get_all_data_lines(
         input_file_path
@@ -1200,7 +1216,12 @@ if __name__ == "__main__":
     perf_data_df = extract_dataframe(perf_data_lines, meta_data, perf_mode)
 
     # parse metrics expressions
-    metrics = get_metrics_formula(meta_data["constants"]["CONST_ARCH"], args.pertxn)
+    metrics = get_metrics_formula(
+        meta_data["constants"]["CONST_ARCH"],
+        meta_data["metadata"]["FixedTMASupported"] == "True",
+        args.metric_file,
+        args.pertxn,
+    )
 
     if args.rawevents:  # generate raw events for system, socket and CPU
         generate_raw_events(perf_data_df, out_file_path, perf_mode)
