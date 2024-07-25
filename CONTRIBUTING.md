@@ -4,6 +4,10 @@
 
 PerfSpect is licensed under the terms in [LICENSE](./LICENSE). By contributing to the project, you agree to the license and copyright terms therein and release your contribution under these terms.
 
+### Significant Feature Additions
+
+Plans for significant changes and/or additions must be raised and discussed with the project Maintainer(s) via GitHub Issues before work begins. If features require additional validation, e.g., support for additional architectures, a validation plan will be required. Finally, a named and committed maintainer for the additional functionality is required.
+
 ### Sign your work
 
 Please use the sign-off line at the end of the patch. Your signature certifies that you wrote the patch or otherwise have the right to pass it on as an open-source patch. The rules are pretty simple: if you can certify
