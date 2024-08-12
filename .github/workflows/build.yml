@@ -20,6 +20,7 @@ jobs:
           apt-get install -y wget curl make zip git gcc software-properties-common cmake g++ openjdk-8-jdk jq
           apt-get clean
       - name: install python 3.10
+        run: |
           apt-get install -y build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev libsqlite3-dev wget libbz2-dev
           wget https://www.python.org/ftp/python/3.10.14/Python-3.10.14.tgz
           tar -xvf Python-3.10.14.tgz
