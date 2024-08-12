@@ -11,51 +11,25 @@ jobs:
     env:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true'
     container:
-      image: centos:7
+      image: ubuntu:18.04
     steps:
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+      - uses: actions/checkout@v4
       - name: install dependencies
         run: |
-          yum update -y
-          yum install -y make python3 gcc
-          python3 -m pip install --upgrade pip
+          apt-get update
+          apt-get install -y wget curl make zip git gcc software-properties-common cmake g++ openjdk-8-jdk jq
+          apt-get clean
+      - name: install python 3.10
+          apt-get install -y build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev libsqlite3-dev wget libbz2-dev
+          wget https://www.python.org/ftp/python/3.10.14/Python-3.10.14.tgz
+          tar -xvf Python-3.10.14.tgz
+          cd Python-3.10.14 && ./configure --enable-optimizations --with-ensurepip=install --enable-shared --prefix=/usr/local LDFLAGS="-Wl,--rpath=/usr/local/lib" && make -j 4 && make install
       - name: build
         run: |
           pip3 install -r requirements.txt
           make dist
       - name: upload artifact
-        uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
+        uses: actions/upload-artifact@v4
         with:
           name: perfspect
           path: dist/perfspect*.tgz
-
-  build-hotspot:
-    runs-on: ubuntu-20.04
-    env:
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true'
-    container:
-      image: centos:7
-    steps:
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
-      - name: install dependencies
-        run: |
-          yum update -y
-          yum install -y make python3 gcc cmake gcc-c++ java-1.8.0-openjdk-devel.x86_64 git
-          python3 -m pip install --upgrade pip
-          curl -LJO https://raw.githubusercontent.com/brendangregg/FlameGraph/master/flamegraph.pl
-          curl -LJO https://raw.githubusercontent.com/brendangregg/FlameGraph/master/difffolded.pl
-          curl -LJO https://raw.githubusercontent.com/brendangregg/FlameGraph/master/stackcollapse-perf.pl
-          chmod +x *.pl
-          git clone https://github.com/jvm-profiling-tools/perf-map-agent.git
-          cd perf-map-agent
-          cmake .
-          make
-      - name: build
-        run: |
-          pip3 install -r requirements.txt
-          pyinstaller -F hotspot.py -n hotspot --bootloader-ignore-signals --add-data "perf-map-agent/out/*:." --add-data "flamegraph.pl:." --add-data "difffolded.pl:." --add-data "stackcollapse-perf.pl:." --runtime-tmpdir . --exclude-module readline
-      - name: upload artifact
-        uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32 # v3.1.3
-        with:
-          name: hotspot
-          path: dist/hotspot
