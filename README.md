@@ -1,3 +1,4 @@
+Notice: We plan to share a new implementation of PerfSpect in the coming months. The new implementation of PerfSpect will enhance its functionality by offering "live" metric generation. This means that the current post-processing step will be optional. Additionally, PerfSpect will incorporate features from other Intel tools, streamlining their acquisition and deployment for users. Stay tuned!
 <div align="center">
 
 <div id="user-content-toc">
