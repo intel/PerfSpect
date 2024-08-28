@@ -254,6 +254,23 @@ def get_all_data_lines(input_file_path):
     return meta_data_lines, perf_events_lines, perf_data_lines
 
 
+# return the number of cpus in a set
+# example sets:
+#   simple range:  "0-95"
+#   individual cpus: "1+4+5+9"
+#   individual cpus and range(s): "1+4-7+9+12-14"
+def count_cpus_in_set(cpu_set):
+    count = 0
+    subsets = cpu_set.split("+")
+    for subset in subsets:
+        if "-" in subset:
+            low_high = subset.split("-")
+            count += int(low_high[1]) - int(low_high[0]) + 1
+        else:
+            count += 1
+    return count
+
+
 # get_metadata
 def get_metadata_as_dict(meta_data_lines, txns=None):
     meta_data = {}
@@ -312,14 +329,7 @@ def get_metadata_as_dict(meta_data_lines, txns=None):
             assert len(docker_HASH) == len(docker_SETS)
             meta_data["CPUSETS"] = {}
             for i, docker_SET in enumerate(docker_SETS):
-                if "-" in docker_SET:  # range of cpus
-                    num_of_cpus = (
-                        int(docker_SET.split("-")[1])
-                        - int(docker_SET.split("-")[0])
-                        + 1
-                    )
-                else:  # either one cpu, or a list of cpus separated by + sign
-                    num_of_cpus = len(docker_SET.split("+"))
+                num_of_cpus = count_cpus_in_set(docker_SET)
                 meta_data["CPUSETS"][docker_HASH[i]] = num_of_cpus
 
         elif line.startswith("Percpu mode"):
@@ -542,9 +552,11 @@ def extract_dataframe(perf_data_lines, meta_data, perf_mode):
 
     # fix metric name X.1, X.2, etc -> just X
     perf_data_df["metric"] = perf_data_df.apply(
-        lambda x: ".".join(x["metric"].split(".")[:-1])
-        if len(re.findall(r"^[0-9]*$", x["metric"].split(".")[-1])) > 0
-        else x["metric"],
+        lambda x: (
+            ".".join(x["metric"].split(".")[:-1])
+            if len(re.findall(r"^[0-9]*$", x["metric"].split(".")[-1])) > 0
+            else x["metric"]
+        ),
         axis=1,
     )
 
@@ -844,11 +856,11 @@ def substitute_event_in_expression(
         if event_df.shape == (1,):  # system wide
             if "sys" not in evaluated_expressions:
                 evaluated_expressions["sys"] = exp_to_evaluate.replace(
-                    "[" + event + "]", str(event_df[0])
+                    "[" + event + "]", str(event_df.iloc[0])
                 )
             else:
                 evaluated_expressions["sys"] = evaluated_expressions["sys"].replace(
-                    "[" + event + "]", str(event_df[0])
+                    "[" + event + "]", str(event_df.iloc[0])
                 )
         else:
             for index in event_df.index:
@@ -1016,9 +1028,7 @@ def generate_metrics(
         + (
             "System"
             if perf_mode == Mode.System
-            else "CPU"
-            if perf_mode == Mode.CPU
-            else "Socket"
+            else "CPU" if perf_mode == Mode.CPU else "Socket"
         )
         + " mode"
     )
