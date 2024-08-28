@@ -552,9 +552,11 @@ def extract_dataframe(perf_data_lines, meta_data, perf_mode):
 
     # fix metric name X.1, X.2, etc -> just X
     perf_data_df["metric"] = perf_data_df.apply(
-        lambda x: ".".join(x["metric"].split(".")[:-1])
-        if len(re.findall(r"^[0-9]*$", x["metric"].split(".")[-1])) > 0
-        else x["metric"],
+        lambda x: (
+            ".".join(x["metric"].split(".")[:-1])
+            if len(re.findall(r"^[0-9]*$", x["metric"].split(".")[-1])) > 0
+            else x["metric"]
+        ),
         axis=1,
     )
 
@@ -1026,9 +1028,7 @@ def generate_metrics(
         + (
             "System"
             if perf_mode == Mode.System
-            else "CPU"
-            if perf_mode == Mode.CPU
-            else "Socket"
+            else "CPU" if perf_mode == Mode.CPU else "Socket"
         )
         + " mode"
     )

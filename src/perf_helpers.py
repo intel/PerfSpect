@@ -148,7 +148,7 @@ def nmi_watchdog_enabled():
         return None
     try:
         nmi_watchdog_status = int(proc_output.decode().strip())
-    except (ValueError) as e:
+    except ValueError as e:
         logging.warning(f"Failed to interpret nmi_watchdog status: {e}")
         return None
     return nmi_watchdog_status == 1
