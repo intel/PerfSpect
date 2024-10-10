@@ -323,7 +323,7 @@ def get_arch_and_name(procinfo):
             arch = "emeraldrapids"
         elif model == 175 and cpufamily == 6:
             arch = "sierraforest"
-        elif model == 173 and cpufamily == 6:
+        elif (model == 173 or model == 174) and cpufamily == 6:  # GNR and GNR-D
             arch = "graniterapids"
     return arch, modelname
 
