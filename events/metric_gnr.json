@@ -1,0 +1,186 @@
+[
+    {
+        "name": "metric_CPU operating frequency (in GHz)",
+        "expression": "([cpu-cycles] / [ref-cycles] * [SYSTEM_TSC_FREQ]) / 1000000000"
+    },
+    {
+        "name": "metric_CPU utilization %",
+        "expression": "100 * [ref-cycles] / [TSC]"
+    },
+    {
+        "name": "metric_CPU utilization% in kernel mode",
+        "expression": "100 * [ref-cycles:k] / [TSC]"
+    },
+    {
+        "name": "metric_CPI",
+        "name-txn": "metric_cycles per txn",
+        "expression": "[cpu-cycles] / [instructions]",
+        "expression-txn": "[cpu-cycles] / [TXN]"
+    },
+    {
+        "name": "metric_kernel_CPI",
+        "name-txn": "metric_kernel_cycles per txn",
+        "expression": "[cpu-cycles:k] / [instructions:k]",
+        "expression-txn": "[cpu-cycles:k] / [TXN]"
+    },
+    {
+        "name": "metric_IPC",
+        "name-txn": "metric_txn per cycle",
+        "expression": "[instructions] / [cpu-cycles]",
+        "expression-txn": "[TXN] / [cpu-cycles]"
+    },
+    {
+        "name": "metric_giga_instructions_per_sec",
+        "expression": "[instructions] / 1000000000"
+    },
+    {
+        "name": "metric_locks retired per instr",
+        "name-txn": "metric_locks retired per txn",
+        "expression": "[MEM_INST_RETIRED.LOCK_LOADS] / [instructions]",
+        "expression-txn": "[MEM_INST_RETIRED.LOCK_LOADS] / [TXN]"
+    },
+    {
+        "name": "metric_L1D MPI (includes data+rfo w/ prefetches)",
+        "name-txn": "metric_L1D misses per txn (includes data+rfo w/ prefetches)",
+        "expression": "[L1D.REPLACEMENT] / [instructions]",
+        "expression-txn": "[L1D.REPLACEMENT] / [TXN]"
+    },
+    {
+        "name": "metric_L1D demand data read hits per instr",
+        "name-txn": "metric_L1D demand data read hits per txn",
+        "expression": "[MEM_LOAD_RETIRED.L1_HIT] / [instructions]",
+        "expression-txn": "[MEM_LOAD_RETIRED.L1_HIT] / [TXN]"
+    },
+    {
+        "name": "metric_L1-I code read misses (w/ prefetches) per instr",
+        "name-txn": "metric_L1I code read misses (includes prefetches) per txn",
+        "expression": "[L2_RQSTS.ALL_CODE_RD] / [instructions]",
+        "expression-txn": "[L2_RQSTS.ALL_CODE_RD] / [TXN]"
+    },
+    {
+        "name": "metric_L2 demand data read hits per instr",
+        "name-txn": "metric_L2 demand data read hits per txn",
+        "expression": "[MEM_LOAD_RETIRED.L2_HIT] / [instructions]",
+        "expression-txn": "[MEM_LOAD_RETIRED.L2_HIT] / [TXN]"
+    },
+    {
+        "name": "metric_L2 MPI (includes code+data+rfo w/ prefetches)",
+        "name-txn": "metric_L2 misses per txn (includes code+data+rfo w/ prefetches)",
+        "expression": "[L2_LINES_IN.ALL] / [instructions]",
+        "expression-txn": "[L2_LINES_IN.ALL] / [TXN]"
+    },
+    {
+        "name": "metric_L2 demand data read MPI",
+        "name-txn": "metric_L2 demand data read misses per txn",
+        "expression": "[MEM_LOAD_RETIRED.L2_MISS] / [instructions]",
+        "expression-txn": "[MEM_LOAD_RETIRED.L2_MISS] / [TXN]"
+    },
+    {
+        "name": "metric_L2 demand code MPI",
+        "name-txn": "metric_L2 demand code misses per txn",
+        "expression": "[L2_RQSTS.CODE_RD_MISS] / [instructions]",
+        "expression-txn": "[L2_RQSTS.CODE_RD_MISS] / [TXN]"
+    },
+    {
+        "name": "metric_LLC code read MPI (demand+prefetch)",
+        "name-txn": "metric_LLC code read (demand+prefetch) misses per txn",
+        "expression": "[UNC_CHA_TOR_INSERTS.IA_MISS_CRD] / [instructions]",
+        "expression-txn": "[UNC_CHA_TOR_INSERTS.IA_MISS_CRD] / [TXN]"
+    },
+    {
+        "name": "metric_LLC data read MPI (demand+prefetch)",
+        "name-txn": "metric_LLC data read (demand+prefetch) misses per txn",
+        "expression": "([UNC_CHA_TOR_INSERTS.IA_MISS_LLCPREFDATA] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF]) / [instructions]",
+        "expression-txn": "([UNC_CHA_TOR_INSERTS.IA_MISS_LLCPREFDATA] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF]) / [TXN]"
+    },
+    {
+        "name": "metric_Average LLC demand data read miss latency (in ns)",
+        "expression": "( 1000000000 * ([UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD] / [UNC_CHA_TOR_INSERTS.IA_MISS_DRD]) / ([UNC_CHA_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]) ) ) * 1"
+    },
+    {
+        "name": "metric_Average LLC demand data read miss latency for LOCAL requests (in ns)",
+        "expression": "( 1000000000 * ([UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD_LOCAL] / [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_LOCAL]) / ([UNC_CHA_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]) ) ) * 1"
+    },
+    {
+        "name": "metric_Average LLC demand data read miss latency for REMOTE requests (in ns)",
+        "expression": "( 1000000000 * ([UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD_REMOTE] / [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_REMOTE]) / ([UNC_CHA_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]) ) ) * 1"
+    },
+    {
+        "name": "metric_UPI Data transmit BW (MB/sec) (only data)",
+        "expression": "([UNC_UPI_TxL_FLITS.ALL_DATA] * (64 / 9.0) / 1000000) / 1"
+    },
+    {
+        "name": "metric_package power (watts)",
+        "expression": "[power/energy-pkg/]"
+    },
+    {
+        "name": "metric_DRAM power (watts)",
+        "expression": "[power/energy-ram/]"
+    },
+    {
+        "name": "metric_core c6 residency %",
+        "expression": "100 * [cstate_core/c6-residency/] / [TSC]"
+    },
+    {
+        "name": "metric_package c6 residency %",
+        "expression": "100 * [cstate_pkg/c6-residency/] * [CORES_PER_SOCKET] / [TSC]"
+    },
+    {
+        "name": "metric_% Uops delivered from decoded Icache (DSB)",
+        "expression": "100 * ([IDQ.DSB_UOPS] / ([IDQ.DSB_UOPS] + [IDQ.MITE_UOPS] + [IDQ.MS_UOPS] + [LSD.UOPS]) )"
+    },
+    {
+        "name": "metric_% Uops delivered from legacy decode pipeline (MITE)",
+        "expression": "100 * ([IDQ.MITE_UOPS] / ([IDQ.DSB_UOPS] + [IDQ.MITE_UOPS] + [IDQ.MS_UOPS] + [LSD.UOPS]) )"
+    },
+    {
+        "name": "metric_memory bandwidth read (MB/sec)",
+        "expression": "(([UNC_M_CAS_COUNT_SCH0.RD] + [UNC_M_CAS_COUNT_SCH1.RD]) * 64 / 1000000) / 1"
+    },
+    {
+        "name": "metric_memory bandwidth write (MB/sec)",
+        "expression": "(([UNC_M_CAS_COUNT_SCH0.WR] + [UNC_M_CAS_COUNT_SCH1.WR]) * 64 / 1000000) / 1"
+    },
+    {
+        "name": "metric_memory bandwidth total (MB/sec)",
+        "expression": "(([UNC_M_CAS_COUNT_SCH0.RD] + [UNC_M_CAS_COUNT_SCH1.RD] + [UNC_M_CAS_COUNT_SCH0.WR] + [UNC_M_CAS_COUNT_SCH1.WR]) * 64 / 1000000) / 1"
+    },
+    {
+        "name": "metric_ITLB (2nd level) MPI",
+        "name-txn": "metric_ITLB (2nd level) misses per txn",
+        "expression": "[ITLB_MISSES.WALK_COMPLETED] / [instructions]",
+        "expression-txn": "[ITLB_MISSES.WALK_COMPLETED] / [TXN]"
+    },
+    {
+        "name": "metric_DTLB (2nd level) load MPI",
+        "name-txn": "metric_DTLB (2nd level) load misses per txn",
+        "expression": "[DTLB_LOAD_MISSES.WALK_COMPLETED] / [instructions]",
+        "expression-txn": "[DTLB_LOAD_MISSES.WALK_COMPLETED] / [TXN]"
+    },
+    {
+        "name": "metric_DTLB (2nd level) store MPI",
+        "name-txn": "metric_DTLB (2nd level) store misses per txn",
+        "expression": "[DTLB_STORE_MISSES.WALK_COMPLETED] / [instructions]",
+        "expression-txn": "[DTLB_STORE_MISSES.WALK_COMPLETED] / [TXN]"
+    },
+    {
+        "name": "metric_NUMA %_Reads addressed to local DRAM",
+        "expression": "100 * ([UNC_CHA_TOR_INSERTS.IA_MISS_DRD_LOCAL] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF_LOCAL]) / ([UNC_CHA_TOR_INSERTS.IA_MISS_DRD_LOCAL] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF_LOCAL] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_REMOTE] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF_REMOTE])"
+    },
+    {
+        "name": "metric_NUMA %_Reads addressed to remote DRAM",
+        "expression": "100 * ([UNC_CHA_TOR_INSERTS.IA_MISS_DRD_REMOTE] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF_REMOTE]) / ([UNC_CHA_TOR_INSERTS.IA_MISS_DRD_LOCAL] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF_LOCAL] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_REMOTE] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF_REMOTE])"
+    },
+    {
+        "name": "metric_uncore frequency GHz",
+        "expression": "([UNC_CHA_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]) / 1000000000) / 1"
+    },
+    {
+        "name": "metric_IO_bandwidth_disk_or_network_writes (MB/sec)",
+        "expression": "([UNC_CHA_TOR_INSERTS.IO_PCIRDCUR] * 64 / 1000000) / 1"
+    },
+    {
+        "name": "metric_IO_bandwidth_disk_or_network_reads (MB/sec)",
+        "expression": "(([UNC_CHA_TOR_INSERTS.IO_ITOM] + [UNC_CHA_TOR_INSERTS.IO_ITOMCACHENEAR]) * 64 / 1000000) / 1"
+    }
+]
