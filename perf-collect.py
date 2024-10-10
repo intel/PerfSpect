@@ -28,6 +28,7 @@ SUPPORTED_ARCHITECTURES = [
     "SapphireRapids",
     "EmeraldRapids",
     "SierraForest",
+    "GraniteRapids",
 ]
 
 
@@ -58,10 +59,11 @@ def write_metadata(
         modified.write("CORES_PER_SOCKET," + str(perf_helpers.get_cpu_count()) + ",\n")
         modified.write("SOCKET_COUNT," + str(perf_helpers.get_socket_count()) + ",\n")
         modified.write("HYPERTHREADING_ON," + str(perf_helpers.get_ht_status()) + ",\n")
-        imc, cha, upi = perf_helpers.get_imc_cha_upi_count()
-        modified.write("IMC count," + str(imc) + ",\n")
-        modified.write("CHAS_PER_SOCKET," + str(cha) + ",\n")
-        modified.write("UPI count," + str(upi) + ",\n")
+        counts = perf_helpers.get_unc_device_counts()
+        modified.write("IMC count," + str(counts["imc"]) + ",\n")
+        modified.write("CHAS_PER_SOCKET," + str(counts["cha"]) + ",\n")
+        modified.write("UPI count," + str(counts["upi"]) + ",\n")
+        modified.write("B2CMI count, " + str(counts["b2cmi"]) + ",\n")
         modified.write("Architecture," + str(arch) + ",\n")
         modified.write("Model," + str(cpuname) + ",\n")
         modified.write("kernel version," + perf_helpers.get_version() + "\n")
@@ -190,12 +192,14 @@ def fixed_tma_supported():
         return False
     try:
         if events["TOPDOWN.SLOTS"] == events["PERF_METRICS.BAD_SPECULATION"]:
+            logging.debug("TOPDOWN.SLOTS and PERF_METRICS.BAD_SPECULATION are equal")
             return False
     except KeyError:
         logging.debug("Failed to find required events in fixed_tma_supported()")
         return False
 
     if events["TOPDOWN.SLOTS"] == 0 or events["PERF_METRICS.BAD_SPECULATION"] == 0:
+        logging.debug("TOPDOWN.SLOTS or PERF_METRICS.BAD_SPECULATION count is 0")
         return False
 
     return True
@@ -212,6 +216,7 @@ def fixed_event_supported(arch, event):
         or arch == "sapphirerapids"
         or arch == "emeraldrapids"
         or arch == "sierraforest"
+        or arch == "graniterapids"
     ):
         num_gp_counters = 8
     else:
@@ -303,6 +308,8 @@ def get_eventfile_path(arch, script_path, supports_tma_fixed_events):
             eventfile = "spr_emr_nofixedtma.txt"
     elif arch == "sierraforest":
         eventfile = "srf.txt"
+    elif arch == "graniterapids":
+        eventfile = "gnr.txt"
 
     if eventfile is None:
         return None
@@ -454,7 +461,12 @@ if __name__ == "__main__":
     # The fixed-purpose PMU counters for TMA events are not supported on architectures older than Icelake
     # They are also not supported on some VMs, e.g., AWS ICX and SPR VMs
     supports_tma_fixed_events = False
-    if arch == "icelake" or arch == "sapphirerapids" or arch == "emeraldrapids":
+    if (
+        arch == "icelake"
+        or arch == "sapphirerapids"
+        or arch == "emeraldrapids"
+        or arch == "graniterapids"
+    ):
         supports_tma_fixed_events = fixed_tma_supported()
         if not supports_tma_fixed_events:
             logging.warning(
@@ -561,10 +573,11 @@ if __name__ == "__main__":
     logging.info("Cores per socket: " + str(perf_helpers.get_cpu_count()))
     logging.info("Socket: " + str(perf_helpers.get_socket_count()))
     logging.info("Hyperthreading on: " + str(perf_helpers.get_ht_status()))
-    imc, cha, upi = perf_helpers.get_imc_cha_upi_count()
-    logging.info("IMC count: " + str(imc))
-    logging.info("CHA per socket: " + str(cha))
-    logging.info("UPI count: " + str(upi))
+    counts = perf_helpers.get_unc_device_counts()
+    logging.info("IMC count: " + str(counts["imc"]))
+    logging.info("CHA per socket: " + str(counts["cha"]))
+    logging.info("UPI count: " + str(counts["upi"]))
+    logging.info("B2CMI count: " + str(counts["b2cmi"]))
     logging.info("PerfSpect version: " + perf_helpers.get_tool_version())
     if args.verbose:
         logging.info("/sys/devices/: " + str(sys_devs))

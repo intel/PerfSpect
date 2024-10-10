@@ -92,24 +92,35 @@ def get_sys_devices():
     return devs
 
 
-# get imc and uncore counts
+# get relevant uncore device counts
 # TODO:fix for memory config with some channels populated
-def get_imc_cha_upi_count():
+def get_unc_device_counts():
     sys_devs = get_sys_devices()
-    cha_count = 0
-    imc_count = 0
-    upi_count = 0
+    counts = {}
     if "uncore_cha" in sys_devs:
-        cha_count = int(sys_devs["uncore_cha"])
-    if "uncore_cbox" in sys_devs:
-        cha_count = int(sys_devs["uncore_cbox"])
+        counts["cha"] = int(sys_devs["uncore_cha"])
+    elif "uncore_cbox" in sys_devs:  # alternate name for cha
+        counts["cha"] = int(sys_devs["uncore_cbox"])
+    else:
+        counts["cha"] = 0
+
     if "uncore_upi" in sys_devs:
-        upi_count = int(sys_devs["uncore_upi"])
-    if "uncore_qpi" in sys_devs:
-        upi_count = int(sys_devs["uncore_qpi"])
+        counts["upi"] = int(sys_devs["uncore_upi"])
+    elif "uncore_qpi" in sys_devs:  # alternate name for upi
+        counts["upi"] = int(sys_devs["uncore_qpi"])
+    else:
+        counts["upi"] = 0
+
     if "uncore_imc" in sys_devs:
-        imc_count = int(sys_devs["uncore_imc"])
-    return imc_count, cha_count, upi_count
+        counts["imc"] = int(sys_devs["uncore_imc"])
+    else:
+        counts["imc"] = 0
+
+    if "uncore_b2cmi" in sys_devs:
+        counts["b2cmi"] = int(sys_devs["uncore_b2cmi"])
+    else:
+        counts["b2cmi"] = 0
+    return counts
 
 
 # return a sorted list of device ids for a given device type pattern, e.g., uncore_cha_, uncore_imc_, etc.
@@ -312,6 +323,8 @@ def get_arch_and_name(procinfo):
             arch = "emeraldrapids"
         elif model == 175 and cpufamily == 6:
             arch = "sierraforest"
+        elif model == 173 and cpufamily == 6:
+            arch = "graniterapids"
     return arch, modelname
 
 
@@ -368,60 +381,41 @@ def get_epoch(start_time):
     return epoch
 
 
-# get cgroups
+# get_cgroups
+# cid: a comma-separated list of container ids
+# note: works only for cgroup v2
 def get_cgroups(cid):
+    # check cgroup version
+    if not os.path.exists("/sys/fs/cgroup/cgroup.controllers"):
+        crash("cgroup v1 detected, cgroup v2 required")
+    # get cgroups from /sys/fs/cgroup directory recursively. They must start with 'docker' or 'containerd' and end with '.scope'.
+    # if cid is provided, only return cgroups that match the provided container ids
     cids = cid.split(",")
-    try:
-        stat = subprocess.Popen(
-            ["stat", "-fc", "%T", "/sys/fs/cgroup/"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-    except subprocess.SubprocessError as e:
-        crash(
-            "Cannot determine cgroup version. failed to open stat subprocess: " + str(e)
-        )
-    out, err = stat.communicate()
-    out = out.decode("utf-8").strip()
-    if out == "tmpfs":
-        logging.info("cgroup v1 detected")
-    elif out == "cgroup2fs":
-        logging.info("cgroup v2 detected")
-    else:
-        logging.info("unknown cgroup version " + out)
-
-    try:
-        p = subprocess.Popen(
-            ["ps", "-a", "-x", "-o", "cgroup", "--sort=-%cpu"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-    except subprocess.SubprocessError as e:
-        crash("failed to open ps subprocess: " + str(e))
-    out, err = p.communicate()
-    if err:
-        crash(f"error reading cgroups: {err}")
-
-    cgroups = [
-        *dict.fromkeys(
-            filter(
-                lambda x: (  # must be container runtime
-                    "docker" in x or "containerd" in x
+    cgroups = []
+    # get all cgroups
+    for dirpath, dirnames, filenames in os.walk("/sys/fs/cgroup"):
+        for dirname in dirnames:
+            if (
+                ("docker" in dirname or "containerd" in dirname)
+                and dirname.endswith(".scope")
+                and (len(cids) == 0 or any(map(lambda y: y in dirname, cids)))
+            ):
+                cgroups.append(
+                    os.path.relpath(os.path.join(dirpath, dirname), "/sys/fs/cgroup")
                 )
-                and x.endswith(".scope")  # don't include services
-                and (  # select all or provided cids
-                    len(cids) == 0 or any(map(lambda y: y in x, cids))
-                ),
-                map(
-                    lambda x: x.split(":")[-1],  # get trailing cgroup name
-                    filter(  # remove extraneous lines
-                        lambda x: x != "" and x != "CGROUP" and x != "-",
-                        out.decode("utf-8").split("\n"),
-                    ),
-                ),
-            )
-        )
-    ]
+    # associate cgroups with their cpu utilization found in the usage_usec field of the cgroup's cpu.stat file
+    cgroup_cpu_usage = {}
+    for cgroup in cgroups:
+        try:
+            with open(f"/sys/fs/cgroup/{cgroup}/cpu.stat", "r") as f:
+                for line in f:
+                    if "usage_usec" in line:
+                        cgroup_cpu_usage[cgroup] = int(line.split()[1])
+        except EnvironmentError as e:
+            logging.warning(str(e), UserWarning)
+    # sort cgroups by cpu usage, highest usage first
+    cgroups = sorted(cgroup_cpu_usage, key=cgroup_cpu_usage.get, reverse=True)
+
     if len(cgroups) == 0:
         crash("no matching cgroups found")
     elif len(cgroups) > 5:
