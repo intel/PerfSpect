@@ -22,11 +22,13 @@ jobs:
       - name: upload md5
         uses: actions/upload-artifact@v4
         with:
-          name: dist/perfspect*.md5.txt
+          name: md5
+          path: dist/perfspect*.md5.txt
       - name: upload manifest
         uses: actions/upload-artifact@v4
         with:
-          name: dist/manifest.json
+          name: manifest
+          path: dist/manifest.json
       - name: upload oss package
         uses: actions/upload-artifact@v4
         with:
