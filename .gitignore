@@ -1,5 +1,0 @@
-build/*
-dist/*
-src/libtsc.so
-__pycache__
-*.log
