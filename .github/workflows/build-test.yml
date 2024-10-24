@@ -14,11 +14,20 @@ jobs:
       - name: build perfspect
         run: |
           builder/build.sh
-      - name: upload build
+      - name: upload perfspect
         uses: actions/upload-artifact@v4
         with:
           name: perfspect
           path: dist/perfspect*.tgz
+      - name: upload md5
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist/perfspect*.md5.txt
+      - name: upload
+      - name: upload manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist/manifest.json
       - name: upload oss package
         uses: actions/upload-artifact@v4
         with:
