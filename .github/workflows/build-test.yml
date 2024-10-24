@@ -1,0 +1,51 @@
+name: Build & Test
+
+on: [pull_request, push, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: build perfspect
+        run: |
+          builder/build.sh
+      - name: upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: perfspect
+          path: dist/perfspect*.tgz
+      - name: upload oss package
+        uses: actions/upload-artifact@v4
+        with:
+          name: oss_source
+          path: dist/oss_source.tgz
+
+  test:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+      - name: download perspect
+        uses: actions/download-artifact@v4
+        with:
+          name: perfspect
+      - name: run test
+        run: |
+          tar -xf perfspect*
+          cp .github/mock_mlc perfspect/tools/x86_64/
+          cd perfspect
+          mkdir output
+          ./perfspect report --format all --output output --benchmark all
+          cp -f perfspect.log output/
+      - name: upload report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.runner }} report
+          path: perfspect/output/

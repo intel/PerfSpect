@@ -1,0 +1,58 @@
+#! /bin/bash
+# mock_mlc
+# arguments:
+#    --loaded_latency
+#    --bandwidth_matrix
+
+if [ "$1" == "--loaded_latency" ]; then
+cat <<EOT
+Intel(R) Memory Latency Checker - v3.10
+Command line parameters: --loaded_latency 
+
+Using buffer size of 100.000MiB/thread for reads and an additional 100.000MiB/thread for writes
+
+Measuring Loaded Latencies for the system
+Using all the threads from each core if Hyper-threading is enabled
+Using Read-only traffic type
+Inject	Latency	Bandwidth
+Delay	(ns)	MB/sec
+==========================
+ 00000	282.55	 135345.6
+ 00002	284.07	 135403.7
+ 00008	278.73	 135411.2
+ 00015	269.25	 135532.7
+ 00050	231.67	 135768.8
+ 00100	134.91	  97362.0
+ 00200	114.13	  43700.8
+ 00300	110.66	  29798.1
+ 00400	109.30	  22699.6
+ 00500	108.59	  18821.4
+ 00700	107.72	  13697.0
+ 01000	107.08	   9975.2
+ 01300	106.73	   8016.6
+ 01700	106.41	   6321.5
+ 02500	106.10	   4561.3
+ 03500	105.90	   3481.5
+ 05000	105.77	   2688.7
+ 09000	105.60	   1844.7
+ 20000	105.48	   1148.7
+
+EOT
+elif [ "$1" == "--bandwidth_matrix" ]; then
+cat <<EOT
+Intel(R) Memory Latency Checker - v3.10
+Command line parameters: --bandwidth_matrix 
+
+Using buffer size of 100.000MiB/thread for reads and an additional 100.000MiB/thread for writes
+Measuring Memory Bandwidths between nodes within system 
+Bandwidths are in MB/sec (1 MB/sec = 1,000,000 Bytes/sec)
+Using all the threads from each core if Hyper-threading is enabled
+Using Read-only traffic type
+		Numa node
+Numa node	     0	
+       0	135248.8	
+
+EOT
+else
+    echo "unknown option"
+fi
