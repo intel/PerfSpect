@@ -355,6 +355,10 @@ func ExtractTGZ(tarballPath, destDir string, stripComponent bool) error {
 		if err != nil {
 			return err
 		}
+		// Check for invalid paths, there should never be a ".." in the path
+		if strings.Contains(header.Name, "..") {
+			return fmt.Errorf("tarball contains invalid path: %s", header.Name)
+		}
 
 		target := filepath.Join(destDir, header.Name)
 
