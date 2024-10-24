@@ -25,23 +25,21 @@ jobs:
       fail-fast: false
       matrix:
         language: [ 'go' ]
-
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@4759df8df70c5ebe7042c3029bbace20eee13edd # v2.23.1
+      uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
-    - name:
+    - name: Build
       run: |
         mkdir -p internal/script/resources
         touch internal/script/resources/dummy
         mkdir -p internal/common/resources
         touch internal/common/resources/dummy
         make
-
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@4759df8df70c5ebe7042c3029bbace20eee13edd # v2.23.1
+      uses: github/codeql-action/analyze@v3
       with:
         category: "/language:${{matrix.language}}"
