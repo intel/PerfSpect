@@ -1,7 +1,0 @@
-black==24.8.0
-flake8
-pytype
-simpleeval
-pandas
-pyinstaller
-pytest

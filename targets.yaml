@@ -1,0 +1,29 @@
+# This YAML file contains a list of remote targets with their corresponding properties.
+# Each target has the following properties:
+#   name: The name of the target (optional)
+#   host: The IP address or host name of the target (required)
+#   port: The port number used to connect to the target via SSH (optional)
+#   user: The user name used to connect to the target via SSH (optional)
+#   key: The path to the private key file used to connect to the target via SSH (optional)
+#   pwd: The password used to connect to the target via SSH (optional)
+#
+# Note: If key and pwd are both provided, the key will be used for authentication.
+#
+# Security Notes: 
+#   It is recommended to use a private key for authentication instead of a password.
+#   Keep this file in a secure location and do not expose it to unauthorized users.
+#
+# Below are examples. Modify them to match your environment.
+targets:
+  - name: ELAINES_TARGET
+    host: 192.168.1.1
+    port: 
+    user: elaine
+    key: /home/elaine/.ssh/id_rsa
+    pwd:
+  - name: JERRYS_TARGET
+    host: 192.168.1.2
+    port: 2222
+    user: jerry
+    key:
+    pwd: george

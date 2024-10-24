@@ -1,0 +1,445 @@
+# Bergamo event list
+
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc:k'/k,
+cpu-cycles,
+cpu-cycles:k,
+instructions,
+instructions:k;
+
+# Branch Misprediction Ratio
+cpu/event=0xc3,name='ex_ret_brn_misp'/,
+cpu/event=0xc2,name='ex_ret_brn'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# All Data Cache Accesses
+cpu/event=0x29,umask=0x7,name='ls_dispatch.any'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# All L2 Cache Accesses
+cpu/event=0x60,umask=0xf9,name='l2_request_g1.all_no_prefetch'/,
+cpu/event=0x70,umask=0x1f,name='l2_pf_hit_l2.all'/,
+cpu/event=0x71,umask=0x1f,name='l2_pf_miss_l2_hit_l3.all'/,
+cpu/event=0x72,umask=0x1f,name='l2_pf_miss_l2_l3.all'/,
+cpu-cycles,
+instructions;
+
+# L2 Cache Accesses from L1 Instruction Cache Misses
+cpu/event=0x60,umask=0x10,name='l2_request_g1.cacheable_ic_read'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# L2 Cache Accesses from L1 Data Cache Misses
+cpu/event=0x60,umask=0xe8,name='l2_request_g1.all_dc'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# L2 Cache Accesses from L2 Cache Hardware Prefetches
+cpu/event=0x70,umask=0x1f,name='l2_pf_hit_l2.all'/,
+cpu/event=0x71,umask=0x1f,name='l2_pf_miss_l2_hit_l3.all'/,
+cpu/event=0x72,umask=0x1f,name='l2_pf_miss_l2_l3.all'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# All L2 Cache Misses
+cpu/event=0x64,umask=0x9,name='l2_cache_req_stat.ic_dc_miss_in_l2'/,
+cpu/event=0x71,umask=0x1f,name='l2_pf_miss_l2_hit_l3.all'/,
+cpu/event=0x72,umask=0x1f,name='l2_pf_miss_l2_l3.all'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# L2 Cache Misses from L1 Instruction Cache Misses
+cpu/event=0x64,umask=0x1,name='l2_cache_req_stat.ic_fill_miss'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# L2 Cache Misses from L1 Data Cache Misses
+cpu/event=0x64,umask=0x8,name='l2_cache_req_stat.ls_rd_blk_c'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# L2 Cache Misses from L2 Cache Hardware Prefetches
+cpu/event=0x71,umask=0x1f,name='l2_pf_miss_l2_hit_l3.all'/,
+cpu/event=0x72,umask=0x1f,name='l2_pf_miss_l2_l3.all'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# All L2 Cache Hits
+cpu/event=0x64,umask=0xf6,name='l2_cache_req_stat.ic_dc_hit_in_l2'/,
+cpu/event=0x70,umask=0x1f,name='l2_pf_hit_l2.all'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# L2 Cache Hits from L1 Instruction Cache Misses
+cpu/event=0x64,umask=0x06,name='l2_cache_req_stat.ic_hit_in_l2'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# L2 Cache Hits from L1 Data Cache Misses
+cpu/event=0x64,umask=0xf0,name='l2_cache_req_stat.dc_hit_in_l2'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# L2 Cache Hits from L2 Cache Hardware Prefetches
+cpu/event=0x70,umask=0x1f,name='l2_pf_hit_l2.all'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# L3 Cache Accesses
+l3/event=0x4,umask=0xff,name='l3_lookup_state.all_coherent_accesses_to_l3'/;
+
+# L3 Cache Misses
+l3/event=0x4,umask=0x1,name='l3_lookup_state.l3_miss'/;
+
+# L3 Cache Hits
+l3/event=0x4,umask=0xfe,name='l3_lookup_state.l3_hit'/;
+
+# Average L3 Cache Read Miss Latency (ns)
+l3/event=0xac,umask=0x3f,enallcores=0x1,enallslices=0x1,sliceid=0x3,threadmask=0x3,name='l3_xi_sampled_latency.all'/,
+l3/event=0xad,umask=0x3f,enallcores=0x1,enallslices=0x1,sliceid=0x3,threadmask=0x3,name='l3_xi_sampled_latency_requests.all'/;
+
+# Op Cache Fetch Miss Ratio
+cpu/event=0x28f,umask=0x4,name='op_cache_hit_miss.miss'/,
+cpu/event=0x28f,umask=0x7,name='op_cache_hit_miss.all'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# Instruction Cache Fetch Miss Ratio
+cpu/event=0x18e,umask=0x18,name='ic_tag_hit_miss.miss'/,
+cpu/event=0x18e,umask=0x1f,name='ic_tag_hit_miss.all'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# L1 Data Cache Fills from DRAM or IO in any NUMA node
+cpu/event=0x44,umask=0x48,name='ls_any_fills_from_sys.dram_io_all'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# L1 Data Cache Fills from a different NUMA node
+cpu/event=0x44,umask=0x50,name='ls_any_fills_from_sys.far_all'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# L1 Data Cache Fills from within the same CCX
+cpu/event=0x44,umask=0x3,name='ls_any_fills_from_sys.local_all'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# L1 Data Cache Fills from another CCX cache in any NUMA node
+cpu/event=0x44,umask=0x14,name='ls_any_fills_from_sys.remote_cache'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# All L1 Data Cache Fills
+cpu/event=0x44,umask=0x5f,name='ls_any_fills_from_sys.all'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# Demand L1 Data Cache Fills from local L2
+cpu/event=0x43,umask=0x1,name='ls_dmnd_fills_from_sys.local_l2'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# Demand L1 Data Cache Fills from local L3 or different L2 in same CCX
+cpu/event=0x43,umask=0x2,name='ls_dmnd_fills_from_sys.local_ccx'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# Demand L1 Data Cache Fills from another CCX cache in the same NUMA node
+cpu/event=0x43,umask=0x4,name='ls_dmnd_fills_from_sys.near_cache'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# Demand L1 Data Cache Fills from DRAM or MMIO in the same NUMA node
+cpu/event=0x43,umask=0x8,name='ls_dmnd_fills_from_sys.dram_io_near'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# Demand L1 Data Cache Fills from another CCX cache in a different NUMA node
+cpu/event=0x43,umask=0x10,name='ls_dmnd_fills_from_sys.far_cache'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# Demand L1 Data Cache Fills from DRAM or MMIO in a different NUMA node
+cpu/event=0x43,umask=0x40,name='ls_dmnd_fills_from_sys.dram_io_far'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# Lines written per Write Combining Buffer close
+cpu/event=0x50,umask=0x1,name='ls_wcb_close_flush.full_line_64b'/,
+cpu/event=0x63,umask=0x20,name='l2_wcb_req.wcb_close'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# L1 ITLB Misses
+# L2 ITLB Misses and Instruction Page Walks
+cpu/event=0x84,name='bp_l1_tlb_miss_l2_tlb_hit'/,
+cpu/event=0x85,umask=0x7,name='bp_l1_tlb_miss_l2_tlb_miss.all'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# L1 DTLB Misses
+cpu/event=0x45,umask=0xff,name='ls_l1_d_tlb_miss.all'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# L2 DTLB Misses and Data Page Walks
+cpu/event=0x45,umask=0xf0,name='ls_l1_d_tlb_miss.all_l2_miss'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# All TLBs Flushed
+cpu/event=0x78,umask=0xff,name='ls_tlb_flush.all'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# Macro-ops Dispatched
+cpu/event=0xaa,umask=0x7,name='de_src_op_disp.all'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# Mixed SSE and AVX Stalls
+cpu/event=0xe,umask=0xe,name='fp_disp_faults.sse_avx_all'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# Macro-ops Retired
+cpu/event=0xc1,name='ex_ret_ops'/,
+cpu/event=0x120,umask=0x1,name='ls_not_halted_p0_cyc'/,
+cpu-cycles,
+instructions;
+
+# DRAM read data bytes for local processor
+df/event=0x1f,umask=0x7fe,name='local_processor_read_data_beats_cs0'/,
+df/event=0x5f,umask=0x7fe,name='local_processor_read_data_beats_cs1'/,
+df/event=0x9f,umask=0x7fe,name='local_processor_read_data_beats_cs2'/,
+df/event=0xdf,umask=0x7fe,name='local_processor_read_data_beats_cs3'/,
+df/event=0x11f,umask=0x7fe,name='local_processor_read_data_beats_cs4'/,
+df/event=0x15f,umask=0x7fe,name='local_processor_read_data_beats_cs5'/,
+df/event=0x19f,umask=0x7fe,name='local_processor_read_data_beats_cs6'/,
+df/event=0x1df,umask=0x7fe,name='local_processor_read_data_beats_cs7'/,
+df/event=0x21f,umask=0x7fe,name='local_processor_read_data_beats_cs8'/,
+df/event=0x25f,umask=0x7fe,name='local_processor_read_data_beats_cs9'/,
+df/event=0x29f,umask=0x7fe,name='local_processor_read_data_beats_cs10'/,
+df/event=0x2df,umask=0x7fe,name='local_processor_read_data_beats_cs11'/;
+
+# DRAM write data bytes for local processor
+df/event=0x1f,umask=0x7ff,name='local_processor_write_data_beats_cs0'/,
+df/event=0x5f,umask=0x7ff,name='local_processor_write_data_beats_cs1'/,
+df/event=0x9f,umask=0x7ff,name='local_processor_write_data_beats_cs2'/,
+df/event=0xdf,umask=0x7ff,name='local_processor_write_data_beats_cs3'/,
+df/event=0x11f,umask=0x7ff,name='local_processor_write_data_beats_cs4'/,
+df/event=0x15f,umask=0x7ff,name='local_processor_write_data_beats_cs5'/,
+df/event=0x19f,umask=0x7ff,name='local_processor_write_data_beats_cs6'/,
+df/event=0x1df,umask=0x7ff,name='local_processor_write_data_beats_cs7'/,
+df/event=0x21f,umask=0x7ff,name='local_processor_write_data_beats_cs8'/,
+df/event=0x25f,umask=0x7ff,name='local_processor_write_data_beats_cs9'/,
+df/event=0x29f,umask=0x7ff,name='local_processor_write_data_beats_cs10'/,
+df/event=0x2df,umask=0x7ff,name='local_processor_write_data_beats_cs11'/;
+
+# DRAM read data bytes for remote processor
+df/event=0x1f,umask=0xbfe,name='remote_processor_read_data_beats_cs0'/,
+df/event=0x5f,umask=0xbfe,name='remote_processor_read_data_beats_cs1'/,
+df/event=0x9f,umask=0xbfe,name='remote_processor_read_data_beats_cs2'/,
+df/event=0xdf,umask=0xbfe,name='remote_processor_read_data_beats_cs3'/,
+df/event=0x11f,umask=0xbfe,name='remote_processor_read_data_beats_cs4'/,
+df/event=0x15f,umask=0xbfe,name='remote_processor_read_data_beats_cs5'/,
+df/event=0x19f,umask=0xbfe,name='remote_processor_read_data_beats_cs6'/,
+df/event=0x1df,umask=0xbfe,name='remote_processor_read_data_beats_cs7'/,
+df/event=0x21f,umask=0xbfe,name='remote_processor_read_data_beats_cs8'/,
+df/event=0x25f,umask=0xbfe,name='remote_processor_read_data_beats_cs9'/,
+df/event=0x29f,umask=0xbfe,name='remote_processor_read_data_beats_cs10'/,
+df/event=0x2df,umask=0xbfe,name='remote_processor_read_data_beats_cs11'/;
+
+# DRAM write data bytes for remote processor
+df/event=0x1f,umask=0xbff,name='remote_processor_write_data_beats_cs0'/,
+df/event=0x5f,umask=0xbff,name='remote_processor_write_data_beats_cs1'/,
+df/event=0x9f,umask=0xbff,name='remote_processor_write_data_beats_cs2'/,
+df/event=0xdf,umask=0xbff,name='remote_processor_write_data_beats_cs3'/,
+df/event=0x11f,umask=0xbff,name='remote_processor_write_data_beats_cs4'/,
+df/event=0x15f,umask=0xbff,name='remote_processor_write_data_beats_cs5'/,
+df/event=0x19f,umask=0xbff,name='remote_processor_write_data_beats_cs6'/,
+df/event=0x1df,umask=0xbff,name='remote_processor_write_data_beats_cs7'/,
+df/event=0x21f,umask=0xbff,name='remote_processor_write_data_beats_cs8'/,
+df/event=0x25f,umask=0xbff,name='remote_processor_write_data_beats_cs9'/,
+df/event=0x29f,umask=0xbff,name='remote_processor_write_data_beats_cs10'/,
+df/event=0x2df,umask=0xbff,name='remote_processor_write_data_beats_cs11'/;
+
+# Local socket upstream DMA read data bytes
+df/event=0x81f,umask=0x7fe,name='local_socket_upstream_read_beats_iom0'/,
+df/event=0x85f,umask=0x7fe,name='local_socket_upstream_read_beats_iom1'/,
+df/event=0x89f,umask=0x7fe,name='local_socket_upstream_read_beats_iom2'/,
+df/event=0x8df,umask=0x7fe,name='local_socket_upstream_read_beats_iom3'/;
+
+# Local socket upstream DMA write data bytes
+df/event=0x81f,umask=0x7ff,name='local_socket_upstream_write_beats_iom0'/,
+df/event=0x85f,umask=0x7ff,name='local_socket_upstream_write_beats_iom1'/,
+df/event=0x89f,umask=0x7ff,name='local_socket_upstream_write_beats_iom2'/,
+df/event=0x8df,umask=0x7ff,name='local_socket_upstream_write_beats_iom3'/;
+
+# Remote socket upstream DMA read data bytes
+df/event=0x81f,umask=0xbfe,name='remote_socket_upstream_read_beats_iom0'/,
+df/event=0x85f,umask=0xbfe,name='remote_socket_upstream_read_beats_iom1'/,
+df/event=0x89f,umask=0xbfe,name='remote_socket_upstream_read_beats_iom2'/,
+df/event=0x8df,umask=0xbfe,name='remote_socket_upstream_read_beats_iom3'/;
+
+# Remote socket upstream DMA write data bytes
+df/event=0x81f,umask=0xbff,name='remote_socket_upstream_write_beats_iom0'/,
+df/event=0x85f,umask=0xbff,name='remote_socket_upstream_write_beats_iom1'/,
+df/event=0x89f,umask=0xbff,name='remote_socket_upstream_write_beats_iom2'/,
+df/event=0x8df,umask=0xbff,name='remote_socket_upstream_write_beats_iom3'/;
+
+# Local socket inbound data bytes to the CPU
+df/event=0x41e,umask=0x7fe,name='local_socket_inf0_inbound_data_beats_ccm0'/,
+df/event=0x45e,umask=0x7fe,name='local_socket_inf0_inbound_data_beats_ccm1'/,
+df/event=0x49e,umask=0x7fe,name='local_socket_inf0_inbound_data_beats_ccm2'/,
+df/event=0x4de,umask=0x7fe,name='local_socket_inf0_inbound_data_beats_ccm3'/,
+df/event=0x51e,umask=0x7fe,name='local_socket_inf0_inbound_data_beats_ccm4'/,
+df/event=0x55e,umask=0x7fe,name='local_socket_inf0_inbound_data_beats_ccm5'/,
+df/event=0x59e,umask=0x7fe,name='local_socket_inf0_inbound_data_beats_ccm6'/,
+df/event=0x5de,umask=0x7fe,name='local_socket_inf0_inbound_data_beats_ccm7'/,
+df/event=0x41f,umask=0x7fe,name='local_socket_inf1_inbound_data_beats_ccm0'/,
+df/event=0x45f,umask=0x7fe,name='local_socket_inf1_inbound_data_beats_ccm1'/,
+df/event=0x49f,umask=0x7fe,name='local_socket_inf1_inbound_data_beats_ccm2'/,
+df/event=0x4df,umask=0x7fe,name='local_socket_inf1_inbound_data_beats_ccm3'/,
+df/event=0x51f,umask=0x7fe,name='local_socket_inf1_inbound_data_beats_ccm4'/,
+df/event=0x55f,umask=0x7fe,name='local_socket_inf1_inbound_data_beats_ccm5'/,
+df/event=0x59f,umask=0x7fe,name='local_socket_inf1_inbound_data_beats_ccm6'/,
+df/event=0x5df,umask=0x7fe,name='local_socket_inf1_inbound_data_beats_ccm7'/;
+
+# Local socket outbound data bytes from the CPU
+df/event=0x41e,umask=0x7ff,name='local_socket_inf0_outbound_data_beats_ccm0'/,
+df/event=0x45e,umask=0x7ff,name='local_socket_inf0_outbound_data_beats_ccm1'/,
+df/event=0x49e,umask=0x7ff,name='local_socket_inf0_outbound_data_beats_ccm2'/,
+df/event=0x4de,umask=0x7ff,name='local_socket_inf0_outbound_data_beats_ccm3'/,
+df/event=0x51e,umask=0x7ff,name='local_socket_inf0_outbound_data_beats_ccm4'/,
+df/event=0x55e,umask=0x7ff,name='local_socket_inf0_outbound_data_beats_ccm5'/,
+df/event=0x59e,umask=0x7ff,name='local_socket_inf0_outbound_data_beats_ccm6'/,
+df/event=0x5de,umask=0x7ff,name='local_socket_inf0_outbound_data_beats_ccm7'/,
+df/event=0x41f,umask=0x7ff,name='local_socket_inf1_outbound_data_beats_ccm0'/,
+df/event=0x45f,umask=0x7ff,name='local_socket_inf1_outbound_data_beats_ccm1'/,
+df/event=0x49f,umask=0x7ff,name='local_socket_inf1_outbound_data_beats_ccm2'/,
+df/event=0x4df,umask=0x7ff,name='local_socket_inf1_outbound_data_beats_ccm3'/,
+df/event=0x51f,umask=0x7ff,name='local_socket_inf1_outbound_data_beats_ccm4'/,
+df/event=0x55f,umask=0x7ff,name='local_socket_inf1_outbound_data_beats_ccm5'/,
+df/event=0x59f,umask=0x7ff,name='local_socket_inf1_outbound_data_beats_ccm6'/,
+df/event=0x5df,umask=0x7ff,name='local_socket_inf1_outbound_data_beats_ccm7'/;
+
+# Remote socket inbound data bytes to the CPU
+df/event=0x41e,umask=0xbfe,name='remote_socket_inf0_inbound_data_beats_ccm0'/,
+df/event=0x45e,umask=0xbfe,name='remote_socket_inf0_inbound_data_beats_ccm1'/,
+df/event=0x49e,umask=0xbfe,name='remote_socket_inf0_inbound_data_beats_ccm2'/,
+df/event=0x4de,umask=0xbfe,name='remote_socket_inf0_inbound_data_beats_ccm3'/,
+df/event=0x51e,umask=0xbfe,name='remote_socket_inf0_inbound_data_beats_ccm4'/,
+df/event=0x55e,umask=0xbfe,name='remote_socket_inf0_inbound_data_beats_ccm5'/,
+df/event=0x59e,umask=0xbfe,name='remote_socket_inf0_inbound_data_beats_ccm6'/,
+df/event=0x5de,umask=0xbfe,name='remote_socket_inf0_inbound_data_beats_ccm7'/,
+df/event=0x41f,umask=0xbfe,name='remote_socket_inf1_inbound_data_beats_ccm0'/,
+df/event=0x45f,umask=0xbfe,name='remote_socket_inf1_inbound_data_beats_ccm1'/,
+df/event=0x49f,umask=0xbfe,name='remote_socket_inf1_inbound_data_beats_ccm2'/,
+df/event=0x4df,umask=0xbfe,name='remote_socket_inf1_inbound_data_beats_ccm3'/,
+df/event=0x51f,umask=0xbfe,name='remote_socket_inf1_inbound_data_beats_ccm4'/,
+df/event=0x55f,umask=0xbfe,name='remote_socket_inf1_inbound_data_beats_ccm5'/,
+df/event=0x59f,umask=0xbfe,name='remote_socket_inf1_inbound_data_beats_ccm6'/,
+df/event=0x5df,umask=0xbfe,name='remote_socket_inf1_inbound_data_beats_ccm7'/;
+
+# Remote socket outbound data bytes from the CPU
+df/event=0x41e,umask=0xbff,name='remote_socket_inf0_outbound_data_beats_ccm0'/,
+df/event=0x45e,umask=0xbff,name='remote_socket_inf0_outbound_data_beats_ccm1'/,
+df/event=0x49e,umask=0xbff,name='remote_socket_inf0_outbound_data_beats_ccm2'/,
+df/event=0x4de,umask=0xbff,name='remote_socket_inf0_outbound_data_beats_ccm3'/,
+df/event=0x51e,umask=0xbff,name='remote_socket_inf0_outbound_data_beats_ccm4'/,
+df/event=0x55e,umask=0xbff,name='remote_socket_inf0_outbound_data_beats_ccm5'/,
+df/event=0x59e,umask=0xbff,name='remote_socket_inf0_outbound_data_beats_ccm6'/,
+df/event=0x5de,umask=0xbff,name='remote_socket_inf0_outbound_data_beats_ccm7'/,
+df/event=0x41f,umask=0xbff,name='remote_socket_inf1_outbound_data_beats_ccm0'/,
+df/event=0x45f,umask=0xbff,name='remote_socket_inf1_outbound_data_beats_ccm1'/,
+df/event=0x49f,umask=0xbff,name='remote_socket_inf1_outbound_data_beats_ccm2'/,
+df/event=0x4df,umask=0xbff,name='remote_socket_inf1_outbound_data_beats_ccm3'/,
+df/event=0x51f,umask=0xbff,name='remote_socket_inf1_outbound_data_beats_ccm4'/,
+df/event=0x55f,umask=0xbff,name='remote_socket_inf1_outbound_data_beats_ccm5'/,
+df/event=0x59f,umask=0xbff,name='remote_socket_inf1_outbound_data_beats_ccm6'/,
+df/event=0x5df,umask=0xbff,name='remote_socket_inf1_outbound_data_beats_ccm7'/;
+
+# Outbound data bytes from all links
+df/event=0xb5f,umask=0xf3e,name='local_socket_outbound_data_beats_link0'/,
+df/event=0xb9f,umask=0xf3e,name='local_socket_outbound_data_beats_link1'/,
+df/event=0xbdf,umask=0xf3e,name='local_socket_outbound_data_beats_link2'/,
+df/event=0xc1f,umask=0xf3e,name='local_socket_outbound_data_beats_link3'/,
+df/event=0xc5f,umask=0xf3e,name='local_socket_outbound_data_beats_link4'/,
+df/event=0xc9f,umask=0xf3e,name='local_socket_outbound_data_beats_link5'/,
+df/event=0xcdf,umask=0xf3e,name='local_socket_outbound_data_beats_link6'/,
+df/event=0xd1f,umask=0xf3e,name='local_socket_outbound_data_beats_link7'/;
+
+# Pipeline Utilization - Frontend Bound (%)
+# Pipeline Utilization - Frontend Bound - Latency (%)
+# Pipeline Utilization - Frontend Bound - Bandwidth (%)
+cpu/event=0x1a0,umask=0x1,name='de_no_dispatch_per_slot.no_ops_from_frontend'/,
+cpu/event=0x1a0,umask=0x1,cmask=0x6,name='de_no_dispatch_per_cycle.no_ops_from_frontend'/,
+cpu/event=0x76,name='ls_not_halted_cyc'/;
+
+# Pipeline Utilization - Bad Speculation (%)
+# Pipeline Utilization - Bad Speculation - Pipeline Restarts (%)
+# Pipeline Utilization - Bad Speculation - Mispredicts (%)
+cpu/event=0xaa,umask=0x7,name='de_src_op_disp.all'/,
+cpu/event=0xc1,name='ex_ret_ops'/,
+cpu/event=0xc3,name='ex_ret_brn_misp'/,
+cpu/event=0x96,name='resyncs_or_nc_redirects'/,
+cpu/event=0x76,name='ls_not_halted_cyc'/;
+
+# Pipeline Utilization - Backend Bound (%)
+# Pipeline Utilization - Backend Bound - Memory (%)
+# Pipeline Utilization - Backend Bound - CPU (%)
+cpu/event=0x1a0,umask=0x1e,name='de_no_dispatch_per_slot.backend_stalls'/,
+cpu/event=0xd6,umask=0xa2,name='ex_no_retire.load_not_complete'/,
+cpu/event=0xd6,umask=0x2,name='ex_no_retire.not_complete'/,
+cpu/event=0x76,name='ls_not_halted_cyc'/;
+
+# Pipeline Utilization - SMT Contention (%)
+cpu/event=0x1a0,umask=0x60,name='de_no_dispatch_per_slot.smt_contention'/,
+cpu/event=0x76,name='ls_not_halted_cyc'/;
+
+# Pipeline Utilization - Retiring (%)
+# Pipeline Utilization - Retiring - Microcode (%)
+# Pipeline Utilization - Retiring - Fastpath (%)
+cpu/event=0xc1,name='ex_ret_ops'/,
+cpu/event=0x1c2,name='ex_ret_ucode_ops'/,
+cpu/event=0x76,name='ls_not_halted_cyc'/;
+
+# Power
+power/energy-pkg/;
