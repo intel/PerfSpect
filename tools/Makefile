@@ -5,16 +5,15 @@
 #
 
 default: tools
-.PHONY: default tools async-profiler avx-turbo cpuid dmidecode ethtool fio flamegraph ipmitool lshw lspci msr-tools pcm perf spectre-meltdown-checker sshpass stress-ng sysstat tsc turbostat
+.PHONY: default tools async-profiler avx-turbo cpuid dmidecode ethtool flamegraph ipmitool lshw lspci msr-tools pcm perf spectre-meltdown-checker sshpass stress-ng sysstat tsc turbostat
 
-tools: async-profiler avx-turbo cpuid dmidecode ethtool fio flamegraph ipmitool lshw lspci msr-tools pcm perf spectre-meltdown-checker sshpass stress-ng sysstat tsc turbostat
+tools: async-profiler avx-turbo cpuid dmidecode ethtool flamegraph ipmitool lshw lspci msr-tools pcm perf spectre-meltdown-checker sshpass stress-ng sysstat tsc turbostat
 	mkdir -p bin
 	cp -R async-profiler bin/
 	cp avx-turbo/avx-turbo bin/
 	cp cpuid/cpuid bin/
 	cp dmidecode/dmidecode bin/
 	cp ethtool/ethtool bin/
-	cp fio/fio bin/
 	cp flamegraph/stackcollapse-perf.pl bin/
 	cp ipmitool/src/ipmitool.static bin/ipmitool
 	cp lshw/src/lshw-static bin/lshw
@@ -85,18 +84,6 @@ ifeq ("$(wildcard ethtool/Makefile)","")
 	cd ethtool && ./autogen.sh && ./configure enable_netlink=no
 endif
 	cd ethtool && make
-
-fio:
-ifeq ("$(wildcard fio)","")
-	git clone https://github.com/axboe/fio.git
-else
-	cd fio && git checkout master && git pull
-endif
-	cd fio && git checkout fio-3.36
-ifeq ("$(wildcard fio/config.log)","")
-	cd fio && ./configure --build-static --disable-native
-endif
-	cd fio && make
 
 flamegraph:
 ifeq ("$(wildcard flamegraph)","")
@@ -214,7 +201,6 @@ reset:
 	cd cpuid && make clean
 	cd dmidecode && git clean -fdx && git reset --hard
 	cd ethtool && git clean -fdx && git reset --hard
-	cd fio && git clean -fdx && git reset --hard
 	cd flamegraph && git clean -fdx && git reset --hard
 	cd ipmitool && git clean -fdx && git reset --hard
 	cd lshw && git clean -fdx && git reset --hard
@@ -239,5 +225,5 @@ libcrypt.tar.gz:
 libs: glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
 
 oss-source: reset libs
-	tar --exclude-vcs -czf oss_source.tgz async-profiler/ cpuid/ dmidecode/ ethtool/ fio/ flamegraph/ ipmitool/ lshw/ lspci/ msr-tools/ pcm/ linux_perf/tools/perf spectre-meltdown-checker/ sshpass/ stress-ng/ sysstat/ linux_turbostat/tools/power/x86/turbostat glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
+	tar --exclude-vcs -czf oss_source.tgz async-profiler/ cpuid/ dmidecode/ ethtool/ flamegraph/ ipmitool/ lshw/ lspci/ msr-tools/ pcm/ linux_perf/tools/perf spectre-meltdown-checker/ sshpass/ stress-ng/ sysstat/ linux_turbostat/tools/power/x86/turbostat glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
 	md5sum oss_source.tgz > oss_source.tgz.md5

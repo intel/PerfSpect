@@ -75,12 +75,6 @@ ethtool
  *      Copyright 2008-2010, 2013-2016 Ben Hutchings
  * QSFP+/QSFP28 DOM support by Vidya Sagar Ravipati <vidya@cumulusnetworks.com>
 -------------------------------------------------------------
-fio
-Copyright (C) 1989, 1991 Free Software Foundation, Inc.,
- 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
- Everyone is permitted to copy and distribute verbatim copies
- of this license document, but changing it is not allowed.
--------------------------------------------------------------
 iostat
 * iostat: report CPU and I/O statistics
  * (C) 1998-2023 by Sebastien GODARD (sysstat <at> orange.fr)

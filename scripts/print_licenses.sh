@@ -13,7 +13,6 @@ github_projects=(
     "async-profiler/async-profiler"
     "harp-intel/avx-turbo"
     "mirror/dmidecode"
-    "axboe/fio"
     "lyonel/lshw"
     "pciutils/pciutils"
     "intel/pcm"
