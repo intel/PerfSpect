@@ -307,36 +307,40 @@ func (rc *ReportingCommand) Run() error {
 			}
 			reportFilePaths = append(reportFilePaths, reportPath)
 		}
-		// keep all the targets table values for a combined HTML report
-		if util.StringInList(report.FormatHtml, formats) {
-			allTargetsTableValues = append(allTargetsTableValues, allTableValues)
-		}
+		// keep all the targets table values for combined reports
+		allTargetsTableValues = append(allTargetsTableValues, allTableValues)
 	}
 	if len(allTargetsTableValues) > 1 {
-		// list of target names for the combined HTML report
+		// list of target names for the combined report
 		// - only those that we received output from
 		targetNames := make([]string, 0)
 		for _, targetScriptOutputs := range orderedTargetScriptOutputs {
 			targetNames = append(targetNames, targetScriptOutputs.targetName)
 		}
-		reportBytes, err := report.CreateMultiTarget(report.FormatHtml, allTargetsTableValues, targetNames)
-		if err != nil {
-			err = fmt.Errorf("failed to create multi-target report: %w", err)
-			fmt.Fprintf(os.Stderr, "Error: %+v\n", err)
-			slog.Error(err.Error())
-			rc.Cmd.SilenceUsage = true
-			return err
+		multiTargetFormats := []string{report.FormatHtml, report.FormatXlsx}
+		for _, format := range multiTargetFormats {
+			if !util.StringInList(format, formats) {
+				continue
+			}
+			reportBytes, err := report.CreateMultiTarget(format, allTargetsTableValues, targetNames)
+			if err != nil {
+				err = fmt.Errorf("failed to create multi-target %s report: %w", format, err)
+				fmt.Fprintf(os.Stderr, "Error: %+v\n", err)
+				slog.Error(err.Error())
+				rc.Cmd.SilenceUsage = true
+				return err
+			}
+			reportFilename := fmt.Sprintf("%s.%s", "all_hosts", format)
+			reportPath := filepath.Join(appContext.OutputDir, reportFilename)
+			if err = report.WriteReport(reportBytes, reportPath); err != nil {
+				err = fmt.Errorf("failed to write multi-target %s report: %w", format, err)
+				fmt.Fprintf(os.Stderr, "Error: %+v\n", err)
+				slog.Error(err.Error())
+				rc.Cmd.SilenceUsage = true
+				return err
+			}
+			reportFilePaths = append(reportFilePaths, reportPath)
 		}
-		reportFilename := fmt.Sprintf("%s.%s", "all_hosts", report.FormatHtml)
-		reportPath := filepath.Join(appContext.OutputDir, reportFilename)
-		if err = report.WriteReport(reportBytes, reportPath); err != nil {
-			err = fmt.Errorf("failed to write multi-target report: %w", err)
-			fmt.Fprintf(os.Stderr, "Error: %+v\n", err)
-			slog.Error(err.Error())
-			rc.Cmd.SilenceUsage = true
-			return err
-		}
-		reportFilePaths = append(reportFilePaths, reportPath)
 	}
 	if len(reportFilePaths) > 0 {
 		fmt.Println("Report files:")

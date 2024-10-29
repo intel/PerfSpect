@@ -87,17 +87,12 @@ func Create(format string, allTableValues []TableValues, scriptOutputs map[strin
 
 func CreateMultiTarget(format string, allTargetsTableValues [][]TableValues, targetNames []string) (out []byte, err error) {
 	switch format {
-	// case "txt":
-	// 	return createTextReportMultiTarget(allTargetsTableValues)
-	// case "json":
-	// 	return createJsonReportMultiTarget(allTargetsTableValues)
 	case "html":
 		return createHtmlReportMultiTarget(allTargetsTableValues, targetNames)
-		// case "xlsx":
-		// 	return createXlsxReportMultiTarget(allTargetsTableValues)
+	case "xlsx":
+		return createXlsxReportMultiTarget(allTargetsTableValues, targetNames)
 	}
-	panic("only HTML multi-target report supported currently")
-	//panic(fmt.Sprintf("expected one of %s, got %s", strings.Join(FormatOptions, ", "), format))
+	panic("only HTML and XLSX multi-target report supported currently")
 }
 
 func createTextReport(allTableValues []TableValues) (out []byte, err error) {
@@ -255,6 +250,95 @@ func renderXlsxTable(tableValues TableValues, f *excelize.File, sheetName string
 	*row++
 }
 
+func renderXlsxTableMultiTarget(tableIdx int, allTargetsTableValues [][]TableValues, targetNames []string, f *excelize.File, sheetName string, row *int) {
+	col := 1
+	// print the table name
+	tableNameStyle, _ := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{
+			Bold: true,
+		},
+	})
+	targetNameStyle, _ := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{
+			Bold: true,
+		},
+	})
+	fieldNameStyle, _ := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{
+			Bold: true,
+		},
+	})
+
+	f.SetCellValue(sheetName, cellName(col, *row), allTargetsTableValues[0][tableIdx].Name)
+	f.SetCellStyle(sheetName, cellName(col, *row), cellName(col, *row), tableNameStyle)
+
+	if !allTargetsTableValues[0][tableIdx].HasRows {
+		col += 2
+		// print the target names
+		for _, targetName := range targetNames {
+			f.SetCellValue(sheetName, cellName(col, *row), targetName)
+			f.SetCellStyle(sheetName, cellName(col, *row), cellName(col, *row), targetNameStyle)
+			col++
+		}
+		*row++
+
+		// print the field names and values from each target
+		for fieldIdx, field := range allTargetsTableValues[0][tableIdx].Fields {
+			col = 2
+			f.SetCellValue(sheetName, cellName(col, *row), field.Name)
+			f.SetCellStyle(sheetName, cellName(col, *row), cellName(col, *row), fieldNameStyle)
+			col++
+			for targetIdx := 0; targetIdx < len(targetNames); targetIdx++ {
+				var fieldValue string
+				if len(allTargetsTableValues[targetIdx][tableIdx].Fields[fieldIdx].Values) > 0 {
+					fieldValue = allTargetsTableValues[targetIdx][tableIdx].Fields[fieldIdx].Values[0]
+				}
+				f.SetCellValue(sheetName, cellName(col, *row), fieldValue)
+				col++
+			}
+			*row++
+		}
+	} else {
+		for targetIdx, targetName := range targetNames {
+			// print the target name
+			col = 2
+			f.SetCellValue(sheetName, cellName(col, *row), targetName)
+			f.SetCellStyle(sheetName, cellName(col, *row), cellName(col, *row), targetNameStyle)
+			*row++
+
+			// if no data found, print a message and skip to the next target
+			if len(allTargetsTableValues[targetIdx][tableIdx].Fields) == 0 || len(allTargetsTableValues[targetIdx][tableIdx].Fields[0].Values) == 0 {
+				f.SetCellValue(sheetName, cellName(col, *row), noDataFound)
+				*row += 2
+				continue
+			}
+
+			// print the field names as column headings across the top of the table
+			col = 2
+			for _, field := range allTargetsTableValues[targetIdx][tableIdx].Fields {
+				f.SetCellValue(sheetName, cellName(col, *row), field.Name)
+				f.SetCellStyle(sheetName, cellName(col, *row), cellName(col, *row), fieldNameStyle)
+				col++
+			}
+			*row++
+			// print the rows of values
+			tableRows := len(allTargetsTableValues[targetIdx][tableIdx].Fields[0].Values)
+			for tableRow := 0; tableRow < tableRows; tableRow++ {
+				col = 2
+				for _, field := range allTargetsTableValues[targetIdx][tableIdx].Fields {
+					value := getValueForCell(field.Values[tableRow])
+					f.SetCellValue(sheetName, cellName(col, *row), value)
+					col++
+				}
+				*row++
+			}
+			*row++
+		}
+	}
+	*row++
+
+}
+
 func DefaultXlsxTableRendererFunc(tableValues TableValues, f *excelize.File, sheetName string, row *int) {
 	headerStyle, _ := f.NewStyle(&excelize.Style{
 		Font: &excelize.Font{
@@ -309,6 +393,7 @@ func DefaultXlsxTableRendererFunc(tableValues TableValues, f *excelize.File, she
 
 const (
 	XlsxPrimarySheetName = "Report"
+	XlsxBriefSheetName   = "Brief"
 )
 
 func createXlsxReport(allTableValues []TableValues) (out []byte, err error) {
@@ -321,7 +406,7 @@ func createXlsxReport(allTableValues []TableValues) (out []byte, err error) {
 	for _, tableValues := range allTableValues {
 		if tableValues.Name == SystemSummaryTableName {
 			row := 1
-			sheetName := SystemSummaryTableName
+			sheetName := XlsxBriefSheetName
 			f.NewSheet(sheetName)
 			f.SetColWidth(sheetName, "A", "L", 25)
 			renderXlsxTable(tableValues, f, sheetName, &row)
@@ -334,6 +419,36 @@ func createXlsxReport(allTableValues []TableValues) (out []byte, err error) {
 	_, err = f.WriteTo(w)
 	if err != nil {
 		err = fmt.Errorf("failed to write xlsx report to buffer: %v", err)
+		return
+	}
+	out = buf.Bytes()
+	return
+}
+
+func createXlsxReportMultiTarget(allTargetsTableValues [][]TableValues, targetNames []string) (out []byte, err error) {
+	f := excelize.NewFile()
+	sheetName := XlsxPrimarySheetName
+	f.SetSheetName("Sheet1", sheetName)
+	f.SetColWidth(sheetName, "A", "A", 15)
+	f.SetColWidth(sheetName, "B", "L", 25)
+	row := 1
+	for tableIdx, tableValues := range allTargetsTableValues[0] {
+		if tableValues.Name == SystemSummaryTableName {
+			row := 1
+			sheetName := XlsxBriefSheetName
+			f.NewSheet(sheetName)
+			f.SetColWidth(sheetName, "A", "A", 15)
+			f.SetColWidth(sheetName, "B", "L", 25)
+			renderXlsxTableMultiTarget(tableIdx, allTargetsTableValues, targetNames, f, sheetName, &row)
+		} else {
+			renderXlsxTableMultiTarget(tableIdx, allTargetsTableValues, targetNames, f, sheetName, &row)
+		}
+	}
+	var buf bytes.Buffer
+	w := bufio.NewWriter(&buf)
+	_, err = f.WriteTo(w)
+	if err != nil {
+		err = fmt.Errorf("failed to write multi-target xlsx report to buffer: %v", err)
 		return
 	}
 	out = buf.Bytes()
