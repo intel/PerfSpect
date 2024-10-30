@@ -8,6 +8,10 @@ PerfSpect is licensed under the terms in [LICENSE](./LICENSE). By contributing t
 
 Plans for significant changes and/or additions must be raised and discussed with the project Maintainer(s) via GitHub Issues before work begins. If features require additional validation, e.g., support for additional architectures, a validation plan will be required. Finally, a named and committed maintainer for the additional functionality is required.
 
+### Extensions for other CPU architectures
+
+Changes that extend the application's support to other CPU architectures should be contained in architecture-specific directories, e.g., cmd/metrics/resources/events/x86_64/GenuineIntel and AuthenticAMD. If additional changes are required outside these directories, please open a GitHub Issue to begin a discussion. As with Significant Feature Addtions, support for other CPUs will require committed validation by the contributor.
+
 ### Sign your work
 
 Please use the sign-off line at the end of the patch. Your signature certifies that you wrote the patch or otherwise have the right to pass it on as an open-source patch. The rules are pretty simple: if you can certify

@@ -1,90 +1,110 @@
+#!make
+#
+# Copyright (C) 2021-2024 Intel Corporation
+# SPDX-License-Identifier: BSD-3-Clause
+#
 COMMIT_ID := $(shell git rev-parse --short=8 HEAD)
 COMMIT_DATE := $(shell git show -s --format=%cd --date=short HEAD)
-VERSION_FILE := _version.txt
-VERSION_BASE := $(COMMIT_DATE)_$(COMMIT_ID)
+COMMIT_TIME := $(shell git show -s --format=%cd --date=format:'%H:%M:%S' HEAD)
+VERSION_FILE := ./version.txt
 VERSION_NUMBER := $(shell cat ${VERSION_FILE})
-VERSION_PUBLIC := $(VERSION_NUMBER)
-PACKAGE_EXTERNAL := perfspect.tgz
-BINARY_FINAL := perfspect
-BINARY_COLLECT := perf-collect
-BINARY_POSTPROCESS := perf-postprocess
-default: dist
+VERSION := $(VERSION_NUMBER)_$(COMMIT_DATE)_$(COMMIT_ID)
 
-.PHONY: test default dist format format_check style_error_check pytype check dist/version_file dist/$(SOURCE_PACKAGE)
+default: perfspect
 
-clean_dir:
-	rm -rf build/*
-	rm -rf dist/*
-	#sudo rm -rf test/$(BINARY_FINAL)
-	rm -rf src/__pycache__
+GO=CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go
+GOFLAGS=-trimpath -mod=readonly -gcflags="all=-spectre=all -N -l" -asmflags="all=-spectre=all" -ldflags="-X perfspect/cmd.gVersion=$(VERSION) -s -w"
 
-build_dir: clean_dir
-	mkdir -p build
+# Build the perfspect binary
+.PHONY: perfspect
+perfspect:
+	$(GO) build $(GOFLAGS) -o $@
 
-build/libtsc:
-	gcc -fno-strict-overflow -fno-delete-null-pointer-checks -fwrapv -fPIC -shared -o src/libtsc.so src/calibrate.c
+# Copy prebuilt tools to script resources
+.PHONY: resources
+resources:
+	mkdir -p internal/script/resources/x86_64
+ifneq ("$(wildcard /prebuilt/tools)","") # /prebuilt/tools is a directory in the container
+	cp -r /prebuilt/tools/* internal/script/resources/x86_64
+else # copy dev system tools to script resources
+ifneq ("$(wildcard tools/bin)","")
+		cp -r tools/bin/* internal/script/resources/x86_64
+else # no prebuilt tools found
+		@echo "No prebuilt tools found in /prebuilt/tools or tools/bin"
+endif
+endif
 
-build-public/collect:
-	$(eval TMPDIR := $(shell mktemp -d build.XXXXXX))
-	mkdir -p $(TMPDIR)/src
-	mkdir -p $(TMPDIR)/events
-	cp src/* $(TMPDIR)/src && cp events/* $(TMPDIR)/events && cp *.py $(TMPDIR)
-	sed -i 's/PerfSpect_DEV_VERSION/$(VERSION_PUBLIC)/g' $(TMPDIR)/src/perf_helpers.py
-	cp perf-collect.spec $(TMPDIR)
-	cd $(TMPDIR) && pyinstaller perf-collect.spec
-	cp $(TMPDIR)/dist/$(BINARY_COLLECT) build/
-	rm -rf $(TMPDIR)
 
-build-public/postprocess:
-	$(eval TMPDIR := $(shell mktemp -d build.XXXXXX))
-	mkdir -p $(TMPDIR)/src
-	mkdir -p $(TMPDIR)/events
-	cp src/* $(TMPDIR)/src && cp events/* $(TMPDIR)/events && cp *.py $(TMPDIR)
-	sed -i 's/PerfSpect_DEV_VERSION/$(VERSION_PUBLIC)/g' $(TMPDIR)/src/perf_helpers.py 
-	cd $(TMPDIR) && pyinstaller -F perf-postprocess.py -n perf-postprocess \
-					--add-data "./events/metric_skx_clx.json:." \
-					--add-data "./events/metric_bdx.json:." \
-					--add-data "./events/metric_icx.json:." \
-					--add-data "./events/metric_icx_nofixedtma.json:." \
-					--add-data "./events/metric_spr_emr.json:." \
-					--add-data "./events/metric_spr_emr_nofixedtma.json:." \
-					--add-data "./events/metric_srf.json:." \
-					--add-data "./events/metric_gnr.json:." \
-					--add-data "./src/base.html:." \
-					--runtime-tmpdir . \
-					--exclude-module readline
-					--bootloader-ignore-signals
-	cp $(TMPDIR)/dist/perf-postprocess build/
-	rm -rf $(TMPDIR)
+# Build the distribution package
+.PHONY: dist
+dist: resources check perfspect
+	rm -rf dist/perfspect
+	mkdir -p dist/perfspect/tools/x86_64
+	cp LICENSE dist/perfspect/
+	cp THIRD_PARTY_PROGRAMS dist/perfspect/
+	cp NOTICE dist/perfspect/
+	cp targets.yaml dist/perfspect/
+	cp perfspect dist/perfspect/
+	cd dist && tar -czf perfspect_$(VERSION_NUMBER).tgz perfspect
+	cd dist && md5sum perfspect_$(VERSION_NUMBER).tgz > perfspect_$(VERSION_NUMBER).tgz.md5.txt
+	rm -rf dist/perfspect
+	echo '{"version": "$(VERSION_NUMBER)", "date": "$(COMMIT_DATE)", "time": "$(COMMIT_TIME)", "commit": "$(COMMIT_ID)" }' | jq '.' > dist/manifest.json
+ifneq ("$(wildcard /prebuilt)","") # /prebuilt is a directory in the container
+	cp -r /prebuilt/oss_source* dist/
+endif
 
-dist/$(PACKAGE_EXTERNAL): build_dir build/libtsc build-public/collect build-public/postprocess
-	rm -rf dist/$(BINARY_FINAL)/
-	mkdir -p dist/$(BINARY_FINAL)
-	cp build/$(BINARY_COLLECT) dist/$(BINARY_FINAL)/$(BINARY_COLLECT)
-	cp build/$(BINARY_POSTPROCESS) dist/$(BINARY_FINAL)/$(BINARY_POSTPROCESS)
-	cp LICENSE dist/$(BINARY_FINAL)/
-	cd dist && tar -czf $(PACKAGE_EXTERNAL) $(BINARY_FINAL)
-	cd dist && cp -r $(BINARY_FINAL) ../build/  
-	rm -rf dist/$(BINARY_FINAL)/
-	cd dist && md5sum $(PACKAGE_EXTERNAL) > $(PACKAGE_EXTERNAL).md5
-
+# Run package-level unit tests
+.PHONY: test
 test:
-	cd dist && tar -xvf perfspect.tgz && cp -r $(BINARY_FINAL) ../test/.
-	cd test && pytest
+	go test -v ./...
 
-format_check:
-	black --check *.py src
+.PHONY: update-deps
+update-deps:
+	@echo "Updating Go dependencies..."
+	go get -u ./...
+	go mod tidy
 
+# Check code formatting
+.PHONY: check_format
+check_format:
+	@echo "Running gofmt to check for code formatting issues..."
+	@test -z "$(shell gofmt -l -s ./)" || { echo "[WARN] Formatting issues detected. Resolve with 'make format'"; exit 1; }
+	@echo "gofmt detected no issues"
+
+# Format code
+.PHONY: format
 format:
-	black *.py src
+	@echo "Running gofmt to format code..."
+	gofmt -l -w -s ./
 
-style_error_check:
-	# ignore long lines and conflicts with black, i.e., black wins
-	flake8 *.py src --ignore=E501,W503,E203
+.PHONY: check_vet
+check_vet:
+	@echo "Running go vet to check for suspicious constructs..."
+	@test -z "$(shell go vet ./...)" || { echo "[WARN] go vet detected issues"; exit 1; }
+	@echo "go vet detected no issues"
 
-pytype: *.py src/*.py
-	pytype ./*.py
+.PHONY: check_static
+check_static:
+	@echo "Running staticcheck to check for bugs..."
+	go install honnef.co/go/tools/cmd/staticcheck@latest
+	staticcheck ./...
 
-check: format_check style_error_check pytype
+.PHONY: check_license
+check_license:
+	@echo "Checking license headers..."
+	@for f in `find . -type f ! -path './perfspect_202*' ! -path './tools/bin/*' ! -path './internal/script/resources/*' ! -path './scripts/.venv/*' ! -path './test/output/*' ! -path './debug_out/*' \( -name "*.go" -o -name "*.s" -o -name "*.html" -o -name "Makefile" -o -name "*.sh" -o -name "*.Dockerfile" -o -name "*.py" \)`; do \
+		if ! grep -E 'Copyright \(C\) [0-9]{4}-[0-9]{4} Intel Corporation' "$$f" >/dev/null; then echo "Error: license not found: $$f"; fail=1; fi; \
+	done; if [ -n "$$fail" ]; then exit 1; fi
 
-dist: check dist/$(PACKAGE_EXTERNAL) 
+.PHONY: check
+check: check_format check_vet check_static check_license
+
+.PHONY: clean
+clean:
+	@echo "Cleaning up..."
+	rm -f perfspect
+	sudo rm -rf dist
+	rm -rf internal/script/resources/x86_64/*
+	rm -rf perfspect_2024-*
+	rm -rf debug_out/*
+	rm -rf test/output
