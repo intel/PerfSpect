@@ -7,7 +7,7 @@
 # build the svr-info Go components using this image
 #    $ docker run --rm -v "$PWD":/workdir -w /workdir perfspect-builder:v1 make dist
 
-FROM golang:1.23
+FROM golang:1.23@sha256:ad5c126b5cf501a8caef751a243bb717ec204ab1aa56dc41dc11be089fafcb4f
 WORKDIR /workdir
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY go.mod go.sum ./
