@@ -96,8 +96,14 @@ check_license:
 		if ! grep -E 'Copyright \(C\) [0-9]{4}-[0-9]{4} Intel Corporation' "$$f" >/dev/null; then echo "Error: license not found: $$f"; fail=1; fi; \
 	done; if [ -n "$$fail" ]; then exit 1; fi
 
+.PHONY: check_lint
+check_lint:
+	@echo "Running golangci-lint..."
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	golangci-lint run
+
 .PHONY: check
-check: check_format check_vet check_static check_license
+check: check_format check_vet check_static check_license check_lint
 
 .PHONY: clean
 clean:
