@@ -917,20 +917,32 @@ func printMetrics(frameChannel chan []MetricFrame, targetName string, outputDir 
 	// block until next set of metric frames arrives, will exit loop when channel is closed
 	for metricFrames := range frameChannel {
 		fileName, err := printMetricsTxt(metricFrames, targetName, flagLive && flagOutputFormat[0] == formatTxt, !flagLive && util.StringInList(formatTxt, flagOutputFormat), outputDir)
-		if err == nil && fileName != "" {
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+		} else if fileName != "" {
 			printedFiles = util.UniqueAppend(printedFiles, fileName)
 		}
 		fileName, err = printMetricsJSON(metricFrames, targetName, flagLive && flagOutputFormat[0] == formatJSON, !flagLive && util.StringInList(formatJSON, flagOutputFormat), outputDir)
-		if err == nil && fileName != "" {
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+		} else if fileName != "" {
 			printedFiles = util.UniqueAppend(printedFiles, fileName)
 		}
 		// csv is always written to file unless no files are requested -- we need it to create the summary reports
 		fileName, err = printMetricsCSV(metricFrames, targetName, flagLive && flagOutputFormat[0] == formatCSV, !flagLive, outputDir)
-		if err == nil && fileName != "" {
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+		} else if fileName != "" {
 			printedFiles = util.UniqueAppend(printedFiles, fileName)
 		}
 		fileName, err = printMetricsWide(metricFrames, targetName, flagLive && flagOutputFormat[0] == formatWide, !flagLive && util.StringInList(formatWide, flagOutputFormat), outputDir)
-		if err == nil && fileName != "" {
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+		} else if fileName != "" {
 			printedFiles = util.UniqueAppend(printedFiles, fileName)
 		}
 	}

@@ -6,7 +6,6 @@ package metrics
 import (
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"math"
 	"os"
 	"strconv"
@@ -14,9 +13,9 @@ import (
 	"time"
 )
 
-func printMetricsJSON(metricFrames []MetricFrame, targetName string, printToStdout bool, printToFile bool, outputDir string) (string, error) {
+func printMetricsJSON(metricFrames []MetricFrame, targetName string, printToStdout bool, printToFile bool, outputDir string) (filename string, err error) {
 	if !printToStdout && !printToFile {
-		return "", nil
+		return
 	}
 	for _, metricFrame := range metricFrames {
 		// can't Marshal NaN or Inf values in JSON, so no need to set them to a specific value
@@ -29,48 +28,42 @@ func printMetricsJSON(metricFrames []MetricFrame, targetName string, printToStdo
 				filteredMetricFrame.Metrics = append(filteredMetricFrame.Metrics, metric)
 			}
 		}
-		jsonBytes, err := json.Marshal(filteredMetricFrame)
+		var jsonBytes []byte
+		jsonBytes, err = json.Marshal(filteredMetricFrame)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			slog.Error(err.Error())
-			return "", err
+			return
 		}
 		if printToStdout {
 			fmt.Println(string(jsonBytes))
 		}
 		if printToFile {
-			file, err := os.OpenFile(outputDir+"/"+targetName+"_"+"metrics.json", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			var file *os.File
+			file, err = os.OpenFile(outputDir+"/"+targetName+"_"+"metrics.json", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				slog.Error(err.Error())
-				return "", err
+				return
 			}
 			defer file.Close()
 			_, err = file.WriteString(string(jsonBytes) + "\n")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				slog.Error(err.Error())
-				return "", err
+				return
 			}
-			return file.Name(), nil
+			filename = file.Name()
+			return // success
 		}
 	}
-	return "", nil
+	return
 }
 
-func printMetricsCSV(metricFrames []MetricFrame, targetName string, printToStdout bool, printToFile bool, outputDir string) (string, error) {
+func printMetricsCSV(metricFrames []MetricFrame, targetName string, printToStdout bool, printToFile bool, outputDir string) (filename string, err error) {
 	if !printToStdout && !printToFile {
-		return "", nil
+		return
 	}
 	var file *os.File
 	if printToFile {
 		// open file for writing/appending
-		var err error
 		file, err = os.OpenFile(outputDir+"/"+targetName+"_"+"metrics.csv", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			slog.Error(err.Error())
-			return "", err
+			return
 		}
 		defer file.Close()
 	}
@@ -81,11 +74,9 @@ func printMetricsCSV(metricFrames []MetricFrame, targetName string, printToStdou
 				fmt.Print(contextHeaders)
 			}
 			if printToFile {
-				_, err := file.WriteString(contextHeaders)
+				_, err = file.WriteString(contextHeaders)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-					slog.Error(err.Error())
-					return "", err
+					return
 				}
 			}
 			names := make([]string, 0, len(metricFrame.Metrics))
@@ -97,11 +88,9 @@ func printMetricsCSV(metricFrames []MetricFrame, targetName string, printToStdou
 				fmt.Println(metricNames)
 			}
 			if printToFile {
-				_, err := file.WriteString(metricNames + "\n")
+				_, err = file.WriteString(metricNames + "\n")
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-					slog.Error(err.Error())
-					return "", err
+					return
 				}
 			}
 		}
@@ -115,31 +104,27 @@ func printMetricsCSV(metricFrames []MetricFrame, targetName string, printToStdou
 			fmt.Println(metricContext + metricValues)
 		}
 		if printToFile {
-			_, err := file.WriteString(metricContext + metricValues + "\n")
+			_, err = file.WriteString(metricContext + metricValues + "\n")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				slog.Error(err.Error())
-				return "", err
+				return
 			}
-			return file.Name(), nil
+			filename = file.Name()
+			return // success
 		}
 	}
 	return "", nil
 }
 
-func printMetricsWide(metricFrames []MetricFrame, targetName string, printToStdout bool, printToFile bool, outputDir string) (string, error) {
+func printMetricsWide(metricFrames []MetricFrame, targetName string, printToStdout bool, printToFile bool, outputDir string) (filename string, err error) {
 	if !printToStdout && !printToFile {
-		return "", nil
+		return
 	}
 	var file *os.File
 	if printToFile {
 		// open file for writing/appending
-		var err error
 		file, err = os.OpenFile(outputDir+"/"+targetName+"_"+"metrics_wide.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			slog.Error(err.Error())
-			return "", err
+			return
 		}
 		defer file.Close()
 	}
@@ -176,11 +161,9 @@ func printMetricsWide(metricFrames []MetricFrame, targetName string, printToStdo
 				fmt.Println(header)
 			}
 			if printToFile {
-				_, err := file.WriteString(header + "\n")
+				_, err = file.WriteString(header + "\n")
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-					slog.Error(err.Error())
-					return "", err
+					return
 				}
 			}
 		}
@@ -220,21 +203,20 @@ func printMetricsWide(metricFrames []MetricFrame, targetName string, printToStdo
 			fmt.Println(row)
 		}
 		if printToFile {
-			_, err := file.WriteString(row + "\n")
+			_, err = file.WriteString(row + "\n")
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				slog.Error(err.Error())
-				return "", err
+				return
 			}
-			return file.Name(), nil
+			filename = file.Name()
+			return // success
 		}
 	}
-	return "", nil
+	return
 }
 
-func printMetricsTxt(metricFrames []MetricFrame, targetName string, printToStdout bool, printToFile bool, outputDir string) (string, error) {
+func printMetricsTxt(metricFrames []MetricFrame, targetName string, printToStdout bool, printToFile bool, outputDir string) (filename string, err error) {
 	if !printToStdout && !printToFile {
-		return "", nil
+		return
 	}
 	var outputLines []string
 	if len(metricFrames) > 0 && metricFrames[0].Socket != "" {
@@ -286,20 +268,18 @@ func printMetricsTxt(metricFrames []MetricFrame, targetName string, printToStdou
 	}
 	if printToFile {
 		// open file for writing/appending
-		file, err := os.OpenFile(outputDir+"/"+targetName+"_"+"metrics.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		var file *os.File
+		file, err = os.OpenFile(outputDir+"/"+targetName+"_"+"metrics.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			slog.Error(err.Error())
-			return "", err
+			return
 		}
 		defer file.Close()
 		_, err = file.WriteString(strings.Join(outputLines, "\n") + "\n")
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			slog.Error(err.Error())
-			return "", err
+			return
 		}
-		return file.Name(), nil
+		filename = file.Name()
+		return // success
 	}
-	return "", nil
+	return
 }
