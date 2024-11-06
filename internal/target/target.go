@@ -379,7 +379,10 @@ func (t *LocalTarget) CanElevatePrivileges() bool {
 		stdin, _ := cmd.StdinPipe()
 		go func() {
 			defer stdin.Close()
-			io.WriteString(stdin, t.sudo+"\n")
+			_, err := io.WriteString(stdin, t.sudo+"\n")
+			if err != nil {
+				slog.Error("error writing sudo password", slog.String("error", err.Error()))
+			}
 		}()
 		_, _, _, err := t.RunCommand(cmd, 0)
 		if err == nil {

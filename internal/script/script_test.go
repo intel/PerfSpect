@@ -18,7 +18,12 @@ func TestRunScript(t *testing.T) {
 	targets = append(targets, target.NewLocalTarget())
 	for _, tgt := range targets {
 		targetTempDir, err := tgt.CreateTempDirectory("/tmp")
-		defer tgt.RemoveDirectory(targetTempDir)
+		defer func() {
+			err := tgt.RemoveDirectory(targetTempDir)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		}()
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

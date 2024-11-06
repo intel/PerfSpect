@@ -232,7 +232,13 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			return err
 		}
-		defer myTarget.RemoveDirectory(targetTempDir)
+		defer func() {
+			err = myTarget.RemoveDirectory(targetTempDir)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to remove target directory: %+v\n", err)
+				slog.Error(err.Error())
+			}
+		}()
 	}
 	// print config prior to changes
 	if err := printConfig(myTargets, localTempDir); err != nil {
@@ -310,18 +316,33 @@ func printConfig(myTargets []target.Target, localTempDir string) (err error) {
 	}
 	for _, myTarget := range myTargets {
 		multiSpinner := progress.NewMultiSpinner()
-		multiSpinner.AddSpinner(myTarget.GetName())
+		err = multiSpinner.AddSpinner(myTarget.GetName())
+		if err != nil {
+			err = fmt.Errorf("failed to add spinner: %v", err)
+			return
+		}
 		multiSpinner.Start()
-		multiSpinner.Status(myTarget.GetName(), "collecting data")
+		err = multiSpinner.Status(myTarget.GetName(), "collecting data")
+		if err != nil {
+			err = fmt.Errorf("failed to set spinner status: %v", err)
+			return
+		}
 		// run the scripts
 		var scriptOutputs map[string]script.ScriptOutput
 		if scriptOutputs, err = script.RunScripts(myTarget, scriptsToRun, true, localTempDir); err != nil {
 			err = fmt.Errorf("failed to run collection scripts: %v", err)
-			multiSpinner.Status(myTarget.GetName(), "error collecting data")
+			errSpinner := multiSpinner.Status(myTarget.GetName(), "error collecting data")
+			if errSpinner != nil {
+				slog.Error(errSpinner.Error())
+			}
 			multiSpinner.Finish()
 			return
 		}
-		multiSpinner.Status(myTarget.GetName(), "collection complete")
+		err = multiSpinner.Status(myTarget.GetName(), "collection complete")
+		if err != nil {
+			err = fmt.Errorf("failed to set spinner status: %v", err)
+			return
+		}
 		multiSpinner.Finish()
 		// process the tables, i.e., get field values from raw script output
 		tableNames := []string{report.ConfigurationTableName}
