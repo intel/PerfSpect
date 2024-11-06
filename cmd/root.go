@@ -230,7 +230,10 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 		go func() {
 			sig := <-sigChannel
 			slog.Info("received signal", slog.String("signal", sig.String()))
-			terminateApplication(cmd, args)
+			err := terminateApplication(cmd, args)
+			if err != nil {
+				slog.Error("Error terminating application", slog.String("error", err.Error()))
+			}
 			fmt.Println()
 			os.Exit(1)
 		}()

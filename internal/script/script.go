@@ -124,7 +124,12 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 		return nil, err
 	}
 	if len(installedLkms) > 0 {
-		defer myTarget.UninstallLkms(installedLkms)
+		defer func() {
+			err := myTarget.UninstallLkms(installedLkms)
+			if err != nil {
+				slog.Error("error uninstalling LKMs", slog.String("lkms", strings.Join(installedLkms, ", ")), slog.String("error", err.Error()))
+			}
+		}()
 	}
 
 	// if there's only 1 parallel script, run it sequentially
@@ -237,7 +242,12 @@ func RunScriptAsync(myTarget target.Target, script ScriptDefinition, localTempDi
 		return
 	}
 	if len(installedLkms) != 0 {
-		defer myTarget.UninstallLkms(installedLkms)
+		defer func() {
+			err := myTarget.UninstallLkms(installedLkms)
+			if err != nil {
+				slog.Error("error uninstalling LKMs", slog.String("lkms", strings.Join(installedLkms, ", ")), slog.String("error", err.Error()))
+			}
+		}()
 	}
 	cmd := prepareCommand(script, myTarget.GetTempDirectory())
 	err = myTarget.RunCommandAsync(cmd, stdoutChannel, stderrChannel, exitcodeChannel, script.Timeout, cmdChannel)

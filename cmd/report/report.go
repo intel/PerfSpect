@@ -226,7 +226,7 @@ func getFlagGroups() []common.FlagGroup {
 	}
 	for _, cat := range categories {
 		flags = append(flags, common.Flag{
-			Name: fmt.Sprintf(cat.FlagName),
+			Name: cat.FlagName,
 			Help: cat.Help,
 		})
 	}

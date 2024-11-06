@@ -377,27 +377,32 @@ func collectOnTarget(cmd *cobra.Command, myTarget target.Target, scriptsToRun []
 	// create a temporary directory on the target
 	var targetTempDir string
 	var err error
-	statusUpdate(myTarget.GetName(), "creating temporary directory")
+	_ = statusUpdate(myTarget.GetName(), "creating temporary directory")
 	targetTempRoot, _ := cmd.Flags().GetString(FlagTargetTempDirName)
 	if targetTempDir, err = myTarget.CreateTempDirectory(targetTempRoot); err != nil {
-		statusUpdate(myTarget.GetName(), fmt.Sprintf("error creating temporary directory: %v", err))
+		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("error creating temporary directory: %v", err))
 		err = fmt.Errorf("error creating temporary directory on %s: %v", myTarget.GetName(), err)
 		channelError <- err
 		return
 	}
 	// don't remove the directory if we're debugging
 	if cmd.Parent().PersistentFlags().Lookup("debug").Value.String() != "true" {
-		defer myTarget.RemoveDirectory(targetTempDir)
+		defer func() {
+			err := myTarget.RemoveDirectory(targetTempDir)
+			if err != nil {
+				slog.Error("error removing target temporary directory", slog.String("error", err.Error()))
+			}
+		}()
 	}
 	// run the scripts on the target
-	statusUpdate(myTarget.GetName(), "collecting data")
+	_ = statusUpdate(myTarget.GetName(), "collecting data")
 	scriptOutputs, err := script.RunScripts(myTarget, scriptsToRun, true, localTempDir)
 	if err != nil {
-		statusUpdate(myTarget.GetName(), fmt.Sprintf("error collecting data: %v", err))
+		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("error collecting data: %v", err))
 		err = fmt.Errorf("error running data collection scripts on %s: %v", myTarget.GetName(), err)
 		channelError <- err
 		return
 	}
-	statusUpdate(myTarget.GetName(), "collection complete")
+	_ = statusUpdate(myTarget.GetName(), "collection complete")
 	channelTargetScriptOutputs <- TargetScriptOutputs{targetName: myTarget.GetName(), scriptOutputs: scriptOutputs}
 }

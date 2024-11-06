@@ -671,7 +671,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			} else {
 				finalMessage += fmt.Sprintf(" for %d seconds", flagDuration)
 			}
-			multiSpinner.Status(targetContexts[i].target.GetName(), finalMessage)
+			_ = multiSpinner.Status(targetContexts[i].target.GetName(), finalMessage)
 		}
 		go collectOnTarget(&targetContexts[i], localTempDir, localOutputDir, channelTargetError, multiSpinner.Status)
 	}
@@ -687,7 +687,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	// finalize and stop the spinner
 	for _, targetContext := range targetContexts {
 		if targetContext.err == nil {
-			multiSpinner.Status(targetContext.target.GetName(), "collection complete")
+			_ = multiSpinner.Status(targetContext.target.GetName(), "collection complete")
 		}
 	}
 	// summarize outputs
@@ -750,11 +750,11 @@ func runCmd(cmd *cobra.Command, args []string) error {
 
 func prepareTarget(targetContext *targetContext, targetTempRoot string, localTempDir string, localPerfPath string, channelError chan targetError, statusUpdate progress.MultiSpinnerUpdateFunc) {
 	myTarget := targetContext.target
-	// create a temporary directory on the target
-	statusUpdate(myTarget.GetName(), "configuring target")
 	var err error
+	// create a temporary directory on the target
+	_ = statusUpdate(myTarget.GetName(), "configuring target")
 	if targetContext.tempDir, err = myTarget.CreateTempDirectory(targetTempRoot); err != nil {
-		statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %v", err))
+		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %v", err))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
 		return
@@ -764,7 +764,7 @@ func prepareTarget(targetContext *targetContext, targetTempRoot string, localTem
 		var nmiWatchdogEnabled bool
 		if nmiWatchdogEnabled, err = NMIWatchdogEnabled(myTarget); err != nil {
 			err = fmt.Errorf("failed to retrieve NMI watchdog status: %w", err)
-			statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
+			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 			targetContext.err = err
 			channelError <- targetError{target: myTarget, err: err}
 			return
@@ -772,7 +772,7 @@ func prepareTarget(targetContext *targetContext, targetTempRoot string, localTem
 		if nmiWatchdogEnabled {
 			if err = DisableNMIWatchdog(myTarget, localTempDir); err != nil {
 				err = fmt.Errorf("failed to disable NMI watchdog: %w", err)
-				statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
+				_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 				targetContext.err = err
 				channelError <- targetError{target: myTarget, err: err}
 				return
@@ -784,14 +784,14 @@ func prepareTarget(targetContext *targetContext, targetTempRoot string, localTem
 	if !flagNoRoot {
 		if targetContext.perfMuxIntervals, err = GetMuxIntervals(myTarget, localTempDir); err != nil {
 			err = fmt.Errorf("failed to get perf mux intervals: %w", err)
-			statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
+			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 			targetContext.err = err
 			channelError <- targetError{target: myTarget, err: err}
 			return
 		}
 		if err = SetAllMuxIntervals(myTarget, flagPerfMuxInterval, localTempDir); err != nil {
 			err = fmt.Errorf("failed to set all perf mux intervals: %w", err)
-			statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
+			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 			targetContext.err = err
 			channelError <- targetError{target: myTarget, err: err}
 			return
@@ -800,7 +800,7 @@ func prepareTarget(targetContext *targetContext, targetTempRoot string, localTem
 	// get the full path to the perf binary
 	if targetContext.perfPath, err = getPerfPath(myTarget, localPerfPath); err != nil {
 		err = fmt.Errorf("failed to find perf: %w", err)
-		statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %v", err))
+		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %v", err))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
 		return
@@ -816,11 +816,11 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 		return
 	}
 	// load metadata
-	statusUpdate(myTarget.GetName(), "collecting metadata")
+	_ = statusUpdate(myTarget.GetName(), "collecting metadata")
 	var err error
 	if targetContext.metadata, err = LoadMetadata(myTarget, flagNoRoot, targetContext.perfPath, localTempDir); err != nil {
 		err = fmt.Errorf("failed to load metadata: %w", err)
-		statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
+		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
 		return
@@ -830,7 +830,7 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 	var uncollectableEvents []string
 	if targetContext.groupDefinitions, uncollectableEvents, err = LoadEventGroups(flagEventFilePath, targetContext.metadata); err != nil {
 		err = fmt.Errorf("failed to load event definitions: %w", err)
-		statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
+		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
 		return
@@ -838,7 +838,7 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 	// load metric definitions
 	if targetContext.metricDefinitions, err = LoadMetricDefinitions(flagMetricFilePath, flagMetricsList, uncollectableEvents, targetContext.metadata); err != nil {
 		err = fmt.Errorf("failed to load metric definitions: %w", err)
-		statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
+		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
 		return
@@ -846,7 +846,7 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 	// configure metrics
 	if err = ConfigureMetrics(targetContext.metricDefinitions, GetEvaluatorFunctions(), targetContext.metadata); err != nil {
 		err = fmt.Errorf("failed to configure metrics: %w", err)
-		statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
+		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
 		return
@@ -877,7 +877,7 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 		// get the perf command
 		if processes, perfCommand, err = getPerfCommand(myTarget, targetContext.perfPath, targetContext.groupDefinitions, localTempDir); err != nil {
 			err = fmt.Errorf("failed to get perf command: %w", err)
-			statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
+			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 			break
 		}
 		beginTimestamp := time.Now()
@@ -887,7 +887,7 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 		if perfErr != nil {
 			if !getSignalReceived() {
 				err = perfErr
-				statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
+				_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 			}
 			break
 		}
@@ -916,21 +916,33 @@ func printMetrics(frameChannel chan []MetricFrame, targetName string, outputDir 
 	var printedFiles []string
 	// block until next set of metric frames arrives, will exit loop when channel is closed
 	for metricFrames := range frameChannel {
-		fileName := printMetricsTxt(metricFrames, targetName, flagLive && flagOutputFormat[0] == formatTxt, !flagLive && util.StringInList(formatTxt, flagOutputFormat), outputDir)
-		if fileName != "" {
+		fileName, err := printMetricsTxt(metricFrames, targetName, flagLive && flagOutputFormat[0] == formatTxt, !flagLive && util.StringInList(formatTxt, flagOutputFormat), outputDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+		} else if fileName != "" {
 			printedFiles = util.UniqueAppend(printedFiles, fileName)
 		}
-		fileName = printMetricsJSON(metricFrames, targetName, flagLive && flagOutputFormat[0] == formatJSON, !flagLive && util.StringInList(formatJSON, flagOutputFormat), outputDir)
-		if fileName != "" {
+		fileName, err = printMetricsJSON(metricFrames, targetName, flagLive && flagOutputFormat[0] == formatJSON, !flagLive && util.StringInList(formatJSON, flagOutputFormat), outputDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+		} else if fileName != "" {
 			printedFiles = util.UniqueAppend(printedFiles, fileName)
 		}
 		// csv is always written to file unless no files are requested -- we need it to create the summary reports
-		fileName = printMetricsCSV(metricFrames, targetName, flagLive && flagOutputFormat[0] == formatCSV, !flagLive, outputDir)
-		if fileName != "" {
+		fileName, err = printMetricsCSV(metricFrames, targetName, flagLive && flagOutputFormat[0] == formatCSV, !flagLive, outputDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+		} else if fileName != "" {
 			printedFiles = util.UniqueAppend(printedFiles, fileName)
 		}
-		fileName = printMetricsWide(metricFrames, targetName, flagLive && flagOutputFormat[0] == formatWide, !flagLive && util.StringInList(formatWide, flagOutputFormat), outputDir)
-		if fileName != "" {
+		fileName, err = printMetricsWide(metricFrames, targetName, flagLive && flagOutputFormat[0] == formatWide, !flagLive && util.StringInList(formatWide, flagOutputFormat), outputDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+		} else if fileName != "" {
 			printedFiles = util.UniqueAppend(printedFiles, fileName)
 		}
 	}
@@ -1170,7 +1182,11 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 				outputLines = [][]byte{} // empty it
 			}
 			if timeout != 0 && int(time.Since(startPerfTimestamp).Seconds()) > timeout {
-				localCommand.Process.Signal(os.Interrupt)
+				err = localCommand.Process.Signal(os.Interrupt)
+				if err != nil {
+					err = fmt.Errorf("failed to terminate perf: %v", err)
+					slog.Error(err.Error())
+				}
 			}
 		}
 	}()
