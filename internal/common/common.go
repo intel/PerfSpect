@@ -377,14 +377,10 @@ func collectOnTarget(cmd *cobra.Command, myTarget target.Target, scriptsToRun []
 	// create a temporary directory on the target
 	var targetTempDir string
 	var err error
-	if statusUpdateErr := statusUpdate(myTarget.GetName(), "creating temporary directory"); statusUpdateErr != nil {
-		slog.Error("failed to set status", slog.String("target", myTarget.GetName()), slog.String("error", statusUpdateErr.Error()))
-	}
+	_ = statusUpdate(myTarget.GetName(), "creating temporary directory")
 	targetTempRoot, _ := cmd.Flags().GetString(FlagTargetTempDirName)
 	if targetTempDir, err = myTarget.CreateTempDirectory(targetTempRoot); err != nil {
-		if statusUpdateErr := statusUpdate(myTarget.GetName(), fmt.Sprintf("error creating temporary directory: %v", err)); statusUpdateErr != nil {
-			slog.Error("failed to set status", slog.String("target", myTarget.GetName()), slog.String("error", statusUpdateErr.Error()))
-		}
+		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("error creating temporary directory: %v", err))
 		err = fmt.Errorf("error creating temporary directory on %s: %v", myTarget.GetName(), err)
 		channelError <- err
 		return
@@ -399,20 +395,14 @@ func collectOnTarget(cmd *cobra.Command, myTarget target.Target, scriptsToRun []
 		}()
 	}
 	// run the scripts on the target
-	if statusUpdateErr := statusUpdate(myTarget.GetName(), "collecting data"); statusUpdateErr != nil {
-		slog.Error("failed to set status", slog.String("target", myTarget.GetName()), slog.String("error", statusUpdateErr.Error()))
-	}
+	_ = statusUpdate(myTarget.GetName(), "collecting data")
 	scriptOutputs, err := script.RunScripts(myTarget, scriptsToRun, true, localTempDir)
 	if err != nil {
-		if statusUpdateErr := statusUpdate(myTarget.GetName(), fmt.Sprintf("error collecting data: %v", err)); statusUpdateErr != nil {
-			slog.Error("failed to set status", slog.String("target", myTarget.GetName()), slog.String("error", statusUpdateErr.Error()))
-		}
+		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("error collecting data: %v", err))
 		err = fmt.Errorf("error running data collection scripts on %s: %v", myTarget.GetName(), err)
 		channelError <- err
 		return
 	}
-	if statusUpdateErr := statusUpdate(myTarget.GetName(), "collection complete"); statusUpdateErr != nil {
-		slog.Error("failed to set status", slog.String("target", myTarget.GetName()), slog.String("error", statusUpdateErr.Error()))
-	}
+	_ = statusUpdate(myTarget.GetName(), "collection complete")
 	channelTargetScriptOutputs <- TargetScriptOutputs{targetName: myTarget.GetName(), scriptOutputs: scriptOutputs}
 }

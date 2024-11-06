@@ -758,13 +758,9 @@ func prepareTarget(targetContext *targetContext, targetTempRoot string, localTem
 	myTarget := targetContext.target
 	var err error
 	// create a temporary directory on the target
-	if err = statusUpdate(myTarget.GetName(), "configuring target"); err != nil {
-		slog.Error("failed to set status", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-	}
+	_ = statusUpdate(myTarget.GetName(), "configuring target")
 	if targetContext.tempDir, err = myTarget.CreateTempDirectory(targetTempRoot); err != nil {
-		if statusUpdateErr := statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %v", err)); statusUpdateErr != nil {
-			slog.Error("failed to set status", slog.String("target", myTarget.GetName()), slog.String("error", statusUpdateErr.Error()))
-		}
+		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %v", err))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
 		return
@@ -774,9 +770,7 @@ func prepareTarget(targetContext *targetContext, targetTempRoot string, localTem
 		var nmiWatchdogEnabled bool
 		if nmiWatchdogEnabled, err = NMIWatchdogEnabled(myTarget); err != nil {
 			err = fmt.Errorf("failed to retrieve NMI watchdog status: %w", err)
-			if statusUpdateErr := statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error())); statusUpdateErr != nil {
-				slog.Error("failed to set status", slog.String("target", myTarget.GetName()), slog.String("error", statusUpdateErr.Error()))
-			}
+			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 			targetContext.err = err
 			channelError <- targetError{target: myTarget, err: err}
 			return
@@ -784,9 +778,7 @@ func prepareTarget(targetContext *targetContext, targetTempRoot string, localTem
 		if nmiWatchdogEnabled {
 			if err = DisableNMIWatchdog(myTarget, localTempDir); err != nil {
 				err = fmt.Errorf("failed to disable NMI watchdog: %w", err)
-				if statusUpdateErr := statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error())); statusUpdateErr != nil {
-					slog.Error("failed to set status", slog.String("target", myTarget.GetName()), slog.String("error", statusUpdateErr.Error()))
-				}
+				_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 				targetContext.err = err
 				channelError <- targetError{target: myTarget, err: err}
 				return
@@ -798,18 +790,14 @@ func prepareTarget(targetContext *targetContext, targetTempRoot string, localTem
 	if !flagNoRoot {
 		if targetContext.perfMuxIntervals, err = GetMuxIntervals(myTarget, localTempDir); err != nil {
 			err = fmt.Errorf("failed to get perf mux intervals: %w", err)
-			if statusUpdateErr := statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error())); statusUpdateErr != nil {
-				slog.Error("failed to set status", slog.String("target", myTarget.GetName()), slog.String("error", statusUpdateErr.Error()))
-			}
+			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 			targetContext.err = err
 			channelError <- targetError{target: myTarget, err: err}
 			return
 		}
 		if err = SetAllMuxIntervals(myTarget, flagPerfMuxInterval, localTempDir); err != nil {
 			err = fmt.Errorf("failed to set all perf mux intervals: %w", err)
-			if statusUpdateErr := statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error())); statusUpdateErr != nil {
-				slog.Error("failed to set status", slog.String("target", myTarget.GetName()), slog.String("error", statusUpdateErr.Error()))
-			}
+			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 			targetContext.err = err
 			channelError <- targetError{target: myTarget, err: err}
 			return
@@ -818,9 +806,7 @@ func prepareTarget(targetContext *targetContext, targetTempRoot string, localTem
 	// get the full path to the perf binary
 	if targetContext.perfPath, err = getPerfPath(myTarget, localPerfPath); err != nil {
 		err = fmt.Errorf("failed to find perf: %w", err)
-		if statusUpdateErr := statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %v", err)); statusUpdateErr != nil {
-			slog.Error("failed to set status", slog.String("target", myTarget.GetName()), slog.String("error", statusUpdateErr.Error()))
-		}
+		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %v", err))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
 		return
@@ -836,15 +822,11 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 		return
 	}
 	// load metadata
-	if statusUpdateErr := statusUpdate(myTarget.GetName(), "collecting metadata"); statusUpdateErr != nil {
-		slog.Error("failed to set status", slog.String("target", myTarget.GetName()), slog.String("error", statusUpdateErr.Error()))
-	}
+	_ = statusUpdate(myTarget.GetName(), "collecting metadata")
 	var err error
 	if targetContext.metadata, err = LoadMetadata(myTarget, flagNoRoot, targetContext.perfPath, localTempDir); err != nil {
 		err = fmt.Errorf("failed to load metadata: %w", err)
-		if statusUpdateErr := statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error())); statusUpdateErr != nil {
-			slog.Error("failed to set status", slog.String("target", myTarget.GetName()), slog.String("error", statusUpdateErr.Error()))
-		}
+		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
 		return
@@ -854,9 +836,7 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 	var uncollectableEvents []string
 	if targetContext.groupDefinitions, uncollectableEvents, err = LoadEventGroups(flagEventFilePath, targetContext.metadata); err != nil {
 		err = fmt.Errorf("failed to load event definitions: %w", err)
-		if statusUpdateErr := statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error())); statusUpdateErr != nil {
-			slog.Error("failed to set status", slog.String("target", myTarget.GetName()), slog.String("error", statusUpdateErr.Error()))
-		}
+		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
 		return
@@ -864,9 +844,7 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 	// load metric definitions
 	if targetContext.metricDefinitions, err = LoadMetricDefinitions(flagMetricFilePath, flagMetricsList, uncollectableEvents, targetContext.metadata); err != nil {
 		err = fmt.Errorf("failed to load metric definitions: %w", err)
-		if statusUpdateErr := statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error())); statusUpdateErr != nil {
-			slog.Error("failed to set status", slog.String("target", myTarget.GetName()), slog.String("error", statusUpdateErr.Error()))
-		}
+		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
 		return
@@ -874,9 +852,7 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 	// configure metrics
 	if err = ConfigureMetrics(targetContext.metricDefinitions, GetEvaluatorFunctions(), targetContext.metadata); err != nil {
 		err = fmt.Errorf("failed to configure metrics: %w", err)
-		if statusUpdateErr := statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error())); statusUpdateErr != nil {
-			slog.Error("failed to set status", slog.String("target", myTarget.GetName()), slog.String("error", statusUpdateErr.Error()))
-		}
+		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
 		return
@@ -907,9 +883,7 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 		// get the perf command
 		if processes, perfCommand, err = getPerfCommand(myTarget, targetContext.perfPath, targetContext.groupDefinitions, localTempDir); err != nil {
 			err = fmt.Errorf("failed to get perf command: %w", err)
-			if statusUpdateErr := statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error())); statusUpdateErr != nil {
-				slog.Error("failed to set status", slog.String("target", myTarget.GetName()), slog.String("error", statusUpdateErr.Error()))
-			}
+			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 			break
 		}
 		beginTimestamp := time.Now()
@@ -919,9 +893,7 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 		if perfErr != nil {
 			if !getSignalReceived() {
 				err = perfErr
-				if statusUpdateErr := statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error())); statusUpdateErr != nil {
-					slog.Error("failed to set status", slog.String("target", myTarget.GetName()), slog.String("error", statusUpdateErr.Error()))
-				}
+				_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 			}
 			break
 		}

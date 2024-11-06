@@ -322,27 +322,16 @@ func printConfig(myTargets []target.Target, localTempDir string) (err error) {
 			return
 		}
 		multiSpinner.Start()
-		err = multiSpinner.Status(myTarget.GetName(), "collecting data")
-		if err != nil {
-			err = fmt.Errorf("failed to set spinner status: %v", err)
-			return
-		}
+		_ = multiSpinner.Status(myTarget.GetName(), "collecting data")
 		// run the scripts
 		var scriptOutputs map[string]script.ScriptOutput
 		if scriptOutputs, err = script.RunScripts(myTarget, scriptsToRun, true, localTempDir); err != nil {
 			err = fmt.Errorf("failed to run collection scripts: %v", err)
-			errSpinner := multiSpinner.Status(myTarget.GetName(), "error collecting data")
-			if errSpinner != nil {
-				slog.Error(errSpinner.Error())
-			}
+			_ = multiSpinner.Status(myTarget.GetName(), "error collecting data")
 			multiSpinner.Finish()
 			return
 		}
-		err = multiSpinner.Status(myTarget.GetName(), "collection complete")
-		if err != nil {
-			err = fmt.Errorf("failed to set spinner status: %v", err)
-			return
-		}
+		_ = multiSpinner.Status(myTarget.GetName(), "collection complete")
 		multiSpinner.Finish()
 		// process the tables, i.e., get field values from raw script output
 		tableNames := []string{report.ConfigurationTableName}
