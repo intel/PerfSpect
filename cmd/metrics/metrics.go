@@ -671,10 +671,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			} else {
 				finalMessage += fmt.Sprintf(" for %d seconds", flagDuration)
 			}
-			err = multiSpinner.Status(targetContexts[i].target.GetName(), finalMessage)
-			if err != nil {
-				slog.Error("failed to set status", slog.String("target", targetContexts[i].target.GetName()), slog.String("error", err.Error()))
-			}
+			_ = multiSpinner.Status(targetContexts[i].target.GetName(), finalMessage)
 		}
 		go collectOnTarget(&targetContexts[i], localTempDir, localOutputDir, channelTargetError, multiSpinner.Status)
 	}
@@ -690,10 +687,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	// finalize and stop the spinner
 	for _, targetContext := range targetContexts {
 		if targetContext.err == nil {
-			err = multiSpinner.Status(targetContext.target.GetName(), "collection complete")
-			if err != nil {
-				slog.Error("failed to set status", slog.String("target", targetContext.target.GetName()), slog.String("error", err.Error()))
-			}
+			_ = multiSpinner.Status(targetContext.target.GetName(), "collection complete")
 		}
 	}
 	// summarize outputs
