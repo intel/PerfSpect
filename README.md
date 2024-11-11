@@ -71,12 +71,10 @@ Metric files:
 The `metrics` command supports two modes -- default and "live". Default mode behaves as above -- metrics are collected and saved into files for review.  The "live" mode prints the metrics in a selected format, e.g., CSV, JSON, to stdout where they can be viewed in the console and/or redirected into a file or observability pipeline.
 
 ##### No Root Permissions
-If sudo is not possible and running as the root user is not possible, then a user may request the following changes be made to the target system by an administrator:
+If sudo is not possible and running as the root user is not possible, use the `--noroot` flag on the command line, e.g., `perfspect metrics --noroot`, and request an administrator make the following changes to the target system:
 - sysctl -w kernel.perf_event_paranoid=0
 - sysctl -w kernel.nmi_watchdog=0
 - write '125' to all perf_event_mux_interval_ms files found under /sys/devices/*, e.g., `for i in $(find /sys/devices -name perf_event_mux_interval_ms); do echo 125 > $i; done`
-
-Recommend returning these settings to their prior values when analysis with PerfSpect is complete.
 
 See `perfspect metrics -h` for the extensive set of options and examples.
 
