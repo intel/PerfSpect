@@ -495,7 +495,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	appContext := cmd.Context().Value(common.AppContext{}).(common.AppContext)
 	localTempDir := appContext.TempDir
 	localOutputDir := appContext.OutputDir
-
 	// handle signals
 	// child processes will exit when the signals are received which will
 	// allow this app to exit normally
@@ -506,7 +505,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		setSignalReceived()
 		slog.Info("received signal", slog.String("signal", sig.String()))
 	}()
-
 	// round up to next perfPrintInterval second (the collection interval used by perf stat)
 	if flagDuration != 0 {
 		qf := float64(flagDuration) / float64(flagPerfPrintInterval)
@@ -515,7 +513,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			flagDuration = (qi + 1) * flagPerfPrintInterval
 		}
 	}
-
 	// get the targets
 	myTargets, targetErrs, err := common.GetTargets(cmd, !flagNoRoot, !flagNoRoot, localTempDir)
 	if err != nil {
@@ -524,7 +521,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		cmd.SilenceUsage = true
 		return err
 	}
-
+	// check for live mode with multiple targets
 	if flagLive && len(myTargets) > 1 {
 		err := fmt.Errorf("live mode is only supported for a single target")
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -532,7 +529,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		cmd.SilenceUsage = true
 		return err
 	}
-
 	// create progress spinner
 	multiSpinner := progress.NewMultiSpinner()
 	for _, myTarget := range myTargets {
@@ -546,7 +542,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 	multiSpinner.Start()
 	defer multiSpinner.Finish()
-
 	// check for errors in target creation
 	for i := range targetErrs {
 		if targetErrs[i] != nil {
@@ -555,7 +550,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			myTargets = append(myTargets[:i], myTargets[i+1:]...)
 		}
 	}
-
+	// check if any targets remain
 	if len(myTargets) == 0 {
 		err := fmt.Errorf("no targets specified")
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -563,7 +558,32 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		cmd.SilenceUsage = true
 		return err
 	}
-
+	// check if all targets have the same architecture
+	for _, target := range myTargets {
+		tArch, err := target.GetArchitecture()
+		if err != nil {
+			err = fmt.Errorf("failed to get architecture: %w", err)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			cmd.SilenceUsage = true
+			return err
+		}
+		tArch0, err := myTargets[0].GetArchitecture()
+		if err != nil {
+			err = fmt.Errorf("failed to get architecture: %w", err)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			cmd.SilenceUsage = true
+			return err
+		}
+		if tArch != tArch0 {
+			err := fmt.Errorf("all targets must have the same architecture")
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			cmd.SilenceUsage = true
+			return err
+		}
+	}
 	// extract perf into local temp directory (assumes all targets have the same architecture)
 	localPerfPath, err := extractPerf(myTargets[0], localTempDir)
 	if err != nil {
@@ -572,7 +592,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		cmd.SilenceUsage = true
 		return err
 	}
-
 	// prepare the targets
 	channelTargetError := make(chan targetError)
 	var targetContexts []targetContext
@@ -593,7 +612,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			numPreparedTargets++
 		}
 	}
-
 	// schedule temporary directory cleanup
 	if cmd.Parent().PersistentFlags().Lookup("debug").Value.String() != "true" { // don't remove the directory if we're debugging
 		defer func() {
@@ -607,7 +625,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			}
 		}()
 	}
-
 	// schedule NMI watchdog reset
 	defer func() {
 		for _, targetContext := range targetContexts {
@@ -619,7 +636,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}()
-
 	// schedule mux interval reset
 	defer func() {
 		for _, targetContext := range targetContexts {
@@ -631,14 +647,13 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}()
-
+	// check if any targets were successfully prepared
 	if numPreparedTargets == 0 {
 		err := fmt.Errorf("no targets were successfully prepared")
 		slog.Error(err.Error())
 		cmd.SilenceUsage = true
 		return err
 	}
-
 	// prepare the metrics for each target
 	for i := range targetContexts {
 		go prepareMetrics(&targetContexts[i], localTempDir, channelTargetError, multiSpinner.Status)
@@ -659,7 +674,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		cmd.SilenceUsage = true
 		return err
 	}
-
 	// show metric names and exit, if requested
 	if flagShowMetricNames {
 		// stop the multiSpinner
@@ -672,7 +686,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		}
 		return nil
 	}
-
 	// create the local output directory
 	if !flagLive {
 		err = common.CreateOutputDir(localOutputDir)
@@ -683,7 +696,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-
 	// write metadata to file
 	if flagWriteEventsToFile {
 		for _, targetContext := range targetContexts {
@@ -695,7 +707,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}
-
 	// start the metric collection
 	for i := range targetContexts {
 		if targetContexts[i].err == nil {
