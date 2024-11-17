@@ -865,7 +865,6 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 	_ = statusUpdate(myTarget.GetName(), "collecting metadata")
 	var err error
 	if targetContext.metadata, err = LoadMetadata(myTarget, flagNoRoot, targetContext.perfPath, localTempDir); err != nil {
-		err = fmt.Errorf("failed to load metadata: %w", err)
 		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
