@@ -70,16 +70,13 @@ func GetTargetFlagGroup() FlagGroup {
 // If a targets file is specified, it reads the targets from the file.
 // Otherwise, it retrieves a single target using the getTarget function.
 // The function returns a slice of target.Target and an error if any.
-func GetTargets(cmd *cobra.Command, needsElevatedPrivileges bool, failIfCantElevate bool, localTempDir string) ([]target.Target, error) {
+func GetTargets(cmd *cobra.Command, needsElevatedPrivileges bool, failIfCantElevate bool, localTempDir string) ([]target.Target, []error, error) {
 	flagTargetsFile, _ := cmd.Flags().GetString(flagTargetsFileName)
 	if flagTargetsFile != "" {
 		return getTargetsFromFile(flagTargetsFile, localTempDir)
 	}
-	myTarget, err := getTarget(cmd, needsElevatedPrivileges, failIfCantElevate, localTempDir)
-	if err != nil {
-		return nil, err
-	}
-	return []target.Target{myTarget}, nil
+	myTarget, targetErr, err := getTarget(cmd, needsElevatedPrivileges, failIfCantElevate, localTempDir)
+	return []target.Target{myTarget}, []error{targetErr}, err
 }
 
 // getTarget returns a target.Target object representing the target host and associated details.
@@ -90,8 +87,9 @@ func GetTargets(cmd *cobra.Command, needsElevatedPrivileges bool, failIfCantElev
 // - localTempDir: A string representing the local temporary directory.
 // The function returns the following values:
 // - myTarget: A target.Target object representing the target host and associated details.
-// - err: An error object indicating any error that occurred during the retrieval process.
-func getTarget(cmd *cobra.Command, needsElevatedPrivileges bool, failIfCantElevate bool, localTempDir string) (target.Target, error) {
+// - targetError: An error indicating a problem with the target host connection.
+// - err: An error object indicating any error that occurred during the function execution.
+func getTarget(cmd *cobra.Command, needsElevatedPrivileges bool, failIfCantElevate bool, localTempDir string) (target.Target, error, error) {
 	targetHost, _ := cmd.Flags().GetString(flagTargetHostName)
 	targetPort, _ := cmd.Flags().GetString(flagTargetPortName)
 	targetUser, _ := cmd.Flags().GetString(flagTargetUserName)
@@ -103,44 +101,44 @@ func getTarget(cmd *cobra.Command, needsElevatedPrivileges bool, failIfCantEleva
 				if !term.IsTerminal(int(os.Stdin.Fd())) {
 					err := fmt.Errorf("can not prompt for SSH password because STDIN isn't coming from a terminal")
 					slog.Error(err.Error())
-					return myTarget, err
+					return myTarget, nil, err
 				} else {
 					slog.Info("Prompting for SSH password.", slog.String("targetHost", targetHost), slog.String("targetUser", targetUser))
 					sshPwd, err := getPassword(fmt.Sprintf("%s@%s's password", targetUser, targetHost))
 					if err != nil {
-						return nil, err
+						return myTarget, nil, err
 					}
 					var hostArchitecture string
 					hostArchitecture, err = getHostArchitecture()
 					if err != nil {
-						return nil, err
+						return myTarget, nil, err
 					}
 					sshPassPath, err := util.ExtractResource(script.Resources, path.Join("resources", hostArchitecture, "sshpass"), localTempDir)
 					if err != nil {
-						return nil, err
+						return myTarget, nil, err
 					}
 					myTarget.SetSshPassPath(sshPassPath)
 					myTarget.SetSshPass(sshPwd)
-					// if still can't connect, return error
+					// if still can't connect, return target error
 					if !myTarget.CanConnect() {
-						err = fmt.Errorf("failed to connect to target host (%s) using provided ssh user (%s) and password (****)", targetHost, targetUser)
-						return nil, err
+						err = fmt.Errorf("failed to connect to target host (%s)", myTarget.GetName())
+						return myTarget, err, nil
 					}
 				}
 			} else {
-				err := fmt.Errorf("failed to connect to target (%s) using provided target arguments", targetHost)
-				return nil, err
+				err := fmt.Errorf("failed to connect to target host (%s)", myTarget.GetName())
+				return myTarget, nil, err
 			}
 		}
 		if needsElevatedPrivileges && !myTarget.CanElevatePrivileges() {
 			if failIfCantElevate {
 				err := fmt.Errorf("failed to elevate privileges on remote target")
-				return nil, err
+				return myTarget, err, nil
 			} else {
 				slog.Warn("failed to elevate privileges on remote target, continuing without elevated privileges", slog.String("targetHost", targetHost))
 			}
 		}
-		return myTarget, nil
+		return myTarget, nil, nil
 	}
 	// local target
 	myTarget := target.NewLocalTarget()
@@ -149,7 +147,7 @@ func getTarget(cmd *cobra.Command, needsElevatedPrivileges bool, failIfCantEleva
 			slog.Warn("can not prompt for sudo password because STDIN isn't coming from a terminal")
 			if failIfCantElevate {
 				err := fmt.Errorf("failed to elevate privileges on local target")
-				return nil, err
+				return myTarget, err, nil
 			} else {
 				slog.Warn("continuing without elevated privileges")
 			}
@@ -157,7 +155,7 @@ func getTarget(cmd *cobra.Command, needsElevatedPrivileges bool, failIfCantEleva
 			fmt.Fprintf(os.Stderr, "WARNING: some operations cannot be performed without elevated privileges.\n")
 			currentUser, err := user.Current()
 			if err != nil {
-				return nil, err
+				return myTarget, nil, err
 			}
 			fmt.Fprintf(os.Stderr, "For complete functionality, please provide your password at the prompt.\n")
 			slog.Info("prompting for sudo password")
@@ -165,13 +163,13 @@ func getTarget(cmd *cobra.Command, needsElevatedPrivileges bool, failIfCantEleva
 			var sudoPwd string
 			sudoPwd, err = getPassword(prompt)
 			if err != nil {
-				return nil, err
+				return myTarget, nil, err
 			}
 			myTarget.SetSudo(sudoPwd)
 			if !myTarget.CanElevatePrivileges() {
 				if failIfCantElevate {
 					err := fmt.Errorf("failed to elevate privileges on local target")
-					return nil, err
+					return myTarget, nil, err
 				} else {
 					slog.Warn("failed to elevate privileges on local target, continuing without elevated privileges")
 					fmt.Fprintf(os.Stderr, "WARNING: Not able to establish elevated privileges with provided password.\n")
@@ -180,7 +178,7 @@ func getTarget(cmd *cobra.Command, needsElevatedPrivileges bool, failIfCantEleva
 			}
 		}
 	}
-	return myTarget, nil
+	return myTarget, nil, nil
 }
 
 type targetFromYAML struct {
@@ -198,7 +196,7 @@ type targetsFile struct {
 
 // getTargetsFromFile reads a targets file and returns a list of target objects.
 // It takes the path to the targets file and the local temporary directory as input.
-func getTargetsFromFile(targetsFilePath string, localTempDir string) (targets []target.Target, err error) {
+func getTargetsFromFile(targetsFilePath string, localTempDir string) (targets []target.Target, targetErrs []error, err error) {
 	var targetsFile targetsFile
 	// read the file into a byte array
 	yamlFile, err := os.ReadFile(targetsFilePath)
@@ -236,6 +234,11 @@ func getTargetsFromFile(targetsFilePath string, localTempDir string) (targets []
 		newTarget := target.NewRemoteTarget(t.Name, t.Host, t.Port, t.User, t.Key)
 		newTarget.SetSshPassPath(sshPassPath)
 		newTarget.SetSshPass(t.Pwd)
+		if !newTarget.CanConnect() {
+			targetErrs = append(targetErrs, fmt.Errorf("failed to connect to target host (%s)", newTarget.GetName()))
+		} else {
+			targetErrs = append(targetErrs, nil)
+		}
 		targets = append(targets, newTarget)
 	}
 	return

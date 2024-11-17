@@ -472,16 +472,17 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 }
 
 type targetContext struct {
-	target            target.Target
-	err               error
-	perfPath          string
-	tempDir           string
-	metadata          Metadata
-	nmiDisabled       bool
-	perfMuxIntervals  map[string]int
-	groupDefinitions  []GroupDefinition
-	metricDefinitions []MetricDefinition
-	printedFiles      []string
+	target              target.Target
+	err                 error
+	perfPath            string
+	tempDir             string
+	metadata            Metadata
+	nmiDisabled         bool
+	perfMuxIntervalsSet bool
+	perfMuxIntervals    map[string]int
+	groupDefinitions    []GroupDefinition
+	metricDefinitions   []MetricDefinition
+	printedFiles        []string
 }
 
 type targetError struct {
@@ -516,21 +517,13 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	// get the targets
-	myTargets, err := common.GetTargets(cmd, !flagNoRoot, !flagNoRoot, localTempDir)
+	myTargets, targetErrs, err := common.GetTargets(cmd, !flagNoRoot, !flagNoRoot, localTempDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
 		cmd.SilenceUsage = true
 		return err
 	}
-	if len(myTargets) == 0 {
-		err := fmt.Errorf("no targets specified")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		slog.Error(err.Error())
-		cmd.SilenceUsage = true
-		return err
-	}
-	targetTempRoot, _ := cmd.Flags().GetString(common.FlagTargetTempDirName)
 
 	if flagLive && len(myTargets) > 1 {
 		err := fmt.Errorf("live mode is only supported for a single target")
@@ -554,6 +547,23 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	multiSpinner.Start()
 	defer multiSpinner.Finish()
 
+	// check for errors in target creation
+	for i := range targetErrs {
+		if targetErrs[i] != nil {
+			multiSpinner.Status(myTargets[i].GetName(), fmt.Sprintf("Error: %v", targetErrs[i]))
+			// remove target from targets list
+			myTargets = append(myTargets[:i], myTargets[i+1:]...)
+		}
+	}
+
+	if len(myTargets) == 0 {
+		err := fmt.Errorf("no targets specified")
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		slog.Error(err.Error())
+		cmd.SilenceUsage = true
+		return err
+	}
+
 	// extract perf into local temp directory (assumes all targets have the same architecture)
 	localPerfPath, err := extractPerf(myTargets[0], localTempDir)
 	if err != nil {
@@ -569,13 +579,18 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	for _, myTarget := range myTargets {
 		targetContexts = append(targetContexts, targetContext{target: myTarget})
 	}
+	targetTempRoot, _ := cmd.Flags().GetString(common.FlagTargetTempDirName)
 	for i := range targetContexts {
 		go prepareTarget(&targetContexts[i], targetTempRoot, localTempDir, localPerfPath, channelTargetError, multiSpinner.Status)
 	}
+	// wait for all targets to be prepared
+	numPreparedTargets := 0
 	for range targetContexts {
 		targetError := <-channelTargetError
 		if targetError.err != nil {
 			slog.Error("failed to prepare target", slog.String("target", targetError.target.GetName()), slog.String("error", targetError.err.Error()))
+		} else {
+			numPreparedTargets++
 		}
 	}
 
@@ -608,22 +623,41 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	// schedule mux interval reset
 	defer func() {
 		for _, targetContext := range targetContexts {
-			err := SetMuxIntervals(targetContext.target, targetContext.perfMuxIntervals, localTempDir)
-			if err != nil {
-				slog.Error("failed to reset perf mux intervals", slog.String("target", targetContext.target.GetName()), slog.String("error", err.Error()))
+			if targetContext.perfMuxIntervalsSet {
+				err := SetMuxIntervals(targetContext.target, targetContext.perfMuxIntervals, localTempDir)
+				if err != nil {
+					slog.Error("failed to reset perf mux intervals", slog.String("target", targetContext.target.GetName()), slog.String("error", err.Error()))
+				}
 			}
 		}
 	}()
+
+	if numPreparedTargets == 0 {
+		err := fmt.Errorf("no targets were successfully prepared")
+		slog.Error(err.Error())
+		cmd.SilenceUsage = true
+		return err
+	}
 
 	// prepare the metrics for each target
 	for i := range targetContexts {
 		go prepareMetrics(&targetContexts[i], localTempDir, channelTargetError, multiSpinner.Status)
 	}
+	// wait for all metrics to be prepared
+	numTargetsWithPreparedMetrics := 0
 	for range targetContexts {
 		targetError := <-channelTargetError
 		if targetError.err != nil {
 			slog.Error("failed to prepare metrics", slog.String("target", targetError.target.GetName()), slog.String("error", targetError.err.Error()))
+		} else {
+			numTargetsWithPreparedMetrics++
 		}
+	}
+	if numTargetsWithPreparedMetrics == 0 {
+		err := fmt.Errorf("no targets had metrics prepared")
+		slog.Error(err.Error())
+		cmd.SilenceUsage = true
+		return err
 	}
 
 	// show metric names and exit, if requested
@@ -796,6 +830,7 @@ func prepareTarget(targetContext *targetContext, targetTempRoot string, localTem
 			channelError <- targetError{target: myTarget, err: err}
 			return
 		}
+		targetContext.perfMuxIntervalsSet = true
 	}
 	// get the full path to the perf binary
 	if targetContext.perfPath, err = getPerfPath(myTarget, localPerfPath); err != nil {

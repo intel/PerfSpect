@@ -148,15 +148,8 @@ func (rc *ReportingCommand) Run() error {
 			}
 		}
 		// get the targets
-		myTargets, err := GetTargets(rc.Cmd, elevated, false, localTempDir)
+		myTargets, targetErrs, err := GetTargets(rc.Cmd, elevated, false, localTempDir)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			slog.Error(err.Error())
-			rc.Cmd.SilenceUsage = true
-			return err
-		}
-		if len(myTargets) == 0 {
-			err := fmt.Errorf("no targets specified")
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			slog.Error(err.Error())
 			rc.Cmd.SilenceUsage = true
@@ -174,6 +167,22 @@ func (rc *ReportingCommand) Run() error {
 			}
 		}
 		multiSpinner.Start()
+		// check for errors in target creation
+		for i := range targetErrs {
+			if targetErrs[i] != nil {
+				multiSpinner.Status(myTargets[i].GetName(), fmt.Sprintf("Error: %v", targetErrs[i]))
+				// remove target from targets list
+				myTargets = append(myTargets[:i], myTargets[i+1:]...)
+			}
+		}
+		// check if we have any targets to run the scripts on
+		if len(myTargets) == 0 {
+			err := fmt.Errorf("no targets specified")
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			rc.Cmd.SilenceUsage = true
+			return err
+		}
 		// run the scripts on the targets
 		channelTargetScriptOutputs := make(chan TargetScriptOutputs)
 		channelError := make(chan error)
