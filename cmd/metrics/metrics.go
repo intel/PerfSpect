@@ -545,7 +545,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	// check for errors in target creation
 	for i := range targetErrs {
 		if targetErrs[i] != nil {
-			multiSpinner.Status(myTargets[i].GetName(), fmt.Sprintf("Error: %v", targetErrs[i]))
+			_ = multiSpinner.Status(myTargets[i].GetName(), fmt.Sprintf("Error: %v", targetErrs[i]))
 			// remove target from targets list
 			myTargets = append(myTargets[:i], myTargets[i+1:]...)
 		}
