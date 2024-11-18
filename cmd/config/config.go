@@ -207,12 +207,21 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	appContext := cmd.Context().Value(common.AppContext{}).(common.AppContext)
 	localTempDir := appContext.TempDir
 	// get the targets
-	myTargets, err := common.GetTargets(cmd, true, true, localTempDir)
+	myTargets, targetErrs, err := common.GetTargets(cmd, true, true, localTempDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
 		cmd.SilenceUsage = true
 		return err
+	}
+	// check for errors in target connections
+	for _, err := range targetErrs {
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			cmd.SilenceUsage = true
+			return err
+		}
 	}
 	if len(myTargets) == 0 {
 		err := fmt.Errorf("no targets specified")

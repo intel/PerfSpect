@@ -140,10 +140,10 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 		var err error
 		var output string
 		if metadata.SupportsFixedCycles, output, err = getSupportsFixedEvent(myTarget, "cpu-cycles", cpu.MicroArchitecture, noRoot, perfPath, localTempDir); err != nil {
-			err = fmt.Errorf("failed to determine if fixed-counter cpu-cycles is supported: %v", err)
+			err = fmt.Errorf("failed to determine if fixed-counter 'cpu-cycles' is supported: %v", err)
 		} else {
 			if !metadata.SupportsFixedCycles {
-				slog.Warn("Fixed-counter cpu-cycles events not supported", slog.String("output", output))
+				slog.Warn("Fixed-counter 'cpu-cycles' events not supported", slog.String("output", output))
 			}
 		}
 		slowFuncChannel <- err
@@ -153,10 +153,10 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 		var err error
 		var output string
 		if metadata.SupportsFixedInstructions, output, err = getSupportsFixedEvent(myTarget, "instructions", cpu.MicroArchitecture, noRoot, perfPath, localTempDir); err != nil {
-			err = fmt.Errorf("failed to determine if fixed-counter instructions is supported: %v", err)
+			err = fmt.Errorf("failed to determine if fixed-counter 'instructions' is supported: %v", err)
 		} else {
 			if !metadata.SupportsFixedInstructions {
-				slog.Warn("Fixed-counter instructions events not supported", slog.String("output", output))
+				slog.Warn("Fixed-counter 'instructions' events not supported", slog.String("output", output))
 			}
 		}
 		slowFuncChannel <- err
@@ -170,11 +170,8 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 		errs = append(errs, <-slowFuncChannel)
 		for _, errInside := range errs {
 			if errInside != nil {
-				if err == nil {
-					err = errInside
-				} else {
-					err = fmt.Errorf("%v : %v", err, errInside)
-				}
+				slog.Error("error loading metadata", slog.String("error", errInside.Error()), slog.String("target", myTarget.GetName()))
+				err = fmt.Errorf("target not supported, see log for details")
 			}
 		}
 	}()
