@@ -215,10 +215,10 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	// check for errors in target connections
-	for i := range targetErrs {
-		if targetErrs[i] != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", targetErrs[i])
-			slog.Error(targetErrs[i].Error())
+	for _, err := range targetErrs {
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
 			cmd.SilenceUsage = true
 			return err
 		}
