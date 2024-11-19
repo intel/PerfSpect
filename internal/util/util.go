@@ -14,8 +14,10 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"math"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	"regexp"
@@ -402,4 +404,36 @@ func ExtractTGZ(tarballPath, destDir string, stripComponent bool) error {
 func GetAppDir() string {
 	exePath, _ := os.Executable()
 	return filepath.Dir(exePath)
+}
+
+// SignalChildren sends a signal to all children of this process
+func SignalChildren(sig os.Signal) {
+	// get list of child processes
+	cmd := exec.Command("pgrep", "-P", strconv.Itoa(os.Getpid()))
+	out, err := cmd.Output()
+	if err != nil {
+		slog.Error("failed to get child processes", slog.String("error", err.Error()))
+		return
+	}
+	// send signal to each child
+	for _, pid := range strings.Split(string(out), "\n") {
+		if pid == "" {
+			continue
+		}
+		pidInt, err := strconv.Atoi(pid)
+		if err != nil {
+			slog.Error("failed to convert pid to int", slog.String("pid", pid), slog.String("error", err.Error()))
+			continue
+		}
+		proc, err := os.FindProcess(pidInt)
+		if err != nil {
+			slog.Error("failed to find process", slog.Int("pid", pidInt), slog.String("error", err.Error()))
+			continue
+		}
+		slog.Info("sending signal to child process", slog.Int("pid", pidInt), slog.String("signal", sig.String()))
+		err = proc.Signal(sig)
+		if err != nil {
+			slog.Error("failed to send signal to process", slog.Int("pid", pidInt), slog.String("error", err.Error()))
+		}
+	}
 }
