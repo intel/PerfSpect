@@ -187,7 +187,7 @@ func (rc *ReportingCommand) Run() error {
 		channelTargetScriptOutputs := make(chan TargetScriptOutputs)
 		channelError := make(chan error)
 		for _, target := range myTargets {
-			go collectOnTarget(rc.Cmd, target, scriptsToRun, localTempDir, channelTargetScriptOutputs, channelError, multiSpinner.Status)
+			go collectOnTarget(rc.Cmd, rc.Duration, target, scriptsToRun, localTempDir, channelTargetScriptOutputs, channelError, multiSpinner.Status)
 		}
 		// wait for scripts to run on all targets
 		var allTargetScriptOutputs []TargetScriptOutputs
@@ -382,7 +382,7 @@ func DefaultInsightsFunc(allTableValues []report.TableValues, scriptOutputs map[
 	return insightsTableValues
 }
 
-func collectOnTarget(cmd *cobra.Command, myTarget target.Target, scriptsToRun []script.ScriptDefinition, localTempDir string, channelTargetScriptOutputs chan TargetScriptOutputs, channelError chan error, statusUpdate progress.MultiSpinnerUpdateFunc) {
+func collectOnTarget(cmd *cobra.Command, duration int, myTarget target.Target, scriptsToRun []script.ScriptDefinition, localTempDir string, channelTargetScriptOutputs chan TargetScriptOutputs, channelError chan error, statusUpdate progress.MultiSpinnerUpdateFunc) {
 	// create a temporary directory on the target
 	var targetTempDir string
 	var err error
@@ -404,7 +404,11 @@ func collectOnTarget(cmd *cobra.Command, myTarget target.Target, scriptsToRun []
 		}()
 	}
 	// run the scripts on the target
-	_ = statusUpdate(myTarget.GetName(), "collecting data")
+	status := "collecting data"
+	if duration > 0 {
+		status = fmt.Sprintf("%s, duration=%ds", status, duration)
+	}
+	_ = statusUpdate(myTarget.GetName(), status)
 	scriptOutputs, err := script.RunScripts(myTarget, scriptsToRun, true, localTempDir)
 	if err != nil {
 		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("error collecting data: %v", err))
