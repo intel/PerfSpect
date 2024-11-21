@@ -32,11 +32,12 @@ import (
 )
 
 var gLogFile *os.File
-var gVersion = "9.9.9" // overwritten by ldflags in Makefile, set to high number here to avoid update prompt while debugging
+var gVersion = "9.9.9" // overwritten by ldflags in Makefile
 
 const (
 	// LongAppName is the name of the application
-	LongAppName = "PerfSpect"
+	LongAppName    = "PerfSpect"
+	artifactoryUrl = "https://af01p-fm.devtools.intel.com/artifactory/perfspectnext-fm-local/releases/latest/"
 )
 
 var examples = []string{
@@ -326,10 +327,24 @@ func updateApp(latestManifest manifest, localTempDir string) error {
 	runningAppFile := filepath.Base(runningAppPath)
 
 	// download the latest release
-	slog.Debug("Downloading latest release")
-	fileName := "perfspect" + "_" + latestManifest.Version + ".tgz"
-	url := "https://af01p-fm.devtools.intel.com/artifactory/perfspectnext-fm-local/releases/latest/" + fileName
-	resp, err := http.Get(url)
+	// try both versioned and unversioned filenames, until we settle on a naming convention
+	versionedFileName := "perfspect" + "_" + latestManifest.Version + ".tgz"
+	unVersionedfileName := "perfspect.tgz"
+	fileNames := []string{unVersionedfileName, versionedFileName}
+	var err error
+	var resp *http.Response
+	for _, fileName := range fileNames {
+		url := artifactoryUrl + fileName
+		resp, err = http.Get(url)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			slog.Info("Downloaded latest release", slog.String("url", url))
+			break
+		} else if err != nil {
+			slog.Warn("Failed to download latest release", slog.String("url", url), slog.String("error", err.Error()))
+		} else {
+			slog.Warn("Failed to download latest release", slog.String("url", url), slog.String("status", resp.Status))
+		}
+	}
 	if err != nil {
 		return err
 	}
@@ -346,9 +361,10 @@ func updateApp(latestManifest manifest, localTempDir string) error {
 		return err
 	}
 	tarballFile.Close()
-	// rename the running app to ".sav"
-	slog.Debug("Renaming running app")
-	oldAppPath := filepath.Join(runningAppDir, runningAppFile+".sav")
+	// rename the running app to "_<version>"
+	oldAppFile := runningAppFile + "_" + gVersion
+	oldAppPath := filepath.Join(runningAppDir, oldAppFile)
+	slog.Info("Renaming running app", slog.String("from", runningAppFile), slog.String("to", oldAppFile))
 	err = os.Rename(runningAppPath, oldAppPath)
 	if err != nil {
 		return err
@@ -356,14 +372,14 @@ func updateApp(latestManifest manifest, localTempDir string) error {
 	// rename the targets.yaml file to ".sav" if it exists
 	targetsFile := filepath.Join(runningAppDir, "targets.yaml")
 	if util.Exists(targetsFile) {
-		slog.Debug("Renaming targets file")
+		slog.Info("Renaming targets file", slog.String("from", "targets.yaml"), slog.String("to", "targets.yaml.sav"))
 		err = os.Rename(targetsFile, targetsFile+".sav")
 		if err != nil {
 			return err
 		}
 	}
 	// extract the tarball over the running app's directory
-	slog.Debug("Extracting tarball")
+	slog.Info("Extracting latest release", slog.String("from", tarballFile.Name()), slog.String("to", runningAppDir))
 	err = util.ExtractTGZ(tarballFile.Name(), runningAppDir, true)
 	if err != nil {
 		slog.Error("Error extracting downloaded tarball", slog.String("error", err.Error()))
@@ -393,7 +409,7 @@ func updateApp(latestManifest manifest, localTempDir string) error {
 	}
 	// replace the new targets.yaml with the saved one
 	if util.Exists(targetsFile + ".sav") {
-		slog.Debug("Restoring targets file")
+		slog.Info("Restoring targets file", slog.String("from", "targets.yaml.sav"), slog.String("to", "targets.yaml"))
 		err = os.Rename(targetsFile+".sav", targetsFile)
 		if err != nil {
 			return err
@@ -412,7 +428,7 @@ type manifest struct {
 
 func getLatestManifest() (manifest, error) {
 	// download manifest file from server
-	url := "https://af01p-fm.devtools.intel.com/artifactory/perfspectnext-fm-local/releases/latest/manifest.json"
+	url := artifactoryUrl + "manifest.json"
 	resp, err := http.Get(url)
 	if err != nil {
 		return manifest{}, err
