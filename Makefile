@@ -45,8 +45,8 @@ dist: resources check perfspect
 	cp NOTICE dist/perfspect/
 	cp targets.yaml dist/perfspect/
 	cp perfspect dist/perfspect/
-	cd dist && tar -czf perfspect_$(VERSION_NUMBER).tgz perfspect
-	cd dist && md5sum perfspect_$(VERSION_NUMBER).tgz > perfspect_$(VERSION_NUMBER).tgz.md5.txt
+	cd dist && tar -czf perfspect.tgz perfspect
+	cd dist && md5sum perfspect.tgz > perfspect.tgz.md5.txt
 	rm -rf dist/perfspect
 	echo '{"version": "$(VERSION_NUMBER)", "date": "$(COMMIT_DATE)", "time": "$(COMMIT_TIME)", "commit": "$(COMMIT_ID)" }' | jq '.' > dist/manifest.json
 ifneq ("$(wildcard /prebuilt)","") # /prebuilt is a directory in the container
