@@ -136,6 +136,8 @@ func ConfigureMetrics(metrics []MetricDefinition, evaluatorFunctions map[string]
 		metrics[metricIdx].Expression = strings.ReplaceAll(metrics[metricIdx].Expression, "[SOCKET_COUNT]", socketCount)
 		metrics[metricIdx].Expression = strings.ReplaceAll(metrics[metricIdx].Expression, "[HYPERTHREADING_ON]", hyperThreadingOn)
 		metrics[metricIdx].Expression = strings.ReplaceAll(metrics[metricIdx].Expression, "[CONST_THREAD_COUNT]", threadsPerCore)
+		// abbreviate event names
+		metrics[metricIdx].Expression = abbreviateEventName(metrics[metricIdx].Expression)
 		// get a list of the variables in the expression
 		metrics[metricIdx].Variables = make(map[string]int)
 		expressionIdx := 0
