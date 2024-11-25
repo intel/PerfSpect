@@ -181,6 +181,7 @@ ifeq ("$(wildcard sysstat)","")
 else
 	cd sysstat && git checkout master && git pull
 endif
+	cd sysstat && git checkout v12.7.6
 ifeq ("$(wildcard sysstat/Makefile)","")
 	cd sysstat && ./configure
 endif
