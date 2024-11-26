@@ -631,7 +631,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	defer func() {
 		for _, targetContext := range targetContexts {
 			if targetContext.nmiDisabled {
-				err := EnableNMIWatchdog(targetContext.target, targetContext.tempDir)
+				err := EnableNMIWatchdog(targetContext.target, localTempDir)
 				if err != nil {
 					slog.Error("failed to re-enable NMI watchdog", slog.String("target", targetContext.target.GetName()), slog.String("error", err.Error()))
 				}
