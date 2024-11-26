@@ -62,6 +62,9 @@ func LoadEventGroups(eventDefinitionOverridePath string, metadata Metadata) (gro
 		if event, err = parseEventDefinition(line[:len(line)-1]); err != nil {
 			return
 		}
+		// abbreviate the event name to shorten the eventual perf stat command line
+		event.Name = abbreviateEventName(event.Name)
+		event.Raw = abbreviateEventName(event.Raw)
 		if isCollectableEvent(event, metadata) {
 			group = append(group, event)
 		} else {
@@ -88,6 +91,38 @@ func LoadEventGroups(eventDefinitionOverridePath string, metadata Metadata) (gro
 		slog.Warn("Events not collectable on target", slog.String("events", uncollectable.String()))
 	}
 	return
+}
+
+// abbreviateEventName replaces long event names with abbreviations to reduce the length of the perf command.
+// focus is on uncore events because they are repeated for each uncore device
+func abbreviateEventName(event string) string {
+	// Abbreviations must be unique and in order. And, if replacing UNC_*, the abbreviation must begin with "UNC" because this is how we identify uncore events when collapsing them.
+	var abbreviations = [][]string{
+		{"UNC_CHA_TOR_INSERTS", "UNCCTI"},
+		{"UNC_CHA_TOR_OCCUPANCY", "UNCCTO"},
+		{"UNC_CHA_CLOCKTICKS", "UNCCCT"},
+		{"UNC_M_CAS_COUNT_SCH", "UNCMCC"},
+		{"IA_MISS_DRD_REMOTE", "IMDR"},
+		{"IA_MISS_DRD_LOCAL", "IMDL"},
+		{"IA_MISS_LLCPREFDATA", "IMLP"},
+		{"IA_MISS_LLCPREFRFO", "IMLR"},
+		{"IA_MISS_DRD_PREF_LOCAL", "IMDPL"},
+		{"IA_MISS_DRD_PREF_REMOTE", "IMDRP"},
+		{"IA_MISS_CRD_PREF", "IMCP"},
+		{"IA_MISS_RFO_PREF", "IMRP"},
+		{"IA_MISS_RFO", "IMRF"},
+		{"IA_MISS_CRD", "IMC"},
+		{"IA_MISS_DRD", "IMD"},
+		{"IO_PCIRDCUR", "IPCI"},
+		{"IO_ITOMCACHENEAR", "IITN"},
+		{"IO_ITOM", "IITO"},
+		{"IMD_OPT", "IMDO"},
+	}
+	// if an abbreviation key is found in the event, replace the matching portion of the event with the abbreviation
+	for _, abbr := range abbreviations {
+		event = strings.Replace(event, abbr[0], abbr[1], -1)
+	}
+	return event
 }
 
 // isCollectableEvent confirms if given event can be collected on the platform
