@@ -33,6 +33,9 @@ else # no prebuilt tools found
 		@echo "No prebuilt tools found in /prebuilt/tools or tools/bin"
 endif
 endif
+ifeq ("$(ls -A internal/script/resources/x86_64)","") # //go:embeded can not support empty directory
+	touch internal/script/resources/x86_64/nofiles
+endif
 
 
 # Build the distribution package
