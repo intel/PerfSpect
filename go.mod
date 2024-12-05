@@ -20,7 +20,7 @@ require (
 	github.com/xuri/excelize/v2 v2.9.0
 	golang.org/x/exp v0.0.0-20241004190924-225e2abe05e6
 	golang.org/x/term v0.27.0
-	golang.org/x/text v0.20.0
+	golang.org/x/text v0.21.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
