@@ -1,4 +1,4 @@
-// Package flame is a subcommand of the root command. It is used to generate flamegraphs from target(s).
+// Package lock is a subcommand of the root command. It is used to collect kernel lock related perf information from target(s).
 package lock
 
 // Copyright (C) 2021-2024 Intel Corporation
