@@ -107,7 +107,7 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 			continue
 		}
 		if script.Superuser && !canElevate {
-			slog.Info("skipping script because it requires superuser privileges and the target cannot elevate privileges", slog.String("script", script.Name))
+			slog.Info("skipping script because it requires superuser privileges and the user cannot elevate privileges on target", slog.String("script", script.Name))
 			continue
 		}
 		if script.Sequential {
@@ -163,8 +163,12 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 		// instigates a known bug in the terminal that corrupts the tty settings:
 		// https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1043320
 		var cmd *exec.Cmd
-		if needsElevatedPrivileges {
-			// run master script with sudo, "-S" to read password from stdin
+		if needsElevatedPrivileges && !canElevate {
+			// this shouldn't happen because we already filtered out the scripts that require elevated privileges if the user cannot elevate privileges on the target
+			err = fmt.Errorf("master script requires elevated privileges but the user cannot elevate privileges on target")
+			return nil, err
+		} else if needsElevatedPrivileges && !myTarget.IsSuperUser() {
+			// run master script with sudo, "-S" to read password from stdin. Note: password won't be asked for if password-less sudo is configured.
 			cmd = exec.Command("sudo", "-S", "bash", path.Join(myTarget.GetTempDirectory(), masterScriptName))
 		} else {
 			cmd = exec.Command("bash", path.Join(myTarget.GetTempDirectory(), masterScriptName))
