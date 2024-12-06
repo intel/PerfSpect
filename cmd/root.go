@@ -22,10 +22,10 @@ import (
 
 	"perfspect/cmd/config"
 	"perfspect/cmd/flame"
+	"perfspect/cmd/lock"
 	"perfspect/cmd/metrics"
 	"perfspect/cmd/report"
 	"perfspect/cmd/telemetry"
-	"perfspect/cmd/lock"
 	"perfspect/internal/common"
 	"perfspect/internal/util"
 
