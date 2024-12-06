@@ -1741,3 +1741,13 @@ func systemFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
 	}
 	return folded
 }
+
+func sectionValueFromOutput(outputs map[string]script.ScriptOutput, sectionName string) string {
+	sections := getSectionsFromOutput(outputs, script.ProfileKernelLockScriptName)
+
+	value := sections[sectionName]
+	if value == "" {
+		slog.Warn("No content for section:", slog.String("warning", sectionName))
+	}
+	return value
+}

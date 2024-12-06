@@ -87,6 +87,7 @@ const (
 	PMUBusyScriptName                           = "pmu busy"
 	ProfileJavaScriptName                       = "profile java"
 	ProfileSystemScriptName                     = "profile system"
+	ProfileKernelLockScriptName                 = "profile kernel lock"
 	GaudiInfoScriptName                         = "gaudi info"
 	GaudiFirmwareScriptName                     = "gaudi firmware"
 	GaudiNumaScriptName                         = "gaudi numa"
@@ -957,6 +958,61 @@ fi
 			}(),
 			Superuser: true,
 			Depends:   []string{"perf", "stackcollapse-perf.pl"},
+		},
+		{
+			Name: ProfileKernelLockScriptName,
+			Script: func() string {
+				return fmt.Sprintf(`# system-wide lock profile collection
+# adjust perf_event_paranoid and kptr_restrict
+PERF_EVENT_PARANOID=$( cat /proc/sys/kernel/perf_event_paranoid )
+echo -1 >/proc/sys/kernel/perf_event_paranoid
+KPTR_RESTRICT=$( cat /proc/sys/kernel/kptr_restrict )
+echo 0 >/proc/sys/kernel/kptr_restrict
+
+frequency=%d
+duration=%d
+
+# collect hotspot
+perf record -F $frequency -a -g --call-graph dwarf -W -d --phys-data --sample-cpu -e cycles:pp,instructions:pp,cpu/mem-loads,ldlat=30/P,cpu/mem-stores/P -o perf_hotspot.data -- sleep $duration &
+PERF_HOTSPOT_PID=$!
+
+# collect c2c
+# perf c2c record -F $frequency -a -g --call-graph dwarf -o perf_c2c.data -- sleep $duration &
+# PERF_C2C_PID=$!
+
+# collect lock
+perf lock contention -a -bv --max-stack 20 2>perf_lock_contention.txt -- sleep $duration &
+PERF_LOCK_PID=$!
+
+wait ${PERF_HOTSPOT_PID}
+# wait ${PERF_C2C_PID}
+wait ${PERF_LOCK_PID}
+
+# restore perf_event_paranoid and kptr_restrict
+echo "$PERF_EVENT_PARANOID" > /proc/sys/kernel/perf_event_paranoid
+echo "$KPTR_RESTRICT" > /proc/sys/kernel/kptr_restrict
+
+# collapse perf data
+if [ -f "perf_hotspot.data" ]; then
+    echo "########## perf_hotspot_no_children ##########"
+    perf report -i perf_hotspot.data --no-children --call-graph none --stdio
+	echo "########## perf_hotspot_callgraph ##########"
+	perf report -i perf_hotspot.data --stdio
+fi
+if [ -f "perf_hotspot.data" ]; then
+    echo "########## perf_c2c_no_children ##########"
+	perf c2c report  -i perf_hotspot.data --call-graph none --stdio
+	echo "########## perf_c2c_callgraph ##########"
+	perf c2c report  -i perf_hotspot.data --stdio
+fi
+if [ -f "perf_lock_contention.txt" ]; then
+    echo "########## perf_lock_contention ##########"
+	cat perf_lock_contention.txt
+fi
+`, frequency, duration)
+			}(),
+			Superuser: true,
+			Depends:   []string{"perf"},
 		},
 	}
 
