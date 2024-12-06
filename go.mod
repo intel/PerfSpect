@@ -14,13 +14,13 @@ replace (
 
 require (
 	github.com/Knetic/govaluate v3.0.0+incompatible
-	github.com/deckarep/golang-set/v2 v2.6.0
+	github.com/deckarep/golang-set/v2 v2.7.0
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/xuri/excelize/v2 v2.9.0
 	golang.org/x/exp v0.0.0-20241004190924-225e2abe05e6
-	golang.org/x/term v0.26.0
-	golang.org/x/text v0.20.0
+	golang.org/x/term v0.27.0
+	golang.org/x/text v0.21.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -33,5 +33,5 @@ require (
 	github.com/xuri/nfp v0.0.0-20240318013403-ab9948c2c4a7 // indirect
 	golang.org/x/crypto v0.28.0 // indirect
 	golang.org/x/net v0.30.0 // indirect
-	golang.org/x/sys v0.27.0 // indirect
+	golang.org/x/sys v0.28.0 // indirect
 )
