@@ -616,8 +616,8 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.ProfileKernelLockScriptName,
 		},
-		FieldsFunc: kernelLockAnalysisTableValues,
-		//HTMLTableRendererFunc: kernelLockAnalysisHTMLRenderer
+		FieldsFunc:            kernelLockAnalysisTableValues,
+		HTMLTableRendererFunc: kernelLockAnalysisHTMLRenderer,
 	},
 }
 

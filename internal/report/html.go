@@ -1041,3 +1041,19 @@ func codePathFrequencyTableHTMLRenderer(tableValues TableValues, targetName stri
 	out += renderFlameGraph("Java", tableValues, "Java Paths")
 	return out
 }
+
+func kernelLockAnalysisHTMLRenderer(tableValues TableValues, targetName string) string {
+	values := [][]string{}
+	var tableValueStyles [][]string
+	for _, field := range tableValues.Fields {
+		rowValues := []string{}
+		rowValues = append(rowValues, field.Name)
+		rowValues = append(rowValues, field.Values[0])
+		values = append(values, rowValues)
+		rowStyles := []string{}
+		rowStyles = append(rowStyles, "font-weight:bold")
+		rowStyles = append(rowStyles, "white-space: pre-wrap")
+		tableValueStyles = append(tableValueStyles, rowStyles)
+	}
+	return renderHTMLTable([]string{}, values, "pure-table pure-table-striped", tableValueStyles)
+}
