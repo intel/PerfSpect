@@ -1906,9 +1906,9 @@ func codePathFrequencyTableValues(outputs map[string]script.ScriptOutput) []Fiel
 func kernelLockAnalysisTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
 		{Name: "Hotspot without Callstack", Values: []string{sectionValueFromOutput(outputs, "perf_hotspot_no_children")}},
-		{Name: "Hotspot with    Callstack", Values: []string{sectionValueFromOutput(outputs, "perf_hotspot_callgraph")}},
+		{Name: "Hotspot with Callstack", Values: []string{sectionValueFromOutput(outputs, "perf_hotspot_callgraph")}},
 		{Name: "Cache2Cache without Callstack", Values: []string{sectionValueFromOutput(outputs, "perf_c2c_no_children")}},
-		{Name: "Cache2Cache with    CallStack", Values: []string{sectionValueFromOutput(outputs, "perf_c2c_callgraph")}},
+		{Name: "Cache2Cache with CallStack", Values: []string{sectionValueFromOutput(outputs, "perf_c2c_callgraph")}},
 		{Name: "Lock Contention", Values: []string{sectionValueFromOutput(outputs, "perf_lock_contention")}},
 	}
 	return fields

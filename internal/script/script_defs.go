@@ -976,17 +976,21 @@ duration=%d
 perf record -F $frequency -a -g --call-graph dwarf -W -d --phys-data --sample-cpu -e cycles:pp,instructions:pp,cpu/mem-loads,ldlat=30/P,cpu/mem-stores/P -o perf_hotspot.data -- sleep $duration &
 PERF_HOTSPOT_PID=$!
 
-# collect c2c
-# perf c2c record -F $frequency -a -g --call-graph dwarf -o perf_c2c.data -- sleep $duration &
-# PERF_C2C_PID=$!
+# check the availability perf lock -b option 
+perf lock contention -a -bv --max-stack 20 2>/dev/null -- sleep 0
+PERF_LOCK_CONTENTION_BPF=$?
 
 # collect lock
-perf lock contention -a -bv --max-stack 20 2>perf_lock_contention.txt -- sleep $duration &
-PERF_LOCK_PID=$!
+if [ ${PERF_LOCK_CONTENTION_BPF} -eq 0 ]; then
+ 	perf lock contention -a -bv --max-stack 20 2>perf_lock_contention.txt -- sleep $duration &
+	PERF_LOCK_PID=$!
+fi
 
 wait ${PERF_HOTSPOT_PID}
-# wait ${PERF_C2C_PID}
-wait ${PERF_LOCK_PID}
+
+if [ ${PERF_LOCK_CONTENTION_BPF} -eq 0 ]; then
+ 	wait ${PERF_LOCK_PID}
+fi
 
 # restore perf_event_paranoid and kptr_restrict
 echo "$PERF_EVENT_PARANOID" > /proc/sys/kernel/perf_event_paranoid
