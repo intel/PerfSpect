@@ -39,6 +39,7 @@ Svr-info functionality is now included in PerfSpect. The svr-info configuration 
 | ------- | ----------- |
 | [`perfspect config`](#config-command) | Modify system configuration |
 | [`perfspect flame`](#flame-command) | Generate flamegraphs |
+| [`perfspect lock`](#lock-command) | Collect system wide hotspot, c2c and lock contention information |
 | [`perfspect metrics`](#metrics-command) | Monitor core and uncore metrics |
 | [`perfspect report`](#report-command) | Generate configuration report |
 | [`perfspect telemetry`](#telemetry-command) | Collect system telemetry |
@@ -55,6 +56,10 @@ $ ./perfspect config --cores 24 --llc 2.0 --uncoremaxfreq 1.8
 ```
 #### Flame Command
 Software flamegraphs are useful in diagnosing software performance bottlenecks. Run `perfspect flame -h` to capture a system-wide software flamegraph.
+
+#### Lock Command
+As system contains more and more cores, it would be usuful to be able to analyze the kernel lock overhead and potential false-sharing that impact the overall system scalability. Run `perfspect lock -h` to collect system wide hotspot, c2c and lock contention information, that will be helpful for experienced performance engineers to have a chance to look into the related problems.
+
 #### Metrics Command
 The `metrics` command provides system performance characterization metrics. The metrics provided are dependent on the platform architecture.
 
