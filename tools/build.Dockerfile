@@ -16,7 +16,9 @@ RUN locale-gen en_US.UTF-8 &&  echo "LANG=en_US.UTF-8" > /etc/default/locale
 RUN add-apt-repository ppa:git-core/ppa -y
 RUN apt-get update && apt-get install -y git build-essential autotools-dev automake \
     gawk zlib1g-dev libtool libaio-dev libaio1 pandoc pkgconf libcap-dev docbook-utils \
-    libreadline-dev default-jre default-jdk cmake flex bison libssl-dev clang libbpf-dev
+    libreadline-dev default-jre default-jdk cmake flex bison libssl-dev clang libbpf-dev \
+    libdw-dev systemtap-sdt-dev libunwind-dev libslang2-dev python-dev binutils-dev \
+    liblzma-dev libzstd-dev libnuma-dev libbabeltrace-dev llvm-13
 
 ENV JAVA_HOME=/usr/lib/jvm/java-1.11.0-openjdk-amd64
 
