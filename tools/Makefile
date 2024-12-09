@@ -146,7 +146,7 @@ PERF_LINUX_VERSION := 6.1.52
 perf:
 	wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$(PERF_LINUX_VERSION).tar.xz
 	tar -xf linux-$(PERF_LINUX_VERSION).tar.xz && mv linux-$(PERF_LINUX_VERSION)/ linux_perf/
-	cd linux_perf/tools/perf && make LDFLAGS="-static --static" BUILD_BPF_SKEL=1
+	cd linux_perf/tools/perf && make LDFLAGS="-static --static" BUILD_BPF_SKEL=1 NO_JVMTI=1
 
 spectre-meltdown-checker:
 ifeq ("$(wildcard spectre-meltdown-checker)","")
