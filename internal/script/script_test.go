@@ -38,7 +38,6 @@ func TestRunScript(t *testing.T) {
 				Superuser: superuser,
 				Lkms:      []string{},
 				Depends:   []string{},
-				Timeout:   0,
 			}
 			tempDir, err := os.MkdirTemp(os.TempDir(), "test")
 			if err != nil {
@@ -73,7 +72,6 @@ echo "Core Count: $num_cores_per_socket"`,
 				Superuser: superuser,
 				Lkms:      []string{},
 				Depends:   []string{},
-				Timeout:   0,
 			}
 			tempDir, err = os.MkdirTemp(os.TempDir(), "test")
 			if err != nil {
@@ -109,7 +107,6 @@ mpstat -u -T -I SCPU -P ALL 1 $count`,
 					Superuser: superuser,
 					Lkms:      []string{},
 					Depends:   []string{"mpstat"},
-					Timeout:   0,
 				}
 				tempDir, err := os.MkdirTemp(os.TempDir(), "test")
 				if err != nil {
