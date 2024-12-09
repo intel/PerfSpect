@@ -6,7 +6,7 @@
 # build output oss_source* will be in workdir
 # build image (from project root directory):
 #   $ docker build -f tools/build.Dockerfile --tag perfspect-tools:$TAG ./tools
-FROM ubuntu:18.04 AS builder
+FROM ubuntu:24.04 AS builder
 ENV http_proxy=${http_proxy}
 ENV https_proxy=${https_proxy}
 ENV LANG=en_US.UTF-8
