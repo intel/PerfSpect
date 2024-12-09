@@ -11,6 +11,18 @@ import (
 	"strings"
 )
 
+type ScriptDefinition struct {
+	Name          string   // just a name
+	Script        string   // the bash script that will be run
+	Architectures []string // architectures, i.e., x86_64, arm64. If empty, it will run on all architectures.
+	Families      []string // families, e.g., 6, 7. If empty, it will run on all families.
+	Models        []string // models, e.g., 62, 63. If empty, it will run on all models.
+	Lkms          []string // loadable kernel modules
+	Depends       []string // binary dependencies that must be available for the script to run
+	Superuser     bool     // requires sudo or root
+	Sequential    bool     // run script sequentially (not at the same time as others)
+}
+
 const (
 	HostnameScriptName                          = "hostname"
 	DateScriptName                              = "date"
