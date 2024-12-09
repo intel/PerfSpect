@@ -470,7 +470,7 @@ rdmsr 0x2FFE`, // uncore client cha count, uncore cha count, uncore cha count sp
 		},
 		{
 			Name:      LshwScriptName,
-			Script:    "lshw -businfo -numeric",
+			Script:    "timeout 30 lshw -businfo -numeric",
 			Depends:   []string{"lshw"},
 			Superuser: true,
 		},
@@ -488,7 +488,7 @@ rdmsr 0x2FFE`, // uncore client cha count, uncore cha count, uncore cha count sp
 		},
 		{
 			Name: NicInfoScriptName,
-			Script: `lshw -businfo -numeric | grep -E "^(pci|usb).*? \S+\s+network\s+\S.*?" \
+			Script: `timeout 30 lshw -businfo -numeric | grep -E "^(pci|usb).*? \S+\s+network\s+\S.*?" \
 | while read -r a ifc c ; do
 	ethtool "$ifc"
 	ethtool -i "$ifc"
@@ -587,26 +587,26 @@ done`,
 		},
 		{
 			Name:      IpmitoolSensorsScriptName,
-			Script:    "LC_ALL=C ipmitool sdr list full",
+			Script:    "LC_ALL=C timeout 30 ipmitool sdr list full",
 			Superuser: true,
 			Depends:   []string{"ipmitool"},
 		},
 		{
 			Name:      IpmitoolChassisScriptName,
-			Script:    "LC_ALL=C ipmitool chassis status",
+			Script:    "LC_ALL=C timeout 30 ipmitool chassis status",
 			Superuser: true,
 			Depends:   []string{"ipmitool"},
 		},
 		{
 			Name:      IpmitoolEventsScriptName,
-			Script:    `LC_ALL=C ipmitool sel elist | tail -n20 | cut -d'|' -f2-`,
+			Script:    `LC_ALL=C timeout 30 ipmitool sel elist | tail -n20 | cut -d'|' -f2-`,
 			Superuser: true,
 			Lkms:      []string{"ipmi_devintf", "ipmi_si"},
 			Depends:   []string{"ipmitool"},
 		},
 		{
 			Name:      IpmitoolEventTimeScriptName,
-			Script:    "LC_ALL=C ipmitool sel time get",
+			Script:    "LC_ALL=C timeout 30 ipmitool sel time get",
 			Superuser: true,
 			Depends:   []string{"ipmitool"},
 		},
