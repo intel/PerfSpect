@@ -35,6 +35,10 @@ type Target interface {
 	// It returns true if the user can elevate privileges, false otherwise.
 	CanElevatePrivileges() bool
 
+	// IsSuperUser checks if the current user is a superuser.
+	// It returns true if the user is a superuser, false otherwise.
+	IsSuperUser() bool
+
 	// GetArchitecture returns the architecture of the target system.
 	// It returns a string representing the architecture and any error that occurred.
 	GetArchitecture() (arch string, err error)
@@ -370,7 +374,7 @@ func (t *LocalTarget) CanElevatePrivileges() bool {
 	if t.canElevate != 0 {
 		return t.canElevate == 1
 	}
-	if os.Geteuid() == 0 {
+	if t.IsSuperUser() {
 		t.canElevate = 1
 		return true // user is root
 	}
@@ -406,7 +410,7 @@ func (t *RemoteTarget) CanElevatePrivileges() bool {
 	if t.canElevate != 0 {
 		return t.canElevate == 1
 	}
-	if t.user == "root" {
+	if t.IsSuperUser() {
 		t.canElevate = 1
 		return true
 	}
@@ -418,6 +422,16 @@ func (t *RemoteTarget) CanElevatePrivileges() bool {
 	}
 	t.canElevate = -1
 	return false
+}
+
+// IsSuperUser checks if the current user is a superuser.
+// It returns true if the user is a superuser, false otherwise.
+func (t *LocalTarget) IsSuperUser() bool {
+	return os.Geteuid() == 0
+}
+
+func (t *RemoteTarget) IsSuperUser() bool {
+	return t.user == "root"
 }
 
 // InstallLkms installs the specified LKMs (Loadable Kernel Modules) on the target.
