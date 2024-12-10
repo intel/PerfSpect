@@ -434,23 +434,32 @@ func prefetchersFromOutput(outputs map[string]script.ScriptOutput) string {
 // get L3 per instance in MB from lscpu
 // known lscpu output formats for L3 cache:
 //
-//	L3 cache:                   576 MiB (2 instances)
+// L3 cache:                   576 MiB (2 instances)
+// L3 cache:                   210 MiB
 func getL3LscpuMB(outputs map[string]script.ScriptOutput) (val float64, err error) {
+	var instances int
 	l3Lscpu := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^L3 cache.*:\s*(.+?)$`)
 	re := regexp.MustCompile(`(\d+\.?\d*)\s*(\w+)\s+\((\d+) instance[s]*\)`) // match known formats
 	match := re.FindStringSubmatch(l3Lscpu)
-	if len(match) == 0 {
-		err = fmt.Errorf("unknown L3 format in lscpu: %s", l3Lscpu)
-		return
+	if match != nil {
+		instances, err = strconv.Atoi(match[3])
+		if err != nil {
+			err = fmt.Errorf("failed to parse L3 instances from lscpu: %s, %v", l3Lscpu, err)
+			return
+		}
+	} else {
+		// try regex without the instance count
+		re = regexp.MustCompile(`(\d+\.?\d*)\s*(\w+)`)
+		match = re.FindStringSubmatch(l3Lscpu)
+		if match == nil {
+			err = fmt.Errorf("unknown L3 format in lscpu: %s", l3Lscpu)
+			return
+		}
+		instances = 1
 	}
 	l3SizeNoUnit, err := strconv.ParseFloat(match[1], 64)
 	if err != nil {
 		err = fmt.Errorf("failed to parse L3 size from lscpu: %s, %v", l3Lscpu, err)
-		return
-	}
-	instances, err := strconv.Atoi(match[3])
-	if err != nil {
-		err = fmt.Errorf("failed to parse L3 instances from lscpu: %s, %v", l3Lscpu, err)
 		return
 	}
 	units := match[2]
