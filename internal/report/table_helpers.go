@@ -437,7 +437,7 @@ func prefetchersFromOutput(outputs map[string]script.ScriptOutput) string {
 //	L3 cache:                   576 MiB (2 instances)
 func getL3LscpuMB(outputs map[string]script.ScriptOutput) (val float64, err error) {
 	l3Lscpu := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^L3 cache.*:\s*(.+?)$`)
-	re := regexp.MustCompile(`(\d+\.?\d*)\s*(\w+)\s+\((\d+) instances\)`) // match known formats
+	re := regexp.MustCompile(`(\d+\.?\d*)\s*(\w+)\s+\((\d+) instance[s]*\)`) // match known formats
 	match := re.FindStringSubmatch(l3Lscpu)
 	if len(match) == 0 {
 		err = fmt.Errorf("unknown L3 format in lscpu: %s", l3Lscpu)
