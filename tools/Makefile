@@ -7,7 +7,7 @@
 default: tools
 .PHONY: default tools async-profiler avx-turbo cpuid dmidecode ethtool flamegraph ipmitool lshw lspci msr-tools pcm perf spectre-meltdown-checker sshpass stress-ng sysstat tsc turbostat
 
-tools: async-profiler avx-turbo cpuid dmidecode ethtool flamegraph ipmitool lshw lspci msr-tools pcm perf spectre-meltdown-checker sshpass stress-ng sysstat tsc turbostat
+tools: async-profiler avx-turbo cpuid dmidecode ethtool flamegraph ipmitool lshw lspci msr-tools pcm spectre-meltdown-checker sshpass stress-ng sysstat tsc turbostat
 	mkdir -p bin
 	cp -R async-profiler bin/
 	cp avx-turbo/avx-turbo bin/
@@ -23,7 +23,6 @@ tools: async-profiler avx-turbo cpuid dmidecode ethtool flamegraph ipmitool lshw
 	cp msr-tools/wrmsr bin/
 	cp pcm/build/bin/pcm-tpmi bin/
 	cp pcm/scripts/bhs-power-mode.sh bin/
-	cp linux_perf/tools/perf/perf bin/
 	cp spectre-meltdown-checker/spectre-meltdown-checker.sh bin/
 	cp sshpass/sshpass bin/
 	cp stress-ng/stress-ng bin/
@@ -147,6 +146,9 @@ perf:
 	wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$(PERF_LINUX_VERSION).tar.xz
 	tar -xf linux-$(PERF_LINUX_VERSION).tar.xz && mv linux-$(PERF_LINUX_VERSION)/ linux_perf/
 	cd linux_perf/tools/perf && make LDFLAGS="-static --static" BUILD_BPF_SKEL=1 NO_JVMTI=1
+	mkdir -p bin
+	cp linux_perf/tools/perf/perf bin/
+	strip --strip-unneeded bin/perf
 
 spectre-meltdown-checker:
 ifeq ("$(wildcard spectre-meltdown-checker)","")
@@ -208,7 +210,6 @@ reset:
 	cd lspci && git clean -fdx && git reset --hard
 	cd pcm && git clean -fdx && git reset --hard
 	cd msr-tools && git clean -fdx && git reset --hard
-	cd linux_perf/tools/perf && make clean
 	cd spectre-meltdown-checker
 	cd sshpass && make clean
 	cd stress-ng && git clean -fdx && git reset --hard
@@ -226,5 +227,5 @@ libcrypt.tar.gz:
 libs: glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
 
 oss-source: reset libs
-	tar --exclude-vcs -czf oss_source.tgz async-profiler/ cpuid/ dmidecode/ ethtool/ flamegraph/ ipmitool/ lshw/ lspci/ msr-tools/ pcm/ linux_perf/tools/perf spectre-meltdown-checker/ sshpass/ stress-ng/ sysstat/ linux_turbostat/tools/power/x86/turbostat glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
+	tar --exclude-vcs -czf oss_source.tgz async-profiler/ cpuid/ dmidecode/ ethtool/ flamegraph/ ipmitool/ lshw/ lspci/ msr-tools/ pcm/ spectre-meltdown-checker/ sshpass/ stress-ng/ sysstat/ linux_turbostat/tools/power/x86/turbostat glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
 	md5sum oss_source.tgz > oss_source.tgz.md5
