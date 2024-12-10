@@ -22,6 +22,7 @@ import (
 
 	"perfspect/cmd/config"
 	"perfspect/cmd/flame"
+	"perfspect/cmd/lock"
 	"perfspect/cmd/metrics"
 	"perfspect/cmd/report"
 	"perfspect/cmd/telemetry"
@@ -111,6 +112,7 @@ Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
 	rootCmd.AddCommand(metrics.Cmd)
 	rootCmd.AddCommand(telemetry.Cmd)
 	rootCmd.AddCommand(flame.Cmd)
+	rootCmd.AddCommand(lock.Cmd)
 	rootCmd.AddCommand(config.Cmd)
 	if onIntelNetwork() {
 		rootCmd.AddGroup([]*cobra.Group{{ID: "other", Title: "Other Commands:"}}...)
