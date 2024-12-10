@@ -11,6 +11,18 @@ import (
 	"strings"
 )
 
+type ScriptDefinition struct {
+	Name          string   // just a name
+	Script        string   // the bash script that will be run
+	Architectures []string // architectures, i.e., x86_64, arm64. If empty, it will run on all architectures.
+	Families      []string // families, e.g., 6, 7. If empty, it will run on all families.
+	Models        []string // models, e.g., 62, 63. If empty, it will run on all models.
+	Lkms          []string // loadable kernel modules
+	Depends       []string // binary dependencies that must be available for the script to run
+	Superuser     bool     // requires sudo or root
+	Sequential    bool     // run script sequentially (not at the same time as others)
+}
+
 const (
 	HostnameScriptName                          = "hostname"
 	DateScriptName                              = "date"
@@ -471,7 +483,7 @@ rdmsr 0x2FFE`, // uncore client cha count, uncore cha count, uncore cha count sp
 		},
 		{
 			Name:      LshwScriptName,
-			Script:    "lshw -businfo -numeric",
+			Script:    "timeout 30 lshw -businfo -numeric",
 			Depends:   []string{"lshw"},
 			Superuser: true,
 		},
@@ -489,7 +501,7 @@ rdmsr 0x2FFE`, // uncore client cha count, uncore cha count, uncore cha count sp
 		},
 		{
 			Name: NicInfoScriptName,
-			Script: `lshw -businfo -numeric | grep -E "^(pci|usb).*? \S+\s+network\s+\S.*?" \
+			Script: `timeout 30 lshw -businfo -numeric | grep -E "^(pci|usb).*? \S+\s+network\s+\S.*?" \
 | while read -r a ifc c ; do
 	ethtool "$ifc"
 	ethtool -i "$ifc"
@@ -588,26 +600,26 @@ done`,
 		},
 		{
 			Name:      IpmitoolSensorsScriptName,
-			Script:    "LC_ALL=C ipmitool sdr list full",
+			Script:    "LC_ALL=C timeout 30 ipmitool sdr list full",
 			Superuser: true,
 			Depends:   []string{"ipmitool"},
 		},
 		{
 			Name:      IpmitoolChassisScriptName,
-			Script:    "LC_ALL=C ipmitool chassis status",
+			Script:    "LC_ALL=C timeout 30 ipmitool chassis status",
 			Superuser: true,
 			Depends:   []string{"ipmitool"},
 		},
 		{
 			Name:      IpmitoolEventsScriptName,
-			Script:    `LC_ALL=C ipmitool sel elist | tail -n20 | cut -d'|' -f2-`,
+			Script:    `LC_ALL=C timeout 30 ipmitool sel elist | tail -n20 | cut -d'|' -f2-`,
 			Superuser: true,
 			Lkms:      []string{"ipmi_devintf", "ipmi_si"},
 			Depends:   []string{"ipmitool"},
 		},
 		{
 			Name:      IpmitoolEventTimeScriptName,
-			Script:    "LC_ALL=C ipmitool sel time get",
+			Script:    "LC_ALL=C timeout 30 ipmitool sel time get",
 			Superuser: true,
 			Depends:   []string{"ipmitool"},
 		},
