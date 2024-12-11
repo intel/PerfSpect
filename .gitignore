@@ -6,3 +6,4 @@
 /dist
 /internal/script/resources/x86_64
 /test
+/__debug_bin*.log

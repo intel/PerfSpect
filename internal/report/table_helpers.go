@@ -431,30 +431,44 @@ func prefetchersFromOutput(outputs map[string]script.ScriptOutput) string {
 	return "None"
 }
 
-// get L3 in MB from lscpu
+// get L3 per instance in MB from lscpu
 // known lscpu output formats for L3 cache:
 //
-//	1.5 MBi    < Ubuntu
-//	1536KB     < CentOS
+// L3 cache:                   576 MiB (2 instances)
+// L3 cache:                   210 MiB
 func getL3LscpuMB(outputs map[string]script.ScriptOutput) (val float64, err error) {
+	var instances int
 	l3Lscpu := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^L3 cache.*:\s*(.+?)$`)
-	re := regexp.MustCompile(`(\d+\.?\d*)\s*(\w+).*`) // match known formats
+	re := regexp.MustCompile(`(\d+\.?\d*)\s*(\w+)\s+\((\d+) instance[s]*\)`) // match known formats
 	match := re.FindStringSubmatch(l3Lscpu)
-	if len(match) == 0 {
-		err = fmt.Errorf("unknown L3 format in lscpu: %s", l3Lscpu)
-		return
+	if match != nil {
+		instances, err = strconv.Atoi(match[3])
+		if err != nil {
+			err = fmt.Errorf("failed to parse L3 instances from lscpu: %s, %v", l3Lscpu, err)
+			return
+		}
+	} else {
+		// try regex without the instance count
+		re = regexp.MustCompile(`(\d+\.?\d*)\s*(\w+)`)
+		match = re.FindStringSubmatch(l3Lscpu)
+		if match == nil {
+			err = fmt.Errorf("unknown L3 format in lscpu: %s", l3Lscpu)
+			return
+		}
+		instances = 1
 	}
 	l3SizeNoUnit, err := strconv.ParseFloat(match[1], 64)
 	if err != nil {
 		err = fmt.Errorf("failed to parse L3 size from lscpu: %s, %v", l3Lscpu, err)
 		return
 	}
-	if strings.ToLower(match[2][:1]) == "m" {
-		val = l3SizeNoUnit
+	units := match[2]
+	if strings.ToLower(units[:1]) == "m" {
+		val = l3SizeNoUnit / float64(instances)
 		return
 	}
-	if strings.ToLower(match[2][:1]) == "k" {
-		val = l3SizeNoUnit / 1024
+	if strings.ToLower(units[:1]) == "k" {
+		val = l3SizeNoUnit / 1024 / float64(instances)
 		return
 	}
 	err = fmt.Errorf("unknown L3 units in lscpu: %s", l3Lscpu)
@@ -548,12 +562,7 @@ func l3PerCoreFromOutput(outputs map[string]script.ScriptOutput) string {
 		slog.Error("failed to parse cores per socket", slog.String("error", err.Error()))
 		return ""
 	}
-	sockets, err := strconv.Atoi(valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(.*:\s*(.+?)$`))
-	if err != nil || sockets == 0 {
-		slog.Error("failed to parse sockets", slog.String("error", err.Error()))
-		return ""
-	}
-	cacheMB := l3 / float64(coresPerSocket*sockets)
+	cacheMB := l3 / float64(coresPerSocket)
 	val := strconv.FormatFloat(cacheMB, 'f', 3, 64)
 	val = strings.TrimRight(val, "0") // trim trailing zeros
 	val = strings.TrimRight(val, ".") // trim decimal point if trailing
