@@ -343,7 +343,7 @@ func getPerfSupportedEvents(myTarget target.Target, perfPath string) (supportedE
 func getSupportsRefCycles(myTarget target.Target, noRoot bool, perfPath string, localTempDir string) (supported bool, output string, err error) {
 	scriptDef := script.ScriptDefinition{
 		Name:      "perf stat ref-cycles",
-		Script:    perfPath + " stat -a -e ref-cycles sleep .1",
+		Script:    perfPath + " stat -a -e ref-cycles sleep 1",
 		Superuser: !noRoot,
 	}
 	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
@@ -369,7 +369,7 @@ func getSupportsRefCycles(myTarget target.Target, noRoot bool, perfPath string, 
 func getSupportsFixedTMA(myTarget target.Target, noRoot bool, perfPath string, localTempDir string) (supported bool, output string, err error) {
 	scriptDef := script.ScriptDefinition{
 		Name:      "perf stat tma",
-		Script:    perfPath + " stat -a -e '{cpu/event=0x00,umask=0x04,period=10000003,name='TOPDOWN.SLOTS'/,cpu/event=0x00,umask=0x81,period=10000003,name='PERF_METRICS.BAD_SPECULATION'/}' sleep .1",
+		Script:    perfPath + " stat -a -e '{cpu/event=0x00,umask=0x04,period=10000003,name='TOPDOWN.SLOTS'/,cpu/event=0x00,umask=0x81,period=10000003,name='PERF_METRICS.BAD_SPECULATION'/}' sleep 1",
 		Superuser: !noRoot,
 	}
 	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
@@ -434,7 +434,7 @@ func getSupportsFixedEvent(myTarget target.Target, event string, uarch string, n
 	}
 	scriptDef := script.ScriptDefinition{
 		Name:      "perf stat " + event,
-		Script:    perfPath + " stat -a -e '{" + strings.Join(eventList, ",") + "}' sleep .1",
+		Script:    perfPath + " stat -a -e '{" + strings.Join(eventList, ",") + "}' sleep 1",
 		Superuser: !noRoot,
 	}
 	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
