@@ -354,7 +354,7 @@ func benchmarkSummaryFromTableValues(allTableValues []report.TableValues, output
 			{Name: "Maximum Temperature", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUTemperatureTableName), "Maximum Temperature", 0)}},
 			{Name: "Minimum Power", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUPowerTableName), "Minimum Power", 0)}},
 			{Name: "Memory Peak Bandwidth"},
-			{Name: "Memory Minimum Latency", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.MemoryLatencyTableName), "Latency (ns)", 0) + " ns"}},
+			{Name: "Memory Minimum Latency"},
 			{Name: "Microarchitecture", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.SystemSummaryTableName), "Microarchitecture", 0)}},
 			{Name: "Sockets", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.SystemSummaryTableName), "Sockets", 0)}},
 		},
@@ -385,6 +385,13 @@ func benchmarkSummaryFromTableValues(allTableValues []report.TableValues, output
 		tableValues.Fields[6].Values = []string{fmt.Sprintf("%.1f GB/s", maxBandwidth)}
 	} else {
 		tableValues.Fields[6].Values = []string{""}
+	}
+	// get the minimum memory latency
+	minLatency := getValueFromTableValues(getTableValues(allTableValues, report.MemoryLatencyTableName), "Latency (ns)", 0)
+	if minLatency != "" {
+		tableValues.Fields[7].Values = []string{minLatency + " ns"}
+	} else {
+		tableValues.Fields[7].Values = []string{""}
 	}
 	return tableValues
 }
