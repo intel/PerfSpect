@@ -54,6 +54,7 @@ var cpus = CPUDB{
 	{MicroArchitecture: "Milan", Family: "25", Model: "1", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 0},                      // Milan
 	{MicroArchitecture: "Genoa", Family: "25", Model: "(1[6-9]|2[0-9]|3[01])", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 0}, // Genoa,  model 16-31
 	{MicroArchitecture: "Bergamo", Family: "25", Model: "(16[0-9]|17[0-5])", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 0},   // Bergamo, model 160-175
+	{MicroArchitecture: "Turin", Family: "26", Model: "2", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 0},                     // Turin
 	// ARM CPUs
 	{MicroArchitecture: "Neoverse N1", Family: "", Model: "1", Stepping: "r3p1", Architecture: "arm64", MemoryChannelCount: 8, LogicalThreadCount: 1, CacheWayCount: 0}, // AWS Graviton 2
 	{MicroArchitecture: "Neoverse V1", Family: "", Model: "1", Stepping: "r1p1", Architecture: "arm64", MemoryChannelCount: 8, LogicalThreadCount: 1, CacheWayCount: 0}, // AWS Graviton 3
