@@ -182,7 +182,7 @@ func init() {
 	}
 	// set up other flags
 	Cmd.Flags().StringVar(&common.FlagInput, common.FlagInputName, "", "")
-	Cmd.Flags().BoolVar(&flagAll, flagAllName, false, "")
+	Cmd.Flags().BoolVar(&flagAll, flagAllName, true, "")
 	Cmd.Flags().StringSliceVar(&common.FlagFormat, common.FlagFormatName, []string{report.FormatAll}, "")
 	Cmd.Flags().StringSliceVar(&flagBenchmark, flagBenchmarkName, []string{}, "")
 
@@ -263,17 +263,13 @@ func getFlagGroups() []common.FlagGroup {
 }
 
 func validateFlags(cmd *cobra.Command, args []string) error {
-	// set flagAll if all categories are selected or if none are selected
-	if !flagAll {
-		numCategoriesTrue := 0
+	// clear flagAll if any categories are selected
+	if flagAll {
 		for _, cat := range categories {
-			if *cat.FlagVar {
-				numCategoriesTrue++
+			if cat.FlagVar != nil && *cat.FlagVar {
+				flagAll = false
 				break
 			}
-		}
-		if numCategoriesTrue == len(categories) || numCategoriesTrue == 0 {
-			flagAll = true
 		}
 	}
 	// validate format options
