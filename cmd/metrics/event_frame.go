@@ -121,8 +121,13 @@ func parseEvents(rawEvents [][]byte, eventGroupDefinitions []GroupDefinition) (e
 	for _, rawEvent := range rawEvents {
 		var event Event
 		if event, err = parseEventJSON(rawEvent); err != nil {
-			err = fmt.Errorf("failed to parse perf event: %v", err)
-			return
+			if strings.Contains(err.Error(), "unrecognized event format") {
+				slog.Error(err.Error(), slog.String("event", string(rawEvent)))
+				return
+			} else {
+				slog.Warn(err.Error(), slog.String("event", string(rawEvent)))
+				event.Value = math.NaN()
+			}
 		}
 		if event.Event != previousEvent {
 			eventIdx++
@@ -347,10 +352,17 @@ func parseEventJSON(rawEvent []byte) (event Event, err error) {
 		err = fmt.Errorf("unrecognized event format: \"%s\"", rawEvent)
 		return
 	}
+	if event.CounterValue == "<not supported>" {
+		err = fmt.Errorf("event not supported: \"%s\"", rawEvent)
+		return
+	}
+	if event.CounterValue == "<not counted>" {
+		err = fmt.Errorf("event not counted: \"%s\"", rawEvent)
+		return
+	}
 	if event.Value, err = strconv.ParseFloat(event.CounterValue, 64); err != nil {
-		event.Value = math.NaN()
-		err = nil
-		slog.Debug("failed to parse event value", slog.String("event", string(rawEvent)))
+		err = fmt.Errorf("failed to parse event value as float: \"%s\"", rawEvent)
+		return
 	}
 	return
 }

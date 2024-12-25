@@ -34,7 +34,7 @@ type MetricDefinition struct {
 // definition file. When the override path argument is empty, the function will load metrics from
 // the file associated with the platform's architecture found in the provided metadata. When
 // a list of metric names is provided, only those metric definitions will be loaded.
-func LoadMetricDefinitions(metricDefinitionOverridePath string, selectedMetrics []string, uncollectableEvents []string, metadata Metadata) (metrics []MetricDefinition, err error) {
+func LoadMetricDefinitions(metricDefinitionOverridePath string, selectedMetrics []string, metadata Metadata) (metrics []MetricDefinition, err error) {
 	var bytes []byte
 	if metricDefinitionOverridePath != "" {
 		if bytes, err = os.ReadFile(metricDefinitionOverridePath); err != nil {
@@ -55,20 +55,6 @@ func LoadMetricDefinitions(metricDefinitionOverridePath string, selectedMetrics 
 	var metricsInFile []MetricDefinition
 	if err = json.Unmarshal(bytes, &metricsInFile); err != nil {
 		return
-	}
-	// remove "metric_" prefix from metric names
-	for i := range metricsInFile {
-		metricsInFile[i].Name = strings.TrimPrefix(metricsInFile[i].Name, "metric_")
-	}
-	// remove metrics from list that use uncollectable events
-	for _, uncollectableEvent := range uncollectableEvents {
-		for i := 0; i < len(metricsInFile); i++ {
-			if strings.Contains(metricsInFile[i].Expression, uncollectableEvent) {
-				slog.Debug("removing metric that uses uncollectable event", slog.String("metric", metricsInFile[i].Name), slog.String("event", uncollectableEvent))
-				metricsInFile = append(metricsInFile[:i], metricsInFile[i+1:]...)
-				i--
-			}
-		}
 	}
 	// if a list of metric names provided, reduce list to match
 	if len(selectedMetrics) > 0 {
@@ -102,7 +88,7 @@ func LoadMetricDefinitions(metricDefinitionOverridePath string, selectedMetrics 
 // ConfigureMetrics prepares metrics for use by the evaluator, by e.g., replacing
 // metric constants with known values and aligning metric variables to perf event
 // groups
-func ConfigureMetrics(metrics []MetricDefinition, evaluatorFunctions map[string]govaluate.ExpressionFunction, metadata Metadata) (err error) {
+func ConfigureMetrics(loadedMetrics []MetricDefinition, uncollectableEvents []string, evaluatorFunctions map[string]govaluate.ExpressionFunction, metadata Metadata) (metrics []MetricDefinition, err error) {
 	// get constants as strings
 	tscFreq := fmt.Sprintf("%f", float64(metadata.TSCFrequencyHz))
 	tsc := fmt.Sprintf("%f", float64(metadata.TSC))
@@ -112,54 +98,70 @@ func ConfigureMetrics(metrics []MetricDefinition, evaluatorFunctions map[string]
 	hyperThreadingOn := fmt.Sprintf("%t", metadata.ThreadsPerCore > 1)
 	threadsPerCore := fmt.Sprintf("%f", float64(metadata.ThreadsPerCore))
 	// configure each metric
-	for metricIdx := range metrics {
-		// swap in per-txn metric definition if transaction rate is provided
-		if flagTransactionRate != 0 && metrics[metricIdx].ExpressionTxn != "" {
-			metrics[metricIdx].Expression = metrics[metricIdx].ExpressionTxn
-			metrics[metricIdx].Expression = strings.ReplaceAll(metrics[metricIdx].Expression, "[TXN]", fmt.Sprintf("%f", flagTransactionRate))
-			metrics[metricIdx].Name = metrics[metricIdx].NameTxn
+	for metricIdx := range loadedMetrics {
+		tmpMetric := loadedMetrics[metricIdx]
+		// abbreviate event names in metric expressions to match abbreviations used in uncollectableEvents
+		tmpMetric.Expression = abbreviateEventName(tmpMetric.Expression)
+		tmpMetric.ExpressionTxn = abbreviateEventName(tmpMetric.ExpressionTxn)
+		// skip metrics that use uncollectable events
+		foundUncollectable := false
+		for _, uncollectableEvent := range uncollectableEvents {
+			if strings.Contains(tmpMetric.Expression, uncollectableEvent) {
+				slog.Warn("removing metric that uses uncollectable event", slog.String("metric", tmpMetric.Name), slog.String("event", uncollectableEvent))
+				foundUncollectable = true
+				break
+			}
 		}
+		if foundUncollectable {
+			continue
+		}
+		// swap in per-txn metric definition if transaction rate is provided
+		if flagTransactionRate != 0 && tmpMetric.ExpressionTxn != "" {
+			tmpMetric.Expression = tmpMetric.ExpressionTxn
+			tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, "[TXN]", fmt.Sprintf("%f", flagTransactionRate))
+			tmpMetric.Name = tmpMetric.NameTxn
+		}
+		// remove "metric_" prefix from metric names
+		tmpMetric.Name = strings.TrimPrefix(tmpMetric.Name, "metric_")
 		// transform if/else to ?/:
 		var transformed string
-		if transformed, err = transformConditional(metrics[metricIdx].Expression); err != nil {
+		if transformed, err = transformConditional(tmpMetric.Expression); err != nil {
 			return
 		}
-		if transformed != metrics[metricIdx].Expression {
-			slog.Debug("transformed metric", slog.String("original", metrics[metricIdx].Name), slog.String("transformed", transformed))
-			metrics[metricIdx].Expression = transformed
+		if transformed != tmpMetric.Expression {
+			slog.Debug("transformed metric", slog.String("original", tmpMetric.Name), slog.String("transformed", transformed))
+			tmpMetric.Expression = transformed
 		}
 		// replace constants with their values
-		metrics[metricIdx].Expression = strings.ReplaceAll(metrics[metricIdx].Expression, "[SYSTEM_TSC_FREQ]", tscFreq)
-		metrics[metricIdx].Expression = strings.ReplaceAll(metrics[metricIdx].Expression, "[TSC]", tsc)
-		metrics[metricIdx].Expression = strings.ReplaceAll(metrics[metricIdx].Expression, "[CORES_PER_SOCKET]", coresPerSocket)
-		metrics[metricIdx].Expression = strings.ReplaceAll(metrics[metricIdx].Expression, "[CHAS_PER_SOCKET]", chasPerSocket)
-		metrics[metricIdx].Expression = strings.ReplaceAll(metrics[metricIdx].Expression, "[SOCKET_COUNT]", socketCount)
-		metrics[metricIdx].Expression = strings.ReplaceAll(metrics[metricIdx].Expression, "[HYPERTHREADING_ON]", hyperThreadingOn)
-		metrics[metricIdx].Expression = strings.ReplaceAll(metrics[metricIdx].Expression, "[CONST_THREAD_COUNT]", threadsPerCore)
-		// abbreviate event names
-		metrics[metricIdx].Expression = abbreviateEventName(metrics[metricIdx].Expression)
-		metrics[metricIdx].ExpressionTxn = abbreviateEventName(metrics[metricIdx].ExpressionTxn)
+		tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, "[SYSTEM_TSC_FREQ]", tscFreq)
+		tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, "[TSC]", tsc)
+		tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, "[CORES_PER_SOCKET]", coresPerSocket)
+		tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, "[CHAS_PER_SOCKET]", chasPerSocket)
+		tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, "[SOCKET_COUNT]", socketCount)
+		tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, "[HYPERTHREADING_ON]", hyperThreadingOn)
+		tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, "[CONST_THREAD_COUNT]", threadsPerCore)
 		// get a list of the variables in the expression
-		metrics[metricIdx].Variables = make(map[string]int)
+		tmpMetric.Variables = make(map[string]int)
 		expressionIdx := 0
 		for {
-			startVar := strings.IndexRune(metrics[metricIdx].Expression[expressionIdx:], '[')
+			startVar := strings.IndexRune(tmpMetric.Expression[expressionIdx:], '[')
 			if startVar == -1 { // no more vars in this expression
 				break
 			}
-			endVar := strings.IndexRune(metrics[metricIdx].Expression[expressionIdx:], ']')
+			endVar := strings.IndexRune(tmpMetric.Expression[expressionIdx:], ']')
 			if endVar == -1 {
-				err = fmt.Errorf("didn't find end of variable indicator (]) in expression: %s", metrics[metricIdx].Expression[expressionIdx:])
+				err = fmt.Errorf("didn't find end of variable indicator (]) in expression: %s", tmpMetric.Expression[expressionIdx:])
 				return
 			}
 			// add the variable name to the map, set group index to -1 to indicate it has not yet been determined
-			metrics[metricIdx].Variables[metrics[metricIdx].Expression[expressionIdx:][startVar+1:endVar]] = -1
+			tmpMetric.Variables[tmpMetric.Expression[expressionIdx:][startVar+1:endVar]] = -1
 			expressionIdx += endVar + 1
 		}
-		if metrics[metricIdx].Evaluable, err = govaluate.NewEvaluableExpressionWithFunctions(metrics[metricIdx].Expression, evaluatorFunctions); err != nil {
-			slog.Error("failed to create evaluable expression for metric", slog.String("error", err.Error()), slog.String("metric name", metrics[metricIdx].Name), slog.String("metric expression", metrics[metricIdx].Expression))
+		if tmpMetric.Evaluable, err = govaluate.NewEvaluableExpressionWithFunctions(tmpMetric.Expression, evaluatorFunctions); err != nil {
+			slog.Error("failed to create evaluable expression for metric", slog.String("error", err.Error()), slog.String("metric name", tmpMetric.Name), slog.String("metric expression", tmpMetric.Expression))
 			return
 		}
+		metrics = append(metrics, tmpMetric)
 	}
 	return
 }

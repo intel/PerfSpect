@@ -883,7 +883,8 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 		return
 	}
 	// load metric definitions
-	if targetContext.metricDefinitions, err = LoadMetricDefinitions(flagMetricFilePath, flagMetricsList, uncollectableEvents, targetContext.metadata); err != nil {
+	var loadedMetrics []MetricDefinition
+	if loadedMetrics, err = LoadMetricDefinitions(flagMetricFilePath, flagMetricsList, targetContext.metadata); err != nil {
 		err = fmt.Errorf("failed to load metric definitions: %w", err)
 		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 		targetContext.err = err
@@ -891,7 +892,7 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 		return
 	}
 	// configure metrics
-	if err = ConfigureMetrics(targetContext.metricDefinitions, GetEvaluatorFunctions(), targetContext.metadata); err != nil {
+	if targetContext.metricDefinitions, err = ConfigureMetrics(loadedMetrics, uncollectableEvents, GetEvaluatorFunctions(), targetContext.metadata); err != nil {
 		err = fmt.Errorf("failed to configure metrics: %w", err)
 		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 		targetContext.err = err

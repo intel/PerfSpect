@@ -39,6 +39,8 @@ type Metadata struct {
 	SupportsFixedTMA          bool
 	SupportsRefCycles         bool
 	SupportsUncore            bool
+	SupportsPEBS              bool
+	SupportsOCR               bool
 	ThreadsPerCore            int
 	TSC                       int
 	TSCFrequencyHz            int
@@ -161,8 +163,36 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 		}
 		slowFuncChannel <- err
 	}()
+	// PEBS
+	go func() {
+		var err error
+		var output string
+		if metadata.SupportsPEBS, output, err = getSupportsPEBS(myTarget, noRoot, perfPath, localTempDir); err != nil {
+			err = fmt.Errorf("failed to determine if 'PEBS' is supported: %v", err)
+		} else {
+			if !metadata.SupportsPEBS {
+				slog.Warn("'PEBS' events not supported", slog.String("output", output))
+			}
+		}
+		slowFuncChannel <- err
+	}()
+	// Offcore response
+	go func() {
+		var err error
+		var output string
+		if metadata.SupportsOCR, output, err = getSupportsOCR(myTarget, noRoot, perfPath, localTempDir); err != nil {
+			err = fmt.Errorf("failed to determine if 'OCR' is supported: %v", err)
+		} else {
+			if !metadata.SupportsOCR {
+				slog.Warn("'OCR' events not supported", slog.String("output", output))
+			}
+		}
+		slowFuncChannel <- err
+	}()
 	defer func() {
 		var errs []error
+		errs = append(errs, <-slowFuncChannel)
+		errs = append(errs, <-slowFuncChannel)
 		errs = append(errs, <-slowFuncChannel)
 		errs = append(errs, <-slowFuncChannel)
 		errs = append(errs, <-slowFuncChannel)
@@ -218,6 +248,8 @@ func (md Metadata) String() string {
 		"Fixed TMA slot supported: %t, "+
 		"ref-cycles supported: %t, "+
 		"Uncore supported: %t, "+
+		"PEBS supported: %t, "+
+		"OCR supported: %t, "+
 		"PMU Driver version: %s, "+
 		"Kernel version: %s, ",
 		md.ModelName,
@@ -234,6 +266,8 @@ func (md Metadata) String() string {
 		md.SupportsFixedTMA,
 		md.SupportsRefCycles,
 		md.SupportsUncore,
+		md.SupportsPEBS,
+		md.SupportsOCR,
 		md.PMUDriverVersion,
 		md.KernelVersion)
 	for deviceName, deviceIds := range md.UncoreDeviceIDs {
@@ -349,6 +383,42 @@ func getSupportsRefCycles(myTarget target.Target, noRoot bool, perfPath string, 
 	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
 	if err != nil {
 		err = fmt.Errorf("failed to determine if ref-cycles is supported: %s, %d, %v", scriptOutput.Stderr, scriptOutput.Exitcode, err)
+		return
+	}
+	supported = !strings.Contains(scriptOutput.Stderr, "<not supported>")
+	return
+}
+
+// getSupportsPEBS() - checks if the PEBS events are supported on the target
+// On some VMs, e.g. GCP C4, PEBS events are not supported and perf returns '<not supported>'
+// Events that use MSR 0x3F7 are PEBS events. We use the INT_MISC.UNKNOWN_BRANCH_CYCLES event since
+// it is a PEBS event that we used in EMR metrics.
+func getSupportsPEBS(myTarget target.Target, noRoot bool, perfPath string, localTempDir string) (supported bool, output string, err error) {
+	scriptDef := script.ScriptDefinition{
+		Name:      "perf stat pebs",
+		Script:    perfPath + " stat -a -e cpu/event=0xad,umask=0x40,period=1000003,name='INT_MISC.UNKNOWN_BRANCH_CYCLES'/ sleep 1",
+		Superuser: !noRoot,
+	}
+	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
+	if err != nil {
+		err = fmt.Errorf("failed to determine if pebs is supported: %s, %d, %v", scriptOutput.Stderr, scriptOutput.Exitcode, err)
+		return
+	}
+	supported = !strings.Contains(scriptOutput.Stderr, "<not supported>")
+	return
+}
+
+// getSupportsOCR() - checks if the offcore response events are supported on the target
+// On some VMs, e.g. GCP C4, offcore response events are not supported and perf returns '<not supported>'
+func getSupportsOCR(myTarget target.Target, noRoot bool, perfPath string, localTempDir string) (supported bool, output string, err error) {
+	scriptDef := script.ScriptDefinition{
+		Name:      "perf stat ocr",
+		Script:    perfPath + " stat -a -e cpu/event=0x2a,umask=0x01,offcore_rsp=0x104004477,name='OCR.READS_TO_CORE.LOCAL_DRAM'/ sleep 1",
+		Superuser: !noRoot,
+	}
+	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
+	if err != nil {
+		err = fmt.Errorf("failed to determine if ocr is supported: %s, %d, %v", scriptOutput.Stderr, scriptOutput.Exitcode, err)
 		return
 	}
 	supported = !strings.Contains(scriptOutput.Stderr, "<not supported>")
