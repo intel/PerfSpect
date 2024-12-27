@@ -199,7 +199,7 @@ func (m *metricsFromCSV) getStats() (stats map[string]metricStats, err error) {
 		sum := 0.0
 		for _, row := range m.rows {
 			val := row.metrics[metricName]
-			if math.IsNaN(val) {
+			if math.IsNaN(val) || math.IsInf(val, 0) {
 				continue
 			}
 			if math.IsNaN(min) { // min was initialized to NaN

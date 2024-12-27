@@ -41,7 +41,7 @@ func LoadEventGroups(eventDefinitionOverridePath string, metadata Metadata) (gro
 		uarch := strings.ToLower(strings.Split(metadata.Microarchitecture, "_")[0])
 		// use alternate events/metrics when TMA fixed counters are not supported
 		alternate := ""
-		if (uarch == "icx" || uarch == "spr" || uarch == "emr") && !metadata.SupportsFixedTMA {
+		if (uarch == "icx" || uarch == "spr" || uarch == "emr") && !metadata.SupportsFixedTMA { // AWS VM instances
 			alternate = "_nofixedtma"
 		}
 		eventFileName := fmt.Sprintf("%s%s.txt", uarch, alternate)
@@ -132,19 +132,31 @@ func isCollectableEvent(event EventDefinition, metadata Metadata) bool {
 		slog.Debug("Fixed counter TMA not supported on target", slog.String("event", event.Name))
 		return false
 	}
-	// short-circuit for cpu events
-	if event.Device == "cpu" && !strings.HasPrefix(event.Name, "OCR") {
+	// PEBS events (not supported on GCP c4 VMs)
+	pebsEventNames := []string{"INT_MISC.UNKNOWN_BRANCH_CYCLES", "UOPS_RETIRED.MS"}
+	if !metadata.SupportsPEBS && util.StringInList(event.Name, pebsEventNames) {
+		slog.Debug("PEBS events not supported on target", slog.String("event", event.Name))
+		return false
+	}
+	// short-circuit for cpu events that aren't off-core response events
+	if event.Device == "cpu" && !(strings.HasPrefix(event.Name, "OCR") || strings.HasPrefix(event.Name, "OFFCORE_REQUESTS_OUTSTANDING")) {
 		return true
 	}
-	// short-circuit off-core response events
-	if event.Device == "cpu" &&
-		strings.HasPrefix(event.Name, "OCR") &&
-		metadata.SupportsUncore {
-		if flagScope == scopeProcess || flagScope == scopeCgroup {
+	// off-core response events
+	if event.Device == "cpu" && (strings.HasPrefix(event.Name, "OCR") || strings.HasPrefix(event.Name, "OFFCORE_REQUESTS_OUTSTANDING")) {
+		if !metadata.SupportsOCR {
+			slog.Debug("Off-core response events not supported on target", slog.String("event", event.Name))
+			return false
+		} else if flagScope == scopeProcess || flagScope == scopeCgroup {
 			slog.Debug("Off-core response events not supported in process or cgroup scope", slog.String("event", event.Name))
 			return false
 		}
 		return true
+	}
+	// uncore events
+	if !metadata.SupportsUncore && strings.HasPrefix(event.Name, "UNC") {
+		slog.Debug("Uncore events not supported on target", slog.String("event", event.Name))
+		return false
 	}
 	// exclude uncore events when
 	// - their corresponding device is not found
@@ -176,7 +188,6 @@ func isCollectableEvent(event EventDefinition, metadata Metadata) bool {
 		slog.Debug("ref-cycles not supported on target", slog.String("event", event.Name))
 		return false
 	}
-
 	// no cstate and power events when collecting at process or cgroup scope
 	if (flagScope == scopeProcess || flagScope == scopeCgroup) &&
 		(strings.Contains(event.Name, "cstate_") || strings.Contains(event.Name, "power/energy")) {
