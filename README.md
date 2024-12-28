@@ -55,10 +55,10 @@ $ ./perfspect config --cores 24 --llc 2.0 --uncoremaxfreq 1.8
 ...
 ```
 #### Flame Command
-Software flamegraphs are useful in diagnosing software performance bottlenecks. Run `perfspect flame -h` to capture a system-wide software flamegraph.
+Software flamegraphs are useful in diagnosing software performance bottlenecks. Run `perfspect flame` to capture a system-wide software flamegraph.
 
 #### Lock Command
-As system contains more and more cores, it would be usuful to be able to analyze the kernel lock overhead and potential false-sharing that impact the overall system scalability. Run `perfspect lock -h` to collect system wide hotspot, c2c and lock contention information, that will be helpful for experienced performance engineers to have a chance to look into the related problems.
+As systems contain more and more cores, it can be useful to analyze the kernel lock overhead and potential false-sharing that impacts system scalability. Run `perfspect lock` to collect system wide hotspot, c2c and lock contention information. Experienced performance engineers can analyze the collected information to identify bottlenecks.
 
 #### Metrics Command
 The `metrics` command provides system performance characterization metrics. The metrics provided are dependent on the platform architecture.
