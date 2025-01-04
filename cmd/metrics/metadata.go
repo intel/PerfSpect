@@ -206,7 +206,7 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 		errs = append(errs, <-slowFuncChannel)
 		for _, errInside := range errs {
 			if errInside != nil {
-				slog.Warn("error loading metadata", slog.String("error", errInside.Error()), slog.String("target", myTarget.GetName()))
+				slog.Error("error loading metadata", slog.String("error", errInside.Error()), slog.String("target", myTarget.GetName()))
 				err = fmt.Errorf("target not supported, see log for details")
 			}
 		}
