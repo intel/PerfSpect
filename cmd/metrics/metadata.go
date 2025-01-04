@@ -207,7 +207,7 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 		for _, errInside := range errs {
 			if errInside != nil {
 				slog.Warn("error loading metadata", slog.String("error", errInside.Error()), slog.String("target", myTarget.GetName()))
-				err = nil //err = fmt.Errorf("target not supported, see log for details")
+				err = fmt.Errorf("target not supported, see log for details")
 			}
 		}
 	}()
