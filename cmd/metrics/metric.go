@@ -159,10 +159,16 @@ func loadMetricBestGroups(metric MetricDefinition, frame EventFrame) (err error)
 		// find group with the greatest number of event names that match the remaining variable names
 		bestGroupIdx := -1
 		bestMatches := 0
-		var matchedNames mapset.Set[string] // := mapset.NewSet([]string{}...)
+		var matchedNames mapset.Set[string]
 		for groupIdx, group := range frame.EventGroups {
 			groupEventNames := mapset.NewSetFromMapKeys(group.EventValues)
 			intersection := remainingVariableNames.Intersect(groupEventNames)
+			// if an event value is NaN, remove it from the intersection map with hopes we'll find a better match
+			for _, name := range intersection.ToSlice() {
+				if math.IsNaN(group.EventValues[name]) {
+					intersection.Remove(name)
+				}
+			}
 			if intersection.Cardinality() > bestMatches {
 				bestGroupIdx = groupIdx
 				bestMatches = intersection.Cardinality()

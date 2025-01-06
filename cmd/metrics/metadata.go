@@ -101,7 +101,7 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 		err = fmt.Errorf("failed to retrieve PMU driver version: %v", err)
 		return
 	}
-	// reduce startup time by running the three perf commands in their own threads
+	// reduce startup time by running the perf commands in their own threads
 	slowFuncChannel := make(chan error)
 	// perf list
 	go func() {
@@ -116,7 +116,8 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 		var err error
 		var output string
 		if metadata.SupportsRefCycles, output, err = getSupportsRefCycles(myTarget, noRoot, perfPath, localTempDir); err != nil {
-			err = fmt.Errorf("failed to determine if ref_cycles is supported: %v", err)
+			slog.Warn("failed to determine if ref_cycles is supported, assuming not supported", slog.String("error", err.Error()))
+			err = nil
 		} else {
 			if !metadata.SupportsRefCycles {
 				slog.Warn("ref-cycles not supported", slog.String("output", output))
@@ -129,7 +130,8 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 		var err error
 		var output string
 		if metadata.SupportsFixedTMA, output, err = getSupportsFixedTMA(myTarget, noRoot, perfPath, localTempDir); err != nil {
-			err = fmt.Errorf("failed to determine if fixed-counter TMA is supported: %v", err)
+			slog.Warn("failed to determine if fixed-counter TMA is supported, assuming not supported", slog.String("error", err.Error()))
+			err = nil
 		} else {
 			if !metadata.SupportsFixedTMA {
 				slog.Warn("Fixed-counter TMA events not supported", slog.String("output", output))
@@ -142,7 +144,8 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 		var err error
 		var output string
 		if metadata.SupportsFixedCycles, output, err = getSupportsFixedEvent(myTarget, "cpu-cycles", cpu.MicroArchitecture, noRoot, perfPath, localTempDir); err != nil {
-			err = fmt.Errorf("failed to determine if fixed-counter 'cpu-cycles' is supported: %v", err)
+			slog.Warn("failed to determine if fixed-counter 'cpu-cycles' is supported, assuming not supported", slog.String("error", err.Error()))
+			err = nil
 		} else {
 			if !metadata.SupportsFixedCycles {
 				slog.Warn("Fixed-counter 'cpu-cycles' events not supported", slog.String("output", output))
@@ -155,7 +158,8 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 		var err error
 		var output string
 		if metadata.SupportsFixedInstructions, output, err = getSupportsFixedEvent(myTarget, "instructions", cpu.MicroArchitecture, noRoot, perfPath, localTempDir); err != nil {
-			err = fmt.Errorf("failed to determine if fixed-counter 'instructions' is supported: %v", err)
+			slog.Warn("failed to determine if fixed-counter 'instructions' is supported, assuming not supported", slog.String("error", err.Error()))
+			err = nil
 		} else {
 			if !metadata.SupportsFixedInstructions {
 				slog.Warn("Fixed-counter 'instructions' events not supported", slog.String("output", output))
@@ -168,7 +172,8 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 		var err error
 		var output string
 		if metadata.SupportsPEBS, output, err = getSupportsPEBS(myTarget, noRoot, perfPath, localTempDir); err != nil {
-			err = fmt.Errorf("failed to determine if 'PEBS' is supported: %v", err)
+			slog.Warn("failed to determine if 'PEBS' is supported, assuming not supported", slog.String("error", err.Error()))
+			err = nil
 		} else {
 			if !metadata.SupportsPEBS {
 				slog.Warn("'PEBS' events not supported", slog.String("output", output))
@@ -181,7 +186,8 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 		var err error
 		var output string
 		if metadata.SupportsOCR, output, err = getSupportsOCR(myTarget, noRoot, perfPath, localTempDir); err != nil {
-			err = fmt.Errorf("failed to determine if 'OCR' is supported: %v", err)
+			slog.Warn("failed to determine if 'OCR' is supported, assuming not supported", slog.String("error", err.Error()))
+			err = nil
 		} else {
 			if !metadata.SupportsOCR {
 				slog.Warn("'OCR' events not supported", slog.String("output", output))
