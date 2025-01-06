@@ -871,10 +871,16 @@ func eppValToLabel(msr int) string {
 	return fmt.Sprintf("%s (%d)", val, msr)
 }
 
+// eppFromOutput gets EPP value from script outputs
+// IF 0x774[42] is '1' AND 0x774[60] is '0'
+// THEN
+//       get EPP from 0x772 (package)
+// ELSE
+//       get EPP from 0x774 (per core)
 func eppFromOutput(outputs map[string]script.ScriptOutput) string {
-	eppValidConsistent := true
+	// check if the epp valid bit is set and consistent across all cores
 	var eppValid string
-	for i, line := range strings.Split(outputs[script.EppValidScriptName].Stdout, "\n") {
+	for i, line := range strings.Split(outputs[script.EppValidScriptName].Stdout, "\n") { // MSR 0x774, bit 60
 		if line == "" {
 			continue
 		}
@@ -884,14 +890,36 @@ func eppFromOutput(outputs map[string]script.ScriptOutput) string {
 			continue
 		}
 		if currentEpbValid != eppValid {
-			eppValidConsistent = false
-			break
+			slog.Warn("EPP valid bit is inconsistent across cores")
+			return "inconsistent"
 		}
 	}
-	if eppValidConsistent && eppValid == "1" {
-		eppConsistent := true
+	// check if epp package control bit is set and consistent across all cores
+	var eppPkgCtrl string
+	for i, line := range strings.Split(outputs[script.EppPackageControlScriptName].Stdout, "\n") { // MSR 0x774, bit 42
+		if line == "" {
+			continue
+		}
+		currentEppPkgCtrl := strings.TrimSpace(strings.Split(line, ":")[1])
+		if i == 0 {
+			eppPkgCtrl = currentEppPkgCtrl
+			continue
+		}
+		if currentEppPkgCtrl != eppPkgCtrl {
+			slog.Warn("EPP package control bit is inconsistent across cores")
+			return "inconsistent"
+		}
+	}
+	if eppPkgCtrl == "1" && eppValid == "0" {
+		eppPackage := strings.TrimSpace(outputs[script.EppPackageScriptName].Stdout) // MSR 0x772, bits 24-31  (package)
+		msr, err := strconv.ParseInt(eppPackage, 16, 0)
+		if err != nil {
+			return "EPP pkg parse error"
+		}
+		return eppValToLabel(int(msr))
+	} else {
 		var epp string
-		for i, line := range strings.Split(outputs[script.EppScriptName].Stdout, "\n") {
+		for i, line := range strings.Split(outputs[script.EppScriptName].Stdout, "\n") { // MSR 0x774, bits 24-31 (per-core)
 			if line == "" {
 				continue
 			}
@@ -901,30 +929,16 @@ func eppFromOutput(outputs map[string]script.ScriptOutput) string {
 				continue
 			}
 			if currentEpp != epp {
-				eppConsistent = false
-				break
+				slog.Warn("EPP is inconsistent across cores")
+				return "inconsistent"
 			}
 		}
-		if eppConsistent {
-			msr, err := strconv.ParseInt(epp, 16, 0)
-			if err != nil {
-				return "epp parse error"
-			}
-			return eppValToLabel(int(msr))
-		} else {
-			return "Varied"
-		}
-	} else if eppValidConsistent && eppValid == "0" {
-		eppPackage := strings.TrimSpace(outputs[script.EppPackageScriptName].Stdout)
-		msr, err := strconv.ParseInt(eppPackage, 16, 0)
+		msr, err := strconv.ParseInt(epp, 16, 0)
 		if err != nil {
-			return "epp pkg parse error"
+			return "EPP parse error"
 		}
 		return eppValToLabel(int(msr))
-	} else if eppValid != "" {
-		return "Varied"
 	}
-	return ""
 }
 
 func operatingSystemFromOutput(outputs map[string]script.ScriptOutput) string {

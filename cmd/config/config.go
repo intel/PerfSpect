@@ -700,8 +700,7 @@ func setEpb(epb int, myTarget target.Target, localTempDir string) {
 
 func setEpp(epp int, myTarget target.Target, localTempDir string) {
 	fmt.Printf("set energy performance profile (EPP) to %d on %s\n", epp, myTarget.GetName())
-	// Mark the per-processor EPP values as invalid, so that the
-	// package EPP value is used. Then set the package EPP value.
+	// Set both the per-core EPP value and the package EPP value
 	// Reference: 15.4.4 Managing HWP in the Intel SDM
 
 	// get the current value of the IAEW_HWP_REQUEST MSR that includes the current EPP valid value in bit 60
@@ -724,12 +723,14 @@ func setEpp(epp int, myTarget target.Target, localTempDir string) {
 		slog.Error("failed to parse msr value", slog.String("msr", stdout), slog.String("error", err.Error()))
 		return
 	}
-	// clear bit 60 in the IA32_HWP_REQUEST MSR value
-	maskedValue := msrValue & 0xEFFFFFFFFFFFFFFF
+	// mask out bits 24-31 IA32_HWP_REQUEST MSR value
+	maskedValue := msrValue & 0xFFFFFFFF00FFFFFF
+	// put the EPP value in bits 24-31
+	eppValue := maskedValue | uint64(epp)<<24
 	// write it back to the MSR
 	setScript := script.ScriptDefinition{
-		Name:          "set epp valid",
-		Script:        fmt.Sprintf("wrmsr -a 0x774 %d", maskedValue),
+		Name:          "set epp",
+		Script:        fmt.Sprintf("wrmsr -a 0x774 %d", eppValue),
 		Superuser:     true,
 		Architectures: []string{"x86_64"},
 		Families:      []string{"6"}, // Intel only
@@ -738,7 +739,7 @@ func setEpp(epp int, myTarget target.Target, localTempDir string) {
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to set EPP valid: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: failed to set EPP: %v\n", err)
 		return
 	}
 
@@ -754,7 +755,7 @@ func setEpp(epp int, myTarget target.Target, localTempDir string) {
 	}
 	stdout, err = runScript(myTarget, getScript, localTempDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to get EPP: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: failed to get pkg EPP: %v\n", err)
 		return
 	}
 	msrValue, err = strconv.ParseUint(strings.TrimSpace(stdout), 16, 64)
@@ -766,7 +767,7 @@ func setEpp(epp int, myTarget target.Target, localTempDir string) {
 	// mask out bits 24-31 IA32_HWP_REQUEST_PKG MSR value
 	maskedValue = msrValue & 0xFFFFFFFF00FFFFFF
 	// put the EPP value in bits 24-31
-	eppValue := maskedValue | uint64(epp)<<24
+	eppValue = maskedValue | uint64(epp)<<24
 	// write it back to the MSR
 	setScript = script.ScriptDefinition{
 		Name:          "set epp",
@@ -779,7 +780,7 @@ func setEpp(epp int, myTarget target.Target, localTempDir string) {
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to set EPP: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: failed to set pkg EPP: %v\n", err)
 	}
 }
 
