@@ -59,6 +59,7 @@ const (
 	EpbScriptName                               = "energy performance bias"
 	EppScriptName                               = "energy performance preference"
 	EppValidScriptName                          = "epp valid"
+	EppPackageControlScriptName                 = "epp package control"
 	EppPackageScriptName                        = "energy performance preference package"
 	IaaDevicesScriptName                        = "iaa devices"
 	DsaDevicesScriptName                        = "dsa devices"
@@ -331,6 +332,15 @@ fi`,
 		{
 			Name:          EppValidScriptName,
 			Script:        "rdmsr -a -f 60:60 0x774", // IA32_HWP_REQUEST: Energy Performance Preference, bit 60 indicates if per-cpu EPP is valid
+			Architectures: []string{x86_64},
+			Families:      []string{"6"}, // Intel
+			Lkms:          []string{"msr"},
+			Depends:       []string{"rdmsr"},
+			Superuser:     true,
+		},
+		{
+			Name:          EppPackageControlScriptName,
+			Script:        "rdmsr -a -f 42:42 0x774", // IA32_HWP_REQUEST: Energy Performance Preference, bit 42 indicates if package control is enabled
 			Architectures: []string{x86_64},
 			Families:      []string{"6"}, // Intel
 			Lkms:          []string{"msr"},
