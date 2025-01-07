@@ -807,22 +807,24 @@ func prepareTarget(targetContext *targetContext, targetTempRoot string, localTem
 		return
 	}
 	// make sure PMUs are not in use on target
-	output, err := script.RunScript(myTarget, script.GetScriptByName(script.PMUBusyScriptName), localTempDir)
-	if err != nil {
-		err = fmt.Errorf("failed to check if PMUs are in use: %w", err)
-		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %v", err))
-		targetContext.err = err
-		channelError <- targetError{target: myTarget, err: err}
-		return
-	}
-	for _, line := range strings.Split(output.Stdout, "\n") {
-		// if one of the MSR registers is active (ignore cpu_cycles), then the PMU is in use
-		if strings.Contains(line, "Active") && !strings.Contains(line, "0x30a") {
-			err = fmt.Errorf("PMU in use on target: %s", line)
+	if family, err := myTarget.GetFamily(); err == nil && family == "6" {
+		output, err := script.RunScript(myTarget, script.GetScriptByName(script.PMUBusyScriptName), localTempDir)
+		if err != nil {
+			err = fmt.Errorf("failed to check if PMUs are in use: %w", err)
 			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %v", err))
 			targetContext.err = err
 			channelError <- targetError{target: myTarget, err: err}
 			return
+		}
+		for _, line := range strings.Split(output.Stdout, "\n") {
+			// if one of the MSR registers is active (ignore cpu_cycles), then the PMU is in use
+			if strings.Contains(line, "Active") && !strings.Contains(line, "0x30a") {
+				err = fmt.Errorf("PMU in use on target: %s", line)
+				_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %v", err))
+				targetContext.err = err
+				channelError <- targetError{target: myTarget, err: err}
+				return
+			}
 		}
 	}
 	// check if NMI watchdog is enabled and disable it if necessary
