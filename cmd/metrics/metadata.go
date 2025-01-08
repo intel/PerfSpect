@@ -343,7 +343,7 @@ func getUncoreDeviceIDs(myTarget target.Target, localTempDir string) (IDs map[st
 // getCPUInfo - reads and returns all data from /proc/cpuinfo
 func getCPUInfo(myTarget target.Target) (cpuInfo []map[string]string, err error) {
 	cmd := exec.Command("cat", "/proc/cpuinfo")
-	stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0)
+	stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, true)
 	if err != nil {
 		err = fmt.Errorf("failed to get cpuinfo: %s, %d, %v", stderr, exitcode, err)
 		return
@@ -369,7 +369,7 @@ func getCPUInfo(myTarget target.Target) (cpuInfo []map[string]string, err error)
 // 'perf list'
 func getPerfSupportedEvents(myTarget target.Target, perfPath string) (supportedEvents string, err error) {
 	cmd := exec.Command(perfPath, "list")
-	stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0)
+	stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, true)
 	if err != nil {
 		err = fmt.Errorf("failed to get perf list: %s, %d, %v", stderr, exitcode, err)
 		return

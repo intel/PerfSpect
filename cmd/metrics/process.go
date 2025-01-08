@@ -63,7 +63,7 @@ func GetCgroups(myTarget target.Target, cids []string, localTempDir string) (cgr
 func GetHotProcesses(myTarget target.Target, maxProcesses int, filter string) (processes []Process, err error) {
 	// run ps to get list of processes sorted by cpu utilization (descending)
 	cmd := exec.Command("ps", "-a", "-x", "-h", "-o", "pid,ppid,comm,cmd", "--sort=-%cpu")
-	stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0)
+	stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, true)
 	if err != nil {
 		err = fmt.Errorf("failed to get hot processes: %s, %d, %v", stderr, exitcode, err)
 		return
@@ -173,7 +173,7 @@ done | sort -nr | head -n %d
 
 func processExists(myTarget target.Target, pid string) (exists bool) {
 	cmd := exec.Command("ps", "-p", pid)
-	_, _, _, err := myTarget.RunCommand(cmd, 0)
+	_, _, _, err := myTarget.RunCommand(cmd, 0, true)
 	if err != nil {
 		exists = false
 		return
@@ -184,7 +184,7 @@ func processExists(myTarget target.Target, pid string) (exists bool) {
 
 func getProcess(myTarget target.Target, pid string) (process Process, err error) {
 	cmd := exec.Command("ps", "-q", pid, "h", "-o", "pid,ppid,comm,cmd", "ww")
-	stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0)
+	stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, true)
 	if err != nil {
 		err = fmt.Errorf("failed to get process: %s, %d, %v", stderr, exitcode, err)
 		return
