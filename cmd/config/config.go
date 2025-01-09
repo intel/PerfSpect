@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"perfspect/internal/common"
+	"perfspect/internal/cpudb"
 	"perfspect/internal/progress"
 	"perfspect/internal/report"
 	"perfspect/internal/script"
@@ -156,7 +157,7 @@ func getFlagGroups() []common.FlagGroup {
 		},
 		{
 			Name: flagElcName,
-			Help: "set Efficiency Latency Control (SRF and GNR) (" + strings.Join(elcOptions, ", ") + ")",
+			Help: "set Efficiency Latency Control (" + strings.Join(elcOptions, ", ") + ")",
 		},
 	}
 	groups := []common.FlagGroup{}
@@ -202,6 +203,83 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+type flagUarch struct {
+	flagName       string
+	supportedUarch []string // empty means all are supported
+}
+
+// define supported uarch for each flag
+var supportedUarchs = []flagUarch{
+	{
+		flagName:       flagCoresName,
+		supportedUarch: []string{},
+	},
+	{
+		flagName:       flagLlcSizeName,
+		supportedUarch: []string{"HSX", "BDX", "SKX", "CLX", "CPX", "ICX", "SPR", "EMR"},
+	},
+	{
+		flagName:       flagAllCoreMaxFrequencyName,
+		supportedUarch: []string{"HSX", "BDX", "SKX", "CLX", "CPX", "ICX", "SPR", "EMR", "SRF", "GNR"},
+	},
+	{
+		flagName:       flagUncoreMaxFrequencyName,
+		supportedUarch: []string{"HSX", "BDX", "SKX", "CLX", "CPX", "ICX", "SPR", "EMR", "SRF", "GNR"},
+	},
+	{
+		flagName:       flagUncoreMinFrequencyName,
+		supportedUarch: []string{"HSX", "BDX", "SKX", "CLX", "CPX", "ICX", "SPR", "EMR", "SRF", "GNR"},
+	},
+	{
+		flagName:       flagPowerName,
+		supportedUarch: []string{"HSX", "BDX", "SKX", "CLX", "CPX", "ICX", "SPR", "EMR", "SRF", "GNR"},
+	},
+	{
+		flagName:       flagEpbName,
+		supportedUarch: []string{"HSX", "BDX", "SKX", "CLX", "CPX", "ICX", "SPR", "EMR", "SRF", "GNR"},
+	},
+	{
+		flagName:       flagEppName,
+		supportedUarch: []string{"HSX", "BDX", "SKX", "CLX", "CPX", "ICX", "SPR", "EMR", "SRF", "GNR"},
+	},
+	{
+		flagName:       flagGovernorName,
+		supportedUarch: []string{"HSX", "BDX", "SKX", "CLX", "CPX", "ICX", "SPR", "EMR", "SRF", "GNR"},
+	},
+	{
+		flagName:       flagElcName,
+		supportedUarch: []string{"SRF", "GNR"},
+	},
+}
+
+func validateFlagsForTarget(cmd *cobra.Command, myTarget target.Target) error {
+	CPUdb := cpudb.NewCPUDB()
+	var family, model, stepping string
+	var err error
+	if family, err = myTarget.GetFamily(); err != nil {
+		return err
+	}
+	if model, err = myTarget.GetModel(); err != nil {
+		return err
+	}
+	if stepping, err = myTarget.GetStepping(); err != nil {
+		return err
+	}
+
+	cpu, err := CPUdb.GetCPU(family, model, stepping, "", "", "")
+	if err != nil {
+		return err
+	}
+	for _, flag := range supportedUarchs {
+		if cmd.Flags().Lookup(flag.flagName).Changed {
+			if len(flag.supportedUarch) != 0 && !util.StringInList(cpu.MicroArchitecture, flag.supportedUarch) {
+				return fmt.Errorf("%s flag not supported on %s microarchitecture", flag.flagName, cpu.MicroArchitecture)
+			}
+		}
+	}
+	return nil
+}
+
 func runCmd(cmd *cobra.Command, args []string) error {
 	// appContext is the application context that holds common data and resources.
 	appContext := cmd.Context().Value(common.AppContext{}).(common.AppContext)
@@ -229,6 +307,14 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		slog.Error(err.Error())
 		cmd.SilenceUsage = true
 		return err
+	}
+	for _, myTarget := range myTargets {
+		if err = validateFlagsForTarget(cmd, myTarget); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			cmd.SilenceUsage = true
+			return err
+		}
 	}
 	// create a temporary directory on each target
 	for _, myTarget := range myTargets {

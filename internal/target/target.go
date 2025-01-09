@@ -51,6 +51,10 @@ type Target interface {
 	// It returns a string representing the model and any error that occurred.
 	GetModel() (model string, err error)
 
+	// GetStepping returns the stepping of the target system's CPU.
+	// It returns a string representing the stepping and any error that occurred.
+	GetStepping() (stepping string, err error)
+
 	// GetName returns the name of the target system.
 	// It returns a string representing the host.
 	GetName() (name string)
@@ -119,6 +123,7 @@ type LocalTarget struct {
 	arch       string
 	family     string
 	model      string
+	stepping   string
 	userPath   string
 	canElevate int // zero indicates unknown, 1 indicates yes, -1 indicates no
 }
@@ -135,6 +140,7 @@ type RemoteTarget struct {
 	arch        string
 	family      string
 	model       string
+	stepping    string
 	userPath    string
 	canElevate  int
 }
@@ -258,6 +264,20 @@ func (t *RemoteTarget) GetModel() (family string, err error) {
 		t.model, err = getModel(t)
 	}
 	return t.model, err
+}
+
+func (t *LocalTarget) GetStepping() (stepping string, err error) {
+	if t.stepping == "" {
+		t.stepping, err = getStepping(t)
+	}
+	return t.stepping, err
+}
+
+func (t *RemoteTarget) GetStepping() (stepping string, err error) {
+	if t.stepping == "" {
+		t.stepping, err = getStepping(t)
+	}
+	return t.stepping, err
 }
 
 // CreateTempDirectory creates a temporary directory under the specified root directory.
@@ -778,6 +798,16 @@ func getModel(t Target) (model string, err error) {
 		return
 	}
 	model = strings.TrimSpace(model)
+	return
+}
+
+func getStepping(t Target) (stepping string, err error) {
+	cmd := exec.Command("bash", "-c", "lscpu | grep -i stepping: | awk '{print $NF}'")
+	stepping, _, _, err = t.RunCommand(cmd, 0, true)
+	if err != nil {
+		return
+	}
+	stepping = strings.TrimSpace(stepping)
 	return
 }
 
