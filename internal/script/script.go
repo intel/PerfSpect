@@ -160,7 +160,7 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 		} else {
 			cmd = exec.Command("bash", path.Join(myTarget.GetTempDirectory(), masterScriptName))
 		}
-		stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0)
+		stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, false) // don't reuse ssh connection on long-running commands, makes it difficult to kill the command
 		if err != nil {
 			slog.Error("error running master script on target", slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitcode", exitcode), slog.String("error", err.Error()))
 			return nil, err
@@ -183,7 +183,7 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 	// run sequential scripts
 	for _, script := range sequentialScripts {
 		cmd := prepareCommand(script, myTarget.GetTempDirectory())
-		stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0)
+		stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, false)
 		if err != nil {
 			slog.Error("error running script on target", slog.String("script", script.Script), slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitcode", exitcode), slog.String("error", err.Error()))
 		}
@@ -241,7 +241,7 @@ func RunScriptAsync(myTarget target.Target, script ScriptDefinition, localTempDi
 		}()
 	}
 	cmd := prepareCommand(script, myTarget.GetTempDirectory())
-	err = myTarget.RunCommandAsync(cmd, stdoutChannel, stderrChannel, exitcodeChannel, 0, cmdChannel)
+	err = myTarget.RunCommandAsync(cmd, 0, false, stdoutChannel, stderrChannel, exitcodeChannel, cmdChannel)
 	errorChannel <- err
 }
 

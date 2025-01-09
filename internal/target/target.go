@@ -60,12 +60,24 @@ type Target interface {
 	GetUserPath() (path string, err error)
 
 	// RunCommand runs the specified command on the target.
+	// Arguments:
+	// - cmd: the command to run
+	// - timeout: the maximum time allowed for the command to run (zero means no timeout)
+	// - reuseSSHConnection: whether to reuse the SSH connection for the command (only relevant for RemoteTarget)
 	// It returns the standard output, standard error, exit code, and any error that occurred.
-	RunCommand(cmd *exec.Cmd, timeout int) (stdout string, stderr string, exitCode int, err error)
+	RunCommand(cmd *exec.Cmd, timeout int, reuseSSHConnection bool) (stdout string, stderr string, exitCode int, err error)
 
 	// RunCommandAsync runs the specified command on the target in an asynchronous manner.
+	// Arguments:
+	// - cmd: the command to run
+	// - timeout: the maximum time allowed for the command to run (zero means no timeout)
+	// - reuseSSHConnection: whether to reuse the SSH connection for the command (only relevant for RemoteTarget)
+	// - stdoutChannel: a channel to send the standard output of the command
+	// - stderrChannel: a channel to send the standard error of the command
+	// - exitcodeChannel: a channel to send the exit code of the command
+	// - cmdChannel: a channel to send the command that was run
 	// It returns any error that occurred.
-	RunCommandAsync(cmd *exec.Cmd, stdoutChannel chan string, stderrChannel chan string, exitcodeChannel chan int, timeout int, cmdChannel chan *exec.Cmd) error
+	RunCommandAsync(cmd *exec.Cmd, timeout int, reuseSSHConnection bool, stdoutChannel chan string, stderrChannel chan string, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) error
 
 	// PushFile transfers a file from the local system to the target.
 	// It returns any error that occurred.
@@ -171,7 +183,7 @@ func (t *RemoteTarget) SetSshPass(sshPass string) {
 
 // RunCommand executes the given command with a timeout and returns the standard output,
 // standard error, exit code, and any error that occurred.
-func (t *LocalTarget) RunCommand(cmd *exec.Cmd, timeout int) (stdout string, stderr string, exitCode int, err error) {
+func (t *LocalTarget) RunCommand(cmd *exec.Cmd, timeout int, argNotUsed bool) (stdout string, stderr string, exitCode int, err error) {
 	input := ""
 	if t.sudo != "" && len(cmd.Args) > 2 && cmd.Args[0] == "sudo" && strings.HasPrefix(cmd.Args[1], "-") && strings.Contains(cmd.Args[1], "S") { // 'sudo -S' gets password from stdin
 		input = t.sudo + "\n"
@@ -179,8 +191,8 @@ func (t *LocalTarget) RunCommand(cmd *exec.Cmd, timeout int) (stdout string, std
 	return runLocalCommandWithInputWithTimeout(cmd, input, timeout)
 }
 
-func (t *RemoteTarget) RunCommand(cmd *exec.Cmd, timeout int) (stdout string, stderr string, exitCode int, err error) {
-	localCommand := t.prepareLocalCommand(cmd, false)
+func (t *RemoteTarget) RunCommand(cmd *exec.Cmd, timeout int, reuseSSHConnection bool) (stdout string, stderr string, exitCode int, err error) {
+	localCommand := t.prepareLocalCommand(cmd, reuseSSHConnection)
 	return runLocalCommandWithInputWithTimeout(localCommand, "", timeout)
 }
 
@@ -190,15 +202,15 @@ func (t *RemoteTarget) RunCommand(cmd *exec.Cmd, timeout int) (stdout string, st
 // and the exit code is sent to the exitcodeChannel.
 // The timeout parameter specifies the maximum time allowed for the command to run.
 // Returns an error if there was a problem running the command.
-func (t *LocalTarget) RunCommandAsync(cmd *exec.Cmd, stdoutChannel chan string, stderrChannel chan string, exitcodeChannel chan int, timeout int, cmdChannel chan *exec.Cmd) (err error) {
+func (t *LocalTarget) RunCommandAsync(cmd *exec.Cmd, timeout int, argNotUsed bool, stdoutChannel chan string, stderrChannel chan string, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) (err error) {
 	localCommand := cmd
 	cmdChannel <- localCommand
 	err = runLocalCommandWithInputWithTimeoutAsync(localCommand, stdoutChannel, stderrChannel, exitcodeChannel, "", timeout)
 	return
 }
 
-func (t *RemoteTarget) RunCommandAsync(cmd *exec.Cmd, stdoutChannel chan string, stderrChannel chan string, exitcodeChannel chan int, timeout int, cmdChannel chan *exec.Cmd) (err error) {
-	localCommand := t.prepareLocalCommand(cmd, true)
+func (t *RemoteTarget) RunCommandAsync(cmd *exec.Cmd, timeout int, reuseSSHConnection bool, stdoutChannel chan string, stderrChannel chan string, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) (err error) {
+	localCommand := t.prepareLocalCommand(cmd, reuseSSHConnection)
 	cmdChannel <- localCommand
 	err = runLocalCommandWithInputWithTimeoutAsync(localCommand, stdoutChannel, stderrChannel, exitcodeChannel, "", timeout)
 	return
@@ -266,7 +278,7 @@ func (t *RemoteTarget) CreateTempDirectory(rootDir string) (tempDir string, err 
 		root = fmt.Sprintf("--tmpdir=%s", rootDir)
 	}
 	cmd := exec.Command("mktemp", "-d", "-t", root, "perfspect.tmp.XXXXXXXXXX", "|", "xargs", "realpath")
-	tempDir, _, _, err = t.RunCommand(cmd, 0)
+	tempDir, _, _, err = t.RunCommand(cmd, 0, true)
 	tempDir = strings.TrimSpace(tempDir)
 	t.tempDir = tempDir
 	return
@@ -331,7 +343,7 @@ func (t *LocalTarget) CreateDirectory(baseDir string, targetDir string) (dir str
 func (t *RemoteTarget) CreateDirectory(baseDir string, targetDir string) (dir string, err error) {
 	dir = filepath.Join(baseDir, targetDir)
 	cmd := exec.Command("mkdir", dir)
-	_, _, _, err = t.RunCommand(cmd, 0)
+	_, _, _, err = t.RunCommand(cmd, 0, true)
 	return
 }
 
@@ -348,7 +360,7 @@ func (t *LocalTarget) RemoveDirectory(targetDir string) (err error) {
 func (t *RemoteTarget) RemoveDirectory(targetDir string) (err error) {
 	if targetDir != "" {
 		cmd := exec.Command("rm", "-rf", targetDir)
-		_, _, _, err = t.RunCommand(cmd, 0)
+		_, _, _, err = t.RunCommand(cmd, 0, true)
 	}
 	return
 }
@@ -360,7 +372,7 @@ func (t *LocalTarget) CanConnect() bool {
 
 func (t *RemoteTarget) CanConnect() bool {
 	cmd := exec.Command("exit", "0")
-	_, _, _, err := t.RunCommand(cmd, 5)
+	_, _, _, err := t.RunCommand(cmd, 5, true)
 	return err == nil
 }
 
@@ -388,14 +400,14 @@ func (t *LocalTarget) CanElevatePrivileges() bool {
 				slog.Error("error writing sudo password", slog.String("error", err.Error()))
 			}
 		}()
-		_, _, _, err := t.RunCommand(cmd, 0)
+		_, _, _, err := t.RunCommand(cmd, 0, true)
 		if err == nil {
 			t.canElevate = 1
 			return true // sudo password works
 		}
 	}
 	cmd := exec.Command("sudo", "-kS", "ls")
-	_, _, _, err := t.RunCommand(cmd, 0)
+	_, _, _, err := t.RunCommand(cmd, 0, true)
 	if err == nil { // true - passwordless sudo works
 		t.canElevate = 1
 		return true
@@ -415,7 +427,7 @@ func (t *RemoteTarget) CanElevatePrivileges() bool {
 		return true
 	}
 	cmd := exec.Command("sudo", "-kS", "ls")
-	_, _, _, err := t.RunCommand(cmd, 0)
+	_, _, _, err := t.RunCommand(cmd, 0, true)
 	if err == nil { // true - passwordless sudo works
 		t.canElevate = 1
 		return true
@@ -492,7 +504,7 @@ func (t *LocalTarget) GetUserPath() (string, error) {
 func (t *RemoteTarget) GetUserPath() (string, error) {
 	if t.userPath == "" {
 		cmd := exec.Command("echo", "$PATH")
-		stdout, _, _, err := t.RunCommand(cmd, 0)
+		stdout, _, _, err := t.RunCommand(cmd, 0, true)
 		if err != nil {
 			return "", err
 		}
@@ -594,7 +606,7 @@ func runLocalCommandWithInputWithTimeoutAsync(cmd *exec.Cmd, stdoutChannel chan 
 	return nil
 }
 
-func (t *RemoteTarget) prepareSSHFlags(scp bool, async bool, prompt bool) (flags []string) {
+func (t *RemoteTarget) prepareSSHFlags(scp bool, useControlMaster bool, prompt bool) (flags []string) {
 	flags = []string{
 		"-2",
 		"-o",
@@ -621,7 +633,7 @@ func (t *RemoteTarget) prepareSSHFlags(scp bool, async bool, prompt bool) (flags
 		flags = append(flags, promptFlags...)
 	}
 	// when using a control master, a long-running remote program doesn't get terminated when the local ssh client is terminated
-	if !async {
+	if useControlMaster {
 		controlPathFlags := []string{
 			"-o",
 			"ControlPath=" + filepath.Join(os.TempDir(), `control-%h-%p-%r`),
@@ -654,10 +666,10 @@ func (t *RemoteTarget) prepareSSHFlags(scp bool, async bool, prompt bool) (flags
 	return
 }
 
-func (t *RemoteTarget) prepareSSHCommand(command []string, async bool, prompt bool) []string {
+func (t *RemoteTarget) prepareSSHCommand(command []string, useControlMaster bool, prompt bool) []string {
 	var cmd []string
 	cmd = append(cmd, "ssh")
-	cmd = append(cmd, t.prepareSSHFlags(false, async, prompt)...)
+	cmd = append(cmd, t.prepareSSHFlags(false, useControlMaster, prompt)...)
 	if t.user != "" {
 		cmd = append(cmd, t.user+"@"+t.host)
 	} else {
@@ -671,7 +683,7 @@ func (t *RemoteTarget) prepareSSHCommand(command []string, async bool, prompt bo
 func (t *RemoteTarget) prepareSCPCommand(src string, dstDir string, push bool) []string {
 	var cmd []string
 	cmd = append(cmd, "scp")
-	cmd = append(cmd, t.prepareSSHFlags(true, false, false)...)
+	cmd = append(cmd, t.prepareSSHFlags(true, true, false)...)
 	if push {
 		fileInfo, err := os.Stat(src)
 		if err != nil {
@@ -698,11 +710,11 @@ func (t *RemoteTarget) prepareSCPCommand(src string, dstDir string, push bool) [
 	return cmd
 }
 
-func (t *RemoteTarget) prepareLocalCommand(cmd *exec.Cmd, async bool) *exec.Cmd {
+func (t *RemoteTarget) prepareLocalCommand(cmd *exec.Cmd, useControlMaster bool) *exec.Cmd {
 	var name string
 	var args []string
 	usePass := t.key == "" && t.sshPass != ""
-	sshCommand := t.prepareSSHCommand(cmd.Args, async, usePass)
+	sshCommand := t.prepareSSHCommand(cmd.Args, useControlMaster, usePass)
 	if usePass {
 		name = t.sshpassPath
 		args = []string{"-e", "--"}
@@ -741,7 +753,7 @@ func (t *RemoteTarget) prepareAndRunSCPCommand(srcPath string, dstDir string, is
 
 func getArchitecture(t Target) (arch string, err error) {
 	cmd := exec.Command("uname", "-m")
-	arch, _, _, err = t.RunCommand(cmd, 0)
+	arch, _, _, err = t.RunCommand(cmd, 0, true)
 	if err != nil {
 		return
 	}
@@ -751,7 +763,7 @@ func getArchitecture(t Target) (arch string, err error) {
 
 func getFamily(t Target) (family string, err error) {
 	cmd := exec.Command("bash", "-c", "lscpu | grep -i \"^CPU family:\" | awk '{print $NF}'")
-	family, _, _, err = t.RunCommand(cmd, 0)
+	family, _, _, err = t.RunCommand(cmd, 0, true)
 	if err != nil {
 		return
 	}
@@ -761,7 +773,7 @@ func getFamily(t Target) (family string, err error) {
 
 func getModel(t Target) (model string, err error) {
 	cmd := exec.Command("bash", "-c", "lscpu | grep -i model: | awk '{print $NF}'")
-	model, _, _, err = t.RunCommand(cmd, 0)
+	model, _, _, err = t.RunCommand(cmd, 0, true)
 	if err != nil {
 		return
 	}
@@ -776,7 +788,7 @@ func installLkms(t Target, lkms []string) (installedLkms []string, err error) {
 	}
 	for _, lkm := range lkms {
 		slog.Debug("attempting to install kernel module", slog.String("lkm", lkm))
-		_, _, _, err := t.RunCommand(exec.Command("modprobe", "--first-time", lkm), 10)
+		_, _, _, err := t.RunCommand(exec.Command("modprobe", "--first-time", lkm), 10, true)
 		if err != nil {
 			slog.Debug("kernel module already installed or problem installing", slog.String("lkm", lkm), slog.String("error", err.Error()))
 			continue
@@ -794,7 +806,7 @@ func uninstallLkms(t Target, lkms []string) (err error) {
 	}
 	for _, lkm := range lkms {
 		slog.Debug("attempting to uninstall kernel module", slog.String("lkm", lkm))
-		_, _, _, err := t.RunCommand(exec.Command("modprobe", "-r", lkm), 10)
+		_, _, _, err := t.RunCommand(exec.Command("modprobe", "-r", lkm), 10, true)
 		if err != nil {
 			slog.Error("error uninstalling kernel module", slog.String("lkm", lkm), slog.String("error", err.Error()))
 			continue
