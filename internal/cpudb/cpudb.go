@@ -21,6 +21,11 @@ func NewCPUDB() *CPUDB {
 }
 
 // GetCPU retrieves the CPU structure that matches the provided args
+func (c *CPUDB) GetCPU(family, model, stepping string) (cpu CPU, err error) {
+	return c.GetCPUExtended(family, model, stepping, "", "", "")
+}
+
+// GetCPUExtended retrieves the CPU structure that matches the provided args
 // capid4 needed to differentiate EMR MCC from EMR XCC
 //
 //	capid4: $ lspci -s $(lspci | grep 325b | awk 'NR==1{{print $1}}') -xxx |  awk '$1 ~ /^90/{{print $9 $8 $7 $6; exit}}'
@@ -28,7 +33,7 @@ func NewCPUDB() *CPUDB {
 // sockets and devices (eventually devices per socket) needed to differentiate GNR X1/2/3
 //
 //	devices: $ lspci -d 8086:3258 | wc -l
-func (c *CPUDB) GetCPU(family, model, stepping, capid4, sockets, devices string) (cpu CPU, err error) {
+func (c *CPUDB) GetCPUExtended(family, model, stepping, capid4, sockets, devices string) (cpu CPU, err error) {
 	for _, info := range *c {
 		// if family matches
 		if info.Family == family {

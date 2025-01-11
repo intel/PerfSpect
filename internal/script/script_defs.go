@@ -152,13 +152,17 @@ func getCollectionScripts(duration, interval int, frequency int) (scripts []Scri
 		{
 			Name:      LspciBitsScriptName,
 			Script:    "lspci -s $(lspci | grep 325b | awk 'NR==1{{print $1}}') -xxx |  awk '$1 ~ /^90/{{print $9 $8 $7 $6; exit}}'",
+			Families:  []string{"6"},          // Intel
+			Models:    []string{"143", "207"}, // SPR, EMR
 			Superuser: true,
 			Depends:   []string{"lspci"},
 		},
 		{
-			Name:    LspciDevicesScriptName,
-			Script:  "lspci -d 8086:3258 | wc -l",
-			Depends: []string{"lspci"},
+			Name:     LspciDevicesScriptName,
+			Script:   "lspci -d 8086:3258 | wc -l",
+			Families: []string{"6"},          // Intel
+			Models:   []string{"143", "207"}, // SPR, EMR
+			Depends:  []string{"lspci"},
 		},
 		{
 			Name:    LspciVmmScriptName,

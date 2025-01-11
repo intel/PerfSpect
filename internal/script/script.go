@@ -48,7 +48,7 @@ func RunScript(myTarget target.Target, script ScriptDefinition, localTempDir str
 	if len(script.Architectures) > 0 && !util.StringInList(targetArchitecture, script.Architectures) ||
 		len(script.Families) > 0 && !util.StringInList(targetFamily, script.Families) ||
 		len(script.Models) > 0 && !util.StringInList(targetModel, script.Models) {
-		err = fmt.Errorf("\"%s\" script is not intended for the target processor", script.Name)
+		err = fmt.Errorf("the \"%s\" script is not intended for the target processor (arch: %s, family: %s, model: %s)", script.Name, targetArchitecture, targetFamily, targetModel)
 		return
 	}
 	scriptOutputs, err := RunScripts(myTarget, []ScriptDefinition{script}, false, localTempDir)

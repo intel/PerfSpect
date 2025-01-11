@@ -89,7 +89,7 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 	metadata.Vendor = cpuInfo[0]["vendor_id"]
 	// CPU microarchitecture
 	cpuDb := cpudb.NewCPUDB()
-	cpu, err := cpuDb.GetCPU(cpuInfo[0]["cpu family"], cpuInfo[0]["model"], cpuInfo[0]["stepping"], "", "", "")
+	cpu, err := cpuDb.GetCPU(cpuInfo[0]["cpu family"], cpuInfo[0]["model"], cpuInfo[0]["stepping"])
 	if err != nil {
 		return
 	}
