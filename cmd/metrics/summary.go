@@ -223,7 +223,7 @@ func (m *metricsFromCSV) getStats() (stats map[string]metricStats, err error) {
 			distanceSquaredSum := 0.0
 			for _, row := range m.rows {
 				val := row.metrics[metricName]
-				if math.IsNaN(val) {
+				if math.IsNaN(val) || math.IsInf(val, 0) {
 					continue
 				}
 				distance := mean - val
@@ -312,7 +312,7 @@ func (m *metricsFromCSV) getHTML() (html string, err error) {
 			if rIdx == 0 {
 				firstTimestamp = row.timestamp
 			}
-			if math.IsNaN(row.metrics[tmpl.metricNames[archIndex]]) {
+			if math.IsNaN(row.metrics[tmpl.metricNames[archIndex]]) || math.IsInf(row.metrics[tmpl.metricNames[archIndex]], 0) {
 				continue
 			}
 			series = append(series, []float64{row.timestamp - firstTimestamp, row.metrics[tmpl.metricNames[archIndex]]})
