@@ -146,7 +146,7 @@ func uarchFromOutput(outputs map[string]script.ScriptOutput) string {
 	capid4 := valFromRegexSubmatch(outputs[script.LspciBitsScriptName].Stdout, `^([0-9a-fA-F]+)`)
 	devices := valFromRegexSubmatch(outputs[script.LspciDevicesScriptName].Stdout, `^([0-9]+)`)
 	CPUdb := cpudb.NewCPUDB()
-	cpu, err := CPUdb.GetCPU(family, model, stepping, capid4, sockets, devices)
+	cpu, err := CPUdb.GetCPUExtended(family, model, stepping, capid4, sockets, devices)
 	if err == nil {
 		return cpu.MicroArchitecture
 	}
@@ -305,7 +305,7 @@ func hyperthreadingFromOutput(outputs map[string]script.ScriptOutput) string {
 		return ""
 	}
 	CPUdb := cpudb.NewCPUDB()
-	cpu, err := CPUdb.GetCPU(family, model, stepping, "", sockets, "")
+	cpu, err := CPUdb.GetCPUExtended(family, model, stepping, "", sockets, "")
 	if err != nil {
 		return ""
 	}
@@ -353,7 +353,7 @@ func channelsFromOutput(outputs map[string]script.ScriptOutput) string {
 	capid4 := valFromRegexSubmatch(outputs[script.LspciBitsScriptName].Stdout, `^([0-9a-fA-F]+)`)
 	devices := valFromRegexSubmatch(outputs[script.LspciDevicesScriptName].Stdout, `^([0-9]+)`)
 	CPUdb := cpudb.NewCPUDB()
-	cpu, err := CPUdb.GetCPU(family, model, stepping, capid4, sockets, devices)
+	cpu, err := CPUdb.GetCPUExtended(family, model, stepping, capid4, sockets, devices)
 	if err != nil {
 		slog.Error("error getting CPU from CPUdb", slog.String("error", err.Error()))
 		return ""

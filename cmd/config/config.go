@@ -156,7 +156,7 @@ func getFlagGroups() []common.FlagGroup {
 		},
 		{
 			Name: flagElcName,
-			Help: "set Efficiency Latency Control (SRF and GNR) (" + strings.Join(elcOptions, ", ") + ")",
+			Help: "set Efficiency Latency Control (" + strings.Join(elcOptions, ", ") + ")",
 		},
 	}
 	groups := []common.FlagGroup{}
@@ -507,7 +507,8 @@ func setLlcSize(llcSize float64, myTarget target.Target, localTempDir string) {
 		Script:        fmt.Sprintf("wrmsr -a 0xC90 %d", cacheWays[waysToSet]),
 		Superuser:     true,
 		Architectures: []string{"x86_64"},
-		Families:      []string{"6"}, // Intel only
+		Families:      []string{"6"},                                                // Intel only
+		Models:        []string{"63", "79", "86", "85", "106", "108", "143", "207"}, // not SRF, GNR
 		Depends:       []string{"wrmsr"},
 		Lkms:          []string{"msr"},
 	}
