@@ -104,7 +104,11 @@ func createTextReport(allTableValues []TableValues) (out []byte, err error) {
 		}
 		sb.WriteString("\n")
 		if len(tableValues.Fields) == 0 || len(tableValues.Fields[0].Values) == 0 {
-			sb.WriteString(noDataFound + "\n\n")
+			msg := noDataFound
+			if tableValues.NoDataFound != "" {
+				msg = tableValues.NoDataFound
+			}
+			sb.WriteString(msg + "\n\n")
 			continue
 		}
 		// custom renderer defined?
@@ -238,7 +242,11 @@ func renderXlsxTable(tableValues TableValues, f *excelize.File, sheetName string
 	_ = f.SetCellStyle(sheetName, cellName(col, *row), cellName(col, *row), tableNameStyle)
 	*row++
 	if len(tableValues.Fields) == 0 || len(tableValues.Fields[0].Values) == 0 {
-		_ = f.SetCellValue(sheetName, cellName(col, *row), noDataFound)
+		msg := noDataFound
+		if tableValues.NoDataFound != "" {
+			msg = tableValues.NoDataFound
+		}
+		_ = f.SetCellValue(sheetName, cellName(col, *row), msg)
 		*row += 2
 		return
 	}
@@ -308,7 +316,11 @@ func renderXlsxTableMultiTarget(tableIdx int, allTargetsTableValues [][]TableVal
 
 			// if no data found, print a message and skip to the next target
 			if len(allTargetsTableValues[targetIdx][tableIdx].Fields) == 0 || len(allTargetsTableValues[targetIdx][tableIdx].Fields[0].Values) == 0 {
-				_ = f.SetCellValue(sheetName, cellName(col, *row), noDataFound)
+				msg := noDataFound
+				if allTargetsTableValues[targetIdx][tableIdx].NoDataFound != "" {
+					msg = allTargetsTableValues[targetIdx][tableIdx].NoDataFound
+				}
+				_ = f.SetCellValue(sheetName, cellName(col, *row), msg)
 				*row += 2
 				continue
 			}

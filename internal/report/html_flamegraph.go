@@ -160,7 +160,11 @@ func renderFlameGraph(header string, tableValues TableValues, field string) (out
 	folded := tableValues.Fields[fieldIdx].Values[0]
 	if folded == "" {
 		out += `<div class="fgheader clearfix"><h3 class="text-muted">` + header + `</h3></div>`
-		out += noDataFound
+		msg := noDataFound
+		if tableValues.NoDataFound != "" {
+			msg = tableValues.NoDataFound
+		}
+		out += msg
 		return
 	}
 	jsonStacks, err := convertFoldedToJSON(folded)
