@@ -463,6 +463,10 @@ func getL3LscpuMB(outputs map[string]script.ScriptOutput) (val float64, err erro
 		return
 	}
 	units := match[2]
+	if strings.ToLower(units[:1]) == "g" {
+		val = l3SizeNoUnit * 1024 / float64(instances)
+		return
+	}
 	if strings.ToLower(units[:1]) == "m" {
 		val = l3SizeNoUnit / float64(instances)
 		return
