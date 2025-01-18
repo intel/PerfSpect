@@ -30,6 +30,9 @@ type MetricDefinition struct {
 	Evaluable     *govaluate.EvaluableExpression // parse expression once, store here for use in metric evaluation
 }
 
+// define const metric name prefix
+const metricPrefix = "metric_"
+
 // LoadMetricDefinitions reads and parses metric definitions from an architecture-specific metric
 // definition file. When the override path argument is empty, the function will load metrics from
 // the file associated with the platform's architecture found in the provided metadata. When
@@ -62,7 +65,7 @@ func LoadMetricDefinitions(metricDefinitionOverridePath string, selectedMetrics 
 		for _, metricName := range selectedMetrics {
 			found := false
 			for _, metric := range metricsInFile {
-				if metricName == metric.Name {
+				if metricPrefix+metricName == metric.Name || metricName == metric.Name {
 					found = true
 					break
 				}
@@ -74,7 +77,8 @@ func LoadMetricDefinitions(metricDefinitionOverridePath string, selectedMetrics 
 		}
 		// build list of metrics based on provided list of metric names
 		for _, metric := range metricsInFile {
-			if !util.StringInList(metric.Name, selectedMetrics) {
+			trimmedName := strings.TrimPrefix(metric.Name, metricPrefix)
+			if !util.StringInList(trimmedName, selectedMetrics) {
 				continue
 			}
 			metrics = append(metrics, metric)
@@ -122,7 +126,7 @@ func ConfigureMetrics(loadedMetrics []MetricDefinition, uncollectableEvents []st
 			tmpMetric.Name = tmpMetric.NameTxn
 		}
 		// remove "metric_" prefix from metric names
-		tmpMetric.Name = strings.TrimPrefix(tmpMetric.Name, "metric_")
+		tmpMetric.Name = strings.TrimPrefix(tmpMetric.Name, metricPrefix)
 		// transform if/else to ?/:
 		var transformed string
 		if transformed, err = transformConditional(tmpMetric.Expression); err != nil {

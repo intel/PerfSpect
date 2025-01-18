@@ -35,9 +35,10 @@ type TableDefinition struct {
 	Name        string
 	ScriptNames []string
 	// Fields function is called to retrieve field values from the script outputs
-	FieldsFunc FieldsRetriever
-	MenuLabel  string // add to tables that will be displayed in the menu
-	HasRows    bool   // table is meant to be displayed in row form, i.e., a field may have multiple values
+	FieldsFunc  FieldsRetriever
+	MenuLabel   string // add to tables that will be displayed in the menu
+	HasRows     bool   // table is meant to be displayed in row form, i.e., a field may have multiple values
+	NoDataFound string // message to display when no data is found
 	// render functions are used to override the default rendering behavior
 	HTMLTableRendererFunc            HTMLTableRenderer
 	HTMLMultiTargetTableRendererFunc HTMLMultiTargetTableRenderer
@@ -524,6 +525,7 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.MemoryBandwidthAndLatencyScriptName,
 		},
+		NoDataFound:                      "No memory latency data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
 		FieldsFunc:                       memoryLatencyTableValues,
 		HTMLTableRendererFunc:            memoryLatencyTableHtmlRenderer,
 		HTMLMultiTargetTableRendererFunc: memoryLatencyTableMultiTargetHtmlRenderer},
@@ -534,7 +536,8 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.NumaBandwidthScriptName,
 		},
-		FieldsFunc: numaBandwidthTableValues},
+		NoDataFound: "No NUMA bandwidth data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
+		FieldsFunc:  numaBandwidthTableValues},
 	StoragePerfTableName: {
 		Name:      StoragePerfTableName,
 		MenuLabel: StoragePerfTableName,

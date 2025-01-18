@@ -200,7 +200,11 @@ func createHtmlReport(allTableValues []TableValues, targetName string) (out []by
 		sb.WriteString(fmt.Sprintf("<h2 id=\"%[1]s\">%[1]s</h2>\n", html.EscapeString(tableValues.Name)))
 		// if there's no data in the table, print a message and continue
 		if len(tableValues.Fields) == 0 || len(tableValues.Fields[0].Values) == 0 {
-			sb.WriteString("<p>" + noDataFound + "</p>\n")
+			msg := noDataFound
+			if tableValues.NoDataFound != "" {
+				msg = tableValues.NoDataFound
+			}
+			sb.WriteString("<p>" + msg + "</p>\n")
 			continue
 		}
 		// render the tables
