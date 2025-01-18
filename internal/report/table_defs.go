@@ -102,6 +102,7 @@ const (
 	CPUFrequencyTableName   = "CPU Frequency"
 	MemoryLatencyTableName  = "Memory Latency"
 	NUMABandwidthTableName  = "NUMA Bandwidth"
+	StoragePerfTableName    = "Storage Performance"
 	// telemetry table names
 	CPUUtilizationTableName        = "CPU Utilization"
 	AverageCPUUtilizationTableName = "Average CPU Utilization"
@@ -115,7 +116,7 @@ const (
 	// flamegraph table names
 	CodePathFrequencyTableName = "Code Path Frequency"
 	// lock table names
-	KernelLockAnalysisTableName = "Kernel Lock Analysis "
+	KernelLockAnalysisTableName = "Kernel Lock Analysis"
 )
 
 const (
@@ -534,6 +535,14 @@ var tableDefinitions = map[string]TableDefinition{
 			script.NumaBandwidthScriptName,
 		},
 		FieldsFunc: numaBandwidthTableValues},
+	StoragePerfTableName: {
+		Name:      StoragePerfTableName,
+		MenuLabel: StoragePerfTableName,
+		HasRows:   false,
+		ScriptNames: []string{
+			script.StoragePerfScriptName,
+		},
+		FieldsFunc: storagePerfTableValues},
 	//
 	// telemetry tables
 	//
@@ -1710,6 +1719,16 @@ func numaBandwidthTableValues(outputs map[string]script.ScriptOutput) []Field {
 		}
 	}
 	return fields
+}
+
+func storagePerfTableValues(outputs map[string]script.ScriptOutput) []Field {
+	storagePerfStats := storagePerfFromOutput(outputs)
+	return []Field{
+		{Name: "read IOPS", Values: []string{storagePerfStats.ReadIOPS}},
+		{Name: "read Bandwidth", Values: []string{storagePerfStats.ReadBW}},
+		{Name: "write IOPS", Values: []string{storagePerfStats.WriteIOPS}},
+		{Name: "write Bandwidth", Values: []string{storagePerfStats.WriteBW}},
+	}
 }
 
 // telemetry

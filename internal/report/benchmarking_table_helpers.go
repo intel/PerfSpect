@@ -35,6 +35,37 @@ func cpuSpeedFromOutput(outputs map[string]script.ScriptOutput) string {
 	return fmt.Sprintf("%.0f", util.GeoMean(vals))
 }
 
+type storagePerfStats struct {
+	ReadIOPS, WriteIOPS, ReadBW, WriteBW string
+}
+
+func storagePerfFromOutput(outputs map[string]script.ScriptOutput) storagePerfStats {
+	// fio output format:
+	// ...
+	// read: IOPS=4876, BW=19.0MiB/s (20.0MB/s)(571MiB/30002msec)
+	// ...
+	// write: IOPS=1623, BW=6495KiB/s (6651kB/s)(190MiB/30002msec); 0 zone resets
+	// ...
+	var stats storagePerfStats
+	re := regexp.MustCompile(`IOPS=(\d+), BW=(\d+[\.\d+]?\w+\/s)`)
+	for _, line := range strings.Split(strings.TrimSpace(outputs[script.StoragePerfScriptName].Stdout), "\n") {
+		if strings.Contains(line, "read: IOPS") {
+			matches := re.FindStringSubmatch(line)
+			if len(matches) == 3 {
+				stats.ReadIOPS = matches[1]
+				stats.ReadBW = matches[2]
+			}
+		} else if strings.Contains(line, "write: IOPS") {
+			matches := re.FindStringSubmatch(line)
+			if len(matches) == 3 {
+				stats.WriteIOPS = matches[1]
+				stats.WriteBW = matches[2]
+			}
+		}
+	}
+	return stats
+}
+
 func ParseTurbostatOutput(output string) (singleCoreTurbo, allCoreTurbo, turboPower, turboTemperature string) {
 	var allTurbos []string
 	var allTDPs []string
