@@ -35,35 +35,27 @@ func cpuSpeedFromOutput(outputs map[string]script.ScriptOutput) string {
 	return fmt.Sprintf("%.0f", util.GeoMean(vals))
 }
 
-type storagePerfStats struct {
-	ReadIOPS, WriteIOPS, ReadBW, WriteBW string
-}
-
-func storagePerfFromOutput(outputs map[string]script.ScriptOutput) storagePerfStats {
+func storagePerfFromOutput(outputs map[string]script.ScriptOutput) (readBW, writeBW string) {
 	// fio output format:
-	// ...
-	// read: IOPS=4876, BW=19.0MiB/s (20.0MB/s)(571MiB/30002msec)
-	// ...
-	// write: IOPS=1623, BW=6495KiB/s (6651kB/s)(190MiB/30002msec); 0 zone resets
-	// ...
-	var stats storagePerfStats
-	re := regexp.MustCompile(`IOPS=(\d+), BW=(\d+[\.\d+]?\w+\/s)`)
+	// READ: bw=140MiB/s (146MB/s), 140MiB/s-140MiB/s (146MB/s-146MB/s), io=16.4GiB (17.6GB), run=120004-120004msec
+	// WRITE: bw=139MiB/s (146MB/s), 139MiB/s-139MiB/s (146MB/s-146MB/s), io=16.3GiB (17.5GB), run=120004-120004msec
+	re := regexp.MustCompile(` bw=(\d+\w+\/s)`)
 	for _, line := range strings.Split(strings.TrimSpace(outputs[script.StoragePerfScriptName].Stdout), "\n") {
-		if strings.Contains(line, "read: IOPS") {
+		if strings.Contains(line, "READ: bw=") {
 			matches := re.FindStringSubmatch(line)
-			if len(matches) == 3 {
-				stats.ReadIOPS = matches[1]
-				stats.ReadBW = matches[2]
+			if len(matches) != 0 {
+				readBW = matches[1]
 			}
-		} else if strings.Contains(line, "write: IOPS") {
+		} else if strings.Contains(line, "WRITE: bw=") {
 			matches := re.FindStringSubmatch(line)
-			if len(matches) == 3 {
-				stats.WriteIOPS = matches[1]
-				stats.WriteBW = matches[2]
+			if len(matches) != 0 {
+				writeBW = matches[1]
 			}
+		} else if strings.Contains(line, "ERROR: ") {
+			slog.Error("failed to run storage benchmark", slog.String("line", line))
 		}
 	}
-	return stats
+	return
 }
 
 func ParseTurbostatOutput(output string) (singleCoreTurbo, allCoreTurbo, turboPower, turboTemperature string) {

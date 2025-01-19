@@ -250,7 +250,7 @@ func getFlagGroups() []common.FlagGroup {
 		},
 		{
 			Name: flagStorageDirName,
-			Help: "directory where storage performance benchmark data is stored",
+			Help: "existing directory where storage performance benchmark data will be temporarily stored",
 		},
 	}
 	groups = append(groups, common.FlagGroup{
@@ -361,6 +361,8 @@ func benchmarkSummaryFromTableValues(allTableValues []report.TableValues, output
 			{Name: "Minimum Power", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUPowerTableName), "Minimum Power", 0)}},
 			{Name: "Memory Peak Bandwidth"},
 			{Name: "Memory Minimum Latency"},
+			{Name: "Disk Read Bandwidth", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.StoragePerfTableName), "Single-Thread Read Bandwidth", 0)}},
+			{Name: "Disk Write Bandwidth", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.StoragePerfTableName), "Single-Thread Write Bandwidth", 0)}},
 			{Name: "Microarchitecture", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.SystemSummaryTableName), "Microarchitecture", 0)}},
 			{Name: "Sockets", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.SystemSummaryTableName), "Sockets", 0)}},
 		},

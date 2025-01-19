@@ -843,26 +843,43 @@ avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd
 		{
 			Name: StoragePerfScriptName,
 			Script: func() string {
-				return fmt.Sprintf(`file_dir=%s
-file_name="fio_file"
-file_size_g=4
-runtime=30
+				return fmt.Sprintf(`
+file_dir=%s
+test_dir="$file_dir"/fio_test
+file_size_g=5
+numjobs=1
+total_file_size_g=$(($file_size_g * $numjobs))
+ramp_time=5s
+runtime=120s
+ioengine=sync
+# confirm the file_dir is a directory, is writeable, and has enough space
 if [[ -d "$file_dir" && -w "$file_dir" ]]; then
 	available_space=$(df -hP "$file_dir")
 	count=$( echo "$available_space" | awk '/[0-9]%%/{print substr($4,1,length($4)-1)}' )
 	unit=$( echo "$available_space" | awk '/[0-9]%%/{print substr($4,length($4),1)}' )
-	if [[ "$unit" == "G"  &&  $(awk -v c="$count" -v f=$file_size_g 'BEGIN{print (c>f)?1:0}') == 1 ]] || (echo "TPEZY" | grep -F -q "$unit" ); then
-		fio --randrepeat=1 --ioengine=sync --direct=1 --gtod_reduce=1 --name=test --filename="$file_dir"/"$file_name" --runtime=$runtime --bs=4k --iodepth=64 --size="$file_size_g"G --readwrite=randrw --rwmixread=75
-		rm "$file_dir"/"$file_name"
-	else
-		echo "$file_dir does not have enough available space - $file_size_g Gigabytes required"
+	is_enough_gigabytes=$(awk -v c="$count" -v f=$total_file_size_g 'BEGIN{print (c>f)?1:0}')
+	is_terabyte_or_more=$(echo "TPEZY" | grep -F -q "$unit" && echo 1 || echo 0)
+	if [[ ("$unit" == "G" && "$is_enough_gigabytes" == 0) && "$is_terabyte_or_more" == 1 ]]; then
+		echo "ERROR: $file_dir does not have enough available space - $total_file_size_g GB required"
+        exit 1
 	fi
 else
-	echo "$file_dir does not exist or is not writeable"
+	echo "ERROR: $file_dir does not exist or is not writeable"
+    exit 1
 fi
-`, fioDir)
+# single-threaded read & write bandwidth test
+rm -rf $test_dir
+mkdir -p $test_dir
+sync
+/sbin/sysctl -w vm.drop_caches=3 || true
+fio --name=bandwidth --directory=$test_dir --numjobs=$numjobs \
+--size="$file_size_g"G --time_based --runtime=$runtime --ramp_time=$ramp_time --ioengine=$ioengine \
+--direct=1 --verify=0 --bs=1M --iodepth=64 --rw=rw \
+--group_reporting=1 --iodepth_batch_submit=64 \
+--iodepth_batch_complete_max=64
+rm -rf $test_dir`, fioDir)
 			}(),
-			Superuser:  false,
+			Superuser:  true,
 			Sequential: true,
 			Depends:    []string{"fio"},
 		},

@@ -1725,12 +1725,10 @@ func numaBandwidthTableValues(outputs map[string]script.ScriptOutput) []Field {
 }
 
 func storagePerfTableValues(outputs map[string]script.ScriptOutput) []Field {
-	storagePerfStats := storagePerfFromOutput(outputs)
+	readBW, writeBW := storagePerfFromOutput(outputs)
 	return []Field{
-		{Name: "read IOPS", Values: []string{storagePerfStats.ReadIOPS}},
-		{Name: "read Bandwidth", Values: []string{storagePerfStats.ReadBW}},
-		{Name: "write IOPS", Values: []string{storagePerfStats.WriteIOPS}},
-		{Name: "write Bandwidth", Values: []string{storagePerfStats.WriteBW}},
+		{Name: "Single-Thread Read Bandwidth", Values: []string{readBW}},
+		{Name: "Single-Thread Write Bandwidth", Values: []string{writeBW}},
 	}
 }
 
