@@ -103,6 +103,7 @@ const (
 	CPUFrequencyTableName   = "CPU Frequency"
 	MemoryLatencyTableName  = "Memory Latency"
 	NUMABandwidthTableName  = "NUMA Bandwidth"
+	StoragePerfTableName    = "Storage Performance"
 	// telemetry table names
 	CPUUtilizationTableName        = "CPU Utilization"
 	AverageCPUUtilizationTableName = "Average CPU Utilization"
@@ -116,7 +117,7 @@ const (
 	// flamegraph table names
 	CodePathFrequencyTableName = "Code Path Frequency"
 	// lock table names
-	KernelLockAnalysisTableName = "Kernel Lock Analysis "
+	KernelLockAnalysisTableName = "Kernel Lock Analysis"
 )
 
 const (
@@ -537,6 +538,14 @@ var tableDefinitions = map[string]TableDefinition{
 		},
 		NoDataFound: "No NUMA bandwidth data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
 		FieldsFunc:  numaBandwidthTableValues},
+	StoragePerfTableName: {
+		Name:      StoragePerfTableName,
+		MenuLabel: StoragePerfTableName,
+		HasRows:   false,
+		ScriptNames: []string{
+			script.StoragePerfScriptName,
+		},
+		FieldsFunc: storagePerfTableValues},
 	//
 	// telemetry tables
 	//
@@ -1713,6 +1722,14 @@ func numaBandwidthTableValues(outputs map[string]script.ScriptOutput) []Field {
 		}
 	}
 	return fields
+}
+
+func storagePerfTableValues(outputs map[string]script.ScriptOutput) []Field {
+	readBW, writeBW := storagePerfFromOutput(outputs)
+	return []Field{
+		{Name: "Single-Thread Read Bandwidth", Values: []string{readBW}},
+		{Name: "Single-Thread Write Bandwidth", Values: []string{writeBW}},
+	}
 }
 
 // telemetry

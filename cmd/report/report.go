@@ -78,7 +78,8 @@ var (
 	flagKernelLog      bool
 	flagSystemSummary  bool
 
-	flagBenchmark []string
+	flagBenchmark  []string
+	flagStorageDir string
 )
 
 // flag names
@@ -116,7 +117,8 @@ const (
 	flagKernelLogName      = "kernellog"
 	flagSystemSummaryName  = "system-summary"
 
-	flagBenchmarkName = "benchmark"
+	flagBenchmarkName  = "benchmark"
+	flagStorageDirName = "storage-dir"
 )
 
 var benchmarkOptions = []string{
@@ -126,6 +128,7 @@ var benchmarkOptions = []string{
 	"frequency",
 	"memory",
 	"numa",
+	"storage",
 }
 
 var benchmarkAll = "all"
@@ -137,6 +140,7 @@ var benchmarkTableNames = map[string][]string{
 	"frequency":   {report.CPUFrequencyTableName},
 	"memory":      {report.MemoryLatencyTableName},
 	"numa":        {report.NUMABandwidthTableName},
+	"storage":     {report.StoragePerfTableName},
 }
 
 var benchmarkSummaryTableName = "Benchmark Summary"
@@ -185,6 +189,7 @@ func init() {
 	Cmd.Flags().BoolVar(&flagAll, flagAllName, true, "")
 	Cmd.Flags().StringSliceVar(&common.FlagFormat, common.FlagFormatName, []string{report.FormatAll}, "")
 	Cmd.Flags().StringSliceVar(&flagBenchmark, flagBenchmarkName, []string{}, "")
+	Cmd.Flags().StringVar(&flagStorageDir, flagStorageDirName, "/tmp", "")
 
 	common.AddTargetFlags(Cmd)
 
@@ -242,6 +247,10 @@ func getFlagGroups() []common.FlagGroup {
 		{
 			Name: flagBenchmarkName,
 			Help: fmt.Sprintf("choose benchmark(s) to include in report from: %s", strings.Join(append([]string{benchmarkAll}, benchmarkOptions...), ", ")),
+		},
+		{
+			Name: flagStorageDirName,
+			Help: "existing directory where storage performance benchmark data will be temporarily stored",
 		},
 	}
 	groups = append(groups, common.FlagGroup{
@@ -324,6 +333,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 	reportingCommand := common.ReportingCommand{
 		Cmd:              cmd,
+		StorageDir:       flagStorageDir,
 		TableNames:       tableNames,
 		SummaryFunc:      summaryFunc,
 		SummaryTableName: benchmarkSummaryTableName,
@@ -351,6 +361,8 @@ func benchmarkSummaryFromTableValues(allTableValues []report.TableValues, output
 			{Name: "Minimum Power", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUPowerTableName), "Minimum Power", 0)}},
 			{Name: "Memory Peak Bandwidth"},
 			{Name: "Memory Minimum Latency"},
+			{Name: "Disk Read Bandwidth", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.StoragePerfTableName), "Single-Thread Read Bandwidth", 0)}},
+			{Name: "Disk Write Bandwidth", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.StoragePerfTableName), "Single-Thread Write Bandwidth", 0)}},
 			{Name: "Microarchitecture", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.SystemSummaryTableName), "Microarchitecture", 0)}},
 			{Name: "Sockets", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.SystemSummaryTableName), "Sockets", 0)}},
 		},
