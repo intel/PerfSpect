@@ -70,6 +70,7 @@ const (
 	TurboFrequenciesScriptName                  = "turbo frequencies"
 	TurboFrequencyPowerAndTemperatureScriptName = "turbo frequency power and temperature"
 	IdlePowerScriptName                         = "idle power"
+	StoragePerfScriptName                       = "storage perf"
 	MpstatScriptName                            = "mpstat"
 	IostatScriptName                            = "iostat"
 	SarMemoryScriptName                         = "sar-memory"
@@ -112,12 +113,12 @@ const (
 
 // GetScriptByName returns the script definition with the given name. It will panic if the script is not found.
 func GetScriptByName(name string) ScriptDefinition {
-	return GetTimedScriptByName(name, 0, 0, 0)
+	return GetParameterizedScriptByName(name, 0, 0, 0, "")
 }
 
-// GetTimedScriptByName returns the script definition with the given name. It will panic if the script is not found.
-func GetTimedScriptByName(name string, duration int, interval int, frequency int) ScriptDefinition {
-	for _, script := range getCollectionScripts(duration, interval, frequency) {
+// GetParameterizedScriptByName returns the script definition with the given name. It will panic if the script is not found.
+func GetParameterizedScriptByName(name string, duration int, interval int, frequency int, fioDir string) ScriptDefinition {
+	for _, script := range getCollectionScripts(duration, interval, frequency, fioDir) {
 		if script.Name == name {
 			return script
 		}
@@ -126,7 +127,7 @@ func GetTimedScriptByName(name string, duration int, interval int, frequency int
 }
 
 // getCollectionScripts returns the script definitions that are used to collect information from the target system.
-func getCollectionScripts(duration, interval int, frequency int) (scripts []ScriptDefinition) {
+func getCollectionScripts(duration, interval int, frequency int, fioDir string) (scripts []ScriptDefinition) {
 
 	// script definitions
 	scripts = []ScriptDefinition{
@@ -838,6 +839,49 @@ avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd
 			Lkms:       []string{"msr"},
 			Depends:    []string{"turbostat"},
 			Sequential: true,
+		},
+		{
+			Name: StoragePerfScriptName,
+			Script: func() string {
+				return fmt.Sprintf(`
+file_dir=%s
+test_dir="$file_dir"/fio_test
+file_size_g=5
+numjobs=1
+total_file_size_g=$(($file_size_g * $numjobs))
+ramp_time=5s
+runtime=120s
+ioengine=sync
+# confirm the file_dir is a directory, is writeable, and has enough space
+if [[ -d "$file_dir" && -w "$file_dir" ]]; then
+	available_space=$(df -hP "$file_dir")
+	count=$( echo "$available_space" | awk '/[0-9]%%/{print substr($4,1,length($4)-1)}' )
+	unit=$( echo "$available_space" | awk '/[0-9]%%/{print substr($4,length($4),1)}' )
+	is_enough_gigabytes=$(awk -v c="$count" -v f=$total_file_size_g 'BEGIN{print (c>f)?1:0}')
+	is_terabyte_or_more=$(echo "TPEZY" | grep -F -q "$unit" && echo 1 || echo 0)
+	if [[ ("$unit" == "G" && "$is_enough_gigabytes" == 0) && "$is_terabyte_or_more" == 1 ]]; then
+		echo "ERROR: $file_dir does not have enough available space - $total_file_size_g GB required"
+        exit 1
+	fi
+else
+	echo "ERROR: $file_dir does not exist or is not writeable"
+    exit 1
+fi
+# single-threaded read & write bandwidth test
+rm -rf $test_dir
+mkdir -p $test_dir
+sync
+/sbin/sysctl -w vm.drop_caches=3 || true
+fio --name=bandwidth --directory=$test_dir --numjobs=$numjobs \
+--size="$file_size_g"G --time_based --runtime=$runtime --ramp_time=$ramp_time --ioengine=$ioengine \
+--direct=1 --verify=0 --bs=1M --iodepth=64 --rw=rw \
+--group_reporting=1 --iodepth_batch_submit=64 \
+--iodepth_batch_complete_max=64
+rm -rf $test_dir`, fioDir)
+			}(),
+			Superuser:  true,
+			Sequential: true,
+			Depends:    []string{"fio"},
 		},
 		// telemetry scripts
 		{

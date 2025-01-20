@@ -83,6 +83,7 @@ type ReportingCommand struct {
 	Duration         int
 	Interval         int
 	Frequency        int
+	StorageDir       string
 	SummaryFunc      SummaryFunc
 	SummaryTableName string
 	InsightsFunc     InsightsFunc
@@ -137,7 +138,7 @@ func (rc *ReportingCommand) Run() error {
 		// make a list of unique script definitions
 		var scriptsToRun []script.ScriptDefinition
 		for _, scriptName := range scriptNames {
-			scriptsToRun = append(scriptsToRun, script.GetTimedScriptByName(scriptName, rc.Duration, rc.Interval, rc.Frequency))
+			scriptsToRun = append(scriptsToRun, script.GetParameterizedScriptByName(scriptName, rc.Duration, rc.Interval, rc.Frequency, rc.StorageDir))
 		}
 		// do any of the scripts require elevated privileges?
 		elevated := false
