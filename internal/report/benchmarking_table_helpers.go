@@ -39,7 +39,7 @@ func storagePerfFromOutput(outputs map[string]script.ScriptOutput) (readBW, writ
 	// fio output format:
 	// READ: bw=140MiB/s (146MB/s), 140MiB/s-140MiB/s (146MB/s-146MB/s), io=16.4GiB (17.6GB), run=120004-120004msec
 	// WRITE: bw=139MiB/s (146MB/s), 139MiB/s-139MiB/s (146MB/s-146MB/s), io=16.3GiB (17.5GB), run=120004-120004msec
-	re := regexp.MustCompile(` bw=(\d+\w+\/s)`)
+	re := regexp.MustCompile(` bw=(\d+[.]?[\d]*\w+\/s)`)
 	for _, line := range strings.Split(strings.TrimSpace(outputs[script.StoragePerfScriptName].Stdout), "\n") {
 		if strings.Contains(line, "READ: bw=") {
 			matches := re.FindStringSubmatch(line)
