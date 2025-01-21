@@ -84,7 +84,7 @@ If sudo is not possible and running as the root user is not possible, use the `-
 See `perfspect metrics -h` for the extensive set of options and examples.
 
 #### Report Command
-The `report` command generates system configuration reports in a variety of formats. By default, all categories of information are collected:
+The `report` command generates system configuration reports in a variety of formats. By default, all categories of information are collected. See `perfspect report -h` for all options.
 ```
 $ ./perfspect report 
 soc-PF4W5A3V          ⢿  collection complete                     
@@ -114,10 +114,29 @@ Microcode:       0x21000230
 Report files:
   /home/myuser/dev/perfspect/perfspect_2024-09-03_17-47-55/emr.txt
 ```
-See `perfspect report -h` for all options.
+###### Benchmarks
+To assist in evaluating the health of target systems, the report command can run a series of micro-benchmarks. The results will be reported along with the target's configuration details. Use --benchmarks \<"all" or comma separated list of benchmarks\>:
+```
+$ ./perfspect report --benchmarks all
+soc-PF4W5A3V          ⢿  collection complete                     
 
-###### Memory Benchmark Requirements
-Memory benchmarks executed through the PerfSpect report command require the Intel® Memory Latency Checker application. It can be downloaded from here: [MLC](https://www.intel.com/content/www/us/en/download/736633/intel-memory-latency-checker-intel-mlc.html). Once downloaded, extract the Linux executable and place it in the perfspect/tools/x86_64 directory.
+Report files:
+  /home/myuser/dev/perfspect/perfspect_2024-09-03_17-45-40/soc-PF4W5A3V.html
+  /home/myuser/dev/perfspect/perfspect_2024-09-03_17-45-40/soc-PF4W5A3V.xlsx
+  /home/myuser/dev/perfspect/perfspect_2024-09-03_17-45-40/soc-PF4W5A3V.json
+  /home/myuser/dev/perfspect/perfspect_2024-09-03_17-45-40/soc-PF4W5A3V.txt
+```
+
+| benchmark | Description |
+| --------- | ----------- |
+| all | runs all benchmarks |
+| speed | runs each [stress-ng](https://github.com/ColinIanKing/stress-ng) cpu-method for 1s each, reports the geo-metric mean of all results. |
+| power | runs stress-ng in two stages: 1) load 1 cpu to 100% for 20s to measure maximum frequency, 2) load all cpus to 100% for 60s. Uses [turbostat](https://github.com/torvalds/linux/tree/master/tools/power/x86/turbostat) to measure power. |
+| temperature | runs the same micro benchmark as 'power', but extracts maximum temperature from turbostat output. |
+| frequency | runs [avx-turbo](https://github.com/intel/avx-turbo) to measure scalar and AVX frequencies across processor's cores. **Note:** Runtime increases with core count.  |
+| memory | runs [Intel(r) Memory Latency Checker](https://www.intel.com/content/www/us/en/download/736633/intel-memory-latency-checker-intel-mlc.html) (MLC) to measure memory bandwidth and latency across a load range. **Important Note:** MLC is not included with PerfSpect. It can be downloaded from here: [MLC](https://www.intel.com/content/www/us/en/download/736633/intel-memory-latency-checker-intel-mlc.html). Once downloaded, extract the Linux executable and place it in the perfspect/tools/x86_64 directory. |
+| numa | runs Intel(r) Memory Latency Checker(MLC) to measure bandwidth between NUMA nodes. See Note above about downloading MLC. |
+| storage | runs [fio](https://github.com/axboe/fio) for 2m in read/write mode with a single worker to measure single-thread read and write bandwidth. Use the --storage-dir flag to override the default location. Minimum 5GB disk space required to run test. |
 
 #### Telemetry Command
 The `telemetry` command runs telemetry collectors on the specified target(s) and then generates reports of the results. By default, all telemetry types are collected. To select telemetry types, additional command line options are available (see `perfspect telemetry -h`).
