@@ -450,17 +450,33 @@
                         borderWidth: 2,
                       },
                       data: [
+                      {
+                          name: "Frontend",
+                          value: Math.round(FRONTEND * 10) / 10,
+                          children:[
+                            {
+                              name: "Fetch Bandwidth",
+                              value: Math.round(FETCHBANDWIDTH * 10) / 10,
+                            },
+                            {
+                              name: "Fetch Latency",
+                              value: Math.round(FETCHLATENCY * 10) / 10,
+                            },
+                          ]
+                        },
                         {
                           name: "Bad Speculation",
                           value: Math.round(BADSPECULATION * 10) / 10,
-                        },
-                        {
-                          name: "Retiring",
-                          value: Math.round(RETIRING * 10) / 10,
-                        },
-                        {
-                          name: "Frontend",
-                          value: Math.round(FRONTEND * 10) / 10,
+                          children: [
+                            {
+                              name: "Branch Mispredicts",
+                              value: Math.round(BRANCHMISPREDICTS * 10) / 10,
+                            },
+                            {
+                              name: "Machine Clears",
+                              value: Math.round(MACHINECLEARS * 10) / 10,
+                            },
+                          ]
                         },
                         {
                           name: "Backend",
@@ -475,6 +491,20 @@
                               value: Math.round(MEMORY * 10) / 10,
                             },
                           ],
+                        },
+                        {
+                          name: "Retiring",
+                          value: Math.round(RETIRING * 10) / 10,
+                          children: [
+                            {
+                              name: "Light Operations",
+                              value: Math.round(LIGHTOPS * 10) / 10,
+                            },
+                            {
+                              name: "Heavy Operations",
+                              value: Math.round(HEAVYOPS * 10) / 10,
+                            },
+                          ]
                         },
                       ],
                       radius: [20, "100%"],

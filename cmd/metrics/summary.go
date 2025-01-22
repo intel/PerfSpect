@@ -266,11 +266,17 @@ func (m *metricsFromCSV) getHTML() (html string, err error) {
 	// TMA Tab
 	templateReplace := []tmplReplace{
 		{"FRONTEND", []string{"TMA_Frontend_Bound(%)", "Pipeline Utilization - Frontend Bound (%)"}},
+		{"FETCHLATENCY", []string{"TMA_..Fetch_Latency(%)", "Pipeline Utilization - Frontend Bound - Latency (%)"}},
+		{"FETCHBANDWIDTH", []string{"TMA_..Fetch_Bandwidth(%)", "Pipeline Utilization - Frontend Bound - Bandwidth (%)"}},
+		{"BADSPECULATION", []string{"TMA_Bad_Speculation(%)", "Pipeline Utilization - Bad Speculation (%)"}},
+		{"BRANCHMISPREDICTS", []string{"TMA_..Branch_Mispredicts(%)", "Pipeline Utilization - Bad Speculation - Mispredicts (%)"}},
+		{"MACHINECLEARS", []string{"TMA_..Machine_Clears(%)"}},
 		{"BACKEND", []string{"TMA_Backend_Bound(%)", "Pipeline Utilization - Backend Bound (%)"}},
 		{"COREDATA", []string{"TMA_..Core_Bound(%)", "Pipeline Utilization - Backend Bound - CPU (%)"}},
 		{"MEMORY", []string{"TMA_..Memory_Bound(%)", "Pipeline Utilization - Backend Bound - Memory (%)"}},
-		{"BADSPECULATION", []string{"TMA_Bad_Speculation(%), Pipeline Utilization - Bad Speculation (%)"}},
 		{"RETIRING", []string{"TMA_Retiring(%)", "Pipeline Utilization - Retiring (%)"}},
+		{"LIGHTOPS", []string{"TMA_..Light_Operations(%)"}},
+		{"HEAVYOPS", []string{"TMA_..Heavy_Operations(%)"}},
 	}
 	haveTMA := false
 	if archIndex == 0 && !math.IsNaN(stats["TMA_Frontend_Bound(%)"].mean) {
@@ -280,7 +286,14 @@ func (m *metricsFromCSV) getHTML() (html string, err error) {
 	}
 	if haveTMA {
 		for _, tmpl := range templateReplace {
-			html = strings.Replace(html, tmpl.tmplVar, fmt.Sprintf("%f", stats[tmpl.metricNames[archIndex]].mean), -1)
+			// confirm that the metric name exists in the stats, otherwise set it to 0
+			var metricVal float64
+			if _, ok := stats[tmpl.metricNames[archIndex]]; ok {
+				metricVal = stats[tmpl.metricNames[archIndex]].mean
+			} else {
+				metricVal = 0
+			}
+			html = strings.Replace(html, tmpl.tmplVar, fmt.Sprintf("%f", metricVal), -1)
 		}
 	} else {
 		for _, tmpl := range templateReplace {
