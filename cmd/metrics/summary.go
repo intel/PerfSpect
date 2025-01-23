@@ -252,7 +252,7 @@ func (m *metricsFromCSV) getHTML() (html string, err error) {
 
 	// hack to determine the architecture of the metrics source
 	var archIndex int
-	if _, ok := stats["metric_Macro-ops Retired"]; ok { // a metric that only exists in the AMD metric definitions
+	if _, ok := stats["Macro-ops Retired"]; ok { // a metric that only exists in the AMD metric definitions
 		archIndex = 1
 	} else {
 		archIndex = 0
@@ -288,10 +288,11 @@ func (m *metricsFromCSV) getHTML() (html string, err error) {
 		for _, tmpl := range templateReplace {
 			// confirm that the metric name exists in the stats, otherwise set it to 0
 			var metricVal float64
-			if _, ok := stats[tmpl.metricNames[archIndex]]; ok {
-				metricVal = stats[tmpl.metricNames[archIndex]].mean
-			} else {
-				metricVal = 0
+			metricVal = 0
+			if len(tmpl.metricNames) > archIndex {
+				if _, ok := stats[tmpl.metricNames[archIndex]]; ok {
+					metricVal = stats[tmpl.metricNames[archIndex]].mean
+				}
 			}
 			html = strings.Replace(html, tmpl.tmplVar, fmt.Sprintf("%f", metricVal), -1)
 		}
