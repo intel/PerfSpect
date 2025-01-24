@@ -526,7 +526,7 @@ func getSupportsFixedEvent(myTarget target.Target, event string, uarch string, n
 		eventList = append(eventList, event)
 	}
 	scriptDef := script.ScriptDefinition{
-		Name:      "perf stat " + event,
+		Name:      "perf stat fixed" + event,
 		Script:    perfPath + " stat -a -e '{" + strings.Join(eventList, ",") + "}' sleep 1",
 		Superuser: !noRoot,
 	}
