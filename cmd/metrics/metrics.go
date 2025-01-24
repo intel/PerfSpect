@@ -662,10 +662,11 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 	// wait for all metrics to be prepared
 	numTargetsWithPreparedMetrics := 0
-	for range targetContexts {
+	for _, ctx := range targetContexts {
 		targetError := <-channelTargetError
 		if targetError.err != nil {
 			slog.Error("failed to prepare metrics", slog.String("target", targetError.target.GetName()), slog.String("error", targetError.err.Error()))
+			_ = multiSpinner.Status(ctx.target.GetName(), fmt.Sprintf("Error: %v", targetError.err))
 		} else {
 			numTargetsWithPreparedMetrics++
 		}
@@ -891,6 +892,12 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
+		return
+	}
+	if !targetContext.metadata.SupportsInstructions {
+		slog.Info("Target does not support instructions event collection", slog.String("target", myTarget.GetName()))
+		targetContext.err = fmt.Errorf("target not supported, does not support instructions event collection")
+		channelError <- targetError{target: myTarget, err: targetContext.err}
 		return
 	}
 	slog.Info(targetContext.metadata.String())
