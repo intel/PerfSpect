@@ -304,6 +304,24 @@ func (md Metadata) String() string {
 	return out
 }
 
+// JSON converts the Metadata struct to a JSON-encoded byte slice.
+// It creates a copy of the Metadata, sets the PerfSupportedEvents field to an empty string,
+// and then marshals the copy to JSON format.
+//
+// Returns:
+// - out: JSON-encoded byte slice representation of the Metadata.
+// - err: error encountered during the marshaling process, if any.
+func (md Metadata) JSON() (out []byte, err error) {
+	if out, err = json.Marshal(md); err != nil {
+		slog.Error("failed to marshal metadata structure", slog.String("error", err.Error()))
+		return
+	}
+	// remove PerfSupportedEvents from json
+	re := regexp.MustCompile(`"PerfSupportedEvents":"[^"]*",`)
+	out = re.ReplaceAll(out, []byte(""))
+	return
+}
+
 // WriteJSONToFile writes the metadata structure (minus perf's supported events) to the filename provided
 // Note that the file will be truncated.
 func (md Metadata) WriteJSONToFile(path string) (err error) {
@@ -314,10 +332,7 @@ func (md Metadata) WriteJSONToFile(path string) (err error) {
 	}
 	defer rawFile.Close()
 	var out []byte
-	mdCopy := md
-	mdCopy.PerfSupportedEvents = ""
-	if out, err = json.Marshal(mdCopy); err != nil {
-		slog.Error("failed to marshal metadata structure", slog.String("error", err.Error()))
+	if out, err = md.JSON(); err != nil {
 		return
 	}
 	out = append(out, []byte("\n")...)

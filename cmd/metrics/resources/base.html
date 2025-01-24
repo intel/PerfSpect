@@ -257,6 +257,8 @@
         "TMA_Info_System_SMT_2T_Utilization": "Fraction of cycles where both hardware Logical Processors were active",
       }
 
+      const metadata = METADATA
+
       const transactions = TRANSACTIONS;
 
       const base_line = {
@@ -388,6 +390,7 @@
               <Tab label="Memory" />
               <Tab label="Power" />
               <Tab label="All Metrics" />
+              <Tab label="Metadata" />
             </Tabs>
           </Box>
           <div style={{ padding: "80px 24px 24px 24px" }}>
@@ -683,6 +686,33 @@
                         <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
                           {Number(row[4]).toFixed(4)}
                         </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </TabPanel>
+            <TabPanel
+              value={systemTabs}
+              index={5}
+            >
+            <TableContainer component={Paper} sx={{ width: "fit-content" }}>
+                <Table size="small" style={{ tableLayout: 'auto' }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Key</TableCell>
+                      <TableCell>Value</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {Object.entries(metadata).sort(([key1], [key2]) => key1.localeCompare(key2)).map(([key, value]) => (
+                      <TableRow key={key}>
+                      <TableCell sx={{ fontFamily: 'Monospace' }} component="th" scope="row" >
+                        {JSON.stringify(key)}
+                      </TableCell>
+                      <TableCell sx={{ fontFamily: 'Monospace' }} align="left">
+                        {JSON.stringify(value)}
+                      </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

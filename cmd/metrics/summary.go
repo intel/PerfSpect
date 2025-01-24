@@ -20,7 +20,7 @@ import (
 
 // Summarize - generates formatted output from a CSV file containing metric values.
 // The output can be in CSV or HTML format. Set html to true to generate HTML output otherwise CSV is generated.
-func Summarize(csvInputPath string, html bool) (out string, err error) {
+func Summarize(csvInputPath string, html bool, metadata Metadata) (out string, err error) {
 	var metrics []metricsFromCSV
 	if metrics, err = newMetricsFromCSV(csvInputPath); err != nil {
 		return
@@ -30,7 +30,7 @@ func Summarize(csvInputPath string, html bool) (out string, err error) {
 			err = fmt.Errorf("html format is supported only when data's scope is '%s' or '%s' and granularity is '%s'", scopeSystem, scopeProcess, granularitySystem)
 			return
 		}
-		out, err = metrics[0].getHTML()
+		out, err = metrics[0].getHTML(metadata)
 	} else {
 		for i, m := range metrics {
 			var oneOut string
@@ -238,7 +238,7 @@ func (m *metricsFromCSV) getStats() (stats map[string]metricStats, err error) {
 }
 
 // getHTML - generate a string containing HTML representing the metrics
-func (m *metricsFromCSV) getHTML() (html string, err error) {
+func (m *metricsFromCSV) getHTML(metadata Metadata) (html string, err error) {
 	var stats map[string]metricStats
 	if stats, err = m.getStats(); err != nil {
 		return
@@ -354,6 +354,12 @@ func (m *metricsFromCSV) getHTML() (html string, err error) {
 	}
 	jsonMetrics := string(jsonMetricsBytes)
 	html = strings.Replace(html, "ALLMETRICS", string(jsonMetrics), -1)
+	// System Information Tab
+	jsonMetadata, err := metadata.JSON()
+	if err != nil {
+		return
+	}
+	html = strings.Replace(html, "METADATA", string(jsonMetadata), -1)
 	return
 }
 
