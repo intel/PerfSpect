@@ -656,7 +656,7 @@ func (t *RemoteTarget) prepareSSHFlags(scp bool, useControlMaster bool, prompt b
 	if useControlMaster {
 		controlPathFlags := []string{
 			"-o",
-			"ControlPath=" + filepath.Join(os.TempDir(), `control-%h-%p-%r`),
+			"ControlPath=" + filepath.Join(os.TempDir(), fmt.Sprintf("control-%%h-%%p-%%r-%d", os.Getpid())),
 			"-o",
 			"ControlMaster=auto",
 			"-o",
