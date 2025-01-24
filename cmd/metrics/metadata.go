@@ -34,6 +34,7 @@ type Metadata struct {
 	PerfSupportedEvents       string
 	PMUDriverVersion          string
 	SocketCount               int
+	SupportsInstructions      bool
 	SupportsFixedCycles       bool
 	SupportsFixedInstructions bool
 	SupportsFixedTMA          bool
@@ -111,11 +112,25 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 		}
 		slowFuncChannel <- err
 	}()
+	// instructions
+	go func() {
+		var err error
+		var output string
+		if metadata.SupportsInstructions, output, err = getSupportsEvent(myTarget, "instructions", noRoot, perfPath, localTempDir); err != nil {
+			slog.Warn("failed to determine if instructions event is supported, assuming not supported", slog.String("error", err.Error()))
+			err = nil
+		} else {
+			if !metadata.SupportsInstructions {
+				slog.Warn("instructions event not supported", slog.String("output", output))
+			}
+		}
+		slowFuncChannel <- err
+	}()
 	// ref_cycles
 	go func() {
 		var err error
 		var output string
-		if metadata.SupportsRefCycles, output, err = getSupportsRefCycles(myTarget, noRoot, perfPath, localTempDir); err != nil {
+		if metadata.SupportsRefCycles, output, err = getSupportsEvent(myTarget, "ref-cycles", noRoot, perfPath, localTempDir); err != nil {
 			slog.Warn("failed to determine if ref_cycles is supported, assuming not supported", slog.String("error", err.Error()))
 			err = nil
 		} else {
@@ -204,6 +219,7 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 		errs = append(errs, <-slowFuncChannel)
 		errs = append(errs, <-slowFuncChannel)
 		errs = append(errs, <-slowFuncChannel)
+		errs = append(errs, <-slowFuncChannel)
 		for _, errInside := range errs {
 			if errInside != nil {
 				slog.Error("error loading metadata", slog.String("error", errInside.Error()), slog.String("target", myTarget.GetName()))
@@ -249,6 +265,7 @@ func (md Metadata) String() string {
 		"Threads per Core: %d, "+
 		"TSC Frequency (Hz): %d, "+
 		"TSC: %d, "+
+		"Instructions event supported: %t, "+
 		"Fixed cycles slot supported: %t, "+
 		"Fixed instructions slot supported: %t, "+
 		"Fixed TMA slot supported: %t, "+
@@ -267,6 +284,7 @@ func (md Metadata) String() string {
 		md.ThreadsPerCore,
 		md.TSCFrequencyHz,
 		md.TSC,
+		md.SupportsInstructions,
 		md.SupportsFixedCycles,
 		md.SupportsFixedInstructions,
 		md.SupportsFixedTMA,
@@ -378,17 +396,16 @@ func getPerfSupportedEvents(myTarget target.Target, perfPath string) (supportedE
 	return
 }
 
-// getSupportsRefCycles() - checks if the ref-cycles event is supported by perf
-// On some VMs, the ref-cycles event is not supported and perf returns an error
-func getSupportsRefCycles(myTarget target.Target, noRoot bool, perfPath string, localTempDir string) (supported bool, output string, err error) {
+// getSupportsEvent() - checks if the event is supported by perf
+func getSupportsEvent(myTarget target.Target, event string, noRoot bool, perfPath string, localTempDir string) (supported bool, output string, err error) {
 	scriptDef := script.ScriptDefinition{
-		Name:      "perf stat ref-cycles",
-		Script:    perfPath + " stat -a -e ref-cycles sleep 1",
+		Name:      "perf stat " + event,
+		Script:    perfPath + " stat -a -e " + event + " sleep 1",
 		Superuser: !noRoot,
 	}
 	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
 	if err != nil {
-		err = fmt.Errorf("failed to determine if ref-cycles is supported: %s, %d, %v", scriptOutput.Stderr, scriptOutput.Exitcode, err)
+		err = fmt.Errorf("failed to determine if %s is supported: %s, %d, %v", event, scriptOutput.Stderr, scriptOutput.Exitcode, err)
 		return
 	}
 	supported = !strings.Contains(scriptOutput.Stderr, "<not supported>")
