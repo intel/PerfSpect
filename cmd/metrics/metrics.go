@@ -666,7 +666,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		targetError := <-channelTargetError
 		if targetError.err != nil {
 			slog.Error("failed to prepare metrics", slog.String("target", targetError.target.GetName()), slog.String("error", targetError.err.Error()))
-			multiSpinner.Status(ctx.target.GetName(), fmt.Sprintf("Error: %v", targetError.err))
+			_ = multiSpinner.Status(ctx.target.GetName(), fmt.Sprintf("Error: %v", targetError.err))
 		} else {
 			numTargetsWithPreparedMetrics++
 		}
