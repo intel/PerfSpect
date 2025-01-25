@@ -801,24 +801,12 @@ func elcSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 	return summary
 }
 
-/*
-	func turboBinsFromOutput(outputs map[string]script.ScriptOutput) string {
-		bins, err := getSpecCountFrequencies(outputs)
-		if err != nil {
-			return ""
-		}
-		var binStrings []string
-		beginInt := 1
-		for _, bin := range bins {
-			count := bin[0]
-			endInt, _ := strconv.Atoi(count)
-			binStrings = append(binStrings, fmt.Sprintf("%d-%d: %sGHz", beginInt, endInt, bin[1]))
-			beginInt = endInt + 1
-		}
-		return strings.Join(binStrings, ", ")
-	}
-*/
 func epbFromOutput(outputs map[string]script.ScriptOutput) string {
+	// if we couldn't get the EPB values, return empty string
+	if outputs[script.EpbScriptName].Exitcode != 0 || len(outputs[script.EpbScriptName].Stdout) == 0 {
+		slog.Warn("EPB script failed or produced no output")
+		return ""
+	}
 	var epb string
 	epbConsistent := true
 	for i, line := range strings.Split(outputs[script.EpbScriptName].Stdout, "\n") {
@@ -836,12 +824,17 @@ func epbFromOutput(outputs map[string]script.ScriptOutput) string {
 		}
 	}
 	if !epbConsistent {
-		return "Varied"
+		return "inconsistent"
 	}
 	msr, err := strconv.ParseInt(epb, 16, 0)
 	if err != nil {
+		slog.Error("failed to parse EPB value", slog.String("error", err.Error()), slog.String("epb", epb))
 		return ""
 	}
+	return epbValToLabel(int(msr))
+}
+
+func epbValToLabel(msr int) string {
 	var val string
 	if msr < 3 {
 		val = "Performance"
@@ -882,6 +875,13 @@ func eppValToLabel(msr int) string {
 // ELSE
 //       get EPP from 0x774 (per core)
 func eppFromOutput(outputs map[string]script.ScriptOutput) string {
+	// if we couldn't get the EPP values, return empty string
+	if outputs[script.EppValidScriptName].Exitcode != 0 || len(outputs[script.EppValidScriptName].Stdout) == 0 ||
+		outputs[script.EppPackageControlScriptName].Exitcode != 0 || len(outputs[script.EppPackageControlScriptName].Stdout) == 0 ||
+		outputs[script.EppPackageScriptName].Exitcode != 0 || len(outputs[script.EppPackageScriptName].Stdout) == 0 {
+		slog.Warn("EPP scripts failed or produced no output")
+		return ""
+	}
 	// check if the epp valid bit is set and consistent across all cores
 	var eppValid string
 	for i, line := range strings.Split(outputs[script.EppValidScriptName].Stdout, "\n") { // MSR 0x774, bit 60
@@ -918,7 +918,8 @@ func eppFromOutput(outputs map[string]script.ScriptOutput) string {
 		eppPackage := strings.TrimSpace(outputs[script.EppPackageScriptName].Stdout) // MSR 0x772, bits 24-31  (package)
 		msr, err := strconv.ParseInt(eppPackage, 16, 0)
 		if err != nil {
-			return "EPP pkg parse error"
+			slog.Error("failed to parse EPP package value", slog.String("error", err.Error()), slog.String("epp", eppPackage))
+			return ""
 		}
 		return eppValToLabel(int(msr))
 	} else {
@@ -939,7 +940,8 @@ func eppFromOutput(outputs map[string]script.ScriptOutput) string {
 		}
 		msr, err := strconv.ParseInt(epp, 16, 0)
 		if err != nil {
-			return "EPP parse error"
+			slog.Error("failed to parse EPP value", slog.String("error", err.Error()), slog.String("epp", epp))
+			return ""
 		}
 		return eppValToLabel(int(msr))
 	}
