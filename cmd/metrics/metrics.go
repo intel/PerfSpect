@@ -741,13 +741,13 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	// summarize outputs
 	if !flagLive {
 		multiSpinner.Finish()
-		for i := range targetContexts {
+		for i, ctx := range targetContexts {
 			if targetContexts[i].err != nil {
 				continue
 			}
 			myTarget := targetContexts[i].target
 			// csv summary
-			out, err := Summarize(localOutputDir+"/"+myTarget.GetName()+"_"+"metrics.csv", false)
+			out, err := Summarize(localOutputDir+"/"+myTarget.GetName()+"_"+"metrics.csv", false, ctx.metadata)
 			if err != nil {
 				err = fmt.Errorf("failed to summarize output: %w", err)
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -766,7 +766,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			// html summary
 			htmlSummary := (flagScope == scopeSystem || flagScope == scopeProcess) && flagGranularity == granularitySystem
 			if htmlSummary {
-				out, err = Summarize(localOutputDir+"/"+myTarget.GetName()+"_"+"metrics.csv", true)
+				out, err = Summarize(localOutputDir+"/"+myTarget.GetName()+"_"+"metrics.csv", true, ctx.metadata)
 				if err != nil {
 					err = fmt.Errorf("failed to summarize output as HTML: %w", err)
 					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
