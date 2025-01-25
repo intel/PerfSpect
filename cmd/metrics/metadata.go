@@ -317,7 +317,7 @@ func (md Metadata) JSON() (out []byte, err error) {
 		return
 	}
 	// remove PerfSupportedEvents from json
-	re := regexp.MustCompile(`"PerfSupportedEvents":"[^"]*",`)
+	re := regexp.MustCompile(`"PerfSupportedEvents":".*?",`)
 	out = re.ReplaceAll(out, []byte(""))
 	return
 }
