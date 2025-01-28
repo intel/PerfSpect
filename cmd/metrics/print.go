@@ -13,10 +13,11 @@ import (
 	"time"
 )
 
-func printMetricsJSON(metricFrames []MetricFrame, targetName string, printToStdout bool, printToFile bool, outputDir string) (filename string, err error) {
+func printMetricsJSON(metricFrames []MetricFrame, targetName string, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
 	if !printToStdout && !printToFile {
 		return
 	}
+	filename := outputDir + "/" + targetName + "_" + "metrics.json"
 	for _, metricFrame := range metricFrames {
 		// can't Marshal NaN or Inf values in JSON, so no need to set them to a specific value
 		filteredMetricFrame := metricFrame
@@ -38,7 +39,7 @@ func printMetricsJSON(metricFrames []MetricFrame, targetName string, printToStdo
 		}
 		if printToFile {
 			var file *os.File
-			file, err = os.OpenFile(outputDir+"/"+targetName+"_"+"metrics.json", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			file, err = os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err != nil {
 				return
 			}
@@ -47,21 +48,21 @@ func printMetricsJSON(metricFrames []MetricFrame, targetName string, printToStdo
 			if err != nil {
 				return
 			}
-			filename = file.Name()
-			return // success
 		}
 	}
+	outputFilename = filename
 	return
 }
 
-func printMetricsCSV(metricFrames []MetricFrame, targetName string, printToStdout bool, printToFile bool, outputDir string) (filename string, err error) {
+func printMetricsCSV(metricFrames []MetricFrame, targetName string, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
 	if !printToStdout && !printToFile {
 		return
 	}
+	filename := outputDir + "/" + targetName + "_" + "metrics.csv"
 	var file *os.File
 	if printToFile {
 		// open file for writing/appending
-		file, err = os.OpenFile(outputDir+"/"+targetName+"_"+"metrics.csv", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		file, err = os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			return
 		}
@@ -108,21 +109,21 @@ func printMetricsCSV(metricFrames []MetricFrame, targetName string, printToStdou
 			if err != nil {
 				return
 			}
-			filename = file.Name()
-			return // success
 		}
 	}
-	return "", nil
+	outputFilename = filename
+	return
 }
 
-func printMetricsWide(metricFrames []MetricFrame, targetName string, printToStdout bool, printToFile bool, outputDir string) (filename string, err error) {
+func printMetricsWide(metricFrames []MetricFrame, targetName string, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
 	if !printToStdout && !printToFile {
 		return
 	}
+	filename := outputDir + "/" + targetName + "_" + "metrics_wide.txt"
 	var file *os.File
 	if printToFile {
 		// open file for writing/appending
-		file, err = os.OpenFile(outputDir+"/"+targetName+"_"+"metrics_wide.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		file, err = os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			return
 		}
@@ -207,14 +208,13 @@ func printMetricsWide(metricFrames []MetricFrame, targetName string, printToStdo
 			if err != nil {
 				return
 			}
-			filename = file.Name()
-			return // success
 		}
 	}
+	outputFilename = filename
 	return
 }
 
-func printMetricsTxt(metricFrames []MetricFrame, targetName string, printToStdout bool, printToFile bool, outputDir string) (filename string, err error) {
+func printMetricsTxt(metricFrames []MetricFrame, targetName string, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
 	if !printToStdout && !printToFile {
 		return
 	}
@@ -278,8 +278,7 @@ func printMetricsTxt(metricFrames []MetricFrame, targetName string, printToStdou
 		if err != nil {
 			return
 		}
-		filename = file.Name()
-		return // success
+		outputFilename = file.Name()
 	}
 	return
 }
