@@ -182,7 +182,18 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 	}
 	// run sequential scripts
 	for _, script := range sequentialScripts {
-		cmd := prepareCommand(script, myTarget.GetTempDirectory())
+		var cmd *exec.Cmd
+		scriptPath := path.Join(myTarget.GetTempDirectory(), scriptNameToFilename(script.Name))
+		if script.Superuser && !canElevate {
+			// this shouldn't happen because we already filtered out the scripts that require elevated privileges if the user cannot elevate privileges on the target
+			err = fmt.Errorf("script requires elevated privileges but the user cannot elevate privileges on target")
+			return nil, err
+		} else if script.Superuser && !myTarget.IsSuperUser() {
+			// run script with sudo, "-S" to read password from stdin. Note: password won't be asked for if password-less sudo is configured.
+			cmd = exec.Command("sudo", "-S", "bash", scriptPath)
+		} else {
+			cmd = exec.Command("bash", scriptPath)
+		}
 		stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, false)
 		if err != nil {
 			slog.Error("error running script on target", slog.String("script", script.Script), slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitcode", exitcode), slog.String("error", err.Error()))
