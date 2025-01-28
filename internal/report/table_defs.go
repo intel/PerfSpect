@@ -6,6 +6,7 @@ package report
 // table_defs.go defines the tables used for generating reports
 
 import (
+	"encoding/csv"
 	"fmt"
 	"log/slog"
 	"math"
@@ -118,6 +119,8 @@ const (
 	CodePathFrequencyTableName = "Code Path Frequency"
 	// lock table names
 	KernelLockAnalysisTableName = "Kernel Lock Analysis"
+	// process watch instruction mix table names
+	InstructionMixTableName = "Instruction Mix"
 )
 
 const (
@@ -612,6 +615,16 @@ var tableDefinitions = map[string]TableDefinition{
 		},
 		FieldsFunc:            powerStatsTableValues,
 		HTMLTableRendererFunc: powerStatsTableHTMLRenderer},
+	InstructionMixTableName: {
+		Name:      InstructionMixTableName,
+		MenuLabel: InstructionMixTableName,
+		HasRows:   true,
+		ScriptNames: []string{
+			script.InstructionMixScriptName,
+		},
+		FieldsFunc:            instructionMixTableValues,
+		HTMLTableRendererFunc: instructionMixTableHTMLRenderer,
+	},
 	//
 	// flamegraph tables
 	//
@@ -1934,6 +1947,49 @@ func kernelLockAnalysisTableValues(outputs map[string]script.ScriptOutput) []Fie
 		{Name: "Cache2Cache without Callstack", Values: []string{sectionValueFromOutput(outputs, "perf_c2c_no_children")}},
 		{Name: "Cache2Cache with CallStack", Values: []string{sectionValueFromOutput(outputs, "perf_c2c_callgraph")}},
 		{Name: "Lock Contention", Values: []string{sectionValueFromOutput(outputs, "perf_lock_contention")}},
+	}
+	return fields
+}
+
+func instructionMixTableValues(outputs map[string]script.ScriptOutput) []Field {
+	// parse the CSV output
+	csvOutput := outputs[script.InstructionMixScriptName].Stdout
+	r := csv.NewReader(strings.NewReader(csvOutput))
+	rows, err := r.ReadAll()
+	if err != nil {
+		slog.Error(err.Error())
+		return []Field{}
+	}
+	if len(rows) < 2 {
+		slog.Error("instruction mix output is not in expected format")
+		return []Field{}
+	}
+	fields := []Field{}
+	// first row is the header, extract field names, skip the first three fields (interval, pid, name)
+	if len(rows[0]) < 3 {
+		slog.Error("instruction mix output is not in expected format")
+		return []Field{}
+	}
+	for _, field := range rows[0][3:] {
+		fields = append(fields, Field{Name: field})
+	}
+	sample := -1
+	// values start in 2nd row, we're only interested in the first row of the sample
+	for _, row := range rows[1:] {
+		if len(row) < 3+len(fields) {
+			continue
+		}
+		rowSample, err := strconv.Atoi(row[0])
+		if err != nil {
+			slog.Error(fmt.Sprintf("unable to convert instruction mix sample to int: %s", row[0]))
+			continue
+		}
+		if rowSample != sample { // new sample
+			sample = rowSample
+			for i := range fields {
+				fields[i].Values = append(fields[i].Values, row[i+3])
+			}
+		}
 	}
 	return fields
 }

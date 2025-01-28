@@ -743,7 +743,7 @@ func cpuUtilizationTableHTMLRenderer(tableValues TableValues, targetName string)
 	}
 	chartConfig := scatterChartTemplateStruct{
 		ID:            fmt.Sprintf("cpuUtilization%d", rand.Intn(10000)),
-		XaxisText:     "Time/Samples",
+		XaxisText:     "Time",
 		YaxisText:     "% Utilization",
 		TitleText:     "",
 		DisplayTitle:  "false",
@@ -778,7 +778,7 @@ func averageCPUUtilizationTableHTMLRenderer(tableValues TableValues, targetName 
 	}
 	chartConfig := scatterChartTemplateStruct{
 		ID:            fmt.Sprintf("avgCPUUtil%d", rand.Intn(10000)),
-		XaxisText:     "Time/Samples",
+		XaxisText:     "Time",
 		YaxisText:     "% Utilization",
 		TitleText:     "",
 		DisplayTitle:  "false",
@@ -819,7 +819,7 @@ func irqRateTableHTMLRenderer(tableValues TableValues, targetName string) string
 	}
 	chartConfig := scatterChartTemplateStruct{
 		ID:            fmt.Sprintf("irqRate%d", rand.Intn(10000)),
-		XaxisText:     "Time/Samples",
+		XaxisText:     "Time",
 		YaxisText:     "IRQ/s",
 		TitleText:     "",
 		DisplayTitle:  "false",
@@ -875,7 +875,7 @@ func driveStatsTableHTMLRenderer(tableValues TableValues, targetName string) str
 		}
 		chartConfig := scatterChartTemplateStruct{
 			ID:            fmt.Sprintf("driveStats%d", rand.Intn(10000)),
-			XaxisText:     "Time/Samples",
+			XaxisText:     "Time",
 			YaxisText:     "",
 			TitleText:     drive,
 			DisplayTitle:  "true",
@@ -933,7 +933,7 @@ func networkStatsTableHTMLRenderer(tableValues TableValues, targetName string) s
 		}
 		chartConfig := scatterChartTemplateStruct{
 			ID:            fmt.Sprintf("nicStats%d", rand.Intn(10000)),
-			XaxisText:     "Time/Samples",
+			XaxisText:     "Time",
 			YaxisText:     "",
 			TitleText:     nic,
 			DisplayTitle:  "true",
@@ -970,7 +970,7 @@ func memoryStatsTableHTMLRenderer(tableValues TableValues, targetName string) st
 	}
 	chartConfig := scatterChartTemplateStruct{
 		ID:            fmt.Sprintf("memoryStats%d", rand.Intn(10000)),
-		XaxisText:     "Time/Samples",
+		XaxisText:     "Time",
 		YaxisText:     "kilobytes",
 		TitleText:     "",
 		DisplayTitle:  "false",
@@ -1005,7 +1005,7 @@ func powerStatsTableHTMLRenderer(tableValues TableValues, targetName string) str
 	}
 	chartConfig := scatterChartTemplateStruct{
 		ID:            fmt.Sprintf("powerStats%d", rand.Intn(10000)),
-		XaxisText:     "Time/Samples",
+		XaxisText:     "Time",
 		YaxisText:     "Watts",
 		TitleText:     "",
 		DisplayTitle:  "false",
@@ -1060,4 +1060,39 @@ func kernelLockAnalysisHTMLRenderer(tableValues TableValues, targetName string) 
 		tableValueStyles = append(tableValueStyles, rowStyles)
 	}
 	return renderHTMLTable([]string{}, values, "pure-table pure-table-striped", tableValueStyles)
+}
+
+func instructionMixTableHTMLRenderer(tableValues TableValues, targetname string) string {
+	data := [][]scatterPoint{}
+	datasetNames := []string{}
+	for _, field := range tableValues.Fields {
+		points := []scatterPoint{}
+		for i, val := range field.Values {
+			if val == "" {
+				break
+			}
+			stat, err := strconv.ParseFloat(val, 64)
+			if err != nil {
+				slog.Error("error parsing stat", slog.String("error", err.Error()))
+				return ""
+			}
+			points = append(points, scatterPoint{float64(i), stat})
+		}
+		if len(points) > 0 {
+			data = append(data, points)
+			datasetNames = append(datasetNames, field.Name)
+		}
+	}
+	chartConfig := scatterChartTemplateStruct{
+		ID:            fmt.Sprintf("instrMix%d", rand.Intn(10000)),
+		XaxisText:     "Time",
+		YaxisText:     "% Samples",
+		TitleText:     "",
+		DisplayTitle:  "false",
+		DisplayLegend: "true",
+		AspectRatio:   "2",
+		SuggestedMin:  "0",
+		SuggestedMax:  "0",
+	}
+	return renderScatterChart(data, datasetNames, chartConfig)
 }

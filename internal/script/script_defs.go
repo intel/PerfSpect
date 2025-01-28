@@ -105,6 +105,7 @@ const (
 	GaudiInfoScriptName                         = "gaudi info"
 	GaudiFirmwareScriptName                     = "gaudi firmware"
 	GaudiNumaScriptName                         = "gaudi numa"
+	InstructionMixScriptName                    = "instruction mix"
 )
 
 const (
@@ -113,12 +114,21 @@ const (
 
 // GetScriptByName returns the script definition with the given name. It will panic if the script is not found.
 func GetScriptByName(name string) ScriptDefinition {
-	return GetParameterizedScriptByName(name, 0, 0, 0, "")
+	return GetParameterizedScriptByName(name, ScriptParams{})
+}
+
+type ScriptParams struct {
+	Duration   int
+	Interval   int
+	Frequency  int
+	StorageDir string
+	PID        int
+	Filter     []string
 }
 
 // GetParameterizedScriptByName returns the script definition with the given name. It will panic if the script is not found.
-func GetParameterizedScriptByName(name string, duration int, interval int, frequency int, fioDir string) ScriptDefinition {
-	for _, script := range getCollectionScripts(duration, interval, frequency, fioDir) {
+func GetParameterizedScriptByName(name string, params ScriptParams) ScriptDefinition {
+	for _, script := range getCollectionScripts(params) {
 		if script.Name == name {
 			return script
 		}
@@ -127,7 +137,7 @@ func GetParameterizedScriptByName(name string, duration int, interval int, frequ
 }
 
 // getCollectionScripts returns the script definitions that are used to collect information from the target system.
-func getCollectionScripts(duration, interval int, frequency int, fioDir string) (scripts []ScriptDefinition) {
+func getCollectionScripts(params ScriptParams) (scripts []ScriptDefinition) {
 
 	// script definitions
 	scripts = []ScriptDefinition{
@@ -877,7 +887,7 @@ fio --name=bandwidth --directory=$test_dir --numjobs=$numjobs \
 --direct=1 --verify=0 --bs=1M --iodepth=64 --rw=rw \
 --group_reporting=1 --iodepth_batch_submit=64 \
 --iodepth_batch_complete_max=64
-rm -rf $test_dir`, fioDir)
+rm -rf $test_dir`, params.StorageDir)
 			}(),
 			Superuser:  true,
 			Sequential: true,
@@ -888,11 +898,11 @@ rm -rf $test_dir`, fioDir)
 			Name: MpstatScriptName,
 			Script: func() string {
 				var count string
-				if duration != 0 && interval != 0 {
-					countInt := duration / interval
+				if params.Duration != 0 && params.Interval != 0 {
+					countInt := params.Duration / params.Interval
 					count = strconv.Itoa(countInt)
 				}
-				return fmt.Sprintf(`mpstat -u -T -I SCPU -P ALL %d %s`, interval, count)
+				return fmt.Sprintf(`mpstat -u -T -I SCPU -P ALL %d %s`, params.Interval, count)
 			}(),
 			Superuser: true,
 			Lkms:      []string{},
@@ -902,11 +912,11 @@ rm -rf $test_dir`, fioDir)
 			Name: IostatScriptName,
 			Script: func() string {
 				var count string
-				if duration != 0 && interval != 0 {
-					countInt := duration / interval
+				if params.Duration != 0 && params.Interval != 0 {
+					countInt := params.Duration / params.Interval
 					count = strconv.Itoa(countInt)
 				}
-				return fmt.Sprintf(`S_TIME_FORMAT=ISO iostat -d -t %d %s | sed '/^loop/d'`, interval, count)
+				return fmt.Sprintf(`S_TIME_FORMAT=ISO iostat -d -t %d %s | sed '/^loop/d'`, params.Interval, count)
 			}(),
 			Superuser: true,
 			Lkms:      []string{},
@@ -916,11 +926,11 @@ rm -rf $test_dir`, fioDir)
 			Name: SarMemoryScriptName,
 			Script: func() string {
 				var count string
-				if duration != 0 && interval != 0 {
-					countInt := duration / interval
+				if params.Duration != 0 && params.Interval != 0 {
+					countInt := params.Duration / params.Interval
 					count = strconv.Itoa(countInt)
 				}
-				return fmt.Sprintf(`sar -r %d %s`, interval, count)
+				return fmt.Sprintf(`sar -r %d %s`, params.Interval, count)
 			}(),
 			Superuser: true,
 			Lkms:      []string{},
@@ -930,11 +940,11 @@ rm -rf $test_dir`, fioDir)
 			Name: SarNetworkScriptName,
 			Script: func() string {
 				var count string
-				if duration != 0 && interval != 0 {
-					countInt := duration / interval
+				if params.Duration != 0 && params.Interval != 0 {
+					countInt := params.Duration / params.Interval
 					count = strconv.Itoa(countInt)
 				}
-				return fmt.Sprintf(`sar -n DEV %d %s`, interval, count)
+				return fmt.Sprintf(`sar -n DEV %d %s`, params.Interval, count)
 			}(),
 			Superuser: true,
 			Lkms:      []string{},
@@ -944,11 +954,11 @@ rm -rf $test_dir`, fioDir)
 			Name: TurbostatScriptName,
 			Script: func() string {
 				var count string
-				if duration != 0 && interval != 0 {
-					countInt := duration / interval
+				if params.Duration != 0 && params.Interval != 0 {
+					countInt := params.Duration / params.Interval
 					count = "-n " + strconv.Itoa(countInt)
 				}
-				return fmt.Sprintf(`turbostat -S -s PkgWatt,RAMWatt -q -i %d %s`, interval, count) + ` | awk '{ print strftime("%H:%M:%S"), $0 }'`
+				return fmt.Sprintf(`turbostat -S -s PkgWatt,RAMWatt -q -i %d %s`, params.Interval, count) + ` | awk '{ print strftime("%H:%M:%S"), $0 }'`
 			}(),
 			Superuser: true,
 			Lkms:      []string{"msr"},
@@ -960,8 +970,8 @@ rm -rf $test_dir`, fioDir)
 			Name: ProfileJavaScriptName,
 			Script: func() string {
 				apInterval := 0
-				if frequency > 0 {
-					apInterval = int(1 / float64(frequency) * 1000000000)
+				if params.Frequency > 0 {
+					apInterval = int(1 / float64(params.Frequency) * 1000000000)
 				}
 				return fmt.Sprintf(`# JAVA app call stack collection (run in background)
 ap_interval=%d
@@ -985,7 +995,7 @@ for idx in "${!java_pids[@]}"; do
     echo "########## async-profiler $pid $cmd ##########"
     async-profiler/profiler.sh stop -o collapsed "$pid"
 done
-`, apInterval, duration)
+`, apInterval, params.Duration)
 			}(),
 			Superuser: true,
 			Depends:   []string{"async-profiler"},
@@ -1024,7 +1034,7 @@ if [ -f "perf_fp.folded" ]; then
     echo "########## perf_fp ##########"
     cat perf_fp.folded
 fi
-`, frequency, duration)
+`, params.Frequency, params.Duration)
 			}(),
 			Superuser: true,
 			Depends:   []string{"perf", "stackcollapse-perf.pl"},
@@ -1083,10 +1093,38 @@ if [ -f "perf_lock_contention.txt" ]; then
     echo "########## perf_lock_contention ##########"
 	cat perf_lock_contention.txt
 fi
-`, frequency, duration)
+`, params.Frequency, params.Duration)
 			}(),
 			Superuser: true,
 			Depends:   []string{"perf"},
+		},
+		{
+			Name: InstructionMixScriptName,
+			Script: func() string {
+				scriptParts := []string{
+					"processwatch -c",
+				}
+				// if no PID specified, increase the sampling interval (defaults to 10,000) to reduce overhead
+				if params.PID == 0 {
+					scriptParts = append(scriptParts, fmt.Sprintf("-s %d", 1000000))
+				} else {
+					scriptParts = append(scriptParts, fmt.Sprintf("-p %d", params.PID))
+				}
+				for _, cat := range params.Filter {
+					scriptParts = append(scriptParts, fmt.Sprintf("-f %s", cat))
+				}
+				if params.Duration != 0 && params.Interval != 0 {
+					count := params.Duration / params.Interval
+					scriptParts = append(scriptParts, fmt.Sprintf("-n %d", count))
+				}
+				if params.Interval != 0 {
+					scriptParts = append(scriptParts, fmt.Sprintf("-i %d", params.Interval))
+				}
+				return strings.Join(scriptParts, " ")
+			}(),
+			Superuser: true,
+			Lkms:      []string{"msr"},
+			Depends:   []string{"processwatch"},
 		},
 	}
 

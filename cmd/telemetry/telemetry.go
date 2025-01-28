@@ -50,13 +50,17 @@ var (
 
 	flagAll bool
 
-	flagCpu     bool
-	flagCpuAvg  bool
-	flagIrq     bool
-	flagNetwork bool
-	flagStorage bool
-	flagMemory  bool
-	flagPower   bool
+	flagCpu      bool
+	flagCpuAvg   bool
+	flagIrq      bool
+	flagNetwork  bool
+	flagStorage  bool
+	flagMemory   bool
+	flagPower    bool
+	flagInstrMix bool
+
+	flagInstrMixPid    int
+	flagInstrMixFilter []string
 )
 
 const (
@@ -65,13 +69,17 @@ const (
 
 	flagAllName = "all"
 
-	flagCpuName     = "cpu"
-	flagCpuAvgName  = "cpuavg"
-	flagIrqName     = "irq"
-	flagNetworkName = "network"
-	flagStorageName = "storage"
-	flagMemoryName  = "memory"
-	flagPowerName   = "power"
+	flagCpuName      = "cpu"
+	flagCpuAvgName   = "cpuavg"
+	flagIrqName      = "irq"
+	flagNetworkName  = "network"
+	flagStorageName  = "storage"
+	flagMemoryName   = "memory"
+	flagPowerName    = "power"
+	flagInstrMixName = "instrmix"
+
+	flagInstrMixPidName    = "instrmix-pid"
+	flagInstrMixFilterName = "instrmix-filter"
 )
 
 var telemetrySummaryTableName = "Telemetry Summary"
@@ -79,6 +87,7 @@ var telemetrySummaryTableName = "Telemetry Summary"
 var categories = []common.Category{
 	{FlagName: flagCpuName, FlagVar: &flagCpu, DefaultValue: false, Help: "monitor cpu", TableNames: []string{report.CPUUtilizationTableName}},
 	{FlagName: flagCpuAvgName, FlagVar: &flagCpuAvg, DefaultValue: false, Help: "monitor cpu average", TableNames: []string{report.AverageCPUUtilizationTableName}},
+	{FlagName: flagInstrMixName, FlagVar: &flagInstrMix, DefaultValue: false, Help: "monitor instruction mix", TableNames: []string{report.InstructionMixTableName}},
 	{FlagName: flagIrqName, FlagVar: &flagIrq, DefaultValue: false, Help: "monitor irq", TableNames: []string{report.IRQRateTableName}},
 	{FlagName: flagStorageName, FlagVar: &flagStorage, DefaultValue: false, Help: "monitor storage", TableNames: []string{report.DriveStatsTableName}},
 	{FlagName: flagNetworkName, FlagVar: &flagNetwork, DefaultValue: false, Help: "monitor network", TableNames: []string{report.NetworkStatsTableName}},
@@ -96,6 +105,8 @@ func init() {
 	Cmd.Flags().StringSliceVar(&common.FlagFormat, common.FlagFormatName, []string{report.FormatAll}, "")
 	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 30, "")
 	Cmd.Flags().IntVar(&flagInterval, flagIntervalName, 2, "")
+	Cmd.Flags().IntVar(&flagInstrMixPid, flagInstrMixPidName, 0, "")
+	Cmd.Flags().StringSliceVar(&flagInstrMixFilter, flagInstrMixFilterName, []string{"SSE", "AVX", "AVX2", "AVX512", "AMX_TILE"}, "")
 
 	common.AddTargetFlags(Cmd)
 
@@ -157,6 +168,14 @@ func getFlagGroups() []common.FlagGroup {
 		{
 			Name: flagIntervalName,
 			Help: "number of seconds between each sample",
+		},
+		{
+			Name: flagInstrMixPidName,
+			Help: "pid to monitor for instruction mix, no pid means all processes",
+		},
+		{
+			Name: flagInstrMixFilterName,
+			Help: "filter to apply to instruction mix",
 		},
 	}
 	groups = append(groups, common.FlagGroup{
@@ -229,8 +248,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	reportingCommand := common.ReportingCommand{
 		Cmd:              cmd,
 		ReportNamePost:   "telem",
-		Interval:         flagInterval,
-		Duration:         flagDuration,
+		ScriptParams:     script.ScriptParams{Interval: flagInterval, Duration: flagDuration, PID: flagInstrMixPid, Filter: flagInstrMixFilter},
 		TableNames:       tableNames,
 		SummaryFunc:      summaryFunc,
 		SummaryTableName: telemetrySummaryTableName,

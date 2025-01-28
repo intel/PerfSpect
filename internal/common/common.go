@@ -80,10 +80,7 @@ type ReportingCommand struct {
 	Cmd              *cobra.Command
 	ReportNamePost   string
 	TableNames       []string
-	Duration         int
-	Interval         int
-	Frequency        int
-	StorageDir       string
+	ScriptParams     script.ScriptParams
 	SummaryFunc      SummaryFunc
 	SummaryTableName string
 	InsightsFunc     InsightsFunc
@@ -138,7 +135,7 @@ func (rc *ReportingCommand) Run() error {
 		// make a list of unique script definitions
 		var scriptsToRun []script.ScriptDefinition
 		for _, scriptName := range scriptNames {
-			scriptsToRun = append(scriptsToRun, script.GetParameterizedScriptByName(scriptName, rc.Duration, rc.Interval, rc.Frequency, rc.StorageDir))
+			scriptsToRun = append(scriptsToRun, script.GetParameterizedScriptByName(scriptName, rc.ScriptParams))
 		}
 		// do any of the scripts require elevated privileges?
 		elevated := false
@@ -188,7 +185,7 @@ func (rc *ReportingCommand) Run() error {
 		channelTargetScriptOutputs := make(chan TargetScriptOutputs)
 		channelError := make(chan error)
 		for _, target := range myTargets {
-			go collectOnTarget(rc.Cmd, rc.Duration, target, scriptsToRun, localTempDir, channelTargetScriptOutputs, channelError, multiSpinner.Status)
+			go collectOnTarget(rc.Cmd, rc.ScriptParams.Duration, target, scriptsToRun, localTempDir, channelTargetScriptOutputs, channelError, multiSpinner.Status)
 		}
 		// wait for scripts to run on all targets
 		var allTargetScriptOutputs []TargetScriptOutputs

@@ -5,7 +5,7 @@
 #
 
 default: tools
-.PHONY: default tools async-profiler avx-turbo cpuid dmidecode ethtool fio flamegraph ipmitool lshw lspci msr-tools pcm perf spectre-meltdown-checker sshpass stress-ng sysstat tsc turbostat
+.PHONY: default tools async-profiler avx-turbo cpuid dmidecode ethtool fio flamegraph ipmitool lshw lspci msr-tools pcm perf processwatch spectre-meltdown-checker sshpass stress-ng sysstat tsc turbostat
 
 tools: async-profiler avx-turbo cpuid dmidecode ethtool fio flamegraph ipmitool lshw lspci msr-tools pcm spectre-meltdown-checker sshpass stress-ng sysstat tsc turbostat
 	mkdir -p bin
@@ -162,6 +162,17 @@ perf:
 	mkdir -p bin
 	cp linux_perf/tools/perf/perf bin/
 	strip --strip-unneeded bin/perf
+
+processwatch:
+ifeq ("$(wildcard processwatch)","")
+	git clone --recursive https://github.com/intel/processwatch.git
+else
+	cd processwatch && git checkout master && git pull
+endif
+	cd processwatch && ./build.sh
+	mkdir -p bin
+	cp processwatch/processwatch bin/
+	strip --strip-unneeded bin/processwatch
 
 spectre-meltdown-checker:
 ifeq ("$(wildcard spectre-meltdown-checker)","")
