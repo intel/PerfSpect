@@ -1101,6 +1101,7 @@ fi
 		{
 			Name: InstructionMixScriptName,
 			Script: func() string {
+				script := fmt.Sprintf("echo TIME: $(date +\"%%H:%%M:%%S\")\necho INTERVAL: %d\n", params.Interval)
 				scriptParts := []string{
 					"processwatch -c",
 				}
@@ -1120,7 +1121,7 @@ fi
 				if params.Interval != 0 {
 					scriptParts = append(scriptParts, fmt.Sprintf("-i %d", params.Interval))
 				}
-				return strings.Join(scriptParts, " ")
+				return script + strings.Join(scriptParts, " ")
 			}(),
 			Superuser: true,
 			Lkms:      []string{"msr"},

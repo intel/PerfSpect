@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"perfspect/internal/cpudb"
 	"perfspect/internal/script"
@@ -1952,8 +1953,42 @@ func kernelLockAnalysisTableValues(outputs map[string]script.ScriptOutput) []Fie
 }
 
 func instructionMixTableValues(outputs map[string]script.ScriptOutput) []Field {
+	// first two lines are not part of the CSV output, they are the start time and interval
+	var startTime time.Time
+	var interval int
+	for i, line := range strings.Split(outputs[script.InstructionMixScriptName].Stdout, "\n") {
+		if i == 0 {
+			if !strings.HasPrefix(line, "TIME") {
+				slog.Error("instruction mix output is not in expected format, missing TIME")
+				return []Field{}
+			} else {
+				val := strings.Split(line, " ")[1]
+				var err error
+				startTime, err = time.Parse("15:04:05", val)
+				if err != nil {
+					slog.Error(fmt.Sprintf("unable to parse instruction mix start time: %s", val))
+					return []Field{}
+				}
+			}
+		} else if i == 1 {
+			if !strings.HasPrefix(line, "INTERVAL") {
+				slog.Error("instruction mix output is not in expected format, missing INTERVAL")
+				return []Field{}
+			} else {
+				val := strings.Split(line, " ")[1]
+				var err error
+				interval, err = strconv.Atoi(val)
+				if err != nil {
+					slog.Error(fmt.Sprintf("unable to convert instruction mix interval to int: %s", val))
+					return []Field{}
+				}
+			}
+		} else {
+			break
+		}
+	}
 	// parse the CSV output
-	csvOutput := outputs[script.InstructionMixScriptName].Stdout
+	csvOutput := strings.Join(strings.Split(outputs[script.InstructionMixScriptName].Stdout, "\n")[2:], "\n")
 	r := csv.NewReader(strings.NewReader(csvOutput))
 	rows, err := r.ReadAll()
 	if err != nil {
@@ -1964,7 +1999,7 @@ func instructionMixTableValues(outputs map[string]script.ScriptOutput) []Field {
 		slog.Error("instruction mix output is not in expected format")
 		return []Field{}
 	}
-	fields := []Field{}
+	fields := []Field{{Name: "Time"}}
 	// first row is the header, extract field names, skip the first three fields (interval, pid, name)
 	if len(rows[0]) < 3 {
 		slog.Error("instruction mix output is not in expected format")
@@ -1976,7 +2011,7 @@ func instructionMixTableValues(outputs map[string]script.ScriptOutput) []Field {
 	sample := -1
 	// values start in 2nd row, we're only interested in the first row of the sample
 	for _, row := range rows[1:] {
-		if len(row) < 3+len(fields) {
+		if len(row) < 2+len(fields) {
 			continue
 		}
 		rowSample, err := strconv.Atoi(row[0])
@@ -1987,7 +2022,11 @@ func instructionMixTableValues(outputs map[string]script.ScriptOutput) []Field {
 		if rowSample != sample { // new sample
 			sample = rowSample
 			for i := range fields {
-				fields[i].Values = append(fields[i].Values, row[i+3])
+				if i == 0 {
+					fields[i].Values = append(fields[i].Values, startTime.Add(time.Duration(sample*interval)*time.Second).Format("15:04:05"))
+				} else {
+					fields[i].Values = append(fields[i].Values, row[i+2])
+				}
 			}
 		}
 	}

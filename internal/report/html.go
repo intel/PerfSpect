@@ -1065,7 +1065,7 @@ func kernelLockAnalysisHTMLRenderer(tableValues TableValues, targetName string) 
 func instructionMixTableHTMLRenderer(tableValues TableValues, targetname string) string {
 	data := [][]scatterPoint{}
 	datasetNames := []string{}
-	for _, field := range tableValues.Fields {
+	for _, field := range tableValues.Fields[1:] {
 		points := []scatterPoint{}
 		for i, val := range field.Values {
 			if val == "" {
