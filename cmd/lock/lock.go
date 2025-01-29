@@ -47,7 +47,7 @@ const (
 
 func init() {
 	Cmd.Flags().StringVar(&common.FlagInput, common.FlagInputName, "", "")
-	Cmd.Flags().StringSliceVar(&common.FlagFormat, common.FlagFormatName, []string{report.FormatHtml}, "")
+	Cmd.Flags().StringSliceVar(&common.FlagFormat, common.FlagFormatName, []string{report.FormatAll}, "")
 	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 10, "")
 	Cmd.Flags().IntVar(&flagFrequency, flagFrequencyName, 11, "")
 
