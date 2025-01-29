@@ -167,8 +167,9 @@ processwatch:
 ifeq ("$(wildcard processwatch)","")
 	git clone --recursive https://github.com/intel/processwatch.git
 else
-	cd processwatch && git checkout master && git pull
+	cd processwatch && git checkout main && git pull
 endif
+	cd processwatch && git checkout c394065 # this commit id has been tested
 	cd processwatch && ./build.sh
 	mkdir -p bin
 	cp processwatch/processwatch bin/

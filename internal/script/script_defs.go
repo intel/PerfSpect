@@ -1104,7 +1104,7 @@ fi
 				scriptParts := []string{
 					"processwatch -c",
 				}
-				// if no PID specified, increase the sampling interval (defaults to 10,000) to reduce overhead
+				// if no PID specified, increase the sampling interval (defaults to 100,000) to reduce overhead
 				if params.PID == 0 {
 					scriptParts = append(scriptParts, fmt.Sprintf("-s %d", 1000000))
 				} else {
