@@ -703,9 +703,9 @@ done`,
 #  need at least 2 GB (2,097,152 KB) of huge pages per NUMA node
 min_kb=2097152
 numa_nodes=$( lscpu | grep "NUMA node(s):" | awk '{print $3}' )
-size_huge_pages_kb=$( cat /proc/meminfo | grep Hugepagesize | awk '{print $2}' )
+size_huge_pages_kb=$( grep Hugepagesize /proc/meminfo | awk '{print $2}' )
 orig_num_huge_pages=$( cat /proc/sys/vm/nr_hugepages )
-needed_num_huge_pages=$( echo "$numa_nodes * $min_kb / $size_huge_pages_kb" | bc )
+needed_num_huge_pages=$((numa_nodes * min_kb / size_huge_pages_kb))
 if [ $needed_num_huge_pages -gt $orig_num_huge_pages ]; then
   echo $needed_num_huge_pages > /proc/sys/vm/nr_hugepages
 fi
@@ -723,9 +723,9 @@ echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages`,
 #  need at least 2 GB (2,097,152 KB) of huge pages per NUMA node
 min_kb=2097152
 numa_nodes=$( lscpu | grep "NUMA node(s):" | awk '{print $3}' )
-size_huge_pages_kb=$( cat /proc/meminfo | grep Hugepagesize | awk '{print $2}' )
+size_huge_pages_kb=$( grep Hugepagesize /proc/meminfo | awk '{print $2}' )
 orig_num_huge_pages=$( cat /proc/sys/vm/nr_hugepages )
-needed_num_huge_pages=$( echo "$numa_nodes * $min_kb / $size_huge_pages_kb" | bc )
+needed_num_huge_pages=$((numa_nodes * min_kb / size_huge_pages_kb))
 if [ $needed_num_huge_pages -gt $orig_num_huge_pages ]; then
   echo $needed_num_huge_pages > /proc/sys/vm/nr_hugepages
 fi
