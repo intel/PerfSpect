@@ -52,6 +52,7 @@ RUN mkdir workdir
 ADD . /workdir
 WORKDIR /workdir
 RUN make perf
+RUN make processwatch
 
 FROM scratch AS output
 COPY --from=builder workdir/bin /bin

@@ -9,6 +9,7 @@ import (
 	"os"
 	"perfspect/internal/common"
 	"perfspect/internal/report"
+	"perfspect/internal/script"
 	"perfspect/internal/util"
 	"strings"
 
@@ -138,8 +139,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	reportingCommand := common.ReportingCommand{
 		Cmd:            cmd,
 		ReportNamePost: "flame",
-		Frequency:      flagFrequency,
-		Duration:       flagDuration,
+		ScriptParams:   script.ScriptParams{Frequency: flagFrequency, Duration: flagDuration},
 		TableNames:     []string{report.CodePathFrequencyTableName},
 	}
 	return reportingCommand.Run()
