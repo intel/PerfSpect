@@ -13,8 +13,8 @@ This command-line tool is designed to help you analyze and optimize Linux server
 
 ## Getting PerfSpect
 ```
-$ wget -qO- https://github.com/intel/PerfSpect/releases/latest/download/perfspect.tgz | tar xvz
-$ cd perfspect
+wget -qO- https://github.com/intel/PerfSpect/releases/latest/download/perfspect.tgz | tar xvz
+cd perfspect
 ```
 ## Running PerfSpect
 PerfSpect includes a suite of commands designed to analyze and optimize both system and software performance.
@@ -50,10 +50,11 @@ Each command has additional help text that can be viewed by running `perfspect <
 The `config` command provides a method to view and change various system configuration parameters. Run `perfspect config -h` to view the parameters that can be modified. <b>USE CAUTION</b> when changing system parameters. It is possible to configure the system in a way that it will no longer operate. In some cases, a reboot will be required to return to the default settings. 
 
 Example:
-```
+<pre>
 $ ./perfspect config --cores 24 --llc 2.0 --uncoremaxfreq 1.8
 ...
-```
+</pre>
+
 #### Flame Command
 Software flamegraphs are useful in diagnosing software performance bottlenecks. Run `perfspect flame` to capture a system-wide software flamegraph. **Important Note:** The target system must have perl installed and on the PATH to process the data required for flamegraphs.
 
@@ -64,7 +65,7 @@ As systems contain more and more cores, it can be useful to analyze the kernel l
 The `metrics` command provides system performance characterization metrics. The metrics provided are dependent on the platform architecture.
 
 Example:
-```
+<pre>
 $ ./perfspect metrics --duration 30
 emr                   ⣯  collection complete                     
 
@@ -72,7 +73,7 @@ Metric files:
   /home/jharper5/dev/pt/perfspect_2024-10-10_10-58-36/emr_metrics.csv
   /home/jharper5/dev/pt/perfspect_2024-10-10_10-58-36/emr_metrics_summary.csv
   /home/jharper5/dev/pt/perfspect_2024-10-10_10-58-36/emr_metrics_summary.html
-```
+</pre>
 The `metrics` command supports two modes -- default and "live". Default mode behaves as above -- metrics are collected and saved into files for review.  The "live" mode prints the metrics in a selected format, e.g., CSV, JSON, to stdout where they can be viewed in the console and/or redirected into a file or observability pipeline.
 
 ##### No Root Permissions
@@ -85,7 +86,7 @@ See `perfspect metrics -h` for the extensive set of options and examples.
 
 #### Report Command
 The `report` command generates system configuration reports in a variety of formats. By default, all categories of information are collected. See `perfspect report -h` for all options.
-```
+<pre>
 $ ./perfspect report 
 soc-PF4W5A3V          ⢿  collection complete                     
 
@@ -94,9 +95,9 @@ Report files:
   /home/myuser/dev/perfspect/perfspect_2024-09-03_17-45-40/soc-PF4W5A3V.xlsx
   /home/myuser/dev/perfspect/perfspect_2024-09-03_17-45-40/soc-PF4W5A3V.json
   /home/myuser/dev/perfspect/perfspect_2024-09-03_17-45-40/soc-PF4W5A3V.txt
-```
+</pre>
 It's possible to collect a subset of information by providing command line options. Note that by specifying only the `txt` format, it is printed to stdout, as well as written to a report file.
-```
+<pre>
 $ ./perfspect report --bios --os --format txt
 BIOS
 ====
@@ -113,10 +114,10 @@ Microcode:       0x21000230
 
 Report files:
   /home/myuser/dev/perfspect/perfspect_2024-09-03_17-47-55/emr.txt
-```
+</pre>
 ###### Benchmarks
 To assist in evaluating the health of target systems, the report command can run a series of micro-benchmarks. The results will be reported along with the target's configuration details. Use --benchmarks \<"all" or comma separated list of benchmarks\>:
-```
+<pre>
 $ ./perfspect report --benchmarks all
 soc-PF4W5A3V          ⢿  collection complete                     
 
@@ -125,7 +126,7 @@ Report files:
   /home/myuser/dev/perfspect/perfspect_2024-09-03_17-45-40/soc-PF4W5A3V.xlsx
   /home/myuser/dev/perfspect/perfspect_2024-09-03_17-45-40/soc-PF4W5A3V.json
   /home/myuser/dev/perfspect/perfspect_2024-09-03_17-45-40/soc-PF4W5A3V.txt
-```
+</pre>
 
 | benchmark | Description |
 | --------- | ----------- |
@@ -140,7 +141,7 @@ Report files:
 
 #### Telemetry Command
 The `telemetry` command runs telemetry collectors on the specified target(s) and then generates reports of the results. By default, all telemetry types are collected. To select telemetry types, additional command line options are available (see `perfspect telemetry -h`).
-```
+<pre>
 $ ./perfspect telemetry --duration 30
 soc-PF4W5A3V          ⣾  collection complete                     
 
@@ -149,7 +150,7 @@ Report files:
   /home/myuser/dev/perfspect/perfspect_2024-09-03_17-55-13/soc-PF4W5A3V_telem.xlsx
   /home/myuser/dev/perfspect/perfspect_2024-09-03_17-55-13/soc-PF4W5A3V_telem.json
   /home/myuser/dev/perfspect/perfspect_2024-09-03_17-55-13/soc-PF4W5A3V_telem.txt
-```
+</pre>
 
 ### Common Command Options
 
@@ -159,18 +160,18 @@ By default, PerfSpect targets the local host, i.e., the host where PerfSpect is 
 **Important:** Ensure the remote user has password-less sudo access (or root privileges) to fully utilize PerfSpect's capabilities.
 
 To target a single remote system using a pre-configured private key:
-```
+<pre>
 $ ./perfspect report --target 192.168.1.42 --user fred --key ~/.ssh/fredkey
 ...
-```
+</pre>
 To target a single remote system using a password:
-```
+<pre>
 $ ./perfspect report --target 192.168.1.42 --user fred
 fred@192.168.1.42's password: ******
 ...
-```
+</pre>
 To target more than one remote system, a YAML file is used to provide the necessary connection parameters, e.g.:
-```
+<pre>
 $ cat targets.yaml
 # This YAML file contains a list of remote targets with their corresponding properties.
 # Each target has the following properties:
@@ -204,7 +205,7 @@ targets:
 
 $ ./perfspect report --benchmark speed,memory --targets targets.yaml
 ...
-```
+</pre>
 ## Building PerfSpect from Source
 ### 1st Build
 `builder/build.sh` builds the dependencies and the app in Docker containers that provide the required build environments. Assumes you have Docker installed on your development system.
