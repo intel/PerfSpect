@@ -158,33 +158,42 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 			coalescedEvents = append(coalescedEvents, allEvents)
 			return
 		} else if granularity == granularitySocket {
-			// one list of Events per Socket
+			// create one list of Events per Socket
 			newEvents := make([][]Event, metadata.SocketCount)
 			for i := 0; i < metadata.SocketCount; i++ {
 				newEvents[i] = make([]Event, 0, len(allEvents)/metadata.SocketCount)
 			}
-			// merge
-			prevSocket := -1
-			var socket int
-			var newEvent Event
-			for i, event := range allEvents {
-				var cpu int
-				if cpu, err = strconv.Atoi(event.CPU); err != nil {
+			// incoming events are labeled with cpu number
+			// we need to map cpu number to socket number, and accumulate the values from each cpu event into a socket event
+			// we assume that the events are ordered by cpu number and events are present for each cpu
+			var currentEvent string
+			for _, event := range allEvents {
+				var eventCPU int
+				if eventCPU, err = strconv.Atoi(event.CPU); err != nil {
+					err = fmt.Errorf("failed to parse cpu number: %s", event.CPU)
 					return
 				}
-				socket = metadata.CPUSocketMap[cpu]
-				if socket != prevSocket {
-					if i != 0 {
-						newEvents[prevSocket] = append(newEvents[prevSocket], newEvent)
+				// if cpu exists in map, add event to the eventSocket, use the !ok go idiom to check if the key exists
+				if eventSocket, ok := metadata.CPUSocketMap[eventCPU]; ok {
+					if eventSocket > len(newEvents)-1 {
+						err = fmt.Errorf("cpu %d is mapped to socket %d, which is greater than the number of sockets %d", eventCPU, eventSocket, len(newEvents)-1)
+						return
 					}
-					prevSocket = socket
-					newEvent = event
-					newEvent.Socket = fmt.Sprintf("%d", socket)
-					continue
+					// if first event or the event name changed, add the event to the list of socket events
+					if len(newEvents[eventSocket]) == 0 || newEvents[eventSocket][len(newEvents[eventSocket])-1].Event != currentEvent || event.Event != currentEvent {
+						newEvents[eventSocket] = append(newEvents[eventSocket], event)
+						newEvents[eventSocket][len(newEvents[eventSocket])-1].Socket = fmt.Sprintf("%d", eventSocket)
+						newEvents[eventSocket][len(newEvents[eventSocket])-1].CPU = ""
+						currentEvent = event.Event
+					} else {
+						// if the event name is the same as the last socket event, add the new event's value to the last socket event's value
+						newEvents[eventSocket][len(newEvents[eventSocket])-1].Value += event.Value
+					}
+				} else {
+					err = fmt.Errorf("cpu %d is not mapped to a socket", eventCPU)
+					return
 				}
-				newEvent.Value += event.Value
 			}
-			newEvents[socket] = append(newEvents[socket], newEvent)
 			coalescedEvents = append(coalescedEvents, newEvents...)
 			return
 		} else if granularity == granularityCPU {
