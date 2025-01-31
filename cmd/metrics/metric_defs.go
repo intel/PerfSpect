@@ -95,7 +95,18 @@ func LoadMetricDefinitions(metricDefinitionOverridePath string, selectedMetrics 
 func ConfigureMetrics(loadedMetrics []MetricDefinition, uncollectableEvents []string, evaluatorFunctions map[string]govaluate.ExpressionFunction, metadata Metadata) (metrics []MetricDefinition, err error) {
 	// get constants as strings
 	tscFreq := fmt.Sprintf("%f", float64(metadata.TSCFrequencyHz))
-	tsc := fmt.Sprintf("%f", float64(metadata.TSC))
+	var tsc string
+	if flagGranularity == granularitySystem {
+		tsc = fmt.Sprintf("%f", float64(metadata.TSC))
+	} else if flagGranularity == granularitySocket {
+		tsc = fmt.Sprintf("%f", float64(metadata.TSC)/float64(metadata.SocketCount))
+	} else if flagGranularity == granularityCPU {
+		tsc = fmt.Sprintf("%f", float64(metadata.TSC)/(float64(metadata.SocketCount*metadata.CoresPerSocket*metadata.ThreadsPerCore)))
+	} else {
+		err = fmt.Errorf("unknown granularity: %s", flagGranularity)
+		return
+	}
+
 	coresPerSocket := fmt.Sprintf("%f", float64(metadata.CoresPerSocket))
 	chasPerSocket := fmt.Sprintf("%f", float64(len(metadata.UncoreDeviceIDs["cha"])))
 	socketCount := fmt.Sprintf("%f", float64(metadata.SocketCount))
