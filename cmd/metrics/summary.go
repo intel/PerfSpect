@@ -12,6 +12,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -359,7 +360,10 @@ func (m *metricsFromCSV) getHTML(metadata Metadata) (html string, err error) {
 	if err != nil {
 		return
 	}
-	html = strings.Replace(html, "METADATA", string(jsonMetadata), -1)
+	// remove PerfSupportedEvents from json
+	re := regexp.MustCompile(`"PerfSupportedEvents":".*?",`)
+	jsonMetadataNoPerfEvents := re.ReplaceAll(jsonMetadata, []byte(""))
+	html = strings.Replace(html, "METADATA", string(jsonMetadataNoPerfEvents), -1)
 	return
 }
 
