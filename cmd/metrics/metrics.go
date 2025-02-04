@@ -490,6 +490,7 @@ type targetContext struct {
 	groupDefinitions    []GroupDefinition
 	metricDefinitions   []MetricDefinition
 	printedFiles        []string
+	perfStartTime       time.Time
 }
 
 type targetError struct {
@@ -629,7 +630,7 @@ func processRawData(localOutputDir string) error {
 	var filesWritten []string
 
 	var frameTimestamp float64
-	frameCount := 0
+	frameCount := 1
 	for {
 		bytes, err := readNextEventFrame(eventsFile)
 		if err != nil {
@@ -643,11 +644,8 @@ func processRawData(localOutputDir string) error {
 		if err != nil {
 			return err
 		}
-		for i := range metricFrames {
-			frameCount += 1
-			metricFrames[i].FrameCount = frameCount
-		}
-		filesWritten = printMetrics(metricFrames, metadata.Hostname, metadata.CollectionStartTime, localOutputDir)
+		filesWritten = printMetrics(metricFrames, frameCount, metadata.Hostname, metadata.CollectionStartTime, localOutputDir)
+		frameCount += len(metricFrames)
 	}
 	summaryFiles, err := summarizeMetrics(localOutputDir, metadata.Hostname, metadata)
 	if err != nil {
@@ -1141,22 +1139,25 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 	errorChannel := make(chan error)
 	frameChannel := make(chan []MetricFrame)
 	printCompleteChannel := make(chan []string)
-	totalRuntimeSeconds := 0 // only relevant in process scope
+	totalPerfRuntimeSeconds := 0 // only relevant in process scope
 	// get current time for use in setting timestamps on output
-	targetContext.metadata.CollectionStartTime = time.Now()
-	go printMetricsAsync(frameChannel, myTarget.GetName(), localOutputDir, targetContext.metadata.CollectionStartTime, printCompleteChannel)
+	targetContext.metadata.CollectionStartTime = time.Now() // save the start time in the metadata for use when using the --input option to process raw data
+	go printMetricsAsync(targetContext, localOutputDir, frameChannel, printCompleteChannel)
 	var err error
 	for {
 		var perfCommand *exec.Cmd
 		var processes []Process
+		var tempErr error
 		// get the perf command
-		if processes, perfCommand, err = getPerfCommand(myTarget, targetContext.perfPath, targetContext.groupDefinitions, localTempDir); err != nil {
-			err = fmt.Errorf("failed to get perf command: %w", err)
-			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
+		if processes, perfCommand, tempErr = getPerfCommand(myTarget, targetContext.perfPath, targetContext.groupDefinitions, localTempDir); tempErr != nil {
+			if !getSignalReceived() {
+				err = fmt.Errorf("failed to get perf command: %w", tempErr)
+				_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
+			}
 			break
 		}
 		// this timestamp is used to determine if we need to exit the loop, i.e., we've run long enough
-		beginTimestamp := time.Now()
+		targetContext.perfStartTime = time.Now()
 		go runPerf(myTarget, flagNoRoot, processes, perfCommand, targetContext.groupDefinitions, targetContext.metricDefinitions, targetContext.metadata, localTempDir, localOutputDir, frameChannel, errorChannel)
 		// wait for runPerf to finish
 		perfErr := <-errorChannel // capture and return all errors
@@ -1168,9 +1169,9 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 			break
 		}
 		// no perf errors, continue
-		endTimestamp := time.Now()
-		totalRuntimeSeconds += int(endTimestamp.Sub(beginTimestamp).Seconds())
-		if !refresh || (flagDuration != 0 && totalRuntimeSeconds >= flagDuration) {
+		perfEndTime := time.Now()
+		totalPerfRuntimeSeconds += int(perfEndTime.Sub(targetContext.perfStartTime).Seconds())
+		if !refresh || (flagDuration != 0 && totalPerfRuntimeSeconds >= flagDuration) {
 			break
 		}
 	}
@@ -1186,7 +1187,7 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 	channelError <- targetError{target: myTarget, err: nil}
 }
 
-func printMetrics(metricFrames []MetricFrame, targetName string, collectionStartTime time.Time, outputDir string) (printedFiles []string) {
+func printMetrics(metricFrames []MetricFrame, frameCount int, targetName string, collectionStartTime time.Time, outputDir string) (printedFiles []string) {
 	fileName, err := printMetricsTxt(metricFrames, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatTxt, !flagLive && util.StringInList(formatTxt, flagOutputFormat), outputDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -1202,14 +1203,14 @@ func printMetrics(metricFrames []MetricFrame, targetName string, collectionStart
 		printedFiles = util.UniqueAppend(printedFiles, fileName)
 	}
 	// csv is always written to file unless no files are requested -- we need it to create the summary reports
-	fileName, err = printMetricsCSV(metricFrames, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatCSV, !flagLive, outputDir)
+	fileName, err = printMetricsCSV(metricFrames, frameCount, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatCSV, !flagLive, outputDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
 	} else if fileName != "" {
 		printedFiles = util.UniqueAppend(printedFiles, fileName)
 	}
-	fileName, err = printMetricsWide(metricFrames, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatWide, !flagLive && util.StringInList(formatWide, flagOutputFormat), outputDir)
+	fileName, err = printMetricsWide(metricFrames, frameCount, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatWide, !flagLive && util.StringInList(formatWide, flagOutputFormat), outputDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
@@ -1221,14 +1222,16 @@ func printMetrics(metricFrames []MetricFrame, targetName string, collectionStart
 
 // printMetricsAsync receives metric frames over the provided channel and prints them to file and stdout in the requested format.
 // It exits when the channel is closed.
-func printMetricsAsync(frameChannel chan []MetricFrame, targetName string, outputDir string, collectionStartTime time.Time, doneChannel chan []string) {
+func printMetricsAsync(targetContext *targetContext, outputDir string, frameChannel chan []MetricFrame, doneChannel chan []string) {
 	var allPrintedFiles []string
+	frameCount := 1
 	// block until next set of metric frames arrives, will exit loop when channel is closed
 	for metricFrames := range frameChannel {
-		printedFiles := printMetrics(metricFrames, targetName, collectionStartTime, outputDir)
+		printedFiles := printMetrics(metricFrames, frameCount, targetContext.target.GetName(), targetContext.perfStartTime, outputDir)
 		for _, file := range printedFiles {
 			allPrintedFiles = util.UniqueAppend(allPrintedFiles, file)
 		}
+		frameCount += len(metricFrames)
 	}
 	doneChannel <- allPrintedFiles
 }
@@ -1436,7 +1439,6 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 	// The first duration needs to be longer than the time it takes for perf to print its first line of output.
 	t1 := time.NewTimer(time.Duration(2 * flagPerfPrintInterval * 1000))
 	var frameTimestamp float64
-	frameCount := 0
 	stopAnonymousFuncChannel := make(chan bool)
 	go func() {
 		stop := false
@@ -1453,10 +1455,6 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 					slog.Warn(err.Error())
 					outputLines = [][]byte{} // empty it
 					continue
-				}
-				for i := range metricFrames {
-					frameCount += 1
-					metricFrames[i].FrameCount = frameCount
 				}
 				// send the metrics frames out to be printed
 				frameChannel <- metricFrames

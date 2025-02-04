@@ -55,7 +55,7 @@ func printMetricsJSON(metricFrames []MetricFrame, targetName string, collectionS
 	return
 }
 
-func printMetricsCSV(metricFrames []MetricFrame, targetName string, collectionStartTime time.Time, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
+func printMetricsCSV(metricFrames []MetricFrame, frameCount int, targetName string, collectionStartTime time.Time, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
 	if !printToStdout && !printToFile {
 		return
 	}
@@ -69,8 +69,8 @@ func printMetricsCSV(metricFrames []MetricFrame, targetName string, collectionSt
 		}
 		defer file.Close()
 	}
-	for _, metricFrame := range metricFrames {
-		if metricFrame.FrameCount == 1 {
+	for idx, metricFrame := range metricFrames {
+		if idx == 0 && frameCount == 1 {
 			contextHeaders := "TS,SKT,CPU,CID,"
 			if printToStdout {
 				fmt.Print(contextHeaders)
@@ -116,7 +116,7 @@ func printMetricsCSV(metricFrames []MetricFrame, targetName string, collectionSt
 	return
 }
 
-func printMetricsWide(metricFrames []MetricFrame, targetName string, collectionStartTime time.Time, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
+func printMetricsWide(metricFrames []MetricFrame, frameCount int, targetName string, collectionStartTime time.Time, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
 	if !printToStdout && !printToFile {
 		return
 	}
@@ -130,7 +130,7 @@ func printMetricsWide(metricFrames []MetricFrame, targetName string, collectionS
 		}
 		defer file.Close()
 	}
-	for _, metricFrame := range metricFrames {
+	for idx, metricFrame := range metricFrames {
 		var names []string
 		var values []float64
 		for _, metric := range metricFrame.Metrics {
@@ -139,7 +139,7 @@ func printMetricsWide(metricFrames []MetricFrame, targetName string, collectionS
 		}
 		minColWidth := 6
 		colSpacing := 3
-		if metricFrame.FrameCount == 1 { // print headers
+		if idx == 0 && frameCount == 1 { // print headers
 			header := "Timestamp    " // 10 + 3
 			if metricFrame.PID != "" {
 				header += "PID       "         // 7 + 3
