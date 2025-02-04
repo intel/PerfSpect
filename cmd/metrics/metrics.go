@@ -586,7 +586,10 @@ func readNextEventFrame(file *os.File) ([][]byte, error) {
 		// if the interval changes, we're done with this section
 		if lastInterval != "" && lastInterval != string(match[1]) {
 			// seek back to the beginning of the last line
-			file.Seek(offset, io.SeekStart)
+			_, err := file.Seek(offset, io.SeekStart)
+			if err != nil {
+				return nil, err
+			}
 			return section, nil
 		}
 
