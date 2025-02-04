@@ -25,14 +25,13 @@ type Metric struct {
 
 // MetricFrame represents the metrics values and associated metadata
 type MetricFrame struct {
-	Metrics    []Metric
-	Timestamp  float64
-	FrameCount int
-	Socket     string
-	CPU        string
-	Cgroup     string
-	PID        string
-	Cmd        string
+	Metrics   []Metric
+	Timestamp float64
+	Socket    string
+	CPU       string
+	Cgroup    string
+	PID       string
+	Cmd       string
 }
 
 // ProcessEvents is responsible for producing metrics from raw perf events
