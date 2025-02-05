@@ -144,7 +144,7 @@ func isCollectableEvent(event EventDefinition, metadata Metadata) bool {
 	}
 	// off-core response events
 	if event.Device == "cpu" && (strings.HasPrefix(event.Name, "OCR") || strings.HasPrefix(event.Name, "OFFCORE_REQUESTS_OUTSTANDING")) {
-		if !metadata.SupportsOCR {
+		if !(metadata.SupportsOCR && metadata.SupportsUncore) {
 			slog.Debug("Off-core response events not supported on target", slog.String("event", event.Name))
 			return false
 		} else if flagScope == scopeProcess || flagScope == scopeCgroup {
