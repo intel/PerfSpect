@@ -1235,9 +1235,9 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 			select {
 			case <-t1.C: // waits for timer to expire
 			case <-stopAnonymousFuncChannel: // wait for signal to exit the goroutine
-				stop = true // exit the loop, but still process the last set of events (if any)
+				stop = true // exit the loop
 			}
-			if len(outputLines) != 0 {
+			if !stop && len(outputLines) != 0 {
 				// process the events
 				var metricFrames []MetricFrame
 				if metricFrames, frameTimestamp, err = ProcessEvents(outputLines, eventGroupDefinitions, metricDefinitions, processes, frameTimestamp, metadata); err != nil {
@@ -1259,11 +1259,13 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 				outputLines = [][]byte{}
 			}
 			// for cgroup scope, terminate perf if timeout is reached
-			if flagScope == scopeCgroup && cgroupTimeout != 0 && int(time.Since(startPerfTimestamp).Seconds()) > cgroupTimeout {
-				err = localCommand.Process.Signal(os.Interrupt)
-				if err != nil {
-					err = fmt.Errorf("failed to terminate perf: %v", err)
-					slog.Error(err.Error())
+			if flagScope == scopeCgroup {
+				if stop || (cgroupTimeout != 0 && int(time.Since(startPerfTimestamp).Seconds()) > cgroupTimeout) {
+					err = localCommand.Process.Signal(os.Interrupt)
+					if err != nil {
+						err = fmt.Errorf("failed to terminate perf: %v", err)
+						slog.Error(err.Error())
+					}
 				}
 			}
 			if stop {
