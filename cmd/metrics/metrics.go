@@ -1481,6 +1481,8 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 				break
 			}
 		}
+		// signal that the goroutine is done
+		stopAnonymousFuncChannel <- true
 	}()
 	// receive perf output
 	done := false
@@ -1504,4 +1506,6 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 	t1.Stop()
 	// send signal to exit the goroutine
 	stopAnonymousFuncChannel <- true
+	// wait for the goroutine to exit
+	<-stopAnonymousFuncChannel
 }
