@@ -1497,8 +1497,7 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 			done = true // exit the loop
 		case exitCode := <-exitcodeChannel: // when perf exits, the exit code comes to this channel
 			slog.Debug("perf exited", slog.Int("exit code", exitCode))
-			time.Sleep(100 * time.Millisecond) // wait long enough to ensure that the timer expires so that the last set of events is processed
-			done = true                        // exit the loop
+			done = true // exit the loop
 		case line := <-stderrChannel: // perf output comes in on this channel, one line at a time
 			t1.Stop()
 			t1.Reset(100 * time.Millisecond) // 100ms is somewhat arbitrary, but seems to work
