@@ -1439,6 +1439,7 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 	// The first duration needs to be longer than the time it takes for perf to print its first line of output.
 	t1 := time.NewTimer(time.Duration(2 * flagPerfPrintInterval * 1000))
 	var frameTimestamp float64
+	frameCount := 0
 	stopAnonymousFuncChannel := make(chan bool)
 	go func() {
 		stop := false
@@ -1455,6 +1456,10 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 					slog.Warn(err.Error())
 					outputLines = [][]byte{} // empty it
 					continue
+				}
+				for i := range metricFrames {
+					frameCount += 1
+					metricFrames[i].FrameCount = frameCount
 				}
 				// send the metrics frames out to be printed
 				frameChannel <- metricFrames
