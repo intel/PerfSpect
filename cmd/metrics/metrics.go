@@ -504,8 +504,8 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		sig := <-sigChannel
 		setSignalReceived()
 		slog.Info("received signal", slog.String("signal", sig.String()))
-		// propogate signal to children
-		util.SignalChildren(sig)
+		// send kill signal to children
+		util.SignalChildren(syscall.SIGKILL)
 	}()
 	// round up to next perfPrintInterval second (the collection interval used by perf stat)
 	if flagDuration != 0 {
