@@ -1436,6 +1436,7 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 	// The timer will expire when no lines (events) have been received from perf for more than 100ms. This
 	// works because perf writes the events to stderr in a burst every collection interval, e.g., 5 seconds.
 	// When the timer expires, this code assumes that perf is done writing events to stderr.
+	perfEventWaitTime := time.Duration(100 * time.Millisecond) // 100ms is somewhat arbitrary, but is long enough for perf to print a frame of events
 	// The first duration needs to be longer than the time it takes for perf to print its first line of output.
 	t1 := time.NewTimer(time.Duration(2 * flagPerfPrintInterval * 1000))
 	var frameTimestamp float64
@@ -1497,10 +1498,11 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 			done = true // exit the loop
 		case exitCode := <-exitcodeChannel: // when perf exits, the exit code comes to this channel
 			slog.Debug("perf exited", slog.Int("exit code", exitCode))
-			done = true // exit the loop
+			time.Sleep(perfEventWaitTime) // wait for timer to expire so that last events can be processed
+			done = true                   // exit the loop
 		case line := <-stderrChannel: // perf output comes in on this channel, one line at a time
 			t1.Stop()
-			t1.Reset(100 * time.Millisecond) // 100ms is somewhat arbitrary, but seems to work
+			t1.Reset(perfEventWaitTime)
 			// accumulate the lines, they will be processed in the goroutine when the timer expires
 			outputLines = append(outputLines, []byte(line))
 		}
