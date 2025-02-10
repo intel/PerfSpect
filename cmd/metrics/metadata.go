@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"perfspect/internal/cpudb"
 	"perfspect/internal/script"
@@ -30,10 +31,12 @@ type Metadata struct {
 	Architecture              string
 	Vendor                    string
 	Microarchitecture         string
+	Hostname                  string
 	ModelName                 string
 	PerfSupportedEvents       string
 	PMUDriverVersion          string
 	SocketCount               int
+	CollectionStartTime       time.Time
 	SupportsInstructions      bool
 	SupportsFixedCycles       bool
 	SupportsFixedInstructions bool
@@ -80,6 +83,8 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 	metadata.CPUSocketMap = createCPUSocketMap(metadata.CoresPerSocket, metadata.SocketCount, metadata.ThreadsPerCore == 2)
 	// Model Name
 	metadata.ModelName = cpuInfo[0]["model name"]
+	// Hostname
+	metadata.Hostname = myTarget.GetName()
 	// Architecture
 	metadata.Architecture, err = myTarget.GetArchitecture()
 	if err != nil {
@@ -256,6 +261,7 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 // String - provides a string representation of the Metadata structure
 func (md Metadata) String() string {
 	out := fmt.Sprintf(""+
+		"Host Name: %s, "+
 		"Model Name: %s, "+
 		"Architecture: %s, "+
 		"Vendor: %s, "+
@@ -274,7 +280,9 @@ func (md Metadata) String() string {
 		"PEBS supported: %t, "+
 		"OCR supported: %t, "+
 		"PMU Driver version: %s, "+
-		"Kernel version: %s, ",
+		"Kernel version: %s, "+
+		"Collection Start Time: %s, ",
+		md.Hostname,
 		md.ModelName,
 		md.Architecture,
 		md.Vendor,
@@ -293,7 +301,9 @@ func (md Metadata) String() string {
 		md.SupportsPEBS,
 		md.SupportsOCR,
 		md.PMUDriverVersion,
-		md.KernelVersion)
+		md.KernelVersion,
+		md.CollectionStartTime.Format(time.RFC3339),
+	)
 	for deviceName, deviceIds := range md.UncoreDeviceIDs {
 		var ids []string
 		for _, id := range deviceIds {
@@ -316,9 +326,6 @@ func (md Metadata) JSON() (out []byte, err error) {
 		slog.Error("failed to marshal metadata structure", slog.String("error", err.Error()))
 		return
 	}
-	// remove PerfSupportedEvents from json
-	re := regexp.MustCompile(`"PerfSupportedEvents":".*?",`)
-	out = re.ReplaceAll(out, []byte(""))
 	return
 }
 
@@ -338,6 +345,22 @@ func (md Metadata) WriteJSONToFile(path string) (err error) {
 	out = append(out, []byte("\n")...)
 	if _, err = rawFile.Write(out); err != nil {
 		slog.Error("failed to write metadata json to file", slog.String("error", err.Error()))
+		return
+	}
+	return
+}
+
+// ReadJSONFromFile reads the metadata structure from the filename provided
+func ReadJSONFromFile(path string) (md Metadata, err error) {
+	// read the file
+	var rawBytes []byte
+	rawBytes, err = os.ReadFile(path)
+	if err != nil {
+		slog.Error("failed to read metadata file", slog.String("error", err.Error()))
+		return
+	}
+	if err = json.Unmarshal(rawBytes, &md); err != nil {
+		slog.Error("failed to unmarshal metadata json", slog.String("error", err.Error()))
 		return
 	}
 	return

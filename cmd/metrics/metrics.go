@@ -7,11 +7,13 @@ package metrics
 import (
 	"embed"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -104,6 +106,7 @@ var (
 	flagPerfMuxInterval   int
 	flagNoRoot            bool
 	flagWriteEventsToFile bool
+	flagInput             string
 
 	// positional arguments
 	argsApplication []string
@@ -131,9 +134,8 @@ const (
 	flagPerfMuxIntervalName   = "muxinterval"
 	flagNoRootName            = "noroot"
 	flagWriteEventsToFileName = "raw"
+	flagInputName             = "input"
 )
-
-var gCollectionStartTime time.Time
 
 const (
 	granularitySystem = "system"
@@ -182,6 +184,7 @@ func init() {
 	Cmd.Flags().IntVar(&flagPerfMuxInterval, flagPerfMuxIntervalName, 125, "")
 	Cmd.Flags().BoolVar(&flagNoRoot, flagNoRootName, false, "")
 	Cmd.Flags().BoolVar(&flagWriteEventsToFile, flagWriteEventsToFileName, false, "")
+	Cmd.Flags().StringVar(&flagInput, flagInputName, "", "")
 
 	common.AddTargetFlags(Cmd)
 
@@ -308,6 +311,10 @@ func getFlagGroups() []common.FlagGroup {
 		{
 			Name: flagWriteEventsToFileName,
 			Help: "write raw perf events to file",
+		},
+		{
+			Name: flagInputName,
+			Help: "path to a file or directory with json file containing raw perf events. Will skip data collection and use raw data for reports.",
 		},
 	}
 	groups = append(groups, common.FlagGroup{
@@ -483,6 +490,7 @@ type targetContext struct {
 	groupDefinitions    []GroupDefinition
 	metricDefinitions   []MetricDefinition
 	printedFiles        []string
+	perfStartTime       time.Time
 }
 
 type targetError struct {
@@ -490,6 +498,163 @@ type targetError struct {
 	err    error
 }
 
+func readRawData(directory string) (metadata Metadata, eventFile *os.File, err error) {
+	var metadataPath string
+	var eventPath string
+	fileInfo, err := os.Stat(directory)
+	if err != nil {
+		err = fmt.Errorf("failed to get file info: %v", err)
+		return
+	}
+	if !fileInfo.IsDir() {
+		err = fmt.Errorf("input must be a directory")
+		return
+	}
+	var files []os.DirEntry
+	files, err = os.ReadDir(directory)
+	if err != nil {
+		err = fmt.Errorf("failed to read raw file directory: %v", err)
+		return
+	}
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		if strings.HasSuffix(file.Name(), "_metadata.json") {
+			metadataPath = directory + "/" + file.Name()
+		} else if strings.HasSuffix(file.Name(), "_events.json") {
+			eventPath = directory + "/" + file.Name()
+		}
+	}
+	if metadataPath == "" {
+		err = fmt.Errorf("metadata file not found in %s", directory)
+		return
+	}
+	if eventPath == "" {
+		err = fmt.Errorf("events file not found in %s", directory)
+		return
+	}
+	metadata, err = ReadJSONFromFile(metadataPath)
+	if err != nil {
+		err = fmt.Errorf("failed to read metadata from file: %v", err)
+		return
+	}
+	eventFile, err = os.Open(eventPath)
+	if err != nil {
+		err = fmt.Errorf("failed to open events file: %v", err)
+		return
+	}
+	return
+}
+func readLine(file *os.File) ([]byte, error) {
+	var line []byte
+	buf := make([]byte, 1)
+	for {
+		_, err := file.Read(buf)
+		if err != nil {
+			return line, err
+		}
+		if buf[0] == '\n' {
+			break
+		}
+		line = append(line, buf[0])
+	}
+	return line, nil
+}
+func readNextEventFrame(file *os.File) ([][]byte, error) {
+	// read one line at a time
+	// line looks like this:
+	// {"interval" : 5.005070723, "counter-value" ...
+	// if the interval value changes, we're done until the next call so need to back up one line in the file
+	re := regexp.MustCompile(`"interval" : ([0-9.]+)`)
+	var section [][]byte
+	var lastInterval string
+	for {
+		// Get the current offset
+		offset, _ := file.Seek(0, io.SeekCurrent)
+		line, err := readLine(file)
+		if err != nil {
+			if err == io.EOF {
+				return section, nil
+			}
+			return nil, err
+		}
+		match := re.FindSubmatch(line)
+		if len(match) < 2 {
+			err = fmt.Errorf("failed to find interval in line: %s", line)
+			return nil, err
+		}
+		// if the interval changes, we're done with this section
+		if lastInterval != "" && lastInterval != string(match[1]) {
+			// seek back to the beginning of the last line
+			_, err := file.Seek(offset, io.SeekStart)
+			if err != nil {
+				return nil, err
+			}
+			return section, nil
+		}
+
+		// Append the line to the section
+		section = append(section, line)
+
+		// Save the interval
+		lastInterval = string(match[1])
+	}
+}
+func processRawData(localOutputDir string) error {
+	metadata, eventsFile, err := readRawData(flagInput)
+	if err != nil {
+		return err
+	}
+	defer eventsFile.Close()
+	// load event definitions
+	var eventGroupDefinitions []GroupDefinition
+	var uncollectableEvents []string
+	if eventGroupDefinitions, uncollectableEvents, err = LoadEventGroups(flagEventFilePath, metadata); err != nil {
+		err = fmt.Errorf("failed to load event definitions: %w", err)
+		return err
+	}
+	// load metric definitions
+	var loadedMetrics []MetricDefinition
+	if loadedMetrics, err = LoadMetricDefinitions(flagMetricFilePath, flagMetricsList, metadata); err != nil {
+		err = fmt.Errorf("failed to load metric definitions: %w", err)
+		return err
+	}
+	// configure metrics
+	var metricDefinitions []MetricDefinition
+	if metricDefinitions, err = ConfigureMetrics(loadedMetrics, uncollectableEvents, GetEvaluatorFunctions(), metadata); err != nil {
+		err = fmt.Errorf("failed to configure metrics: %w", err)
+		return err
+	}
+
+	var filesWritten []string
+
+	var frameTimestamp float64
+	frameCount := 1
+	for {
+		bytes, err := readNextEventFrame(eventsFile)
+		if err != nil {
+			return err
+		}
+		if len(bytes) == 0 {
+			break
+		}
+		var metricFrames []MetricFrame
+		metricFrames, frameTimestamp, err = ProcessEvents(bytes, eventGroupDefinitions, metricDefinitions, []Process{}, frameTimestamp, metadata)
+		if err != nil {
+			return err
+		}
+		filesWritten = printMetrics(metricFrames, frameCount, metadata.Hostname, metadata.CollectionStartTime, localOutputDir)
+		frameCount += len(metricFrames)
+	}
+	summaryFiles, err := summarizeMetrics(localOutputDir, metadata.Hostname, metadata)
+	if err != nil {
+		return err
+	}
+	filesWritten = append(filesWritten, summaryFiles...)
+	printOutputFileNames([][]string{filesWritten})
+	return nil
+}
 func runCmd(cmd *cobra.Command, args []string) error {
 	// appContext is the application context that holds common data and resources.
 	appContext := cmd.Context().Value(common.AppContext{}).(common.AppContext)
@@ -507,6 +672,25 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		// send kill signal to children
 		util.SignalChildren(syscall.SIGKILL)
 	}()
+	if flagInput != "" {
+		// create output directory
+		err := common.CreateOutputDir(localOutputDir)
+		if err != nil {
+			err = fmt.Errorf("failed to create output directory: %w", err)
+			fmt.Fprintf(os.Stderr, "Error: %+v\n", err)
+			cmd.SilenceUsage = true
+			return err
+		}
+		// skip data collection and use raw data for reports
+		err = processRawData(localOutputDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			cmd.SilenceUsage = true
+			return err
+		}
+		return nil
+	}
 	// round up to next perfPrintInterval second (the collection interval used by perf stat)
 	if flagDuration != 0 {
 		qf := float64(flagDuration) / float64(flagPerfPrintInterval)
@@ -699,17 +883,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-	// write metadata to file
-	if flagWriteEventsToFile {
-		for _, targetContext := range targetContexts {
-			if err = targetContext.metadata.WriteJSONToFile(localOutputDir + "/" + targetContext.target.GetName() + "_" + "metadata.json"); err != nil {
-				err = fmt.Errorf("failed to write metadata to file: %w", err)
-				fmt.Fprintf(os.Stderr, "Error: %+v\n", err)
-				cmd.SilenceUsage = true
-				return err
-			}
-		}
-	}
 	// start the metric collection
 	for i := range targetContexts {
 		if targetContexts[i].err == nil {
@@ -738,6 +911,17 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			_ = multiSpinner.Status(targetContext.target.GetName(), "collection complete")
 		}
 	}
+	// write metadata to file
+	if flagWriteEventsToFile {
+		for _, targetContext := range targetContexts {
+			if err = targetContext.metadata.WriteJSONToFile(localOutputDir + "/" + targetContext.target.GetName() + "_" + "metadata.json"); err != nil {
+				err = fmt.Errorf("failed to write metadata to file: %w", err)
+				fmt.Fprintf(os.Stderr, "Error: %+v\n", err)
+				cmd.SilenceUsage = true
+				return err
+			}
+		}
+	}
 	// summarize outputs
 	if !flagLive {
 		multiSpinner.Finish()
@@ -746,54 +930,67 @@ func runCmd(cmd *cobra.Command, args []string) error {
 				continue
 			}
 			myTarget := targetContexts[i].target
-			// csv summary
-			out, err := Summarize(localOutputDir+"/"+myTarget.GetName()+"_"+"metrics.csv", false, ctx.metadata)
+			summaryFiles, err := summarizeMetrics(localOutputDir, myTarget.GetName(), ctx.metadata)
 			if err != nil {
-				err = fmt.Errorf("failed to summarize output: %w", err)
+				err = fmt.Errorf("failed to summarize metrics: %w", err)
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				slog.Error(err.Error())
 				cmd.SilenceUsage = true
 				return err
 			}
-			if err = os.WriteFile(localOutputDir+"/"+myTarget.GetName()+"_"+"metrics_summary.csv", []byte(out), 0644); err != nil {
-				err = fmt.Errorf("failed to write summary to file: %w", err)
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				slog.Error(err.Error())
-				cmd.SilenceUsage = true
-				return err
-			}
-			targetContexts[i].printedFiles = append(targetContexts[i].printedFiles, localOutputDir+"/"+myTarget.GetName()+"_"+"metrics_summary.csv")
-			// html summary
-			htmlSummary := (flagScope == scopeSystem || flagScope == scopeProcess) && flagGranularity == granularitySystem
-			if htmlSummary {
-				out, err = Summarize(localOutputDir+"/"+myTarget.GetName()+"_"+"metrics.csv", true, ctx.metadata)
-				if err != nil {
-					err = fmt.Errorf("failed to summarize output as HTML: %w", err)
-					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-					slog.Error(err.Error())
-					cmd.SilenceUsage = true
-					return err
-				}
-				if err = os.WriteFile(localOutputDir+"/"+myTarget.GetName()+"_"+"metrics_summary.html", []byte(out), 0644); err != nil {
-					err = fmt.Errorf("failed to write HTML summary to file: %w", err)
-					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-					slog.Error(err.Error())
-					cmd.SilenceUsage = true
-					return err
-				}
-				targetContexts[i].printedFiles = append(targetContexts[i].printedFiles, localOutputDir+"/"+myTarget.GetName()+"_"+"metrics_summary.html")
-			}
+			targetContexts[i].printedFiles = append(targetContexts[i].printedFiles, summaryFiles...)
 		}
 		// print the names of the files that were created
-		fmt.Println()
-		fmt.Println("Metric files:")
-		for i := range targetContexts {
-			for _, file := range targetContexts[i].printedFiles {
-				fmt.Printf("  %s\n", file)
-			}
+		allFileNames := make([][]string, len(targetContexts))
+		for i, ctx := range targetContexts {
+			allFileNames[i] = ctx.printedFiles
 		}
+		printOutputFileNames(allFileNames)
 	}
 	return nil
+}
+
+func printOutputFileNames(allFileNames [][]string) {
+	fmt.Println()
+	fmt.Println("Metric files:")
+	for _, fileNames := range allFileNames {
+		for _, fileName := range fileNames {
+			fmt.Printf("  %s\n", fileName)
+		}
+	}
+}
+
+func summarizeMetrics(localOutputDir string, targetName string, metadata Metadata) ([]string, error) {
+	filesCreated := []string{}
+	csvMetricsFile := localOutputDir + "/" + targetName + "_" + "metrics.csv"
+	// csv summary
+	out, err := Summarize(csvMetricsFile, false, metadata)
+	if err != nil {
+		err = fmt.Errorf("failed to summarize output: %w", err)
+		return filesCreated, err
+	}
+	csvSummaryFile := localOutputDir + "/" + targetName + "_" + "metrics_summary.csv"
+	if err = os.WriteFile(csvSummaryFile, []byte(out), 0644); err != nil {
+		err = fmt.Errorf("failed to write summary to file: %w", err)
+		return filesCreated, err
+	}
+	filesCreated = append(filesCreated, csvSummaryFile)
+	// html summary
+	htmlSummary := (flagScope == scopeSystem || flagScope == scopeProcess) && flagGranularity == granularitySystem
+	if htmlSummary {
+		out, err = Summarize(csvMetricsFile, true, metadata)
+		if err != nil {
+			err = fmt.Errorf("failed to summarize output as HTML: %w", err)
+			return filesCreated, err
+		}
+		htmlSummaryFile := localOutputDir + "/" + targetName + "_" + "metrics_summary.html"
+		if err = os.WriteFile(htmlSummaryFile, []byte(out), 0644); err != nil {
+			err = fmt.Errorf("failed to write HTML summary to file: %w", err)
+			return filesCreated, err
+		}
+		filesCreated = append(filesCreated, htmlSummaryFile)
+	}
+	return filesCreated, nil
 }
 
 func prepareTarget(targetContext *targetContext, targetTempRoot string, localTempDir string, localPerfPath string, channelError chan targetError, statusUpdate progress.MultiSpinnerUpdateFunc) {
@@ -942,21 +1139,25 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 	errorChannel := make(chan error)
 	frameChannel := make(chan []MetricFrame)
 	printCompleteChannel := make(chan []string)
-	totalRuntimeSeconds := 0 // only relevant in process scope
-	go printMetrics(frameChannel, myTarget.GetName(), localOutputDir, printCompleteChannel)
+	totalPerfRuntimeSeconds := 0 // only relevant in process scope
+	// get current time for use in setting timestamps on output
+	targetContext.metadata.CollectionStartTime = time.Now() // save the start time in the metadata for use when using the --input option to process raw data
+	go printMetricsAsync(targetContext, localOutputDir, frameChannel, printCompleteChannel)
 	var err error
 	for {
-		// get current time for use in setting timestamps on output
-		gCollectionStartTime = time.Now()
 		var perfCommand *exec.Cmd
 		var processes []Process
+		var tempErr error
 		// get the perf command
-		if processes, perfCommand, err = getPerfCommand(myTarget, targetContext.perfPath, targetContext.groupDefinitions, localTempDir); err != nil {
-			err = fmt.Errorf("failed to get perf command: %w", err)
-			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
+		if processes, perfCommand, tempErr = getPerfCommand(myTarget, targetContext.perfPath, targetContext.groupDefinitions, localTempDir); tempErr != nil {
+			if !getSignalReceived() {
+				err = fmt.Errorf("failed to get perf command: %w", tempErr)
+				_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
+			}
 			break
 		}
-		beginTimestamp := time.Now()
+		// this timestamp is used to determine if we need to exit the loop, i.e., we've run long enough
+		targetContext.perfStartTime = time.Now()
 		go runPerf(myTarget, flagNoRoot, processes, perfCommand, targetContext.groupDefinitions, targetContext.metricDefinitions, targetContext.metadata, localTempDir, localOutputDir, frameChannel, errorChannel)
 		// wait for runPerf to finish
 		perfErr := <-errorChannel // capture and return all errors
@@ -968,9 +1169,9 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 			break
 		}
 		// no perf errors, continue
-		endTimestamp := time.Now()
-		totalRuntimeSeconds += int(endTimestamp.Sub(beginTimestamp).Seconds())
-		if !refresh || (flagDuration != 0 && totalRuntimeSeconds >= flagDuration) {
+		perfEndTime := time.Now()
+		totalPerfRuntimeSeconds += int(perfEndTime.Sub(targetContext.perfStartTime).Seconds())
+		if !refresh || (flagDuration != 0 && totalPerfRuntimeSeconds >= flagDuration) {
 			break
 		}
 	}
@@ -986,43 +1187,53 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 	channelError <- targetError{target: myTarget, err: nil}
 }
 
-// printMetrics receives metric frames over the provided channel and prints them to file and stdout in the requested format.
+func printMetrics(metricFrames []MetricFrame, frameCount int, targetName string, collectionStartTime time.Time, outputDir string) (printedFiles []string) {
+	fileName, err := printMetricsTxt(metricFrames, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatTxt, !flagLive && util.StringInList(formatTxt, flagOutputFormat), outputDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		slog.Error(err.Error())
+	} else if fileName != "" {
+		printedFiles = util.UniqueAppend(printedFiles, fileName)
+	}
+	fileName, err = printMetricsJSON(metricFrames, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatJSON, !flagLive && util.StringInList(formatJSON, flagOutputFormat), outputDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		slog.Error(err.Error())
+	} else if fileName != "" {
+		printedFiles = util.UniqueAppend(printedFiles, fileName)
+	}
+	// csv is always written to file unless no files are requested -- we need it to create the summary reports
+	fileName, err = printMetricsCSV(metricFrames, frameCount, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatCSV, !flagLive, outputDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		slog.Error(err.Error())
+	} else if fileName != "" {
+		printedFiles = util.UniqueAppend(printedFiles, fileName)
+	}
+	fileName, err = printMetricsWide(metricFrames, frameCount, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatWide, !flagLive && util.StringInList(formatWide, flagOutputFormat), outputDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		slog.Error(err.Error())
+	} else if fileName != "" {
+		printedFiles = util.UniqueAppend(printedFiles, fileName)
+	}
+	return printedFiles
+}
+
+// printMetricsAsync receives metric frames over the provided channel and prints them to file and stdout in the requested format.
 // It exits when the channel is closed.
-func printMetrics(frameChannel chan []MetricFrame, targetName string, outputDir string, doneChannel chan []string) {
-	var printedFiles []string
+func printMetricsAsync(targetContext *targetContext, outputDir string, frameChannel chan []MetricFrame, doneChannel chan []string) {
+	var allPrintedFiles []string
+	frameCount := 1
 	// block until next set of metric frames arrives, will exit loop when channel is closed
 	for metricFrames := range frameChannel {
-		fileName, err := printMetricsTxt(metricFrames, targetName, flagLive && flagOutputFormat[0] == formatTxt, !flagLive && util.StringInList(formatTxt, flagOutputFormat), outputDir)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			slog.Error(err.Error())
-		} else if fileName != "" {
-			printedFiles = util.UniqueAppend(printedFiles, fileName)
+		printedFiles := printMetrics(metricFrames, frameCount, targetContext.target.GetName(), targetContext.perfStartTime, outputDir)
+		for _, file := range printedFiles {
+			allPrintedFiles = util.UniqueAppend(allPrintedFiles, file)
 		}
-		fileName, err = printMetricsJSON(metricFrames, targetName, flagLive && flagOutputFormat[0] == formatJSON, !flagLive && util.StringInList(formatJSON, flagOutputFormat), outputDir)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			slog.Error(err.Error())
-		} else if fileName != "" {
-			printedFiles = util.UniqueAppend(printedFiles, fileName)
-		}
-		// csv is always written to file unless no files are requested -- we need it to create the summary reports
-		fileName, err = printMetricsCSV(metricFrames, targetName, flagLive && flagOutputFormat[0] == formatCSV, !flagLive, outputDir)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			slog.Error(err.Error())
-		} else if fileName != "" {
-			printedFiles = util.UniqueAppend(printedFiles, fileName)
-		}
-		fileName, err = printMetricsWide(metricFrames, targetName, flagLive && flagOutputFormat[0] == formatWide, !flagLive && util.StringInList(formatWide, flagOutputFormat), outputDir)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			slog.Error(err.Error())
-		} else if fileName != "" {
-			printedFiles = util.UniqueAppend(printedFiles, fileName)
-		}
+		frameCount += len(metricFrames)
 	}
-	doneChannel <- printedFiles
+	doneChannel <- allPrintedFiles
 }
 
 // extractPerf extracts the perf binary from the resources to the local temporary directory.
@@ -1229,7 +1440,6 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 	// The first duration needs to be longer than the time it takes for perf to print its first line of output.
 	t1 := time.NewTimer(time.Duration(2 * flagPerfPrintInterval * 1000))
 	var frameTimestamp float64
-	frameCount := 0
 	stopAnonymousFuncChannel := make(chan bool)
 	go func() {
 		stop := false
@@ -1246,10 +1456,6 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 					slog.Warn(err.Error())
 					outputLines = [][]byte{} // empty it
 					continue
-				}
-				for i := range metricFrames {
-					frameCount += 1
-					metricFrames[i].FrameCount = frameCount
 				}
 				// send the metrics frames out to be printed
 				frameChannel <- metricFrames

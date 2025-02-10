@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-func printMetricsJSON(metricFrames []MetricFrame, targetName string, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
+func printMetricsJSON(metricFrames []MetricFrame, targetName string, collectionStartTime time.Time, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
 	if !printToStdout && !printToFile {
 		return
 	}
@@ -22,6 +22,7 @@ func printMetricsJSON(metricFrames []MetricFrame, targetName string, printToStdo
 		// can't Marshal NaN or Inf values in JSON, so no need to set them to a specific value
 		filteredMetricFrame := metricFrame
 		filteredMetricFrame.Metrics = make([]Metric, 0, len(metricFrame.Metrics))
+		filteredMetricFrame.Timestamp = float64(collectionStartTime.Unix() + int64(metricFrame.Timestamp))
 		for _, metric := range metricFrame.Metrics {
 			if math.IsNaN(metric.Value) || math.IsInf(metric.Value, 0) {
 				filteredMetricFrame.Metrics = append(filteredMetricFrame.Metrics, Metric{Name: metric.Name, Value: -1})
@@ -54,7 +55,7 @@ func printMetricsJSON(metricFrames []MetricFrame, targetName string, printToStdo
 	return
 }
 
-func printMetricsCSV(metricFrames []MetricFrame, targetName string, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
+func printMetricsCSV(metricFrames []MetricFrame, frameCount int, targetName string, collectionStartTime time.Time, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
 	if !printToStdout && !printToFile {
 		return
 	}
@@ -68,8 +69,8 @@ func printMetricsCSV(metricFrames []MetricFrame, targetName string, printToStdou
 		}
 		defer file.Close()
 	}
-	for _, metricFrame := range metricFrames {
-		if metricFrame.FrameCount == 1 {
+	for idx, metricFrame := range metricFrames {
+		if idx == 0 && frameCount == 1 {
 			contextHeaders := "TS,SKT,CPU,CID,"
 			if printToStdout {
 				fmt.Print(contextHeaders)
@@ -95,7 +96,7 @@ func printMetricsCSV(metricFrames []MetricFrame, targetName string, printToStdou
 				}
 			}
 		}
-		metricContext := fmt.Sprintf("%d,%s,%s,%s,", gCollectionStartTime.Unix()+int64(metricFrame.Timestamp), metricFrame.Socket, metricFrame.CPU, metricFrame.Cgroup)
+		metricContext := fmt.Sprintf("%d,%s,%s,%s,", collectionStartTime.Unix()+int64(metricFrame.Timestamp), metricFrame.Socket, metricFrame.CPU, metricFrame.Cgroup)
 		values := make([]string, 0, len(metricFrame.Metrics))
 		for _, metric := range metricFrame.Metrics {
 			values = append(values, strconv.FormatFloat(metric.Value, 'g', 8, 64))
@@ -115,7 +116,7 @@ func printMetricsCSV(metricFrames []MetricFrame, targetName string, printToStdou
 	return
 }
 
-func printMetricsWide(metricFrames []MetricFrame, targetName string, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
+func printMetricsWide(metricFrames []MetricFrame, frameCount int, targetName string, collectionStartTime time.Time, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
 	if !printToStdout && !printToFile {
 		return
 	}
@@ -129,7 +130,7 @@ func printMetricsWide(metricFrames []MetricFrame, targetName string, printToStdo
 		}
 		defer file.Close()
 	}
-	for _, metricFrame := range metricFrames {
+	for idx, metricFrame := range metricFrames {
 		var names []string
 		var values []float64
 		for _, metric := range metricFrame.Metrics {
@@ -138,7 +139,7 @@ func printMetricsWide(metricFrames []MetricFrame, targetName string, printToStdo
 		}
 		minColWidth := 6
 		colSpacing := 3
-		if metricFrame.FrameCount == 1 { // print headers
+		if idx == 0 && frameCount == 1 { // print headers
 			header := "Timestamp    " // 10 + 3
 			if metricFrame.PID != "" {
 				header += "PID       "         // 7 + 3
@@ -170,7 +171,7 @@ func printMetricsWide(metricFrames []MetricFrame, targetName string, printToStdo
 		}
 		// handle values
 		TimestampColWidth := 10
-		formattedTimestamp := fmt.Sprintf("%d", gCollectionStartTime.Unix()+int64(metricFrame.Timestamp))
+		formattedTimestamp := fmt.Sprintf("%d", collectionStartTime.Unix()+int64(metricFrame.Timestamp))
 		row := fmt.Sprintf("%s%*s%*s", formattedTimestamp, TimestampColWidth-len(formattedTimestamp), "", colSpacing, "")
 		if metricFrame.PID != "" {
 			PIDColWidth := 7
@@ -214,14 +215,14 @@ func printMetricsWide(metricFrames []MetricFrame, targetName string, printToStdo
 	return
 }
 
-func printMetricsTxt(metricFrames []MetricFrame, targetName string, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
+func printMetricsTxt(metricFrames []MetricFrame, targetName string, collectionStartTime time.Time, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
 	if !printToStdout && !printToFile {
 		return
 	}
 	var outputLines []string
 	if len(metricFrames) > 0 && metricFrames[0].Socket != "" {
 		outputLines = append(outputLines, "--------------------------------------------------------------------------------------")
-		outputLines = append(outputLines, fmt.Sprintf("- Metrics captured at %s", gCollectionStartTime.Add(time.Second*time.Duration(int(metricFrames[0].Timestamp))).UTC()))
+		outputLines = append(outputLines, fmt.Sprintf("- Metrics captured at %s", collectionStartTime.Add(time.Second*time.Duration(int(metricFrames[0].Timestamp))).UTC()))
 		outputLines = append(outputLines, "--------------------------------------------------------------------------------------")
 		line := fmt.Sprintf("%-70s ", "metric")
 		for i := range len(metricFrames) {
@@ -243,7 +244,7 @@ func printMetricsTxt(metricFrames []MetricFrame, targetName string, printToStdou
 	} else {
 		for _, metricFrame := range metricFrames {
 			outputLines = append(outputLines, "--------------------------------------------------------------------------------------")
-			outputLines = append(outputLines, fmt.Sprintf("- Metrics captured at %s", gCollectionStartTime.Add(time.Second*time.Duration(int(metricFrame.Timestamp))).UTC()))
+			outputLines = append(outputLines, fmt.Sprintf("- Metrics captured at %s", collectionStartTime.Add(time.Second*time.Duration(int(metricFrame.Timestamp))).UTC()))
 			if metricFrame.PID != "" {
 				outputLines = append(outputLines, fmt.Sprintf("- PID: %s", metricFrame.PID))
 				outputLines = append(outputLines, fmt.Sprintf("- CMD: %s", metricFrame.Cmd))
