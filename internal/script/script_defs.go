@@ -21,6 +21,7 @@ type ScriptDefinition struct {
 	Depends       []string // binary dependencies that must be available for the script to run
 	Superuser     bool     // requires sudo or root
 	Sequential    bool     // run script sequentially (not at the same time as others)
+	NeedsKill     bool     // process/script needs to be killed after run without a duration specified, i.e., it doesn't stop through SIGINT
 }
 
 const (
@@ -902,11 +903,17 @@ rm -rf $test_dir`, params.StorageDir)
 					countInt := params.Duration / params.Interval
 					count = strconv.Itoa(countInt)
 				}
-				return fmt.Sprintf(`mpstat -u -T -I SCPU -P ALL %d %s`, params.Interval, count)
+				script := fmt.Sprintf(`mpstat -u -T -I SCPU -P ALL %d %s`, params.Interval, count)
+				script += " &"                      // run it in the background
+				script += "\necho $! > {cmd_pid}\n" // this is used to kill the command
+				script += "wait\n"                  // wait for the command to finish
+				return script
+
 			}(),
 			Superuser: true,
 			Lkms:      []string{},
 			Depends:   []string{"mpstat"},
+			NeedsKill: true,
 		},
 		{
 			Name: IostatScriptName,
@@ -916,11 +923,16 @@ rm -rf $test_dir`, params.StorageDir)
 					countInt := params.Duration / params.Interval
 					count = strconv.Itoa(countInt)
 				}
-				return fmt.Sprintf(`S_TIME_FORMAT=ISO iostat -d -t %d %s | sed '/^loop/d'`, params.Interval, count)
+				script := fmt.Sprintf(`S_TIME_FORMAT=ISO iostat -d -t %d %s | sed '/^loop/d'`, params.Interval, count)
+				script += " &"                      // run it in the background
+				script += "\necho $! > {cmd_pid}\n" // this is used to kill the command
+				script += "wait\n"                  // wait for the command to finish
+				return script
 			}(),
 			Superuser: true,
 			Lkms:      []string{},
 			Depends:   []string{"iostat"},
+			NeedsKill: true,
 		},
 		{
 			Name: SarMemoryScriptName,
@@ -930,11 +942,16 @@ rm -rf $test_dir`, params.StorageDir)
 					countInt := params.Duration / params.Interval
 					count = strconv.Itoa(countInt)
 				}
-				return fmt.Sprintf(`sar -r %d %s`, params.Interval, count)
+				script := fmt.Sprintf(`sar -r %d %s`, params.Interval, count)
+				script += " &"                      // run it in the background
+				script += "\necho $! > {cmd_pid}\n" // this is used to kill the command
+				script += "wait\n"                  // wait for the command to finish
+				return script
 			}(),
 			Superuser: true,
 			Lkms:      []string{},
 			Depends:   []string{"sar", "sadc"},
+			NeedsKill: true,
 		},
 		{
 			Name: SarNetworkScriptName,
@@ -944,11 +961,16 @@ rm -rf $test_dir`, params.StorageDir)
 					countInt := params.Duration / params.Interval
 					count = strconv.Itoa(countInt)
 				}
-				return fmt.Sprintf(`sar -n DEV %d %s`, params.Interval, count)
+				script := fmt.Sprintf(`sar -n DEV %d %s`, params.Interval, count)
+				script += " &"                      // run it in the background
+				script += "\necho $! > {cmd_pid}\n" // this is used to kill the command
+				script += "wait\n"                  // wait for the command to finish
+				return script
 			}(),
 			Superuser: true,
 			Lkms:      []string{},
 			Depends:   []string{"sar", "sadc"},
+			NeedsKill: true,
 		},
 		{
 			Name: TurbostatScriptName,
@@ -958,11 +980,50 @@ rm -rf $test_dir`, params.StorageDir)
 					countInt := params.Duration / params.Interval
 					count = "-n " + strconv.Itoa(countInt)
 				}
-				return fmt.Sprintf(`turbostat -S -s PkgWatt,RAMWatt -q -i %d %s`, params.Interval, count) + ` | awk '{ print strftime("%H:%M:%S"), $0 }'`
+				script := fmt.Sprintf(`turbostat -S -s PkgWatt,RAMWatt -q -i %d %s`, params.Interval, count) + ` | awk '{ print strftime("%H:%M:%S"), $0 }'`
+				script += " &"                      // run it in the background
+				script += "\necho $! > {cmd_pid}\n" // this is used to kill the command
+				script += "wait\n"                  // wait for the command to finish
+				return script
 			}(),
 			Superuser: true,
 			Lkms:      []string{"msr"},
 			Depends:   []string{"turbostat"},
+			NeedsKill: true,
+		},
+		{
+			Name: InstructionMixScriptName,
+			Script: func() string {
+				script := fmt.Sprintf("echo TIME: $(date +\"%%H:%%M:%%S\")\necho INTERVAL: %d\n", params.Interval)
+				commandParts := []string{
+					"processwatch -c",
+				}
+				// if no PID specified, increase the sampling interval (defaults to 100,000) to reduce overhead
+				if params.PID == 0 {
+					commandParts = append(commandParts, fmt.Sprintf("-s %d", 1000000))
+				} else {
+					commandParts = append(commandParts, fmt.Sprintf("-p %d", params.PID))
+				}
+				for _, cat := range params.Filter {
+					commandParts = append(commandParts, fmt.Sprintf("-f %s", cat))
+				}
+				if params.Duration != 0 && params.Interval != 0 {
+					count := params.Duration / params.Interval
+					commandParts = append(commandParts, fmt.Sprintf("-n %d", count))
+				}
+				if params.Interval != 0 {
+					commandParts = append(commandParts, fmt.Sprintf("-i %d", params.Interval))
+				}
+				script += strings.Join(commandParts, " ")
+				script += " &"                      // run it in the background
+				script += "\necho $! > {cmd_pid}\n" // this is used to kill the command
+				script += "wait\n"                  // wait for the command to finish
+				return script
+			}(),
+			Superuser: true,
+			Lkms:      []string{"msr"},
+			Depends:   []string{"processwatch"},
+			NeedsKill: true,
 		},
 
 		// flamegraph scripts
@@ -1097,35 +1158,6 @@ fi
 			}(),
 			Superuser: true,
 			Depends:   []string{"perf"},
-		},
-		{
-			Name: InstructionMixScriptName,
-			Script: func() string {
-				script := fmt.Sprintf("echo TIME: $(date +\"%%H:%%M:%%S\")\necho INTERVAL: %d\n", params.Interval)
-				scriptParts := []string{
-					"processwatch -c",
-				}
-				// if no PID specified, increase the sampling interval (defaults to 100,000) to reduce overhead
-				if params.PID == 0 {
-					scriptParts = append(scriptParts, fmt.Sprintf("-s %d", 1000000))
-				} else {
-					scriptParts = append(scriptParts, fmt.Sprintf("-p %d", params.PID))
-				}
-				for _, cat := range params.Filter {
-					scriptParts = append(scriptParts, fmt.Sprintf("-f %s", cat))
-				}
-				if params.Duration != 0 && params.Interval != 0 {
-					count := params.Duration / params.Interval
-					scriptParts = append(scriptParts, fmt.Sprintf("-n %d", count))
-				}
-				if params.Interval != 0 {
-					scriptParts = append(scriptParts, fmt.Sprintf("-i %d", params.Interval))
-				}
-				return script + strings.Join(scriptParts, " ")
-			}(),
-			Superuser: true,
-			Lkms:      []string{"msr"},
-			Depends:   []string{"processwatch"},
 		},
 	}
 
