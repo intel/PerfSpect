@@ -263,9 +263,15 @@
 
       const base_line = {
         xAxis: {
+          type: "category",
+          data: TIMESTAMPS,
           name: "time (s)",
           min: "dataMin",
           max: "dataMax",
+          boundaryGap: false, // ensure the chart starts at the first data point
+          axisLabel: {
+            rotate: 45,
+          }
         },
         yAxis: {},
         tooltip: {

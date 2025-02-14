@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"perfspect/internal/util"
 )
@@ -320,23 +321,30 @@ func (m *metricsFromCSV) getHTML(metadata Metadata) (html string, err error) {
 		{"PKGPOWER", []string{"package power (watts)", "package power (watts)"}},
 		{"DRAMPOWER", []string{"DRAM power (watts)", ""}},
 	}
-	for _, tmpl := range templateReplace {
+	for tIdx, tmpl := range templateReplace {
+		var timeStamps []string
 		var series [][]float64
-		var firstTimestamp float64
 		for rIdx, row := range m.rows {
-			if rIdx == 0 {
-				firstTimestamp = row.timestamp
-			}
 			if math.IsNaN(row.metrics[tmpl.metricNames[archIndex]]) || math.IsInf(row.metrics[tmpl.metricNames[archIndex]], 0) {
 				continue
 			}
-			series = append(series, []float64{row.timestamp - firstTimestamp, row.metrics[tmpl.metricNames[archIndex]]})
+			series = append(series, []float64{float64(rIdx), row.metrics[tmpl.metricNames[archIndex]]})
+			// format the UNIX timestamp as a local tz string
+			ts := time.Unix(int64(row.timestamp), 0).Format("15:04:05")
+			timeStamps = append(timeStamps, ts)
 		}
 		var seriesBytes []byte
 		if seriesBytes, err = json.Marshal(series); err != nil {
 			return
 		}
 		html = strings.Replace(html, tmpl.tmplVar, string(seriesBytes), -1)
+		if tIdx == 0 {
+			var timeStampsBytes []byte
+			if timeStampsBytes, err = json.Marshal(timeStamps); err != nil {
+				return
+			}
+			html = strings.Replace(html, "TIMESTAMPS", string(timeStampsBytes), -1)
+		}
 	}
 	// All Metrics Tab
 	var metricHTMLStats [][]string
