@@ -403,8 +403,10 @@ func collectOnTarget(cmd *cobra.Command, duration int, myTarget target.Target, s
 	}
 	// run the scripts on the target
 	status := "collecting data"
-	if duration > 0 {
-		status = fmt.Sprintf("%s, duration=%ds", status, duration)
+	if cmd.Name() == "telemetry" && duration == 0 { // telemetry is the only command that uses this common code that can run indefinitely
+		status += ", press Ctrl+c to stop"
+	} else if duration != 0 {
+		status += fmt.Sprintf(" for %d seconds", duration)
 	}
 	_ = statusUpdate(myTarget.GetName(), status)
 	scriptOutputs, err := script.RunScripts(myTarget, scriptsToRun, true, localTempDir)

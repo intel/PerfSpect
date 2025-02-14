@@ -163,7 +163,7 @@ func getFlagGroups() []common.FlagGroup {
 		},
 		{
 			Name: flagDurationName,
-			Help: "number of seconds to run the collection. If 0, the collection will run indefinitely. Ctrl-C to stop.",
+			Help: "number of seconds to run the collection. If 0, the collection will run indefinitely. Ctrl+c to stop.",
 		},
 		{
 			Name: flagIntervalName,
@@ -220,8 +220,21 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-	if flagDuration <= 0 {
-		err := fmt.Errorf("duration must be greater than 0")
+	if flagDuration < 0 {
+		err := fmt.Errorf("duration must be 0 or greater")
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return err
+	}
+	target, err := cmd.Flags().GetString("target")
+	if err != nil {
+		panic("failed to get target flag")
+	}
+	targets, err := cmd.Flags().GetString("targets")
+	if err != nil {
+		panic("failed to get targets flag")
+	}
+	if flagDuration == 0 && (target != "" || targets != "") {
+		err := fmt.Errorf("duration must be greater than 0 when collecting from a remote target")
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
 	}

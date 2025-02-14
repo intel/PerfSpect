@@ -283,11 +283,41 @@ func formMasterScript(myTarget target.Target, parallelScripts []ScriptDefinition
 	// in a variable named after the script
 	var masterScript strings.Builder
 	targetTempDirectory := myTarget.GetTempDirectory()
+
+	masterScript.WriteString("#!/bin/bash\n")
+
+	// set dir var and change working directory to dir in case any of the scripts write out temporary files
 	masterScript.WriteString(fmt.Sprintf("script_dir=%s\n", targetTempDirectory))
-	// change working directory to target temporary directory in case any of the scripts write out temporary files
 	masterScript.WriteString(fmt.Sprintf("cd %s\n", targetTempDirectory))
-	// the master script will run all parallel scripts in the background
-	masterScript.WriteString("\n# run all scripts in the background\n")
+
+	// function to print the output of each script
+	masterScript.WriteString("\nprint_output() {\n")
+	for _, script := range parallelScripts {
+		masterScript.WriteString("\techo \"<---------------------->\"\n")
+		masterScript.WriteString(fmt.Sprintf("\techo SCRIPT NAME: %s\n", script.Name))
+		masterScript.WriteString(fmt.Sprintf("\techo STDOUT:\n\tcat %s\n", path.Join("$script_dir", sanitizeScriptName(script.Name)+".stdout")))
+		masterScript.WriteString(fmt.Sprintf("\techo STDERR:\n\tcat %s\n", path.Join("$script_dir", sanitizeScriptName(script.Name)+".stderr")))
+		masterScript.WriteString(fmt.Sprintf("\techo EXIT CODE: $%s_exitcode\n", sanitizeScriptName(script.Name)))
+	}
+	masterScript.WriteString("}\n")
+
+	// function to handle SIGINT
+	masterScript.WriteString("\nhandle_sigint() {\n")
+	for _, script := range parallelScripts {
+		masterScript.WriteString(fmt.Sprintf("\tkill -SIGINT $%s_pid\n", sanitizeScriptName(script.Name)))
+		if script.NeedsKill {
+			masterScript.WriteString(fmt.Sprintf("\tkill -SIGKILL $(cat %s_cmd.pid)\n", sanitizeScriptName(script.Name)))
+		}
+	}
+	masterScript.WriteString("\tprint_output\n")
+	masterScript.WriteString("\texit 0\n")
+	masterScript.WriteString("}\n")
+
+	// call handle_sigint func when SIGINT is received
+	masterScript.WriteString("\ntrap handle_sigint SIGINT\n")
+
+	// run all parallel scripts in the background
+	masterScript.WriteString("\n")
 	needsElevatedPrivileges := false
 	for _, script := range parallelScripts {
 		if script.Superuser {
@@ -302,21 +332,15 @@ func formMasterScript(myTarget target.Target, parallelScripts []ScriptDefinition
 		)
 		masterScript.WriteString(fmt.Sprintf("%s_pid=$!\n", sanitizeScriptName(script.Name)))
 	}
-	// the master script will wait for all parallel scripts to finish
-	masterScript.WriteString("\n# wait for all scripts to finish\n")
+
+	// wait for all parallel scripts to finish then print their output
+	masterScript.WriteString("\n")
 	for _, script := range parallelScripts {
 		masterScript.WriteString(fmt.Sprintf("wait \"$%s_pid\"\n", sanitizeScriptName(script.Name)))
 		masterScript.WriteString(fmt.Sprintf("%s_exitcode=$?\n", sanitizeScriptName(script.Name)))
 	}
-	// the master script will print the output of each script
-	masterScript.WriteString("\n# print output of each script\n")
-	for _, script := range parallelScripts {
-		masterScript.WriteString("echo \"<---------------------->\"\n")
-		masterScript.WriteString(fmt.Sprintf("echo SCRIPT NAME: %s\n", script.Name))
-		masterScript.WriteString(fmt.Sprintf("echo STDOUT:\ncat %s\n", path.Join("$script_dir", sanitizeScriptName(script.Name)+".stdout")))
-		masterScript.WriteString(fmt.Sprintf("echo STDERR:\ncat %s\n", path.Join("$script_dir", sanitizeScriptName(script.Name)+".stderr")))
-		masterScript.WriteString(fmt.Sprintf("echo EXIT CODE: $%s_exitcode\n", sanitizeScriptName(script.Name)))
-	}
+	masterScript.WriteString("\nprint_output\n")
+
 	return masterScript.String(), needsElevatedPrivileges
 }
 
@@ -421,6 +445,8 @@ func prepareTargetToRunScripts(myTarget target.Target, scripts []ScriptDefinitio
 				dependenciesToCopy[path.Join(targetArchitecture, dependency)] = 1
 			}
 		}
+		// replace any placeholders in the script with the actual values
+		script.Script = strings.ReplaceAll(script.Script, "{cmd_pid}", sanitizeScriptName(script.Name)+"_cmd.pid")
 		// add user's path to script
 		scriptWithPath := fmt.Sprintf("export PATH=\"%s\"\n%s", userPath, script.Script)
 		if script.Name == "" {
