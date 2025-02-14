@@ -229,7 +229,11 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		panic("failed to get target flag")
 	}
-	if flagDuration == 0 && target != "" {
+	targets, err := cmd.Flags().GetString("targets")
+	if err != nil {
+		panic("failed to get targets flag")
+	}
+	if flagDuration == 0 && (target != "" || targets != "") {
 		err := fmt.Errorf("duration must be greater than 0 when collecting from a remote target")
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
