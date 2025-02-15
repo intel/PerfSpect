@@ -409,9 +409,9 @@ new Chart(document.getElementById('{{.ID}}'), {
 </script>
 `
 
-type scatterOrLineChartTemplateStruct struct {
+type chartTemplateStruct struct {
 	ID            string
-	Labels        string
+	Labels        string // only for line charts
 	Datasets      string
 	XaxisText     string
 	YaxisText     string
@@ -610,12 +610,63 @@ func dimmTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	return renderHTMLTable(socketTableHeaders, socketTableValues, "pure-table pure-table-bordered", [][]string{})
 }
 
+func renderChart(chartType string, allFormattedPoints []string, datasetNames []string, xAxisLabels []string, config chartTemplateStruct) string {
+	datasets := []string{}
+	for dataIdx, formattedPoints := range allFormattedPoints {
+		specValues := formattedPoints
+		dst := texttemplate.Must(texttemplate.New("datasetTemplate").Parse(datasetTemplate))
+		buf := new(bytes.Buffer)
+		err := dst.Execute(buf, struct {
+			Label string
+			Data  string
+			Color string
+		}{
+			Label: datasetNames[dataIdx],
+			Data:  specValues,
+			Color: getColor(dataIdx),
+		})
+		if err != nil {
+			slog.Error("error executing template", slog.String("error", err.Error()))
+			return "Error rendering chart."
+		}
+		datasets = append(datasets, buf.String())
+	}
+	var chartTemplate string
+	if chartType == "line" {
+		chartTemplate = lineChartTemplate
+	} else if chartType == "scatter" {
+		chartTemplate = scatterChartTemplate
+	} else {
+		panic("unknown chart type")
+	}
+	sct := texttemplate.Must(texttemplate.New("chartTemplate").Parse(chartTemplate))
+	buf := new(bytes.Buffer)
+	config.Datasets = strings.Join(datasets, ",")
+	if chartType == "line" {
+		config.Labels = func() string {
+			var labels []string
+			for _, label := range xAxisLabels {
+				labels = append(labels, fmt.Sprintf("'%s'", label))
+			}
+			return strings.Join(labels, ",")
+		}()
+	}
+	err := sct.Execute(buf, config)
+	if err != nil {
+		slog.Error("error executing template", slog.String("error", err.Error()))
+		return "Error rendering chart."
+	}
+	out := buf.String()
+	out += "\n"
+	return out
+}
+
 type scatterPoint struct {
 	x float64
 	y float64
 }
 
-func renderScatterChart(data [][]scatterPoint, datasetNames []string, config scatterOrLineChartTemplateStruct) string {
+func renderScatterChart(data [][]scatterPoint, datasetNames []string, config chartTemplateStruct) string {
 	allFormattedPoints := []string{}
 	for dataIdx := 0; dataIdx < len(data); dataIdx++ {
 		formattedPoints := []string{}
@@ -624,40 +675,10 @@ func renderScatterChart(data [][]scatterPoint, datasetNames []string, config sca
 		}
 		allFormattedPoints = append(allFormattedPoints, strings.Join(formattedPoints, ","))
 	}
-	datasets := []string{}
-	for dataIdx, formattedPoints := range allFormattedPoints {
-		specValues := formattedPoints
-		dst := texttemplate.Must(texttemplate.New("datasetTemplate").Parse(datasetTemplate))
-		buf := new(bytes.Buffer)
-		err := dst.Execute(buf, struct {
-			Label string
-			Data  string
-			Color string
-		}{
-			Label: datasetNames[dataIdx],
-			Data:  specValues,
-			Color: getColor(dataIdx),
-		})
-		if err != nil {
-			slog.Error("error executing template", slog.String("error", err.Error()))
-			return "Error rendering chart."
-		}
-		datasets = append(datasets, buf.String())
-	}
-	sct := texttemplate.Must(texttemplate.New("scatterChartTemplate").Parse(scatterChartTemplate))
-	buf := new(bytes.Buffer)
-	config.Datasets = strings.Join(datasets, ",")
-	err := sct.Execute(buf, config)
-	if err != nil {
-		slog.Error("error executing template", slog.String("error", err.Error()))
-		return "Error rendering chart."
-	}
-	out := buf.String()
-	out += "\n"
-	return out
+	return renderChart("scatter", allFormattedPoints, datasetNames, nil, config)
 }
 
-func renderLineChart(xAxisLabels []string, data [][]float64, datasetNames []string, config scatterOrLineChartTemplateStruct) string {
+func renderLineChart(xAxisLabels []string, data [][]float64, datasetNames []string, config chartTemplateStruct) string {
 	allFormattedPoints := []string{}
 	for dataIdx := 0; dataIdx < len(data); dataIdx++ {
 		formattedPoints := []string{}
@@ -666,44 +687,7 @@ func renderLineChart(xAxisLabels []string, data [][]float64, datasetNames []stri
 		}
 		allFormattedPoints = append(allFormattedPoints, strings.Join(formattedPoints, ","))
 	}
-	datasets := []string{}
-	for dataIdx, formattedPoints := range allFormattedPoints {
-		specValues := formattedPoints
-		dst := texttemplate.Must(texttemplate.New("datasetTemplate").Parse(datasetTemplate))
-		buf := new(bytes.Buffer)
-		err := dst.Execute(buf, struct {
-			Label string
-			Data  string
-			Color string
-		}{
-			Label: datasetNames[dataIdx],
-			Data:  specValues,
-			Color: getColor(dataIdx),
-		})
-		if err != nil {
-			slog.Error("error executing template", slog.String("error", err.Error()))
-			return "Error rendering chart."
-		}
-		datasets = append(datasets, buf.String())
-	}
-	sct := texttemplate.Must(texttemplate.New("lineChartTemplate").Parse(lineChartTemplate))
-	buf := new(bytes.Buffer)
-	config.Datasets = strings.Join(datasets, ",")
-	config.Labels = func() string {
-		var labels []string
-		for _, label := range xAxisLabels {
-			labels = append(labels, fmt.Sprintf("'%s'", label))
-		}
-		return strings.Join(labels, ",")
-	}()
-	err := sct.Execute(buf, config)
-	if err != nil {
-		slog.Error("error executing template", slog.String("error", err.Error()))
-		return "Error rendering chart."
-	}
-	out := buf.String()
-	out += "\n"
-	return out
+	return renderChart("line", allFormattedPoints, datasetNames, xAxisLabels, config)
 }
 
 func renderFrequencyTable(tableValues TableValues) (out string) {
@@ -743,7 +727,7 @@ func coreTurboFrequencyTableHTMLRenderer(tableValues TableValues, targetName str
 			datasetNames = append(datasetNames, field.Name)
 		}
 	}
-	chartConfig := scatterOrLineChartTemplateStruct{
+	chartConfig := chartTemplateStruct{
 		ID:            fmt.Sprintf("turboFrequency%d", rand.Intn(10000)),
 		XaxisText:     "Core Count",
 		YaxisText:     "Frequency (GHz)",
@@ -789,7 +773,7 @@ func memoryLatencyTableMultiTargetHtmlRenderer(allTableValues []TableValues, tar
 		data = append(data, points)
 		datasetNames = append(datasetNames, targetNames[targetIdx])
 	}
-	chartConfig := scatterOrLineChartTemplateStruct{
+	chartConfig := chartTemplateStruct{
 		ID:            fmt.Sprintf("latencyBandwidth%d", rand.Intn(10000)),
 		XaxisText:     "Bandwidth (MB/s)",
 		YaxisText:     "Latency (ns)",
@@ -809,6 +793,18 @@ func getColor(idx int) string {
 	return colors[idx%len(colors)]
 }
 
+func telemetryTableHTMLRenderer(tableValues TableValues, data [][]float64, datasetNames []string, chartConfig chartTemplateStruct) string {
+	tsFieldIdx := 0
+	var timestamps []string
+	for i := range tableValues.Fields[0].Values {
+		timestamp := tableValues.Fields[tsFieldIdx].Values[i]
+		if !util.StringInList(timestamp, timestamps) { // could be slow if list is long
+			timestamps = append(timestamps, timestamp)
+		}
+	}
+	return renderLineChart(timestamps, data, datasetNames, chartConfig)
+}
+
 func cpuUtilizationTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
@@ -816,8 +812,6 @@ func cpuUtilizationTableHTMLRenderer(tableValues TableValues, targetName string)
 	cpuBusyStats := make(map[int][]float64)
 	idleFieldIdx := len(tableValues.Fields) - 1
 	cpuFieldIdx := 1
-	tsFieldIdx := 0
-	var timestamps []string
 	for i := range tableValues.Fields[0].Values {
 		idle, err := strconv.ParseFloat(tableValues.Fields[idleFieldIdx].Values[i], 64)
 		if err != nil {
@@ -832,10 +826,6 @@ func cpuUtilizationTableHTMLRenderer(tableValues TableValues, targetName string)
 			cpuBusyStats[cpu] = []float64{}
 		}
 		cpuBusyStats[cpu] = append(cpuBusyStats[cpu], busy)
-		timestamp := tableValues.Fields[tsFieldIdx].Values[i]
-		if !util.StringInList(timestamp, timestamps) { // could be slow if list is long
-			timestamps = append(timestamps, timestamp)
-		}
 	}
 	// sort map keys by cpu number
 	var keys []int
@@ -850,8 +840,8 @@ func cpuUtilizationTableHTMLRenderer(tableValues TableValues, targetName string)
 			datasetNames = append(datasetNames, fmt.Sprintf("CPU %d", cpu))
 		}
 	}
-	chartConfig := scatterOrLineChartTemplateStruct{
-		ID:            fmt.Sprintf("cpuUtilization%d", rand.Intn(10000)),
+	chartConfig := chartTemplateStruct{
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.Intn(10000)),
 		XaxisText:     "Time",
 		YaxisText:     "% Utilization",
 		TitleText:     "",
@@ -861,20 +851,12 @@ func cpuUtilizationTableHTMLRenderer(tableValues TableValues, targetName string)
 		SuggestedMin:  "0",
 		SuggestedMax:  "100",
 	}
-	return renderLineChart(timestamps, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
 }
 
 func averageCPUUtilizationTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
-	tsFieldIdx := 0
-	var timestamps []string
-	for i := range tableValues.Fields[0].Values {
-		timestamp := tableValues.Fields[tsFieldIdx].Values[i]
-		if !util.StringInList(timestamp, timestamps) { // could be slow if list is long
-			timestamps = append(timestamps, timestamp)
-		}
-	}
 	for _, field := range tableValues.Fields[1:] {
 		points := []float64{}
 		for _, val := range field.Values {
@@ -893,8 +875,8 @@ func averageCPUUtilizationTableHTMLRenderer(tableValues TableValues, targetName 
 			datasetNames = append(datasetNames, field.Name)
 		}
 	}
-	chartConfig := scatterOrLineChartTemplateStruct{
-		ID:            fmt.Sprintf("avgCPUUtil%d", rand.Intn(10000)),
+	chartConfig := chartTemplateStruct{
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.Intn(10000)),
 		XaxisText:     "Time",
 		YaxisText:     "% Utilization",
 		TitleText:     "",
@@ -904,20 +886,12 @@ func averageCPUUtilizationTableHTMLRenderer(tableValues TableValues, targetName 
 		SuggestedMin:  "0",
 		SuggestedMax:  "100",
 	}
-	return renderLineChart(timestamps, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
 }
 
 func irqRateTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
-	tsFieldIdx := 0
-	var timestamps []string
-	for i := range tableValues.Fields[0].Values {
-		timestamp := tableValues.Fields[tsFieldIdx].Values[i]
-		if !util.StringInList(timestamp, timestamps) { // could be slow if list is long
-			timestamps = append(timestamps, timestamp)
-		}
-	}
 	for _, field := range tableValues.Fields[2:] { // 1 data set per field, e.g., %usr, %nice, etc., skip Time and CPU fields
 		datasetNames = append(datasetNames, field.Name)
 		// sum the values in the field per timestamp, store the sum as a point
@@ -941,8 +915,8 @@ func irqRateTableHTMLRenderer(tableValues TableValues, targetName string) string
 		// save the points in the data slice
 		data = append(data, points)
 	}
-	chartConfig := scatterOrLineChartTemplateStruct{
-		ID:            fmt.Sprintf("irqRate%d", rand.Intn(10000)),
+	chartConfig := chartTemplateStruct{
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.Intn(10000)),
 		XaxisText:     "Time",
 		YaxisText:     "IRQ/s",
 		TitleText:     "",
@@ -952,21 +926,13 @@ func irqRateTableHTMLRenderer(tableValues TableValues, targetName string) string
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	return renderLineChart(timestamps, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
 }
 
 // driveStatsTableHTMLRenderer renders charts of drive statistics
 // - one scatter chart per drive, showing the drive's utilization over time
 // - each drive stat is a separate dataset within the chart
 func driveStatsTableHTMLRenderer(tableValues TableValues, targetName string) string {
-	tsFieldIdx := 0
-	var timestamps []string
-	for i := range tableValues.Fields[0].Values {
-		timestamp := tableValues.Fields[tsFieldIdx].Values[i]
-		if !util.StringInList(timestamp, timestamps) { // could be slow if list is long
-			timestamps = append(timestamps, timestamp)
-		}
-	}
 	var out string
 	driveStats := make(map[string][][]string)
 	for i := 0; i < len(tableValues.Fields[0].Values); i++ {
@@ -1005,8 +971,8 @@ func driveStatsTableHTMLRenderer(tableValues TableValues, targetName string) str
 				datasetNames = append(datasetNames, tableValues.Fields[i+2].Name)
 			}
 		}
-		chartConfig := scatterOrLineChartTemplateStruct{
-			ID:            fmt.Sprintf("driveStats%d", rand.Intn(10000)),
+		chartConfig := chartTemplateStruct{
+			ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.Intn(10000)),
 			XaxisText:     "Time",
 			YaxisText:     "",
 			TitleText:     drive,
@@ -1016,7 +982,7 @@ func driveStatsTableHTMLRenderer(tableValues TableValues, targetName string) str
 			SuggestedMin:  "0",
 			SuggestedMax:  "0",
 		}
-		out += renderLineChart(timestamps, data, datasetNames, chartConfig)
+		out += telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
 	}
 	return out
 }
@@ -1025,14 +991,6 @@ func driveStatsTableHTMLRenderer(tableValues TableValues, targetName string) str
 // - one scatter chart per network device, showing the device's utilization over time
 // - each network stat is a separate dataset within the chart
 func networkStatsTableHTMLRenderer(tableValues TableValues, targetName string) string {
-	tsFieldIdx := 0
-	var timestamps []string
-	for i := range tableValues.Fields[0].Values {
-		timestamp := tableValues.Fields[tsFieldIdx].Values[i]
-		if !util.StringInList(timestamp, timestamps) { // could be slow if list is long
-			timestamps = append(timestamps, timestamp)
-		}
-	}
 	var out string
 	nicStats := make(map[string][][]string)
 	for i := 0; i < len(tableValues.Fields[0].Values); i++ {
@@ -1071,8 +1029,8 @@ func networkStatsTableHTMLRenderer(tableValues TableValues, targetName string) s
 				datasetNames = append(datasetNames, tableValues.Fields[i+2].Name)
 			}
 		}
-		chartConfig := scatterOrLineChartTemplateStruct{
-			ID:            fmt.Sprintf("nicStats%d", rand.Intn(10000)),
+		chartConfig := chartTemplateStruct{
+			ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.Intn(10000)),
 			XaxisText:     "Time",
 			YaxisText:     "",
 			TitleText:     nic,
@@ -1082,7 +1040,7 @@ func networkStatsTableHTMLRenderer(tableValues TableValues, targetName string) s
 			SuggestedMin:  "0",
 			SuggestedMax:  "0",
 		}
-		out += renderLineChart(timestamps, data, datasetNames, chartConfig)
+		out += telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
 	}
 	return out
 }
@@ -1090,14 +1048,6 @@ func networkStatsTableHTMLRenderer(tableValues TableValues, targetName string) s
 func memoryStatsTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
-	tsFieldIdx := 0
-	var timestamps []string
-	for i := range tableValues.Fields[0].Values {
-		timestamp := tableValues.Fields[tsFieldIdx].Values[i]
-		if !util.StringInList(timestamp, timestamps) { // could be slow if list is long
-			timestamps = append(timestamps, timestamp)
-		}
-	}
 	for _, field := range tableValues.Fields[1:] {
 		points := []float64{}
 		for _, val := range field.Values {
@@ -1116,8 +1066,8 @@ func memoryStatsTableHTMLRenderer(tableValues TableValues, targetName string) st
 			datasetNames = append(datasetNames, field.Name)
 		}
 	}
-	chartConfig := scatterOrLineChartTemplateStruct{
-		ID:            fmt.Sprintf("memoryStats%d", rand.Intn(10000)),
+	chartConfig := chartTemplateStruct{
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.Intn(10000)),
 		XaxisText:     "Time",
 		YaxisText:     "kilobytes",
 		TitleText:     "",
@@ -1127,20 +1077,12 @@ func memoryStatsTableHTMLRenderer(tableValues TableValues, targetName string) st
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	return renderLineChart(timestamps, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
 }
 
 func powerStatsTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
-	tsFieldIdx := 0
-	var timestamps []string
-	for i := range tableValues.Fields[0].Values {
-		timestamp := tableValues.Fields[tsFieldIdx].Values[i]
-		if !util.StringInList(timestamp, timestamps) { // could be slow if list is long
-			timestamps = append(timestamps, timestamp)
-		}
-	}
 	for _, field := range tableValues.Fields[1:] {
 		points := []float64{}
 		for _, val := range field.Values {
@@ -1159,8 +1101,8 @@ func powerStatsTableHTMLRenderer(tableValues TableValues, targetName string) str
 			datasetNames = append(datasetNames, field.Name)
 		}
 	}
-	chartConfig := scatterOrLineChartTemplateStruct{
-		ID:            fmt.Sprintf("powerStats%d", rand.Intn(10000)),
+	chartConfig := chartTemplateStruct{
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.Intn(10000)),
 		XaxisText:     "Time",
 		YaxisText:     "Watts",
 		TitleText:     "",
@@ -1170,18 +1112,10 @@ func powerStatsTableHTMLRenderer(tableValues TableValues, targetName string) str
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	return renderLineChart(timestamps, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
 }
 
 func instructionMixTableHTMLRenderer(tableValues TableValues, targetname string) string {
-	tsFieldIdx := 0
-	var timestamps []string
-	for i := range tableValues.Fields[0].Values {
-		timestamp := tableValues.Fields[tsFieldIdx].Values[i]
-		if !util.StringInList(timestamp, timestamps) { // could be slow if list is long
-			timestamps = append(timestamps, timestamp)
-		}
-	}
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -1202,8 +1136,8 @@ func instructionMixTableHTMLRenderer(tableValues TableValues, targetname string)
 			datasetNames = append(datasetNames, field.Name)
 		}
 	}
-	chartConfig := scatterOrLineChartTemplateStruct{
-		ID:            fmt.Sprintf("instrMix%d", rand.Intn(10000)),
+	chartConfig := chartTemplateStruct{
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.Intn(10000)),
 		XaxisText:     "Time",
 		YaxisText:     "% Samples",
 		TitleText:     "",
@@ -1213,7 +1147,7 @@ func instructionMixTableHTMLRenderer(tableValues TableValues, targetname string)
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	return renderLineChart(timestamps, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
 }
 
 func codePathFrequencyTableHTMLRenderer(tableValues TableValues, targetName string) string {
