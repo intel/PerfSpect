@@ -39,9 +39,7 @@
     },
     {
         "name": "metric_branch misprediction ratio",
-        "name-txn": "metric_branch mispredictions per txn",
         "expression": "[BR_MISP_RETIRED.ALL_BRANCHES] / [BR_INST_RETIRED.ALL_BRANCHES]",
-        "expression-txn": "[BR_MISP_RETIRED.ALL_BRANCHES] / [TXN]",
         "origin": "perfspect"
     },
     {
