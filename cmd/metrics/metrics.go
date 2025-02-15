@@ -1247,24 +1247,55 @@ func extractPerf(myTarget target.Target, localTempDir string) (string, error) {
 	return util.ExtractResource(script.Resources, path.Join("resources", arch, "perf"), localTempDir)
 }
 
-// getPerfPath returns the path to the perf binary, along with a temporary directory and any error encountered.
-// If the target is local, the function returns the local path to the perf binary.
-// If the target is remote, the function creates a temporary directory on the remote system, and pushes the perf binary to that directory.
-func getPerfPath(myTarget target.Target, localPerfPath string) (perfPath string, err error) {
+// getPerfPath determines the path to the `perf` binary for the given target.
+// If the target is a local target, it uses the provided localPerfPath.
+// If the target is remote, it checks if `perf` version 6.1 or later is available on the target.
+// If available, it uses the `perf` binary on the target.
+// If not available, it pushes the local `perf` binary to the target's temporary directory and uses that.
+//
+// Parameters:
+// - myTarget: The target system where the `perf` binary is needed.
+// - localPerfPath: The local path to the `perf` binary.
+//
+// Returns:
+// - perfPath: The path to the `perf` binary on the target.
+// - err: An error if any occurred during the process.
+func getPerfPath(myTarget target.Target, localPerfPath string) (string, error) {
+	var perfPath string
 	if _, ok := myTarget.(*target.LocalTarget); ok {
 		perfPath = localPerfPath
 	} else {
-		targetTempDir := myTarget.GetTempDirectory()
-		if targetTempDir == "" {
-			panic("targetTempDir is empty")
+		hasPerf := false
+		cmd := exec.Command("perf", "--version")
+		output, _, _, err := myTarget.RunCommand(cmd, 0, true)
+		if err == nil && strings.Contains(output, "perf version") {
+			// get the version number
+			version := strings.Split(strings.TrimSpace(output), " ")[2]
+			// split version into major and minor and build numbers
+			versionParts := strings.Split(version, ".")
+			if len(versionParts) >= 2 {
+				major, _ := strconv.Atoi(versionParts[0])
+				minor, _ := strconv.Atoi(versionParts[1])
+				if major > 6 || (major == 6 && minor >= 1) {
+					hasPerf = true
+				}
+			}
 		}
-		if err = myTarget.PushFile(localPerfPath, targetTempDir); err != nil {
-			slog.Error("failed to push perf binary to remote directory", slog.String("error", err.Error()))
-			return
+		if hasPerf {
+			perfPath = "perf"
+		} else {
+			targetTempDir := myTarget.GetTempDirectory()
+			if targetTempDir == "" {
+				panic("targetTempDir is empty")
+			}
+			if err = myTarget.PushFile(localPerfPath, targetTempDir); err != nil {
+				slog.Error("failed to push perf binary to remote directory", slog.String("error", err.Error()))
+				return "", err
+			}
+			perfPath = path.Join(targetTempDir, "perf")
 		}
-		perfPath = path.Join(targetTempDir, "perf")
 	}
-	return
+	return perfPath, nil
 }
 
 // getPerfCommandArgs returns the command arguments for the 'perf stat' command
