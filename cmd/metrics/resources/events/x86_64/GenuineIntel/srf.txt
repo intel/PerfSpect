@@ -1,5 +1,7 @@
 # SierraForest event list
 
+cpu/event=0xc4,umask=0x00,period=100003,name='BR_INST_RETIRED.ALL_BRANCHES'/,
+cpu/event=0xc5,umask=0x00,period=100003,name='BR_MISP_RETIRED.ALL_BRANCHES'/,
 cpu-cycles:k,
 ref-cycles:k,
 instructions:k;

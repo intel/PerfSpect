@@ -52,6 +52,8 @@ cpu-cycles,
 ref-cycles,
 instructions;
 
+cpu/event=0xc4,umask=0x00,period=100003,name='BR_INST_RETIRED.ALL_BRANCHES'/,
+cpu/event=0xc5,umask=0x00,period=100003,name='BR_MISP_RETIRED.ALL_BRANCHES'/,
 cpu/event=0xcf,umask=0x10,cmask=0x00,period=100003,name='FP_ARITH_INST_RETIRED2.512B_PACKED_HALF'/,
 cpu/event=0xcf,umask=0x08,cmask=0x00,period=100003,name='FP_ARITH_INST_RETIRED2.256B_PACKED_HALF'/,
 cpu/event=0xc7,umask=0x80,cmask=0x00,period=100003,name='FP_ARITH_INST_RETIRED.512B_PACKED_SINGLE'/,

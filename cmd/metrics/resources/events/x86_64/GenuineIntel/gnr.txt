@@ -23,6 +23,8 @@ cpu-cycles,
 ref-cycles,
 instructions;
 
+cpu/event=0xc4,umask=0x00,period=100003,name='BR_INST_RETIRED.ALL_BRANCHES'/,
+cpu/event=0xc5,umask=0x00,period=100003,name='BR_MISP_RETIRED.ALL_BRANCHES'/,
 cpu/event=0x12,umask=0x0e,period=100003,name='DTLB_LOAD_MISSES.WALK_COMPLETED'/,
 cpu/event=0x12,umask=0x04,period=100003,name='DTLB_LOAD_MISSES.WALK_COMPLETED_2M_4M'/,
 cpu/event=0x13,umask=0x0e,period=100003,name='DTLB_STORE_MISSES.WALK_COMPLETED'/,
