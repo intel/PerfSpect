@@ -200,6 +200,8 @@ $ ./perfspect report --benchmark speed,memory --targets targets.yaml
 ...
 </pre>
 ## Building PerfSpect from Source
+> [!TIP]
+> Skip the build. Pre-built PerfSpect releases are available in the repository's [Releases](https://github.com/intel/PerfSpect/releases). Simply download and extract perfspect.tgz.
 ### 1st Build
 `builder/build.sh` builds the dependencies and the app in Docker containers that provide the required build environments. Assumes you have Docker installed on your development system.
 
