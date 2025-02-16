@@ -18,8 +18,10 @@ cd perfspect
 ```
 ## Running PerfSpect
 PerfSpect includes a suite of commands designed to analyze and optimize both system and software performance.
-
-Run `perfspect -h` for top level help. Note the available commands and options.
+<pre>
+Usage:
+  perfspect [command] [flags]
+</pre>
 
 ### Commands
 | Command | Description |
@@ -31,7 +33,8 @@ Run `perfspect -h` for top level help. Note the available commands and options.
 | [`config`](#config-command) | Modify system configuration |
 | [`lock`](#lock-command) | Collect system wide hot spot, c2c and lock contention information |
 
-Each command has additional help text that can be viewed by running `perfspect <command> -h`.
+> [!TIP]
+> Run `perfspect [command] -h` to view command-specific help text.
 
 #### Metrics Command
 The `metrics` command reports CPU architectural performance characterization metrics.
@@ -91,7 +94,7 @@ Report files:
   /home/myuser/dev/perfspect/perfspect_2024-09-03_17-47-55/emr.txt
 </pre>
 ###### Report Benchmarks
-To assist in evaluating the health of target systems, the `report` command can run a series of micro-benchmarks by applying the `--benchmark` flag, e.g., `perfspect report --benchmark all` The results will be reported along with the target's configuration details. 
+To assist in evaluating the health of target systems, the `report` command can run a series of micro-benchmarks by applying the `--benchmark` flag, e.g., `perfspect report --benchmark all` The benchmark results will be reported along with the target's configuration details. 
 
 > [!IMPORTANT]
 > Benchmarks should be run on idle systems to measure accurately and to avoid interfering with active workloads.
