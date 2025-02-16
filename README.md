@@ -18,8 +18,10 @@ cd perfspect
 ```
 ## Running PerfSpect
 PerfSpect includes a suite of commands designed to analyze and optimize both system and software performance.
-
-Run `perfspect -h` for top level help. Note the available commands and options.
+<pre>
+Usage:
+  perfspect [command] [flags]
+</pre>
 
 ### Commands
 | Command | Description |
@@ -29,9 +31,10 @@ Run `perfspect -h` for top level help. Note the available commands and options.
 | [`telemetry`](#telemetry-command) | Report system telemetry |
 | [`flame`](#flame-command) | Generate software call-stack flamegraphs |
 | [`config`](#config-command) | Modify system configuration |
-| [`lock`](#lock-command) | Collect system wide hotspot, c2c and lock contention information |
+| [`lock`](#lock-command) | Collect system wide hot spot, c2c and lock contention information |
 
-Each command has additional help text that can be viewed by running `perfspect <command> -h`.
+> [!TIP]
+> Run `perfspect [command] -h` to view command-specific help text.
 
 #### Metrics Command
 The `metrics` command reports CPU architectural performance characterization metrics.
@@ -42,9 +45,9 @@ $ ./perfspect metrics --duration 30
 emr                   ⣯  collection complete                     
 
 Metric files:
-  /home/jharper5/dev/pt/perfspect_2024-10-10_10-58-36/emr_metrics.csv
-  /home/jharper5/dev/pt/perfspect_2024-10-10_10-58-36/emr_metrics_summary.csv
-  /home/jharper5/dev/pt/perfspect_2024-10-10_10-58-36/emr_metrics_summary.html
+  /home/myuser/dev/pt/perfspect_2024-10-10_10-58-36/emr_metrics.csv
+  /home/myuser/dev/pt/perfspect_2024-10-10_10-58-36/emr_metrics_summary.csv
+  /home/myuser/dev/pt/perfspect_2024-10-10_10-58-36/emr_metrics_summary.html
 </pre>
 ##### Live Metrics
 The `metrics` command supports two modes -- default and "live". Default mode behaves as above -- metrics are collected and saved into files for review.  The "live" mode prints the metrics to stdout where they can be viewed in the console and/or redirected into a file or observability pipeline. Run `perfspect metrics --live`.
@@ -90,8 +93,11 @@ Microcode:       0x21000230
 Report files:
   /home/myuser/dev/perfspect/perfspect_2024-09-03_17-47-55/emr.txt
 </pre>
-###### Report Benchmarks
-To assist in evaluating the health of target systems, the `report` command can run a series of micro-benchmarks by applying the `--benchmark` flag, e.g., `perfspect report --benchmark all` The results will be reported along with the target's configuration details. **Important Note:** benchmarks should be run on idle systems.
+##### Report Benchmarks
+To assist in evaluating the health of target systems, the `report` command can run a series of micro-benchmarks by applying the `--benchmark` flag, e.g., `perfspect report --benchmark all` The benchmark results will be reported along with the target's configuration details. 
+
+> [!IMPORTANT]
+> Benchmarks should be run on idle systems to measure accurately and to avoid interfering with active workloads.
 
 | benchmark | Description |
 | --------- | ----------- |
@@ -100,7 +106,7 @@ To assist in evaluating the health of target systems, the `report` command can r
 | power | runs stress-ng in two stages: 1) load 1 cpu to 100% for 20s to measure maximum frequency, 2) load all cpus to 100% for 60s. Uses [turbostat](https://github.com/torvalds/linux/tree/master/tools/power/x86/turbostat) to measure power. |
 | temperature | runs the same micro benchmark as 'power', but extracts maximum temperature from turbostat output. |
 | frequency | runs [avx-turbo](https://github.com/travisdowns/avx-turbo) to measure scalar and AVX frequencies across processor's cores. **Note:** Runtime increases with core count.  |
-| memory | runs [Intel(r) Memory Latency Checker](https://www.intel.com/content/www/us/en/download/736633/intel-memory-latency-checker-intel-mlc.html) (MLC) to measure memory bandwidth and latency across a load range. **Important Note:** MLC is not included with PerfSpect. It can be downloaded from here: [MLC](https://www.intel.com/content/www/us/en/download/736633/intel-memory-latency-checker-intel-mlc.html). Once downloaded, extract the Linux executable and place it in the perfspect/tools/x86_64 directory. |
+| memory | runs [Intel(r) Memory Latency Checker](https://www.intel.com/content/www/us/en/download/736633/intel-memory-latency-checker-intel-mlc.html) (MLC) to measure memory bandwidth and latency across a load range. **Note: MLC is not included with PerfSpect.** It can be downloaded from [here](https://www.intel.com/content/www/us/en/download/736633/intel-memory-latency-checker-intel-mlc.html). Once downloaded, extract the Linux executable and place it in the perfspect/tools/x86_64 directory. |
 | numa | runs Intel(r) Memory Latency Checker(MLC) to measure bandwidth between NUMA nodes. See Note above about downloading MLC. |
 | storage | runs [fio](https://github.com/axboe/fio) for 2 minutes in read/write mode with a single worker to measure single-thread read and write bandwidth. Use the --storage-dir flag to override the default location. Minimum 5GB disk space required to run test. |
 
@@ -118,10 +124,16 @@ Report files:
 </pre>
 
 #### Flame Command
-Software flamegraphs are useful in diagnosing software performance bottlenecks. Run `perfspect flame` to capture a system-wide software flamegraph. **Important Note:** The target system must have perl installed and on the PATH to process the data required for flamegraphs.
+Software flamegraphs are useful in diagnosing software performance bottlenecks. Run `perfspect flame` to capture a system-wide software flamegraph.
+
+> [!NOTE]
+> Perl must be installed on the target system to process the data required for flamegraphs.
 
 #### Config Command
-The `config` command provides a method to view and change various system configuration parameters. Run `perfspect config -h` to view the parameters that can be modified. <b>USE CAUTION</b> when changing system parameters. It is possible to configure the system in a way that it will no longer operate. In some cases, a reboot will be required to return to the default settings. 
+The `config` command provides a method to view and change various system configuration parameters. Run `perfspect config -h` to view the parameters that can be modified. 
+
+> [!WARNING]
+> It is possible to configure the system in a way that it will no longer operate. In some cases, a reboot will be required to return to default settings. 
 
 Example:
 <pre>
@@ -130,14 +142,15 @@ $ ./perfspect config --cores 24 --llc 2.0 --uncoremaxfreq 1.8
 </pre>
 
 #### Lock Command
-As systems contain more and more cores, it can be useful to analyze the Linux kernel lock overhead and potential false-sharing that impacts system scalability. Run `perfspect lock` to collect system wide hotspot, c2c and lock contention information. Experienced performance engineers can analyze the collected information to identify bottlenecks.
+As systems contain more and more cores, it can be useful to analyze the Linux kernel lock overhead and potential false-sharing that impacts system scalability. Run `perfspect lock` to collect system wide hot spot, cache-to-cache and lock contention information. Experienced performance engineers can analyze the collected information to identify bottlenecks.
 
 ### Common Command Options
 
 #### Local vs. Remote Targets
 By default, PerfSpect targets the local host, i.e., the host where PerfSpect is running. Remote system(s) can also be targetted when the remote systems are reachable through SSH from the local host.
 
-**Important:** Ensure the remote user has password-less sudo access (or root privileges) to fully utilize PerfSpect's capabilities.
+> [!NOTE]
+> Ensure the remote user has password-less sudo access (or root privileges) to fully utilize PerfSpect's capabilities.
 
 To target a single remote system using a pre-configured private key:
 <pre>
@@ -187,6 +200,8 @@ $ ./perfspect report --benchmark speed,memory --targets targets.yaml
 ...
 </pre>
 ## Building PerfSpect from Source
+> [!TIP]
+> Skip the build. Pre-built PerfSpect releases are available in the repository's [Releases](https://github.com/intel/PerfSpect/releases). Download and extract perfspect.tgz.
 ### 1st Build
 `builder/build.sh` builds the dependencies and the app in Docker containers that provide the required build environments. Assumes you have Docker installed on your development system.
 
