@@ -38,6 +38,11 @@
         "origin": "perfspect"
     },
     {
+        "name": "metric_branch misprediction ratio",
+        "expression": "[BR_MISP_RETIRED.ALL_BRANCHES] / [BR_INST_RETIRED.ALL_BRANCHES]",
+        "origin": "perfspect"
+    },
+    {
         "name": "metric_locks retired per instr",
         "name-txn": "metric_locks retired per txn",
         "expression": "[MEM_UOPS_RETIRED.LOCK_LOADS] / [instructions]",

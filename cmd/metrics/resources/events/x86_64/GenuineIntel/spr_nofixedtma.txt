@@ -7,6 +7,8 @@ cpu/event=0x51,umask=0x01,period=100003,name='L1D.REPLACEMENT'/,
 cpu/event=0x24,umask=0xe4,period=200003,name='L2_RQSTS.ALL_CODE_RD'/,
 cpu/event=0xd1,umask=0x01,period=1000003,name='MEM_LOAD_RETIRED.L1_HIT'/,
 cpu/event=0x25,umask=0x1f,period=100003,name='L2_LINES_IN.ALL'/,
+cpu/event=0xc4,umask=0x00,period=100003,name='BR_INST_RETIRED.ALL_BRANCHES'/,
+cpu/event=0xc5,umask=0x00,period=100003,name='BR_MISP_RETIRED.ALL_BRANCHES'/,
 cpu-cycles,
 ref-cycles,
 instructions;
