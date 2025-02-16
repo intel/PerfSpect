@@ -93,7 +93,7 @@ Microcode:       0x21000230
 Report files:
   /home/myuser/dev/perfspect/perfspect_2024-09-03_17-47-55/emr.txt
 </pre>
-###### Report Benchmarks
+##### Report Benchmarks
 To assist in evaluating the health of target systems, the `report` command can run a series of micro-benchmarks by applying the `--benchmark` flag, e.g., `perfspect report --benchmark all` The benchmark results will be reported along with the target's configuration details. 
 
 > [!IMPORTANT]
