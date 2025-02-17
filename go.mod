@@ -15,7 +15,7 @@ replace (
 require (
 	github.com/Knetic/govaluate v3.0.0+incompatible
 	github.com/deckarep/golang-set/v2 v2.7.0
-	github.com/spf13/cobra v1.8.1
+	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/xuri/excelize/v2 v2.9.0
 	golang.org/x/exp v0.0.0-20241217172543-b2144cdd0a67
