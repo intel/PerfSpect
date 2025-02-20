@@ -79,6 +79,8 @@ const (
 	PowerTableName              = "Power"
 	CstateTableName             = "C-states"
 	CoreTurboFrequencyTableName = "Core Turbo Frequency"
+	SSTTFHPTableName            = "Speed Select Turbo Frequency - High Priority Cores"
+	SSTTFLPTableName            = "Speed Select Turbo Frequency - Low Priority Cores"
 	UncoreTableName             = "Uncore"
 	ElcTableName                = "Efficiency Latency Control"
 	MemoryTableName             = "Memory"
@@ -269,6 +271,20 @@ var tableDefinitions = map[string]TableDefinition{
 		},
 		FieldsFunc:   elcTableValues,
 		InsightsFunc: elcTableInsights},
+	SSTTFHPTableName: {
+		Name:    SSTTFHPTableName,
+		HasRows: true,
+		ScriptNames: []string{
+			script.SstTfHighPriorityCoreFrequenciesScriptName,
+		},
+		FieldsFunc: sstTFHPTableValues},
+	SSTTFLPTableName: {
+		Name:    SSTTFLPTableName,
+		HasRows: true,
+		ScriptNames: []string{
+			script.SstTfLowPriorityCoreFrequenciesScriptName,
+		},
+		FieldsFunc: sstTFLPTableValues},
 	MemoryTableName: {
 		Name:      MemoryTableName,
 		HasRows:   false,
@@ -1076,6 +1092,84 @@ func coreTurboFrequencyTableValues(outputs map[string]script.ScriptOutput) []Fie
 	}
 	fields[0].Values = counts
 	fields[1].Values = frequencies
+	return fields
+}
+
+func sstTFHPTableValues(outputs map[string]script.ScriptOutput) []Field {
+	output := outputs[script.SstTfHighPriorityCoreFrequenciesScriptName].Stdout
+	if len(output) == 0 {
+		return []Field{}
+	}
+	lines := strings.Split(output, "\n")
+	if len(lines) >= 1 && (strings.Contains(lines[0], "not supported") || strings.Contains(lines[0], "not enabled")) {
+		return []Field{}
+	}
+	// lines should contain CSV formatted data
+	fields := []Field{}
+	for i, line := range lines {
+		// field names are in the header
+		if i == 0 {
+			fieldNames := strings.Split(line, ",")
+			for j, fieldName := range fieldNames {
+				if j > 1 {
+					fieldName = fieldName + " (MHz)"
+				}
+				fields = append(fields, Field{Name: fieldName})
+			}
+			continue
+		}
+		// skip empty lines
+		if line == "" {
+			continue
+		}
+		values := strings.Split(line, ",")
+		if len(values) != len(fields) {
+			slog.Warn("unexpected number of values in line", slog.String("line", line))
+			continue
+		}
+		for j, value := range values {
+			if j > 1 {
+				value = value + "00"
+			}
+			fields[j].Values = append(fields[j].Values, value)
+		}
+	}
+	return fields
+}
+
+func sstTFLPTableValues(outputs map[string]script.ScriptOutput) []Field {
+	output := outputs[script.SstTfLowPriorityCoreFrequenciesScriptName].Stdout
+	if len(output) == 0 {
+		return []Field{}
+	}
+	lines := strings.Split(output, "\n")
+	if len(lines) >= 1 && (strings.Contains(lines[0], "not supported") || strings.Contains(lines[0], "not enabled")) {
+		return []Field{}
+	}
+	// lines should contain CSV formatted data
+	fields := []Field{}
+	for i, line := range lines {
+		// field names are in the header
+		if i == 0 {
+			fieldNames := strings.Split(line, ",")
+			for _, fieldName := range fieldNames {
+				fields = append(fields, Field{Name: fieldName + " (MHz)"})
+			}
+			continue
+		}
+		// skip empty lines
+		if line == "" {
+			continue
+		}
+		values := strings.Split(line, ",")
+		if len(values) != len(fields) {
+			slog.Warn("unexpected number of values in line", slog.String("line", line))
+			continue
+		}
+		for j, value := range values {
+			fields[j].Values = append(fields[j].Values, value+"00")
+		}
+	}
 	return fields
 }
 

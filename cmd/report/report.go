@@ -60,6 +60,7 @@ var (
 	flagTurbo          bool
 	flagUncore         bool
 	flagElc            bool
+	flagSST            bool
 	flagMemory         bool
 	flagDimm           bool
 	flagNic            bool
@@ -99,6 +100,7 @@ const (
 	flagTurboName          = "turbo"
 	flagUncoreName         = "uncore"
 	flagElcName            = "elc"
+	flagSSTName            = "sst"
 	flagMemoryName         = "memory"
 	flagDimmName           = "dimm"
 	flagNicName            = "nic"
@@ -157,6 +159,7 @@ var categories = []common.Category{
 	{FlagName: flagPowerName, FlagVar: &flagPower, Help: "Power Settings", TableNames: []string{report.PowerTableName}},
 	{FlagName: flagCstatesName, FlagVar: &flagCstates, Help: "C-states", TableNames: []string{report.CstateTableName}},
 	{FlagName: flagTurboName, FlagVar: &flagTurbo, Help: "Turbo Frequency", TableNames: []string{report.CoreTurboFrequencyTableName}},
+	{FlagName: flagSSTName, FlagVar: &flagSST, Help: "Speed Select Technology Settings", TableNames: []string{report.SSTTFHPTableName, report.SSTTFLPTableName}},
 	{FlagName: flagUncoreName, FlagVar: &flagUncore, Help: "Uncore Configuration", TableNames: []string{report.UncoreTableName}},
 	{FlagName: flagElcName, FlagVar: &flagElc, Help: "Efficiency Latency Control Settings", TableNames: []string{report.ElcTableName}},
 	{FlagName: flagMemoryName, FlagVar: &flagMemory, Help: "Memory Configuration", TableNames: []string{report.MemoryTableName}},
