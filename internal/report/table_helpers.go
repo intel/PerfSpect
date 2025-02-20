@@ -465,7 +465,6 @@ func getL3LscpuParts(outputs map[string]script.ScriptOutput) (size float64, unit
 }
 
 // get L3 per instance in MB from lscpu
-// known lscpu output formats for L3 cache:
 func getL3LscpuMB(outputs map[string]script.ScriptOutput) (instanceSizeMB float64, instances int, err error) {
 	l3SizeNoUnit, units, instances, err := getL3LscpuParts(outputs)
 	if err != nil {
