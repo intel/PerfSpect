@@ -82,6 +82,8 @@ const (
 	UncoreMaxFromTPMIScriptName                 = "uncore max from tpmi"
 	UncoreMinFromTPMIScriptName                 = "uncore min from tpmi"
 	ElcScriptName                               = "efficiency latency control"
+	SstTfHighPriorityCoreFrequenciesScriptName  = "sst tf high priority core frequencies"
+	SstTfLowPriorityCoreFrequenciesScriptName   = "sst tf low priority core frequencies"
 	ChaCountScriptName                          = "cha count"
 	MeminfoScriptName                           = "meminfo"
 	TransparentHugePagesScriptName              = "transparent huge pages"
@@ -485,6 +487,91 @@ done
 			`,
 			Architectures: []string{x86_64},
 			Families:      []string{"6"}, // Intel
+			Depends:       []string{"pcm-tpmi"},
+			Superuser:     true,
+		},
+		{
+			Name: SstTfHighPriorityCoreFrequenciesScriptName,
+			Script: `#!/bin/bash
+# Is SST-TF supported?
+supported=$(pcm-tpmi 5 0xF8 -d -b 12:12 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
+if [ "$supported" -eq 0 ]; then
+    echo "SST-TF is not supported"
+    exit 0
+fi
+# Is SST-TF enabled?
+enabled=$(pcm-tpmi 5 0x78 -d -b 9:9 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
+if [ "$enabled" -eq 0 ]; then
+    echo "SST-TF is not enabled"
+    exit 0
+fi
+echo "bucket,cores,AVX,AVX2,AVX-512,AVX-512 heavy,AMX"
+# up to 5 buckets
+for ((i=0; i<5; i++))
+do
+    # Get the # of cores in this bucket
+    bithigh=$((i*8+7))
+    bitlow=$((i*8))
+    numcores=$(pcm-tpmi 5 0x100 -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
+    # if the number of cores is 0, skip this bucket
+    if [ "$numcores" -eq 0 ]; then
+        continue
+    fi
+    echo -n "$i,$numcores,"
+    # Get the frequencies for this bucket
+    bithigh=$((i*8+7)) # 8 bits per frequency
+    bitlow=$((i*8))
+    # 5 isa frequencies per bucket (AVX, AVX2, AVX-512, AVX-512 heavy, AMX)
+    for((j=0; j<5; j++))
+    do
+        offset=$((j*8 + 264)) # 264 is 0x108 (SST_TF_INFO_2) AVX
+        freq=$(pcm-tpmi 5 $offset -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
+        echo -n "$freq"
+        if [ $j -lt 4 ]; then
+            echo -n ","
+        fi
+    done
+    echo "" # finish the line
+done
+`,
+			Architectures: []string{x86_64},
+			Families:      []string{"6"},   // Intel
+			Models:        []string{"173"}, // GNR
+			Depends:       []string{"pcm-tpmi"},
+			Superuser:     true,
+		},
+		{
+			Name: SstTfLowPriorityCoreFrequenciesScriptName,
+			Script: `#!/bin/bash
+# Is SST-TF supported?
+supported=$(pcm-tpmi 5 0xF8 -d -b 12:12 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
+if [ "$supported" -eq 0 ]; then
+    echo "SST-TF is not supported"
+    exit 0
+fi
+# Is SST-TF enabled?
+enabled=$(pcm-tpmi 5 0x78 -d -b 9:9 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
+if [ "$enabled" -eq 0 ]; then
+    echo "SST-TF is not enabled"
+    exit 0
+fi
+echo "AVX,AVX2,AVX-512,AVX-512 heavy,AMX"
+# Get the low priority core clip ratios (frequencies)
+for((j=0; j<5; j++))
+do
+    bithigh=$((j*8+23))
+    bitlow=$((j*8+16))
+    freq=$(pcm-tpmi 5 0xF8 -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
+    echo -n "$freq"
+    if [ $j -ne 4 ]; then
+        echo -n ","
+    fi
+done
+echo "" # finish the line
+`,
+			Architectures: []string{x86_64},
+			Families:      []string{"6"},   // Intel
+			Models:        []string{"173"}, // GNR
 			Depends:       []string{"pcm-tpmi"},
 			Superuser:     true,
 		},
