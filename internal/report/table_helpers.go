@@ -431,13 +431,11 @@ func prefetchersFromOutput(outputs map[string]script.ScriptOutput) string {
 	return "None"
 }
 
-// get L3 per instance in MB from lscpu
-// known lscpu output formats for L3 cache:
-//
+// getL3LscpuParts extracts the size, units, and instances of the L3 cache from the lscpu output.
+// Examples:
 // L3 cache:                   576 MiB (2 instances)
 // L3 cache:                   210 MiB
-func getL3LscpuMB(outputs map[string]script.ScriptOutput) (val float64, err error) {
-	var instances int
+func getL3LscpuParts(outputs map[string]script.ScriptOutput) (size float64, units string, instances int, err error) {
 	l3Lscpu := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^L3 cache.*:\s*(.+?)$`)
 	re := regexp.MustCompile(`(\d+\.?\d*)\s*(\w+)\s+\((\d+) instance[s]*\)`) // match known formats
 	match := re.FindStringSubmatch(l3Lscpu)
@@ -457,30 +455,40 @@ func getL3LscpuMB(outputs map[string]script.ScriptOutput) (val float64, err erro
 		}
 		instances = 1
 	}
-	l3SizeNoUnit, err := strconv.ParseFloat(match[1], 64)
+	size, err = strconv.ParseFloat(match[1], 64)
 	if err != nil {
 		err = fmt.Errorf("failed to parse L3 size from lscpu: %s, %v", l3Lscpu, err)
 		return
 	}
-	units := match[2]
+	units = match[2]
+	return
+}
+
+// get L3 per instance in MB from lscpu
+// known lscpu output formats for L3 cache:
+func getL3LscpuMB(outputs map[string]script.ScriptOutput) (instanceSizeMB float64, instances int, err error) {
+	l3SizeNoUnit, units, instances, err := getL3LscpuParts(outputs)
+	if err != nil {
+		return
+	}
 	if strings.ToLower(units[:1]) == "g" {
-		val = l3SizeNoUnit * 1024 / float64(instances)
+		instanceSizeMB = l3SizeNoUnit * 1024 / float64(instances)
 		return
 	}
 	if strings.ToLower(units[:1]) == "m" {
-		val = l3SizeNoUnit / float64(instances)
+		instanceSizeMB = l3SizeNoUnit / float64(instances)
 		return
 	}
 	if strings.ToLower(units[:1]) == "k" {
-		val = l3SizeNoUnit / 1024 / float64(instances)
+		instanceSizeMB = l3SizeNoUnit / 1024 / float64(instances)
 		return
 	}
-	err = fmt.Errorf("unknown L3 units in lscpu: %s", l3Lscpu)
+	err = fmt.Errorf("unknown L3 units in lscpu: %s", units)
 	return
 }
 
 // GetL3LscpuMB exports getL3LscpuMB
-func GetL3LscpuMB(outputs map[string]script.ScriptOutput) (val float64, err error) {
+func GetL3LscpuMB(outputs map[string]script.ScriptOutput) (instanceSizeMB float64, instances int, err error) {
 	return getL3LscpuMB(outputs)
 }
 
@@ -505,7 +513,7 @@ func getL3MSRMB(outputs map[string]script.ScriptOutput) (val float64, err error)
 		err = fmt.Errorf("uarch is required")
 		return
 	}
-	l3LscpuMB, err := getL3LscpuMB(outputs)
+	l3LscpuMB, _, err := getL3LscpuMB(outputs)
 	if err != nil {
 		return
 	}
@@ -541,7 +549,7 @@ func l3FromOutput(outputs map[string]script.ScriptOutput) string {
 	l3, err := getL3MSRMB(outputs)
 	if err != nil {
 		slog.Info("Could not get L3 size from MSR, falling back to lscpu", slog.String("error", err.Error()))
-		l3, err = getL3LscpuMB(outputs)
+		l3, _, err = getL3LscpuMB(outputs)
 		if err != nil {
 			slog.Error("Could not get L3 size from lscpu", slog.String("error", err.Error()))
 			return ""
@@ -556,18 +564,34 @@ func l3PerCoreFromOutput(outputs map[string]script.ScriptOutput) string {
 		slog.Info("Can't calculate L3 per Core on virtualized host.")
 		return ""
 	}
-	l3, err := strconv.ParseFloat(strings.Split(l3FromOutput(outputs), " ")[0], 64)
-	if err != nil {
-		slog.Error("failed to parse L3 size", slog.String("error", err.Error()))
-		return ""
+	var l3PerCoreMB float64
+	if l3, err := getL3MSRMB(outputs); err == nil {
+		coresPerSocket, err := strconv.Atoi(valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket.*:\s*(.+?)$`))
+		if err != nil || coresPerSocket == 0 {
+			slog.Error("failed to parse cores per socket", slog.String("error", err.Error()))
+			return ""
+		}
+		l3PerCoreMB = l3 / float64(coresPerSocket)
+	} else {
+		slog.Info("Could not get L3 size from MSR, falling back to lscpu", slog.String("error", err.Error()))
+		instanceSizeMB, instances, err := getL3LscpuMB(outputs)
+		if err != nil {
+			slog.Error("Could not get L3 size from lscpu", slog.String("error", err.Error()))
+			return ""
+		}
+		coresPerSocket, err := strconv.Atoi(valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket.*:\s*(.+?)$`))
+		if err != nil || coresPerSocket == 0 {
+			slog.Error("failed to parse cores per socket", slog.String("error", err.Error()))
+			return ""
+		}
+		numSockets, err := strconv.Atoi(valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`))
+		if err != nil || numSockets == 0 {
+			slog.Error("failed to parse sockets", slog.String("error", err.Error()))
+			return ""
+		}
+		l3PerCoreMB = (instanceSizeMB * float64(instances)) / (float64(coresPerSocket) * float64(numSockets))
 	}
-	coresPerSocket, err := strconv.Atoi(valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket.*:\s*(.+?)$`))
-	if err != nil || coresPerSocket == 0 {
-		slog.Error("failed to parse cores per socket", slog.String("error", err.Error()))
-		return ""
-	}
-	cacheMB := l3 / float64(coresPerSocket)
-	val := strconv.FormatFloat(cacheMB, 'f', 3, 64)
+	val := strconv.FormatFloat(l3PerCoreMB, 'f', 3, 64)
 	val = strings.TrimRight(val, "0") // trim trailing zeros
 	val = strings.TrimRight(val, ".") // trim decimal point if trailing
 	val += " MiB"

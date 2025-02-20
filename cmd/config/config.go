@@ -468,7 +468,7 @@ func setLlcSize(llcSize float64, myTarget target.Target, localTempDir string) {
 		slog.Error("failed to run scripts on target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
 		return
 	}
-	maximumLlcSize, err := report.GetL3LscpuMB(outputs)
+	maximumLlcSize, _, err := report.GetL3LscpuMB(outputs)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		slog.Error("failed to get maximum LLC size", slog.String("error", err.Error()))
