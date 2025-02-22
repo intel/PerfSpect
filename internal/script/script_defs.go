@@ -110,6 +110,7 @@ const (
 	GaudiFirmwareScriptName                     = "gaudi firmware"
 	GaudiNumaScriptName                         = "gaudi numa"
 	InstructionMixScriptName                    = "instruction mix"
+	GaudiStatsScriptName                        = "gaudi stats"
 )
 
 const (
@@ -1145,7 +1146,20 @@ rm -rf $test_dir`, params.StorageDir)
 			Depends:   []string{"processwatch"},
 			NeedsKill: true,
 		},
-
+		{
+			Name: GaudiStatsScriptName,
+			Script: func() string {
+				script := fmt.Sprintf("hl-smi --query-aip=timestamp,name,temperature.aip,module_id,utilization.aip,memory.total,memory.free,memory.used,power.draw --format=csv,nounits -l %d", params.Interval)
+				script += " &\n"                                     // run it in the background
+				script += "echo $! > {cmd_pid}\n"                    // this is used to kill the command
+				script += fmt.Sprintf("sleep %d\n", params.Duration) // sleep because hl-smi doesn't have a duration flag
+				script += "wait\n"                                   // wait for the command to finish
+				return script
+			}(),
+			Superuser: true,
+			Depends:   []string{"hl-smi"},
+			NeedsKill: true,
+		},
 		// flamegraph scripts
 		{
 			Name: ProfileJavaScriptName,

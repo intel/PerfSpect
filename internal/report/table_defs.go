@@ -111,19 +111,19 @@ const (
 	// telemetry table names
 	CPUUtilizationTableName        = "CPU Utilization"
 	AverageCPUUtilizationTableName = "Average CPU Utilization"
+	InstructionMixTableName        = "Instruction Mix"
 	IRQRateTableName               = "IRQ Rate"
 	DriveStatsTableName            = "Drive Stats"
 	NetworkStatsTableName          = "Network Stats"
 	MemoryStatsTableName           = "Memory Stats"
 	PowerStatsTableName            = "Power Stats"
+	GaudiStatsTableName            = "Gaudi Stats"
 	// config  table names
 	ConfigurationTableName = "Configuration"
 	// flamegraph table names
 	CodePathFrequencyTableName = "Code Path Frequency"
 	// lock table names
 	KernelLockAnalysisTableName = "Kernel Lock Analysis"
-	// process watch instruction mix table names
-	InstructionMixTableName = "Instruction Mix"
 )
 
 const (
@@ -642,8 +642,16 @@ var tableDefinitions = map[string]TableDefinition{
 			script.InstructionMixScriptName,
 		},
 		FieldsFunc:            instructionMixTableValues,
-		HTMLTableRendererFunc: instructionMixTableHTMLRenderer,
-	},
+		HTMLTableRendererFunc: instructionMixTableHTMLRenderer},
+	GaudiStatsTableName: {
+		Name:      GaudiStatsTableName,
+		MenuLabel: GaudiStatsTableName,
+		HasRows:   true,
+		ScriptNames: []string{
+			script.GaudiStatsScriptName,
+		},
+		FieldsFunc:            gaudiStatsTableValues,
+		HTMLTableRendererFunc: gaudiStatsTableHTMLRenderer},
 	//
 	// flamegraph tables
 	//
@@ -2062,6 +2070,45 @@ func powerStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
 		}
 		for i := range fields {
 			fields[i].Values = append(fields[i].Values, match[i+1])
+		}
+	}
+	return fields
+}
+
+func gaudiStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
+	// build fields to match CSV output from hl_smi tool
+	fields := []Field{}
+	// parse the CSV output
+	csvOutput := outputs[script.GaudiStatsScriptName].Stdout
+	r := csv.NewReader(strings.NewReader(csvOutput))
+	rows, err := r.ReadAll()
+	if err != nil {
+		slog.Error(err.Error())
+		return []Field{}
+	}
+	if len(rows) < 2 {
+		slog.Error("gaudi stats output is not in expected format")
+		return []Field{}
+	}
+	// first row is the header, extract field names
+	for _, fieldName := range rows[0] {
+		fields = append(fields, Field{Name: strings.TrimSpace(fieldName)})
+	}
+	// values start in 2nd row
+	for _, row := range rows[1:] {
+		for i := range fields {
+			// reformat the timestamp field to only include the time
+			if i == 0 {
+				timestampParts := strings.Split(row[i], " ")
+				if len(timestampParts) < 4 {
+					slog.Error("gaudi stats output is not in expected format")
+					return []Field{}
+				}
+				timestamp := timestampParts[3]
+				fields[i].Values = append(fields[i].Values, timestamp)
+			} else {
+				fields[i].Values = append(fields[i].Values, strings.TrimSpace(row[i]))
+			}
 		}
 	}
 	return fields
