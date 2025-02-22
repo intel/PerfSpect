@@ -15,6 +15,7 @@ import (
 	"perfspect/internal/script"
 	"perfspect/internal/target"
 	"perfspect/internal/util"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -23,29 +24,37 @@ import (
 )
 
 var (
-	flagCores               int
-	flagLlcSize             float64
-	flagAllCoreMaxFrequency float64
-	flagUncoreMaxFrequency  float64
-	flagUncoreMinFrequency  float64
-	flagPower               int
-	flagEpb                 int
-	flagEpp                 int
-	flagGovernor            string
-	flagElc                 string
+	flagCores                     int
+	flagLlcSize                   float64
+	flagAllCoreMaxFrequency       float64
+	flagUncoreMaxFrequency        float64
+	flagUncoreMinFrequency        float64
+	flagUncoreMaxComputeFrequency float64
+	flagUncoreMinComputeFrequency float64
+	flagUncoreMaxIOFrequency      float64
+	flagUncoreMinIOFrequency      float64
+	flagPower                     int
+	flagEpb                       int
+	flagEpp                       int
+	flagGovernor                  string
+	flagElc                       string
 )
 
 const (
-	flagCoresName               = "cores"
-	flagLlcSizeName             = "llc"
-	flagAllCoreMaxFrequencyName = "coremax"
-	flagUncoreMaxFrequencyName  = "uncoremax"
-	flagUncoreMinFrequencyName  = "uncoremin"
-	flagPowerName               = "power"
-	flagEpbName                 = "epb"
-	flagEppName                 = "epp"
-	flagGovernorName            = "governor"
-	flagElcName                 = "elc"
+	flagCoresName                     = "cores"
+	flagLlcSizeName                   = "llc"
+	flagAllCoreMaxFrequencyName       = "coremax"
+	flagUncoreMaxFrequencyName        = "uncoremax"
+	flagUncoreMinFrequencyName        = "uncoremin"
+	flagUncoreMaxComputeFrequencyName = "uncoremaxcompute"
+	flagUncoreMinComputeFrequencyName = "uncoremincompute"
+	flagUncoreMaxIOFrequencyName      = "uncoremaxio"
+	flagUncoreMinIOFrequencyName      = "uncoreminio"
+	flagPowerName                     = "power"
+	flagEpbName                       = "epb"
+	flagEppName                       = "epp"
+	flagGovernorName                  = "governor"
+	flagElcName                       = "elc"
 )
 
 // governorOptions - list of valid governor options
@@ -84,6 +93,10 @@ func init() {
 	Cmd.Flags().Float64Var(&flagAllCoreMaxFrequency, flagAllCoreMaxFrequencyName, 0, "")
 	Cmd.Flags().Float64Var(&flagUncoreMaxFrequency, flagUncoreMaxFrequencyName, 0, "")
 	Cmd.Flags().Float64Var(&flagUncoreMinFrequency, flagUncoreMinFrequencyName, 0, "")
+	Cmd.Flags().Float64Var(&flagUncoreMaxComputeFrequency, flagUncoreMaxComputeFrequencyName, 0, "")
+	Cmd.Flags().Float64Var(&flagUncoreMinComputeFrequency, flagUncoreMinComputeFrequencyName, 0, "")
+	Cmd.Flags().Float64Var(&flagUncoreMaxIOFrequency, flagUncoreMaxIOFrequencyName, 0, "")
+	Cmd.Flags().Float64Var(&flagUncoreMinIOFrequency, flagUncoreMinIOFrequencyName, 0, "")
 	Cmd.Flags().IntVar(&flagPower, flagPowerName, 0, "")
 	Cmd.Flags().IntVar(&flagEpb, flagEpbName, 0, "")
 	Cmd.Flags().IntVar(&flagEpp, flagEppName, 0, "")
@@ -132,11 +145,27 @@ func getFlagGroups() []common.FlagGroup {
 		},
 		{
 			Name: flagUncoreMaxFrequencyName,
-			Help: "set uncore max frequency (GHz)",
+			Help: "set uncore max frequency on EMR and earlier architectures (GHz)",
 		},
 		{
 			Name: flagUncoreMinFrequencyName,
-			Help: "set uncore min frequency (GHz)",
+			Help: "set uncore min frequency on EMR and earlier architectures (GHz)",
+		},
+		{
+			Name: flagUncoreMaxComputeFrequencyName,
+			Help: "set uncore max compute frequency on SRF and newer architectures (GHz)",
+		},
+		{
+			Name: flagUncoreMinComputeFrequencyName,
+			Help: "set uncore min compute frequency on SRF and newer architectures (GHz)",
+		},
+		{
+			Name: flagUncoreMaxIOFrequencyName,
+			Help: "set uncore max IO frequency on SRF and newer architectures (GHz)",
+		},
+		{
+			Name: flagUncoreMinIOFrequencyName,
+			Help: "set uncore min IO frequency on SRF and newer architectures (GHz)",
 		},
 		{
 			Name: flagPowerName,
@@ -290,6 +319,18 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		}
 		if cmd.Flags().Lookup(flagUncoreMinFrequencyName).Changed {
 			setUncoreFrequency(false, flagUncoreMinFrequency, myTarget, localTempDir)
+		}
+		if cmd.Flags().Lookup(flagUncoreMaxComputeFrequencyName).Changed {
+			setUncoreDieFrequency(true, true, flagUncoreMaxComputeFrequency, myTarget, localTempDir)
+		}
+		if cmd.Flags().Lookup(flagUncoreMinComputeFrequencyName).Changed {
+			setUncoreDieFrequency(false, true, flagUncoreMinComputeFrequency, myTarget, localTempDir)
+		}
+		if cmd.Flags().Lookup(flagUncoreMaxIOFrequencyName).Changed {
+			setUncoreDieFrequency(true, false, flagUncoreMaxIOFrequency, myTarget, localTempDir)
+		}
+		if cmd.Flags().Lookup(flagUncoreMinIOFrequencyName).Changed {
+			setUncoreDieFrequency(false, false, flagUncoreMinIOFrequency, myTarget, localTempDir)
 		}
 		if cmd.Flags().Lookup(flagPowerName).Changed {
 			setPower(flagPower, myTarget, localTempDir)
@@ -539,6 +580,90 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 	}
 }
 
+func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float64, myTarget target.Target, localTempDir string) {
+	var minmax, dietype string
+	if maxFreq {
+		minmax = "max"
+	} else {
+		minmax = "min"
+	}
+	if computeDie {
+		dietype = "compute"
+	} else {
+		dietype = "I/O"
+	}
+	fmt.Printf("set uncore %s %s die frequency to %.1f GHz on %s\n", minmax, dietype, uncoreFrequency, myTarget.GetName())
+	targetFamily, err := myTarget.GetFamily()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error getting target family: %v\n", err)
+		slog.Error("failed to get target family", slog.String("error", err.Error()))
+		return
+	}
+	targetModel, err := myTarget.GetModel()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error getting target model: %v\n", err)
+		slog.Error("failed to get target model", slog.String("error", err.Error()))
+		return
+	}
+	if targetFamily != "6" || (targetFamily == "6" && targetModel != "173" && targetModel != "175") {
+		err := fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())
+		slog.Error(err.Error())
+		fmt.Fprintf(os.Stderr, "Error: failed to set uncore frequency: %v\n", err)
+		return
+	}
+	type dieId struct {
+		instance string
+		entry    string
+	}
+	var dies []dieId
+	// build list of compute or IO dies
+	scripts := []script.ScriptDefinition{}
+	scripts = append(scripts, script.GetScriptByName(script.UncoreDieTypesFromTPMIScriptName))
+	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		slog.Error("failed to run scripts on target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+		return
+	}
+	re := regexp.MustCompile(`Read bits \d+:\d+ value (\d+) from TPMI ID .* for entry (\d+) in instance (\d+)`)
+	for _, line := range strings.Split(outputs[script.UncoreDieTypesFromTPMIScriptName].Stdout, "\n") {
+		match := re.FindStringSubmatch(line)
+		if match == nil {
+			continue
+		}
+		if computeDie && match[1] == "0" {
+			dies = append(dies, dieId{instance: match[3], entry: match[2]})
+		}
+		if !computeDie && match[1] == "1" {
+			dies = append(dies, dieId{instance: match[3], entry: match[2]})
+		}
+	}
+
+	value := uint64(uncoreFrequency * 10)
+	var bits string
+	if maxFreq {
+		bits = "8:14" // bits 8:14 are the max frequency
+	} else {
+		bits = "15:21" // bits 15:21 are the min frequency
+	}
+	// run script for each die of specified type
+	for _, die := range dies {
+		setScript := script.ScriptDefinition{
+			Name:          "write max and min uncore frequency TPMI",
+			Script:        fmt.Sprintf("pcm-tpmi 2 0x18 -d -b %s -w %d -i %s -e %s", bits, value, die.instance, die.entry),
+			Architectures: []string{"x86_64"},
+			Families:      []string{"6"}, // Intel only
+			Depends:       []string{"pcm-tpmi"},
+			Superuser:     true,
+		}
+		_, err = runScript(myTarget, setScript, localTempDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: failed to set uncore frequency: %v\n", err)
+			return
+		}
+	}
+}
+
 func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.Target, localTempDir string) {
 	var minmax string
 	if maxFreq {
@@ -548,13 +673,6 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 	}
 	fmt.Printf("set uncore %s frequency to %.1f GHz on %s\n", minmax, uncoreFrequency, myTarget.GetName())
 	scripts := []script.ScriptDefinition{}
-	scripts = append(scripts, script.GetScriptByName(script.LscpuScriptName))
-	scripts = append(scripts, script.GetScriptByName(script.LspciBitsScriptName))
-	scripts = append(scripts, script.GetScriptByName(script.LspciDevicesScriptName))
-	scripts = append(scripts, script.GetScriptByName(script.UncoreMaxFromMSRScriptName))
-	scripts = append(scripts, script.GetScriptByName(script.UncoreMinFromMSRScriptName))
-	scripts = append(scripts, script.GetScriptByName(script.UncoreMaxFromTPMIScriptName))
-	scripts = append(scripts, script.GetScriptByName(script.UncoreMinFromTPMIScriptName))
 	scripts = append(scripts, script.ScriptDefinition{
 		Name:          "get uncore frequency MSR",
 		Script:        "rdmsr 0x620",
@@ -582,60 +700,44 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 		slog.Error("failed to get target model", slog.String("error", err.Error()))
 		return
 	}
-	if targetFamily == "6" && (targetModel == "173" || targetModel == "175") { //Intel, GNR and SRF only
-		value := uint64(uncoreFrequency * 10)
-		var bits string
-		if maxFreq {
-			bits = "8:14" // bits 8:14 are the max frequency
-		} else {
-			bits = "15:21" // bits 15:21 are the min frequency
-		}
-		setScript := script.ScriptDefinition{
-			Name:          "write max and min uncore frequency TPMI",
-			Script:        fmt.Sprintf("pcm-tpmi 2 0x18 -d -b %s -w %d", bits, value),
-			Architectures: []string{"x86_64"},
-			Families:      []string{"6"}, // Intel only
-			Depends:       []string{"pcm-tpmi"},
-			Superuser:     true,
-		}
-		_, err = runScript(myTarget, setScript, localTempDir)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: failed to set uncore frequency: %v\n", err)
-		}
-	} else if targetFamily == "6" { // Intel only
-		msrHex := strings.TrimSpace(outputs["get uncore frequency MSR"].Stdout)
-		msrInt, err := strconv.ParseInt(msrHex, 16, 0)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			slog.Error("failed to read or parse msr value", slog.String("msr", msrHex), slog.String("error", err.Error()))
-			return
-		}
-		newFreq := uint64((uncoreFrequency * 1000) / 100)
-		var newVal uint64
-		if maxFreq {
-			// mask out lower 6 bits to write the max frequency
-			newVal = uint64(msrInt) & 0xFFFFFFFFFFFFFFC0
-			// add in the new frequency value
-			newVal = newVal | newFreq
-		} else {
-			// mask bits 8:14 to write the min frequency
-			newVal = uint64(msrInt) & 0xFFFFFFFFFFFF80FF
-			// add in the new frequency value
-			newVal = newVal | newFreq<<8
-		}
-		setScript := script.ScriptDefinition{
-			Name:          "set uncore frequency MSR",
-			Script:        fmt.Sprintf("wrmsr -a 0x620 %d", newVal),
-			Superuser:     true,
-			Architectures: []string{"x86_64"},
-			Families:      []string{"6"}, // Intel only
-			Lkms:          []string{"msr"},
-			Depends:       []string{"wrmsr"},
-		}
-		_, err = runScript(myTarget, setScript, localTempDir)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: failed to set uncore frequency: %v\n", err)
-		}
+	if targetFamily != "6" || (targetFamily == "6" && (targetModel == "173" || targetModel == "175")) {
+		err := fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())
+		slog.Error(err.Error())
+		fmt.Fprintf(os.Stderr, "Error: failed to set uncore frequency: %v\n", err)
+		return
+	}
+	msrHex := strings.TrimSpace(outputs["get uncore frequency MSR"].Stdout)
+	msrInt, err := strconv.ParseInt(msrHex, 16, 0)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		slog.Error("failed to read or parse msr value", slog.String("msr", msrHex), slog.String("error", err.Error()))
+		return
+	}
+	newFreq := uint64((uncoreFrequency * 1000) / 100)
+	var newVal uint64
+	if maxFreq {
+		// mask out lower 6 bits to write the max frequency
+		newVal = uint64(msrInt) & 0xFFFFFFFFFFFFFFC0
+		// add in the new frequency value
+		newVal = newVal | newFreq
+	} else {
+		// mask bits 8:14 to write the min frequency
+		newVal = uint64(msrInt) & 0xFFFFFFFFFFFF80FF
+		// add in the new frequency value
+		newVal = newVal | newFreq<<8
+	}
+	setScript := script.ScriptDefinition{
+		Name:          "set uncore frequency MSR",
+		Script:        fmt.Sprintf("wrmsr -a 0x620 %d", newVal),
+		Superuser:     true,
+		Architectures: []string{"x86_64"},
+		Families:      []string{"6"}, // Intel only
+		Lkms:          []string{"msr"},
+		Depends:       []string{"wrmsr"},
+	}
+	_, err = runScript(myTarget, setScript, localTempDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to set uncore frequency: %v\n", err)
 	}
 }
 

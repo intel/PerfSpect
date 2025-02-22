@@ -673,57 +673,82 @@ func tdpFromOutput(outputs map[string]script.ScriptOutput) string {
 	return fmt.Sprint(msr/8) + "W"
 }
 
-func uncoreMinMaxFrequencyFromOutput(maxFreq bool, outputs map[string]script.ScriptOutput) string {
-	uarch := uarchFromOutput(outputs)
-	if uarch == "" {
-		slog.Error("failed to get uarch from script outputs")
+func uncoreMinMaxDieFrequencyFromOutput(maxFreq bool, computeDie bool, outputs map[string]script.ScriptOutput) string {
+	// find the first die that matches requrested die type (compute or I/O)
+	re := regexp.MustCompile(`Read bits \d+:\d+ value (\d+) from TPMI ID .* for entry (\d+) in instance (\d+)`)
+	var instance, entry string
+	found := false
+	for _, line := range strings.Split(outputs[script.UncoreDieTypesFromTPMIScriptName].Stdout, "\n") {
+		match := re.FindStringSubmatch(line)
+		if match == nil {
+			continue
+		}
+		if computeDie && match[1] == "0" {
+			found = true
+			entry = match[2]
+			instance = match[3]
+			break
+		}
+		if !computeDie && match[1] == "1" {
+			found = true
+			entry = match[2]
+			instance = match[3]
+			break
+		}
+	}
+	if !found {
+		slog.Error("failed to find uncore die type in TPMI output", slog.String("output", outputs[script.UncoreDieTypesFromTPMIScriptName].Stdout))
 		return ""
 	}
+	// get the frequency for the found die
+	re = regexp.MustCompile(fmt.Sprintf(`Read bits \d+:\d+ value (\d+) from TPMI ID .* for entry %s in instance %s`, entry, instance))
+	found = false
 	var parsed int64
 	var err error
-	if strings.Contains(uarch, "SRF") || strings.Contains(uarch, "GNR") {
-		re := regexp.MustCompile(`Read bits \d+:\d+ value (\d+) from TPMI ID .* for entry 0`)
-		found := false
-		var scriptName string
-		if maxFreq {
-			scriptName = script.UncoreMaxFromTPMIScriptName
-		} else {
-			scriptName = script.UncoreMinFromTPMIScriptName
-		}
-		for _, line := range strings.Split(outputs[scriptName].Stdout, "\n") {
-			match := re.FindStringSubmatch(line)
-			if len(match) > 0 {
-				found = true
-				parsed, err = strconv.ParseInt(match[1], 10, 64)
-				if err != nil {
-					slog.Error("failed to parse uncore frequency", slog.String("error", err.Error()), slog.String("line", line))
-					return ""
-				}
-				break
+	var scriptName string
+	if maxFreq {
+		scriptName = script.UncoreMaxFromTPMIScriptName
+	} else {
+		scriptName = script.UncoreMinFromTPMIScriptName
+	}
+	for _, line := range strings.Split(outputs[scriptName].Stdout, "\n") {
+		match := re.FindStringSubmatch(line)
+		if len(match) > 0 {
+			found = true
+			parsed, err = strconv.ParseInt(match[1], 10, 64)
+			if err != nil {
+				slog.Error("failed to parse uncore frequency", slog.String("error", err.Error()), slog.String("line", line))
+				return ""
 			}
+			break
 		}
-		if !found {
-			slog.Error("failed to find uncore frequency in TPMI output", slog.String("output", outputs[scriptName].Stdout))
+	}
+	if !found {
+		slog.Error("failed to find uncore frequency in TPMI output", slog.String("output", outputs[scriptName].Stdout))
+		return ""
+	}
+	return fmt.Sprintf("%.1fGHz", float64(parsed)/10)
+}
+
+func uncoreMinMaxFrequencyFromOutput(maxFreq bool, outputs map[string]script.ScriptOutput) string {
+	var parsed int64
+	var err error
+	var scriptName string
+	if maxFreq {
+		scriptName = script.UncoreMaxFromMSRScriptName
+	} else {
+		scriptName = script.UncoreMinFromMSRScriptName
+	}
+	hex := strings.TrimSpace(outputs[scriptName].Stdout)
+	if hex != "" && hex != "0" {
+		parsed, err = strconv.ParseInt(hex, 16, 64)
+		if err != nil {
+			slog.Error("failed to parse uncore frequency", slog.String("error", err.Error()), slog.String("hex", hex))
 			return ""
 		}
 	} else {
-		var scriptName string
-		if maxFreq {
-			scriptName = script.UncoreMaxFromMSRScriptName
-		} else {
-			scriptName = script.UncoreMinFromMSRScriptName
-		}
-		hex := strings.TrimSpace(outputs[scriptName].Stdout)
-		if hex != "" && hex != "0" {
-			parsed, err = strconv.ParseInt(hex, 16, 64)
-			if err != nil {
-				slog.Error("failed to parse uncore frequency", slog.String("error", err.Error()), slog.String("hex", hex))
-				return ""
-			}
-		} else {
-			slog.Warn("failed to get uncore frequency from MSR", slog.String("hex", hex))
-			return ""
-		}
+		slog.Warn("failed to get uncore frequency from MSR", slog.String("hex", hex))
+		return ""
 	}
 	return fmt.Sprintf("%.1fGHz", float64(parsed)/10)
 }
