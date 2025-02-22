@@ -650,6 +650,7 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.GaudiStatsScriptName,
 		},
+		NoDataFound:           "No Gaudi stats data found. Gaudi devices and the hl-smi tool must be installed on the target system to collect Gaudi stats.",
 		FieldsFunc:            gaudiStatsTableValues,
 		HTMLTableRendererFunc: gaudiStatsTableHTMLRenderer},
 	//
