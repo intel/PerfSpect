@@ -1030,10 +1030,12 @@ func uncoreTableValues(outputs map[string]script.ScriptOutput) []Field {
 			{Name: "Max Frequency (I/O)", Values: []string{uncoreMinMaxDieFrequencyFromOutput(true, false, outputs)}},
 			{Name: "CHA Count", Values: []string{chaCountFromOutput(outputs)}},
 		}
-	} else {
+	} else { // field counts need to match for the all_hosts reports to work properly
 		return []Field{
 			{Name: "Min Frequency", Values: []string{uncoreMinFrequencyFromOutput(outputs)}},
+			{Name: "N/A", Values: []string{""}},
 			{Name: "Max Frequency", Values: []string{uncoreMaxFrequencyFromOutput(outputs)}},
+			{Name: "N/A", Values: []string{""}},
 			{Name: "CHA Count", Values: []string{chaCountFromOutput(outputs)}},
 		}
 	}
