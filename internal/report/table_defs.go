@@ -258,6 +258,7 @@ var tableDefinitions = map[string]TableDefinition{
 			script.UncoreMinFromMSRScriptName,
 			script.UncoreMaxFromTPMIScriptName,
 			script.UncoreMinFromTPMIScriptName,
+			script.UncoreDieTypesFromTPMIScriptName,
 			script.ChaCountScriptName,
 			script.LscpuScriptName,
 			script.LspciBitsScriptName,
@@ -491,6 +492,7 @@ var tableDefinitions = map[string]TableDefinition{
 			script.UncoreMinFromMSRScriptName,
 			script.UncoreMaxFromTPMIScriptName,
 			script.UncoreMinFromTPMIScriptName,
+			script.UncoreDieTypesFromTPMIScriptName,
 			script.SpecTurboFrequenciesScriptName,
 			script.SpecTurboCoresScriptName,
 			script.ElcScriptName,
@@ -1015,10 +1017,25 @@ func cstateTableValues(outputs map[string]script.ScriptOutput) []Field {
 }
 
 func uncoreTableValues(outputs map[string]script.ScriptOutput) []Field {
-	return []Field{
-		{Name: "Min Frequency", Values: []string{uncoreMinFrequencyFromOutput(outputs)}},
-		{Name: "Max Frequency", Values: []string{uncoreMaxFrequencyFromOutput(outputs)}},
-		{Name: "CHA Count", Values: []string{chaCountFromOutput(outputs)}},
+	uarch := uarchFromOutput(outputs)
+	if uarch == "" {
+		slog.Error("failed to get uarch from script outputs")
+		return []Field{}
+	}
+	if strings.Contains(uarch, "SRF") || strings.Contains(uarch, "GNR") {
+		return []Field{
+			{Name: "Min Frequency (Compute)", Values: []string{uncoreMinMaxDieFrequencyFromOutput(false, true, outputs)}},
+			{Name: "Min Frequency (I/O)", Values: []string{uncoreMinMaxDieFrequencyFromOutput(false, false, outputs)}},
+			{Name: "Max Frequency (Compute)", Values: []string{uncoreMinMaxDieFrequencyFromOutput(true, true, outputs)}},
+			{Name: "Max Frequency (I/O)", Values: []string{uncoreMinMaxDieFrequencyFromOutput(true, false, outputs)}},
+			{Name: "CHA Count", Values: []string{chaCountFromOutput(outputs)}},
+		}
+	} else {
+		return []Field{
+			{Name: "Min Frequency", Values: []string{uncoreMinFrequencyFromOutput(outputs)}},
+			{Name: "Max Frequency", Values: []string{uncoreMaxFrequencyFromOutput(outputs)}},
+			{Name: "CHA Count", Values: []string{chaCountFromOutput(outputs)}},
+		}
 	}
 }
 
@@ -1683,18 +1700,39 @@ func systemSummaryTableValues(outputs map[string]script.ScriptOutput) []Field {
 }
 
 func configurationTableValues(outputs map[string]script.ScriptOutput) []Field {
-	return []Field{
+	uarch := uarchFromOutput(outputs)
+	if uarch == "" {
+		slog.Error("failed to get uarch from script outputs")
+		return []Field{}
+	}
+
+	fields := []Field{
 		{Name: "Cores per Socket", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)}},
 		{Name: "L3 Cache", Values: []string{l3FromOutput(outputs)}},
-		{Name: "Package Power / TDP (Watts)", Values: []string{tdpFromOutput(outputs)}},
-		{Name: "All-Core Max Frequency (GHz)", Values: []string{allCoreMaxFrequencyFromOutput(outputs)}},
-		{Name: "Uncore Max Frequency (GHz)", Values: []string{uncoreMaxFrequencyFromOutput(outputs)}},
-		{Name: "Uncore Min Frequency (GHz)", Values: []string{uncoreMinFrequencyFromOutput(outputs)}},
+		{Name: "Package Power / TDP", Values: []string{tdpFromOutput(outputs)}},
+		{Name: "All-Core Max Frequency", Values: []string{allCoreMaxFrequencyFromOutput(outputs)}},
+	}
+	if strings.Contains(uarch, "SRF") || strings.Contains(uarch, "GNR") {
+		fields = append(fields, []Field{
+			{Name: "Uncore Min Frequency (Compute)", Values: []string{uncoreMinMaxDieFrequencyFromOutput(false, true, outputs)}},
+			{Name: "Uncore Min Frequency (I/O)", Values: []string{uncoreMinMaxDieFrequencyFromOutput(false, false, outputs)}},
+			{Name: "Uncore Max Frequency (Compute)", Values: []string{uncoreMinMaxDieFrequencyFromOutput(true, true, outputs)}},
+			{Name: "Uncore Max Frequency (I/O)", Values: []string{uncoreMinMaxDieFrequencyFromOutput(true, false, outputs)}},
+		}...)
+	} else {
+		fields = append(fields, []Field{
+			{Name: "Uncore Max Frequency (GHz)", Values: []string{uncoreMaxFrequencyFromOutput(outputs)}},
+			{Name: "Uncore Min Frequency (GHz)", Values: []string{uncoreMinFrequencyFromOutput(outputs)}},
+		}...)
+	}
+	fields = append(fields, []Field{
 		{Name: "Energy Performance Bias", Values: []string{epbFromOutput(outputs)}},
 		{Name: "Energy Performance Preference", Values: []string{eppFromOutput(outputs)}},
 		{Name: "Scaling Governor", Values: []string{strings.TrimSpace(outputs[script.ScalingGovernorScriptName].Stdout)}},
 		{Name: "Efficiency Latency Control", Values: []string{elcSummaryFromOutput(outputs)}},
-	}
+	}...)
+
+	return fields
 }
 
 // benchmarking

@@ -81,6 +81,7 @@ const (
 	UncoreMinFromMSRScriptName                  = "uncore min from msr"
 	UncoreMaxFromTPMIScriptName                 = "uncore max from tpmi"
 	UncoreMinFromTPMIScriptName                 = "uncore min from tpmi"
+	UncoreDieTypesFromTPMIScriptName            = "uncore die types from tpmi"
 	ElcScriptName                               = "efficiency latency control"
 	SstTfHighPriorityCoreFrequenciesScriptName  = "sst tf high priority core frequencies"
 	SstTfLowPriorityCoreFrequenciesScriptName   = "sst tf low priority core frequencies"
@@ -425,7 +426,8 @@ rdmsr 0x1ad # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
 			Name:          UncoreMaxFromTPMIScriptName,
 			Script:        "pcm-tpmi 2 0x18 -d -b 8:14",
 			Architectures: []string{x86_64},
-			Families:      []string{"6"}, // Intel
+			Families:      []string{"6"},          // Intel
+			Models:        []string{"173", "175"}, // GNR, SRF
 			Depends:       []string{"pcm-tpmi"},
 			Superuser:     true,
 		},
@@ -433,7 +435,17 @@ rdmsr 0x1ad # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
 			Name:          UncoreMinFromTPMIScriptName,
 			Script:        "pcm-tpmi 2 0x18 -d -b 15:21",
 			Architectures: []string{x86_64},
-			Families:      []string{"6"}, // Intel
+			Families:      []string{"6"},          // Intel
+			Models:        []string{"173", "175"}, // GNR, SRF
+			Depends:       []string{"pcm-tpmi"},
+			Superuser:     true,
+		},
+		{
+			Name:          UncoreDieTypesFromTPMIScriptName,
+			Script:        "pcm-tpmi 2 0x10 -d -b 26:26",
+			Architectures: []string{x86_64},
+			Families:      []string{"6"},          // Intel
+			Models:        []string{"173", "175"}, // GNR, SRF
 			Depends:       []string{"pcm-tpmi"},
 			Superuser:     true,
 		},
@@ -506,7 +518,8 @@ for die in "${!die_types[@]}"; do
 done
 			`,
 			Architectures: []string{x86_64},
-			Families:      []string{"6"}, // Intel
+			Families:      []string{"6"},          // Intel
+			Models:        []string{"173", "175"}, // GNR, SRF
 			Depends:       []string{"pcm-tpmi"},
 			Superuser:     true,
 		},
