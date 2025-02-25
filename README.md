@@ -1,15 +1,12 @@
-<div align="center">
-
-# PerfSpect
-Analyze and Optimize Linux Servers
+# Intel&reg; PerfSpect
 
 [![Build](https://github.com/intel/PerfSpect/actions/workflows/build-test.yml/badge.svg)](https://github.com/intel/PerfSpect/actions/workflows/build-test.yml)[![CodeQL](https://github.com/intel/PerfSpect/actions/workflows/codeql.yml/badge.svg)](https://github.com/intel/PerfSpect/actions/workflows/codeql.yml)[![License](https://img.shields.io/badge/License-BSD--3-blue)](https://github.com/intel/PerfSpect/blob/master/LICENSE)
 
 [Getting PerfSpect](#getting-perfspect) | [Running PerfSpect](#running-perfspect) | [Building PerfSpect](#building-perfspect-from-source)
-</div>
 
-## What is PerfSpect
-PerfSpect is a command-line tool designed to help you analyze and optimize Linux servers and the software running on them. Whether you’re a system administrator, a developer, or a performance engineer, PerfSpect provides comprehensive insights and actionable recommendations to enhance performance and efficiency.
+Intel&reg; PerfSpect is a command-line tool designed to help you analyze and optimize Linux servers and the software running on them. Whether you’re a system administrator, a developer, or a performance engineer, PerfSpect provides comprehensive insights and actionable recommendations to enhance performance and efficiency.
+
+We welcome bug reports and enhancement requests, which can be submitted via the [Issues](https://github.com/intel/PerfSpect/issues) section on GitHub. For those interested in contributing to the code, please refer to the guidelines outlined in the [CONTRIBUTING.md](CONTRIBUTING.md) file.
 
 ## Getting PerfSpect
 ```
@@ -88,7 +85,7 @@ To assist in evaluating the health of target systems, the `report` command can r
 | storage | runs [fio](https://github.com/axboe/fio) for 2 minutes in read/write mode with a single worker to measure single-thread read and write bandwidth. Use the --storage-dir flag to override the default location. Minimum 5GB disk space required to run test. |
 
 #### Telemetry Command
-The `telemetry` command reports CPU utilization, instruction mix, disk stats, network stats, and more on the specified target(s). By default, all telemetry types are collected. To select telemetry types, additional command line options are available (see `perfspect telemetry -h`).
+The `telemetry` command reports CPU utilization, instruction mix, disk stats, network stats, and more on the specified target(s). By default, all telemetry types are collected. To choose telemetry types, see the additional command line options (`perfspect telemetry -h`).
 
 ![telemetry html](docs/telemetry_html.png)
 
