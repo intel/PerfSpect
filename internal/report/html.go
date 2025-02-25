@@ -1207,96 +1207,13 @@ func renderGaudiStatsChart(tableValues TableValues, chartStatFieldName string, t
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
 }
 
-func renderGaudiMemoryChart(tableValues TableValues) string {
-	// one chart per module
-	// three datasets per chart: used, free, total
-	// timestamp is in the first field
-	// find the module_id and memory field indexes
-	moduleIdFieldIdx, err := getFieldIndex("module_id", tableValues)
-	if err != nil {
-		slog.Error("error getting module_id field index", slog.String("error", err.Error()))
-		return ""
-	}
-	memoryUsedFieldIdx, err := getFieldIndex("memory.used [MiB]", tableValues)
-	if err != nil {
-		slog.Error("error getting memory.used field index", slog.String("error", err.Error()))
-		return ""
-	}
-	memoryFreeFieldIdx, err := getFieldIndex("memory.free [MiB]", tableValues)
-	if err != nil {
-		slog.Error("error getting memory.free field index", slog.String("error", err.Error()))
-		return ""
-	}
-	memoryTotalFieldIdx, err := getFieldIndex("memory.total [MiB]", tableValues)
-	if err != nil {
-		slog.Error("error getting memory.total field index", slog.String("error", err.Error()))
-		return ""
-	}
-	// group the memory data points by module_id
-	moduleMemory := make(map[string]map[string][]float64)
-	for i := 0; i < len(tableValues.Fields[0].Values); i++ {
-		moduleId := tableValues.Fields[moduleIdFieldIdx].Values[i]
-		if _, ok := moduleMemory[moduleId]; !ok {
-			moduleMemory[moduleId] = make(map[string][]float64)
-		}
-		used, err := strconv.ParseFloat(tableValues.Fields[memoryUsedFieldIdx].Values[i], 64)
-		if err != nil {
-			slog.Error("error parsing memory used", slog.String("error", err.Error()))
-			return ""
-		}
-		free, err := strconv.ParseFloat(tableValues.Fields[memoryFreeFieldIdx].Values[i], 64)
-		if err != nil {
-			slog.Error("error parsing memory free", slog.String("error", err.Error()))
-			return ""
-		}
-		total, err := strconv.ParseFloat(tableValues.Fields[memoryTotalFieldIdx].Values[i], 64)
-		if err != nil {
-			slog.Error("error parsing memory total", slog.String("error", err.Error()))
-			return ""
-		}
-		moduleMemory[moduleId]["used"] = append(moduleMemory[moduleId]["used"], used)
-		moduleMemory[moduleId]["free"] = append(moduleMemory[moduleId]["free"], free)
-		moduleMemory[moduleId]["total"] = append(moduleMemory[moduleId]["total"], total)
-	}
-	// sort the module ids
-	var moduleIds []string
-	for moduleId := range moduleMemory {
-		moduleIds = append(moduleIds, moduleId)
-	}
-	sort.Strings(moduleIds)
-	// build the data
-	var out string
-	for _, moduleId := range moduleIds {
-		data := [][]float64{}
-		datasetNames := []string{}
-		for _, stat := range []string{"used", "free", "total"} {
-			if len(moduleMemory[moduleId][stat]) > 0 {
-				data = append(data, moduleMemory[moduleId][stat])
-				datasetNames = append(datasetNames, stat)
-			}
-		}
-		chartConfig := chartTemplateStruct{
-			ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.Intn(10000)),
-			XaxisText:     "Time",
-			YaxisText:     "MiB",
-			TitleText:     fmt.Sprintf("Memory (module %s)", moduleId),
-			DisplayTitle:  "true",
-			DisplayLegend: "true",
-			AspectRatio:   "2",
-			SuggestedMin:  "0",
-			SuggestedMax:  "0",
-		}
-		out += telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
-	}
-	return out
-}
-
 func gaudiStatsTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	out := ""
 	out += renderGaudiStatsChart(tableValues, "utilization.aip [%]", "Utilization", "% Utilization", "100")
-	out += renderGaudiStatsChart(tableValues, "temperature.aip [C]", "Temperature", "Temperature (C)", "100")
+	out += renderGaudiStatsChart(tableValues, "memory.free [MiB]", "Memory Free", "Memory (MiB)", "0")
+	out += renderGaudiStatsChart(tableValues, "memory.used [MiB]", "Memory Used", "Memory (MiB)", "0")
 	out += renderGaudiStatsChart(tableValues, "power.draw [W]", "Power", "Watts", "0")
-	out += renderGaudiMemoryChart(tableValues)
+	out += renderGaudiStatsChart(tableValues, "temperature.aip [C]", "Temperature", "Temperature (C)", "0")
 	return out
 }
 
