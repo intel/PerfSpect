@@ -370,9 +370,9 @@ func ReadJSONFromFile(path string) (md Metadata, err error) {
 // e.g., "upi" -> [0,1,2,3],
 func getUncoreDeviceIDs(myTarget target.Target, localTempDir string) (IDs map[string][]int, err error) {
 	scriptDef := script.ScriptDefinition{
-		Name:      "list uncore devices",
-		Script:    "find /sys/bus/event_source/devices/ \\( -name uncore_* -o -name amd_* \\)",
-		Superuser: false,
+		Name:           "list uncore devices",
+		ScriptTemplate: "find /sys/bus/event_source/devices/ \\( -name uncore_* -o -name amd_* \\)",
+		Superuser:      false,
 	}
 	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
 	if err != nil {
@@ -437,9 +437,9 @@ func getPerfSupportedEvents(myTarget target.Target, perfPath string) (supportedE
 // getSupportsEvent() - checks if the event is supported by perf
 func getSupportsEvent(myTarget target.Target, event string, noRoot bool, perfPath string, localTempDir string) (supported bool, output string, err error) {
 	scriptDef := script.ScriptDefinition{
-		Name:      "perf stat " + event,
-		Script:    perfPath + " stat -a -e " + event + " sleep 1",
-		Superuser: !noRoot,
+		Name:           "perf stat " + event,
+		ScriptTemplate: perfPath + " stat -a -e " + event + " sleep 1",
+		Superuser:      !noRoot,
 	}
 	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
 	if err != nil {
@@ -456,9 +456,9 @@ func getSupportsEvent(myTarget target.Target, event string, noRoot bool, perfPat
 // it is a PEBS event that we used in EMR metrics.
 func getSupportsPEBS(myTarget target.Target, noRoot bool, perfPath string, localTempDir string) (supported bool, output string, err error) {
 	scriptDef := script.ScriptDefinition{
-		Name:      "perf stat pebs",
-		Script:    perfPath + " stat -a -e cpu/event=0xad,umask=0x40,period=1000003,name='INT_MISC.UNKNOWN_BRANCH_CYCLES'/ sleep 1",
-		Superuser: !noRoot,
+		Name:           "perf stat pebs",
+		ScriptTemplate: perfPath + " stat -a -e cpu/event=0xad,umask=0x40,period=1000003,name='INT_MISC.UNKNOWN_BRANCH_CYCLES'/ sleep 1",
+		Superuser:      !noRoot,
 	}
 	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
 	if err != nil {
@@ -473,9 +473,9 @@ func getSupportsPEBS(myTarget target.Target, noRoot bool, perfPath string, local
 // On some VMs, e.g. GCP C4, offcore response events are not supported and perf returns '<not supported>'
 func getSupportsOCR(myTarget target.Target, noRoot bool, perfPath string, localTempDir string) (supported bool, output string, err error) {
 	scriptDef := script.ScriptDefinition{
-		Name:      "perf stat ocr",
-		Script:    perfPath + " stat -a -e cpu/event=0x2a,umask=0x01,offcore_rsp=0x104004477,name='OCR.READS_TO_CORE.LOCAL_DRAM'/ sleep 1",
-		Superuser: !noRoot,
+		Name:           "perf stat ocr",
+		ScriptTemplate: perfPath + " stat -a -e cpu/event=0x2a,umask=0x01,offcore_rsp=0x104004477,name='OCR.READS_TO_CORE.LOCAL_DRAM'/ sleep 1",
+		Superuser:      !noRoot,
 	}
 	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
 	if err != nil {
@@ -499,9 +499,9 @@ func getSupportsOCR(myTarget target.Target, noRoot bool, perfPath string, localT
 // All three of these failure modes are checked for in this function.
 func getSupportsFixedTMA(myTarget target.Target, noRoot bool, perfPath string, localTempDir string) (supported bool, output string, err error) {
 	scriptDef := script.ScriptDefinition{
-		Name:      "perf stat tma",
-		Script:    perfPath + " stat -a -e '{cpu/event=0x00,umask=0x04,period=10000003,name='TOPDOWN.SLOTS'/,cpu/event=0x00,umask=0x81,period=10000003,name='PERF_METRICS.BAD_SPECULATION'/}' sleep 1",
-		Superuser: !noRoot,
+		Name:           "perf stat tma",
+		ScriptTemplate: perfPath + " stat -a -e '{cpu/event=0x00,umask=0x04,period=10000003,name='TOPDOWN.SLOTS'/,cpu/event=0x00,umask=0x81,period=10000003,name='PERF_METRICS.BAD_SPECULATION'/}' sleep 1",
+		Superuser:      !noRoot,
 	}
 	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
 	if err != nil {
@@ -564,9 +564,9 @@ func getSupportsFixedEvent(myTarget target.Target, event string, uarch string, n
 		eventList = append(eventList, event)
 	}
 	scriptDef := script.ScriptDefinition{
-		Name:      "perf stat fixed" + event,
-		Script:    perfPath + " stat -a -e '{" + strings.Join(eventList, ",") + "}' sleep 1",
-		Superuser: !noRoot,
+		Name:           "perf stat fixed" + event,
+		ScriptTemplate: perfPath + " stat -a -e '{" + strings.Join(eventList, ",") + "}' sleep 1",
+		Superuser:      !noRoot,
 	}
 	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
 	if err != nil {
@@ -595,9 +595,9 @@ func getSupportsFixedEvent(myTarget target.Target, event string, uarch string, n
 // getPMUDriverVersion - returns the version of the Intel PMU driver
 func getPMUDriverVersion(myTarget target.Target, localTempDir string) (version string, err error) {
 	scriptDef := script.ScriptDefinition{
-		Name:      "pmu driver version",
-		Script:    "dmesg | grep -A 1 \"Intel PMU driver\" | tail -1 | awk '{print $NF}'",
-		Superuser: true,
+		Name:           "pmu driver version",
+		ScriptTemplate: "dmesg | grep -A 1 \"Intel PMU driver\" | tail -1 | awk '{print $NF}'",
+		Superuser:      true,
 	}
 	output, err := script.RunScript(myTarget, scriptDef, localTempDir)
 	if err != nil {
@@ -613,9 +613,9 @@ func getPMUDriverVersion(myTarget target.Target, localTempDir string) (version s
 func getTSCFreqHz(myTarget target.Target, localTempDir string) (freqHz int, err error) {
 	// run tsc app on target to get TSC Frequency in MHz
 	scriptDef := script.ScriptDefinition{
-		Name:    "tsc",
-		Script:  "tsc",
-		Depends: []string{"tsc"},
+		Name:           "tsc",
+		ScriptTemplate: "tsc",
+		Depends:        []string{"tsc"},
 	}
 	output, err := script.RunScript(myTarget, scriptDef, localTempDir)
 	if err != nil {
@@ -632,8 +632,8 @@ func getTSCFreqHz(myTarget target.Target, localTempDir string) (freqHz int, err 
 
 func getKernelVersion(myTarget target.Target, localTempDir string) (version string, err error) {
 	scriptDef := script.ScriptDefinition{
-		Name:   "kernel version",
-		Script: "uname -r",
+		Name:           "kernel version",
+		ScriptTemplate: "uname -r",
 	}
 	output, err := script.RunScript(myTarget, scriptDef, localTempDir)
 	if err != nil {

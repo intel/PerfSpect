@@ -406,7 +406,7 @@ func setCoreCount(cores int, myTarget target.Target, localTempDir string) (strin
 	fmt.Printf("set core count per processor to %d on %s\n", cores, myTarget.GetName())
 	setScript := script.ScriptDefinition{
 		Name: "set core count",
-		Script: fmt.Sprintf(`
+		ScriptTemplate: fmt.Sprintf(`
 desired_core_count_per_socket=%d
 num_cpus=$(ls /sys/devices/system/cpu/ | grep -E "^cpu[0-9]+$" | wc -l)
 num_threads=$(lscpu | grep 'Thread(s) per core' | awk '{print $NF}')
@@ -544,14 +544,14 @@ func setLlcSize(llcSize float64, myTarget target.Target, localTempDir string) {
 	}
 	// set the LLC size
 	setScript := script.ScriptDefinition{
-		Name:          "set LLC size",
-		Script:        fmt.Sprintf("wrmsr -a 0xC90 %d", cacheWays[waysToSet]),
-		Superuser:     true,
-		Architectures: []string{"x86_64"},
-		Families:      []string{"6"},                                                // Intel only
-		Models:        []string{"63", "79", "86", "85", "106", "108", "143", "207"}, // not SRF, GNR
-		Depends:       []string{"wrmsr"},
-		Lkms:          []string{"msr"},
+		Name:           "set LLC size",
+		ScriptTemplate: fmt.Sprintf("wrmsr -a 0xC90 %d", cacheWays[waysToSet]),
+		Superuser:      true,
+		Architectures:  []string{"x86_64"},
+		Families:       []string{"6"},                                                // Intel only
+		Models:         []string{"63", "79", "86", "85", "106", "108", "143", "207"}, // not SRF, GNR
+		Depends:        []string{"wrmsr"},
+		Lkms:           []string{"msr"},
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
@@ -567,12 +567,12 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 		msr = msr | freqInt<<uint(i*8)
 	}
 	setScript := script.ScriptDefinition{
-		Name:          "set frequency bins",
-		Script:        fmt.Sprintf("wrmsr -a 0x1AD %d", msr),
-		Superuser:     true,
-		Architectures: []string{"x86_64"},
-		Families:      []string{"6"}, // Intel only
-		Depends:       []string{"wrmsr"},
+		Name:           "set frequency bins",
+		ScriptTemplate: fmt.Sprintf("wrmsr -a 0x1AD %d", msr),
+		Superuser:      true,
+		Architectures:  []string{"x86_64"},
+		Families:       []string{"6"}, // Intel only
+		Depends:        []string{"wrmsr"},
 	}
 	_, err := runScript(myTarget, setScript, localTempDir)
 	if err != nil {
@@ -649,12 +649,12 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 	// run script for each die of specified type
 	for _, die := range dies {
 		setScript := script.ScriptDefinition{
-			Name:          "write max and min uncore frequency TPMI",
-			Script:        fmt.Sprintf("pcm-tpmi 2 0x18 -d -b %s -w %d -i %s -e %s", bits, value, die.instance, die.entry),
-			Architectures: []string{"x86_64"},
-			Families:      []string{"6"}, // Intel only
-			Depends:       []string{"pcm-tpmi"},
-			Superuser:     true,
+			Name:           "write max and min uncore frequency TPMI",
+			ScriptTemplate: fmt.Sprintf("pcm-tpmi 2 0x18 -d -b %s -w %d -i %s -e %s", bits, value, die.instance, die.entry),
+			Architectures:  []string{"x86_64"},
+			Families:       []string{"6"}, // Intel only
+			Depends:        []string{"pcm-tpmi"},
+			Superuser:      true,
 		}
 		_, err = runScript(myTarget, setScript, localTempDir)
 		if err != nil {
@@ -674,13 +674,13 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 	fmt.Printf("set uncore %s frequency to %.1f GHz on %s\n", minmax, uncoreFrequency, myTarget.GetName())
 	scripts := []script.ScriptDefinition{}
 	scripts = append(scripts, script.ScriptDefinition{
-		Name:          "get uncore frequency MSR",
-		Script:        "rdmsr 0x620",
-		Lkms:          []string{"msr"},
-		Architectures: []string{"x86_64"},
-		Families:      []string{"6"}, // Intel only
-		Depends:       []string{"rdmsr"},
-		Superuser:     true,
+		Name:           "get uncore frequency MSR",
+		ScriptTemplate: "rdmsr 0x620",
+		Lkms:           []string{"msr"},
+		Architectures:  []string{"x86_64"},
+		Families:       []string{"6"}, // Intel only
+		Depends:        []string{"rdmsr"},
+		Superuser:      true,
 	})
 	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir)
 	if err != nil {
@@ -727,13 +727,13 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 		newVal = newVal | newFreq<<8
 	}
 	setScript := script.ScriptDefinition{
-		Name:          "set uncore frequency MSR",
-		Script:        fmt.Sprintf("wrmsr -a 0x620 %d", newVal),
-		Superuser:     true,
-		Architectures: []string{"x86_64"},
-		Families:      []string{"6"}, // Intel only
-		Lkms:          []string{"msr"},
-		Depends:       []string{"wrmsr"},
+		Name:           "set uncore frequency MSR",
+		ScriptTemplate: fmt.Sprintf("wrmsr -a 0x620 %d", newVal),
+		Superuser:      true,
+		Architectures:  []string{"x86_64"},
+		Families:       []string{"6"}, // Intel only
+		Lkms:           []string{"msr"},
+		Depends:        []string{"wrmsr"},
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
@@ -744,13 +744,13 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 func setPower(power int, myTarget target.Target, localTempDir string) {
 	fmt.Printf("set power to %d Watts on %s\n", power, myTarget.GetName())
 	readScript := script.ScriptDefinition{
-		Name:          "get power MSR",
-		Script:        "rdmsr 0x610",
-		Superuser:     true,
-		Architectures: []string{"x86_64"},
-		Families:      []string{"6"}, // Intel only
-		Lkms:          []string{"msr"},
-		Depends:       []string{"rdmsr"},
+		Name:           "get power MSR",
+		ScriptTemplate: "rdmsr 0x610",
+		Superuser:      true,
+		Architectures:  []string{"x86_64"},
+		Families:       []string{"6"}, // Intel only
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
 	}
 	readOutput, err := script.RunScript(myTarget, readScript, localTempDir)
 	if err != nil {
@@ -768,13 +768,13 @@ func setPower(power int, myTarget target.Target, localTempDir string) {
 			// add in the new power value
 			newVal = newVal | uint64(power*8)
 			setScript := script.ScriptDefinition{
-				Name:          "set tdp",
-				Script:        fmt.Sprintf("wrmsr -a 0x610 %d", newVal),
-				Superuser:     true,
-				Architectures: []string{"x86_64"},
-				Families:      []string{"6"}, // Intel only
-				Lkms:          []string{"msr"},
-				Depends:       []string{"wrmsr"},
+				Name:           "set tdp",
+				ScriptTemplate: fmt.Sprintf("wrmsr -a 0x610 %d", newVal),
+				Superuser:      true,
+				Architectures:  []string{"x86_64"},
+				Families:       []string{"6"}, // Intel only
+				Lkms:           []string{"msr"},
+				Depends:        []string{"wrmsr"},
 			}
 			_, err := runScript(myTarget, setScript, localTempDir)
 			if err != nil {
@@ -787,13 +787,13 @@ func setPower(power int, myTarget target.Target, localTempDir string) {
 func setEpb(epb int, myTarget target.Target, localTempDir string) {
 	fmt.Printf("set energy performance bias (EPB) to %d on %s\n", epb, myTarget.GetName())
 	setScript := script.ScriptDefinition{
-		Name:          "set epb",
-		Script:        fmt.Sprintf("wrmsr -a 0x1B0 %d", epb),
-		Superuser:     true,
-		Architectures: []string{"x86_64"},
-		Families:      []string{"6"}, // Intel only
-		Lkms:          []string{"msr"},
-		Depends:       []string{"wrmsr"},
+		Name:           "set epb",
+		ScriptTemplate: fmt.Sprintf("wrmsr -a 0x1B0 %d", epb),
+		Superuser:      true,
+		Architectures:  []string{"x86_64"},
+		Families:       []string{"6"}, // Intel only
+		Lkms:           []string{"msr"},
+		Depends:        []string{"wrmsr"},
 	}
 	_, err := runScript(myTarget, setScript, localTempDir)
 	if err != nil {
@@ -808,13 +808,13 @@ func setEpp(epp int, myTarget target.Target, localTempDir string) {
 
 	// get the current value of the IAEW_HWP_REQUEST MSR that includes the current EPP valid value in bit 60
 	getScript := script.ScriptDefinition{
-		Name:          "get epp msr",
-		Script:        "rdmsr 0x774", // IA32_HWP_REQUEST
-		Architectures: []string{"x86_64"},
-		Families:      []string{"6"}, // Intel only
-		Lkms:          []string{"msr"},
-		Depends:       []string{"rdmsr"},
-		Superuser:     true,
+		Name:           "get epp msr",
+		ScriptTemplate: "rdmsr 0x774", // IA32_HWP_REQUEST
+		Architectures:  []string{"x86_64"},
+		Families:       []string{"6"}, // Intel only
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
+		Superuser:      true,
 	}
 	stdout, err := runScript(myTarget, getScript, localTempDir)
 	if err != nil {
@@ -832,13 +832,13 @@ func setEpp(epp int, myTarget target.Target, localTempDir string) {
 	eppValue := maskedValue | uint64(epp)<<24
 	// write it back to the MSR
 	setScript := script.ScriptDefinition{
-		Name:          "set epp",
-		Script:        fmt.Sprintf("wrmsr -a 0x774 %d", eppValue),
-		Superuser:     true,
-		Architectures: []string{"x86_64"},
-		Families:      []string{"6"}, // Intel only
-		Lkms:          []string{"msr"},
-		Depends:       []string{"wrmsr"},
+		Name:           "set epp",
+		ScriptTemplate: fmt.Sprintf("wrmsr -a 0x774 %d", eppValue),
+		Superuser:      true,
+		Architectures:  []string{"x86_64"},
+		Families:       []string{"6"}, // Intel only
+		Lkms:           []string{"msr"},
+		Depends:        []string{"wrmsr"},
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
@@ -848,13 +848,13 @@ func setEpp(epp int, myTarget target.Target, localTempDir string) {
 
 	// get the current value of the IA32_HWP_REQUEST_PKG MSR that includes the current package EPP value
 	getScript = script.ScriptDefinition{
-		Name:          "get epp pkg msr",
-		Script:        "rdmsr 0x772", // IA32_HWP_REQUEST_PKG
-		Architectures: []string{"x86_64"},
-		Families:      []string{"6"}, // Intel only
-		Lkms:          []string{"msr"},
-		Depends:       []string{"rdmsr"},
-		Superuser:     true,
+		Name:           "get epp pkg msr",
+		ScriptTemplate: "rdmsr 0x772", // IA32_HWP_REQUEST_PKG
+		Architectures:  []string{"x86_64"},
+		Families:       []string{"6"}, // Intel only
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
+		Superuser:      true,
 	}
 	stdout, err = runScript(myTarget, getScript, localTempDir)
 	if err != nil {
@@ -873,13 +873,13 @@ func setEpp(epp int, myTarget target.Target, localTempDir string) {
 	eppValue = maskedValue | uint64(epp)<<24
 	// write it back to the MSR
 	setScript = script.ScriptDefinition{
-		Name:          "set epp",
-		Script:        fmt.Sprintf("wrmsr -a 0x772 %d", eppValue),
-		Superuser:     true,
-		Architectures: []string{"x86_64"},
-		Families:      []string{"6"}, // Intel only
-		Lkms:          []string{"msr"},
-		Depends:       []string{"wrmsr"},
+		Name:           "set epp",
+		ScriptTemplate: fmt.Sprintf("wrmsr -a 0x772 %d", eppValue),
+		Superuser:      true,
+		Architectures:  []string{"x86_64"},
+		Families:       []string{"6"}, // Intel only
+		Lkms:           []string{"msr"},
+		Depends:        []string{"wrmsr"},
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
@@ -890,9 +890,9 @@ func setEpp(epp int, myTarget target.Target, localTempDir string) {
 func setGovernor(governor string, myTarget target.Target, localTempDir string) {
 	fmt.Printf("set governor to %s on %s\n", governor, myTarget.GetName())
 	setScript := script.ScriptDefinition{
-		Name:      "set governor",
-		Script:    fmt.Sprintf("echo %s | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor", governor),
-		Superuser: true,
+		Name:           "set governor",
+		ScriptTemplate: fmt.Sprintf("echo %s | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor", governor),
+		Superuser:      true,
 	}
 	_, err := runScript(myTarget, setScript, localTempDir)
 	if err != nil {
@@ -913,13 +913,13 @@ func setElc(elc string, myTarget target.Target, localTempDir string) {
 		return
 	}
 	setScript := script.ScriptDefinition{
-		Name:          "set elc",
-		Script:        fmt.Sprintf("bhs-power-mode.sh --%s", mode),
-		Superuser:     true,
-		Architectures: []string{"x86_64"},
-		Families:      []string{"6"},          // Intel only
-		Models:        []string{"173", "175"}, // GNR and SRF only
-		Depends:       []string{"bhs-power-mode.sh"},
+		Name:           "set elc",
+		ScriptTemplate: fmt.Sprintf("bhs-power-mode.sh --%s", mode),
+		Superuser:      true,
+		Architectures:  []string{"x86_64"},
+		Families:       []string{"6"},          // Intel only
+		Models:         []string{"173", "175"}, // GNR and SRF only
+		Depends:        []string{"bhs-power-mode.sh"},
 	}
 	_, err := runScript(myTarget, setScript, localTempDir)
 	if err != nil {

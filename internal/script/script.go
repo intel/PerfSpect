@@ -176,7 +176,7 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 					break
 				}
 			}
-			scriptOutput.Script = parallelScripts[scriptIdx].Script
+			scriptOutput.ScriptTemplate = parallelScripts[scriptIdx].ScriptTemplate
 			scriptOutputs[scriptOutput.Name] = scriptOutput
 		}
 	}
@@ -196,7 +196,7 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 		}
 		stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, false)
 		if err != nil {
-			slog.Error("error running script on target", slog.String("script", script.Script), slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitcode", exitcode), slog.String("error", err.Error()))
+			slog.Error("error running script on target", slog.String("script", script.ScriptTemplate), slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitcode", exitcode), slog.String("error", err.Error()))
 		}
 		scriptOutputs[script.Name] = ScriptOutput{ScriptDefinition: script, Stdout: stdout, Stderr: stderr, Exitcode: exitcode}
 		if !ignoreScriptErrors {
@@ -446,9 +446,9 @@ func prepareTargetToRunScripts(myTarget target.Target, scripts []ScriptDefinitio
 			}
 		}
 		// replace any placeholders in the script with the actual values
-		script.Script = strings.ReplaceAll(script.Script, "{cmd_pid}", sanitizeScriptName(script.Name)+"_cmd.pid")
+		script.ScriptTemplate = strings.ReplaceAll(script.ScriptTemplate, "{cmd_pid}", sanitizeScriptName(script.Name)+"_cmd.pid")
 		// add user's path to script
-		scriptWithPath := fmt.Sprintf("export PATH=\"%s\"\n%s", userPath, script.Script)
+		scriptWithPath := fmt.Sprintf("export PATH=\"%s\"\n%s", userPath, script.ScriptTemplate)
 		if script.Name == "" {
 			panic("script name cannot be empty")
 		}

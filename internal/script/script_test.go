@@ -33,11 +33,11 @@ func TestRunScript(t *testing.T) {
 		for _, superuser := range superuserVals {
 			// test one line script
 			scriptDef1 := ScriptDefinition{
-				Name:      "unittest hello",
-				Script:    "echo 'Hello, World!'",
-				Superuser: superuser,
-				Lkms:      []string{},
-				Depends:   []string{},
+				Name:           "unittest hello",
+				ScriptTemplate: "echo 'Hello, World!'",
+				Superuser:      superuser,
+				Lkms:           []string{},
+				Depends:        []string{},
 			}
 			tempDir, err := os.MkdirTemp(os.TempDir(), "test")
 			if err != nil {
@@ -67,7 +67,7 @@ func TestRunScript(t *testing.T) {
 			// test multi-line script
 			scriptDef2 := ScriptDefinition{
 				Name: "unittest cores",
-				Script: `num_cores_per_socket=$( lscpu | grep 'Core(s) per socket:' | head -1 | awk '{print $4}' )
+				ScriptTemplate: `num_cores_per_socket=$( lscpu | grep 'Core(s) per socket:' | head -1 | awk '{print $4}' )
 echo "Core Count: $num_cores_per_socket"`,
 				Superuser: superuser,
 				Lkms:      []string{},
@@ -102,7 +102,7 @@ echo "Core Count: $num_cores_per_socket"`,
 				// test multi-line script w/ dependency
 				scriptDef3 := ScriptDefinition{
 					Name: "Test Script",
-					Script: `count=1
+					ScriptTemplate: `count=1
 mpstat -u -T -I SCPU -P ALL 1 $count`,
 					Superuser: superuser,
 					Lkms:      []string{},

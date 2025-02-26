@@ -17,7 +17,7 @@ import (
 // GetMuxIntervals - get a map of sysfs device file names to current mux value for the associated device
 func GetMuxIntervals(myTarget target.Target, localTempDir string) (intervals map[string]int, err error) {
 	bash := "for file in $(find /sys/devices -type f -name perf_event_mux_interval_ms); do echo $file $(cat $file); done"
-	scriptOutput, err := script.RunScript(myTarget, script.ScriptDefinition{Name: "get mux intervals", Script: bash, Superuser: false}, localTempDir)
+	scriptOutput, err := script.RunScript(myTarget, script.ScriptDefinition{Name: "get mux intervals", ScriptTemplate: bash, Superuser: false}, localTempDir)
 	if err != nil {
 		return
 	}
@@ -39,7 +39,7 @@ func SetMuxIntervals(myTarget target.Target, intervals map[string]int, localTemp
 	for device := range intervals {
 		bash += fmt.Sprintf("echo %d > %s; ", intervals[device], device)
 	}
-	scriptOutput, err := script.RunScript(myTarget, script.ScriptDefinition{Name: "set mux intervals", Script: bash, Superuser: true}, localTempDir)
+	scriptOutput, err := script.RunScript(myTarget, script.ScriptDefinition{Name: "set mux intervals", ScriptTemplate: bash, Superuser: true}, localTempDir)
 	if err != nil {
 		err = fmt.Errorf("failed to set mux interval on device: %s, %d, %v", scriptOutput.Stderr, scriptOutput.Exitcode, err)
 		return
@@ -50,7 +50,7 @@ func SetMuxIntervals(myTarget target.Target, intervals map[string]int, localTemp
 // SetAllMuxIntervals - writes the given interval (ms) to all perf mux sysfs device files
 func SetAllMuxIntervals(myTarget target.Target, interval int, localTempDir string) (err error) {
 	bash := fmt.Sprintf("for file in $(find /sys/devices -type f -name perf_event_mux_interval_ms); do echo %d > $file; done", interval)
-	_, err = script.RunScript(myTarget, script.ScriptDefinition{Name: "set all mux intervals", Script: bash, Superuser: true}, localTempDir)
+	_, err = script.RunScript(myTarget, script.ScriptDefinition{Name: "set all mux intervals", ScriptTemplate: bash, Superuser: true}, localTempDir)
 	if err != nil {
 		return
 	}
