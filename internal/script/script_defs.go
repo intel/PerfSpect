@@ -1153,7 +1153,7 @@ rm -rf $test_dir`, params.StorageDir)
 				script += " &\n"                                     // run it in the background
 				script += "echo $! > {cmd_pid}\n"                    // this is used to kill the command
 				script += fmt.Sprintf("sleep %d\n", params.Duration) // sleep because hl-smi doesn't have a duration flag
-				script += "wait\n"                                   // wait for the command to finish
+				script += "kill -9 $(cat {cmd_pid})\n"               // kill the hl-smi command
 				return script
 			}(),
 			Superuser: true,
