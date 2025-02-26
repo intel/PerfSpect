@@ -1154,7 +1154,8 @@ rm -rf $test_dir`, params.StorageDir)
 				if params.Frequency > 0 {
 					apInterval = int(1 / float64(params.Frequency) * 1000000000)
 				}
-				return fmt.Sprintf(`# JAVA app call stack collection (run in background)
+				return fmt.Sprintf(`#!/bin/bash
+# JAVA app call stack collection (run in background)
 ap_interval=%d
 duration=%d
 declare -a java_pids=()
@@ -1184,37 +1185,67 @@ done
 		{
 			Name: ProfileSystemScriptName,
 			Script: func() string {
-				return fmt.Sprintf(`# system-wide call stack collection
+				return fmt.Sprintf(`#!/bin/bash
+# system-wide call stack collection
+
+# Function to restore original settings
+restore_settings() {
+    echo "$PERF_EVENT_PARANOID" > /proc/sys/kernel/perf_event_paranoid
+    echo "$KPTR_RESTRICT" > /proc/sys/kernel/kptr_restrict
+}
+
 # adjust perf_event_paranoid and kptr_restrict
 PERF_EVENT_PARANOID=$( cat /proc/sys/kernel/perf_event_paranoid )
 echo -1 >/proc/sys/kernel/perf_event_paranoid
 KPTR_RESTRICT=$( cat /proc/sys/kernel/kptr_restrict )
 echo 0 >/proc/sys/kernel/kptr_restrict
-# system-wide call stack collection - frame pointer mode
+
+# Ensure settings are restored on exit
+trap restore_settings EXIT
+
 frequency=%d
 duration=%d
-perf record -F $frequency -a -g -o perf_fp.data -m 129 -- sleep $duration &
+
+# system-wide call stack collection - frame pointer mode
+perf_fp_data=$(mktemp /tmp/perf_fp.XXXXXX)
+perf record -F $frequency -a -g -o "$perf_fp_data" -m 129 -- sleep $duration &
 PERF_FP_PID=$!
+if ! kill -0 $PERF_FP_PID 2>/dev/null; then
+    echo "Failed to start perf record for frame pointer mode"
+    exit 1
+fi
+
 # system-wide call stack collection - dwarf mode
-perf record -F $frequency -a -g -o perf_dwarf.data -m 257 --call-graph dwarf,8192 -- sleep $duration &
-PERF_SYS_PID=$!
+perf_dwarf_data=$(mktemp /tmp/perf_dwarf.XXXXXX)
+perf record -F $frequency -a -g -o "$perf_dwarf_data" -m 257 --call-graph dwarf,8192 -- sleep $duration &
+PERF_DWARF_PID=$!
+if ! kill -0 $PERF_DWARF_PID 2>/dev/null; then
+    echo "Failed to start perf record for dwarf mode"
+    kill $PERF_FP_PID
+    exit 1
+fi
+
 # wait for perf to finish
-wait ${PERF_FP_PID}
-wait ${PERF_SYS_PID}
-# restore perf_event_paranoid and kptr_restrict
-echo "$PERF_EVENT_PARANOID" > /proc/sys/kernel/perf_event_paranoid
-echo "$KPTR_RESTRICT" > /proc/sys/kernel/kptr_restrict
+wait ${PERF_FP_PID} ${PERF_DWARF_PID}
+
 # collapse perf data
-perf script -i perf_dwarf.data | stackcollapse-perf.pl > perf_dwarf.folded
-perf script -i perf_fp.data | stackcollapse-perf.pl > perf_fp.folded
-if [ -f "perf_dwarf.folded" ]; then
+perf_dwarf_folded=$(mktemp /tmp/perf_dwarf_folded.XXXXXX)
+perf_fp_folded=$(mktemp /tmp/perf_fp_folded.XXXXXX)
+perf script -i "$perf_dwarf_data" | stackcollapse-perf.pl > "$perf_dwarf_folded"
+perf script -i "$perf_fp_data" | stackcollapse-perf.pl > "$perf_fp_folded"
+
+# Display results
+if [ -f "$perf_dwarf_folded" ]; then
     echo "########## perf_dwarf ##########"
-    cat perf_dwarf.folded
+    cat "$perf_dwarf_folded"
 fi
-if [ -f "perf_fp.folded" ]; then
+if [ -f "$perf_fp_folded" ]; then
     echo "########## perf_fp ##########"
-    cat perf_fp.folded
+    cat "$perf_fp_folded"
 fi
+
+# Clean up temporary files
+rm -f "$perf_fp_data" "$perf_dwarf_data" "$perf_dwarf_folded" "$perf_fp_folded"
 `, params.Frequency, params.Duration)
 			}(),
 			Superuser: true,
