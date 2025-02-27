@@ -2090,53 +2090,71 @@ func instructionMixTableValues(outputs map[string]script.ScriptOutput) []Field {
 	// first two lines are not part of the CSV output, they are the start time and interval
 	var startTime time.Time
 	var interval int
-	for i, line := range strings.Split(outputs[script.InstructionMixScriptName].Stdout, "\n") {
-		if i == 0 {
-			if !strings.HasPrefix(line, "TIME") {
-				slog.Error("instruction mix output is not in expected format, missing TIME")
-				return []Field{}
-			} else {
-				val := strings.Split(line, " ")[1]
-				var err error
-				startTime, err = time.Parse("15:04:05", val)
-				if err != nil {
-					slog.Error(fmt.Sprintf("unable to parse instruction mix start time: %s", val))
-					return []Field{}
-				}
-			}
-		} else if i == 1 {
-			if !strings.HasPrefix(line, "INTERVAL") {
-				slog.Error("instruction mix output is not in expected format, missing INTERVAL")
-				return []Field{}
-			} else {
-				val := strings.Split(line, " ")[1]
-				var err error
-				interval, err = strconv.Atoi(val)
-				if err != nil {
-					slog.Error(fmt.Sprintf("unable to convert instruction mix interval to int: %s", val))
-					return []Field{}
-				}
-			}
-		} else {
-			break
+	lines := strings.Split(outputs[script.InstructionMixScriptName].Stdout, "\n")
+	if len(lines) < 4 {
+		slog.Error("no data found in instruction mix output")
+		return []Field{}
+	}
+	// TIME
+	line := lines[0]
+	if !strings.HasPrefix(line, "TIME") {
+		slog.Error("instruction mix output is not in expected format, missing TIME")
+		return []Field{}
+	} else {
+		val := strings.Split(line, " ")[1]
+		var err error
+		startTime, err = time.Parse("15:04:05", val)
+		if err != nil {
+			slog.Error(fmt.Sprintf("unable to parse instruction mix start time: %s", val))
+			return []Field{}
 		}
 	}
-	// parse the CSV output
-	csvOutput := strings.Join(strings.Split(outputs[script.InstructionMixScriptName].Stdout, "\n")[2:], "\n")
-	r := csv.NewReader(strings.NewReader(csvOutput))
+	// INTERVAL
+	line = lines[1]
+	if !strings.HasPrefix(line, "INTERVAL") {
+		slog.Error("instruction mix output is not in expected format, missing INTERVAL")
+		return []Field{}
+	} else {
+		val := strings.Split(line, " ")[1]
+		var err error
+		interval, err = strconv.Atoi(val)
+		if err != nil {
+			slog.Error(fmt.Sprintf("unable to convert instruction mix interval to int: %s", val))
+			return []Field{}
+		}
+	}
+	// remove blank lines that occur throughout the remaining lines
+	csvLines := []string{}
+	for _, line := range lines[2:] { // skip the TIME and INTERVAL lines
+		if line != "" {
+			csvLines = append(csvLines, line)
+		}
+	}
+	if len(csvLines) < 2 {
+		slog.Error("instruction mix CSV output is not in expected format, missing header and data")
+		return []Field{}
+	}
+	// if processwatch was killed, it may print a partial output line at the end
+	// check if the last line is a partial line by comparing the number of fields in the last line to the number of fields in the header
+	if len(strings.Split(csvLines[len(csvLines)-1], ",")) != len(strings.Split(csvLines[0], ",")) {
+		slog.Debug("removing partial line from instruction mix output", "line", csvLines[len(csvLines)-1], "lineNo", len(csvLines)-1)
+		csvLines = csvLines[:len(csvLines)-1] // remove the last line
+	}
+	// CSV
+	r := csv.NewReader(strings.NewReader(strings.Join(csvLines, "\n")))
 	rows, err := r.ReadAll()
 	if err != nil {
 		slog.Error(err.Error())
 		return []Field{}
 	}
 	if len(rows) < 2 {
-		slog.Error("instruction mix output is not in expected format")
+		slog.Error("instruction mix CSV output is not in expected format")
 		return []Field{}
 	}
 	fields := []Field{{Name: "Time"}}
 	// first row is the header, extract field names, skip the first three fields (interval, pid, name)
 	if len(rows[0]) < 3 {
-		slog.Error("instruction mix output is not in expected format")
+		slog.Error("not enough headers in instruction mix CSV output", slog.Any("headers", rows[0]))
 		return []Field{}
 	}
 	for _, field := range rows[0][3:] {
@@ -2157,7 +2175,7 @@ func instructionMixTableValues(outputs map[string]script.ScriptOutput) []Field {
 			sample = rowSample
 			for i := range fields {
 				if i == 0 {
-					fields[i].Values = append(fields[i].Values, startTime.Add(time.Duration(sample*interval)*time.Second).Format("15:04:05"))
+					fields[i].Values = append(fields[i].Values, startTime.Add(time.Duration(interval+(sample*interval))*time.Second).Format("15:04:05"))
 				} else {
 					fields[i].Values = append(fields[i].Values, row[i+2])
 				}
