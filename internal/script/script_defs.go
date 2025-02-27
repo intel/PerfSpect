@@ -586,7 +586,7 @@ do
 			echo -n ","
 		fi
 	done
-	echo "" // finish the line
+	echo "" # finish the line
 done
 `,
 		Architectures: []string{x86_64},
@@ -621,7 +621,7 @@ do
 		echo -n ","
 	fi
 done
-echo "" // finish the line
+echo "" # finish the line
 `,
 		Architectures: []string{x86_64},
 		Families:      []string{"6"},   // Intel
@@ -1041,7 +1041,7 @@ duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
 	count=$((duration / interval))
 fi
-mpstat -u -T -I SCPU -P ALL $interval "$count" &
+mpstat -u -T -I SCPU -P ALL $interval $count &
 echo $! > {{.ScriptName}}_cmd.pid
 wait`,
 		Superuser: true,
@@ -1121,18 +1121,20 @@ fi
 if [ $interval -ne 0 ]; then
 	arg_interval="-i $interval"
 fi
-echo TIME: $(date +\"%%H:%%M:%%S\")
-echo INTERVAL: {{.Interval}}
+echo TIME: $(date +"%H:%M:%S")
+echo INTERVAL: $interval
 # if no PID specified, increase the sampling interval (defaults to 100,000) to reduce overhead
 if [ {{.PID}} -eq 0 ]; then
 	arg_sampling_rate="-s 1000000"
 else
 	arg_pid="-p {{.PID}}"
 fi
-# if filter is not empty
-if [ "{{.Filter}}" != "" ]; then
-	arg_filter="-f {{.Filter}}"
-fi
+# .Filter is a space separated list of ISA categories
+# for each category in the list, add -f <category> to the command line
+for category in {{.Filter}}; do
+    arg_filter="$arg_filter -f $category"
+done
+
 processwatch -c $arg_sampling_rate $arg_pid $arg_interval $arg_count $arg_filter &
 echo $! > {{.ScriptName}}_cmd.pid
 wait`,
