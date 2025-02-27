@@ -445,8 +445,6 @@ func prepareTargetToRunScripts(myTarget target.Target, scripts []ScriptDefinitio
 				dependenciesToCopy[path.Join(targetArchitecture, dependency)] = 1
 			}
 		}
-		// replace any placeholders in the script with the actual values
-		script.ScriptTemplate = strings.ReplaceAll(script.ScriptTemplate, "{cmd_pid}", sanitizeScriptName(script.Name)+"_cmd.pid")
 		// add user's path to script
 		scriptWithPath := fmt.Sprintf("export PATH=\"%s\"\n%s", userPath, script.ScriptTemplate)
 		if script.Name == "" {
