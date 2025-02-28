@@ -122,7 +122,7 @@ func GetHotProcesses(myTarget target.Target, maxProcesses int, filter string) (p
 func GetHotCgroups(myTarget target.Target, maxCgroups int, filter string, localTempDir string) (cgroups []string, err error) {
 	hotCgroupsScript := script.ScriptDefinition{
 		Name: "hot_cgroups",
-		Script: fmt.Sprintf(`
+		ScriptTemplate: fmt.Sprintf(`
 # Directory to search for cgroups
 search_dir="/sys/fs/cgroup"
 
@@ -203,7 +203,7 @@ func getProcess(myTarget target.Target, pid string) (process Process, err error)
 func getCgroup(myTarget target.Target, cid string, localTempDir string) (cGroupName string, err error) {
 	cgroupScript := script.ScriptDefinition{
 		Name: "cgroup",
-		Script: fmt.Sprintf(`
+		ScriptTemplate: fmt.Sprintf(`
 # Directory to search for cgroups
 search_dir="/sys/fs/cgroup"
 

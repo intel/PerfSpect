@@ -1,15 +1,12 @@
-<div align="center">
-
-# PerfSpect
-Analyze and Optimize Linux Servers
+# Intel&reg; PerfSpect
 
 [![Build](https://github.com/intel/PerfSpect/actions/workflows/build-test.yml/badge.svg)](https://github.com/intel/PerfSpect/actions/workflows/build-test.yml)[![CodeQL](https://github.com/intel/PerfSpect/actions/workflows/codeql.yml/badge.svg)](https://github.com/intel/PerfSpect/actions/workflows/codeql.yml)[![License](https://img.shields.io/badge/License-BSD--3-blue)](https://github.com/intel/PerfSpect/blob/master/LICENSE)
 
 [Getting PerfSpect](#getting-perfspect) | [Running PerfSpect](#running-perfspect) | [Building PerfSpect](#building-perfspect-from-source)
-</div>
 
-## What is PerfSpect
-PerfSpect is a command-line tool designed to help you analyze and optimize Linux servers and the software running on them. Whether you’re a system administrator, a developer, or a performance engineer, PerfSpect provides comprehensive insights and actionable recommendations to enhance performance and efficiency.
+Intel&reg; PerfSpect is a command-line tool designed to help you analyze and optimize Linux servers and the software running on them. Whether you’re a system administrator, a developer, or a performance engineer, PerfSpect provides comprehensive insights and actionable recommendations to enhance performance and efficiency.
+
+We welcome bug reports and enhancement requests, which can be submitted via the [Issues](https://github.com/intel/PerfSpect/issues) section on GitHub. For those interested in contributing to the code, please refer to the guidelines outlined in the [CONTRIBUTING.md](CONTRIBUTING.md) file.
 
 ## Getting PerfSpect
 ```
@@ -37,20 +34,14 @@ Usage:
 > Run `perfspect [command] -h` to view command-specific help text.
 
 #### Metrics Command
-The `metrics` command reports CPU architectural performance characterization metrics.
+The `metrics` command generates reports containing CPU architectural performance characterization metrics in HTML and CSV formats. Run `perfspect metrics`.
 
-Example:
-<pre>
-$ ./perfspect metrics --duration 30
-emr                   ⣯  collection complete                     
+![metrics html TMA](docs/metrics_html_tma.png)
 
-Metric files:
-  /home/myuser/dev/pt/perfspect_2024-10-10_10-58-36/emr_metrics.csv
-  /home/myuser/dev/pt/perfspect_2024-10-10_10-58-36/emr_metrics_summary.csv
-  /home/myuser/dev/pt/perfspect_2024-10-10_10-58-36/emr_metrics_summary.html
-</pre>
 ##### Live Metrics
-The `metrics` command supports two modes -- default and "live". Default mode behaves as above -- metrics are collected and saved into files for review.  The "live" mode prints the metrics to stdout where they can be viewed in the console and/or redirected into a file or observability pipeline. Run `perfspect metrics --live`.
+The `metrics` command supports two modes -- default and "live". Default mode behaves as above -- metrics are collected and saved into report files for review.  The "live" mode prints the metrics to stdout where they can be viewed in the console and/or redirected into a file or observability pipeline. Run `perfspect metrics --live`.
+
+![live metrics](docs/metrics_live.png)
 
 ##### Metrics Without Root Permissions
 If sudo is not possible and running as the root user is not possible, the following configuration needs to be applied to the target system(s) by an administrator:
@@ -64,34 +55,17 @@ See `perfspect metrics -h` for the extensive set of options and examples.
 
 #### Report Command
 The `report` command generates system configuration reports in a variety of formats. By default, all categories of information are collected. See `perfspect report -h` for all options.
-<pre>
-$ ./perfspect report 
-soc-PF4W5A3V          ⢿  collection complete                     
 
-Report files:
-  /home/myuser/dev/perfspect/perfspect_2024-09-03_17-45-40/soc-PF4W5A3V.html
-  /home/myuser/dev/perfspect/perfspect_2024-09-03_17-45-40/soc-PF4W5A3V.xlsx
-  /home/myuser/dev/perfspect/perfspect_2024-09-03_17-45-40/soc-PF4W5A3V.json
-  /home/myuser/dev/perfspect/perfspect_2024-09-03_17-45-40/soc-PF4W5A3V.txt
-</pre>
+![report html](docs/report_html.png)
+
 It's possible to collect a subset of information by providing command line options. Note that by specifying only the `txt` format, it is printed to stdout, as well as written to a report file.
 <pre>
-$ ./perfspect report --bios --os --format txt
+$ ./perfspect report --bios --format txt
 BIOS
 ====
 Vendor:       Intel Corporation
 Version:      EGSDCRB1.SYS.1752.P05.2401050248
 Release Date: 01/05/2024
-
-Operating System
-================
-OS:              Ubuntu 23.10
-Kernel:          6.5.0-44-generic
-Boot Parameters: BOOT_IMAGE=/boot/vmlinuz-6.5.0-44-generic root=UUID=e6d667af-f0b7-450b-b409-9fe2647aeb38 ro
-Microcode:       0x21000230
-
-Report files:
-  /home/myuser/dev/perfspect/perfspect_2024-09-03_17-47-55/emr.txt
 </pre>
 ##### Report Benchmarks
 To assist in evaluating the health of target systems, the `report` command can run a series of micro-benchmarks by applying the `--benchmark` flag, e.g., `perfspect report --benchmark all` The benchmark results will be reported along with the target's configuration details. 
@@ -111,23 +85,17 @@ To assist in evaluating the health of target systems, the `report` command can r
 | storage | runs [fio](https://github.com/axboe/fio) for 2 minutes in read/write mode with a single worker to measure single-thread read and write bandwidth. Use the --storage-dir flag to override the default location. Minimum 5GB disk space required to run test. |
 
 #### Telemetry Command
-The `telemetry` command reports CPU utilization, instruction mix, disk stats, network stats, and more on the specified target(s). By default, all telemetry types are collected. To select telemetry types, additional command line options are available (see `perfspect telemetry -h`).
-<pre>
-$ ./perfspect telemetry --duration 30
-soc-PF4W5A3V          ⣾  collection complete                     
+The `telemetry` command reports CPU utilization, instruction mix, disk stats, network stats, and more on the specified target(s). By default, all telemetry types are collected. To choose telemetry types, see the additional command line options (`perfspect telemetry -h`).
 
-Report files:
-  /home/myuser/dev/perfspect/perfspect_2024-09-03_17-55-13/soc-PF4W5A3V_telem.html
-  /home/myuser/dev/perfspect/perfspect_2024-09-03_17-55-13/soc-PF4W5A3V_telem.xlsx
-  /home/myuser/dev/perfspect/perfspect_2024-09-03_17-55-13/soc-PF4W5A3V_telem.json
-  /home/myuser/dev/perfspect/perfspect_2024-09-03_17-55-13/soc-PF4W5A3V_telem.txt
-</pre>
+![telemetry html](docs/telemetry_html.png)
 
 #### Flame Command
 Software flamegraphs are useful in diagnosing software performance bottlenecks. Run `perfspect flame` to capture a system-wide software flamegraph.
 
 > [!NOTE]
 > Perl must be installed on the target system to process the data required for flamegraphs.
+
+![flame graph](docs/flamegraph.png)
 
 #### Config Command
 The `config` command provides a method to view and change various system configuration parameters. Run `perfspect config -h` to view the parameters that can be modified. 
@@ -163,40 +131,9 @@ $ ./perfspect report --target 192.168.1.42 --user fred
 fred@192.168.1.42's password: ******
 ...
 </pre>
-To target more than one remote system, a YAML file is used to provide the necessary connection parameters, e.g.:
+To target more than one remote system, a YAML file with the necessary connection parameters is provided to PerfSpect. See the example YAML file [targets.yaml](targets.yaml).
 <pre>
-$ cat targets.yaml
-# This YAML file contains a list of remote targets with their corresponding properties.
-# Each target has the following properties:
-#   name: The name of the target (optional)
-#   host: The IP address or host name of the target (required)
-#   port: The port number used to connect to the target via SSH (optional)
-#   user: The user name used to connect to the target via SSH (optional)
-#   key: The path to the private key file used to connect to the target via SSH (optional)
-#   pwd: The password used to connect to the target via SSH (optional)
-#
-# Note: If key and pwd are both provided, the key will be used for authentication.
-#
-# Security Notes: 
-#   It is recommended to use a private key for authentication instead of a password.
-#   Keep this file in a secure location and do not expose it to unauthorized users.
-#
-# Below are examples. Modify them to match your environment.
-targets:
-  - name: ELAINES_TARGET
-    host: 192.168.1.1
-    port: 
-    user: elaine
-    key: /home/elaine/.ssh/id_rsa
-    pwd:
-  - name: JERRYS_TARGET
-    host: 192.168.1.2
-    port: 2222
-    user: jerry
-    key:
-    pwd: george
-
-$ ./perfspect report --benchmark speed,memory --targets targets.yaml
+$ ./perfspect report --targets mytargets.yaml
 ...
 </pre>
 ## Building PerfSpect from Source
