@@ -306,7 +306,12 @@ func formMasterScript(myTarget target.Target, parallelScripts []ScriptDefinition
 	for _, script := range parallelScripts {
 		masterScript.WriteString(fmt.Sprintf("\tkill -SIGINT $%s_pid\n", sanitizeScriptName(script.Name)))
 		if script.NeedsKill {
+			// kill the command started by the script
 			masterScript.WriteString(fmt.Sprintf("\tkill -SIGKILL $(cat %s_cmd.pid)\n", sanitizeScriptName(script.Name)))
+			masterScript.WriteString(fmt.Sprintf("\t%s_exitcode=137\n", sanitizeScriptName(script.Name))) // 137 is the exit code for SIGKILL
+		} else {
+			masterScript.WriteString(fmt.Sprintf("\twait \"$%s_pid\"\n", sanitizeScriptName(script.Name)))
+			masterScript.WriteString(fmt.Sprintf("\t%s_exitcode=$?\n", sanitizeScriptName(script.Name)))
 		}
 	}
 	masterScript.WriteString("\tprint_output\n")
