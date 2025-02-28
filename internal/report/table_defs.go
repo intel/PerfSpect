@@ -222,7 +222,9 @@ var tableDefinitions = map[string]TableDefinition{
 		MenuLabel: PowerMenuLabel,
 		ScriptNames: []string{
 			script.PackagePowerLimitName,
-			script.EpbScriptName,
+			script.EpbSourceScriptName,
+			script.EpbOSScriptName,
+			script.EpbBIOSScriptName,
 			script.EppScriptName,
 			script.EppValidScriptName,
 			script.EppPackageControlScriptName,
@@ -462,7 +464,9 @@ var tableDefinitions = map[string]TableDefinition{
 			script.UnameScriptName,
 			script.EtcReleaseScriptName,
 			script.PackagePowerLimitName,
-			script.EpbScriptName,
+			script.EpbSourceScriptName,
+			script.EpbOSScriptName,
+			script.EpbBIOSScriptName,
 			script.ScalingDriverScriptName,
 			script.ScalingGovernorScriptName,
 			script.CstatesScriptName,
@@ -482,7 +486,9 @@ var tableDefinitions = map[string]TableDefinition{
 			script.LspciDevicesScriptName,
 			script.L3WaySizeName,
 			script.PackagePowerLimitName,
-			script.EpbScriptName,
+			script.EpbSourceScriptName,
+			script.EpbOSScriptName,
+			script.EpbBIOSScriptName,
 			script.EppScriptName,
 			script.EppValidScriptName,
 			script.EppPackageControlScriptName,
@@ -1051,6 +1057,18 @@ func elcTableInsights(outputs map[string]script.ScriptOutput, tableValues TableV
 	if err != nil {
 		slog.Warn(err.Error())
 	} else {
+		// warn if ELC mode is not set to 'Latency Optimized' or 'Default' consistently across all dies
+		firstMode := tableValues.Fields[modeFieldIndex].Values[0]
+		for _, mode := range tableValues.Fields[modeFieldIndex].Values[1:] {
+			if mode != firstMode {
+				insights = append(insights, Insight{
+					Recommendation: "Consider setting Efficiency Latency Control mode consistently across all dies.",
+					Justification:  "ELC mode is not set consistently across all dies.",
+				})
+				break
+			}
+		}
+		// suggest setting ELC mode to 'Latency Optimized' or 'Default' based on the current setting
 		for _, mode := range tableValues.Fields[modeFieldIndex].Values {
 			if mode != "" && mode != "Latency Optimized" {
 				insights = append(insights, Insight{
@@ -1068,6 +1086,14 @@ func elcTableInsights(outputs map[string]script.ScriptOutput, tableValues TableV
 				})
 				break
 			}
+		}
+		// if epb is not set to 'Performance (0)' and ELC mode is set to 'Latency Optimized', suggest setting epb to 'Performance (0)'
+		epb := epbFromOutput(outputs)
+		if epb != "" && epb != "Performance (0)" && firstMode == "Latency Optimized" {
+			insights = append(insights, Insight{
+				Recommendation: "Consider setting Energy Performance Bias to 'Performance (0)' to allow Latency Optimized mode to operate as designed.",
+				Justification:  fmt.Sprintf("Energy Performance Bias is set to '%s' and ELC Mode is set to '%s'.", epb, firstMode),
+			})
 		}
 	}
 	return insights
