@@ -1442,7 +1442,7 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 	scriptErrorChannel := make(chan error)
 	cmdChannel := make(chan *exec.Cmd)
 	slog.Debug("running perf stat", slog.String("command", perfCommand))
-	go script.RunScriptAsync(myTarget, script.ScriptDefinition{Name: "perf stat", Script: perfCommand, Superuser: !noRoot}, localTempDir, stdoutChannel, stderrChannel, exitcodeChannel, scriptErrorChannel, cmdChannel)
+	go script.RunScriptAsync(myTarget, script.ScriptDefinition{Name: "perf stat", ScriptTemplate: perfCommand, Superuser: !noRoot}, localTempDir, stdoutChannel, stderrChannel, exitcodeChannel, scriptErrorChannel, cmdChannel)
 	var localCommand *exec.Cmd
 	select {
 	case cmd := <-cmdChannel:

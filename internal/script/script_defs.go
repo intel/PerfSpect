@@ -1,27 +1,28 @@
 package script
 
+import (
+	"bytes"
+	"fmt"
+	"strings"
+	texttemplate "text/template"
+)
+
 // Copyright (C) 2021-2024 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
 // script_defs.go defines the bash scripts that are used to collect information from target systems
 
-import (
-	"fmt"
-	"strconv"
-	"strings"
-)
-
 type ScriptDefinition struct {
-	Name          string   // just a name
-	Script        string   // the bash script that will be run
-	Architectures []string // architectures, i.e., x86_64, arm64. If empty, it will run on all architectures.
-	Families      []string // families, e.g., 6, 7. If empty, it will run on all families.
-	Models        []string // models, e.g., 62, 63. If empty, it will run on all models.
-	Lkms          []string // loadable kernel modules
-	Depends       []string // binary dependencies that must be available for the script to run
-	Superuser     bool     // requires sudo or root
-	Sequential    bool     // run script sequentially (not at the same time as others)
-	NeedsKill     bool     // process/script needs to be killed after run without a duration specified, i.e., it doesn't stop through SIGINT
+	Name           string   // just a name
+	ScriptTemplate string   // the bash script that will be run
+	Architectures  []string // architectures, i.e., x86_64, arm64. If empty, it will run on all architectures.
+	Families       []string // families, e.g., 6, 7. If empty, it will run on all families.
+	Models         []string // models, e.g., 62, 63. If empty, it will run on all models.
+	Lkms           []string // loadable kernel modules
+	Depends        []string // binary dependencies that must be available for the script to run
+	Superuser      bool     // requires sudo or root
+	Sequential     bool     // run script sequentially (not at the same time as others)
+	NeedsKill      bool     // process/script needs to be killed after run without a duration specified, i.e., it doesn't stop through SIGINT
 }
 
 const (
@@ -130,156 +131,179 @@ type ScriptParams struct {
 	Filter     []string
 }
 
-// GetParameterizedScriptByName returns the script definition with the given name. It will panic if the script is not found.
-func GetParameterizedScriptByName(name string, params ScriptParams) ScriptDefinition {
-	for _, script := range getCollectionScripts(params) {
-		if script.Name == name {
-			return script
-		}
-	}
-	panic(fmt.Sprintf("script not found: %s", name))
+type ScriptTemplateParams struct {
+	Duration   string
+	Interval   string
+	Frequency  string
+	StorageDir string
+	PID        string
+	Filter     string
+	ScriptName string
 }
 
-// getCollectionScripts returns the script definitions that are used to collect information from the target system.
-func getCollectionScripts(params ScriptParams) (scripts []ScriptDefinition) {
+// GetParameterizedScriptByName returns the script definition with the given name. It will panic if the script is not found.
+func GetParameterizedScriptByName(name string, params ScriptParams) ScriptDefinition {
+	// if the script doesn't exist, panic
+	if _, ok := scripts[name]; !ok {
+		panic("script not found: " + name)
+	}
+	// convert ScriptParams to ScriptTemplateParams
+	templateParams := ScriptTemplateParams{
+		Duration:   fmt.Sprintf("%d", params.Duration),
+		Interval:   fmt.Sprintf("%d", params.Interval),
+		Frequency:  fmt.Sprintf("%d", params.Frequency),
+		StorageDir: params.StorageDir,
+		PID:        fmt.Sprintf("%d", params.PID),
+		Filter:     strings.Join(params.Filter, " "),
+		ScriptName: sanitizeScriptName(name),
+	}
+	scriptTemplate := texttemplate.Must(texttemplate.New("scriptTemplate").Parse(scripts[name].ScriptTemplate))
+	buf := new(bytes.Buffer)
+	err := scriptTemplate.Execute(buf, templateParams)
+	if err != nil {
+		panic(err)
+	}
+	ScriptDefinition := scripts[name]
+	ScriptDefinition.ScriptTemplate = buf.String()
+	return ScriptDefinition
+}
 
-	// script definitions
-	scripts = []ScriptDefinition{
-		// configuration scripts
-		{
-			Name:   HostnameScriptName,
-			Script: "hostname",
-		},
-		{
-			Name:   DateScriptName,
-			Script: "date",
-		},
-		{
-			Name:      DmidecodeScriptName,
-			Script:    "dmidecode",
-			Superuser: true,
-			Depends:   []string{"dmidecode"},
-		},
-		{
-			Name:   LscpuScriptName,
-			Script: "lscpu",
-		},
-		{
-			Name:      LspciBitsScriptName,
-			Script:    "lspci -s $(lspci | grep 325b | awk 'NR==1{{print $1}}') -xxx |  awk '$1 ~ /^90/{{print $9 $8 $7 $6; exit}}'",
-			Families:  []string{"6"},                 // Intel
-			Models:    []string{"143", "207", "173"}, // SPR, EMR, GNR
-			Superuser: true,
-			Depends:   []string{"lspci"},
-		},
-		{
-			Name:     LspciDevicesScriptName,
-			Script:   "lspci -d 8086:3258 | wc -l",
-			Families: []string{"6"},                 // Intel
-			Models:   []string{"143", "207", "173"}, // SPR, EMR, GNR
-			Depends:  []string{"lspci"},
-		},
-		{
-			Name:    LspciVmmScriptName,
-			Script:  "lspci -vmm",
-			Depends: []string{"lspci"},
-		},
-		{
-			Name:   UnameScriptName,
-			Script: "uname -a",
-		},
-		{
-			Name:   ProcCmdlineScriptName,
-			Script: "cat /proc/cmdline",
-		},
-		{
-			Name:   ProcCpuinfoScriptName,
-			Script: "cat /proc/cpuinfo",
-		},
-		{
-			Name:   EtcReleaseScriptName,
-			Script: "cat /etc/*-release",
-		},
-		{
-			Name:   GccVersionScriptName,
-			Script: "gcc --version",
-		},
-		{
-			Name:   BinutilsVersionScriptName,
-			Script: "ld -v",
-		},
-		{
-			Name:   GlibcVersionScriptName,
-			Script: "ldd --version",
-		},
-		{
-			Name:   PythonVersionScriptName,
-			Script: "python --version 2>&1",
-		},
-		{
-			Name:   Python3VersionScriptName,
-			Script: "python3 --version",
-		},
-		{
-			Name:   JavaVersionScriptName,
-			Script: "java -version 2>&1",
-		},
-		{
-			Name:   OpensslVersionScriptName,
-			Script: "openssl version",
-		},
-		{
-			Name:      CpuidScriptName,
-			Script:    "cpuid -1",
-			Lkms:      []string{"cpuid"},
-			Depends:   []string{"cpuid"},
-			Superuser: true,
-		},
-		{
-			Name:   BaseFrequencyScriptName,
-			Script: "cat /sys/devices/system/cpu/cpu0/cpufreq/base_frequency",
-		},
-		{
-			Name:   MaximumFrequencyScriptName,
-			Script: "cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq",
-		},
-		{
-			Name:   ScalingDriverScriptName,
-			Script: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver",
-		},
-		{
-			Name:   ScalingGovernorScriptName,
-			Script: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor",
-		},
-		{
-			Name:   MaxCStateScriptName,
-			Script: "cat /sys/module/intel_idle/parameters/max_cstate",
-		},
-		{
-			Name: CstatesScriptName,
-			Script: `# Directory where C-state information is stored
+// script definitions
+var scripts = map[string]ScriptDefinition{
+	// configuration scripts
+	HostnameScriptName: {
+		Name:           HostnameScriptName,
+		ScriptTemplate: "hostname",
+	},
+	DateScriptName: {
+		Name:           DateScriptName,
+		ScriptTemplate: "date",
+	},
+	DmidecodeScriptName: {
+		Name:           DmidecodeScriptName,
+		ScriptTemplate: "dmidecode",
+		Superuser:      true,
+		Depends:        []string{"dmidecode"},
+	},
+	LscpuScriptName: {
+		Name:           LscpuScriptName,
+		ScriptTemplate: "lscpu",
+	},
+	LspciBitsScriptName: {
+		Name:           LspciBitsScriptName,
+		ScriptTemplate: `lspci -s $(lspci | grep 325b | awk 'NR==1{{"{"}}print $1{{"}"}}') -xxx |  awk '$1 ~ /^90/{{"{"}}print $9 $8 $7 $6; exit{{"}"}}'`,
+		Families:       []string{"6"},                 // Intel
+		Models:         []string{"143", "207", "173"}, // SPR, EMR, GNR
+		Superuser:      true,
+		Depends:        []string{"lspci"},
+	},
+	LspciDevicesScriptName: {
+		Name:           LspciDevicesScriptName,
+		ScriptTemplate: "lspci -d 8086:3258 | wc -l",
+		Families:       []string{"6"},                 // Intel
+		Models:         []string{"143", "207", "173"}, // SPR, EMR, GNR
+		Depends:        []string{"lspci"},
+	},
+	LspciVmmScriptName: {
+		Name:           LspciVmmScriptName,
+		ScriptTemplate: "lspci -vmm",
+		Depends:        []string{"lspci"},
+	},
+	UnameScriptName: {
+		Name:           UnameScriptName,
+		ScriptTemplate: "uname -a",
+	},
+	ProcCmdlineScriptName: {
+		Name:           ProcCmdlineScriptName,
+		ScriptTemplate: "cat /proc/cmdline",
+	},
+	ProcCpuinfoScriptName: {
+		Name:           ProcCpuinfoScriptName,
+		ScriptTemplate: "cat /proc/cpuinfo",
+	},
+	EtcReleaseScriptName: {
+		Name:           EtcReleaseScriptName,
+		ScriptTemplate: "cat /etc/*-release",
+	},
+	GccVersionScriptName: {
+		Name:           GccVersionScriptName,
+		ScriptTemplate: "gcc --version",
+	},
+	BinutilsVersionScriptName: {
+		Name:           BinutilsVersionScriptName,
+		ScriptTemplate: "ld -v",
+	},
+	GlibcVersionScriptName: {
+		Name:           GlibcVersionScriptName,
+		ScriptTemplate: "ldd --version",
+	},
+	PythonVersionScriptName: {
+		Name:           PythonVersionScriptName,
+		ScriptTemplate: "python --version 2>&1",
+	},
+	Python3VersionScriptName: {
+		Name:           Python3VersionScriptName,
+		ScriptTemplate: "python3 --version",
+	},
+	JavaVersionScriptName: {
+		Name:           JavaVersionScriptName,
+		ScriptTemplate: "java -version 2>&1",
+	},
+	OpensslVersionScriptName: {
+		Name:           OpensslVersionScriptName,
+		ScriptTemplate: "openssl version",
+	},
+	CpuidScriptName: {
+		Name:           CpuidScriptName,
+		ScriptTemplate: "cpuid -1",
+		Lkms:           []string{"cpuid"},
+		Depends:        []string{"cpuid"},
+		Superuser:      true,
+	},
+	BaseFrequencyScriptName: {
+		Name:           BaseFrequencyScriptName,
+		ScriptTemplate: "cat /sys/devices/system/cpu/cpu0/cpufreq/base_frequency",
+	},
+	MaximumFrequencyScriptName: {
+		Name:           MaximumFrequencyScriptName,
+		ScriptTemplate: "cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq",
+	},
+	ScalingDriverScriptName: {
+		Name:           ScalingDriverScriptName,
+		ScriptTemplate: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver",
+	},
+	ScalingGovernorScriptName: {
+		Name:           ScalingGovernorScriptName,
+		ScriptTemplate: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor",
+	},
+	MaxCStateScriptName: {
+		Name:           MaxCStateScriptName,
+		ScriptTemplate: "cat /sys/module/intel_idle/parameters/max_cstate",
+	},
+	CstatesScriptName: {
+		Name: CstatesScriptName,
+		ScriptTemplate: `# Directory where C-state information is stored
 cstate_dir="/sys/devices/system/cpu/cpu0/cpuidle"
 
 # Check if the directory exists
 if [ -d "$cstate_dir" ]; then
-    for state in "$cstate_dir"/state*; do
-        name=$(cat "$state/name")
-        disable=$(cat "$state/disable")
-        if [ "$disable" -eq 0 ]; then
-            status="Enabled"
-        else
-            status="Disabled"
-        fi
-        echo "$name,$status"
-    done
+	for state in "$cstate_dir"/state*; do
+		name=$(cat "$state/name")
+		disable=$(cat "$state/disable")
+		if [ "$disable" -eq 0 ]; then
+			status="Enabled"
+		else
+			status="Disabled"
+		fi
+		echo "$name,$status"
+	done
 else
-    echo "C-state directory not found."
+	echo "C-state directory not found."
 fi`,
-		},
-		{
-			Name: SpecTurboCoresScriptName,
-			Script: `#!/bin/bash
-# if SST-TF is supported and enabled, then the MSR values are not valid
+	},
+	SpecTurboCoresScriptName: {
+		Name: SpecTurboCoresScriptName,
+		ScriptTemplate: `# if SST-TF is supported and enabled, then the MSR values are not valid
 supported=$(pcm-tpmi 5 0xF8 -d -b 12:12 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
 if [ "$supported" -eq 1 ]; then
 	enabled=$(pcm-tpmi 5 0x78 -d -b 9:9 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
@@ -289,16 +313,15 @@ if [ "$supported" -eq 1 ]; then
 fi
 rdmsr 0x1ae # MSR_TURBO_GROUP_CORE_CNT: Group Size of Active Cores for Turbo Mode Operation
 `,
-			Architectures: []string{x86_64},
-			Families:      []string{"6"}, // Intel
-			Lkms:          []string{"msr"},
-			Depends:       []string{"rdmsr", "pcm-tpmi"},
-			Superuser:     true,
-		},
-		{
-			Name: SpecTurboFrequenciesScriptName,
-			Script: `#!/bin/bash
-# if SST-TF is supported and enabled, then the MSR values are not valid
+		Architectures: []string{x86_64},
+		Families:      []string{"6"}, // Intel
+		Lkms:          []string{"msr"},
+		Depends:       []string{"rdmsr", "pcm-tpmi"},
+		Superuser:     true,
+	},
+	SpecTurboFrequenciesScriptName: {
+		Name: SpecTurboFrequenciesScriptName,
+		ScriptTemplate: `# if SST-TF is supported and enabled, then the MSR values are not valid
 supported=$(pcm-tpmi 5 0xF8 -d -b 12:12 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
 if [ "$supported" -eq 1 ]; then
 	enabled=$(pcm-tpmi 5 0x78 -d -b 9:9 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
@@ -308,150 +331,150 @@ if [ "$supported" -eq 1 ]; then
 fi
 rdmsr 0x1ad # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
 `,
-			Architectures: []string{x86_64},
-			Families:      []string{"6"}, // Intel
-			Lkms:          []string{"msr"},
-			Depends:       []string{"rdmsr", "pcm-tpmi"},
-			Superuser:     true,
-		},
-		{
-			Name:          PPINName,
-			Script:        "rdmsr -a 0x4f", // MSR_PPIN: Protected Processor Inventory Number
-			Architectures: []string{x86_64},
-			Families:      []string{"6"}, // Intel
-			Lkms:          []string{"msr"},
-			Depends:       []string{"rdmsr"},
-			Superuser:     true,
-		},
-		{
-			Name:          PrefetchControlName,
-			Script:        "rdmsr -f 7:0 0x1a4", // MSR_PREFETCH_CONTROL: L2, DCU, and AMP Prefetchers enabled/disabled
-			Architectures: []string{x86_64},
-			Families:      []string{"6"}, // Intel
-			Lkms:          []string{"msr"},
-			Depends:       []string{"rdmsr"},
-			Superuser:     true,
-		},
-		{
-			Name:          PrefetchersName,
-			Script:        "rdmsr 0x6d", // TODO: get name, used to read prefetchers
-			Architectures: []string{x86_64},
-			Families:      []string{"6"}, // Intel
-			Lkms:          []string{"msr"},
-			Depends:       []string{"rdmsr"},
-			Superuser:     true,
-		},
-		{
-			Name:          L3WaySizeName,
-			Script:        "rdmsr 0xc90", // TODO: get name, used to read l3 size
-			Architectures: []string{x86_64},
-			Families:      []string{"6"}, // Intel
-			Lkms:          []string{"msr"},
-			Depends:       []string{"rdmsr"},
-			Superuser:     true,
-		},
-		{
-			Name:          PackagePowerLimitName,
-			Script:        "rdmsr -f 14:0 0x610", // MSR_PKG_POWER_LIMIT: Package limit in bits 14:0
-			Architectures: []string{x86_64},
-			Families:      []string{"6"}, // Intel
-			Lkms:          []string{"msr"},
-			Depends:       []string{"rdmsr"},
-			Superuser:     true,
-		},
-		{
-			Name:          EpbScriptName,
-			Script:        "rdmsr -a -f 3:0 0x1B0", // IA32_ENERGY_PERF_BIAS: Energy Performance Bias Hint (0 is highest perf, 15 is highest energy saving)
-			Architectures: []string{x86_64},
-			Families:      []string{"6"}, // Intel
-			Lkms:          []string{"msr"},
-			Depends:       []string{"rdmsr"},
-			Superuser:     true,
-		},
-		{
-			Name:          EppValidScriptName,
-			Script:        "rdmsr -a -f 60:60 0x774", // IA32_HWP_REQUEST: Energy Performance Preference, bit 60 indicates if per-cpu EPP is valid
-			Architectures: []string{x86_64},
-			Families:      []string{"6"}, // Intel
-			Lkms:          []string{"msr"},
-			Depends:       []string{"rdmsr"},
-			Superuser:     true,
-		},
-		{
-			Name:          EppPackageControlScriptName,
-			Script:        "rdmsr -a -f 42:42 0x774", // IA32_HWP_REQUEST: Energy Performance Preference, bit 42 indicates if package control is enabled
-			Architectures: []string{x86_64},
-			Families:      []string{"6"}, // Intel
-			Lkms:          []string{"msr"},
-			Depends:       []string{"rdmsr"},
-			Superuser:     true,
-		},
-		{
-			Name:          EppScriptName,
-			Script:        "rdmsr -a -f 31:24 0x774", // IA32_HWP_REQUEST: Energy Performance Preference, bits 24-31 (0 is highest perf, 255 is highest energy saving)
-			Architectures: []string{x86_64},
-			Families:      []string{"6"}, // Intel
-			Lkms:          []string{"msr"},
-			Depends:       []string{"rdmsr"},
-			Superuser:     true,
-		},
-		{
-			Name:          EppPackageScriptName,
-			Script:        "rdmsr -f 31:24 0x772", // IA32_HWP_REQUEST_PKG: Energy Performance Preference, bits 24-31 (0 is highest perf, 255 is highest energy saving)
-			Architectures: []string{x86_64},
-			Families:      []string{"6"}, // Intel
-			Lkms:          []string{"msr"},
-			Depends:       []string{"rdmsr"},
-			Superuser:     true,
-		},
-		{
-			Name:          UncoreMaxFromMSRScriptName,
-			Script:        "rdmsr -f 6:0 0x620", // MSR_UNCORE_RATIO_LIMIT: MAX_RATIO in bits 6:0
-			Architectures: []string{x86_64},
-			Families:      []string{"6"}, // Intel
-			Lkms:          []string{"msr"},
-			Depends:       []string{"rdmsr"},
-			Superuser:     true,
-		},
-		{
-			Name:          UncoreMinFromMSRScriptName,
-			Script:        "rdmsr -f 14:8 0x620", // MSR_UNCORE_RATIO_LIMIT: MAX_RATIO in bits 14:8
-			Architectures: []string{x86_64},
-			Families:      []string{"6"}, // Intel
-			Lkms:          []string{"msr"},
-			Depends:       []string{"rdmsr"},
-			Superuser:     true,
-		},
-		{
-			Name:          UncoreMaxFromTPMIScriptName,
-			Script:        "pcm-tpmi 2 0x18 -d -b 8:14",
-			Architectures: []string{x86_64},
-			Families:      []string{"6"},          // Intel
-			Models:        []string{"173", "175"}, // GNR, SRF
-			Depends:       []string{"pcm-tpmi"},
-			Superuser:     true,
-		},
-		{
-			Name:          UncoreMinFromTPMIScriptName,
-			Script:        "pcm-tpmi 2 0x18 -d -b 15:21",
-			Architectures: []string{x86_64},
-			Families:      []string{"6"},          // Intel
-			Models:        []string{"173", "175"}, // GNR, SRF
-			Depends:       []string{"pcm-tpmi"},
-			Superuser:     true,
-		},
-		{
-			Name:          UncoreDieTypesFromTPMIScriptName,
-			Script:        "pcm-tpmi 2 0x10 -d -b 26:26",
-			Architectures: []string{x86_64},
-			Families:      []string{"6"},          // Intel
-			Models:        []string{"173", "175"}, // GNR, SRF
-			Depends:       []string{"pcm-tpmi"},
-			Superuser:     true,
-		},
-		{
-			Name: ElcScriptName,
-			Script: `
+		Architectures: []string{x86_64},
+		Families:      []string{"6"}, // Intel
+		Lkms:          []string{"msr"},
+		Depends:       []string{"rdmsr", "pcm-tpmi"},
+		Superuser:     true,
+	},
+	PPINName: {
+		Name:           PPINName,
+		ScriptTemplate: "rdmsr -a 0x4f", // MSR_PPIN: Protected Processor Inventory Number
+		Architectures:  []string{x86_64},
+		Families:       []string{"6"}, // Intel
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
+		Superuser:      true,
+	},
+	PrefetchControlName: {
+		Name:           PrefetchControlName,
+		ScriptTemplate: "rdmsr -f 7:0 0x1a4", // MSR_PREFETCH_CONTROL: L2, DCU, and AMP Prefetchers enabled/disabled
+		Architectures:  []string{x86_64},
+		Families:       []string{"6"}, // Intel
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
+		Superuser:      true,
+	},
+	PrefetchersName: {
+		Name:           PrefetchersName,
+		ScriptTemplate: "rdmsr 0x6d", // TODO: get name, used to read prefetchers
+		Architectures:  []string{x86_64},
+		Families:       []string{"6"}, // Intel
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
+		Superuser:      true,
+	},
+	L3WaySizeName: {
+		Name:           L3WaySizeName,
+		ScriptTemplate: "rdmsr 0xc90", // TODO: get name, used to read l3 size
+		Architectures:  []string{x86_64},
+		Families:       []string{"6"}, // Intel
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
+		Superuser:      true,
+	},
+	PackagePowerLimitName: {
+		Name:           PackagePowerLimitName,
+		ScriptTemplate: "rdmsr -f 14:0 0x610", // MSR_PKG_POWER_LIMIT: Package limit in bits 14:0
+		Architectures:  []string{x86_64},
+		Families:       []string{"6"}, // Intel
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
+		Superuser:      true,
+	},
+	EpbScriptName: {
+		Name:           EpbScriptName,
+		ScriptTemplate: "rdmsr -a -f 3:0 0x1B0", // IA32_ENERGY_PERF_BIAS: Energy Performance Bias Hint (0 is highest perf, 15 is highest energy saving)
+		Architectures:  []string{x86_64},
+		Families:       []string{"6"}, // Intel
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
+		Superuser:      true,
+	},
+	EppValidScriptName: {
+		Name:           EppValidScriptName,
+		ScriptTemplate: "rdmsr -a -f 60:60 0x774", // IA32_HWP_REQUEST: Energy Performance Preference, bit 60 indicates if per-cpu EPP is valid
+		Architectures:  []string{x86_64},
+		Families:       []string{"6"}, // Intel
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
+		Superuser:      true,
+	},
+	EppPackageControlScriptName: {
+		Name:           EppPackageControlScriptName,
+		ScriptTemplate: "rdmsr -a -f 42:42 0x774", // IA32_HWP_REQUEST: Energy Performance Preference, bit 42 indicates if package control is enabled
+		Architectures:  []string{x86_64},
+		Families:       []string{"6"}, // Intel
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
+		Superuser:      true,
+	},
+	EppScriptName: {
+		Name:           EppScriptName,
+		ScriptTemplate: "rdmsr -a -f 31:24 0x774", // IA32_HWP_REQUEST: Energy Performance Preference, bits 24-31 (0 is highest perf, 255 is highest energy saving)
+		Architectures:  []string{x86_64},
+		Families:       []string{"6"}, // Intel
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
+		Superuser:      true,
+	},
+	EppPackageScriptName: {
+		Name:           EppPackageScriptName,
+		ScriptTemplate: "rdmsr -f 31:24 0x772", // IA32_HWP_REQUEST_PKG: Energy Performance Preference, bits 24-31 (0 is highest perf, 255 is highest energy saving)
+		Architectures:  []string{x86_64},
+		Families:       []string{"6"}, // Intel
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
+		Superuser:      true,
+	},
+	UncoreMaxFromMSRScriptName: {
+		Name:           UncoreMaxFromMSRScriptName,
+		ScriptTemplate: "rdmsr -f 6:0 0x620", // MSR_UNCORE_RATIO_LIMIT: MAX_RATIO in bits 6:0
+		Architectures:  []string{x86_64},
+		Families:       []string{"6"}, // Intel
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
+		Superuser:      true,
+	},
+	UncoreMinFromMSRScriptName: {
+		Name:           UncoreMinFromMSRScriptName,
+		ScriptTemplate: "rdmsr -f 14:8 0x620", // MSR_UNCORE_RATIO_LIMIT: MAX_RATIO in bits 14:8
+		Architectures:  []string{x86_64},
+		Families:       []string{"6"}, // Intel
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
+		Superuser:      true,
+	},
+	UncoreMaxFromTPMIScriptName: {
+		Name:           UncoreMaxFromTPMIScriptName,
+		ScriptTemplate: "pcm-tpmi 2 0x18 -d -b 8:14",
+		Architectures:  []string{x86_64},
+		Families:       []string{"6"},          // Intel
+		Models:         []string{"173", "175"}, // GNR, SRF
+		Depends:        []string{"pcm-tpmi"},
+		Superuser:      true,
+	},
+	UncoreMinFromTPMIScriptName: {
+		Name:           UncoreMinFromTPMIScriptName,
+		ScriptTemplate: "pcm-tpmi 2 0x18 -d -b 15:21",
+		Architectures:  []string{x86_64},
+		Families:       []string{"6"},          // Intel
+		Models:         []string{"173", "175"}, // GNR, SRF
+		Depends:        []string{"pcm-tpmi"},
+		Superuser:      true,
+	},
+	UncoreDieTypesFromTPMIScriptName: {
+		Name:           UncoreDieTypesFromTPMIScriptName,
+		ScriptTemplate: "pcm-tpmi 2 0x10 -d -b 26:26",
+		Architectures:  []string{x86_64},
+		Families:       []string{"6"},          // Intel
+		Models:         []string{"173", "175"}, // GNR, SRF
+		Depends:        []string{"pcm-tpmi"},
+		Superuser:      true,
+	},
+	ElcScriptName: {
+		Name: ElcScriptName,
+		ScriptTemplate: `
 # Script derived from bhs-power-mode script in Intel PCM repository
 # Run the pcm-tpmi command to determine I/O and compute dies
 output=$(pcm-tpmi 2 0x10 -d -b 26:26)
@@ -517,137 +540,135 @@ for die in "${!die_types[@]}"; do
 	done <<< "$output"
 done
 			`,
-			Architectures: []string{x86_64},
-			Families:      []string{"6"},          // Intel
-			Models:        []string{"173", "175"}, // GNR, SRF
-			Depends:       []string{"pcm-tpmi"},
-			Superuser:     true,
-		},
-		{
-			Name: SstTfHighPriorityCoreFrequenciesScriptName,
-			Script: `#!/bin/bash
-# Is SST-TF supported?
+		Architectures: []string{x86_64},
+		Families:      []string{"6"},          // Intel
+		Models:        []string{"173", "175"}, // GNR, SRF
+		Depends:       []string{"pcm-tpmi"},
+		Superuser:     true,
+	},
+	SstTfHighPriorityCoreFrequenciesScriptName: {
+		Name: SstTfHighPriorityCoreFrequenciesScriptName,
+		ScriptTemplate: `# Is SST-TF supported?
 supported=$(pcm-tpmi 5 0xF8 -d -b 12:12 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
 if [ "$supported" -eq 0 ]; then
-    echo "SST-TF is not supported"
-    exit 0
+	echo "SST-TF is not supported"
+	exit 0
 fi
 # Is SST-TF enabled?
 enabled=$(pcm-tpmi 5 0x78 -d -b 9:9 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
 if [ "$enabled" -eq 0 ]; then
-    echo "SST-TF is not enabled"
-    exit 0
+	echo "SST-TF is not enabled"
+	exit 0
 fi
 echo "bucket,cores,AVX,AVX2,AVX-512,AVX-512 heavy,AMX"
 # up to 5 buckets
 for ((i=0; i<5; i++))
 do
-    # Get the # of cores in this bucket
-    bithigh=$((i*8+7))
-    bitlow=$((i*8))
-    numcores=$(pcm-tpmi 5 0x100 -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
-    # if the number of cores is 0, skip this bucket
-    if [ "$numcores" -eq 0 ]; then
-        continue
-    fi
-    echo -n "$i,$numcores,"
-    # Get the frequencies for this bucket
-    bithigh=$((i*8+7)) # 8 bits per frequency
-    bitlow=$((i*8))
-    # 5 isa frequencies per bucket (AVX, AVX2, AVX-512, AVX-512 heavy, AMX)
-    for((j=0; j<5; j++))
-    do
-        offset=$((j*8 + 264)) # 264 is 0x108 (SST_TF_INFO_2) AVX
-        freq=$(pcm-tpmi 5 $offset -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
-        echo -n "$freq"
-        if [ $j -lt 4 ]; then
-            echo -n ","
-        fi
-    done
-    echo "" # finish the line
+	# Get the # of cores in this bucket
+	bithigh=$((i*8+7))
+	bitlow=$((i*8))
+	numcores=$(pcm-tpmi 5 0x100 -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
+	# if the number of cores is 0, skip this bucket
+	if [ "$numcores" -eq 0 ]; then
+		continue
+	fi
+	echo -n "$i,$numcores,"
+	# Get the frequencies for this bucket
+	bithigh=$((i*8+7)) # 8 bits per frequency
+	bitlow=$((i*8))
+	# 5 isa frequencies per bucket (AVX, AVX2, AVX-512, AVX-512 heavy, AMX)
+	for((j=0; j<5; j++))
+	do
+		offset=$((j*8 + 264)) // 264 is 0x108 (SST_TF_INFO_2) AVX
+		freq=$(pcm-tpmi 5 $offset -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
+		echo -n "$freq"
+		if [ $j -lt 4 ]; then
+			echo -n ","
+		fi
+	done
+	echo "" # finish the line
 done
 `,
-			Architectures: []string{x86_64},
-			Families:      []string{"6"},   // Intel
-			Models:        []string{"173"}, // GNR
-			Depends:       []string{"pcm-tpmi"},
-			Superuser:     true,
-		},
-		{
-			Name: SstTfLowPriorityCoreFrequenciesScriptName,
-			Script: `#!/bin/bash
-# Is SST-TF supported?
+		Architectures: []string{x86_64},
+		Families:      []string{"6"},   // Intel
+		Models:        []string{"173"}, // GNR
+		Depends:       []string{"pcm-tpmi"},
+		Superuser:     true,
+	},
+	SstTfLowPriorityCoreFrequenciesScriptName: {
+		Name: SstTfLowPriorityCoreFrequenciesScriptName,
+		ScriptTemplate: `# Is SST-TF supported?
 supported=$(pcm-tpmi 5 0xF8 -d -b 12:12 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
 if [ "$supported" -eq 0 ]; then
-    echo "SST-TF is not supported"
-    exit 0
+	echo "SST-TF is not supported"
+	exit 0
 fi
 # Is SST-TF enabled?
 enabled=$(pcm-tpmi 5 0x78 -d -b 9:9 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
 if [ "$enabled" -eq 0 ]; then
-    echo "SST-TF is not enabled"
-    exit 0
+	echo "SST-TF is not enabled"
+	exit 0
 fi
 echo "AVX,AVX2,AVX-512,AVX-512 heavy,AMX"
 # Get the low priority core clip ratios (frequencies)
 for((j=0; j<5; j++))
 do
-    bithigh=$((j*8+23))
-    bitlow=$((j*8+16))
-    freq=$(pcm-tpmi 5 0xF8 -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
-    echo -n "$freq"
-    if [ $j -ne 4 ]; then
-        echo -n ","
-    fi
+	bithigh=$((j*8+23))
+	bitlow=$((j*8+16))
+	freq=$(pcm-tpmi 5 0xF8 -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
+	echo -n "$freq"
+	if [ $j -ne 4 ]; then
+		echo -n ","
+	fi
 done
 echo "" # finish the line
 `,
-			Architectures: []string{x86_64},
-			Families:      []string{"6"},   // Intel
-			Models:        []string{"173"}, // GNR
-			Depends:       []string{"pcm-tpmi"},
-			Superuser:     true,
-		},
-		{
-			Name: ChaCountScriptName,
-			Script: `rdmsr 0x396
+		Architectures: []string{x86_64},
+		Families:      []string{"6"},   // Intel
+		Models:        []string{"173"}, // GNR
+		Depends:       []string{"pcm-tpmi"},
+		Superuser:     true,
+	},
+	ChaCountScriptName: {
+		Name: ChaCountScriptName,
+		ScriptTemplate: `rdmsr 0x396
 rdmsr 0x702
 rdmsr 0x2FFE`, // uncore client cha count, uncore cha count, uncore cha count spr
-			Architectures: []string{x86_64},
-			Families:      []string{"6"}, // Intel
-			Lkms:          []string{"msr"},
-			Depends:       []string{"rdmsr"},
-			Superuser:     true,
-		},
-		{
-			Name:   IaaDevicesScriptName,
-			Script: "ls -1 /dev/iax",
-		},
-		{
-			Name:   DsaDevicesScriptName,
-			Script: "ls -1 /dev/dsa",
-		},
-		{
-			Name:      LshwScriptName,
-			Script:    "timeout 30 lshw -businfo -numeric",
-			Depends:   []string{"lshw"},
-			Superuser: true,
-		},
-		{
-			Name:   MeminfoScriptName,
-			Script: "cat /proc/meminfo",
-		},
-		{
-			Name:   TransparentHugePagesScriptName,
-			Script: "cat /sys/kernel/mm/transparent_hugepage/enabled",
-		},
-		{
-			Name:   NumaBalancingScriptName,
-			Script: "cat /proc/sys/kernel/numa_balancing",
-		},
-		{
-			Name: NicInfoScriptName,
-			Script: `timeout 30 lshw -businfo -numeric | grep -E "^(pci|usb).*? \S+\s+network\s+\S.*?" \
+		Architectures: []string{x86_64},
+		Families:      []string{"6"}, // Intel
+		Lkms:          []string{"msr"},
+		Depends:       []string{"rdmsr"},
+		Superuser:     true,
+	},
+	IaaDevicesScriptName: {
+		Name:           IaaDevicesScriptName,
+		ScriptTemplate: "ls -1 /dev/iax",
+	},
+	DsaDevicesScriptName: {
+		Name:           DsaDevicesScriptName,
+		ScriptTemplate: "ls -1 /dev/dsa",
+	},
+	LshwScriptName: {
+		Name:           LshwScriptName,
+		ScriptTemplate: "timeout 30 lshw -businfo -numeric",
+		Depends:        []string{"lshw"},
+		Superuser:      true,
+	},
+	MeminfoScriptName: {
+		Name:           MeminfoScriptName,
+		ScriptTemplate: "cat /proc/meminfo",
+	},
+	TransparentHugePagesScriptName: {
+		Name:           TransparentHugePagesScriptName,
+		ScriptTemplate: "cat /sys/kernel/mm/transparent_hugepage/enabled",
+	},
+	NumaBalancingScriptName: {
+		Name:           NumaBalancingScriptName,
+		ScriptTemplate: "cat /proc/sys/kernel/numa_balancing",
+	},
+	NicInfoScriptName: {
+		Name: NicInfoScriptName,
+		ScriptTemplate: `timeout 30 lshw -businfo -numeric | grep -E "^(pci|usb).*? \S+\s+network\s+\S.*?" \
 | while read -r a ifc c ; do
 	ethtool "$ifc"
 	ethtool -i "$ifc"
@@ -666,12 +687,12 @@ rdmsr 0x2FFE`, // uncore client cha count, uncore cha count, uncore cha count sp
 	pgrep irqbalance >/dev/null && echo "Enabled" || echo "Disabled"
 done
 	`,
-			Depends:   []string{"lshw"},
-			Superuser: true,
-		},
-		{
-			Name: DiskInfoScriptName,
-			Script: `echo "NAME|MODEL|SIZE|MOUNTPOINT|FSTYPE|RQ-SIZE|MIN-IO|FIRMWARE|ADDR|NUMA|LINKSPEED|LINKWIDTH|MAXLINKSPEED|MAXLINKWIDTH"
+		Depends:   []string{"lshw"},
+		Superuser: true,
+	},
+	DiskInfoScriptName: {
+		Name: DiskInfoScriptName,
+		ScriptTemplate: `echo "NAME|MODEL|SIZE|MOUNTPOINT|FSTYPE|RQ-SIZE|MIN-IO|FIRMWARE|ADDR|NUMA|LINKSPEED|LINKWIDTH|MAXLINKSPEED|MAXLINKWIDTH"
 lsblk -r -o NAME,MODEL,SIZE,MOUNTPOINT,FSTYPE,RQ-SIZE,MIN-IO -e7 -e1 \
 | cut -d' ' -f1,2,3,4,5,6,7 --output-delimiter='|' \
 | while IFS='|' read -r name model size mountpoint fstype rqsize minio ;
@@ -715,122 +736,121 @@ do
 	fi
 	echo "$name|$model|$size|$mountpoint|$fstype|$rqsize|$minio|$fw|$addr|$numa|$curlinkspeed|$curlinkwidth|$maxlinkspeed|$maxlinkwidth"
 done`,
-		},
-		{
-			Name: HdparmScriptName,
-			Script: `lsblk -d -r -o NAME -e7 -e1 -n | while read -r device ; do
+	},
+	HdparmScriptName: {
+		Name: HdparmScriptName,
+		ScriptTemplate: `lsblk -d -r -o NAME -e7 -e1 -n | while read -r device ; do
 	hdparm -i /dev/"$device"
 done`,
-			Superuser: true,
-		},
-		{
-			Name:   DfScriptName,
-			Script: `df -h`,
-		},
-		{
-			Name:      FindMntScriptName,
-			Script:    `findmnt -r`,
-			Superuser: true,
-		},
-		{
-			Name:      CveScriptName,
-			Script:    "spectre-meltdown-checker.sh --batch text",
-			Superuser: true,
-			Lkms:      []string{"msr"},
-			Depends:   []string{"spectre-meltdown-checker.sh", "rdmsr"},
-		},
-		{
-			Name:       ProcessListScriptName,
-			Script:     `ps -eo pid,ppid,%cpu,%mem,rss,command --sort=-%cpu,-pid | grep -v "]" | head -n 20`,
-			Sequential: true,
-		},
-		{
-			Name:      IpmitoolSensorsScriptName,
-			Script:    "LC_ALL=C timeout 30 ipmitool sdr list full",
-			Superuser: true,
-			Depends:   []string{"ipmitool"},
-		},
-		{
-			Name:      IpmitoolChassisScriptName,
-			Script:    "LC_ALL=C timeout 30 ipmitool chassis status",
-			Superuser: true,
-			Depends:   []string{"ipmitool"},
-		},
-		{
-			Name:      IpmitoolEventsScriptName,
-			Script:    `LC_ALL=C timeout 30 ipmitool sel elist | tail -n20 | cut -d'|' -f2-`,
-			Superuser: true,
-			Lkms:      []string{"ipmi_devintf", "ipmi_si"},
-			Depends:   []string{"ipmitool"},
-		},
-		{
-			Name:      IpmitoolEventTimeScriptName,
-			Script:    "LC_ALL=C timeout 30 ipmitool sel time get",
-			Superuser: true,
-			Depends:   []string{"ipmitool"},
-		},
-		{
-			Name:      KernelLogScriptName,
-			Script:    "dmesg --kernel --human --nopager | tail -n20",
-			Superuser: true,
-		},
-		{
-			Name:          PMUDriverVersionScriptName,
-			Script:        `dmesg | grep -A 1 "Intel PMU driver" | tail -1 | awk '{print $NF}'`,
-			Superuser:     true,
-			Architectures: []string{x86_64},
-			Families:      []string{"6"}, // Intel
-		},
-		{
-			Name: PMUBusyScriptName,
-			Script: `# loop through the PMU counters and check if they are active or inactive
+		Superuser: true,
+	},
+	DfScriptName: {
+		Name:           DfScriptName,
+		ScriptTemplate: `df -h`,
+	},
+	FindMntScriptName: {
+		Name:           FindMntScriptName,
+		ScriptTemplate: `findmnt -r`,
+		Superuser:      true,
+	},
+	CveScriptName: {
+		Name:           CveScriptName,
+		ScriptTemplate: "spectre-meltdown-checker.sh --batch text",
+		Superuser:      true,
+		Lkms:           []string{"msr"},
+		Depends:        []string{"spectre-meltdown-checker.sh", "rdmsr"},
+	},
+	ProcessListScriptName: {
+		Name:           ProcessListScriptName,
+		ScriptTemplate: `ps -eo pid,ppid,%cpu,%mem,rss,command --sort=-%cpu,-pid | grep -v "]" | head -n 20`,
+		Sequential:     true,
+	},
+	IpmitoolSensorsScriptName: {
+		Name:           IpmitoolSensorsScriptName,
+		ScriptTemplate: "LC_ALL=C timeout 30 ipmitool sdr list full",
+		Superuser:      true,
+		Depends:        []string{"ipmitool"},
+	},
+	IpmitoolChassisScriptName: {
+		Name:           IpmitoolChassisScriptName,
+		ScriptTemplate: "LC_ALL=C timeout 30 ipmitool chassis status",
+		Superuser:      true,
+		Depends:        []string{"ipmitool"},
+	},
+	IpmitoolEventsScriptName: {
+		Name:           IpmitoolEventsScriptName,
+		ScriptTemplate: `LC_ALL=C timeout 30 ipmitool sel elist | tail -n20 | cut -d'|' -f2-`,
+		Superuser:      true,
+		Lkms:           []string{"ipmi_devintf", "ipmi_si"},
+		Depends:        []string{"ipmitool"},
+	},
+	IpmitoolEventTimeScriptName: {
+		Name:           IpmitoolEventTimeScriptName,
+		ScriptTemplate: "LC_ALL=C timeout 30 ipmitool sel time get",
+		Superuser:      true,
+		Depends:        []string{"ipmitool"},
+	},
+	KernelLogScriptName: {
+		Name:           KernelLogScriptName,
+		ScriptTemplate: "dmesg --kernel --human --nopager | tail -n20",
+		Superuser:      true,
+	},
+	PMUDriverVersionScriptName: {
+		Name:           PMUDriverVersionScriptName,
+		ScriptTemplate: `dmesg | grep -A 1 "Intel PMU driver" | tail -1 | awk '{print $NF}'`,
+		Superuser:      true,
+		Architectures:  []string{x86_64},
+		Families:       []string{"6"}, // Intel
+	},
+	PMUBusyScriptName: {
+		Name: PMUBusyScriptName,
+		ScriptTemplate: `# loop through the PMU counters and check if they are active or inactive
 for i in 0x30a 0x309 0x30b 0x30c 0xc1 0xc2 0xc3 0xc4 0xc5 0xc6 0xc7 0xc8; do
-    arr=()
-    # read the value of the msr represented by the hex value 6 times, save results in an array
-    for j in {1..6}; do
-        val=$(rdmsr $i | tr -d '\n')
-        # if the value isn't a hex value, go on to next hex value
-        if [[ ! $val =~ ^[0-9a-fA-F]+$ ]]; then
-            echo "$i Unknown"
-            continue 2
-        fi
-        arr+=($val)
-    done
-    # if the first and last value in the array are the same, the counter is inactive
-    if [ ${arr[0]} == ${arr[5]} ]; then
-        echo "$i Inactive"
-    else
-        echo "$i Active"
-    fi
+	arr=()
+	# read the value of the msr represented by the hex value 6 times, save results in an array
+	for j in {1..6}; do
+		val=$(rdmsr $i | tr -d '\n')
+		# if the value isn't a hex value, go on to next hex value
+		if [[ ! $val =~ ^[0-9a-fA-F]+$ ]]; then
+			echo "$i Unknown"
+			continue 2
+		fi
+		arr+=($val)
+	done
+	# if the first and last value in the array are the same, the counter is inactive
+	if [ ${arr[0]} == ${arr[5]} ]; then
+		echo "$i Inactive"
+	else
+		echo "$i Active"
+	fi
 done`,
-			Superuser:     true,
-			Architectures: []string{x86_64},
-			Families:      []string{"6"}, // Intel
-			Lkms:          []string{"msr"},
-			Depends:       []string{"rdmsr"},
-		},
-		{
-			Name:          GaudiInfoScriptName,
-			Script:        `hl-smi -Q module_id,serial,bus_id,driver_version -f csv`,
-			Architectures: []string{"x86_64"},
-			Families:      []string{"6"}, // Intel
-		},
-		{
-			Name:          GaudiFirmwareScriptName,
-			Script:        `hl-smi --fw-version`,
-			Architectures: []string{"x86_64"},
-			Families:      []string{"6"}, // Intel
-		},
-		{
-			Name:          GaudiNumaScriptName,
-			Script:        `hl-smi topo -N`,
-			Architectures: []string{"x86_64"},
-			Families:      []string{"6"}, // Intel
-		},
-		// benchmarking scripts
-		{
-			Name: MemoryBandwidthAndLatencyScriptName,
-			Script: `# measure memory loaded latency
+		Superuser:     true,
+		Architectures: []string{x86_64},
+		Families:      []string{"6"}, // Intel
+		Lkms:          []string{"msr"},
+		Depends:       []string{"rdmsr"},
+	},
+	GaudiInfoScriptName: {
+		Name:           GaudiInfoScriptName,
+		ScriptTemplate: `hl-smi -Q module_id,serial,bus_id,driver_version -f csv`,
+		Architectures:  []string{"x86_64"},
+		Families:       []string{"6"}, // Intel
+	},
+	GaudiFirmwareScriptName: {
+		Name:           GaudiFirmwareScriptName,
+		ScriptTemplate: `hl-smi --fw-version`,
+		Architectures:  []string{"x86_64"},
+		Families:       []string{"6"}, // Intel
+	},
+	GaudiNumaScriptName: {
+		Name:           GaudiNumaScriptName,
+		ScriptTemplate: `hl-smi topo -N`,
+		Architectures:  []string{"x86_64"},
+		Families:       []string{"6"}, // Intel
+	},
+	MemoryBandwidthAndLatencyScriptName: {
+		Name: MemoryBandwidthAndLatencyScriptName,
+		ScriptTemplate: `# measure memory loaded latency
 #  need at least 2 GB (2,097,152 KB) of huge pages per NUMA node
 min_kb=2097152
 numa_nodes=$( lscpu | grep "NUMA node(s):" | awk '{print $3}' )
@@ -842,15 +862,15 @@ if [ $needed_num_huge_pages -gt $orig_num_huge_pages ]; then
 fi
 mlc --loaded_latency
 echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages`,
-			Architectures: []string{x86_64},
-			Superuser:     true,
-			Lkms:          []string{"msr"},
-			Depends:       []string{"mlc"},
-			Sequential:    true,
-		},
-		{
-			Name: NumaBandwidthScriptName,
-			Script: `# measure memory bandwidth matrix
+		Architectures: []string{x86_64},
+		Superuser:     true,
+		Lkms:          []string{"msr"},
+		Depends:       []string{"mlc"},
+		Sequential:    true,
+	},
+	NumaBandwidthScriptName: {
+		Name: NumaBandwidthScriptName,
+		ScriptTemplate: `# measure memory bandwidth matrix
 #  need at least 2 GB (2,097,152 KB) of huge pages per NUMA node
 min_kb=2097152
 numa_nodes=$( lscpu | grep "NUMA node(s):" | awk '{print $3}' )
@@ -862,41 +882,41 @@ if [ $needed_num_huge_pages -gt $orig_num_huge_pages ]; then
 fi
 mlc --bandwidth_matrix
 echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages`,
-			Architectures: []string{x86_64},
-			Superuser:     true,
-			Lkms:          []string{"msr"},
-			Depends:       []string{"mlc"},
-			Sequential:    true,
-		},
-		{
-			Name: CpuSpeedScriptName,
-			Script: `methods=$( stress-ng --cpu 1 --cpu-method x 2>&1 | cut -d":" -f2 | cut -c 6- )
+		Architectures: []string{x86_64},
+		Superuser:     true,
+		Lkms:          []string{"msr"},
+		Depends:       []string{"mlc"},
+		Sequential:    true,
+	},
+	CpuSpeedScriptName: {
+		Name: CpuSpeedScriptName,
+		ScriptTemplate: `methods=$( stress-ng --cpu 1 --cpu-method x 2>&1 | cut -d":" -f2 | cut -c 6- )
 for method in $methods; do
 	printf "%s " "$method"
 	stress-ng --cpu 0 -t 1 --cpu-method "$method" --metrics-brief 2>&1 | tail -1 | awk '{print $9}'
 done`,
-			Superuser:  false,
-			Depends:    []string{"stress-ng"},
-			Sequential: true,
-		},
-		{
-			Name: TurboFrequenciesScriptName,
-			Script: `# Function to expand a range of numbers, e.g. "0-24", into an array of numbers
+		Superuser:  false,
+		Depends:    []string{"stress-ng"},
+		Sequential: true,
+	},
+	TurboFrequenciesScriptName: {
+		Name: TurboFrequenciesScriptName,
+		ScriptTemplate: `# Function to expand a range of numbers, e.g. "0-24", into an array of numbers
 expand_range() {
-    local range=$1
-    local expanded=()
-    IFS=',' read -ra parts <<< "$range"
-    for part in "${parts[@]}"; do
-        if [[ $part == *-* ]]; then
-            IFS='-' read -ra limits <<< "$part"
-            for ((i=${limits[0]}; i<=${limits[1]}; i++)); do
-                expanded+=("$i")
-            done
-        else
-            expanded+=("$part")
-        fi
-    done
-    echo "${expanded[@]}"
+	local range=$1
+	local expanded=()
+	IFS=',' read -ra parts <<< "$range"
+	for part in "${parts[@]}"; do
+		if [[ $part == *-* ]]; then
+			IFS='-' read -ra limits <<< "$part"
+			for ((i=${limits[0]}; i<=${limits[1]}; i++)); do
+				expanded+=("$i")
+			done
+		else
+			expanded+=("$part")
+		fi
+	done
+	echo "${expanded[@]}"
 }
 
 # Get the number of NUMA nodes and sockets
@@ -914,9 +934,9 @@ declare -a core_lists
 
 # Loop through each NUMA node in the first socket and expand the core IDs
 for ((i=0; i<nodes_per_socket; i++)); do
-    core_range=$(lscpu | grep "NUMA node$i CPU(s):" | awk -F: '{print $2}' | tr -d ' ' | cut -d',' -f1)
-    core_list=$(expand_range "$core_range")
-    core_lists+=("$core_list")
+	core_range=$(lscpu | grep "NUMA node$i CPU(s):" | awk -F: '{print $2}' | tr -d ' ' | cut -d',' -f1)
+	core_list=$(expand_range "$core_range")
+	core_lists+=("$core_list")
 done
 
 # Interleave the core IDs from each NUMA node
@@ -925,20 +945,20 @@ max_length=0
 
 # Find the maximum length of the core lists
 for core_list in "${core_lists[@]}"; do
-    core_array=($core_list)
-    if (( ${#core_array[@]} > max_length )); then
-        max_length=${#core_array[@]}
-    fi
+	core_array=($core_list)
+	if (( ${#core_array[@]} > max_length )); then
+		max_length=${#core_array[@]}
+	fi
 done
 
 # Interleave the core IDs
 for ((i=0; i<max_length; i++)); do
-    for core_list in "${core_lists[@]}"; do
-        core_array=($core_list)
-        if (( i < ${#core_array[@]} )); then
-            interleaved_cores+=("${core_array[i]}")
-        fi
-    done
+	for core_list in "${core_lists[@]}"; do
+		core_array=($core_list)
+		if (( i < ${#core_array[@]} )); then
+			interleaved_cores+=("${core_array[i]}")
+		fi
+	done
 done
 
 # Form the interleaved core IDs into a comma-separated list
@@ -950,32 +970,31 @@ num_cores_per_socket=$( lscpu | grep 'Core(s) per socket:' | head -1 | awk '{pri
 
 # Run the avx-turbo benchmark
 avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd,avx128_fma,avx256_fma,avx512_fma --iters=100000 --cpuids=$interleaved_core_list`,
-			Superuser:  true,
-			Lkms:       []string{"msr"},
-			Depends:    []string{"avx-turbo"},
-			Sequential: true,
-		},
-		{
-			Name:       TurboFrequencyPowerAndTemperatureScriptName,
-			Script:     `((turbostat -i 2 2>/dev/null &) ; stress-ng --cpu 1 -t 20s 2>&1 ; stress-ng --cpu 0 -t 60s 2>&1 ; pkill -9 -f turbostat) | awk '$0~"stress" {print $0} $1=="Package" || $1=="CPU" || $1=="Core" || $1=="Node" {if(f!=1) print $0;f=1} $1=="-" {print $0}'		`,
-			Superuser:  true,
-			Lkms:       []string{"msr"},
-			Depends:    []string{"turbostat", "stress-ng"},
-			Sequential: true,
-		},
-		{
-			Name:       IdlePowerScriptName,
-			Script:     `turbostat --show PkgWatt -n 1 | sed -n 2p`,
-			Superuser:  true,
-			Lkms:       []string{"msr"},
-			Depends:    []string{"turbostat"},
-			Sequential: true,
-		},
-		{
-			Name: StoragePerfScriptName,
-			Script: func() string {
-				return fmt.Sprintf(`
-file_dir=%s
+		Superuser:  true,
+		Lkms:       []string{"msr"},
+		Depends:    []string{"avx-turbo"},
+		Sequential: true,
+	},
+	TurboFrequencyPowerAndTemperatureScriptName: {
+		Name:           TurboFrequencyPowerAndTemperatureScriptName,
+		ScriptTemplate: `((turbostat -i 2 2>/dev/null &) ; stress-ng --cpu 1 -t 20s 2>&1 ; stress-ng --cpu 0 -t 60s 2>&1 ; pkill -9 -f turbostat) | awk '$0~"stress" {print $0} $1=="Package" || $1=="CPU" || $1=="Core" || $1=="Node" {if(f!=1) print $0;f=1} $1=="-" {print $0}'		`,
+		Superuser:      true,
+		Lkms:           []string{"msr"},
+		Depends:        []string{"turbostat", "stress-ng"},
+		Sequential:     true,
+	},
+	IdlePowerScriptName: {
+		Name:           IdlePowerScriptName,
+		ScriptTemplate: `turbostat --show PkgWatt -n 1 | sed -n 2p`,
+		Superuser:      true,
+		Lkms:           []string{"msr"},
+		Depends:        []string{"turbostat"},
+		Sequential:     true,
+	},
+	StoragePerfScriptName: {
+		Name: StoragePerfScriptName,
+		ScriptTemplate: `
+file_dir={{.StorageDir}}
 test_dir="$file_dir"/fio_test
 file_size_g=5
 numjobs=1
@@ -992,11 +1011,11 @@ if [[ -d "$file_dir" && -w "$file_dir" ]]; then
 	is_terabyte_or_more=$(echo "TPEZY" | grep -F -q "$unit" && echo 1 || echo 0)
 	if [[ ("$unit" == "G" && "$is_enough_gigabytes" == 0) && "$is_terabyte_or_more" == 1 ]]; then
 		echo "ERROR: $file_dir does not have enough available space - $total_file_size_g GB required"
-        exit 1
+		exit 1
 	fi
 else
 	echo "ERROR: $file_dir does not exist or is not writeable"
-    exit 1
+	exit 1
 fi
 # single-threaded read & write bandwidth test
 rm -rf $test_dir
@@ -1008,230 +1027,231 @@ fio --name=bandwidth --directory=$test_dir --numjobs=$numjobs \
 --direct=1 --verify=0 --bs=1M --iodepth=64 --rw=rw \
 --group_reporting=1 --iodepth_batch_submit=64 \
 --iodepth_batch_complete_max=64
-rm -rf $test_dir`, params.StorageDir)
-			}(),
-			Superuser:  true,
-			Sequential: true,
-			Depends:    []string{"fio"},
-		},
-		// telemetry scripts
-		{
-			Name: MpstatScriptName,
-			Script: func() string {
-				var count string
-				if params.Duration != 0 && params.Interval != 0 {
-					countInt := params.Duration / params.Interval
-					count = strconv.Itoa(countInt)
-				}
-				script := fmt.Sprintf(`mpstat -u -T -I SCPU -P ALL %d %s`, params.Interval, count)
-				script += " &"                      // run it in the background
-				script += "\necho $! > {cmd_pid}\n" // this is used to kill the command
-				script += "wait\n"                  // wait for the command to finish
-				return script
+rm -rf $test_dir
+`,
+		Superuser:  true,
+		Sequential: true,
+		Depends:    []string{"fio"},
+	},
+	// telemetry scripts
+	MpstatScriptName: {
+		Name: MpstatScriptName,
+		ScriptTemplate: `interval={{.Interval}}
+duration={{.Duration}}
+if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
+	count=$((duration / interval))
+fi
+mpstat -u -T -I SCPU -P ALL $interval $count &
+echo $! > {{.ScriptName}}_cmd.pid
+wait`,
+		Superuser: true,
+		Lkms:      []string{},
+		Depends:   []string{"mpstat"},
+		NeedsKill: true,
+	},
+	IostatScriptName: {
+		Name: IostatScriptName,
+		ScriptTemplate: `interval={{.Interval}}
+duration={{.Duration}}
+if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
+	count=$((duration / interval))
+fi
+S_TIME_FORMAT=ISO iostat -d -t $interval $count | sed '/^loop/d' &
+echo $! > {{.ScriptName}}_cmd.pid
+wait`,
+		Superuser: true,
+		Lkms:      []string{},
+		Depends:   []string{"iostat"},
+		NeedsKill: true,
+	},
+	SarMemoryScriptName: {
+		Name: SarMemoryScriptName,
+		ScriptTemplate: `interval={{.Interval}}
+duration={{.Duration}}
+if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
+	count=$((duration / interval))
+fi
+sar -r $interval $count &
+echo $! > {{.ScriptName}}_cmd.pid
+wait`,
+		Superuser: true,
+		Lkms:      []string{},
+		Depends:   []string{"sar", "sadc"},
+		NeedsKill: true,
+	},
+	SarNetworkScriptName: {
+		Name: SarNetworkScriptName,
+		ScriptTemplate: `interval={{.Interval}}
+duration={{.Duration}}
+if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
+	count=$((duration / interval))
+fi
+sar -n DEV $interval $count &
+echo $! > {{.ScriptName}}_cmd.pid
+wait`,
+		Superuser: true,
+		Lkms:      []string{},
+		Depends:   []string{"sar", "sadc"},
+		NeedsKill: true,
+	},
+	TurbostatScriptName: {
+		Name: TurbostatScriptName,
+		ScriptTemplate: `interval={{.Interval}}
+duration={{.Duration}}
+if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
+	count=$((duration / interval))
+	count="-n $count"
+fi
+turbostat -S -s PkgWatt,RAMWatt -q -i $interval $count | awk '{ print strftime("%H:%M:%S"), $0 }' &
+echo $! > {{.ScriptName}}_cmd.pid
+wait`,
+		Superuser: true,
+		Lkms:      []string{"msr"},
+		Depends:   []string{"turbostat"},
+		NeedsKill: true,
+	},
+	InstructionMixScriptName: {
+		Name: InstructionMixScriptName,
+		ScriptTemplate: `interval={{.Interval}}
+duration={{.Duration}}
+if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
+	count=$((duration / interval))
+	arg_count="-n $count"
+fi
+if [ $interval -ne 0 ]; then
+	arg_interval="-i $interval"
+fi
+echo TIME: $(date +"%H:%M:%S")
+echo INTERVAL: $interval
+# if no PID specified, increase the sampling interval (defaults to 100,000) to reduce overhead
+if [ {{.PID}} -eq 0 ]; then
+	arg_sampling_rate="-s 1000000"
+else
+	arg_pid="-p {{.PID}}"
+fi
+# .Filter is a space separated list of ISA categories
+# for each category in the list, add -f <category> to the command line
+for category in {{.Filter}}; do
+    arg_filter="$arg_filter -f $category"
+done
 
-			}(),
-			Superuser: true,
-			Lkms:      []string{},
-			Depends:   []string{"mpstat"},
-			NeedsKill: true,
-		},
-		{
-			Name: IostatScriptName,
-			Script: func() string {
-				var count string
-				if params.Duration != 0 && params.Interval != 0 {
-					countInt := params.Duration / params.Interval
-					count = strconv.Itoa(countInt)
-				}
-				script := fmt.Sprintf(`S_TIME_FORMAT=ISO iostat -d -t %d %s | sed '/^loop/d'`, params.Interval, count)
-				script += " &"                      // run it in the background
-				script += "\necho $! > {cmd_pid}\n" // this is used to kill the command
-				script += "wait\n"                  // wait for the command to finish
-				return script
-			}(),
-			Superuser: true,
-			Lkms:      []string{},
-			Depends:   []string{"iostat"},
-			NeedsKill: true,
-		},
-		{
-			Name: SarMemoryScriptName,
-			Script: func() string {
-				var count string
-				if params.Duration != 0 && params.Interval != 0 {
-					countInt := params.Duration / params.Interval
-					count = strconv.Itoa(countInt)
-				}
-				script := fmt.Sprintf(`sar -r %d %s`, params.Interval, count)
-				script += " &"                      // run it in the background
-				script += "\necho $! > {cmd_pid}\n" // this is used to kill the command
-				script += "wait\n"                  // wait for the command to finish
-				return script
-			}(),
-			Superuser: true,
-			Lkms:      []string{},
-			Depends:   []string{"sar", "sadc"},
-			NeedsKill: true,
-		},
-		{
-			Name: SarNetworkScriptName,
-			Script: func() string {
-				var count string
-				if params.Duration != 0 && params.Interval != 0 {
-					countInt := params.Duration / params.Interval
-					count = strconv.Itoa(countInt)
-				}
-				script := fmt.Sprintf(`sar -n DEV %d %s`, params.Interval, count)
-				script += " &"                      // run it in the background
-				script += "\necho $! > {cmd_pid}\n" // this is used to kill the command
-				script += "wait\n"                  // wait for the command to finish
-				return script
-			}(),
-			Superuser: true,
-			Lkms:      []string{},
-			Depends:   []string{"sar", "sadc"},
-			NeedsKill: true,
-		},
-		{
-			Name: TurbostatScriptName,
-			Script: func() string {
-				var count string
-				if params.Duration != 0 && params.Interval != 0 {
-					countInt := params.Duration / params.Interval
-					count = "-n " + strconv.Itoa(countInt)
-				}
-				script := fmt.Sprintf(`turbostat -S -s PkgWatt,RAMWatt -q -i %d %s`, params.Interval, count) + ` | awk '{ print strftime("%H:%M:%S"), $0 }'`
-				script += " &"                      // run it in the background
-				script += "\necho $! > {cmd_pid}\n" // this is used to kill the command
-				script += "wait\n"                  // wait for the command to finish
-				return script
-			}(),
-			Superuser: true,
-			Lkms:      []string{"msr"},
-			Depends:   []string{"turbostat"},
-			NeedsKill: true,
-		},
-		{
-			Name: InstructionMixScriptName,
-			Script: func() string {
-				script := fmt.Sprintf("echo TIME: $(date +\"%%H:%%M:%%S\")\necho INTERVAL: %d\n", params.Interval)
-				commandParts := []string{
-					"processwatch -c",
-				}
-				// if no PID specified, increase the sampling interval (defaults to 100,000) to reduce overhead
-				if params.PID == 0 {
-					commandParts = append(commandParts, fmt.Sprintf("-s %d", 1000000))
-				} else {
-					commandParts = append(commandParts, fmt.Sprintf("-p %d", params.PID))
-				}
-				for _, cat := range params.Filter {
-					commandParts = append(commandParts, fmt.Sprintf("-f %s", cat))
-				}
-				if params.Duration != 0 && params.Interval != 0 {
-					count := params.Duration / params.Interval
-					commandParts = append(commandParts, fmt.Sprintf("-n %d", count))
-				}
-				if params.Interval != 0 {
-					commandParts = append(commandParts, fmt.Sprintf("-i %d", params.Interval))
-				}
-				script += strings.Join(commandParts, " ")
-				script += " &"                      // run it in the background
-				script += "\necho $! > {cmd_pid}\n" // this is used to kill the command
-				script += "wait\n"                  // wait for the command to finish
-				return script
-			}(),
-			Superuser: true,
-			Lkms:      []string{"msr"},
-			Depends:   []string{"processwatch"},
-			NeedsKill: true,
-		},
-
-		// flamegraph scripts
-		{
-			Name: ProfileJavaScriptName,
-			Script: func() string {
-				apInterval := 0
-				if params.Frequency > 0 {
-					apInterval = int(1 / float64(params.Frequency) * 1000000000)
-				}
-				return fmt.Sprintf(`# JAVA app call stack collection (run in background)
-ap_interval=%d
-duration=%d
+processwatch -c $arg_sampling_rate $arg_pid $arg_interval $arg_count $arg_filter &
+echo $! > {{.ScriptName}}_cmd.pid
+wait`,
+		Superuser: true,
+		Lkms:      []string{"msr"},
+		Depends:   []string{"processwatch"},
+		NeedsKill: true,
+	},
+	ProfileJavaScriptName: {
+		Name: ProfileJavaScriptName,
+		ScriptTemplate: `interval={{.Interval}}
+duration={{.Duration}}
+frequency={{.Frequency}}
+ap_interval=0
+if [ $frequency -ne 0 ]; then
+	ap_interval=$((1000000000 / frequency))
+fi
+# JAVA app call stack collection (run in background)
 declare -a java_pids=()
 declare -a java_cmds=()
 for pid in $( pgrep java ) ; do
-    # verify pid is still running
-    if [ -d "/proc/$pid" ]; then
-        java_pids+=($pid)
-        java_cmds+=("$( tr '\000' ' ' <  /proc/$pid/cmdline )")
-        # profile pid in background
-        async-profiler/profiler.sh start -i "$ap_interval" -o collapsed "$pid"
-    fi
+	# verify pid is still running
+	if [ -d "/proc/$pid" ]; then
+		java_pids+=($pid)
+		java_cmds+=("$( tr '\000' ' ' <  /proc/$pid/cmdline )")
+		# profile pid in background
+		async-profiler/profiler.sh start -i "$ap_interval" -o collapsed "$pid"
+	fi
 done
 sleep $duration
 # stop java profiling for each java pid
 for idx in "${!java_pids[@]}"; do
-    pid="${java_pids[$idx]}"
-    cmd="${java_cmds[$idx]}"
-    echo "########## async-profiler $pid $cmd ##########"
-    async-profiler/profiler.sh stop -o collapsed "$pid"
+	pid="${java_pids[$idx]}"
+	cmd="${java_cmds[$idx]}"
+	echo "########## async-profiler $pid $cmd ##########"
+	async-profiler/profiler.sh stop -o collapsed "$pid"
 done
-`, apInterval, params.Duration)
-			}(),
-			Superuser: true,
-			Depends:   []string{"async-profiler"},
-		},
-		{
-			Name: ProfileSystemScriptName,
-			Script: func() string {
-				return fmt.Sprintf(`# system-wide call stack collection
-# adjust perf_event_paranoid and kptr_restrict
-PERF_EVENT_PARANOID=$( cat /proc/sys/kernel/perf_event_paranoid )
-echo -1 >/proc/sys/kernel/perf_event_paranoid
-KPTR_RESTRICT=$( cat /proc/sys/kernel/kptr_restrict )
-echo 0 >/proc/sys/kernel/kptr_restrict
-# system-wide call stack collection - frame pointer mode
-frequency=%d
-duration=%d
-perf record -F $frequency -a -g -o perf_fp.data -m 129 -- sleep $duration &
-PERF_FP_PID=$!
-# system-wide call stack collection - dwarf mode
-perf record -F $frequency -a -g -o perf_dwarf.data -m 257 --call-graph dwarf,8192 -- sleep $duration &
-PERF_SYS_PID=$!
-# wait for perf to finish
-wait ${PERF_FP_PID}
-wait ${PERF_SYS_PID}
-# restore perf_event_paranoid and kptr_restrict
-echo "$PERF_EVENT_PARANOID" > /proc/sys/kernel/perf_event_paranoid
-echo "$KPTR_RESTRICT" > /proc/sys/kernel/kptr_restrict
-# collapse perf data
-perf script -i perf_dwarf.data | stackcollapse-perf.pl > perf_dwarf.folded
-perf script -i perf_fp.data | stackcollapse-perf.pl > perf_fp.folded
-if [ -f "perf_dwarf.folded" ]; then
-    echo "########## perf_dwarf ##########"
-    cat perf_dwarf.folded
-fi
-if [ -f "perf_fp.folded" ]; then
-    echo "########## perf_fp ##########"
-    cat perf_fp.folded
-fi
-`, params.Frequency, params.Duration)
-			}(),
-			Superuser: true,
-			Depends:   []string{"perf", "stackcollapse-perf.pl"},
-		},
-		{
-			Name: ProfileKernelLockScriptName,
-			Script: func() string {
-				return fmt.Sprintf(`# system-wide lock profile collection
+`,
+		Superuser: true,
+		Depends:   []string{"async-profiler"},
+	},
+	ProfileSystemScriptName: {
+		Name: ProfileSystemScriptName,
+		ScriptTemplate: `frequency={{.Frequency}}
+duration={{.Duration}}
+
+# system-wide call stack collection
+
+# Function to restore original settings
+restore_settings() {
+	echo "$PERF_EVENT_PARANOID" > /proc/sys/kernel/perf_event_paranoid
+	echo "$KPTR_RESTRICT" > /proc/sys/kernel/kptr_restrict
+}
+
 # adjust perf_event_paranoid and kptr_restrict
 PERF_EVENT_PARANOID=$( cat /proc/sys/kernel/perf_event_paranoid )
 echo -1 >/proc/sys/kernel/perf_event_paranoid
 KPTR_RESTRICT=$( cat /proc/sys/kernel/kptr_restrict )
 echo 0 >/proc/sys/kernel/kptr_restrict
 
-frequency=%d
-duration=%d
+# Ensure settings are restored on exit
+trap restore_settings EXIT
+
+# system-wide call stack collection - frame pointer mode
+perf_fp_data=$(mktemp /tmp/perf_fp.XXXXXX)
+perf record -F $frequency -a -g -o "$perf_fp_data" -m 129 -- sleep $duration &
+PERF_FP_PID=$!
+if ! kill -0 $PERF_FP_PID 2>/dev/null; then
+	echo "Failed to start perf record for frame pointer mode"
+	exit 1
+fi
+
+# system-wide call stack collection - dwarf mode
+perf_dwarf_data=$(mktemp /tmp/perf_dwarf.XXXXXX)
+perf record -F $frequency -a -g -o "$perf_dwarf_data" -m 257 --call-graph dwarf,8192 -- sleep $duration &
+PERF_DWARF_PID=$!
+if ! kill -0 $PERF_DWARF_PID 2>/dev/null; then
+	echo "Failed to start perf record for dwarf mode"
+	kill $PERF_FP_PID
+	exit 1
+fi
+
+# wait for perf to finish
+wait ${PERF_FP_PID} ${PERF_DWARF_PID}
+
+# collapse perf data
+perf_dwarf_folded=$(mktemp /tmp/perf_dwarf_folded.XXXXXX)
+perf_fp_folded=$(mktemp /tmp/perf_fp_folded.XXXXXX)
+perf script -i "$perf_dwarf_data" | stackcollapse-perf.pl > "$perf_dwarf_folded"
+perf script -i "$perf_fp_data" | stackcollapse-perf.pl > "$perf_fp_folded"
+
+# Display results
+if [ -f "$perf_dwarf_folded" ]; then
+	echo "########## perf_dwarf ##########"
+	cat "$perf_dwarf_folded"
+fi
+if [ -f "$perf_fp_folded" ]; then
+	echo "########## perf_fp ##########"
+	cat "$perf_fp_folded"
+fi
+
+# Clean up temporary files
+rm -f "$perf_fp_data" "$perf_dwarf_data" "$perf_dwarf_folded" "$perf_fp_folded"
+`,
+		Superuser: true,
+		Depends:   []string{"perf", "stackcollapse-perf.pl"},
+	},
+	ProfileKernelLockScriptName: {
+		Name: ProfileKernelLockScriptName,
+		ScriptTemplate: `frequency={{.Frequency}}
+duration={{.Duration}}
+# system-wide lock profile collection
+# adjust perf_event_paranoid and kptr_restrict
+PERF_EVENT_PARANOID=$( cat /proc/sys/kernel/perf_event_paranoid )
+echo -1 >/proc/sys/kernel/perf_event_paranoid
+KPTR_RESTRICT=$( cat /proc/sys/kernel/kptr_restrict )
+echo 0 >/proc/sys/kernel/kptr_restrict
 
 # collect hotspot
 perf record -F $frequency -a -g --call-graph dwarf -W -d --phys-data --sample-cpu -e cycles:pp,instructions:pp,cpu/mem-loads,ldlat=30/P,cpu/mem-stores/P -o perf_hotspot.data -- sleep $duration &
@@ -1243,14 +1263,14 @@ PERF_LOCK_CONTENTION_BPF=$?
 
 # collect lock
 if [ ${PERF_LOCK_CONTENTION_BPF} -eq 0 ]; then
- 	perf lock contention -a -bv --max-stack 20 2>perf_lock_contention.txt -- sleep $duration &
+	perf lock contention -a -bv --max-stack 20 2>perf_lock_contention.txt -- sleep $duration &
 	PERF_LOCK_PID=$!
 fi
 
 wait ${PERF_HOTSPOT_PID}
 
 if [ ${PERF_LOCK_CONTENTION_BPF} -eq 0 ]; then
- 	wait ${PERF_LOCK_PID}
+	wait ${PERF_LOCK_PID}
 fi
 
 # restore perf_event_paranoid and kptr_restrict
@@ -1259,43 +1279,23 @@ echo "$KPTR_RESTRICT" > /proc/sys/kernel/kptr_restrict
 
 # collapse perf data
 if [ -f "perf_hotspot.data" ]; then
-    echo "########## perf_hotspot_no_children ##########"
-    perf report -i perf_hotspot.data --no-children --call-graph none --stdio
+	echo "########## perf_hotspot_no_children ##########"
+	perf report -i perf_hotspot.data --no-children --call-graph none --stdio
 	echo "########## perf_hotspot_callgraph ##########"
 	perf report -i perf_hotspot.data --stdio
 fi
 if [ -f "perf_hotspot.data" ]; then
-    echo "########## perf_c2c_no_children ##########"
+	echo "########## perf_c2c_no_children ##########"
 	perf c2c report  -i perf_hotspot.data --call-graph none --stdio
 	echo "########## perf_c2c_callgraph ##########"
 	perf c2c report  -i perf_hotspot.data --stdio
 fi
 if [ -f "perf_lock_contention.txt" ]; then
-    echo "########## perf_lock_contention ##########"
+	echo "########## perf_lock_contention ##########"
 	cat perf_lock_contention.txt
 fi
-`, params.Frequency, params.Duration)
-			}(),
-			Superuser: true,
-			Depends:   []string{"perf"},
-		},
-	}
-
-	// validate script definitions
-	var scriptNames = make(map[string]bool)
-	for i, s := range scripts {
-		if _, ok := scriptNames[s.Name]; ok {
-			panic(fmt.Sprintf("script %d, duplicate script name: %s", i, s.Name))
-		}
-		if s.Name == "" {
-			panic(fmt.Sprintf("script %d, name cannot be empty", i))
-		}
-		if s.Script == "" {
-			panic(fmt.Sprintf("script %d, script cannot be empty: %s", i, s.Name))
-		}
-		if strings.ContainsAny(s.Name, "/") {
-			panic(fmt.Sprintf("script %d, name cannot contain /: %s", i, s.Name))
-		}
-	}
-	return
+`,
+		Superuser: true,
+		Depends:   []string{"perf"},
+	},
 }
