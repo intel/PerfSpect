@@ -113,6 +113,7 @@ const (
 	GaudiFirmwareScriptName                     = "gaudi firmware"
 	GaudiNumaScriptName                         = "gaudi numa"
 	InstructionMixScriptName                    = "instruction mix"
+	GaudiStatsScriptName                        = "gaudi stats"
 )
 
 const (
@@ -1161,6 +1162,15 @@ wait`,
 		Superuser: true,
 		Lkms:      []string{"msr"},
 		Depends:   []string{"processwatch"},
+		NeedsKill: true,
+	},
+	GaudiStatsScriptName: {
+		Name: GaudiStatsScriptName,
+		ScriptTemplate: `hl-smi --query-aip=timestamp,name,temperature.aip,module_id,utilization.aip,memory.total,memory.free,memory.used,power.draw --format=csv,nounits -l {{.Interval}} &
+echo $! > {{.ScriptName}}_cmd.pid
+sleep {{.Duration}}
+kill -SIGINT $(cat {{.ScriptName}}_cmd.pid)`,
+		Superuser: true,
 		NeedsKill: true,
 	},
 	ProfileJavaScriptName: {
