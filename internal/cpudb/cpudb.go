@@ -22,7 +22,7 @@ func NewCPUDB() *CPUDB {
 
 // GetCPU retrieves the CPU structure that matches the provided args
 func (c *CPUDB) GetCPU(family, model, stepping string) (cpu CPU, err error) {
-	return c.GetCPUExtended(family, model, stepping, "", "", "")
+	return c.GetCPUExtended(family, model, stepping, "", "")
 }
 
 // GetCPUExtended retrieves the CPU structure that matches the provided args
@@ -30,10 +30,10 @@ func (c *CPUDB) GetCPU(family, model, stepping string) (cpu CPU, err error) {
 //
 //	capid4: $ lspci -s $(lspci | grep 325b | awk 'NR==1{{print $1}}') -xxx |  awk '$1 ~ /^90/{{print $9 $8 $7 $6; exit}}'
 //
-// sockets and devices (eventually devices per socket) needed to differentiate GNR X1/2/3
+// devices needed to differentiate GNR X1/2/3
 //
 //	devices: $ lspci -d 8086:3258 | wc -l
-func (c *CPUDB) GetCPUExtended(family, model, stepping, capid4, sockets, devices string) (cpu CPU, err error) {
+func (c *CPUDB) GetCPUExtended(family, model, stepping, capid4, devices string) (cpu CPU, err error) {
 	for _, info := range *c {
 		// if family matches
 		if info.Family == family {
@@ -59,7 +59,7 @@ func (c *CPUDB) GetCPUExtended(family, model, stepping, capid4, sockets, devices
 				}
 				cpu = info
 				if cpu.Family == "6" && (cpu.Model == "143" || cpu.Model == "207" || cpu.Model == "173") { // SPR, EMR, GNR
-					cpu, err = c.getSpecificCPU(family, model, capid4, sockets, devices)
+					cpu, err = c.getSpecificCPU(family, model, capid4, devices)
 				}
 				return
 			}
@@ -80,13 +80,13 @@ func (c *CPUDB) GetCPUByMicroArchitecture(uarch string) (cpu CPU, err error) {
 	return
 }
 
-func (c *CPUDB) getSpecificCPU(family, model, capid4, sockets, devices string) (cpu CPU, err error) {
+func (c *CPUDB) getSpecificCPU(family, model, capid4, devices string) (cpu CPU, err error) {
 	if family == "6" && model == "143" { // SPR
 		cpu, err = c.getSPRCPU(capid4)
 	} else if family == "6" && model == "207" { // EMR
 		cpu, err = c.getEMRCPU(capid4)
 	} else if family == "6" && model == "173" { // GNR
-		cpu, err = c.getGNRCPU(sockets, devices)
+		cpu, err = c.getGNRCPU(devices)
 	}
 	return
 }
@@ -149,21 +149,17 @@ func (c *CPUDB) getEMRCPU(capid4 string) (cpu CPU, err error) {
 	return
 }
 
-func (c *CPUDB) getGNRCPU(sockets, devices string) (cpu CPU, err error) {
+func (c *CPUDB) getGNRCPU(devices string) (cpu CPU, err error) {
 	var uarch string
-	if sockets != "" && devices != "" {
-		s, err := strconv.Atoi(sockets)
-		if err == nil && s != 0 {
-			d, err := strconv.Atoi(devices)
-			if err == nil && d != 0 {
-				devicesPerSocket := d / s
-				if devicesPerSocket == 3 {
-					uarch = "GNR_X1"
-				} else if devicesPerSocket == 4 {
-					uarch = "GNR_X2"
-				} else if devicesPerSocket == 5 {
-					uarch = "GNR_X3"
-				}
+	if devices != "" {
+		d, err := strconv.Atoi(devices)
+		if err == nil && d != 0 {
+			if d%5 == 0 { // device count is multiple of 5
+				uarch = "GNR_X3"
+			} else if d%4 == 0 { // device count is multiple of 4
+				uarch = "GNR_X2"
+			} else if d%3 == 0 { // device count is multiple of 3
+				uarch = "GNR_X1"
 			}
 		}
 	}

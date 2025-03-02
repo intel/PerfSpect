@@ -136,17 +136,16 @@ func getDmiDecodeEntries(dmiDecodeOutput string, dmiType string) (entries [][]st
 	return
 }
 
-// uarchFromOutput returns the architecture of the CPU that matches family, model, stepping, sockets,
+// uarchFromOutput returns the architecture of the CPU that matches family, model, stepping,
 // capid4, and devices information from the output or an empty string, if no match is found.
 func uarchFromOutput(outputs map[string]script.ScriptOutput) string {
 	family := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU family:\s*(.+)$`)
 	model := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Model:\s*(.+)$`)
 	stepping := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Stepping:\s*(.+)$`)
-	sockets := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)
 	capid4 := valFromRegexSubmatch(outputs[script.LspciBitsScriptName].Stdout, `^([0-9a-fA-F]+)`)
 	devices := valFromRegexSubmatch(outputs[script.LspciDevicesScriptName].Stdout, `^([0-9]+)`)
 	CPUdb := cpudb.NewCPUDB()
-	cpu, err := CPUdb.GetCPUExtended(family, model, stepping, capid4, sockets, devices)
+	cpu, err := CPUdb.GetCPUExtended(family, model, stepping, capid4, devices)
 	if err == nil {
 		return cpu.MicroArchitecture
 	}
@@ -305,7 +304,7 @@ func hyperthreadingFromOutput(outputs map[string]script.ScriptOutput) string {
 		return ""
 	}
 	CPUdb := cpudb.NewCPUDB()
-	cpu, err := CPUdb.GetCPUExtended(family, model, stepping, "", sockets, "")
+	cpu, err := CPUdb.GetCPUExtended(family, model, stepping, "", "")
 	if err != nil {
 		return ""
 	}
@@ -349,11 +348,10 @@ func channelsFromOutput(outputs map[string]script.ScriptOutput) string {
 	family := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU family:\s*(.+)$`)
 	model := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Model:\s*(.+)$`)
 	stepping := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Stepping:\s*(.+)$`)
-	sockets := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(.*:\s*(.+?)$`)
 	capid4 := valFromRegexSubmatch(outputs[script.LspciBitsScriptName].Stdout, `^([0-9a-fA-F]+)`)
 	devices := valFromRegexSubmatch(outputs[script.LspciDevicesScriptName].Stdout, `^([0-9]+)`)
 	CPUdb := cpudb.NewCPUDB()
-	cpu, err := CPUdb.GetCPUExtended(family, model, stepping, capid4, sockets, devices)
+	cpu, err := CPUdb.GetCPUExtended(family, model, stepping, capid4, devices)
 	if err != nil {
 		slog.Error("error getting CPU from CPUdb", slog.String("error", err.Error()))
 		return ""
