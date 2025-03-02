@@ -849,53 +849,54 @@ func elcSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 	return summary
 }
 
+// epbFromOutput gets EPB value from script outputs
 func epbFromOutput(outputs map[string]script.ScriptOutput) string {
-	// if we couldn't get the EPB values, return empty string
-	if outputs[script.EpbScriptName].Exitcode != 0 || len(outputs[script.EpbScriptName].Stdout) == 0 {
-		slog.Warn("EPB script failed or produced no output")
+	// if we couldn't read the EPB related MSR values, return empty string
+	if outputs[script.EpbSourceScriptName].Exitcode != 0 || len(outputs[script.EpbSourceScriptName].Stdout) == 0 ||
+		outputs[script.EpbOSScriptName].Exitcode != 0 || len(outputs[script.EpbOSScriptName].Stdout) == 0 ||
+		outputs[script.EpbBIOSScriptName].Exitcode != 0 || len(outputs[script.EpbBIOSScriptName].Stdout) == 0 {
+		slog.Warn("EPB scripts failed or produced no output")
 		return ""
 	}
-	var epb string
-	epbConsistent := true
-	for i, line := range strings.Split(outputs[script.EpbScriptName].Stdout, "\n") {
-		if line == "" {
-			continue
-		}
-		currentEpb := strings.TrimSpace(strings.Split(line, ":")[1])
-		if i == 0 {
-			epb = currentEpb
-			continue
-		}
-		if currentEpb != epb {
-			epbConsistent = false
-			break
-		}
-	}
-	if !epbConsistent {
-		return "inconsistent"
-	}
-	msr, err := strconv.ParseInt(epb, 16, 0)
+	// read the EPB source value
+	epbSource := strings.TrimSpace(outputs[script.EpbSourceScriptName].Stdout)
+	msr, err := strconv.ParseInt(epbSource, 16, 0)
 	if err != nil {
-		slog.Error("failed to parse EPB value", slog.String("error", err.Error()), slog.String("epb", epb))
+		slog.Error("failed to parse EPB Source value", slog.String("error", err.Error()), slog.String("epbSource", epbSource))
 		return ""
+	}
+	if msr == 1 { // BIOS
+		// read the EPB BIOS value
+		epbBIOS := strings.TrimSpace(outputs[script.EpbBIOSScriptName].Stdout)
+		msr, err = strconv.ParseInt(epbBIOS, 16, 0)
+		if err != nil {
+			slog.Error("failed to parse EPB BIOS value", slog.String("error", err.Error()), slog.String("epbBIOS", epbBIOS))
+			return ""
+		}
+		slog.Debug("EPB value from BIOS", slog.Int("msr", int(msr)))
+	} else { // OS
+		// read the EPB OS value
+		epbOS := strings.TrimSpace(outputs[script.EpbOSScriptName].Stdout)
+		msr, err = strconv.ParseInt(epbOS, 16, 0)
+		if err != nil {
+			slog.Error("failed to parse EPB OS value", slog.String("error", err.Error()), slog.String("epbOS", epbOS))
+			return ""
+		}
+		slog.Debug("EPB value from OS", slog.Int("msr", int(msr)))
 	}
 	return epbValToLabel(int(msr))
 }
 
 func epbValToLabel(msr int) string {
 	var val string
-	if msr < 3 {
+	if msr >= 0 && msr <= 3 {
 		val = "Performance"
-	} else if msr < 6 {
-		val = "Balance Performance"
-	} else if msr == 6 {
-		val = "Normal"
-	} else if msr == 7 {
-		val = "Normal Powersave"
-	} else if msr == 8 {
-		val = "Balance Powersave"
-	} else {
-		val = "Powersave"
+	} else if msr >= 4 && msr <= 7 {
+		val = "Balanced Performance"
+	} else if msr >= 8 && msr <= 11 {
+		val = "Balanced Energy"
+	} else if msr >= 12 {
+		val = "Energy Efficient"
 	}
 	return fmt.Sprintf("%s (%d)", val, msr)
 }
@@ -905,11 +906,11 @@ func eppValToLabel(msr int) string {
 	if msr == 128 {
 		val = "Normal"
 	} else if msr < 128 && msr > 64 {
-		val = "Balance Performance"
+		val = "Balanced Performance"
 	} else if msr <= 64 {
 		val = "Performance"
 	} else if msr > 128 && msr < 192 {
-		val = "Balance Powersave"
+		val = "Balanced Powersave"
 	} else {
 		val = "Powersave"
 	}

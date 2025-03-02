@@ -85,12 +85,12 @@ func Create(format string, allTableValues []TableValues, scriptOutputs map[strin
 	panic(fmt.Sprintf("expected one of %s, got %s", strings.Join(FormatOptions, ", "), format))
 }
 
-func CreateMultiTarget(format string, allTargetsTableValues [][]TableValues, targetNames []string) (out []byte, err error) {
+func CreateMultiTarget(format string, allTargetsTableValues [][]TableValues, targetNames []string, allTableNames []string) (out []byte, err error) {
 	switch format {
 	case "html":
-		return createHtmlReportMultiTarget(allTargetsTableValues, targetNames)
+		return createHtmlReportMultiTarget(allTargetsTableValues, targetNames, allTableNames)
 	case "xlsx":
-		return createXlsxReportMultiTarget(allTargetsTableValues, targetNames)
+		return createXlsxReportMultiTarget(allTargetsTableValues, targetNames, allTableNames)
 	}
 	panic("only HTML and XLSX multi-target report supported currently")
 }
@@ -258,7 +258,7 @@ func renderXlsxTable(tableValues TableValues, f *excelize.File, sheetName string
 	*row++
 }
 
-func renderXlsxTableMultiTarget(tableIdx int, allTargetsTableValues [][]TableValues, targetNames []string, f *excelize.File, sheetName string, row *int) {
+func renderXlsxTableMultiTarget(targetTableValues []TableValues, targetNames []string, f *excelize.File, sheetName string, row *int) {
 	col := 1
 	// print the table name
 	tableNameStyle, _ := f.NewStyle(&excelize.Style{
@@ -277,10 +277,10 @@ func renderXlsxTableMultiTarget(tableIdx int, allTargetsTableValues [][]TableVal
 		},
 	})
 
-	_ = f.SetCellValue(sheetName, cellName(col, *row), allTargetsTableValues[0][tableIdx].Name)
+	_ = f.SetCellValue(sheetName, cellName(col, *row), targetTableValues[0].Name)
 	_ = f.SetCellStyle(sheetName, cellName(col, *row), cellName(col, *row), tableNameStyle)
 
-	if !allTargetsTableValues[0][tableIdx].HasRows {
+	if !targetTableValues[0].HasRows {
 		col += 2
 		// print the target names
 		for _, targetName := range targetNames {
@@ -291,15 +291,15 @@ func renderXlsxTableMultiTarget(tableIdx int, allTargetsTableValues [][]TableVal
 		*row++
 
 		// print the field names and values from each target
-		for fieldIdx, field := range allTargetsTableValues[0][tableIdx].Fields {
+		for fieldIdx, field := range targetTableValues[0].Fields {
 			col = 2
 			_ = f.SetCellValue(sheetName, cellName(col, *row), field.Name)
 			_ = f.SetCellStyle(sheetName, cellName(col, *row), cellName(col, *row), fieldNameStyle)
 			col++
 			for targetIdx := 0; targetIdx < len(targetNames); targetIdx++ {
 				var fieldValue string
-				if len(allTargetsTableValues[targetIdx][tableIdx].Fields[fieldIdx].Values) > 0 {
-					fieldValue = allTargetsTableValues[targetIdx][tableIdx].Fields[fieldIdx].Values[0]
+				if len(targetTableValues[targetIdx].Fields[fieldIdx].Values) > 0 {
+					fieldValue = targetTableValues[targetIdx].Fields[fieldIdx].Values[0]
 				}
 				_ = f.SetCellValue(sheetName, cellName(col, *row), fieldValue)
 				col++
@@ -315,10 +315,10 @@ func renderXlsxTableMultiTarget(tableIdx int, allTargetsTableValues [][]TableVal
 			*row++
 
 			// if no data found, print a message and skip to the next target
-			if len(allTargetsTableValues[targetIdx][tableIdx].Fields) == 0 || len(allTargetsTableValues[targetIdx][tableIdx].Fields[0].Values) == 0 {
+			if len(targetTableValues[targetIdx].Fields) == 0 || len(targetTableValues[targetIdx].Fields[0].Values) == 0 {
 				msg := noDataFound
-				if allTargetsTableValues[targetIdx][tableIdx].NoDataFound != "" {
-					msg = allTargetsTableValues[targetIdx][tableIdx].NoDataFound
+				if targetTableValues[targetIdx].NoDataFound != "" {
+					msg = targetTableValues[targetIdx].NoDataFound
 				}
 				_ = f.SetCellValue(sheetName, cellName(col, *row), msg)
 				*row += 2
@@ -327,17 +327,17 @@ func renderXlsxTableMultiTarget(tableIdx int, allTargetsTableValues [][]TableVal
 
 			// print the field names as column headings across the top of the table
 			col = 2
-			for _, field := range allTargetsTableValues[targetIdx][tableIdx].Fields {
+			for _, field := range targetTableValues[targetIdx].Fields {
 				_ = f.SetCellValue(sheetName, cellName(col, *row), field.Name)
 				_ = f.SetCellStyle(sheetName, cellName(col, *row), cellName(col, *row), fieldNameStyle)
 				col++
 			}
 			*row++
 			// print the rows of values
-			tableRows := len(allTargetsTableValues[targetIdx][tableIdx].Fields[0].Values)
+			tableRows := len(targetTableValues[targetIdx].Fields[0].Values)
 			for tableRow := 0; tableRow < tableRows; tableRow++ {
 				col = 2
-				for _, field := range allTargetsTableValues[targetIdx][tableIdx].Fields {
+				for _, field := range targetTableValues[targetIdx].Fields {
 					value := getValueForCell(field.Values[tableRow])
 					_ = f.SetCellValue(sheetName, cellName(col, *row), value)
 					col++
@@ -348,7 +348,6 @@ func renderXlsxTableMultiTarget(tableIdx int, allTargetsTableValues [][]TableVal
 		}
 	}
 	*row++
-
 }
 
 func DefaultXlsxTableRendererFunc(tableValues TableValues, f *excelize.File, sheetName string, row *int) {
@@ -437,23 +436,37 @@ func createXlsxReport(allTableValues []TableValues) (out []byte, err error) {
 	return
 }
 
-func createXlsxReportMultiTarget(allTargetsTableValues [][]TableValues, targetNames []string) (out []byte, err error) {
+func createXlsxReportMultiTarget(allTargetsTableValues [][]TableValues, targetNames []string, allTableNames []string) (out []byte, err error) {
 	f := excelize.NewFile()
 	sheetName := XlsxPrimarySheetName
 	_ = f.SetSheetName("Sheet1", sheetName)
 	_ = f.SetColWidth(sheetName, "A", "A", 15)
 	_ = f.SetColWidth(sheetName, "B", "L", 25)
 	row := 1
-	for tableIdx, tableValues := range allTargetsTableValues[0] {
-		if tableValues.Name == SystemSummaryTableName {
-			row := 1
+
+	// render the tables in the order they were passed in
+	for _, tableName := range allTableNames {
+		// build list of target names and TableValues for targets that have values for this table
+		tableTargets := []string{}
+		tableValues := []TableValues{}
+		for targetIndex, targetTableValues := range allTargetsTableValues {
+			tableIndex := findTableIndex(targetTableValues, tableName)
+			if tableIndex == -1 {
+				continue
+			}
+			tableTargets = append(tableTargets, targetNames[targetIndex])
+			tableValues = append(tableValues, targetTableValues[tableIndex])
+		}
+		// render the table, if system summary table put it in a separate sheet
+		if tableName == SystemSummaryTableName {
+			row = 1
 			sheetName := XlsxBriefSheetName
 			_, _ = f.NewSheet(sheetName)
 			_ = f.SetColWidth(sheetName, "A", "A", 15)
 			_ = f.SetColWidth(sheetName, "B", "L", 25)
-			renderXlsxTableMultiTarget(tableIdx, allTargetsTableValues, targetNames, f, sheetName, &row)
+			renderXlsxTableMultiTarget(tableValues, tableTargets, f, sheetName, &row)
 		} else {
-			renderXlsxTableMultiTarget(tableIdx, allTargetsTableValues, targetNames, f, sheetName, &row)
+			renderXlsxTableMultiTarget(tableValues, tableTargets, f, sheetName, &row)
 		}
 	}
 	var buf bytes.Buffer

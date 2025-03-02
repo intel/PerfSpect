@@ -58,7 +58,9 @@ const (
 	PrefetchersName                             = "prefetchers"
 	L3WaySizeName                               = "l3 way size"
 	PackagePowerLimitName                       = "package power limit"
-	EpbScriptName                               = "energy performance bias"
+	EpbOSScriptName                             = "energy performance bias OS"
+	EpbBIOSScriptName                           = "energy performance bias BIOS"
+	EpbSourceScriptName                         = "energy performance bias source"
 	EppScriptName                               = "energy performance preference"
 	EppValidScriptName                          = "epp valid"
 	EppPackageControlScriptName                 = "epp package control"
@@ -383,9 +385,27 @@ rdmsr 0x1ad # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
 	},
-	EpbScriptName: {
-		Name:           EpbScriptName,
-		ScriptTemplate: "rdmsr -a -f 3:0 0x1B0", // IA32_ENERGY_PERF_BIAS: Energy Performance Bias Hint (0 is highest perf, 15 is highest energy saving)
+	EpbSourceScriptName: {
+		Name:           EpbSourceScriptName,
+		ScriptTemplate: "rdmsr -f 34:34 0x1FC", // MSR_POWER_CTL, PWR_PERF_TUNING_ALT_EPB: Energy Performance Bias Hint Source (1 is from BIOS, 0 is from OS)
+		Architectures:  []string{x86_64},
+		Families:       []string{"6"}, // Intel
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
+		Superuser:      true,
+	},
+	EpbOSScriptName: {
+		Name:           EpbOSScriptName,
+		ScriptTemplate: "rdmsr -f 3:0 0x1B0", // IA32_ENERGY_PERF_BIAS: Energy Performance Bias Hint (0 is highest perf, 15 is highest energy saving)
+		Architectures:  []string{x86_64},
+		Families:       []string{"6"}, // Intel
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
+		Superuser:      true,
+	},
+	EpbBIOSScriptName: {
+		Name:           EpbBIOSScriptName,
+		ScriptTemplate: "rdmsr -f 6:3 0xA01", // ENERGY_PERF_BIAS_CONFIG, ALT_ENERGY_PERF_BIAS: Energy Performance Bias Hint from BIOS (0 is highest perf, 15 is highest energy saving)
 		Architectures:  []string{x86_64},
 		Families:       []string{"6"}, // Intel
 		Lkms:           []string{"msr"},

@@ -173,7 +173,7 @@ func getFlagGroups() []common.FlagGroup {
 		},
 		{
 			Name: flagEpbName,
-			Help: "set energy perf bias (EPB) from best performance (0) to most power savings (9)",
+			Help: "set energy perf bias (EPB) from best performance (0) to most power savings (15)",
 		},
 		{
 			Name: flagEppName,
@@ -216,7 +216,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	if cmd.Flags().Lookup(flagPowerName).Changed && flagPower < 1 {
 		return fmt.Errorf("invalid power: %d", flagPower)
 	}
-	if cmd.Flags().Lookup(flagEpbName).Changed && (flagEpb < 0 || flagEpb > 9) {
+	if cmd.Flags().Lookup(flagEpbName).Changed && (flagEpb < 0 || flagEpb > 15) {
 		return fmt.Errorf("invalid epb: %d", flagEpb)
 	}
 	if cmd.Flags().Lookup(flagEppName).Changed && (flagEpp < 0 || flagEpp > 255) {
@@ -785,17 +785,62 @@ func setPower(power int, myTarget target.Target, localTempDir string) {
 }
 
 func setEpb(epb int, myTarget target.Target, localTempDir string) {
+	epbSourceScript := script.GetScriptByName(script.EpbSourceScriptName)
+	epbSourceOutput, err := runScript(myTarget, epbSourceScript, localTempDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to get EPB source: %v\n", err)
+		return
+	}
+	epbSource := strings.TrimSpace(epbSourceOutput)
+	source, err := strconv.ParseInt(epbSource, 16, 0)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
 	fmt.Printf("set energy performance bias (EPB) to %d on %s\n", epb, myTarget.GetName())
+	var msr string
+	var bitOffset uint
+	if source == 0 { // 0 means the EPB is controlled by the OS
+		msr = "0x1B0"
+		bitOffset = 0
+	} else { // 1 means the EPB is controlled by the BIOS
+		msr = "0xA01"
+		bitOffset = 3
+	}
+	readScript := script.ScriptDefinition{
+		Name:           "read " + msr,
+		ScriptTemplate: "rdmsr " + msr,
+		Architectures:  []string{"x86_64"},
+		Families:       []string{"6"}, // Intel
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
+		Superuser:      true,
+	}
+	readOutput, err := runScript(myTarget, readScript, localTempDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to read MSR %s: %v\n", msr, err)
+		return
+	}
+	msrValue, err := strconv.ParseUint(strings.TrimSpace(readOutput), 16, 64)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+	// mask out 4 bits starting at bitOffset
+	maskedValue := msrValue &^ (0xF << bitOffset)
+	// put the EPB value in the masked bits
+	msrValue = maskedValue | uint64(epb)<<bitOffset
+	// write the new value to the MSR
 	setScript := script.ScriptDefinition{
 		Name:           "set epb",
-		ScriptTemplate: fmt.Sprintf("wrmsr -a 0x1B0 %d", epb),
+		ScriptTemplate: fmt.Sprintf("wrmsr -a %s %d", msr, msrValue),
 		Superuser:      true,
 		Architectures:  []string{"x86_64"},
 		Families:       []string{"6"}, // Intel only
 		Lkms:           []string{"msr"},
 		Depends:        []string{"wrmsr"},
 	}
-	_, err := runScript(myTarget, setScript, localTempDir)
+	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to set EPB: %v\n", err)
 	}
