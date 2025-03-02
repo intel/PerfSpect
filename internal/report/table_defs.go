@@ -17,6 +17,8 @@ import (
 
 	"perfspect/internal/cpudb"
 	"perfspect/internal/script"
+	"perfspect/internal/target"
+	"perfspect/internal/util"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -34,8 +36,11 @@ type TextTableRenderer func(TableValues) string
 type XlsxTableRenderer func(TableValues, *excelize.File, string, *int)
 
 type TableDefinition struct {
-	Name        string
-	ScriptNames []string
+	Name          string
+	ScriptNames   []string
+	Architectures []string // architectures, i.e., x86_64, arm64. If empty, it will be present for all architectures.
+	Families      []string // families, e.g., 6, 7. If empty, it will be present for all families.
+	Models        []string // models, e.g., 62, 63. If empty, it will be present for all models.
 	// Fields function is called to retrieve field values from the script outputs
 	FieldsFunc  FieldsRetriever
 	MenuLabel   string // add to tables that will be displayed in the menu
@@ -116,14 +121,13 @@ const (
 	NetworkStatsTableName          = "Network Stats"
 	MemoryStatsTableName           = "Memory Stats"
 	PowerStatsTableName            = "Power Stats"
+	InstructionMixTableName        = "Instruction Mix"
 	// config  table names
 	ConfigurationTableName = "Configuration"
 	// flamegraph table names
 	CodePathFrequencyTableName = "Code Path Frequency"
 	// lock table names
 	KernelLockAnalysisTableName = "Kernel Lock Analysis"
-	// process watch instruction mix table names
-	InstructionMixTableName = "Instruction Mix"
 )
 
 const (
@@ -141,6 +145,44 @@ const (
 	LogsMenuLabel          = "Logs"
 	SystemSummaryMenuLabel = "System Summary"
 )
+
+func GetTableByName(name string) TableDefinition {
+	if table, ok := tableDefinitions[name]; ok {
+		return table
+	}
+	panic(fmt.Sprintf("table not found: %s", name))
+}
+
+func TableForTarget(name string, myTarget target.Target) bool {
+	table := GetTableByName(name)
+	var err error
+	var architecture, family, model string
+	architecture, err = myTarget.GetArchitecture()
+	if err != nil {
+		slog.Error("failed to get architecture for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+		return false
+	}
+	family, err = myTarget.GetFamily()
+	if err != nil {
+		slog.Error("failed to get family for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+		return false
+	}
+	model, err = myTarget.GetModel()
+	if err != nil {
+		slog.Error("failed to get model for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+		return false
+	}
+	if len(table.Architectures) > 0 && !util.StringInList(architecture, table.Architectures) {
+		return false
+	}
+	if len(table.Families) > 0 && !util.StringInList(family, table.Families) {
+		return false
+	}
+	if len(table.Models) > 0 && !util.StringInList(model, table.Models) {
+		return false
+	}
+	return true
+}
 
 var tableDefinitions = map[string]TableDefinition{
 	//
@@ -208,8 +250,10 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{script.CpuidScriptName},
 		FieldsFunc:  isaTableValues},
 	AcceleratorTableName: {
-		Name:    AcceleratorTableName,
-		HasRows: true,
+		Name:          AcceleratorTableName,
+		Architectures: []string{"x86_64"},
+		Families:      []string{"6"}, // Intel CPUs only
+		HasRows:       true,
 		ScriptNames: []string{
 			script.LshwScriptName,
 			script.IaaDevicesScriptName,
@@ -217,9 +261,11 @@ var tableDefinitions = map[string]TableDefinition{
 		FieldsFunc:   acceleratorTableValues,
 		InsightsFunc: acceleratorTableInsights},
 	PowerTableName: {
-		Name:      PowerTableName,
-		HasRows:   false,
-		MenuLabel: PowerMenuLabel,
+		Name:          PowerTableName,
+		Architectures: []string{"x86_64"},
+		Families:      []string{"6"}, // Intel CPUs only
+		HasRows:       false,
+		MenuLabel:     PowerMenuLabel,
 		ScriptNames: []string{
 			script.PackagePowerLimitName,
 			script.EpbSourceScriptName,
@@ -253,8 +299,10 @@ var tableDefinitions = map[string]TableDefinition{
 		FieldsFunc:            coreTurboFrequencyTableValues,
 		HTMLTableRendererFunc: coreTurboFrequencyTableHTMLRenderer},
 	UncoreTableName: {
-		Name:    UncoreTableName,
-		HasRows: false,
+		Name:          UncoreTableName,
+		Architectures: []string{"x86_64"},
+		Families:      []string{"6"}, // Intel CPUs only
+		HasRows:       false,
 		ScriptNames: []string{
 			script.UncoreMaxFromMSRScriptName,
 			script.UncoreMinFromMSRScriptName,
@@ -267,23 +315,30 @@ var tableDefinitions = map[string]TableDefinition{
 			script.LspciDevicesScriptName},
 		FieldsFunc: uncoreTableValues},
 	ElcTableName: {
-		Name:    ElcTableName,
-		HasRows: true,
+		Name:          ElcTableName,
+		Architectures: []string{"x86_64"},
+		Families:      []string{"6"},          // Intel CPUs only
+		Models:        []string{"173", "175"}, // Granite Rapids, Sierra Forest
+		HasRows:       true,
 		ScriptNames: []string{
 			script.ElcScriptName,
 		},
 		FieldsFunc:   elcTableValues,
 		InsightsFunc: elcTableInsights},
 	SSTTFHPTableName: {
-		Name:    SSTTFHPTableName,
-		HasRows: true,
+		Name:          SSTTFHPTableName,
+		Architectures: []string{"x86_64"},
+		Families:      []string{"6"}, // Intel CPUs only
+		HasRows:       true,
 		ScriptNames: []string{
 			script.SstTfHighPriorityCoreFrequenciesScriptName,
 		},
 		FieldsFunc: sstTFHPTableValues},
 	SSTTFLPTableName: {
-		Name:    SSTTFLPTableName,
-		HasRows: true,
+		Name:          SSTTFLPTableName,
+		Architectures: []string{"x86_64"},
+		Families:      []string{"6"}, // Intel CPUs only
+		HasRows:       true,
 		ScriptNames: []string{
 			script.SstTfLowPriorityCoreFrequenciesScriptName,
 		},
@@ -412,8 +467,10 @@ var tableDefinitions = map[string]TableDefinition{
 		},
 		FieldsFunc: chassisStatusTableValues},
 	PMUTableName: {
-		Name:    PMUTableName,
-		HasRows: false,
+		Name:          PMUTableName,
+		Architectures: []string{"x86_64"},
+		Families:      []string{"6"}, // Intel CPUs only
+		HasRows:       false,
 		ScriptNames: []string{
 			script.PMUBusyScriptName,
 			script.PMUDriverVersionScriptName,
@@ -478,8 +535,10 @@ var tableDefinitions = map[string]TableDefinition{
 	// configuration set table
 	//
 	ConfigurationTableName: {
-		Name:    ConfigurationTableName,
-		HasRows: false,
+		Name:          ConfigurationTableName,
+		Architectures: []string{"x86_64"},
+		Families:      []string{"6"}, // Intel CPUs only
+		HasRows:       false,
 		ScriptNames: []string{
 			script.LscpuScriptName,
 			script.LspciBitsScriptName,
