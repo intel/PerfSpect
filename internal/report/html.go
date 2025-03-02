@@ -227,7 +227,7 @@ func createHtmlReport(allTableValues []TableValues, targetName string) (out []by
 	return
 }
 
-func createHtmlReportMultiTarget(allTargetsTableValues [][]TableValues, targetNames []string) (out []byte, err error) {
+func createHtmlReportMultiTarget(allTargetsTableValues [][]TableValues, targetNames []string, allTableNames []string) (out []byte, err error) {
 	var sb strings.Builder
 	sb.WriteString(getHtmlReportBegin())
 
@@ -244,35 +244,50 @@ func createHtmlReportMultiTarget(allTargetsTableValues [][]TableValues, targetNa
 	<h3>JavaScript is disabled. Functionality is limited.</h3>
 </noscript>
 `)
-	for tableIndex := 0; tableIndex < len(allTargetsTableValues[0]); tableIndex++ {
+	// print the tables in the order they were passed in
+	for _, tableName := range allTableNames {
 		oneTableValuesForAllTargets := []TableValues{}
-		for targetIndex, allTableValues := range allTargetsTableValues {
-			if allTableValues[tableIndex].HasRows && allTableValues[tableIndex].HTMLMultiTargetTableRendererFunc == nil {
+		// build list of target names and TableValues for targets that have values for this table
+		tableTargets := []string{}
+		tableValues := []TableValues{}
+		for targetIndex, targetTableValues := range allTargetsTableValues {
+			tableIndex := findTableIndex(targetTableValues, tableName)
+			if tableIndex == -1 {
+				continue
+			}
+			tableTargets = append(tableTargets, targetNames[targetIndex])
+			tableValues = append(tableValues, targetTableValues[tableIndex])
+		}
+		// loop through the targets that have values for this table
+		for targetIndex, targetTableValues := range tableValues {
+			targetName := tableTargets[targetIndex]
+			// if the table has rows and no custom renderer, print the table for the target normally
+			if targetTableValues.HasRows && targetTableValues.HTMLMultiTargetTableRendererFunc == nil {
 				// print the table name only one time per table
 				if targetIndex == 0 {
-					sb.WriteString(fmt.Sprintf("<h2 id=\"%[1]s\">%[1]s</h2>\n", html.EscapeString(allTableValues[tableIndex].Name)))
+					sb.WriteString(fmt.Sprintf("<h2 id=\"%[1]s\">%[1]s</h2>\n", html.EscapeString(targetTableValues.Name)))
 				}
 				// print the target name
-				sb.WriteString(fmt.Sprintf("<h3>%s</h3>\n", targetNames[targetIndex]))
+				sb.WriteString(fmt.Sprintf("<h3>%s</h3>\n", targetName))
 				// if there's no data in the table, print a message and continue
-				if len(allTableValues[tableIndex].Fields) == 0 || len(allTableValues[tableIndex].Fields[0].Values) == 0 {
+				if len(targetTableValues.Fields) == 0 || len(targetTableValues.Fields[0].Values) == 0 {
 					sb.WriteString("<p>" + noDataFound + "</p>\n")
 					continue
 				}
-				if allTableValues[tableIndex].HTMLTableRendererFunc != nil { // custom table renderer
-					sb.WriteString(allTableValues[tableIndex].HTMLTableRendererFunc(allTableValues[tableIndex], targetNames[targetIndex]))
+				if targetTableValues.HTMLTableRendererFunc != nil { // custom table renderer
+					sb.WriteString(targetTableValues.HTMLTableRendererFunc(targetTableValues, targetNames[targetIndex]))
 				} else {
-					sb.WriteString(DefaultHTMLTableRendererFunc(allTableValues[tableIndex]))
+					sb.WriteString(DefaultHTMLTableRendererFunc(targetTableValues))
 				}
-			} else {
-				oneTableValuesForAllTargets = append(oneTableValuesForAllTargets, allTableValues[tableIndex])
+			} else { // if the table has no rows or a custom renderer, add the table to the list to render as a multi-target table
+				oneTableValuesForAllTargets = append(oneTableValuesForAllTargets, targetTableValues)
 			}
 		}
+		// print the multi-target table, if any
 		if len(oneTableValuesForAllTargets) > 0 {
-			// print the table name
 			sb.WriteString(fmt.Sprintf("<h2 id=\"%[1]s\">%[1]s</h2>\n", html.EscapeString(oneTableValuesForAllTargets[0].Name)))
-			if allTargetsTableValues[0][tableIndex].HTMLMultiTargetTableRendererFunc != nil {
-				sb.WriteString(allTargetsTableValues[0][tableIndex].HTMLMultiTargetTableRendererFunc(oneTableValuesForAllTargets, targetNames))
+			if oneTableValuesForAllTargets[0].HTMLMultiTargetTableRendererFunc != nil {
+				sb.WriteString(oneTableValuesForAllTargets[0].HTMLMultiTargetTableRendererFunc(oneTableValuesForAllTargets, targetNames))
 			} else {
 				// render the multi-target table
 				sb.WriteString(RenderMultiTargetTableValuesAsHTML(oneTableValuesForAllTargets, targetNames))
@@ -289,6 +304,16 @@ func createHtmlReportMultiTarget(allTargetsTableValues [][]TableValues, targetNa
 	sb.WriteString("</html>\n")
 	out = []byte(sb.String())
 	return
+}
+
+// findTableIndex
+func findTableIndex(tableValues []TableValues, tableName string) int {
+	for i, tableValue := range tableValues {
+		if tableValue.Name == tableName {
+			return i
+		}
+	}
+	return -1
 }
 
 const datasetTemplate = `
