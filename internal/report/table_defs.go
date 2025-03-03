@@ -2186,12 +2186,15 @@ func gaudiStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
 		for i := range fields {
 			// reformat the timestamp field to only include the time
 			if i == 0 {
-				timestampParts := strings.Split(row[i], " ")
-				if len(timestampParts) < 4 {
-					slog.Error("gaudi stats output is not in expected format")
+				// parse the timestamp field's value
+				rowTime, err := time.Parse("Mon Jan 2 15:04:05 MST 2006", row[i])
+				if err != nil {
+					err = fmt.Errorf("unable to parse Gaudi telemetry timestamp: %s", row[i])
+					slog.Error(err.Error())
 					return []Field{}
 				}
-				timestamp := timestampParts[3]
+				// reformat the timestamp field's value to include time only
+				timestamp := rowTime.Format("15:04:05")
 				fields[i].Values = append(fields[i].Values, timestamp)
 			} else {
 				fields[i].Values = append(fields[i].Values, strings.TrimSpace(row[i]))
