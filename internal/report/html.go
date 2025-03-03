@@ -1175,6 +1175,73 @@ func instructionMixTableHTMLRenderer(tableValues TableValues, targetname string)
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
 }
 
+func renderGaudiStatsChart(tableValues TableValues, chartStatFieldName string, titleText string, yAxisText string, suggestedMax string) string {
+	data := [][]float64{}
+	datasetNames := []string{}
+	// timestamp is in the first field
+	// find the module_id field index
+	moduleIdFieldIdx, err := getFieldIndex("module_id", tableValues)
+	if err != nil {
+		slog.Error("no gaudi module_id field found")
+		return ""
+	}
+	// find the chartStatFieldName field index
+	chartStatFieldIndex, err := getFieldIndex(chartStatFieldName, tableValues)
+	if err != nil {
+		slog.Error("no gaudi chartStatFieldName field found")
+		return ""
+	}
+	// group the data points by module_id
+	moduleStat := make(map[string][]float64)
+	for i := 0; i < len(tableValues.Fields[0].Values); i++ {
+		moduleId := tableValues.Fields[moduleIdFieldIdx].Values[i]
+		val, err := strconv.ParseFloat(tableValues.Fields[chartStatFieldIndex].Values[i], 64)
+		if err != nil {
+			slog.Error("error parsing utilization", slog.String("error", err.Error()))
+			return ""
+		}
+		if _, ok := moduleStat[moduleId]; !ok {
+			moduleStat[moduleId] = []float64{}
+		}
+		moduleStat[moduleId] = append(moduleStat[moduleId], val)
+	}
+	// sort the module ids
+	var moduleIds []string
+	for moduleId := range moduleStat {
+		moduleIds = append(moduleIds, moduleId)
+	}
+	sort.Strings(moduleIds)
+	// build the data
+	for _, moduleId := range moduleIds {
+		if len(moduleStat[moduleId]) > 0 {
+			data = append(data, moduleStat[moduleId])
+			datasetNames = append(datasetNames, "module "+moduleId)
+		}
+	}
+	chartConfig := chartTemplateStruct{
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.Intn(10000)),
+		XaxisText:     "Time",
+		YaxisText:     yAxisText,
+		TitleText:     titleText,
+		DisplayTitle:  "true",
+		DisplayLegend: "true",
+		AspectRatio:   "2",
+		SuggestedMin:  "0",
+		SuggestedMax:  suggestedMax,
+	}
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+}
+
+func gaudiStatsTableHTMLRenderer(tableValues TableValues, targetName string) string {
+	out := ""
+	out += renderGaudiStatsChart(tableValues, "utilization.aip [%]", "Utilization", "% Utilization", "100")
+	out += renderGaudiStatsChart(tableValues, "memory.free [MiB]", "Memory Free", "Memory (MiB)", "0")
+	out += renderGaudiStatsChart(tableValues, "memory.used [MiB]", "Memory Used", "Memory (MiB)", "0")
+	out += renderGaudiStatsChart(tableValues, "power.draw [W]", "Power", "Watts", "0")
+	out += renderGaudiStatsChart(tableValues, "temperature.aip [C]", "Temperature", "Temperature (C)", "0")
+	return out
+}
+
 func codePathFrequencyTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	out := `<style>
 
