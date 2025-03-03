@@ -116,12 +116,13 @@ const (
 	// telemetry table names
 	CPUUtilizationTableName        = "CPU Utilization"
 	AverageCPUUtilizationTableName = "Average CPU Utilization"
+	InstructionMixTableName        = "Instruction Mix"
 	IRQRateTableName               = "IRQ Rate"
 	DriveStatsTableName            = "Drive Stats"
 	NetworkStatsTableName          = "Network Stats"
 	MemoryStatsTableName           = "Memory Stats"
 	PowerStatsTableName            = "Power Stats"
-	InstructionMixTableName        = "Instruction Mix"
+	GaudiStatsTableName            = "Gaudi Stats"
 	// config  table names
 	ConfigurationTableName = "Configuration"
 	// flamegraph table names
@@ -707,8 +708,17 @@ var tableDefinitions = map[string]TableDefinition{
 			script.InstructionMixScriptName,
 		},
 		FieldsFunc:            instructionMixTableValues,
-		HTMLTableRendererFunc: instructionMixTableHTMLRenderer,
-	},
+		HTMLTableRendererFunc: instructionMixTableHTMLRenderer},
+	GaudiStatsTableName: {
+		Name:      GaudiStatsTableName,
+		MenuLabel: GaudiStatsTableName,
+		HasRows:   true,
+		ScriptNames: []string{
+			script.GaudiStatsScriptName,
+		},
+		NoDataFound:           "No Gaudi stats data found. Gaudi devices and the hl-smi tool must be installed on the target system to collect Gaudi stats.",
+		FieldsFunc:            gaudiStatsTableValues,
+		HTMLTableRendererFunc: gaudiStatsTableHTMLRenderer},
 	//
 	// flamegraph tables
 	//
@@ -2147,6 +2157,48 @@ func powerStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
 		}
 		for i := range fields {
 			fields[i].Values = append(fields[i].Values, match[i+1])
+		}
+	}
+	return fields
+}
+
+func gaudiStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
+	// build fields to match CSV output from hl_smi tool
+	fields := []Field{}
+	// parse the CSV output
+	csvOutput := outputs[script.GaudiStatsScriptName].Stdout
+	r := csv.NewReader(strings.NewReader(csvOutput))
+	rows, err := r.ReadAll()
+	if err != nil {
+		slog.Error(err.Error())
+		return []Field{}
+	}
+	if len(rows) < 2 {
+		slog.Error("gaudi stats output is not in expected format")
+		return []Field{}
+	}
+	// first row is the header, extract field names
+	for _, fieldName := range rows[0] {
+		fields = append(fields, Field{Name: strings.TrimSpace(fieldName)})
+	}
+	// values start in 2nd row
+	for _, row := range rows[1:] {
+		for i := range fields {
+			// reformat the timestamp field to only include the time
+			if i == 0 {
+				// parse the timestamp field's value
+				rowTime, err := time.Parse("Mon Jan 2 15:04:05 MST 2006", row[i])
+				if err != nil {
+					err = fmt.Errorf("unable to parse Gaudi telemetry timestamp: %s", row[i])
+					slog.Error(err.Error())
+					return []Field{}
+				}
+				// reformat the timestamp field's value to include time only
+				timestamp := rowTime.Format("15:04:05")
+				fields[i].Values = append(fields[i].Values, timestamp)
+			} else {
+				fields[i].Values = append(fields[i].Values, strings.TrimSpace(row[i]))
+			}
 		}
 	}
 	return fields

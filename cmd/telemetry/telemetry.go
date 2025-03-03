@@ -58,6 +58,7 @@ var (
 	flagMemory   bool
 	flagPower    bool
 	flagInstrMix bool
+	flagGaudi    bool
 
 	flagInstrMixPid    int
 	flagInstrMixFilter []string
@@ -77,6 +78,7 @@ const (
 	flagMemoryName   = "memory"
 	flagPowerName    = "power"
 	flagInstrMixName = "instrmix"
+	flagGaudiName    = "gaudi"
 
 	flagInstrMixPidName    = "instrmix-pid"
 	flagInstrMixFilterName = "instrmix-filter"
@@ -93,6 +95,7 @@ var categories = []common.Category{
 	{FlagName: flagNetworkName, FlagVar: &flagNetwork, DefaultValue: false, Help: "monitor network", TableNames: []string{report.NetworkStatsTableName}},
 	{FlagName: flagMemoryName, FlagVar: &flagMemory, DefaultValue: false, Help: "monitor memory", TableNames: []string{report.MemoryStatsTableName}},
 	{FlagName: flagPowerName, FlagVar: &flagPower, DefaultValue: false, Help: "monitor power", TableNames: []string{report.PowerStatsTableName}},
+	{FlagName: flagGaudiName, FlagVar: &flagGaudi, DefaultValue: false, Help: "monitor gaudi", TableNames: []string{report.GaudiStatsTableName}},
 }
 
 func init() {
