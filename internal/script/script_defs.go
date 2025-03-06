@@ -825,25 +825,40 @@ done`,
 	},
 	PMUBusyScriptName: {
 		Name: PMUBusyScriptName,
-		ScriptTemplate: `# loop through the PMU counters and check if they are active or inactive
-for i in 0x30a 0x309 0x30b 0x30c 0xc1 0xc2 0xc3 0xc4 0xc5 0xc6 0xc7 0xc8; do
-	arr=()
-	# read the value of the msr represented by the hex value 6 times, save results in an array
-	for j in {1..6}; do
-		val=$(rdmsr $i | tr -d '\n')
-		# if the value isn't a hex value, go on to next hex value
-		if [[ ! $val =~ ^[0-9a-fA-F]+$ ]]; then
-			echo "$i Unknown"
-			continue 2
-		fi
-		arr+=($val)
-	done
-	# if the first and last value in the array are the same, the counter is inactive
-	if [ ${arr[0]} == ${arr[5]} ]; then
-		echo "$i Inactive"
-	else
-		echo "$i Active"
-	fi
+		ScriptTemplate: `# define the list of PMU counters
+pmu_counters=(0x30a 0x309 0x30b 0x30c 0xc1 0xc2 0xc3 0xc4 0xc5 0xc6 0xc7 0xc8)
+
+# define the number of times to loop, i.e., read the MSR value
+num_loops=6
+
+# initialize an associative array to store the values for each PMU counter
+declare -A pmu_values
+
+# read the value of the msr represented by the hex value num_loops times for each PMU counter
+for ((j=1; j<=num_loops; j++)); do
+    for i in "${pmu_counters[@]}"; do
+        val=$(rdmsr $i | tr -d '\n')
+        # if the value isn't a hex value, go on to next hex value
+        if [[ ! $val =~ ^[0-9a-fA-F]+$ ]]; then
+            echo "$i Unknown"
+            continue 2
+        fi
+        # append the value to the array for the current PMU counter
+        pmu_values[$i]+="$val "
+    done
+done
+
+# check if the first and last value in the array are the same for each PMU counter
+for i in "${pmu_counters[@]}"; do
+    # convert the space-separated string to an array
+    arr=(${pmu_values[$i]})
+    if [ ${arr[0]} == ${arr[5]} ]; then
+        echo "$i Inactive"
+    else
+        echo "$i Active"
+    fi
+    # print the full list of PMU values
+    echo "Values: ${pmu_values[$i]}"
 done`,
 		Superuser:     true,
 		Architectures: []string{x86_64},
