@@ -398,6 +398,8 @@ func prefetchersFromOutput(outputs map[string]script.ScriptOutput) string {
 		{name: "DCU HW", msr: script.PrefetchControlName, bit: 2, uarchs: "all"},
 		{name: "DCU IP", msr: script.PrefetchControlName, bit: 3, uarchs: "all"},
 		{name: "AMP", msr: script.PrefetchControlName, bit: 5, uarchs: "SPR_EMR_GNR"},
+		{name: "LLCPP", msr: script.PrefetchControlName, bit: 6, uarchs: "GNR"},
+		{name: "AOP", msr: script.PrefetchControlName, bit: 7, uarchs: "GNR"},
 		{name: "Homeless", msr: script.PrefetchersName, bit: 14, uarchs: "SPR_EMR_GNR"},
 		{name: "LLC", msr: script.PrefetchersName, bit: 42, uarchs: "SPR_EMR_GNR"},
 	}
