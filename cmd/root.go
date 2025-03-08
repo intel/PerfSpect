@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"log/syslog"
 	"net"
 	"net/http"
 	"os"
@@ -168,27 +169,31 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 			os.Exit(1)
 		}
 	}
-	// open log file in current directory
-	gLogFile, err = os.OpenFile(common.AppName+".log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		fmt.Printf("Error: failed to open log file: %v\n", err)
-		os.Exit(1)
-	}
-	var logLevel slog.Leveler
-	var logSource bool
+	// configure logging
+	var logOpts slog.HandlerOptions
 	if flagDebug {
-		logLevel = slog.LevelDebug
-		logSource = true
+		logOpts.Level = slog.LevelDebug
+		logOpts.AddSource = true
 	} else {
-		logLevel = slog.LevelInfo
-		logSource = false
+		logOpts.Level = slog.LevelInfo
+		logOpts.AddSource = false
 	}
-	opts := &slog.HandlerOptions{
-		Level:     logLevel,
-		AddSource: logSource,
+	if flagSyslog { // log to syslog
+		handler, err := NewSyslogHandler(&logOpts)
+		if err != nil {
+			fmt.Printf("Error: failed to create syslog handler: %v\n", err)
+			os.Exit(1)
+		}
+		slog.SetDefault(slog.New(handler))
+	} else { // log to file
+		// open log file in current directory
+		gLogFile, err = os.OpenFile(common.AppName+".log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			fmt.Printf("Error: failed to open log file: %v\n", err)
+			os.Exit(1)
+		}
+		slog.SetDefault(slog.New(slog.NewTextHandler(gLogFile, &logOpts)))
 	}
-	logger := slog.New(slog.NewTextHandler(gLogFile, opts))
-	slog.SetDefault(logger)
 	slog.Info("Starting up", slog.String("app", common.AppName), slog.String("version", gVersion), slog.Int("PID", os.Getpid()), slog.String("arguments", strings.Join(os.Args, " ")))
 	// verify requested local temp dir exists
 	var localTempDir string
@@ -449,4 +454,50 @@ func getLatestManifest() (manifest, error) {
 	}
 	// return latest version
 	return latestManifest, nil
+}
+
+// SyslogHandler is a slog.Handler that logs to syslog.
+type SyslogHandler struct {
+	writer     *syslog.Writer
+	logLeveler slog.Leveler
+}
+
+func NewSyslogHandler(logOpts *slog.HandlerOptions) (*SyslogHandler, error) {
+	writer, err := syslog.New(syslog.LOG_INFO|syslog.LOG_USER, filepath.Base(os.Args[0]))
+	if err != nil {
+		return nil, err
+	}
+	return &SyslogHandler{writer: writer, logLeveler: logOpts.Level}, nil
+}
+
+func (h *SyslogHandler) Handle(ctx context.Context, r slog.Record) error {
+	msg := r.Message
+	r.Attrs(func(attr slog.Attr) bool {
+		msg += " " + attr.String()
+		return true
+	})
+	switch r.Level {
+	case slog.LevelDebug:
+		return h.writer.Debug(msg)
+	case slog.LevelInfo:
+		return h.writer.Info(msg)
+	case slog.LevelWarn:
+		return h.writer.Warning(msg)
+	case slog.LevelError:
+		return h.writer.Err(msg)
+	default:
+		return h.writer.Info(msg)
+	}
+}
+
+func (h *SyslogHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return h
+}
+
+func (h *SyslogHandler) WithGroup(name string) slog.Handler {
+	return h
+}
+
+func (h *SyslogHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	return level >= h.logLeveler.Level()
 }
