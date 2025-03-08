@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -460,6 +461,7 @@ func getLatestManifest() (manifest, error) {
 type SyslogHandler struct {
 	writer     *syslog.Writer
 	logLeveler slog.Leveler
+	addSource  bool
 }
 
 func NewSyslogHandler(logOpts *slog.HandlerOptions) (*SyslogHandler, error) {
@@ -467,13 +469,35 @@ func NewSyslogHandler(logOpts *slog.HandlerOptions) (*SyslogHandler, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &SyslogHandler{writer: writer, logLeveler: logOpts.Level}, nil
+	return &SyslogHandler{writer: writer, logLeveler: logOpts.Level, addSource: logOpts.AddSource}, nil
 }
 
 func (h *SyslogHandler) Handle(ctx context.Context, r slog.Record) error {
-	msg := r.Message
+	var msg string
+	if r.PC != 0 && h.addSource {
+		fs := runtime.CallersFrames([]uintptr{r.PC})
+		f, _ := fs.Next()
+		// get the file name with path relative to the current working directory + the last directory in the working directory
+		filePath := f.File
+		if strings.HasPrefix(filePath, "/") {
+			wd, err := os.Getwd()
+			if err == nil {
+				filePath, err = filepath.Rel(wd, filePath)
+				if err == nil {
+					// last path element in working directory
+					_, lastWd := filepath.Split(wd)
+					filePath = filepath.Join(lastWd, filePath)
+				} else {
+					filePath = f.File
+				}
+			}
+		}
+		msg = fmt.Sprintf("level=%s source=%s:%d msg=\"%s\"", r.Level.String(), filePath, f.Line, r.Message)
+	} else {
+		msg = fmt.Sprintf("level=%s msg=\"%s\"", r.Level.String(), r.Message)
+	}
 	r.Attrs(func(attr slog.Attr) bool {
-		msg += " " + attr.String()
+		msg += fmt.Sprintf(" %s=\"%s\"", attr.Key, attr.Value)
 		return true
 	})
 	switch r.Level {
