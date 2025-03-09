@@ -55,7 +55,7 @@ func TestTransformConditional(t *testing.T) {
 		t.Errorf("improper transform: [%s] -> [%s]", in, out)
 	}
 
-	// from SPR metrics -- metric_TMA_....DRAM_Bound(%)
+	// from SPR metrics -- TMA_....DRAM_Bound(%)
 	in = "100 * ( min( ( ( ( a / ( b ) ) - ( min( ( ( ( ( 1 - ( ( ( 19 * ( c * ( 1 + ( d / e ) ) ) + 10 * ( ( f * ( 1 + ( d / e ) ) ) + ( g * ( 1 + ( d / e ) ) ) + ( h * ( 1 + ( d / e ) ) ) ) ) / ( ( 19 * ( c * ( 1 + ( d / e ) ) ) + 10 * ( ( f * ( 1 + ( d / e ) ) ) + ( g * ( 1 + ( d / e ) ) ) + ( h * ( 1 + ( d / e ) ) ) ) ) + ( 25 * ( ( i * ( 1 + ( d / e ) ) ) ) + 33 * ( ( j * ( 1 + ( d / e ) ) ) ) ) ) ) ) ) * ( a / ( b ) ) ) if ( ( 1000000 ) * ( j + i ) > e ) else 0 ) ) , ( 1 ) ) ) ) ) , ( 1 ) ) )"
 	if out, err = transformConditional(in); err != nil {
 		t.Error(err)
@@ -64,7 +64,7 @@ func TestTransformConditional(t *testing.T) {
 		t.Errorf("improper transform: [%s] -> [%s]", in, out)
 	}
 
-	// from SPR metrics -- metric_TMA_....Ports_Utilization(%)
+	// from SPR metrics -- TMA_....Ports_Utilization(%)
 	in = "100 * ( ( a + ( b / ( c ) ) * ( d - e ) + ( f + ( g / ( h + i + g + j ) ) * k ) ) / ( c ) if ( l < ( d - e ) ) else ( f + ( g / ( h + i + g + j ) ) * k ) / ( c ) )"
 	if out, err = transformConditional(in); err != nil {
 		t.Error(err)

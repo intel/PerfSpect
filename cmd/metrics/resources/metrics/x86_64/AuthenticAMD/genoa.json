@@ -1,299 +1,298 @@
 [
     {
-        "name": "metric_CPU operating frequency (in GHz)",
+        "name": "CPU operating frequency (in GHz)",
         "expression": "(([cpu-cycles] / [ls_not_halted_p0_cyc] * [SYSTEM_TSC_FREQ]) / 1000000000)"
     },
     {
-        "name": "metric_CPU utilization %",
+        "name": "CPU utilization %",
         "expression": "(100 * [ls_not_halted_p0_cyc]) / [TSC]"
     },
     {
-        "name": "metric_CPU utilization% in kernel mode",
+        "name": "CPU utilization% in kernel mode",
         "expression": "(100 * [ls_not_halted_p0_cyc:k]) / [TSC]"
     },
     {
-        "name": "metric_CPI",
+        "name": "CPI",
         "expression": "[cpu-cycles] / [instructions]"
     },
     {
-        "name": "metric_kernel_CPI",
+        "name": "kernel_CPI",
         "expression": "[cpu-cycles:k] / [instructions:k]"
     },
     {
-        "name": "metric_IPC",
+        "name": "IPC",
         "expression": "[instructions] / [cpu-cycles]"
     },
     {
-        "name": "metric_giga_instructions_per_sec",
+        "name": "giga_instructions_per_sec",
         "expression": "[instructions] / 1000000000"
     },
     {
-        "name": "metric_Branch Misprediction Ratio",
+        "name": "Branch Misprediction Ratio",
         "expression": "[ex_ret_brn_misp] / [ex_ret_brn]"
     },
     {
-        "name": "metric_All Data Cache Accesses",
+        "name": "All Data Cache Accesses",
         "expression": "[ls_dispatch.any]"
     },
     {
-        "name": "metric_All L2 Cache Accesses",
+        "name": "All L2 Cache Accesses",
         "expression": "[l2_request_g1.all_no_prefetch] + [l2_pf_hit_l2.all] + [l2_pf_miss_l2_hit_l3.all] + [l2_pf_miss_l2_l3.all]"
     },
     {
-        "name": "metric_L2 Cache Accesses from L1 Instruction Cache Misses",
+        "name": "L2 Cache Accesses from L1 Instruction Cache Misses",
         "expression": "[l2_request_g1.cacheable_ic_read]"
     },
     {
-        "name": "metric_L2 Cache Accesses from L1 Data Cache Misses",
+        "name": "L2 Cache Accesses from L1 Data Cache Misses",
         "expression": "[ic_tag_hit_miss.miss] / [instructions]"
     },
     {
-        "name": "metric_L2 Cache Accesses from L2 Cache Hardware Prefetches",
+        "name": "L2 Cache Accesses from L2 Cache Hardware Prefetches",
         "expression": "[l2_pf_hit_l2.all] + [l2_pf_miss_l2_hit_l3.all] + [l2_pf_miss_l2_l3.all]"
     },
     {
-        "name": "metric_All L2 Cache Misses",
+        "name": "All L2 Cache Misses",
         "expression": "[l2_cache_req_stat.ic_dc_miss_in_l2] + [l2_pf_miss_l2_hit_l3.all] + [l2_pf_miss_l2_l3.all]"
     },
     {
-        "name": "metric_L2 Cache Misses from L1 Instruction Cache Misses",
+        "name": "L2 Cache Misses from L1 Instruction Cache Misses",
         "expression": "[l2_cache_req_stat.ic_fill_miss]"
     },
     {
-        "name": "metric_L2 Cache Misses from L1 Data Cache Misses",
+        "name": "L2 Cache Misses from L1 Data Cache Misses",
         "expression": "[l2_cache_req_stat.ls_rd_blk_c]"
     },
     {
-        "name": "metric_L2 Cache Misses from L2 Cache Hardware Prefetches",
+        "name": "L2 Cache Misses from L2 Cache Hardware Prefetches",
         "expression": "[l2_pf_miss_l2_hit_l3.all] + [l2_pf_miss_l2_l3.all]"
     },
     {
-        "name": "metric_All L2 Cache Hits",
+        "name": "All L2 Cache Hits",
         "expression": "[l2_cache_req_stat.ic_dc_hit_in_l2] + [l2_pf_hit_l2.all]"
     },
     {
-        "name": "metric_L2 Cache Hits from L1 Instruction Cache Misses",
+        "name": "L2 Cache Hits from L1 Instruction Cache Misses",
         "expression": "[l2_cache_req_stat.ic_hit_in_l2]"
     },
     {
-        "name": "metric_L2 Cache Hits from L1 Data Cache Misses",
+        "name": "L2 Cache Hits from L1 Data Cache Misses",
         "expression": "[l2_cache_req_stat.dc_hit_in_l2]"
     },
     {
-        "name": "metric_L2 Cache Hits from L2 Cache Hardware Prefetches",
+        "name": "L2 Cache Hits from L2 Cache Hardware Prefetches",
         "expression": "[l2_pf_hit_l2.all]"
     },
     {
-        "name": "metric_L3 Cache Accesses",
+        "name": "L3 Cache Accesses",
         "expression": "[l3_lookup_state.all_coherent_accesses_to_l3]"
     },
     {
-        "name": "metric_L3 Cache Misses",
+        "name": "L3 Cache Misses",
         "expression": "[l3_lookup_state.l3_miss]"
     },
     {
-        "name": "metric_L3 Cache Hits",
+        "name": "L3 Cache Hits",
         "expression": "[l3_lookup_state.l3_hit]"
     },
     {
-        "name": "metric_Average L3 Cache Read Miss Latency (in ns)",
+        "name": "Average L3 Cache Read Miss Latency (in ns)",
         "expression": "([l3_xi_sampled_latency.all] * 10) / [l3_xi_sampled_latency_requests.all]"
     },
     {
-        "name": "metric_Op Cache Fetch Miss Ratio",
+        "name": "Op Cache Fetch Miss Ratio",
         "expression": "[op_cache_hit_miss.miss] / [op_cache_hit_miss.all]"
     },
     {
-        "name": "metric_Instruction Cache Fetch Miss Ratio",
+        "name": "Instruction Cache Fetch Miss Ratio",
         "expression": "[ic_tag_hit_miss.miss] / [ic_tag_hit_miss.all]"
     },
     {
-        "name": "metric_L1 Data Cache Fills from DRAM or IO in any NUMA node",
+        "name": "L1 Data Cache Fills from DRAM or IO in any NUMA node",
         "expression": "[ls_any_fills_from_sys.dram_io_all]"
     },
     {
-        "name": "metric_L1 Data Cache Fills from a different NUMA node",
+        "name": "L1 Data Cache Fills from a different NUMA node",
         "expression": "[ls_any_fills_from_sys.far_all]"
     },
     {
-        "name": "metric_L1 Data Cache Fills from within the same CCX",
+        "name": "L1 Data Cache Fills from within the same CCX",
         "expression": "[ls_any_fills_from_sys.local_all]"
     },
     {
-        "name": "metric_L1 Data Cache Fills from another CCX cache in any NUMA node",
+        "name": "L1 Data Cache Fills from another CCX cache in any NUMA node",
         "expression": "[ls_any_fills_from_sys.remote_cache]"
     },
     {
-        "name": "metric_All L1 Data Cache Fills",
+        "name": "All L1 Data Cache Fills",
         "expression": "[ls_any_fills_from_sys.all]"
     },
     {
-        "name": "metric_Demand L1 Data Cache Fills from local L2",
+        "name": "Demand L1 Data Cache Fills from local L2",
         "expression": "[ls_dmnd_fills_from_sys.local_l2]"
     },
     {
-        "name": "metric_Demand L1 Data Cache Fills from local L3 or different L2 in same CCX",
+        "name": "Demand L1 Data Cache Fills from local L3 or different L2 in same CCX",
         "expression": "[ls_dmnd_fills_from_sys.local_ccx]"
     },
     {
-        "name": "metric_Demand L1 Data Cache Fills from another CCX cache in the same NUMA node",
+        "name": "Demand L1 Data Cache Fills from another CCX cache in the same NUMA node",
         "expression": "[ls_dmnd_fills_from_sys.near_cache]"
     },
     {
-        "name": "metric_Demand L1 Data Cache Fills from DRAM or MMIO in the same NUMA node",
+        "name": "Demand L1 Data Cache Fills from DRAM or MMIO in the same NUMA node",
         "expression": "[ls_dmnd_fills_from_sys.dram_io_near]"
     },
     {
-        "name": "metric_Demand L1 Data Cache Fills from another CCX cache in a different NUMA node",
+        "name": "Demand L1 Data Cache Fills from another CCX cache in a different NUMA node",
         "expression": "[ls_dmnd_fills_from_sys.far_cache]"
     },
     {
-        "name": "metric_Demand L1 Data Cache Fills from DRAM or MMIO in a different NUMA node",
+        "name": "Demand L1 Data Cache Fills from DRAM or MMIO in a different NUMA node",
         "expression": "[ls_dmnd_fills_from_sys.dram_io_far]"
     },
     {
-        "name": "metric_Lines written per Write Combining Buffer close",
+        "name": "Lines written per Write Combining Buffer close",
         "expression": "[ls_wcb_close_flush.full_line_64b] / [l2_wcb_req.wcb_close]"
     },
     {
-        "name": "metric_L1 ITLB Misses",
+        "name": "L1 ITLB Misses",
         "expression": "[bp_l1_tlb_miss_l2_tlb_hit] + [bp_l1_tlb_miss_l2_tlb_miss.all]"
     },
     {
-        "name": "metric_L2 ITLB Misses and Instruction Page Walks",
+        "name": "L2 ITLB Misses and Instruction Page Walks",
         "expression": "[bp_l1_tlb_miss_l2_tlb_miss.all]"
     },
     {
-        "name": "metric_L1 DTLB Misses",
+        "name": "L1 DTLB Misses",
         "expression": "[ls_l1_d_tlb_miss.all]"
     },
     {
-        "name": "metric_L2 DTLB Misses and Data Page Walks",
+        "name": "L2 DTLB Misses and Data Page Walks",
         "expression": "[ls_l1_d_tlb_miss.all_l2_miss]"
     },
     {
-        "name": "metric_All TLBs Flushed",
+        "name": "All TLBs Flushed",
         "expression": "[ls_tlb_flush.all]"
     },
     {
-        "name": "metric_Macro-ops Dispatched",
+        "name": "Macro-ops Dispatched",
         "expression": "[de_src_op_disp.all]"
     },
     {
-        "name": "metric_Mixed SSE and AVX Stalls",
+        "name": "Mixed SSE and AVX Stalls",
         "expression": "[fp_disp_faults.sse_avx_all]"
     },
     {
-        "name": "metric_Macro-ops Retired",
+        "name": "Macro-ops Retired",
         "expression": "[ex_ret_ops]"
     },
     {
-        "name": "metric_DRAM read bandwidth for local processor",
+        "name": "DRAM read bandwidth for local processor",
         "expression": "(64 * ([local_processor_read_data_beats_cs0] + [local_processor_read_data_beats_cs1] + [local_processor_read_data_beats_cs2] + [local_processor_read_data_beats_cs3] + [local_processor_read_data_beats_cs4] + [local_processor_read_data_beats_cs5] + [local_processor_read_data_beats_cs6] + [local_processor_read_data_beats_cs7] + [local_processor_read_data_beats_cs8] + [local_processor_read_data_beats_cs9] + [local_processor_read_data_beats_cs10] + [local_processor_read_data_beats_cs11]) / 1000000) / 1"
     },
     {
-        "name": "metric_DRAM write bandwidth for local processor",
+        "name": "DRAM write bandwidth for local processor",
         "expression": "(64 * ([local_processor_write_data_beats_cs0] + [local_processor_write_data_beats_cs1] + [local_processor_write_data_beats_cs2] + [local_processor_write_data_beats_cs3] + [local_processor_write_data_beats_cs4] + [local_processor_write_data_beats_cs5] + [local_processor_write_data_beats_cs6] + [local_processor_write_data_beats_cs7] + [local_processor_write_data_beats_cs8] + [local_processor_write_data_beats_cs9] + [local_processor_write_data_beats_cs10] + [local_processor_write_data_beats_cs11]) / 1000000) / 1"
     },
     {
-        "name": "metric_DRAM read bandwidth for remote processor",
+        "name": "DRAM read bandwidth for remote processor",
         "expression": "(64 * ([remote_processor_read_data_beats_cs0] + [remote_processor_read_data_beats_cs1] + [remote_processor_read_data_beats_cs2] + [remote_processor_read_data_beats_cs3] + [remote_processor_read_data_beats_cs4] + [remote_processor_read_data_beats_cs5] + [remote_processor_read_data_beats_cs6] + [remote_processor_read_data_beats_cs7] + [remote_processor_read_data_beats_cs8] + [remote_processor_read_data_beats_cs9] + [remote_processor_read_data_beats_cs10] + [remote_processor_read_data_beats_cs11]) / 1000000) / 1"
     },
     {
-        "name": "metric_DRAM write bandwidth for remote processor",
+        "name": "DRAM write bandwidth for remote processor",
         "expression": "(64 * ([remote_processor_write_data_beats_cs0] + [remote_processor_write_data_beats_cs1] + [remote_processor_write_data_beats_cs2] + [remote_processor_write_data_beats_cs3] + [remote_processor_write_data_beats_cs4] + [remote_processor_write_data_beats_cs5] + [remote_processor_write_data_beats_cs6] + [remote_processor_write_data_beats_cs7] + [remote_processor_write_data_beats_cs8] + [remote_processor_write_data_beats_cs9] + [remote_processor_write_data_beats_cs10] + [remote_processor_write_data_beats_cs11]) / 1000000) / 1"
     },
     {
-        "name": "metric_Local socket upstream DMA read bandwidth",
+        "name": "Local socket upstream DMA read bandwidth",
         "expression": "(64 * ([local_socket_upstream_read_beats_iom0] + [local_socket_upstream_read_beats_iom1] + [local_socket_upstream_read_beats_iom2] + [local_socket_upstream_read_beats_iom3]) / 1000000) / 1"
     },
     {
-        "name": "metric_Local socket upstream DMA write bandwidth",
+        "name": "Local socket upstream DMA write bandwidth",
         "expression": "(64 * ([local_socket_upstream_write_beats_iom0] + [local_socket_upstream_write_beats_iom1] + [local_socket_upstream_write_beats_iom2] + [local_socket_upstream_write_beats_iom3]) / 1000000) / 1"
     },
     {
-        "name": "metric_Remote socket upstream DMA read bandwidth",
+        "name": "Remote socket upstream DMA read bandwidth",
         "expression": "(64 * ([remote_socket_upstream_read_beats_iom0] + [remote_socket_upstream_read_beats_iom1] + [remote_socket_upstream_read_beats_iom2] + [remote_socket_upstream_read_beats_iom3]) / 1000000) / 1"
     },
     {
-        "name": "metric_Remote socket upstream DMA write bandwidth",
+        "name": "Remote socket upstream DMA write bandwidth",
         "expression": "(64 * ([remote_socket_upstream_write_beats_iom0] + [remote_socket_upstream_write_beats_iom1] + [remote_socket_upstream_write_beats_iom2] + [remote_socket_upstream_write_beats_iom3]) / 1000000) / 1"
     },
     {
-        "name": "metric_Local socket inbound bandwidth to the CPU",
+        "name": "Local socket inbound bandwidth to the CPU",
         "expression": "(32 * ([local_socket_inf0_inbound_data_beats_ccm0] + [local_socket_inf1_inbound_data_beats_ccm0] + [local_socket_inf0_inbound_data_beats_ccm1] + [local_socket_inf1_inbound_data_beats_ccm1] + [local_socket_inf0_inbound_data_beats_ccm2] + [local_socket_inf1_inbound_data_beats_ccm2] + [local_socket_inf0_inbound_data_beats_ccm3] + [local_socket_inf1_inbound_data_beats_ccm3] + [local_socket_inf0_inbound_data_beats_ccm4] + [local_socket_inf1_inbound_data_beats_ccm4] + [local_socket_inf0_inbound_data_beats_ccm5] + [local_socket_inf1_inbound_data_beats_ccm5] + [local_socket_inf0_inbound_data_beats_ccm6] + [local_socket_inf1_inbound_data_beats_ccm6] + [local_socket_inf0_inbound_data_beats_ccm7] + [local_socket_inf1_inbound_data_beats_ccm7]) / 1000000) / 1"
     },
     {
-        "name": "metric_Local socket outbound bandwidth from the CPU",
+        "name": "Local socket outbound bandwidth from the CPU",
         "expression": "(64 * ([local_socket_inf0_outbound_data_beats_ccm0] + [local_socket_inf1_outbound_data_beats_ccm0] + [local_socket_inf0_outbound_data_beats_ccm1] + [local_socket_inf1_outbound_data_beats_ccm1] + [local_socket_inf0_outbound_data_beats_ccm2] + [local_socket_inf1_outbound_data_beats_ccm2] + [local_socket_inf0_outbound_data_beats_ccm3] + [local_socket_inf1_outbound_data_beats_ccm3] + [local_socket_inf0_outbound_data_beats_ccm4] + [local_socket_inf1_outbound_data_beats_ccm4] + [local_socket_inf0_outbound_data_beats_ccm5] + [local_socket_inf1_outbound_data_beats_ccm5] + [local_socket_inf0_outbound_data_beats_ccm6] + [local_socket_inf1_outbound_data_beats_ccm6] + [local_socket_inf0_outbound_data_beats_ccm7] + [local_socket_inf1_outbound_data_beats_ccm7]) / 1000000) / 1"
     },
     {
-        "name": "metric_Remote socket inbound bandwidth to the CPU",
+        "name": "Remote socket inbound bandwidth to the CPU",
         "expression": "(32 * ([remote_socket_inf0_inbound_data_beats_ccm0] + [remote_socket_inf1_inbound_data_beats_ccm0] + [remote_socket_inf0_inbound_data_beats_ccm1] + [remote_socket_inf1_inbound_data_beats_ccm1] + [remote_socket_inf0_inbound_data_beats_ccm2] + [remote_socket_inf1_inbound_data_beats_ccm2] + [remote_socket_inf0_inbound_data_beats_ccm3] + [remote_socket_inf1_inbound_data_beats_ccm3] + [remote_socket_inf0_inbound_data_beats_ccm4] + [remote_socket_inf1_inbound_data_beats_ccm4] + [remote_socket_inf0_inbound_data_beats_ccm5] + [remote_socket_inf1_inbound_data_beats_ccm5] + [remote_socket_inf0_inbound_data_beats_ccm6] + [remote_socket_inf1_inbound_data_beats_ccm6] + [remote_socket_inf0_inbound_data_beats_ccm7] + [remote_socket_inf1_inbound_data_beats_ccm7]) / 1000000) / 1"
     },
     {
-        "name": "metric_Remote socket outbound bandwidth from the CPU",
+        "name": "Remote socket outbound bandwidth from the CPU",
         "expression": "(64 * ([remote_socket_inf0_outbound_data_beats_ccm0] + [remote_socket_inf1_outbound_data_beats_ccm0] + [remote_socket_inf0_outbound_data_beats_ccm1] + [remote_socket_inf1_outbound_data_beats_ccm1] + [remote_socket_inf0_outbound_data_beats_ccm2] + [remote_socket_inf1_outbound_data_beats_ccm2] + [remote_socket_inf0_outbound_data_beats_ccm3] + [remote_socket_inf1_outbound_data_beats_ccm3] + [remote_socket_inf0_outbound_data_beats_ccm4] + [remote_socket_inf1_outbound_data_beats_ccm4] + [remote_socket_inf0_outbound_data_beats_ccm5] + [remote_socket_inf1_outbound_data_beats_ccm5] + [remote_socket_inf0_outbound_data_beats_ccm6] + [remote_socket_inf1_outbound_data_beats_ccm6] + [remote_socket_inf0_outbound_data_beats_ccm7] + [remote_socket_inf1_outbound_data_beats_ccm7]) / 1000000) / 1"
     },
     {
-        "name": "metric_Outbound bandwidth from all links",
+        "name": "Outbound bandwidth from all links",
         "expression": "(64 * ([local_socket_outbound_data_beats_link0] + [local_socket_outbound_data_beats_link1] + [local_socket_outbound_data_beats_link2] + [local_socket_outbound_data_beats_link3] + [local_socket_outbound_data_beats_link4] + [local_socket_outbound_data_beats_link5] + [local_socket_outbound_data_beats_link6] + [local_socket_outbound_data_beats_link7]) / 1000000) / 1"
     },
     {
-        "name": "metric_Pipeline Utilization - Frontend Bound (%)",
+        "name": "Pipeline Utilization - Frontend Bound (%)",
         "expression": "([de_no_dispatch_per_slot.no_ops_from_frontend] / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
-        "name": "metric_Pipeline Utilization - Frontend Bound - Latency (%)",
+        "name": "Pipeline Utilization - Frontend Bound - Latency (%)",
         "expression": "((6 * [de_no_dispatch_per_cycle.no_ops_from_frontend]) / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
-        "name": "metric_Pipeline Utilization - Frontend Bound - Bandwidth (%)",
+        "name": "Pipeline Utilization - Frontend Bound - Bandwidth (%)",
         "expression": "((([de_no_dispatch_per_slot.no_ops_from_frontend] / 6) - ([de_no_dispatch_per_cycle.no_ops_from_frontend])) / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
-        "name": "metric_Pipeline Utilization - Bad Speculation (%)",
+        "name": "Pipeline Utilization - Bad Speculation (%)",
         "expression": "(([de_src_op_disp.all] - [ex_ret_ops]) / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
-        "name": "metric_Pipeline Utilization - Bad Speculation - Mispredicts (%)",
+        "name": "Pipeline Utilization - Bad Speculation - Mispredicts (%)",
         "expression": "((([de_src_op_disp.all] - [ex_ret_ops]) * ([ex_ret_brn_misp] / ([ex_ret_brn_misp] + [resyncs_or_nc_redirects]))) / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
-        "name": "metric_Pipeline Utilization - Bad Speculation - Pipeline Restarts (%)",
+        "name": "Pipeline Utilization - Bad Speculation - Pipeline Restarts (%)",
         "expression": "((([de_src_op_disp.all] - [ex_ret_ops]) * ([resyncs_or_nc_redirects] / ([ex_ret_brn_misp] + [resyncs_or_nc_redirects]))) / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
-        "name": "metric_Pipeline Utilization - Backend Bound (%)",
+        "name": "Pipeline Utilization - Backend Bound (%)",
         "expression": "([de_no_dispatch_per_slot.backend_stalls] / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
-        "name": "metric_Pipeline Utilization - Backend Bound - Memory (%)",
+        "name": "Pipeline Utilization - Backend Bound - Memory (%)",
         "expression": "(([de_no_dispatch_per_slot.backend_stalls] * ([ex_no_retire.load_not_complete] / [ex_no_retire.not_complete])) / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
-        "name": "metric_Pipeline Utilization - Backend Bound - CPU (%)",
+        "name": "Pipeline Utilization - Backend Bound - CPU (%)",
         "expression": "(([de_no_dispatch_per_slot.backend_stalls] * (1 - ([ex_no_retire.load_not_complete] / [ex_no_retire.not_complete]))) / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
-        "name": "metric_Pipeline Utilization - SMT Contention (%)",
+        "name": "Pipeline Utilization - SMT Contention (%)",
         "expression": "([de_no_dispatch_per_slot.smt_contention] / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
-        "name": "metric_Pipeline Utilization - Retiring (%)",
+        "name": "Pipeline Utilization - Retiring (%)",
         "expression": "([ex_ret_ops] / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
-        "name": "metric_Pipeline Utilization - Retiring - Fastpath (%)",
+        "name": "Pipeline Utilization - Retiring - Fastpath (%)",
         "expression": "(([ex_ret_ops] - [ex_ret_ucode_ops]) / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
-        "name": "metric_Pipeline Utilization - Retiring - Microcode (%)",
+        "name": "Pipeline Utilization - Retiring - Microcode (%)",
         "expression": "([ex_ret_ucode_ops] / (6 * [ls_not_halted_cyc])) * 100"
     },
     {
-        "name": "metric_package power (watts)",
-        "expression": "[power/energy-pkg/]",
-        "origin": "perfspect"
+        "name": "package power (watts)",
+        "expression": "[power/energy-pkg/]"
     }
 ]
