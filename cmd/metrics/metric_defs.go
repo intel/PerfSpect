@@ -11,8 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"perfspect/internal/util"
-
 	"github.com/Knetic/govaluate"
 )
 
@@ -22,16 +20,11 @@ type Variable struct {
 }
 
 type MetricDefinition struct {
-	Name          string                         `json:"name"`
-	Expression    string                         `json:"expression"`
-	NameTxn       string                         `json:"name-txn"`
-	ExpressionTxn string                         `json:"expression-txn"`
-	Variables     map[string]int                 // parsed from Expression for efficiency, int represents group index
-	Evaluable     *govaluate.EvaluableExpression // parse expression once, store here for use in metric evaluation
+	Name       string                         `json:"name"`
+	Expression string                         `json:"expression"`
+	Variables  map[string]int                 // parsed from Expression for efficiency, int represents group index
+	Evaluable  *govaluate.EvaluableExpression // parse expression once, store here for use in metric evaluation
 }
-
-// define const metric name prefix
-const metricPrefix = "metric_"
 
 // LoadMetricDefinitions reads and parses metric definitions from an architecture-specific metric
 // definition file. When the override path argument is empty, the function will load metrics from
@@ -62,26 +55,17 @@ func LoadMetricDefinitions(metricDefinitionOverridePath string, selectedMetrics 
 	// if a list of metric names provided, reduce list to match
 	if len(selectedMetrics) > 0 {
 		// confirm provided metric names are valid (included in metrics defined in file)
-		for _, metricName := range selectedMetrics {
-			found := false
-			for _, metric := range metricsInFile {
-				if metricPrefix+metricName == metric.Name || metricName == metric.Name {
-					found = true
-					break
-				}
-			}
-			if !found {
-				err = fmt.Errorf("provided metric name not found: %s", metricName)
+		// and build list of metrics based on provided list of metric names
+		metricMap := make(map[string]MetricDefinition)
+		for _, metric := range metricsInFile {
+			metricMap[metric.Name] = metric
+		}
+		for _, selectedMetricName := range selectedMetrics {
+			if _, ok := metricMap[selectedMetricName]; !ok {
+				err = fmt.Errorf("provided metric name not found: %s", selectedMetricName)
 				return
 			}
-		}
-		// build list of metrics based on provided list of metric names
-		for _, metric := range metricsInFile {
-			trimmedName := strings.TrimPrefix(metric.Name, metricPrefix)
-			if !util.StringInList(trimmedName, selectedMetrics) {
-				continue
-			}
-			metrics = append(metrics, metric)
+			metrics = append(metrics, metricMap[selectedMetricName])
 		}
 	} else {
 		metrics = metricsInFile
@@ -117,9 +101,11 @@ func ConfigureMetrics(loadedMetrics []MetricDefinition, uncollectableEvents []st
 		tmpMetric := loadedMetrics[metricIdx]
 		// abbreviate event names in metric expressions to match abbreviations used in uncollectableEvents
 		tmpMetric.Expression = abbreviateEventName(tmpMetric.Expression)
-		tmpMetric.ExpressionTxn = abbreviateEventName(tmpMetric.ExpressionTxn)
 		// skip metrics that use uncollectable events
 		foundUncollectable := false
+		if flagTransactionRate == 0 {
+			uncollectableEvents = append(uncollectableEvents, "TXN")
+		}
 		for _, uncollectableEvent := range uncollectableEvents {
 			if strings.Contains(tmpMetric.Expression, uncollectableEvent) {
 				slog.Warn("removing metric that uses uncollectable event", slog.String("metric", tmpMetric.Name), slog.String("event", uncollectableEvent))
@@ -130,14 +116,6 @@ func ConfigureMetrics(loadedMetrics []MetricDefinition, uncollectableEvents []st
 		if foundUncollectable {
 			continue
 		}
-		// swap in per-txn metric definition if transaction rate is provided
-		if flagTransactionRate != 0 && tmpMetric.ExpressionTxn != "" {
-			tmpMetric.Expression = tmpMetric.ExpressionTxn
-			tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, "[TXN]", fmt.Sprintf("%f", flagTransactionRate))
-			tmpMetric.Name = tmpMetric.NameTxn
-		}
-		// remove "metric_" prefix from metric names
-		tmpMetric.Name = strings.TrimPrefix(tmpMetric.Name, metricPrefix)
 		// transform if/else to ?/:
 		var transformed string
 		if transformed, err = transformConditional(tmpMetric.Expression); err != nil {
@@ -155,6 +133,7 @@ func ConfigureMetrics(loadedMetrics []MetricDefinition, uncollectableEvents []st
 		tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, "[SOCKET_COUNT]", socketCount)
 		tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, "[HYPERTHREADING_ON]", hyperThreadingOn)
 		tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, "[CONST_THREAD_COUNT]", threadsPerCore)
+		tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, "[TXN]", fmt.Sprintf("%f", flagTransactionRate))
 		// get a list of the variables in the expression
 		tmpMetric.Variables = make(map[string]int)
 		expressionIdx := 0
