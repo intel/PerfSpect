@@ -302,7 +302,8 @@ if [ -d "$cstate_dir" ]; then
 	done
 else
 	echo "C-state directory not found."
-fi`,
+fi
+`,
 	},
 	SpecTurboCoresScriptName: {
 		Name: SpecTurboCoresScriptName,
@@ -495,8 +496,7 @@ rdmsr 0x1ad # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
 	},
 	ElcScriptName: {
 		Name: ElcScriptName,
-		ScriptTemplate: `
-# Script derived from bhs-power-mode script in Intel PCM repository
+		ScriptTemplate: `# Script derived from bhs-power-mode script in Intel PCM repository
 # Run the pcm-tpmi command to determine I/O and compute dies
 output=$(pcm-tpmi 2 0x10 -d -b 26:26)
 
@@ -560,7 +560,7 @@ for die in "${!die_types[@]}"; do
 		fi
 	done <<< "$output"
 done
-			`,
+`,
 		Architectures: []string{x86_64},
 		Families:      []string{"6"},          // Intel
 		Models:        []string{"173", "175"}, // GNR, SRF
@@ -654,7 +654,8 @@ echo "" # finish the line
 		Name: ChaCountScriptName,
 		ScriptTemplate: `rdmsr 0x396
 rdmsr 0x702
-rdmsr 0x2FFE`, // uncore client cha count, uncore cha count, uncore cha count spr
+rdmsr 0x2FFE
+`, // uncore client cha count, uncore cha count, uncore cha count spr
 		Architectures: []string{x86_64},
 		Families:      []string{"6"}, // Intel
 		Lkms:          []string{"msr"},
@@ -707,7 +708,7 @@ rdmsr 0x2FFE`, // uncore client cha count, uncore cha count, uncore cha count sp
 	echo -n "IRQ Balance: "
 	pgrep irqbalance >/dev/null && echo "Enabled" || echo "Disabled"
 done
-	`,
+`,
 		Depends:   []string{"lshw"},
 		Superuser: true,
 	},
@@ -756,13 +757,15 @@ do
 		fi
 	fi
 	echo "$name|$model|$size|$mountpoint|$fstype|$rqsize|$minio|$fw|$addr|$numa|$curlinkspeed|$curlinkwidth|$maxlinkspeed|$maxlinkwidth"
-done`,
+done
+`,
 	},
 	HdparmScriptName: {
 		Name: HdparmScriptName,
 		ScriptTemplate: `lsblk -d -r -o NAME -e7 -e1 -n | while read -r device ; do
 	hdparm -i /dev/"$device"
-done`,
+done
+`,
 		Superuser: true,
 	},
 	DfScriptName: {
@@ -859,7 +862,8 @@ for i in "${pmu_counters[@]}"; do
     fi
     # print the full list of PMU values
     echo "Values: ${pmu_values[$i]}"
-done`,
+done
+`,
 		Superuser:     true,
 		Architectures: []string{x86_64},
 		Families:      []string{"6"}, // Intel
@@ -897,7 +901,8 @@ if [ $needed_num_huge_pages -gt $orig_num_huge_pages ]; then
   echo $needed_num_huge_pages > /proc/sys/vm/nr_hugepages
 fi
 mlc --loaded_latency
-echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages`,
+echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages
+`,
 		Architectures: []string{x86_64},
 		Superuser:     true,
 		Lkms:          []string{"msr"},
@@ -917,7 +922,8 @@ if [ $needed_num_huge_pages -gt $orig_num_huge_pages ]; then
   echo $needed_num_huge_pages > /proc/sys/vm/nr_hugepages
 fi
 mlc --bandwidth_matrix
-echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages`,
+echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages
+`,
 		Architectures: []string{x86_64},
 		Superuser:     true,
 		Lkms:          []string{"msr"},
@@ -930,7 +936,8 @@ echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages`,
 for method in $methods; do
 	printf "%s " "$method"
 	stress-ng --cpu 0 -t 1 --cpu-method "$method" --metrics-brief 2>&1 | tail -1 | awk '{print $9}'
-done`,
+done
+`,
 		Superuser:  false,
 		Depends:    []string{"stress-ng"},
 		Sequential: true,
@@ -1005,7 +1012,8 @@ interleaved_core_list=$(IFS=,; echo "${interleaved_cores[*]}")
 num_cores_per_socket=$( lscpu | grep 'Core(s) per socket:' | head -1 | awk '{print $4}' )
 
 # Run the avx-turbo benchmark
-avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd,avx128_fma,avx256_fma,avx512_fma --iters=100000 --cpuids=$interleaved_core_list`,
+avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd,avx128_fma,avx256_fma,avx512_fma --iters=100000 --cpuids=$interleaved_core_list
+`,
 		Superuser:  true,
 		Lkms:       []string{"msr"},
 		Depends:    []string{"avx-turbo"},
@@ -1079,7 +1087,8 @@ if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
 fi
 mpstat -u -T -I SCPU -P ALL $interval $count &
 echo $! > {{.ScriptName}}_cmd.pid
-wait`,
+wait
+`,
 		Superuser: true,
 		Lkms:      []string{},
 		Depends:   []string{"mpstat"},
@@ -1094,7 +1103,8 @@ if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
 fi
 S_TIME_FORMAT=ISO iostat -d -t $interval $count | sed '/^loop/d' &
 echo $! > {{.ScriptName}}_cmd.pid
-wait`,
+wait
+`,
 		Superuser: true,
 		Lkms:      []string{},
 		Depends:   []string{"iostat"},
@@ -1109,7 +1119,8 @@ if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
 fi
 sar -r $interval $count &
 echo $! > {{.ScriptName}}_cmd.pid
-wait`,
+wait
+`,
 		Superuser: true,
 		Lkms:      []string{},
 		Depends:   []string{"sar", "sadc"},
@@ -1124,7 +1135,8 @@ if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
 fi
 sar -n DEV $interval $count &
 echo $! > {{.ScriptName}}_cmd.pid
-wait`,
+wait
+`,
 		Superuser: true,
 		Lkms:      []string{},
 		Depends:   []string{"sar", "sadc"},
@@ -1140,7 +1152,8 @@ if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
 fi
 turbostat -S -s PkgWatt,RAMWatt -q -i $interval $count | awk '{ print strftime("%H:%M:%S"), $0 }' &
 echo $! > {{.ScriptName}}_cmd.pid
-wait`,
+wait
+`,
 		Superuser: true,
 		Lkms:      []string{"msr"},
 		Depends:   []string{"turbostat"},
@@ -1173,7 +1186,8 @@ done
 
 processwatch -c $arg_sampling_rate $arg_pid $arg_interval $arg_count $arg_filter &
 echo $! > {{.ScriptName}}_cmd.pid
-wait`,
+wait
+`,
 		Superuser: true,
 		Lkms:      []string{"msr"},
 		Depends:   []string{"processwatch"},
@@ -1181,13 +1195,26 @@ wait`,
 	},
 	GaudiStatsScriptName: {
 		Name: GaudiStatsScriptName,
-		ScriptTemplate: `hl-smi --query-aip=timestamp,name,temperature.aip,module_id,utilization.aip,memory.total,memory.free,memory.used,power.draw --format=csv,nounits -l {{.Interval}} &
-echo $! > {{.ScriptName}}_cmd.pid
-sleep {{.Duration}}
-kill -SIGINT $(cat {{.ScriptName}}_cmd.pid)`,
+		ScriptTemplate: `
+# if the hl-smi program is in the path
+if command -v hl-smi &> /dev/null; then
+	hl-smi --query-aip=timestamp,name,temperature.aip,module_id,utilization.aip,memory.total,memory.free,memory.used,power.draw --format=csv,nounits -l {{.Interval}} &
+	echo $! > {{.ScriptName}}_cmd.pid
+	# if duration is set, sleep for the duration then kill the process
+	if [ {{.Duration}} -ne 0 ]; then
+		sleep {{.Duration}}
+		kill -SIGINT $(cat {{.ScriptName}}_cmd.pid)
+	fi
+	wait
+else
+	echo "hl-smi not found in the path" >&2
+	exit 1
+fi
+`,
 		Superuser: true,
 		NeedsKill: true,
 	},
+	// profile (flamegraph) scripts
 	ProfileJavaScriptName: {
 		Name: ProfileJavaScriptName,
 		ScriptTemplate: `interval={{.Interval}}
@@ -1287,6 +1314,7 @@ rm -f "$perf_fp_data" "$perf_dwarf_data" "$perf_dwarf_folded" "$perf_fp_folded"
 		Superuser: true,
 		Depends:   []string{"perf", "stackcollapse-perf.pl"},
 	},
+	// lock analysis scripts
 	ProfileKernelLockScriptName: {
 		Name: ProfileKernelLockScriptName,
 		ScriptTemplate: `frequency={{.Frequency}}

@@ -130,7 +130,7 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 	if len(parallelScripts) > 0 {
 		// form one master script that calls all the parallel scripts in the background
 		masterScriptName := "parallel_master.sh"
-		masterScript, needsElevatedPrivileges := formMasterScript(myTarget, parallelScripts)
+		masterScript, needsElevatedPrivileges := formMasterScript(myTarget.GetTempDirectory(), parallelScripts)
 		// write master script to local file
 		masterScriptPath := path.Join(localTempDirForTarget, masterScriptName)
 		err = os.WriteFile(masterScriptPath, []byte(masterScript), 0644)
@@ -278,11 +278,10 @@ func scriptNameToFilename(name string) string {
 
 // formMasterScript forms a master script that runs all parallel scripts in the background, waits for them to finish, then prints the output of each script.
 // Return values are the master script and a boolean indicating whether the master script requires elevated privileges.
-func formMasterScript(myTarget target.Target, parallelScripts []ScriptDefinition) (string, bool) {
+func formMasterScript(targetTempDirectory string, parallelScripts []ScriptDefinition) (string, bool) {
 	// we write the stdout and stderr from each command to temporary files and save the PID of each command
 	// in a variable named after the script
 	var masterScript strings.Builder
-	targetTempDirectory := myTarget.GetTempDirectory()
 
 	masterScript.WriteString("#!/bin/bash\n")
 
@@ -304,11 +303,34 @@ func formMasterScript(myTarget target.Target, parallelScripts []ScriptDefinition
 	// function to handle SIGINT
 	masterScript.WriteString("\nhandle_sigint() {\n")
 	for _, script := range parallelScripts {
-		masterScript.WriteString(fmt.Sprintf("\tkill -SIGINT $%s_pid\n", sanitizeScriptName(script.Name)))
-		if script.NeedsKill {
-			// kill the command started by the script
-			masterScript.WriteString(fmt.Sprintf("\tkill -SIGKILL $(cat %s_cmd.pid)\n", sanitizeScriptName(script.Name)))
-			masterScript.WriteString(fmt.Sprintf("\t%s_exitcode=137\n", sanitizeScriptName(script.Name))) // 137 is the exit code for SIGKILL
+		// send SIGINT to the child script, if it is still running
+		masterScript.WriteString(fmt.Sprintf("\tif ps -p \"$%s_pid\" > /dev/null; then\n", sanitizeScriptName(script.Name)))
+		masterScript.WriteString(fmt.Sprintf("\t\tkill -SIGINT $%s_pid\n", sanitizeScriptName(script.Name)))
+		masterScript.WriteString("\tfi\n")
+		if script.NeedsKill { // this is primarily used for scripts that start commands in the background, some of which (processwatch) doesn't respond to SIGINT as expected
+			// if the *cmd.pid file exists, check if the process is still running
+			masterScript.WriteString(fmt.Sprintf("\tif [ -f %s_cmd.pid ]; then\n", sanitizeScriptName(script.Name)))
+			masterScript.WriteString(fmt.Sprintf("\t\tif ps -p $(cat %s_cmd.pid) > /dev/null; then\n", sanitizeScriptName(script.Name)))
+			// send SIGINT to the background process first, then SIGKILL if it doesn't respond to SIGINT
+			masterScript.WriteString(fmt.Sprintf("\t\t\tkill -SIGINT $(cat %s_cmd.pid)\n", sanitizeScriptName(script.Name)))
+			// give the process a chance to respond to SIGINT
+			masterScript.WriteString("\t\t\tsleep 0.5\n")
+			// if the background process is still running, send SIGKILL
+			masterScript.WriteString(fmt.Sprintf("\t\t\tif ps -p $(cat %s_cmd.pid) > /dev/null; then\n", sanitizeScriptName(script.Name)))
+			masterScript.WriteString(fmt.Sprintf("\t\t\t\tkill -SIGKILL $(cat %s_cmd.pid)\n", sanitizeScriptName(script.Name)))
+			masterScript.WriteString(fmt.Sprintf("\t\t\t\t%s_exitcode=137\n", sanitizeScriptName(script.Name))) // 137 is the exit code for SIGKILL
+			masterScript.WriteString("\t\t\telse\n")
+			// if the background process has exited, set the exit code to 0
+			masterScript.WriteString(fmt.Sprintf("\t\t\t\t%s_exitcode=0\n", sanitizeScriptName(script.Name)))
+			masterScript.WriteString("\t\t\tfi\n")
+			masterScript.WriteString("\t\telse\n")
+			// if the script itself has exited, set the exit code to 0
+			masterScript.WriteString(fmt.Sprintf("\t\t\t%s_exitcode=0\n", sanitizeScriptName(script.Name)))
+			masterScript.WriteString("\t\tfi\n")
+			masterScript.WriteString("\telse\n")
+			// if the *cmd.pid file doesn't exist, set the exit code to 1
+			masterScript.WriteString(fmt.Sprintf("\t\t%s_exitcode=0\n", sanitizeScriptName(script.Name)))
+			masterScript.WriteString("\tfi\n")
 		} else {
 			masterScript.WriteString(fmt.Sprintf("\twait \"$%s_pid\"\n", sanitizeScriptName(script.Name)))
 			masterScript.WriteString(fmt.Sprintf("\t%s_exitcode=$?\n", sanitizeScriptName(script.Name)))
@@ -402,10 +424,15 @@ func parseMasterScriptOutput(masterScriptOutput string) (scriptOutputs []ScriptO
 		}
 		stdout = strings.Join(stdoutLines, "\n")
 		stderr = strings.Join(stderrLines, "\n")
-		exitCodeInt, err := strconv.Atoi(exitcode)
-		if err != nil {
-			slog.Error("error converting exit code to integer, setting to -100", slog.String("exitcode", exitcode), slog.String("error", err.Error()))
-			exitCodeInt = -100
+		exitCodeInt := -100
+		if exitcode == "" {
+			slog.Warn("exit code for script not set", slog.String("script", scriptName))
+		} else {
+			var err error
+			exitCodeInt, err = strconv.Atoi(exitcode)
+			if err != nil {
+				slog.Warn("error converting exit code to integer", slog.String("exitcode", exitcode), slog.String("error", err.Error()), slog.String("script", scriptName))
+			}
 		}
 		scriptOutputs = append(scriptOutputs, ScriptOutput{
 			ScriptDefinition: ScriptDefinition{Name: scriptName},

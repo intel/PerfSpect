@@ -96,6 +96,7 @@ func (rc *ReportingCommand) Run() error {
 	go func() {
 		sig := <-sigChannel
 		slog.Info("received signal", slog.String("signal", sig.String()))
+		util.SignalChildren(syscall.SIGINT)
 	}()
 	// get the data we need to generate reports
 	orderedTargetScriptOutputs, err := rc.retrieveScriptOutputs(localTempDir)
