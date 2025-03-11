@@ -96,6 +96,9 @@ func (rc *ReportingCommand) Run() error {
 	go func() {
 		sig := <-sigChannel
 		slog.Info("received signal", slog.String("signal", sig.String()))
+		// when perfspect receives ctrl-c while in the shell, the shell makes sure to propogate the
+		// signal to all our children. But when perfspect is run in the background or disowned and
+		// then receives SIGINT, e.g., from a script, we need to send the signal to our children
 		util.SignalChildren(syscall.SIGINT)
 	}()
 	// get the data we need to generate reports
