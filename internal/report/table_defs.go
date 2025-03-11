@@ -2163,10 +2163,11 @@ func powerStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
 }
 
 func gaudiStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
-	// build fields to match CSV output from hl_smi tool
-	fields := []Field{}
 	// parse the CSV output
 	csvOutput := outputs[script.GaudiStatsScriptName].Stdout
+	if csvOutput == "" {
+		return []Field{}
+	}
 	r := csv.NewReader(strings.NewReader(csvOutput))
 	rows, err := r.ReadAll()
 	if err != nil {
@@ -2177,6 +2178,8 @@ func gaudiStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
 		slog.Error("gaudi stats output is not in expected format")
 		return []Field{}
 	}
+	// build fields to match CSV output from hl_smi tool
+	fields := []Field{}
 	// first row is the header, extract field names
 	for _, fieldName := range rows[0] {
 		fields = append(fields, Field{Name: strings.TrimSpace(fieldName)})
@@ -2229,7 +2232,7 @@ func instructionMixTableValues(outputs map[string]script.ScriptOutput) []Field {
 	var interval int
 	lines := strings.Split(outputs[script.InstructionMixScriptName].Stdout, "\n")
 	if len(lines) < 4 {
-		slog.Error("no data found in instruction mix output")
+		slog.Warn("no data found in instruction mix output")
 		return []Field{}
 	}
 	// TIME
