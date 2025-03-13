@@ -962,61 +962,74 @@ expand_range() {
 	echo "${expanded[@]}"
 }
 
-# Get the number of NUMA nodes and sockets
-num_nodes=$(lscpu | grep 'NUMA node(s):' | awk '{print $3}')
-num_sockets=$(lscpu | grep 'Socket(s):' | awk '{print $2}')
+num_cores_per_socket=$( lscpu | grep -E 'Core\(s\) per socket:' | head -1 | awk '{print $4}' )
+# echo "Number of cores per socket: $num_cores_per_socket"
+family=$(lscpu | grep -E '^CPU family:' | awk '{print $3}')
+model=$(lscpu | grep -E '^Model:' | awk '{print $2}')
 
-# echo "Number of NUMA nodes: $num_nodes"
-# echo "Number of sockets: $num_sockets"
+# if GNR (family 6, model 173), we need to interleave the core-ids across dies
+if [ $family -eq 6 ] && [ $model -eq 173 ]; then
+    # Get the number of dies and sockets
+    num_devices=$(lspci -d 8086:3258 | wc -l)
+    num_sockets=$(lscpu | grep -E '^Socket\(s\):' | awk '{print $2}')
+    # echo "Number of devices: $num_devices"
+    # echo "Number of sockets: $num_sockets"
+    num_devices_per_die=2
+    # Calculate the number of dies per socket
+    dies_per_socket=$((num_devices / num_sockets / num_devices_per_die))
+    # echo "Number of dies per socket: $dies_per_socket"
+    # Calculate the number of cores per die
+    cores_per_die=$((num_cores_per_socket / dies_per_socket))
+    # echo "Number of cores per die: $cores_per_die"
 
-# Calculate the number of NUMA nodes per socket
-nodes_per_socket=$((num_nodes / num_sockets))
+    # Array to hold the expanded core lists for each die
+    declare -a core_lists
 
-# Array to hold the expanded core lists for each NUMA node
-declare -a core_lists
+    # Loop through each die in the first socket and expand the core IDs
+    for ((i=0; i<dies_per_socket; i++)); do
+        core_range_start=$((i * cores_per_die))
+        core_range_end=$((core_range_start + cores_per_die - 1))
+        core_range="$core_range_start-$core_range_end"
+        # echo "Core range for die $i: $core_range"
+        core_list=$(expand_range "$core_range")
+        core_lists+=("$core_list")
+    done
 
-# Loop through each NUMA node in the first socket and expand the core IDs
-for ((i=0; i<nodes_per_socket; i++)); do
-	core_range=$(lscpu | grep "NUMA node$i CPU(s):" | awk -F: '{print $2}' | tr -d ' ' | cut -d',' -f1)
-	core_list=$(expand_range "$core_range")
-	core_lists+=("$core_list")
-done
+    # Interleave the core IDs from each die
+    interleaved_cores=()
+    max_length=0
 
-# Interleave the core IDs from each NUMA node
-interleaved_cores=()
-max_length=0
+    # Find the maximum length of the core lists
+    for core_list in "${core_lists[@]}"; do
+        core_array=($core_list)
+        if (( ${#core_array[@]} > max_length )); then
+            max_length=${#core_array[@]}
+        fi
+    done
 
-# Find the maximum length of the core lists
-for core_list in "${core_lists[@]}"; do
-	core_array=($core_list)
-	if (( ${#core_array[@]} > max_length )); then
-		max_length=${#core_array[@]}
-	fi
-done
+    # Interleave the core IDs
+    for ((i=0; i<max_length; i++)); do
+        for core_list in "${core_lists[@]}"; do
+            core_array=($core_list)
+            if (( i < ${#core_array[@]} )); then
+                interleaved_cores+=("${core_array[i]}")
+            fi
+        done
+    done
 
-# Interleave the core IDs
-for ((i=0; i<max_length; i++)); do
-	for core_list in "${core_lists[@]}"; do
-		core_array=($core_list)
-		if (( i < ${#core_array[@]} )); then
-			interleaved_cores+=("${core_array[i]}")
-		fi
-	done
-done
+    # Form the interleaved core IDs into a comma-separated list
+    interleaved_core_list=$(IFS=,; echo "${interleaved_cores[*]}")
+    # echo "Interleaved core IDs: $interleaved_core_list"
+    cpu_ids="--cpuids=$interleaved_core_list"
+else
+    cpu_ids=""
+fi
 
-# Form the interleaved core IDs into a comma-separated list
-interleaved_core_list=$(IFS=,; echo "${interleaved_cores[*]}")
-# echo "Interleaved core IDs: $interleaved_core_list"
-
-# Get the number of cores per socket
-num_cores_per_socket=$( lscpu | grep 'Core(s) per socket:' | head -1 | awk '{print $4}' )
-
-# Run the avx-turbo benchmark
-avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd,avx128_fma,avx256_fma,avx512_fma --iters=100000 --cpuids=$interleaved_core_list
+avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd,avx128_fma,avx256_fma,avx512_fma --iters=100000 $cpu_ids
 `,
 		Superuser:  true,
 		Lkms:       []string{"msr"},
-		Depends:    []string{"avx-turbo"},
+		Depends:    []string{"avx-turbo", "lspci"},
 		Sequential: true,
 	},
 	TurboFrequencyPowerAndTemperatureScriptName: {
