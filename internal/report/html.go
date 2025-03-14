@@ -1392,7 +1392,14 @@ func kernelParameterTableHtmlRenderer(tableValues TableValues, targetName string
 		}
 		if len(node.Children) > 0 {
 			out += "<ul>\n"
-			for _, child := range node.Children {
+			// render children in alphabetical order
+			keys := make([]string, 0, len(node.Children))
+			for k := range node.Children {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			for _, key := range keys {
+				child := node.Children[key]
 				out += renderKernelParameterNode(child, level+1)
 			}
 			out += "</ul>\n"
@@ -1486,10 +1493,10 @@ func kernelParameterTableHtmlRenderer(tableValues TableValues, targetName string
 	`
 	parameterTree := renderKernelParameterNode(root, 0)
 	values := [][]string{{"sysctl parameters", parameterTree}}
-	//rowStyles := []string{}
+	rowStyles := []string{}
 	var tableValueStyles [][]string
-	//rowStyles = append(rowStyles, "font-weight:bold")
+	rowStyles = append(rowStyles, "font-weight:bold")
 	//rowStyles = append(rowStyles, "white-space: pre-wrap")
-	//tableValueStyles = append(tableValueStyles, rowStyles)
+	tableValueStyles = append(tableValueStyles, rowStyles)
 	return style + renderHTMLTable([]string{}, values, "pure-table pure-table-striped", tableValueStyles)
 }
