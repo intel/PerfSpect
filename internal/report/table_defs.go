@@ -115,15 +115,16 @@ const (
 	NUMABandwidthTableName  = "NUMA Bandwidth"
 	StoragePerfTableName    = "Storage Performance"
 	// telemetry table names
-	CPUUtilizationTableName        = "CPU Utilization"
-	AverageCPUUtilizationTableName = "Average CPU Utilization"
-	InstructionMixTableName        = "Instruction Mix"
-	IRQRateTableName               = "IRQ Rate"
-	DriveStatsTableName            = "Drive Stats"
-	NetworkStatsTableName          = "Network Stats"
-	MemoryStatsTableName           = "Memory Stats"
-	PowerStatsTableName            = "Power Stats"
-	GaudiStatsTableName            = "Gaudi Stats"
+	CPUUtilizationTableName          = "CPU Utilization"
+	SummaryCPUUtilizationTableName   = "Summary CPU Utilization"
+	SummaryCpuFreqTelemetryTableName = "Summary CPU Frequency"
+	IRQRateTableName                 = "IRQ Rate"
+	InstructionMixTableName          = "Instruction Mix"
+	DriveStatsTableName              = "Drive Stats"
+	NetworkStatsTableName            = "Network Stats"
+	MemoryStatsTableName             = "Memory Stats"
+	PowerStatsTableName              = "Power Stats"
+	GaudiStatsTableName              = "Gaudi Stats"
 	// config  table names
 	ConfigurationTableName = "Configuration"
 	// flamegraph table names
@@ -654,15 +655,24 @@ var tableDefinitions = map[string]TableDefinition{
 		},
 		FieldsFunc:            cpuUtilizationTableValues,
 		HTMLTableRendererFunc: cpuUtilizationTableHTMLRenderer},
-	AverageCPUUtilizationTableName: {
-		Name:      AverageCPUUtilizationTableName,
-		MenuLabel: AverageCPUUtilizationTableName,
+	SummaryCPUUtilizationTableName: {
+		Name:      SummaryCPUUtilizationTableName,
+		MenuLabel: SummaryCPUUtilizationTableName,
 		HasRows:   true,
 		ScriptNames: []string{
 			script.MpstatScriptName,
 		},
-		FieldsFunc:            averageCPUUtilizationTableValues,
-		HTMLTableRendererFunc: averageCPUUtilizationTableHTMLRenderer},
+		FieldsFunc:            summaryCPUUtilizationTableValues,
+		HTMLTableRendererFunc: summaryCPUUtilizationTableHTMLRenderer},
+	SummaryCpuFreqTelemetryTableName: {
+		Name:      SummaryCpuFreqTelemetryTableName,
+		MenuLabel: SummaryCpuFreqTelemetryTableName,
+		HasRows:   true,
+		ScriptNames: []string{
+			script.TurbostatScriptName,
+		},
+		FieldsFunc:            summaryCpuFreqTelemetryTableValues,
+		HTMLTableRendererFunc: summaryCpuFreqTelemetryTableHTMLRenderer},
 	IRQRateTableName: {
 		Name:      IRQRateTableName,
 		MenuLabel: IRQRateTableName,
@@ -2032,7 +2042,7 @@ func cpuUtilizationTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return fields
 }
 
-func averageCPUUtilizationTableValues(outputs map[string]script.ScriptOutput) []Field {
+func summaryCPUUtilizationTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
 		{Name: "Time"},
 		{Name: "%usr"},
@@ -2173,15 +2183,32 @@ func powerStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Package"},
 		{Name: "DRAM"},
 	}
-	reStat := regexp.MustCompile(`^(\d\d:\d\d:\d\d)\s*(\d+\.\d+)\s*(\d+\.\d+)$`)
-	for _, line := range strings.Split(outputs[script.TurbostatScriptName].Stdout, "\n") {
-		match := reStat.FindStringSubmatch(line)
-		if len(match) == 0 {
-			continue
-		}
-		for i := range fields {
-			fields[i].Values = append(fields[i].Values, match[i+1])
-		}
+	tsRowValues, err := turbostatSummaryRows(outputs, []string{"PkgWatt", "RAMWatt"})
+	if err != nil {
+		slog.Error(err.Error())
+		return []Field{}
+	}
+	for _, tsRow := range tsRowValues {
+		fields[0].Values = append(fields[0].Values, tsRow[0])
+		fields[1].Values = append(fields[1].Values, tsRow[1])
+		fields[2].Values = append(fields[2].Values, tsRow[2])
+	}
+	return fields
+}
+
+func summaryCpuFreqTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
+	fields := []Field{
+		{Name: "Time"},
+		{Name: "Frequency"},
+	}
+	tsRowValues, err := turbostatSummaryRows(outputs, []string{"Bzy_MHz"})
+	if err != nil {
+		slog.Error(err.Error())
+		return []Field{}
+	}
+	for _, tsRow := range tsRowValues {
+		fields[0].Values = append(fields[0].Values, tsRow[0])
+		fields[1].Values = append(fields[1].Values, tsRow[1])
 	}
 	return fields
 }

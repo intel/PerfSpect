@@ -1168,8 +1168,12 @@ duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
 	count=$((duration / interval))
 	count="-n $count"
+else
+	count=""
 fi
-turbostat -S -s PkgWatt,RAMWatt -q -i $interval $count | awk '{ print strftime("%H:%M:%S"), $0 }' &
+echo TIME: $(date +"%H:%M:%S")
+echo INTERVAL: $interval
+turbostat -i $interval $count &
 echo $! > {{.ScriptName}}_cmd.pid
 wait
 `,
