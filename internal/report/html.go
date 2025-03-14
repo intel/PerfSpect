@@ -1490,11 +1490,10 @@ func kernelParameterTableHtmlRenderer(tableValues TableValues, targetName string
 	</style>
 	`
 	parameterTree := renderKernelParameterNode(root, 0)
-	values := [][]string{{"sysctl parameters", parameterTree}}
+	values := [][]string{{"Sysctl Parameters", parameterTree}}
 	rowStyles := []string{}
 	var tableValueStyles [][]string
 	rowStyles = append(rowStyles, "font-weight:bold")
-	//rowStyles = append(rowStyles, "white-space: pre-wrap")
 	tableValueStyles = append(tableValueStyles, rowStyles)
 	return style + renderHTMLTable([]string{}, values, "pure-table pure-table-striped", tableValueStyles)
 }
