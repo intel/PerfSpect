@@ -51,11 +51,9 @@ var (
 	flagAll bool
 
 	flagCpu      bool
-	flagCpuAvg   bool
-	flagIrq      bool
+	flagMemory   bool
 	flagNetwork  bool
 	flagStorage  bool
-	flagMemory   bool
 	flagPower    bool
 	flagInstrMix bool
 	flagGaudi    bool
@@ -71,11 +69,9 @@ const (
 	flagAllName = "all"
 
 	flagCpuName      = "cpu"
-	flagCpuAvgName   = "cpuavg"
-	flagIrqName      = "irq"
+	flagMemoryName   = "memory"
 	flagNetworkName  = "network"
 	flagStorageName  = "storage"
-	flagMemoryName   = "memory"
 	flagPowerName    = "power"
 	flagInstrMixName = "instrmix"
 	flagGaudiName    = "gaudi"
@@ -87,14 +83,12 @@ const (
 var telemetrySummaryTableName = "Telemetry Summary"
 
 var categories = []common.Category{
-	{FlagName: flagCpuName, FlagVar: &flagCpu, DefaultValue: false, Help: "monitor cpu", TableNames: []string{report.CPUUtilizationTableName}},
-	{FlagName: flagCpuAvgName, FlagVar: &flagCpuAvg, DefaultValue: false, Help: "monitor cpu average", TableNames: []string{report.AverageCPUUtilizationTableName}},
-	{FlagName: flagInstrMixName, FlagVar: &flagInstrMix, DefaultValue: false, Help: "monitor instruction mix", TableNames: []string{report.InstructionMixTableName}},
-	{FlagName: flagIrqName, FlagVar: &flagIrq, DefaultValue: false, Help: "monitor irq", TableNames: []string{report.IRQRateTableName}},
-	{FlagName: flagStorageName, FlagVar: &flagStorage, DefaultValue: false, Help: "monitor storage", TableNames: []string{report.DriveStatsTableName}},
-	{FlagName: flagNetworkName, FlagVar: &flagNetwork, DefaultValue: false, Help: "monitor network", TableNames: []string{report.NetworkStatsTableName}},
+	{FlagName: flagCpuName, FlagVar: &flagCpu, DefaultValue: false, Help: "monitor cpu", TableNames: []string{report.CPUUtilizationTableName, report.SummaryCPUUtilizationTableName, report.SummaryCpuFreqTelemetryTableName, report.IRQRateTableName}},
 	{FlagName: flagMemoryName, FlagVar: &flagMemory, DefaultValue: false, Help: "monitor memory", TableNames: []string{report.MemoryStatsTableName}},
+	{FlagName: flagNetworkName, FlagVar: &flagNetwork, DefaultValue: false, Help: "monitor network", TableNames: []string{report.NetworkStatsTableName}},
+	{FlagName: flagStorageName, FlagVar: &flagStorage, DefaultValue: false, Help: "monitor storage", TableNames: []string{report.DriveStatsTableName}},
 	{FlagName: flagPowerName, FlagVar: &flagPower, DefaultValue: false, Help: "monitor power", TableNames: []string{report.PowerStatsTableName}},
+	{FlagName: flagInstrMixName, FlagVar: &flagInstrMix, DefaultValue: false, Help: "monitor instruction mix", TableNames: []string{report.InstructionMixTableName}},
 	{FlagName: flagGaudiName, FlagVar: &flagGaudi, DefaultValue: false, Help: "monitor gaudi", TableNames: []string{report.GaudiStatsTableName}},
 }
 
@@ -283,7 +277,8 @@ func getTableValues(allTableValues []report.TableValues, tableName string) repor
 }
 
 func summaryFromTableValues(allTableValues []report.TableValues, _ map[string]script.ScriptOutput) report.TableValues {
-	cpuUtil := getCPUAveragePercentage(getTableValues(allTableValues, report.AverageCPUUtilizationTableName), "%idle", true)
+	cpuUtil := getCPUAveragePercentage(getTableValues(allTableValues, report.SummaryCPUUtilizationTableName), "%idle", true)
+	cpuFreq := getMetricAverage(getTableValues(allTableValues, report.SummaryCpuFreqTelemetryTableName), []string{"Frequency"}, "Time")
 	pkgPower := getMetricAverage(getTableValues(allTableValues, report.PowerStatsTableName), []string{"Package"}, "")
 	driveReads := getMetricAverage(getTableValues(allTableValues, report.DriveStatsTableName), []string{"kB_read/s"}, "Device")
 	driveWrites := getMetricAverage(getTableValues(allTableValues, report.DriveStatsTableName), []string{"kB_wrtn/s"}, "Device")
@@ -298,6 +293,7 @@ func summaryFromTableValues(allTableValues []report.TableValues, _ map[string]sc
 		},
 		Fields: []report.Field{
 			{Name: "CPU Utilization (%)", Values: []string{cpuUtil}},
+			{Name: "CPU Frequency (MHz)", Values: []string{cpuFreq}},
 			{Name: "Package Power (Watts)", Values: []string{pkgPower}},
 			{Name: "Drive Reads (kB/s)", Values: []string{driveReads}},
 			{Name: "Drive Writes (kB/s)", Values: []string{driveWrites}},

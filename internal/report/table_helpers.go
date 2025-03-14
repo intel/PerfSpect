@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"perfspect/internal/cpudb"
 	"perfspect/internal/script"
@@ -1556,6 +1557,84 @@ func expandCPUList(cpuList string) (cpus []int) {
 		}
 	}
 	return
+}
+
+func turbostatSummaryRows(outputs map[string]script.ScriptOutput, fieldNames []string) ([][]string, error) {
+	var fieldValues [][]string
+	// initialize indices with -1
+	fieldIndices := make([]int, len(fieldNames))
+	for i := range fieldIndices {
+		fieldIndices[i] = -1
+	}
+	headerLine := -1
+	var startTime time.Time
+	var interval int
+	var sampleTime time.Time
+	sampleCount := 0
+	// parse the turbostat output
+	for i, line := range strings.Split(outputs[script.TurbostatScriptName].Stdout, "\n") {
+		if i == 0 { // first line is the time stamp, e.g., TIME: 15:04:05
+			var err error
+			startTime, err = time.Parse("15:04:05", strings.TrimPrefix(line, "TIME: "))
+			if err != nil {
+				err := fmt.Errorf("unable to parse power stats start time: %s", line)
+				return nil, err
+			}
+			continue
+		} else if i == 1 { // second line is the collection interval, e.g., INTERVAL: 2
+			var err error
+			interval, err = strconv.Atoi(strings.TrimPrefix(line, "INTERVAL: "))
+			if err != nil {
+				err := fmt.Errorf("unable to parse power stats interval: %s", line)
+				return nil, err
+			}
+			continue
+		}
+		// skip lines until we see "Package Core    CPU" at the beginning of a line, this is the header for the rest of the data
+		if headerLine == -1 {
+			if strings.HasPrefix(line, "Package\tCore\tCPU") {
+				headerLine = i
+			} else {
+				continue
+			}
+		}
+		if i == headerLine {
+			// parse the field names from the header line
+			tsFields := strings.Fields(line)
+			// find the index of the fields we are interested in
+			for j, tsFieldName := range tsFields {
+				for k, fieldName := range fieldNames {
+					if tsFieldName == fieldName {
+						fieldIndices[k] = j
+					}
+				}
+			}
+			// check that we found all the fields
+			for _, fieldIndex := range fieldIndices {
+				if fieldIndex == -1 {
+					err := fmt.Errorf("turbostat output is missing field: %s", fieldNames)
+					return nil, err
+				}
+			}
+			continue
+		}
+		// alright...we should be at the data now
+		tsRowValues := strings.Fields(line)
+		if len(tsRowValues) == 0 {
+			continue
+		}
+		// summary rows have a "-" in the first column
+		if tsRowValues[0] == "-" {
+			sampleTime = startTime.Add(time.Duration(sampleCount*interval) * time.Second)
+			sampleCount++
+			rowValues := []string{sampleTime.Format("15:04:05")}
+			for _, fieldIndex := range fieldIndices {
+				rowValues = append(rowValues, tsRowValues[fieldIndex])
+			}
+			fieldValues = append(fieldValues, rowValues)
+		}
+	}
+	return fieldValues, nil
 }
 
 func nicIRQMappingsFromOutput(outputs map[string]script.ScriptOutput) [][]string {
