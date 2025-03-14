@@ -1352,12 +1352,11 @@ func kernelParameterTableHtmlRenderer(tableValues TableValues, targetName string
 		Children: make(map[string]*kernelParameterNode),
 	}
 	// assemble the tree
-	// for debugging, use only the first 6 parameters
-	//for i := range 6 {
-	for i := 0; i < len(tableValues.Fields[0].Values); i++ {
-		parameter := strings.Split(tableValues.Fields[0].Values[i], ".")
+	for i := range tableValues.Fields[0].Values {
+		// split the parameter name at the dots
+		parameterNameLevels := strings.Split(tableValues.Fields[0].Values[i], ".")
 		node := root
-		for _, level := range parameter {
+		for _, level := range parameterNameLevels {
 			if _, ok := node.Children[level]; !ok {
 				node.Children[level] = &kernelParameterNode{
 					Name:     level,
@@ -1366,7 +1365,10 @@ func kernelParameterTableHtmlRenderer(tableValues TableValues, targetName string
 			}
 			node = node.Children[level]
 		}
-		node.Value = tableValues.Fields[1].Values[i]
+		if node.Value != "" {
+			node.Value += ", "
+		}
+		node.Value += tableValues.Fields[1].Values[i]
 	}
 	// render the tree as HTML list
 	var renderKernelParameterNode func(node *kernelParameterNode, level int) string
@@ -1377,18 +1379,14 @@ func kernelParameterTableHtmlRenderer(tableValues TableValues, targetName string
 		}
 		out += "<li>\n"
 		if level == 0 {
-			out += "<details open>\n"
+			out += "<details open>\n" // initialize the root to open
 		} else if len(node.Children) > 0 {
 			out += "<details>\n"
 		}
 		if level == 0 || len(node.Children) > 0 {
 			out += fmt.Sprintf("<summary>%s</summary>\n", node.Name)
 		} else { // this is a leaf node
-			value := ""
-			if node.Value != "" {
-				value = fmt.Sprintf(" = %s", node.Value)
-			}
-			out += fmt.Sprintf("%s%s\n", node.Name, value)
+			out += fmt.Sprintf("%s = %s\n", node.Name, node.Value)
 		}
 		if len(node.Children) > 0 {
 			out += "<ul>\n"
