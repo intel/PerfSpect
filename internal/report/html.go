@@ -1286,3 +1286,92 @@ func kernelLockAnalysisHTMLRenderer(tableValues TableValues, targetName string) 
 	}
 	return renderHTMLTable([]string{}, values, "pure-table pure-table-striped", tableValueStyles)
 }
+
+// kernelParameterTableHtmlRenderer renders the sysctl kernel parameters as a collapsible tree
+// Ex.:
+// .	- net
+// .		- core
+// .			- rmem_max = 212992
+// .			- wmem_max = 212992
+// .		- ipv4
+// .			- tcp
+// .				- rmem_max = 212992
+// .				- wmem_max = 212992
+// .	- vm
+// .		- dirty_ratio = 20
+func kernelParameterTableHtmlRenderer(tableValues TableValues, targetName string) string {
+	// kernel parameter levels are separated by dots
+	// Ex.: net.core.rmem_max
+	// The first level is the root level
+	// There can be a range of levels, each level is a child of the previous level
+	// The last level is the parameter name and its value
+
+	// root level
+	type kernelParameterNode struct {
+		Name     string
+		Value    string
+		Children map[string]*kernelParameterNode
+	}
+	root := &kernelParameterNode{
+		Name:     "root",
+		Children: make(map[string]*kernelParameterNode),
+	}
+	// assemble the tree
+	// for debugging, use only the first 6 parameters
+	for i := range 6 {
+		//for i := 0; i < len(tableValues.Fields[0].Values); i++ {
+		parameter := strings.Split(tableValues.Fields[0].Values[i], ".")
+		node := root
+		for _, level := range parameter {
+			if _, ok := node.Children[level]; !ok {
+				node.Children[level] = &kernelParameterNode{
+					Name:     level,
+					Children: make(map[string]*kernelParameterNode),
+				}
+			}
+			node = node.Children[level]
+		}
+		node.Value = tableValues.Fields[1].Values[i]
+	}
+	// render the tree as HTML list
+	var renderKernelParameterNode func(node *kernelParameterNode, level int) string
+	renderKernelParameterNode = func(node *kernelParameterNode, level int) string {
+		out := ""
+		if level == 0 {
+			out += "<ul class=\"collapsibleList\">\n"
+		}
+		out += "<li>\n"
+		out += fmt.Sprintf("<span class=\"collapsibleNode\">%s</span>\n", node.Name)
+		if node.Value != "" {
+			out += fmt.Sprintf("<span class=\"collapsibleValue\">%s</span>\n", node.Value)
+		}
+		if len(node.Children) > 0 {
+			out += "<ul class=\"collapsibleList\">\n"
+			for _, child := range node.Children {
+				out += renderKernelParameterNode(child, level+1)
+			}
+			out += "</ul>\n"
+		}
+		out += "</li>\n"
+		if level == 0 {
+			out += "</ul>\n"
+		}
+		return out
+	}
+	out := `<style>
+.collapsibleList {
+	list-style-type: none;
+	margin: 0;
+	padding: 0;
+}
+.collapsibleNode {
+	cursor: pointer;
+}
+.collapsibleValue {
+	margin-left: 10px;
+}
+</style>
+`
+	out += renderKernelParameterNode(root, 0)
+	return out
+}

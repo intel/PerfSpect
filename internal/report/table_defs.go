@@ -77,6 +77,7 @@ const (
 	PCIeSlotsTableName          = "PCIe Slots"
 	BIOSTableName               = "BIOS"
 	OperatingSystemTableName    = "Operating System"
+	KernelParameterTableName    = "Kernel Parameter"
 	SoftwareVersionTableName    = "Software Version"
 	CPUTableName                = "CPU"
 	ISATableName                = "ISA"
@@ -215,6 +216,13 @@ var tableDefinitions = map[string]TableDefinition{
 			script.ProcCmdlineScriptName,
 			script.ProcCpuinfoScriptName},
 		FieldsFunc: operatingSystemTableValues},
+	KernelParameterTableName: {
+		Name:    KernelParameterTableName,
+		HasRows: true,
+		ScriptNames: []string{
+			script.SysctlScriptName},
+		FieldsFunc:            kernelParameterTableValues,
+		HTMLTableRendererFunc: kernelParameterTableHtmlRenderer},
 	SoftwareVersionTableName: {
 		Name:    SoftwareVersionTableName,
 		HasRows: false,
@@ -879,6 +887,22 @@ func operatingSystemTableValues(outputs map[string]script.ScriptOutput) []Field 
 		{Name: "Boot Parameters", Values: []string{strings.TrimSpace(outputs[script.ProcCmdlineScriptName].Stdout)}},
 		{Name: "Microcode", Values: []string{valFromRegexSubmatch(outputs[script.ProcCpuinfoScriptName].Stdout, `^microcode.*:\s*(.+?)$`)}},
 	}
+}
+
+func kernelParameterTableValues(outputs map[string]script.ScriptOutput) []Field {
+	fields := []Field{
+		{Name: "Parameter"},
+		{Name: "Value"},
+	}
+	for _, line := range strings.Split(outputs[script.SysctlScriptName].Stdout, "\n") {
+		parts := strings.SplitN(line, " = ", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		fields[0].Values = append(fields[0].Values, parts[0])
+		fields[1].Values = append(fields[1].Values, parts[1])
+	}
+	return fields
 }
 
 func softwareVersionTableValues(outputs map[string]script.ScriptOutput) []Field {
