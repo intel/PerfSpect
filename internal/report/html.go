@@ -1348,13 +1348,13 @@ func kernelParameterTableHtmlRenderer(tableValues TableValues, targetName string
 		Children map[string]*kernelParameterNode
 	}
 	root := &kernelParameterNode{
-		Name:     "root",
+		Name:     "sysctl",
 		Children: make(map[string]*kernelParameterNode),
 	}
 	// assemble the tree
 	// for debugging, use only the first 6 parameters
-	for i := range 6 {
-		//for i := 0; i < len(tableValues.Fields[0].Values); i++ {
+	//for i := range 6 {
+	for i := 0; i < len(tableValues.Fields[0].Values); i++ {
 		parameter := strings.Split(tableValues.Fields[0].Values[i], ".")
 		node := root
 		for _, level := range parameter {
@@ -1373,19 +1373,32 @@ func kernelParameterTableHtmlRenderer(tableValues TableValues, targetName string
 	renderKernelParameterNode = func(node *kernelParameterNode, level int) string {
 		out := ""
 		if level == 0 {
-			out += "<ul class=\"collapsibleList\">\n"
+			out += "<ul class=\"tree\">\n"
 		}
 		out += "<li>\n"
-		out += fmt.Sprintf("<span class=\"collapsibleNode\">%s</span>\n", node.Name)
-		if node.Value != "" {
-			out += fmt.Sprintf("<span class=\"collapsibleValue\">%s</span>\n", node.Value)
+		if level == 0 {
+			out += "<details open>\n"
+		} else if len(node.Children) > 0 {
+			out += "<details>\n"
+		}
+		if level == 0 || len(node.Children) > 0 {
+			out += fmt.Sprintf("<summary>%s</summary>\n", node.Name)
+		} else { // this is a leaf node
+			value := ""
+			if node.Value != "" {
+				value = fmt.Sprintf(" = %s", node.Value)
+			}
+			out += fmt.Sprintf("%s%s\n", node.Name, value)
 		}
 		if len(node.Children) > 0 {
-			out += "<ul class=\"collapsibleList\">\n"
+			out += "<ul>\n"
 			for _, child := range node.Children {
 				out += renderKernelParameterNode(child, level+1)
 			}
 			out += "</ul>\n"
+		}
+		if level == 0 || len(node.Children) > 0 {
+			out += "</details>\n"
 		}
 		out += "</li>\n"
 		if level == 0 {
@@ -1393,20 +1406,90 @@ func kernelParameterTableHtmlRenderer(tableValues TableValues, targetName string
 		}
 		return out
 	}
-	out := `<style>
-.collapsibleList {
-	list-style-type: none;
-	margin: 0;
-	padding: 0;
-}
-.collapsibleNode {
-	cursor: pointer;
-}
-.collapsibleValue {
-	margin-left: 10px;
-}
-</style>
-`
-	out += renderKernelParameterNode(root, 0)
-	return out
+	style := `<style>
+	.tree {
+	  --spacing: 1.5rem;
+	  --radius: 10px;
+	}
+
+	.tree li {
+	  display: block;
+	  position: relative;
+	  padding-left: calc(2 * var(--spacing) - var(--radius) + 10px);
+	}
+
+	.tree ul {
+	  margin-left: calc(var(--radius) - var(--spacing));
+	  padding-left: 0;
+	}
+
+	.tree ul li {
+	  border-left: 2px solid #ddd;
+	}
+
+	.tree ul li:last-child {
+	  border-color: transparent;
+	}
+
+	.tree ul li::before {
+	  content: '';
+	  display: block;
+	  position: absolute;
+	  top: calc(var(--spacing) / -2);
+	  left: -2px;
+	  width: calc(var(--spacing) + 2px);
+	  height: calc(var(--spacing) + 1px);
+	  border: solid #ddd;
+	  border-width: 0 0 2px 2px;
+	}
+
+	.tree summary {
+	  display: block;
+	  cursor: pointer;
+	}
+
+	.tree summary::marker,
+	.tree summary::-webkit-details-marker {
+	  display: none;
+	}
+
+	.tree summary:focus {
+	  outline: none;
+	}
+
+	.tree summary:focus-visible {
+	  outline: 1px dotted #000;
+	}
+
+	.tree li::after,
+	.tree summary::before {
+	  content: '';
+	  display: block;
+	  position: absolute;
+	  top: calc(var(--spacing) / 2 - var(--radius));
+	  left: calc(var(--spacing) - var(--radius) - 1px);
+	  width: calc(2 * var(--radius));
+	  height: calc(2 * var(--radius));
+	  border-radius: 50%;
+	  background: #ddd;
+	}
+
+	.tree summary::before {
+	  z-index: 1;
+      background: #696 url("data:image/svg+xml;utf8,%3C?xml version='1.0'?%3E%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='20'%3E %3Cg fill='%23fff'%3E %3Cpath d='m5 9h4v-4h2v4h4v2h-4v4h-2v-4h-4z'/%3E %3Cpath d='m25 9h10v2h-10z'/%3E %3C/g%3E %3C/svg%3E") 0 0;	
+	}
+
+	.tree details[open] > summary::before {
+	  background-position: calc(-2 * var(--radius)) 0;
+	}
+	</style>
+	`
+	parameterTree := renderKernelParameterNode(root, 0)
+	values := [][]string{{"sysctl parameters", parameterTree}}
+	//rowStyles := []string{}
+	var tableValueStyles [][]string
+	//rowStyles = append(rowStyles, "font-weight:bold")
+	//rowStyles = append(rowStyles, "white-space: pre-wrap")
+	//tableValueStyles = append(tableValueStyles, rowStyles)
+	return style + renderHTMLTable([]string{}, values, "pure-table pure-table-striped", tableValueStyles)
 }

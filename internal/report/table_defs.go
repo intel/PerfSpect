@@ -77,7 +77,7 @@ const (
 	PCIeSlotsTableName          = "PCIe Slots"
 	BIOSTableName               = "BIOS"
 	OperatingSystemTableName    = "Operating System"
-	KernelParameterTableName    = "Kernel Parameter"
+	KernelParametersTableName   = "Kernel Parameters"
 	SoftwareVersionTableName    = "Software Version"
 	CPUTableName                = "CPU"
 	ISATableName                = "ISA"
@@ -217,8 +217,8 @@ var tableDefinitions = map[string]TableDefinition{
 			script.ProcCmdlineScriptName,
 			script.ProcCpuinfoScriptName},
 		FieldsFunc: operatingSystemTableValues},
-	KernelParameterTableName: {
-		Name:    KernelParameterTableName,
+	KernelParametersTableName: {
+		Name:    KernelParametersTableName,
 		HasRows: true,
 		ScriptNames: []string{
 			script.SysctlScriptName},

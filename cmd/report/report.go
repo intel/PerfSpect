@@ -151,7 +151,7 @@ var benchmarkSummaryTableName = "Benchmark Summary"
 var categories = []common.Category{
 	{FlagName: flagHostName, FlagVar: &flagHost, Help: "Host", TableNames: []string{report.HostTableName}},
 	{FlagName: flagBiosName, FlagVar: &flagBios, Help: "BIOS", TableNames: []string{report.BIOSTableName}},
-	{FlagName: flagOsName, FlagVar: &flagOs, Help: "Operating System", TableNames: []string{report.OperatingSystemTableName, report.KernelParameterTableName}},
+	{FlagName: flagOsName, FlagVar: &flagOs, Help: "Operating System", TableNames: []string{report.OperatingSystemTableName, report.KernelParametersTableName}},
 	{FlagName: flagSoftwareName, FlagVar: &flagSoftware, Help: "Software Versions", TableNames: []string{report.SoftwareVersionTableName}},
 	{FlagName: flagCpuName, FlagVar: &flagCpu, Help: "Processor Details", TableNames: []string{report.CPUTableName}},
 	{FlagName: flagIsaName, FlagVar: &flagIsa, Help: "Instruction Sets", TableNames: []string{report.ISATableName}},
