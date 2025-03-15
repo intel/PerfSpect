@@ -1321,3 +1321,179 @@ func kernelLockAnalysisHTMLRenderer(tableValues TableValues, targetName string) 
 	}
 	return renderHTMLTable([]string{}, values, "pure-table pure-table-striped", tableValueStyles)
 }
+
+// kernelParameterTableHtmlRenderer renders the sysctl kernel parameters as a collapsible tree
+// Ex.:
+// .	- net
+// .		- core
+// .			- rmem_max = 212992
+// .			- wmem_max = 212992
+// .		- ipv4
+// .			- tcp
+// .				- rmem_max = 212992
+// .				- wmem_max = 212992
+// .	- vm
+// .		- dirty_ratio = 20
+func kernelParameterTableHtmlRenderer(tableValues TableValues, targetName string) string {
+	// kernel parameter levels are separated by dots
+	// Ex.: net.core.rmem_max
+	// The first level is the root level
+	// There can be a range of levels, each level is a child of the previous level
+	// The last level is the parameter name and its value
+
+	// root level
+	type kernelParameterNode struct {
+		Name     string
+		Value    string
+		Children map[string]*kernelParameterNode
+	}
+	root := &kernelParameterNode{
+		Name:     "sysctl",
+		Children: make(map[string]*kernelParameterNode),
+	}
+	// assemble the tree
+	for i := range tableValues.Fields[0].Values {
+		// split the parameter name at the dots
+		parameterNameLevels := strings.Split(tableValues.Fields[0].Values[i], ".")
+		node := root
+		for _, level := range parameterNameLevels {
+			if _, ok := node.Children[level]; !ok {
+				node.Children[level] = &kernelParameterNode{
+					Name:     level,
+					Children: make(map[string]*kernelParameterNode),
+				}
+			}
+			node = node.Children[level]
+		}
+		if node.Value != "" {
+			node.Value += ", "
+		}
+		node.Value += tableValues.Fields[1].Values[i]
+	}
+	// render the tree as HTML list
+	var renderKernelParameterNode func(node *kernelParameterNode, level int) string
+	renderKernelParameterNode = func(node *kernelParameterNode, level int) string {
+		out := ""
+		if level == 0 {
+			out += "<ul class=\"tree\">\n"
+		}
+		out += "<li>\n"
+		if level == 0 {
+			out += "<details open>\n" // initialize the root to open
+		} else if len(node.Children) > 0 {
+			out += "<details>\n"
+		}
+		if level == 0 || len(node.Children) > 0 {
+			out += fmt.Sprintf("<summary>%s</summary>\n", node.Name)
+		} else { // this is a leaf node
+			out += fmt.Sprintf("%s = %s\n", node.Name, node.Value)
+		}
+		if len(node.Children) > 0 {
+			out += "<ul>\n"
+			// render children in alphabetical order
+			keys := make([]string, 0, len(node.Children))
+			for k := range node.Children {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			for _, key := range keys {
+				child := node.Children[key]
+				out += renderKernelParameterNode(child, level+1)
+			}
+			out += "</ul>\n"
+		}
+		if level == 0 || len(node.Children) > 0 {
+			out += "</details>\n"
+		}
+		out += "</li>\n"
+		if level == 0 {
+			out += "</ul>\n"
+		}
+		return out
+	}
+	style := `<style>
+	.tree {
+	  --spacing: 1.5rem;
+	  --radius: 10px;
+	}
+
+	.tree li {
+	  display: block;
+	  position: relative;
+	  padding-left: calc(2 * var(--spacing) - var(--radius) + 10px);
+	}
+
+	.tree ul {
+	  margin-left: calc(var(--radius) - var(--spacing));
+	  padding-left: 0;
+	}
+
+	.tree ul li {
+	  border-left: 2px solid #ddd;
+	}
+
+	.tree ul li:last-child {
+	  border-color: transparent;
+	}
+
+	.tree ul li::before {
+	  content: '';
+	  display: block;
+	  position: absolute;
+	  top: calc(var(--spacing) / -2);
+	  left: -2px;
+	  width: calc(var(--spacing) + 2px);
+	  height: calc(var(--spacing) + 1px);
+	  border: solid #ddd;
+	  border-width: 0 0 2px 2px;
+	}
+
+	.tree summary {
+	  display: block;
+	  cursor: pointer;
+	}
+
+	.tree summary::marker,
+	.tree summary::-webkit-details-marker {
+	  display: none;
+	}
+
+	.tree summary:focus {
+	  outline: none;
+	}
+
+	.tree summary:focus-visible {
+	  outline: 1px dotted #000;
+	}
+
+	.tree li::after,
+	.tree summary::before {
+	  content: '';
+	  display: block;
+	  position: absolute;
+	  top: calc(var(--spacing) / 2 - var(--radius));
+	  left: calc(var(--spacing) - var(--radius) - 1px);
+	  width: calc(2 * var(--radius));
+	  height: calc(2 * var(--radius));
+	  border-radius: 50%;
+	  background: #ddd;
+	}
+
+	.tree summary::before {
+	  z-index: 1;
+      background: #696 url("data:image/svg+xml;utf8,%3C?xml version='1.0'?%3E%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='20'%3E %3Cg fill='%23fff'%3E %3Cpath d='m5 9h4v-4h2v4h4v2h-4v4h-2v-4h-4z'/%3E %3Cpath d='m25 9h10v2h-10z'/%3E %3C/g%3E %3C/svg%3E") 0 0;	
+	}
+
+	.tree details[open] > summary::before {
+	  background-position: calc(-2 * var(--radius)) 0;
+	}
+	</style>
+	`
+	parameterTree := renderKernelParameterNode(root, 0)
+	values := [][]string{{"Sysctl Parameters", parameterTree}}
+	rowStyles := []string{}
+	var tableValueStyles [][]string
+	rowStyles = append(rowStyles, "font-weight:bold")
+	tableValueStyles = append(tableValueStyles, rowStyles)
+	return style + renderHTMLTable([]string{}, values, "pure-table pure-table-striped", tableValueStyles)
+}

@@ -36,6 +36,7 @@ const (
 	UnameScriptName                             = "uname"
 	ProcCmdlineScriptName                       = "proc cmdline"
 	ProcCpuinfoScriptName                       = "proc cpuinfo"
+	SysctlScriptName                            = "sysctl"
 	EtcReleaseScriptName                        = "etc release"
 	GccVersionScriptName                        = "gcc version"
 	BinutilsVersionScriptName                   = "binutils version"
@@ -223,6 +224,11 @@ var scripts = map[string]ScriptDefinition{
 	ProcCpuinfoScriptName: {
 		Name:           ProcCpuinfoScriptName,
 		ScriptTemplate: "cat /proc/cpuinfo",
+	},
+	SysctlScriptName: {
+		Name:           SysctlScriptName,
+		ScriptTemplate: "sysctl -a",
+		Superuser:      true,
 	},
 	EtcReleaseScriptName: {
 		Name:           EtcReleaseScriptName,

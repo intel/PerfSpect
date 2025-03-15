@@ -402,6 +402,21 @@ func DefaultXlsxTableRendererFunc(tableValues TableValues, f *excelize.File, she
 	}
 }
 
+// kernelParameterTableXlsxRenderer renders the kernel parameter table in xlsx format. It is the same as the default renderer except...
+// - it hides the rows containing the kernel parameters
+// - it puts a note in the first row to un-hide the rows to view the parameters
+func kernelParameterTableXlsxRenderer(tableValues TableValues, f *excelize.File, sheetName string, row *int) {
+	rowSave := *row
+	// call default renderer, then hide the rows containing the kernel parameters
+	DefaultXlsxTableRendererFunc(tableValues, f, sheetName, row)
+	// hide the rows containing the kernel parameters
+	for i := range len(tableValues.Fields[0].Values) + 1 {
+		_ = f.SetRowVisible(sheetName, rowSave+i, false)
+	}
+	// put a message in the first row
+	_ = f.SetCellValue(sheetName, cellName(2, rowSave-1), "Note: Unhide rows to view parameters")
+}
+
 const (
 	XlsxPrimarySheetName = "Report"
 	XlsxBriefSheetName   = "Brief"
