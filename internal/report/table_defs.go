@@ -223,7 +223,8 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.SysctlScriptName},
 		FieldsFunc:            kernelParameterTableValues,
-		HTMLTableRendererFunc: kernelParameterTableHtmlRenderer},
+		HTMLTableRendererFunc: kernelParameterTableHtmlRenderer,
+		XlsxTableRendererFunc: kernelParameterTableXlsxRenderer},
 	SoftwareVersionTableName: {
 		Name:    SoftwareVersionTableName,
 		HasRows: false,
