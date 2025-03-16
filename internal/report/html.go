@@ -1371,6 +1371,7 @@ func kernelParameterTableHtmlRenderer(tableValues TableValues, targetName string
 		node.Value += tableValues.Fields[1].Values[i]
 	}
 	// render the tree as HTML list
+	// HTML/CSS for tree adapted from: https://iamkate.com/code/tree-views/, License CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/legalcode)
 	var renderKernelParameterNode func(node *kernelParameterNode, level int) string
 	renderKernelParameterNode = func(node *kernelParameterNode, level int) string {
 		out := ""
