@@ -417,6 +417,18 @@ func kernelParameterTableXlsxRenderer(tableValues TableValues, f *excelize.File,
 	_ = f.SetCellValue(sheetName, cellName(2, rowSave-1), "Note: Unhide rows to view parameters")
 }
 
+// kernelParameterTableTextRenderer renders the kernel parameter table in text format. It is the same as the default renderer except...
+// - it only prints the first few rows of the table
+// - it puts a note at the end to view the full table in the xlsx or HTML report
+func kernelParameterTableTextRenderer(tableValues TableValues) string {
+	// limit tableValues to the first 5 rows
+	if len(tableValues.Fields[0].Values) > 5 {
+		tableValues.Fields[0].Values = tableValues.Fields[0].Values[:5]
+	}
+	// call default renderer, then add a note to view the full table in the xlsx or HTML report
+	return DefaultTextTableRendererFunc(tableValues) + "...\nNote: View the full table in the xlsx or HTML report.\n"
+}
+
 const (
 	XlsxPrimarySheetName = "Report"
 	XlsxBriefSheetName   = "Brief"

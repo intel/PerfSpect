@@ -48,9 +48,9 @@ var (
 	flagAll bool
 	// categories
 	flagHost           bool
-	flagPcie           bool
 	flagBios           bool
 	flagOs             bool
+	flagKernelParams   bool
 	flagSoftware       bool
 	flagCpu            bool
 	flagIsa            bool
@@ -70,6 +70,7 @@ var (
 	flagGpu            bool
 	flagGaudi          bool
 	flagCxl            bool
+	flagPcie           bool
 	flagCve            bool
 	flagProcess        bool
 	flagSensor         bool
@@ -88,9 +89,9 @@ const (
 	flagAllName = "all"
 	// categories
 	flagHostName           = "host"
-	flagPcieName           = "pcie"
 	flagBiosName           = "bios"
 	flagOsName             = "os"
+	flagKernelParamsName   = "params"
 	flagSoftwareName       = "software"
 	flagCpuName            = "cpu"
 	flagIsaName            = "isa"
@@ -110,6 +111,7 @@ const (
 	flagGpuName            = "gpu"
 	flagGaudiName          = "gaudi"
 	flagCxlName            = "cxl"
+	flagPcieName           = "pcie"
 	flagCveName            = "cve"
 	flagProcessName        = "process"
 	flagSensorName         = "sensor"
@@ -151,7 +153,8 @@ var benchmarkSummaryTableName = "Benchmark Summary"
 var categories = []common.Category{
 	{FlagName: flagHostName, FlagVar: &flagHost, Help: "Host", TableNames: []string{report.HostTableName}},
 	{FlagName: flagBiosName, FlagVar: &flagBios, Help: "BIOS", TableNames: []string{report.BIOSTableName}},
-	{FlagName: flagOsName, FlagVar: &flagOs, Help: "Operating System", TableNames: []string{report.OperatingSystemTableName, report.KernelParametersTableName}},
+	{FlagName: flagOsName, FlagVar: &flagOs, Help: "Operating System", TableNames: []string{report.OperatingSystemTableName}},
+	{FlagName: flagKernelParamsName, FlagVar: &flagKernelParams, Help: "Kernel Parameters", TableNames: []string{report.KernelParametersTableName}},
 	{FlagName: flagSoftwareName, FlagVar: &flagSoftware, Help: "Software Versions", TableNames: []string{report.SoftwareVersionTableName}},
 	{FlagName: flagCpuName, FlagVar: &flagCpu, Help: "Processor Details", TableNames: []string{report.CPUTableName}},
 	{FlagName: flagIsaName, FlagVar: &flagIsa, Help: "Instruction Sets", TableNames: []string{report.ISATableName}},

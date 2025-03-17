@@ -224,7 +224,8 @@ var tableDefinitions = map[string]TableDefinition{
 			script.SysctlScriptName},
 		FieldsFunc:            kernelParameterTableValues,
 		HTMLTableRendererFunc: kernelParameterTableHtmlRenderer,
-		XlsxTableRendererFunc: kernelParameterTableXlsxRenderer},
+		XlsxTableRendererFunc: kernelParameterTableXlsxRenderer,
+		TextTableRendererFunc: kernelParameterTableTextRenderer},
 	SoftwareVersionTableName: {
 		Name:    SoftwareVersionTableName,
 		HasRows: false,
