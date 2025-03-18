@@ -357,7 +357,8 @@ var tableDefinitions = map[string]TableDefinition{
 			script.NumaBalancingScriptName,
 			script.LscpuScriptName,
 			script.LspciBitsScriptName,
-			script.LspciDevicesScriptName},
+			script.LspciDevicesScriptName,
+			script.TmeScriptName},
 		FieldsFunc:   memoryTableValues,
 		InsightsFunc: memoryTableInsights},
 	DIMMTableName: {
@@ -1318,6 +1319,7 @@ func memoryTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Transparent Huge Pages", Values: []string{valFromRegexSubmatch(outputs[script.TransparentHugePagesScriptName].Stdout, `.*\[(.*)\].*`)}},
 		{Name: "Automatic NUMA Balancing", Values: []string{numaBalancingFromOutput(outputs)}},
 		{Name: "Populated Memory Channels", Values: []string{populatedChannelsFromOutput(outputs)}},
+		{Name: "Total Memory Encryption (TME)", Values: []string{outputs[script.TmeScriptName].Stdout}},
 	}
 }
 
@@ -1354,19 +1356,28 @@ func memoryTableInsights(outputs map[string]script.ScriptOutput, tableValues Tab
 			}
 		}
 	}
-	// check if NUMA balancing is not enabled
-	numaBalancingIndex, err := getFieldIndex("Automatic NUMA Balancing", tableValues)
+	// check if NUMA balancing is not enabled (when there are multiple NUMA nodes)
+	nodes := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^NUMA node\(s\):\s*(.+)$`)
+	nodeCount, err := strconv.Atoi(nodes)
 	if err != nil {
 		slog.Warn(err.Error())
 	} else {
-		numaBalancing := tableValues.Fields[numaBalancingIndex].Values[0]
-		if numaBalancing != "" && numaBalancing != "Enabled" {
-			insights = append(insights, Insight{
-				Recommendation: "Consider enabling Automatic NUMA Balancing.",
-				Justification:  "Automatic NUMA Balancing is not enabled.",
-			})
+		if nodeCount > 1 {
+			numaBalancingIndex, err := getFieldIndex("Automatic NUMA Balancing", tableValues)
+			if err != nil {
+				slog.Warn(err.Error())
+			} else {
+				numaBalancing := tableValues.Fields[numaBalancingIndex].Values[0]
+				if numaBalancing != "" && numaBalancing != "Enabled" {
+					insights = append(insights, Insight{
+						Recommendation: "Consider enabling Automatic NUMA Balancing.",
+						Justification:  "Automatic NUMA Balancing is not enabled.",
+					})
+				}
+			}
 		}
 	}
+
 	return insights
 }
 
