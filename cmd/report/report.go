@@ -65,6 +65,7 @@ var (
 	flagDimm           bool
 	flagNic            bool
 	flagNetIrq         bool
+	flagNetConfig      bool
 	flagDisk           bool
 	flagFilesystem     bool
 	flagGpu            bool
@@ -105,6 +106,7 @@ const (
 	flagDimmName           = "dimm"
 	flagNicName            = "nic"
 	flagNetIrqName         = "netirq"
+	flagNetConfigName      = "netconfig"
 	flagDiskName           = "disk"
 	flagFilesystemName     = "filesystem"
 	flagGpuName            = "gpu"
@@ -166,6 +168,7 @@ var categories = []common.Category{
 	{FlagName: flagDimmName, FlagVar: &flagDimm, Help: "DIMM Population", TableNames: []string{report.DIMMTableName}},
 	{FlagName: flagNicName, FlagVar: &flagNic, Help: "Network Cards", TableNames: []string{report.NICTableName}},
 	{FlagName: flagNetIrqName, FlagVar: &flagNetIrq, Help: "Network IRQ to CPU Mapping", TableNames: []string{report.NetworkIRQMappingTableName}},
+	{FlagName: flagNetConfigName, FlagVar: &flagNetConfig, Help: "Network Configuration", TableNames: []string{report.NetworkConfigTableName}},
 	{FlagName: flagDiskName, FlagVar: &flagDisk, Help: "Storage Devices", TableNames: []string{report.DiskTableName}},
 	{FlagName: flagFilesystemName, FlagVar: &flagFilesystem, Help: "File Systems", TableNames: []string{report.FilesystemTableName}},
 	{FlagName: flagGpuName, FlagVar: &flagGpu, Help: "GPUs", TableNames: []string{report.GPUTableName}},
