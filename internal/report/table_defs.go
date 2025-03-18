@@ -92,6 +92,7 @@ const (
 	DIMMTableName               = "DIMM"
 	NICTableName                = "NIC"
 	NetworkIRQMappingTableName  = "Network IRQ Mapping"
+	NetworkConfigTableName      = "Network Configuration"
 	DiskTableName               = "Disk"
 	FilesystemTableName         = "Filesystem"
 	GPUTableName                = "GPU"
@@ -388,6 +389,13 @@ var tableDefinitions = map[string]TableDefinition{
 			script.NicInfoScriptName,
 		},
 		FieldsFunc: networkIRQMappingTableValues},
+	NetworkConfigTableName: {
+		Name:    NetworkConfigTableName,
+		HasRows: false,
+		ScriptNames: []string{
+			script.SysctlScriptName,
+		},
+		FieldsFunc: networkConfigTableValues},
 	DiskTableName: {
 		Name:      DiskTableName,
 		HasRows:   true,
@@ -1493,6 +1501,42 @@ func networkIRQMappingTableValues(outputs map[string]script.ScriptOutput) []Fiel
 	for _, nicIRQMapping := range nicIRQMappings {
 		fields[0].Values = append(fields[0].Values, nicIRQMapping[0])
 		fields[1].Values = append(fields[1].Values, nicIRQMapping[1])
+	}
+	return fields
+}
+
+func networkConfigTableValues(outputs map[string]script.ScriptOutput) []Field {
+	// these are the fields we want to display
+	fields := []Field{
+		{Name: "net.ipv4.tcp_rmem"},
+		{Name: "net.ipv4.tcp_wmem"},
+		{Name: "net.core.rmem_max"},
+		{Name: "net.core.wmem_max"},
+		{Name: "net.core.netdev_max_backlog"},
+		{Name: "net.ipv4.tcp_max_syn_backlog"},
+		{Name: "net.core.somaxconn"},
+	}
+	// load the params into a map so we can easily look them up
+	sysctlParams := make(map[string]string)
+	for line := range strings.SplitSeq(outputs[script.SysctlScriptName].Stdout, "\n") {
+		parts := strings.SplitN(line, " = ", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		// if the param name is already in the map, append the value
+		if val, ok := sysctlParams[parts[0]]; ok {
+			sysctlParams[parts[0]] = val + ", " + parts[1]
+		} else {
+			sysctlParams[parts[0]] = parts[1]
+		}
+	}
+	// add the values to the fields
+	for i := range fields {
+		if val, ok := sysctlParams[fields[i].Name]; ok {
+			fields[i].Values = append(fields[i].Values, val)
+		} else {
+			fields[i].Values = append(fields[i].Values, "")
+		}
 	}
 	return fields
 }
