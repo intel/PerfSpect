@@ -2,6 +2,8 @@ module perfspect
 
 go 1.23.0
 
+toolchain go1.24.1
+
 replace (
 	perfspect/internal/common => ./internal/common
 	perfspect/internal/cpudb => ./internal/cpudb
@@ -14,7 +16,7 @@ replace (
 
 require (
 	github.com/Knetic/govaluate v3.0.0+incompatible
-	github.com/deckarep/golang-set/v2 v2.7.0
+	github.com/deckarep/golang-set/v2 v2.8.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
 	github.com/xuri/excelize/v2 v2.9.0

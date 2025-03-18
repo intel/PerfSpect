@@ -58,7 +58,7 @@ func (c *CPUDB) GetCPUExtended(family, model, stepping, capid4, devices string) 
 					}
 				}
 				cpu = info
-				if cpu.Family == "6" && (cpu.Model == "143" || cpu.Model == "207" || cpu.Model == "173") { // SPR, EMR, GNR
+				if cpu.Family == "6" && (cpu.Model == "143" || cpu.Model == "207" || cpu.Model == "173" || cpu.Model == "175") { // SPR, EMR, GNR, SRF
 					cpu, err = c.getSpecificCPU(family, model, capid4, devices)
 				}
 				return
@@ -87,6 +87,8 @@ func (c *CPUDB) getSpecificCPU(family, model, capid4, devices string) (cpu CPU, 
 		cpu, err = c.getEMRCPU(capid4)
 	} else if family == "6" && model == "173" { // GNR
 		cpu, err = c.getGNRCPU(devices)
+	} else if family == "6" && model == "175" { // SRF
+		cpu, err = c.getSRFCPU(devices)
 	}
 	return
 }
@@ -173,6 +175,31 @@ func (c *CPUDB) getGNRCPU(devices string) (cpu CPU, err error) {
 		}
 	}
 	err = fmt.Errorf("did not find matching GNR architecture in CPU database: %s", uarch)
+	return
+}
+
+func (c *CPUDB) getSRFCPU(devices string) (cpu CPU, err error) {
+	var uarch string
+	if devices != "" {
+		d, err := strconv.Atoi(devices)
+		if err == nil && d != 0 {
+			if d%3 == 0 { // device count is multiple of 3
+				uarch = "SRF_SP"
+			} else if d%4 == 0 { // device count is multiple of 4
+				uarch = "SRF_AP"
+			}
+		}
+	}
+	if uarch == "" {
+		uarch = "SRF"
+	}
+	for _, info := range *c {
+		if info.MicroArchitecture == uarch {
+			cpu = info
+			return
+		}
+	}
+	err = fmt.Errorf("did not find matching SRF architecture in CPU database: %s", uarch)
 	return
 }
 

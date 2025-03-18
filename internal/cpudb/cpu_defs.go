@@ -42,7 +42,9 @@ var cpus = CPUDB{
 	{MicroArchitecture: "EMR", Family: "6", Model: "207", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 15},           // Emerald Rapids - generic
 	{MicroArchitecture: "EMR_MCC", Family: "6", Model: "207", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 15},       // Emerald Rapids - MCC
 	{MicroArchitecture: "EMR_XCC", Family: "6", Model: "207", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 20},       // Emerald Rapids - XCC
-	{MicroArchitecture: "SRF", Family: "6", Model: "175", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 8, LogicalThreadCount: 1, CacheWayCount: 12},           // Sierra Forest
+	{MicroArchitecture: "SRF", Family: "6", Model: "175", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 0, LogicalThreadCount: 1, CacheWayCount: 12},           // Sierra Forest
+	{MicroArchitecture: "SRF_SP", Family: "6", Model: "175", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 8, LogicalThreadCount: 1, CacheWayCount: 12},        // Sierra Forest
+	{MicroArchitecture: "SRF_AP", Family: "6", Model: "175", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 12, LogicalThreadCount: 1, CacheWayCount: 12},       // Sierra Forest
 	{MicroArchitecture: "GNR", Family: "6", Model: "173", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 0, LogicalThreadCount: 2, CacheWayCount: 16},           // Granite Rapids - generic
 	{MicroArchitecture: "GNR_X1", Family: "6", Model: "173", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 16},        // Granite Rapids - SP (MCC/LCC)
 	{MicroArchitecture: "GNR_X2", Family: "6", Model: "173", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 16},        // Granite Rapids - SP (XCC)
