@@ -4,10 +4,10 @@
 # image contains build environment for the application
 # build the image (from repo root directory): 
 #    $ docker image build -f build.Dockerfile --tag perfspect-builder:v1 .
-# build the svr-info Go components using this image
+# build the perfspect Go components using this image
 #    $ docker run --rm -v "$PWD":/workdir -w /workdir perfspect-builder:v1 make dist
 
-FROM golang:1.23@sha256:ad5c126b5cf501a8caef751a243bb717ec204ab1aa56dc41dc11be089fafcb4f
+FROM golang:1.24.1@sha256:af0bb3052d6700e1bc70a37bca483dc8d76994fd16ae441ad72390eea6016d03
 WORKDIR /workdir
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY go.mod go.sum ./

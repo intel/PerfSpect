@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y git build-essential autotools-dev autom
     libreadline-dev default-jre default-jdk cmake flex bison libssl-dev
 ENV JAVA_HOME=/usr/lib/jvm/java-1.11.0-openjdk-amd64
 # need golang to build go tools
-RUN rm -rf /usr/local/go && wget -qO- https://go.dev/dl/go1.23.0.linux-amd64.tar.gz | tar -C /usr/local -xz
+RUN rm -rf /usr/local/go && wget -qO- https://go.dev/dl/go1.24.1.linux-amd64.tar.gz | tar -C /usr/local -xz
 ENV PATH="${PATH}:/usr/local/go/bin"
 # need up-to-date zlib (used by stress-ng static build) to fix security vulnerabilities
 RUN git clone https://github.com/madler/zlib.git && cd zlib && ./configure && make install
