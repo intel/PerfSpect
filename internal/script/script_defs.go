@@ -104,6 +104,7 @@ const (
 	IpmitoolChassisScriptName                   = "ipmitool chassis"
 	IpmitoolEventsScriptName                    = "ipmitool events"
 	IpmitoolEventTimeScriptName                 = "ipmitool event time"
+	TmeScriptName                               = "tme"
 	KernelLogScriptName                         = "kernel log"
 	PMUDriverVersionScriptName                  = "pmu driver version"
 	PMUBusyScriptName                           = "pmu busy"
@@ -818,6 +819,18 @@ done
 		ScriptTemplate: "LC_ALL=C timeout 30 ipmitool sel time get",
 		Superuser:      true,
 		Depends:        []string{"ipmitool"},
+	},
+	TmeScriptName: {
+		Name: TmeScriptName,
+		ScriptTemplate: `output=$(dmesg | grep -i "x86/tme")
+if [[ $output == *"not enabled by BIOS"* ]]; then
+    echo "Disabled"
+elif [[ $output == *"enabled"* ]]; then
+    echo "Enabled"
+else
+    echo "Unknown"
+fi`,
+		Superuser: true,
 	},
 	KernelLogScriptName: {
 		Name:           KernelLogScriptName,
