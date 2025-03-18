@@ -174,7 +174,7 @@ func transformConditional(origIn string) (out string, err error) {
 		return
 	}
 	in := origIn
-	for i := 0; i < numIfs; i++ {
+	for i := range numIfs {
 		if i > 0 {
 			in = out
 		}

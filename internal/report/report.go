@@ -99,7 +99,7 @@ func createTextReport(allTableValues []TableValues) (out []byte, err error) {
 	var sb strings.Builder
 	for _, tableValues := range allTableValues {
 		sb.WriteString(fmt.Sprintf("%s\n", tableValues.Name))
-		for i := 0; i < len(tableValues.Name); i++ {
+		for range len(tableValues.Name) {
 			sb.WriteString("=")
 		}
 		sb.WriteString("\n")
@@ -151,7 +151,7 @@ func DefaultTextTableRendererFunc(tableValues TableValues) string {
 		// underline the field names
 		for _, field := range tableValues.Fields {
 			underline := ""
-			for i := 0; i < len(field.Name); i++ {
+			for range len(field.Name) {
 				underline += "-"
 			}
 			sb.WriteString(fmt.Sprintf("%-*s", maxFieldLen[field.Name]+columnSpacing, underline))
@@ -159,7 +159,7 @@ func DefaultTextTableRendererFunc(tableValues TableValues) string {
 		sb.WriteString("\n")
 		// print the rows
 		numRows := len(tableValues.Fields[0].Values)
-		for row := 0; row < numRows; row++ {
+		for row := range numRows {
 			for fieldIdx, field := range tableValues.Fields {
 				sb.WriteString(fmt.Sprintf("%-*s", maxFieldLen[field.Name]+columnSpacing, tableValues.Fields[fieldIdx].Values[row]))
 			}
@@ -198,7 +198,7 @@ func createJsonReport(allTableValues []TableValues) (out []byte, err error) {
 		}
 		numRecords := len(tableValues.Fields[0].Values)
 		if numRecords > 0 {
-			for recordIdx := 0; recordIdx < numRecords; recordIdx++ {
+			for recordIdx := range numRecords {
 				oRecord := make(outRecord)
 				for _, field := range tableValues.Fields {
 					oRecord[field.Name] = field.Values[recordIdx]
@@ -296,7 +296,7 @@ func renderXlsxTableMultiTarget(targetTableValues []TableValues, targetNames []s
 			_ = f.SetCellValue(sheetName, cellName(col, *row), field.Name)
 			_ = f.SetCellStyle(sheetName, cellName(col, *row), cellName(col, *row), fieldNameStyle)
 			col++
-			for targetIdx := 0; targetIdx < len(targetNames); targetIdx++ {
+			for targetIdx := range targetNames {
 				var fieldValue string
 				if len(targetTableValues[targetIdx].Fields[fieldIdx].Values) > 0 {
 					fieldValue = targetTableValues[targetIdx].Fields[fieldIdx].Values[0]
@@ -335,7 +335,7 @@ func renderXlsxTableMultiTarget(targetTableValues []TableValues, targetNames []s
 			*row++
 			// print the rows of values
 			tableRows := len(targetTableValues[targetIdx].Fields[0].Values)
-			for tableRow := 0; tableRow < tableRows; tableRow++ {
+			for tableRow := range tableRows {
 				col = 2
 				for _, field := range targetTableValues[targetIdx].Fields {
 					value := getValueForCell(field.Values[tableRow])
@@ -373,7 +373,7 @@ func DefaultXlsxTableRendererFunc(tableValues TableValues, f *excelize.File, she
 		*row++
 		// print the rows
 		tableRows := len(tableValues.Fields[0].Values)
-		for tableRow := 0; tableRow < tableRows; tableRow++ {
+		for tableRow := range tableRows {
 			for _, field := range tableValues.Fields {
 				value := getValueForCell(field.Values[tableRow])
 				_ = f.SetCellValue(sheetName, cellName(col, *row), value)
@@ -480,7 +480,7 @@ func createXlsxReportMultiTarget(allTargetsTableValues [][]TableValues, targetNa
 	return
 }
 
-func getValueForCell(value string) (val interface{}) {
+func getValueForCell(value string) (val any) {
 	intValue, err := strconv.Atoi(value)
 	if err == nil {
 		val = intValue

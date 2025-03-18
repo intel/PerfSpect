@@ -18,6 +18,7 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
+	"slices"
 )
 
 var AppName = filepath.Base(os.Args[0])
@@ -326,7 +327,7 @@ func (rc *ReportingCommand) retrieveScriptOutputs(localTempDir string) ([]Target
 			if targetErrs[i] != nil {
 				_ = multiSpinner.Status(myTargets[i].GetName(), fmt.Sprintf("Error: %v", targetErrs[i]))
 				// remove target from targets list
-				myTargets = append(myTargets[:i], myTargets[i+1:]...)
+				myTargets = slices.Delete(myTargets, i, i+1)
 			}
 		}
 		// check if we have any remaining targets to run the scripts on

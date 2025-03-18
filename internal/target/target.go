@@ -507,8 +507,8 @@ func (t *LocalTarget) GetUserPath() (string, error) {
 		// get user's PATH environment variable, verify that it only contains paths (mitigate risk raised by Checkmarx)
 		var verifiedPaths []string
 		pathEnv := os.Getenv("PATH")
-		pathEnvPaths := strings.Split(pathEnv, ":")
-		for _, p := range pathEnvPaths {
+		pathEnvPaths := strings.SplitSeq(pathEnv, ":")
+		for p := range pathEnvPaths {
 			files, err := filepath.Glob(p)
 			// Goal is to filter out any non path strings
 			// Glob will throw an error on pattern mismatch and return no files if no files

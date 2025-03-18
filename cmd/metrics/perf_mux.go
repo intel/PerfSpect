@@ -22,7 +22,7 @@ func GetMuxIntervals(myTarget target.Target, localTempDir string) (intervals map
 		return
 	}
 	intervals = make(map[string]int)
-	for _, line := range strings.Split(scriptOutput.Stdout, "\n") {
+	for line := range strings.SplitSeq(scriptOutput.Stdout, "\n") {
 		fields := strings.Fields(line)
 		if len(fields) == 2 {
 			if interval, err := strconv.Atoi(fields[1]); err == nil {

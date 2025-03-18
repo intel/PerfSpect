@@ -210,11 +210,11 @@ func (cpu *CPU) GetCacheWays() (cacheWays []int64) {
 	}
 	var cacheSize int64 = 0
 	// set wayCount bits in cacheSize
-	for i := 0; i < wayCount; i++ {
+	for range wayCount {
 		cacheSize = (cacheSize << 1) | 1
 	}
 	var mask int64 = -1 // all bits set
-	for i := 0; i < wayCount; i++ {
+	for range wayCount {
 		// prepend the cache size to the list of ways
 		cacheWays = append([]int64{cacheSize}, cacheWays...)
 		// clear another low bit in mask

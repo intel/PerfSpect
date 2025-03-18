@@ -22,7 +22,7 @@ type Stacks map[string]int
 
 func (p *ProcessStacks) parsePerfFolded(folded string) (err error) {
 	re := regexp.MustCompile(`^([\w,\-, ,\.]+);(.+) (\d+)$`)
-	for _, line := range strings.Split(folded, "\n") {
+	for line := range strings.SplitSeq(folded, "\n") {
 		match := re.FindStringSubmatch(line)
 		if match == nil {
 			continue
@@ -42,7 +42,7 @@ func (p *ProcessStacks) parsePerfFolded(folded string) (err error) {
 }
 
 func (p *ProcessStacks) parseAsyncProfilerFolded(folded string, processName string) (err error) {
-	for _, line := range strings.Split(folded, "\n") {
+	for line := range strings.SplitSeq(folded, "\n") {
 		splitAt := strings.LastIndex(line, " ")
 		if splitAt == -1 {
 			continue

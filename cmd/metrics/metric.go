@@ -61,12 +61,12 @@ func ProcessEvents(perfEvents [][]byte, eventGroupDefinitions []GroupDefinition,
 		// produce metrics from event groups
 		for _, metricDef := range metricDefinitions {
 			metric := Metric{Name: metricDef.Name, Value: math.NaN()}
-			var variables map[string]interface{}
+			var variables map[string]any
 			if variables, err = getExpressionVariableValues(metricDef, eventFrame, previousTimestamp, metadata); err != nil {
 				slog.Debug("failed to get expression variable values", slog.String("error", err.Error()))
 				err = nil
 			} else {
-				var result interface{}
+				var result any
 				if result, err = evaluateExpression(metricDef, variables); err != nil {
 					slog.Debug("failed to evaluate expression", slog.String("error", err.Error()))
 					err = nil
@@ -89,7 +89,7 @@ func ProcessEvents(perfEvents [][]byte, eventGroupDefinitions []GroupDefinition,
 // GetEvaluatorFunctions defines functions that can be called in metric expressions
 func GetEvaluatorFunctions() (functions map[string]govaluate.ExpressionFunction) {
 	functions = make(map[string]govaluate.ExpressionFunction)
-	functions["max"] = func(args ...interface{}) (interface{}, error) {
+	functions["max"] = func(args ...any) (any, error) {
 		var leftVal float64
 		var rightVal float64
 		switch t := args[0].(type) {
@@ -106,7 +106,7 @@ func GetEvaluatorFunctions() (functions map[string]govaluate.ExpressionFunction)
 		}
 		return max(leftVal, rightVal), nil
 	}
-	functions["min"] = func(args ...interface{}) (interface{}, error) {
+	functions["min"] = func(args ...any) (any, error) {
 		var leftVal float64
 		var rightVal float64
 		switch t := args[0].(type) {
@@ -194,8 +194,8 @@ func loadMetricBestGroups(metric MetricDefinition, frame EventFrame) (err error)
 }
 
 // get the variable values that will be used to evaluate the metric's expression
-func getExpressionVariableValues(metric MetricDefinition, frame EventFrame, previousTimestamp float64, metadata Metadata) (variables map[string]interface{}, err error) {
-	variables = make(map[string]interface{})
+func getExpressionVariableValues(metric MetricDefinition, frame EventFrame, previousTimestamp float64, metadata Metadata) (variables map[string]any, err error) {
+	variables = make(map[string]any)
 	if err = loadMetricBestGroups(metric, frame); err != nil {
 		err = fmt.Errorf("at least one of the variables couldn't be assigned to a group: %v", err)
 		return
@@ -222,7 +222,7 @@ func getExpressionVariableValues(metric MetricDefinition, frame EventFrame, prev
 }
 
 // function to call evaluator so that we can catch panics that come from the evaluator
-func evaluateExpression(metric MetricDefinition, variables map[string]interface{}) (result interface{}, err error) {
+func evaluateExpression(metric MetricDefinition, variables map[string]any) (result any, err error) {
 	defer func() {
 		if errx := recover(); errx != nil {
 			err = errx.(error)

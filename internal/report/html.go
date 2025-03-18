@@ -484,7 +484,7 @@ func DefaultHTMLTableRendererFunc(tableValues TableValues) string {
 			headers = append(headers, field.Name)
 		}
 		values := [][]string{}
-		for row := 0; row < len(tableValues.Fields[0].Values); row++ {
+		for row := range tableValues.Fields[0].Values {
 			rowValues := []string{}
 			for _, field := range tableValues.Fields {
 				rowValues = append(rowValues, field.Values[row])
@@ -556,7 +556,7 @@ func dimmTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	var slotColorIndices = make(map[string]int)
 	// socket -> channel -> slot -> dimm details
 	var dimms = map[string]map[string]map[string]string{}
-	for dimmIdx := 0; dimmIdx < len(tableValues.Fields[DerivedSocketIdx].Values); dimmIdx++ {
+	for dimmIdx := range tableValues.Fields[DerivedSocketIdx].Values {
 		if _, ok := dimms[tableValues.Fields[DerivedSocketIdx].Values[dimmIdx]]; !ok {
 			dimms[tableValues.Fields[DerivedSocketIdx].Values[dimmIdx]] = make(map[string]map[string]string)
 		}
@@ -693,7 +693,7 @@ type scatterPoint struct {
 
 func renderScatterChart(data [][]scatterPoint, datasetNames []string, config chartTemplateStruct) string {
 	allFormattedPoints := []string{}
-	for dataIdx := 0; dataIdx < len(data); dataIdx++ {
+	for dataIdx := range data {
 		formattedPoints := []string{}
 		for _, point := range data[dataIdx] {
 			formattedPoints = append(formattedPoints, fmt.Sprintf("{x: %f, y: %f}", point.x, point.y))
@@ -705,7 +705,7 @@ func renderScatterChart(data [][]scatterPoint, datasetNames []string, config cha
 
 func renderLineChart(xAxisLabels []string, data [][]float64, datasetNames []string, config chartTemplateStruct) string {
 	allFormattedPoints := []string{}
-	for dataIdx := 0; dataIdx < len(data); dataIdx++ {
+	for dataIdx := range data {
 		formattedPoints := []string{}
 		for _, point := range data[dataIdx] {
 			formattedPoints = append(formattedPoints, fmt.Sprintf("%f", point))
@@ -719,7 +719,7 @@ func renderFrequencyTable(tableValues TableValues) (out string) {
 	var rows [][]string
 	headers := []string{""}
 	valuesStyles := [][]string{}
-	for i := 0; i < len(tableValues.Fields[0].Values); i++ {
+	for i := range tableValues.Fields[0].Values {
 		headers = append(headers, fmt.Sprintf("%d", i+1))
 	}
 	for _, field := range tableValues.Fields[1:] {
@@ -960,12 +960,12 @@ func irqRateTableHTMLRenderer(tableValues TableValues, targetName string) string
 func driveStatsTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	var out string
 	driveStats := make(map[string][][]string)
-	for i := 0; i < len(tableValues.Fields[0].Values); i++ {
+	for i := range tableValues.Fields[0].Values {
 		drive := tableValues.Fields[1].Values[i]
 		if _, ok := driveStats[drive]; !ok {
 			driveStats[drive] = make([][]string, len(tableValues.Fields)-2)
 		}
-		for j := 0; j < len(tableValues.Fields)-2; j++ {
+		for j := range len(tableValues.Fields) - 2 {
 			driveStats[drive][j] = append(driveStats[drive][j], tableValues.Fields[j+2].Values[i])
 		}
 	}
@@ -1018,12 +1018,12 @@ func driveStatsTableHTMLRenderer(tableValues TableValues, targetName string) str
 func networkStatsTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	var out string
 	nicStats := make(map[string][][]string)
-	for i := 0; i < len(tableValues.Fields[0].Values); i++ {
+	for i := range tableValues.Fields[0].Values {
 		drive := tableValues.Fields[1].Values[i]
 		if _, ok := nicStats[drive]; !ok {
 			nicStats[drive] = make([][]string, len(tableValues.Fields)-2)
 		}
-		for j := 0; j < len(tableValues.Fields)-2; j++ {
+		for j := range len(tableValues.Fields) - 2 {
 			nicStats[drive][j] = append(nicStats[drive][j], tableValues.Fields[j+2].Values[i])
 		}
 	}
@@ -1228,7 +1228,7 @@ func renderGaudiStatsChart(tableValues TableValues, chartStatFieldName string, t
 	}
 	// group the data points by module_id
 	moduleStat := make(map[string][]float64)
-	for i := 0; i < len(tableValues.Fields[0].Values); i++ {
+	for i := range tableValues.Fields[0].Values {
 		moduleId := tableValues.Fields[moduleIdFieldIdx].Values[i]
 		val, err := strconv.ParseFloat(tableValues.Fields[chartStatFieldIndex].Values[i], 64)
 		if err != nil {

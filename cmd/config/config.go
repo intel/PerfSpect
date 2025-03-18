@@ -563,7 +563,7 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 	fmt.Printf("set core frequency to %.1f GHz on %s\n", coreFrequency, myTarget.GetName())
 	freqInt := uint64(coreFrequency * 10)
 	var msr uint64
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		msr = msr | freqInt<<uint(i*8)
 	}
 	setScript := script.ScriptDefinition{
@@ -626,7 +626,7 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 		return
 	}
 	re := regexp.MustCompile(`Read bits \d+:\d+ value (\d+) from TPMI ID .* for entry (\d+) in instance (\d+)`)
-	for _, line := range strings.Split(outputs[script.UncoreDieTypesFromTPMIScriptName].Stdout, "\n") {
+	for line := range strings.SplitSeq(outputs[script.UncoreDieTypesFromTPMIScriptName].Stdout, "\n") {
 		match := re.FindStringSubmatch(line)
 		if match == nil {
 			continue
