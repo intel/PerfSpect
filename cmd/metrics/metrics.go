@@ -28,6 +28,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"slices"
 )
 
 const cmdName = "metrics"
@@ -71,7 +72,7 @@ func setSignalReceived() {
 }
 
 func getSignalReceived() bool {
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		gSignalMutex.Lock()
 		received := gSignalReceived
 		gSignalMutex.Unlock()
@@ -733,7 +734,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		if targetErrs[i] != nil {
 			_ = multiSpinner.Status(myTargets[i].GetName(), fmt.Sprintf("Error: %v", targetErrs[i]))
 			// remove target from targets list
-			myTargets = append(myTargets[:i], myTargets[i+1:]...)
+			myTargets = slices.Delete(myTargets, i, i+1)
 		}
 	}
 	// check if any targets remain
@@ -1014,7 +1015,7 @@ func prepareTarget(targetContext *targetContext, targetTempRoot string, localTem
 			channelError <- targetError{target: myTarget, err: err}
 			return
 		}
-		for _, line := range strings.Split(output.Stdout, "\n") {
+		for line := range strings.SplitSeq(output.Stdout, "\n") {
 			// if one of the MSR registers is active (ignore cpu_cycles), then the PMU is in use
 			if strings.Contains(line, "Active") && !strings.Contains(line, "0x30a") {
 				err = fmt.Errorf("PMU in use on target: %s", line)

@@ -405,7 +405,7 @@ func getCPUInfo(myTarget target.Target) (cpuInfo []map[string]string, err error)
 		return
 	}
 	oneCPUInfo := make(map[string]string)
-	for _, line := range strings.Split(stdout, "\n") {
+	for line := range strings.SplitSeq(stdout, "\n") {
 		fields := strings.Split(line, ":")
 		if len(fields) < 2 {
 			if len(oneCPUInfo) > 0 {
@@ -560,7 +560,7 @@ func getSupportsFixedEvent(myTarget target.Target, event string, uarch string, n
 		return
 	}
 	var eventList []string
-	for i := 0; i < numGPCounters; i++ {
+	for range numGPCounters {
 		eventList = append(eventList, event)
 	}
 	scriptDef := script.ScriptDefinition{
@@ -580,8 +580,8 @@ func getSupportsFixedEvent(myTarget target.Target, event string, uarch string, n
 		return
 	}
 	// on some VMs we get a count of 0
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(output, "\n")
+	for line := range lines {
 		tokens := strings.Fields(line)
 		if len(tokens) == 2 && tokens[0] == "0" {
 			supported = false
@@ -656,7 +656,7 @@ func createCPUSocketMap(coresPerSocket int, sockets int, hyperthreading bool) (c
 		totalCPUs *= 2 // hyperthreading doubles the number of logical CPUs
 	}
 	// Assign each CPU to a socket
-	for i := 0; i < totalCPUs; i++ {
+	for i := range totalCPUs {
 		// Assume that the CPUs are evenly distributed between the sockets
 		socket := i / coresPerSocket
 		if hyperthreading {

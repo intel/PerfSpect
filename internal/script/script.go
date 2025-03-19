@@ -215,7 +215,7 @@ func RunScriptAsync(myTarget target.Target, script ScriptDefinition, localTempDi
 	// if the directory doesn't exist, create it
 	// we try a few times because there could multiple go routines trying to create the same directory
 	maxTries := 3
-	for i := 0; i < maxTries; i++ {
+	for i := range maxTries {
 		if _, err := os.Stat(localTempDirForTarget); os.IsNotExist(err) {
 			if err := os.Mkdir(localTempDirForTarget, 0755); err != nil {
 				if i == maxTries-1 {
@@ -375,8 +375,8 @@ func formMasterScript(targetTempDirectory string, parallelScripts []ScriptDefini
 // It returns a list of ScriptOutput objects, one for each script that was run.
 func parseMasterScriptOutput(masterScriptOutput string) (scriptOutputs []ScriptOutput) {
 	// split output of master script into individual script outputs
-	outputs := strings.Split(masterScriptOutput, "<---------------------->\n")
-	for _, output := range outputs {
+	outputs := strings.SplitSeq(masterScriptOutput, "<---------------------->\n")
+	for output := range outputs {
 		lines := strings.Split(output, "\n")
 		if len(lines) < 4 { // minimum lines for a script output
 			continue

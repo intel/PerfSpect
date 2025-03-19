@@ -15,7 +15,7 @@ import (
 
 func cpuSpeedFromOutput(outputs map[string]script.ScriptOutput) string {
 	var vals []float64
-	for _, line := range strings.Split(strings.TrimSpace(outputs[script.CpuSpeedScriptName].Stdout), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(outputs[script.CpuSpeedScriptName].Stdout), "\n") {
 		tokens := strings.Split(line, " ")
 		if len(tokens) != 2 {
 			slog.Error("unexpected stress-ng output format", slog.String("line", line))
@@ -40,7 +40,7 @@ func storagePerfFromOutput(outputs map[string]script.ScriptOutput) (readBW, writ
 	// READ: bw=140MiB/s (146MB/s), 140MiB/s-140MiB/s (146MB/s-146MB/s), io=16.4GiB (17.6GB), run=120004-120004msec
 	// WRITE: bw=139MiB/s (146MB/s), 139MiB/s-139MiB/s (146MB/s-146MB/s), io=16.3GiB (17.5GB), run=120004-120004msec
 	re := regexp.MustCompile(` bw=(\d+[.]?[\d]*\w+\/s)`)
-	for _, line := range strings.Split(strings.TrimSpace(outputs[script.StoragePerfScriptName].Stdout), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(outputs[script.StoragePerfScriptName].Stdout), "\n") {
 		if strings.Contains(line, "READ: bw=") {
 			matches := re.FindStringSubmatch(line)
 			if len(matches) != 0 {
@@ -70,7 +70,7 @@ func ParseTurbostatOutput(output string) (singleCoreTurbo, allCoreTurbo, turboPo
 	idxTdp := -1
 	idxTemp := -1
 	re := regexp.MustCompile(`\s+`) // whitespace
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
@@ -167,7 +167,7 @@ func maxTemperatureFromOutput(outputs map[string]script.ScriptOutput) string {
 // ...
 func avxTurboFrequenciesFromOutput(output string) (nonavxFreqs, avx128Freqs, avx256Freqs, avx512Freqs []float64, err error) {
 	started := false
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		if strings.HasPrefix(line, "Cores | ID") {
 			started = true
 			continue

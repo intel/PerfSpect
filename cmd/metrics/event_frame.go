@@ -160,7 +160,7 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 		} else if granularity == granularitySocket {
 			// create one list of Events per Socket
 			newEvents := make([][]Event, metadata.SocketCount)
-			for i := 0; i < metadata.SocketCount; i++ {
+			for i := range metadata.SocketCount {
 				newEvents[i] = make([]Event, 0, len(allEvents)/metadata.SocketCount)
 			}
 			// incoming events are labeled with cpu number
@@ -202,7 +202,7 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 			// note: if some cores have been off-lined, this may cause an issue because 'perf' seems
 			// to still report events for those cores
 			newEvents := make([][]Event, numCPUs)
-			for i := 0; i < numCPUs; i++ {
+			for i := range numCPUs {
 				newEvents[i] = make([]Event, 0, len(allEvents)/numCPUs)
 			}
 			for _, event := range allEvents {
@@ -213,7 +213,7 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 				// handle case where perf returns events for off-lined cores
 				if cpu > len(newEvents)-1 {
 					cpusToAdd := len(newEvents) + 1 - cpu
-					for i := 0; i < cpusToAdd; i++ {
+					for range cpusToAdd {
 						newEvents = append(newEvents, make([]Event, 0, len(allEvents)/numCPUs))
 					}
 				}

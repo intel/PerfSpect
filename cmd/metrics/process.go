@@ -76,7 +76,7 @@ func GetHotProcesses(myTarget target.Target, maxProcesses int, filter string) (p
 		}
 	}
 	reProcess := regexp.MustCompile(psRegex)
-	for _, line := range strings.Split(psOutput, "\n") {
+	for line := range strings.SplitSeq(psOutput, "\n") {
 		if line == "" {
 			continue
 		}
@@ -159,8 +159,8 @@ done | sort -nr | head -n %d
 		err = fmt.Errorf("failed to get hot cgroups: %v", err)
 		return
 	}
-	lines := strings.Split(output.Stdout, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(output.Stdout, "\n")
+	for line := range lines {
 		if line == "" {
 			continue
 		}

@@ -21,6 +21,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -193,12 +194,7 @@ func StringIndexInList(s string, l []string) (idx int, err error) {
 
 // StringInList confirms if string is in list of strings
 func StringInList(s string, l []string) bool {
-	for _, item := range l {
-		if item == s {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(l, s)
 }
 
 // GeoMean calculates the geomean of a slice of floats
@@ -264,10 +260,8 @@ func ExtractResource(resources embed.FS, resourcePath string, tempDir string) (s
 
 // UniqueAppend appends an item to a slice if it is not already present
 func UniqueAppend(slice []string, item string) []string {
-	for _, s := range slice {
-		if s == item {
-			return slice
-		}
+	if slices.Contains(slice, item) {
+		return slice
 	}
 	return append(slice, item)
 }
@@ -416,7 +410,7 @@ func SignalChildren(sig os.Signal) {
 		return
 	}
 	// send signal to each child
-	for _, pid := range strings.Split(string(out), "\n") {
+	for pid := range strings.SplitSeq(string(out), "\n") {
 		if pid == "" {
 			continue
 		}

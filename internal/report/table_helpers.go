@@ -19,13 +19,14 @@ import (
 
 	"perfspect/internal/cpudb"
 	"perfspect/internal/script"
+	"slices"
 )
 
 // valFromRegexSubmatch searches for a regex pattern in the given output string and returns the first captured group.
 // If no match is found, an empty string is returned.
 func valFromRegexSubmatch(output string, regex string) string {
 	re := regexp.MustCompile(regex)
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		match := re.FindStringSubmatch(strings.TrimSpace(line))
 		if len(match) > 1 {
 			return match[1]
@@ -40,7 +41,7 @@ func valFromRegexSubmatch(output string, regex string) string {
 func valsFromRegexSubmatch(output string, regex string) []string {
 	var vals []string
 	re := regexp.MustCompile(regex)
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		match := re.FindStringSubmatch(strings.TrimSpace(line))
 		if len(match) > 1 {
 			vals = append(vals, match[1])
@@ -52,7 +53,7 @@ func valsFromRegexSubmatch(output string, regex string) []string {
 // return all matches for all capture groups in regex
 func valsArrayFromRegexSubmatch(output string, regex string) (vals [][]string) {
 	re := regexp.MustCompile(regex)
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		match := re.FindStringSubmatch(line)
 		if len(match) > 1 {
 			vals = append(vals, match[1:])
@@ -93,7 +94,7 @@ func valsArrayFromDmiDecodeRegexSubmatch(dmiDecodeOutput string, dmiType string,
 func getDmiDecodeType(dmiDecodeOutput string, dmiType string) string {
 	var lines []string
 	start := false
-	for _, line := range strings.Split(dmiDecodeOutput, "\n") {
+	for line := range strings.SplitSeq(dmiDecodeOutput, "\n") {
 		if start && strings.HasPrefix(line, "Handle ") {
 			start = false
 		}
@@ -325,7 +326,7 @@ func numaCPUListFromOutput(outputs map[string]script.ScriptOutput) string {
 
 func ppinsFromOutput(outputs map[string]script.ScriptOutput) string {
 	uniquePpins := []string{}
-	for _, line := range strings.Split(outputs[script.PPINName].Stdout, "\n") {
+	for line := range strings.SplitSeq(outputs[script.PPINName].Stdout, "\n") {
 		parts := strings.Split(line, ":")
 		if len(parts) < 2 {
 			continue
@@ -679,7 +680,7 @@ func uncoreMinMaxDieFrequencyFromOutput(maxFreq bool, computeDie bool, outputs m
 	re := regexp.MustCompile(`Read bits \d+:\d+ value (\d+) from TPMI ID .* for entry (\d+) in instance (\d+)`)
 	var instance, entry string
 	found := false
-	for _, line := range strings.Split(outputs[script.UncoreDieTypesFromTPMIScriptName].Stdout, "\n") {
+	for line := range strings.SplitSeq(outputs[script.UncoreDieTypesFromTPMIScriptName].Stdout, "\n") {
 		match := re.FindStringSubmatch(line)
 		if match == nil {
 			continue
@@ -712,7 +713,7 @@ func uncoreMinMaxDieFrequencyFromOutput(maxFreq bool, computeDie bool, outputs m
 	} else {
 		scriptName = script.UncoreMinFromTPMIScriptName
 	}
-	for _, line := range strings.Split(outputs[scriptName].Stdout, "\n") {
+	for line := range strings.SplitSeq(outputs[scriptName].Stdout, "\n") {
 		match := re.FindStringSubmatch(line)
 		if len(match) > 0 {
 			found = true
@@ -769,7 +770,7 @@ func chaCountFromOutput(outputs map[string]script.ScriptOutput) string {
 	// - spr cha count
 	// stop when we find a non-zero value
 	// note: rdmsr writes to stderr on error so we will likely have fewer than 3 lines in stdout
-	for _, hexCount := range strings.Split(outputs[script.ChaCountScriptName].Stdout, "\n") {
+	for hexCount := range strings.SplitSeq(outputs[script.ChaCountScriptName].Stdout, "\n") {
 		if hexCount != "" && hexCount != "0" {
 			count, err := strconv.ParseInt(hexCount, 16, 64)
 			if err == nil {
@@ -1014,7 +1015,7 @@ type cstateInfo struct {
 func cstatesFromOutput(outputs map[string]script.ScriptOutput) []cstateInfo {
 	var cstatesInfo []cstateInfo
 	output := outputs[script.CstatesScriptName].Stdout
-	for _, line := range strings.Split(output, "\n") {
+	for line := range strings.SplitSeq(output, "\n") {
 		if line == "" {
 			continue
 		}
@@ -1134,7 +1135,7 @@ func nicInfoFromOutput(outputs map[string]script.ScriptOutput) []nicInfo {
 	var perNicOutput [][]string
 	reBeginNicInfo := regexp.MustCompile(`Settings for (.*):`)
 	nicIndex := -1
-	for _, line := range strings.Split(outputs[script.NicInfoScriptName].Stdout, "\n") {
+	for line := range strings.SplitSeq(outputs[script.NicInfoScriptName].Stdout, "\n") {
 		match := reBeginNicInfo.FindStringSubmatch(line)
 		if len(match) > 0 {
 			nicIndex++
@@ -1217,7 +1218,7 @@ func diskInfoFromOutput(outputs map[string]script.ScriptOutput) []diskInfo {
 			reFwRev := regexp.MustCompile(`FwRev=(\w+)`)
 			reDev := regexp.MustCompile(fmt.Sprintf(`/dev/%s:`, fields[0]))
 			devFound := false
-			for _, line := range strings.Split(outputs[script.HdparmScriptName].Stdout, "\n") {
+			for line := range strings.SplitSeq(outputs[script.HdparmScriptName].Stdout, "\n") {
 				if !devFound {
 					if reDev.FindString(line) != "" {
 						devFound = true
@@ -1428,7 +1429,7 @@ func gaudiInfoFromOutput(outputs map[string]script.ScriptOutput) []Gaudi {
 	reCpldComponent := regexp.MustCompile(`^\s+component\s+:\s+(0x[0-9a-fA-F]+\.[0-9a-fA-F]+)$`)
 	deviceIdx := -1
 	state := -1
-	for _, line := range strings.Split(outputs[script.GaudiFirmwareScriptName].Stdout, "\n") {
+	for line := range strings.SplitSeq(outputs[script.GaudiFirmwareScriptName].Stdout, "\n") {
 		if line == "" {
 			continue
 		}
@@ -1489,7 +1490,7 @@ func gaudiInfoFromOutput(outputs map[string]script.ScriptOutput) []Gaudi {
 func getPCIDevices(class string, outputs map[string]script.ScriptOutput) (devices []map[string]string) {
 	device := make(map[string]string)
 	re := regexp.MustCompile(`^(\w+):\s+(.*)$`)
-	for _, line := range strings.Split(outputs[script.LspciVmmScriptName].Stdout, "\n") {
+	for line := range strings.SplitSeq(outputs[script.LspciVmmScriptName].Stdout, "\n") {
 		if line == "" { // end of device
 			if devClass, ok := device["Class"]; ok {
 				if devClass == class {
@@ -1531,8 +1532,8 @@ func cveInfoFromOutput(outputs map[string]script.ScriptOutput) [][]string {
 /* "1,3-5,8" -> [1,3,4,5,8] */
 func expandCPUList(cpuList string) (cpus []int) {
 	if cpuList != "" {
-		tokens := strings.Split(cpuList, ",")
-		for _, token := range tokens {
+		tokens := strings.SplitSeq(cpuList, ",")
+		for token := range tokens {
 			if strings.Contains(token, "-") {
 				subTokens := strings.Split(token, "-")
 				if len(subTokens) == 2 {
@@ -1610,11 +1611,9 @@ func turbostatSummaryRows(outputs map[string]script.ScriptOutput, fieldNames []s
 				}
 			}
 			// check that we found all the fields
-			for _, fieldIndex := range fieldIndices {
-				if fieldIndex == -1 {
-					err := fmt.Errorf("turbostat output is missing field: %s", fieldNames)
-					return nil, err
-				}
+			if slices.Contains(fieldIndices, -1) {
+				err := fmt.Errorf("turbostat output is missing field: %s", fieldNames)
+				return nil, err
 			}
 			continue
 		}
@@ -1648,8 +1647,8 @@ func nicIRQMappingsFromOutput(outputs map[string]script.ScriptOutput) [][]string
 		// which is <irq>:<cpu(s)>
 		// we need to reverse it to <cpu>:<irq(s)>
 		cpuIRQMappings := make(map[int][]int)
-		irqCPUPairs := strings.Split(nic.CPUAffinity, ";")
-		for _, pair := range irqCPUPairs {
+		irqCPUPairs := strings.SplitSeq(nic.CPUAffinity, ";")
+		for pair := range irqCPUPairs {
 			if pair == "" {
 				continue
 			}

@@ -1284,8 +1284,8 @@ func sstTFLPTableValues(outputs map[string]script.ScriptOutput) []Field {
 	for i, line := range lines {
 		// field names are in the header
 		if i == 0 {
-			fieldNames := strings.Split(line, ",")
-			for _, fieldName := range fieldNames {
+			fieldNames := strings.SplitSeq(line, ",")
+			for fieldName := range fieldNames {
 				fields = append(fields, Field{Name: fieldName + " (MHz)"})
 			}
 			continue
@@ -1725,7 +1725,7 @@ func sensorTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Reading"},
 		{Name: "Status"},
 	}
-	for _, line := range strings.Split(outputs[script.IpmitoolSensorsScriptName].Stdout, "\n") {
+	for line := range strings.SplitSeq(outputs[script.IpmitoolSensorsScriptName].Stdout, "\n") {
 		tokens := strings.Split(line, " | ")
 		if len(tokens) < len(fields) {
 			continue
@@ -1757,7 +1757,7 @@ func systemEventLogTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Status"},
 		{Name: "Event"},
 	}
-	for _, line := range strings.Split(outputs[script.IpmitoolEventsScriptName].Stdout, "\n") {
+	for line := range strings.SplitSeq(outputs[script.IpmitoolEventsScriptName].Stdout, "\n") {
 		tokens := strings.Split(line, " | ")
 		if len(tokens) < len(fields) {
 			continue
@@ -1937,7 +1937,7 @@ func cpuFrequencyTableValues(outputs map[string]script.ScriptOutput) []Field {
 		return fields
 	} else {
 		// pad core counts and spec frequency (field 0 and 1)
-		for i := 0; i < 2; i++ {
+		for i := range 2 {
 			for j := len(fields[i].Values); j < len(nonavxFreqs); j++ {
 				pad := ""
 				if i == 0 {
@@ -1946,16 +1946,16 @@ func cpuFrequencyTableValues(outputs map[string]script.ScriptOutput) []Field {
 				fields[i].Values = append(fields[i].Values, pad)
 			}
 		}
-		for i := 0; i < len(nonavxFreqs); i++ {
+		for i := range nonavxFreqs {
 			fields[2].Values = append(fields[2].Values, fmt.Sprintf("%.1f", nonavxFreqs[i]))
 		}
-		for i := 0; i < len(avx128Freqs); i++ {
+		for i := range avx128Freqs {
 			fields[3].Values = append(fields[3].Values, fmt.Sprintf("%.1f", avx128Freqs[i]))
 		}
-		for i := 0; i < len(avx256Freqs); i++ {
+		for i := range avx256Freqs {
 			fields[4].Values = append(fields[4].Values, fmt.Sprintf("%.1f", avx256Freqs[i]))
 		}
-		for i := 0; i < len(avx512Freqs); i++ {
+		for i := range avx512Freqs {
 			fields[5].Values = append(fields[5].Values, fmt.Sprintf("%.1f", avx512Freqs[i]))
 		}
 	}
@@ -2061,7 +2061,7 @@ func cpuUtilizationTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "%idle"},
 	}
 	reStat := regexp.MustCompile(`^(\d\d:\d\d:\d\d)\s+(\d+)\s+(\d+)\s+(\d+)\s+(-*\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)$`)
-	for _, line := range strings.Split(outputs[script.MpstatScriptName].Stdout, "\n") {
+	for line := range strings.SplitSeq(outputs[script.MpstatScriptName].Stdout, "\n") {
 		match := reStat.FindStringSubmatch(line)
 		if len(match) == 0 {
 			continue
@@ -2088,7 +2088,7 @@ func summaryCPUUtilizationTableValues(outputs map[string]script.ScriptOutput) []
 		{Name: "%idle"},
 	}
 	reStat := regexp.MustCompile(`^(\d\d:\d\d:\d\d)\s+all\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)$`)
-	for _, line := range strings.Split(outputs[script.MpstatScriptName].Stdout, "\n") {
+	for line := range strings.SplitSeq(outputs[script.MpstatScriptName].Stdout, "\n") {
 		match := reStat.FindStringSubmatch(line)
 		if len(match) == 0 {
 			continue
@@ -2116,7 +2116,7 @@ func irqRateTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "RCU/s"},
 	}
 	reStat := regexp.MustCompile(`^(\d\d:\d\d:\d\d)\s+(\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)$`)
-	for _, line := range strings.Split(outputs[script.MpstatScriptName].Stdout, "\n") {
+	for line := range strings.SplitSeq(outputs[script.MpstatScriptName].Stdout, "\n") {
 		match := reStat.FindStringSubmatch(line)
 		if len(match) == 0 {
 			continue
@@ -2142,7 +2142,7 @@ func driveStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
 	// don't capture the last three vals: "kB_read","kB_wrtn","kB_dscd" -- they aren't the same scale as the others
 	reStat := regexp.MustCompile(`^(\w+)\s*(\d+.\d+)\s*(\d+.\d+)\s*(\d+.\d+)\s*(\d+.\d+)\s*\d+\s*\d+\s*\d+$`)
 	var time string
-	for _, line := range strings.Split(outputs[script.IostatScriptName].Stdout, "\n") {
+	for line := range strings.SplitSeq(outputs[script.IostatScriptName].Stdout, "\n") {
 		match := reTime.FindStringSubmatch(line)
 		if len(match) > 0 {
 			time = match[1]
@@ -2170,7 +2170,7 @@ func networkStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
 	}
 	// don't capture the last four vals: "rxcmp/s","txcmp/s","rxcmt/s","%ifutil" -- obscure more important vals
 	reStat := regexp.MustCompile(`^(\d+:\d+:\d+)\s*(\w*)\s*(\d+.\d+)\s*(\d+.\d+)\s*(\d+.\d+)\s*(\d+.\d+)\s*\d+.\d+\s*\d+.\d+\s*\d+.\d+\s*\d+.\d+$`)
-	for _, line := range strings.Split(outputs[script.SarNetworkScriptName].Stdout, "\n") {
+	for line := range strings.SplitSeq(outputs[script.SarNetworkScriptName].Stdout, "\n") {
 		match := reStat.FindStringSubmatch(line)
 		if len(match) == 0 {
 			continue
@@ -2196,7 +2196,7 @@ func memoryStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "dirty"},
 	}
 	reStat := regexp.MustCompile(`^(\d+:\d+:\d+)\s*(\d+)\s*(\d+)\s*(\d+)\s*\d+\.\d+\s*(\d+)\s*(\d+)\s*(\d+)\s*\d+\.\d+\s*(\d+)\s*(\d+)\s*(\d+)$`)
-	for _, line := range strings.Split(outputs[script.SarMemoryScriptName].Stdout, "\n") {
+	for line := range strings.SplitSeq(outputs[script.SarMemoryScriptName].Stdout, "\n") {
 		match := reStat.FindStringSubmatch(line)
 		if len(match) == 0 {
 			continue
