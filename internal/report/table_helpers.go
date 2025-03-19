@@ -1567,7 +1567,6 @@ func turbostatSummaryRows(outputs map[string]script.ScriptOutput, fieldNames []s
 	for i := range fieldIndices {
 		fieldIndices[i] = -1
 	}
-	headerLine := -1
 	var startTime time.Time
 	var interval int
 	var sampleTime time.Time
@@ -1590,16 +1589,7 @@ func turbostatSummaryRows(outputs map[string]script.ScriptOutput, fieldNames []s
 				return nil, err
 			}
 			continue
-		}
-		// skip lines until we see "Package Core    CPU" at the beginning of a line, this is the header for the rest of the data
-		if headerLine == -1 {
-			if strings.HasPrefix(line, "Package\tCore\tCPU") {
-				headerLine = i
-			} else {
-				continue
-			}
-		}
-		if i == headerLine {
+		} else if i == 2 { // third line is the header, e.g., Package	Die	Node	Core	CPU	Avg_MHz	Busy%	Bzy_MHz	TSC_MHz	IPC
 			// parse the field names from the header line
 			tsFields := strings.Fields(line)
 			// find the index of the fields we are interested in
@@ -1619,19 +1609,16 @@ func turbostatSummaryRows(outputs map[string]script.ScriptOutput, fieldNames []s
 		}
 		// alright...we should be at the data now
 		tsRowValues := strings.Fields(line)
-		if len(tsRowValues) == 0 {
+		if len(tsRowValues) == 0 || tsRowValues[0] != "-" { // summary rows have a "-" in the first colum
 			continue
 		}
-		// summary rows have a "-" in the first column
-		if tsRowValues[0] == "-" {
-			sampleTime = startTime.Add(time.Duration(sampleCount*interval) * time.Second)
-			sampleCount++
-			rowValues := []string{sampleTime.Format("15:04:05")}
-			for _, fieldIndex := range fieldIndices {
-				rowValues = append(rowValues, tsRowValues[fieldIndex])
-			}
-			fieldValues = append(fieldValues, rowValues)
+		sampleTime = startTime.Add(time.Duration(sampleCount*interval) * time.Second)
+		sampleCount++
+		rowValues := []string{sampleTime.Format("15:04:05")}
+		for _, fieldIndex := range fieldIndices {
+			rowValues = append(rowValues, tsRowValues[fieldIndex])
 		}
+		fieldValues = append(fieldValues, rowValues)
 	}
 	return fieldValues, nil
 }
