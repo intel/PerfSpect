@@ -129,7 +129,7 @@
           style={{ width: "100%", height: "100%", ...style }}
         />
       );
-    }
+      }
 
     function TabPanel(props) {
       const { children, value, index, ...other } = props;
@@ -163,7 +163,7 @@
         setOpenlink(false)
       };
 
-      const all_metrics = ALLMETRICS
+      const all_metrics = <<.ALLMETRICS>>
       const [current_metrics, setCurrent_metrics] = React.useState(JSON.parse(JSON.stringify(all_metrics)));
       const description = {
         "CPU operating frequency (in GHz)": "CPU operating frequency (in GHz)",
@@ -257,14 +257,14 @@
         "TMA_Info_System_SMT_2T_Utilization": "Fraction of cycles where both hardware Logical Processors were active",
       }
 
-      const metadata = METADATA
+      const metadata = <<.METADATA>>
 
-      const transactions = TRANSACTIONS;
+      const transactions = <<.TRANSACTIONS>>;
 
       const base_line = {
         xAxis: {
           type: "category",
-          data: TIMESTAMPS,
+          data: <<.TIMESTAMPS>>,
           name: "time (s)",
           min: "dataMin",
           max: "dataMax",
@@ -281,12 +281,38 @@
         legend: {},
       }
 
+      let level1tma = {
+        ...base_line,
+        series: [
+          {
+            name: "Front-end",
+            type: 'line',
+            data: <<.TMAFRONTEND>>,
+          },
+          {
+            name: "Back-end",
+            type: 'line',
+            data: <<.TMABACKEND>>,
+          },
+          {
+            name: "Retiring",
+            type: 'line',
+            data: <<.TMARETIRING>>,
+          },
+          {
+            name: "Bad Speculation",
+            type: 'line',
+            data: <<.TMABADSPECULATION>>,
+          },
+        ]
+      }
+
       let cpu_util = {
         ...base_line,
         series: [
           {
             type: 'line',
-            data: CPUUTIL,
+            data: <<.CPUUTIL>>,
           }
         ]
       }
@@ -296,7 +322,7 @@
         series: [
           {
             type: 'line',
-            data: CPIDATA,
+            data: <<.CPIDATA>>,
           }
         ]
       }
@@ -306,7 +332,7 @@
         series: [
           {
             type: 'line',
-            data: CPUFREQ,
+            data: <<.CPUFREQ>>,
           }
         ]
       }
@@ -316,7 +342,7 @@
         series: [
           {
             type: 'line',
-            data: REMOTENUMA,
+            data: <<.REMOTENUMA>>,
           }
         ]
       }
@@ -327,17 +353,17 @@
           {
             name: "L1D",
             type: 'line',
-            data: L1DATA,
+            data: <<.L1DATA>>,
           },
           {
             name: "L2",
             type: 'line',
-            data: L2DATA,
+            data: <<.L2DATA>>,
           },
           {
             name: "LLC Data",
             type: 'line',
-            data: LLCDATA,
+            data: <<.LLCDATA>>,
           },
         ]
       }
@@ -348,17 +374,17 @@
           {
             name: "Read",
             type: 'line',
-            data: READDATA,
+            data: <<.READDATA>>,
           },
           {
             name: "Write",
             type: 'line',
-            data: WRITEDATA,
+            data: <<.WRITEDATA>>,
           },
           {
             name: "Total",
             type: 'line',
-            data: TOTALDATA,
+            data: <<.TOTALDATA>>,
           },
         ]
       }
@@ -368,7 +394,7 @@
         series: [
           {
             type: 'line',
-            data: PKGPOWER,
+            data: <<.PKGPOWER>>,
           }
         ]
       }
@@ -378,7 +404,7 @@
         series: [
           {
             type: 'line',
-            data: DRAMPOWER,
+            data: <<.DRAMPOWER>>,
           }
         ]
       }
@@ -461,57 +487,57 @@
                       data: [
                       {
                           name: "Frontend",
-                          value: Math.round(FRONTEND * 10) / 10,
+                          value: Math.round(<<.FRONTEND>> * 10) / 10,
                           children:[
                             {
                               name: "Fetch Bandwidth",
-                              value: Math.round(FETCHBANDWIDTH * 10) / 10,
+                              value: Math.round(<<.FETCHBANDWIDTH>> * 10) / 10,
                             },
                             {
                               name: "Fetch Latency",
-                              value: Math.round(FETCHLATENCY * 10) / 10,
+                              value: Math.round(<<.FETCHLATENCY>> * 10) / 10,
                             },
                           ]
                         },
                         {
                           name: "Bad Speculation",
-                          value: Math.round(BADSPECULATION * 10) / 10,
+                          value: Math.round(<<.BADSPECULATION>> * 10) / 10,
                           children: [
                             {
                               name: "Branch Mispredicts",
-                              value: Math.round(BRANCHMISPREDICTS * 10) / 10,
+                              value: Math.round(<<.BRANCHMISPREDICTS>> * 10) / 10,
                             },
                             {
                               name: "Machine Clears",
-                              value: Math.round(MACHINECLEARS * 10) / 10,
+                              value: Math.round(<<.MACHINECLEARS>> * 10) / 10,
                             },
                           ]
                         },
                         {
                           name: "Backend",
-                          value: Math.round(BACKEND * 10) / 10,
+                          value: Math.round(<<.BACKEND>> * 10) / 10,
                           children: [
                             {
                               name: "Core",
-                              value: Math.round(COREDATA * 10) / 10,
+                              value: Math.round(<<.COREDATA>> * 10) / 10,
                             },
                             {
                               name: "Memory",
-                              value: Math.round(MEMORY * 10) / 10,
+                              value: Math.round(<<.MEMORY>> * 10) / 10,
                             },
                           ],
                         },
                         {
                           name: "Retiring",
-                          value: Math.round(RETIRING * 10) / 10,
+                          value: Math.round(<<.RETIRING>> * 10) / 10,
                           children: [
                             {
                               name: "Light Operations",
-                              value: Math.round(LIGHTOPS * 10) / 10,
+                              value: Math.round(<<.LIGHTOPS>> * 10) / 10,
                             },
                             {
                               name: "Heavy Operations",
-                              value: Math.round(HEAVYOPS * 10) / 10,
+                              value: Math.round(<<.HEAVYOPS>> * 10) / 10,
                             },
                           ]
                         },
@@ -522,6 +548,19 @@
                       },
                     },
                   }} />
+                </Grid>
+              </Grid>
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    TMA Level 1
+                  </Typography>
+                  <Typography variant="body1">
+                    Here, we show the TMA Front-end, Back-end, Retiring and Bad Speculation percentages over the collection period.
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={level1tma} />
                 </Grid>
               </Grid>
             </TabPanel>

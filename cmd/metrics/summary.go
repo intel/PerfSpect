@@ -6,15 +6,17 @@ package metrics
 // functions to create summary (mean,min,max,stddev) metrics from metrics CSV
 
 import (
+	"bytes"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"math"
 	"os"
 	"regexp"
 	"strconv"
-	"strings"
+	texttemplate "text/template"
 	"time"
 
 	"perfspect/internal/util"
@@ -240,32 +242,48 @@ func (m *metricsFromCSV) getStats() (stats map[string]metricStats, err error) {
 }
 
 // getHTML - generate a string containing HTML representing the metrics
-func (m *metricsFromCSV) getHTML(metadata Metadata) (html string, err error) {
+func (m *metricsFromCSV) getHTML(metadata Metadata) (out string, err error) {
+	var htmlTemplateBytes []byte
+	if htmlTemplateBytes, err = resources.ReadFile("resources/base.html"); err != nil {
+		slog.Error("failed to read base.html template", slog.String("error", err.Error()))
+		return
+	}
+	templateVals, err := m.loadHTMLTemplateValues(metadata)
+	if err != nil {
+		slog.Error("failed to load template values", slog.String("error", err.Error()))
+		return
+	}
+	fg := texttemplate.Must(texttemplate.New("metricsSummaryTemplate").Delims("<<", ">>").Parse(string(htmlTemplateBytes)))
+	buf := new(bytes.Buffer)
+	if err = fg.Execute(buf, templateVals); err != nil {
+		slog.Error("failed to render metrics template", slog.String("error", err.Error()))
+		return
+	}
+	return buf.String(), nil
+}
+
+func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata) (templateVals map[string]string, err error) {
+	templateVals = make(map[string]string)
 	var stats map[string]metricStats
 	if stats, err = m.getStats(); err != nil {
 		return
 	}
-	var htmlTemplate []byte
-	if htmlTemplate, err = resources.ReadFile("resources/base.html"); err != nil {
-		return
-	}
-	html = string(htmlTemplate)
-	html = strings.Replace(html, "TRANSACTIONS", "false", 1) // no transactions for now
-
 	// hack to determine the architecture of the metrics source
 	var archIndex int
 	if _, ok := stats["Macro-ops Retired"]; ok { // a metric that only exists in the AMD metric definitions
-		archIndex = 1
+		archIndex = 1 // AMD
 	} else {
-		archIndex = 0
+		archIndex = 0 // Intel
 	}
-
 	type tmplReplace struct {
 		tmplVar     string
-		metricNames []string
+		metricNames []string // names per architecture, 0=Intel, 1=AMD
 	}
 
-	// TMA Tab
+	templateVals["TRANSACTIONS"] = "false" // no transactions for now
+
+	// TMA Tab's pie chart
+	// these are intended to be replaced with the mean value of the metric
 	templateReplace := []tmplReplace{
 		{"FRONTEND", []string{"TMA_Frontend_Bound(%)", "Pipeline Utilization - Frontend Bound (%)"}},
 		{"FETCHLATENCY", []string{"TMA_..Fetch_Latency(%)", "Pipeline Utilization - Frontend Bound - Latency (%)"}},
@@ -280,31 +298,27 @@ func (m *metricsFromCSV) getHTML(metadata Metadata) (html string, err error) {
 		{"LIGHTOPS", []string{"TMA_..Light_Operations(%)"}},
 		{"HEAVYOPS", []string{"TMA_..Heavy_Operations(%)"}},
 	}
-	haveTMA := false
-	if archIndex == 0 && !math.IsNaN(stats["TMA_Frontend_Bound(%)"].mean) {
-		haveTMA = true
-	} else if archIndex == 1 && !math.IsNaN(stats["Pipeline Utilization - Frontend Bound (%)"].mean) {
-		haveTMA = true
-	}
-	if haveTMA {
-		for _, tmpl := range templateReplace {
-			// confirm that the metric name exists in the stats, otherwise set it to 0
-			var metricVal float64
-			metricVal = 0
-			if len(tmpl.metricNames) > archIndex {
-				if _, ok := stats[tmpl.metricNames[archIndex]]; ok {
-					metricVal = stats[tmpl.metricNames[archIndex]].mean
+	// replace the template variables with the mean value of the metric
+	for _, tmpl := range templateReplace {
+		// confirm that the metric name exists in the stats, otherwise set it to 0
+		metricMean := 0.0
+		if len(tmpl.metricNames) > archIndex {
+			if _, ok := stats[tmpl.metricNames[archIndex]]; ok {
+				metricMean = stats[tmpl.metricNames[archIndex]].mean
+				if math.IsInf(metricMean, 0) || math.IsNaN(metricMean) || metricMean < 0 {
+					metricMean = 0
 				}
 			}
-			html = strings.Replace(html, tmpl.tmplVar, fmt.Sprintf("%f", metricVal), -1)
 		}
-	} else {
-		for _, tmpl := range templateReplace {
-			html = strings.Replace(html, tmpl.tmplVar, "0", -1)
-		}
+		templateVals[tmpl.tmplVar] = fmt.Sprintf("%f", metricMean)
 	}
-
+	// these get the series data for the graphs
 	templateReplace = []tmplReplace{
+		// TMAM Tab
+		{"TMAFRONTEND", []string{"TMA_Frontend_Bound(%)", "Pipeline Utilization - Frontend Bound (%)"}},
+		{"TMABACKEND", []string{"TMA_Backend_Bound(%)", "Pipeline Utilization - Backend Bound (%)"}},
+		{"TMARETIRING", []string{"TMA_Retiring(%)", "Pipeline Utilization - Retiring (%)"}},
+		{"TMABADSPECULATION", []string{"TMA_Bad_Speculation(%)", "Pipeline Utilization - Bad Speculation (%)"}},
 		// CPU Tab
 		{"CPUUTIL", []string{"CPU utilization %", "CPU utilization %"}},
 		{"CPIDATA", []string{"CPI", "CPI"}},
@@ -321,14 +335,16 @@ func (m *metricsFromCSV) getHTML(metadata Metadata) (html string, err error) {
 		{"PKGPOWER", []string{"package power (watts)", "package power (watts)"}},
 		{"DRAMPOWER", []string{"DRAM power (watts)", ""}},
 	}
+	// replace the template variables with the series data
 	for tIdx, tmpl := range templateReplace {
 		var timeStamps []string
 		var series [][]float64
 		for rIdx, row := range m.rows {
-			if math.IsNaN(row.metrics[tmpl.metricNames[archIndex]]) || math.IsInf(row.metrics[tmpl.metricNames[archIndex]], 0) {
-				continue
+			metricRowVal := row.metrics[tmpl.metricNames[archIndex]]
+			if math.IsNaN(metricRowVal) || math.IsInf(metricRowVal, 0) || metricRowVal < 0 {
+				metricRowVal = 0
 			}
-			series = append(series, []float64{float64(rIdx), row.metrics[tmpl.metricNames[archIndex]]})
+			series = append(series, []float64{float64(rIdx), metricRowVal})
 			// format the UNIX timestamp as a local tz string
 			ts := time.Unix(int64(row.timestamp), 0).Format("15:04:05")
 			timeStamps = append(timeStamps, ts)
@@ -337,13 +353,13 @@ func (m *metricsFromCSV) getHTML(metadata Metadata) (html string, err error) {
 		if seriesBytes, err = json.Marshal(series); err != nil {
 			return
 		}
-		html = strings.Replace(html, tmpl.tmplVar, string(seriesBytes), -1)
+		templateVals[tmpl.tmplVar] = string(seriesBytes)
 		if tIdx == 0 {
 			var timeStampsBytes []byte
 			if timeStampsBytes, err = json.Marshal(timeStamps); err != nil {
 				return
 			}
-			html = strings.Replace(html, "TIMESTAMPS", string(timeStampsBytes), -1)
+			templateVals["TIMESTAMPS"] = string(timeStampsBytes)
 		}
 	}
 	// All Metrics Tab
@@ -362,7 +378,7 @@ func (m *metricsFromCSV) getHTML(metadata Metadata) (html string, err error) {
 		return
 	}
 	jsonMetrics := string(jsonMetricsBytes)
-	html = strings.Replace(html, "ALLMETRICS", string(jsonMetrics), -1)
+	templateVals["ALLMETRICS"] = jsonMetrics
 	// System Information Tab
 	jsonMetadata, err := metadata.JSON()
 	if err != nil {
@@ -371,7 +387,7 @@ func (m *metricsFromCSV) getHTML(metadata Metadata) (html string, err error) {
 	// remove PerfSupportedEvents from json
 	re := regexp.MustCompile(`"PerfSupportedEvents":".*?",`)
 	jsonMetadataNoPerfEvents := re.ReplaceAll(jsonMetadata, []byte(""))
-	html = strings.Replace(html, "METADATA", string(jsonMetadataNoPerfEvents), -1)
+	templateVals["METADATA"] = string(jsonMetadataNoPerfEvents)
 	return
 }
 
