@@ -121,8 +121,8 @@ sweep:
 	rm -rf perfspect_2025-*
 	rm -rf debug_out/*
 	rm -rf test/output
-	rm __debug_bin*.log
-	rm perfspect.log
+	rm -f __debug_bin*.log
+	rm -f perfspect.log
 
 .PHONY: clean
 clean: sweep
