@@ -56,6 +56,7 @@ endif
 # Run package-level unit tests
 .PHONY: test
 test:
+	@echo "Running unit tests..."
 	go test -v ./...
 
 .PHONY: update-deps
@@ -91,26 +92,41 @@ check_static:
 
 .PHONY: check_license
 check_license:
-	@echo "Checking license headers..."
+	@echo "Confirming source files have license headers..."
 	@for f in `find . -type f ! -path './perfspect_202*' ! -path './tools/bin/*' ! -path './internal/script/resources/*' ! -path './scripts/.venv/*' ! -path './test/output/*' ! -path './debug_out/*' \( -name "*.go" -o -name "*.s" -o -name "*.html" -o -name "Makefile" -o -name "*.sh" -o -name "*.Dockerfile" -o -name "*.py" \)`; do \
 		if ! grep -E 'Copyright \(C\) [0-9]{4}-[0-9]{4} Intel Corporation' "$$f" >/dev/null; then echo "Error: license not found: $$f"; fail=1; fi; \
 	done; if [ -n "$$fail" ]; then exit 1; fi
 
 .PHONY: check_lint
 check_lint:
-	@echo "Running golangci-lint..."
+	@echo "Running golangci-lint to check for style issues..."
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	golangci-lint run
 
+.PHONY: check_modernize
+check_modernize:
+	@echo "Running go-modernize to check for modernization opportunities..."
+	go run golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize@latest -test ./...
+
+.PHONY: modernize
+modernize:
+	@echo "Running go-modernize to apply modernization opportunities..."
+	go run golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize@latest -fix -test ./...
+
 .PHONY: check
-check: check_format check_vet check_static check_license check_lint
+check: check_format check_vet check_static check_license check_lint check_modernize
+
+.PHONY: sweep
+sweep:
+	rm -rf perfspect_2025-*
+	rm -rf debug_out/*
+	rm -rf test/output
+	rm __debug_bin*.log
+	rm perfspect.log
 
 .PHONY: clean
-clean:
+clean: sweep
 	@echo "Cleaning up..."
 	rm -f perfspect
 	sudo rm -rf dist
 	rm -rf internal/script/resources/x86_64/*
-	rm -rf perfspect_2024-*
-	rm -rf debug_out/*
-	rm -rf test/output
