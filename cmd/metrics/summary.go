@@ -419,7 +419,11 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata) (templateVals
 			if math.IsNaN(row.metrics[tmpl.metricNames[archIndex]]) || math.IsInf(row.metrics[tmpl.metricNames[archIndex]], 0) {
 				continue
 			}
-			series = append(series, []float64{float64(rIdx), row.metrics[tmpl.metricNames[archIndex]]})
+			if row.metrics[tmpl.metricNames[archIndex]] < 0 { // sometimes TMA metrics are negative
+				series = append(series, []float64{float64(rIdx), 0})
+			} else {
+				series = append(series, []float64{float64(rIdx), row.metrics[tmpl.metricNames[archIndex]]})
+			}
 			// format the UNIX timestamp as a local tz string
 			ts := time.Unix(int64(row.timestamp), 0).Format("15:04:05")
 			timeStamps = append(timeStamps, ts)
