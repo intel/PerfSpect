@@ -1122,7 +1122,20 @@ type nicInfo struct {
 func nicInfoFromOutput(outputs map[string]script.ScriptOutput) []nicInfo {
 	// get nic names and models from lshw
 	namesAndModels := valsArrayFromRegexSubmatch(outputs[script.LshwScriptName].Stdout, `^\S+\s+(\S+)\s+network\s+([^\[]+?)(?:\s+\[.*\])?$`)
-	namesAndModels = append(namesAndModels, valsArrayFromRegexSubmatch(outputs[script.LshwScriptName].Stdout, `^usb.*? (\S+)\s+network\s+(\S.*?)$`)...)
+	usbNICs := valsArrayFromRegexSubmatch(outputs[script.LshwScriptName].Stdout, `^usb.*? (\S+)\s+network\s+(\S.*?)$`)
+	// if USB NIC name isn't already in the list, add it
+	for _, usbNIC := range usbNICs {
+		found := false
+		for _, nameAndModel := range namesAndModels {
+			if nameAndModel[0] == usbNIC[0] {
+				found = true
+				break
+			}
+		}
+		if !found {
+			namesAndModels = append(namesAndModels, usbNIC)
+		}
+	}
 	if len(namesAndModels) == 0 {
 		return nil
 	}
