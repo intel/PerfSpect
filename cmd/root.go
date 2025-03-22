@@ -379,7 +379,7 @@ func updateApp(latestManifest manifest, localTempDir string) error {
 	}
 	// rename the targets.yaml file to ".sav" if it exists
 	targetsFile := filepath.Join(runningAppDir, "targets.yaml")
-	if util.Exists(targetsFile) {
+	if util.FileOrDirectoryExists(targetsFile) {
 		slog.Info("Renaming targets file", slog.String("from", "targets.yaml"), slog.String("to", "targets.yaml.sav"))
 		err = os.Rename(targetsFile, targetsFile+".sav")
 		if err != nil {
@@ -399,7 +399,7 @@ func updateApp(latestManifest manifest, localTempDir string) error {
 			slog.Info("Old executable restored")
 		}
 		slog.Info("Attempting to restore targets file")
-		if util.Exists(targetsFile + ".sav") {
+		if util.FileOrDirectoryExists(targetsFile + ".sav") {
 			errRestore = os.Rename(targetsFile+".sav", targetsFile)
 			if errRestore != nil {
 				slog.Error("Failed to restore targets file", slog.String("error", errRestore.Error()))
@@ -416,7 +416,7 @@ func updateApp(latestManifest manifest, localTempDir string) error {
 		return err
 	}
 	// replace the new targets.yaml with the saved one
-	if util.Exists(targetsFile + ".sav") {
+	if util.FileOrDirectoryExists(targetsFile + ".sav") {
 		slog.Info("Restoring targets file", slog.String("from", "targets.yaml.sav"), slog.String("to", "targets.yaml"))
 		err = os.Rename(targetsFile+".sav", targetsFile)
 		if err != nil {

@@ -19,7 +19,7 @@ import (
 	texttemplate "text/template"
 	"time"
 
-	"perfspect/internal/util"
+	"golang.org/x/exp/slices"
 )
 
 // Summarize - generates formatted output from a CSV file containing metric values.
@@ -171,7 +171,7 @@ func newMetricsFromCSV(csvPath string) (metrics []metricsFromCSV, err error) {
 		} else {
 			groupByValue := fields[groupByField]
 			var listIdx int
-			if listIdx, err = util.StringIndexInList(groupByValue, groupByValues); err != nil {
+			if listIdx = slices.Index(groupByValues, groupByValue); listIdx == -1 {
 				groupByValues = append(groupByValues, groupByValue)
 				metrics = append(metrics, metricsFromCSV{})
 				listIdx = len(metrics) - 1

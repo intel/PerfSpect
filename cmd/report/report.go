@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -290,7 +291,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	// validate format options
 	for _, format := range common.FlagFormat {
 		formatOptions := append([]string{report.FormatAll}, report.FormatOptions...)
-		if !util.StringInList(format, formatOptions) {
+		if !slices.Contains(formatOptions, format) {
 			err := fmt.Errorf("format options are: %s", strings.Join(formatOptions, ", "))
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			return err
@@ -299,14 +300,14 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	// validate benchmark options
 	for _, benchmark := range flagBenchmark {
 		options := append([]string{benchmarkAll}, benchmarkOptions...)
-		if !util.StringInList(benchmark, options) {
+		if !slices.Contains(options, benchmark) {
 			err := fmt.Errorf("benchmark options are: %s", strings.Join(options, ", "))
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			return err
 		}
 	}
 	// if benchmark all is selected, replace it with all benchmark options
-	if util.StringInList(benchmarkAll, flagBenchmark) {
+	if slices.Contains(flagBenchmark, benchmarkAll) {
 		flagBenchmark = benchmarkOptions
 	}
 	return nil

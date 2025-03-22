@@ -323,14 +323,14 @@ func (t *LocalTarget) PushFile(srcPath string, dstPath string) (err error) {
 	}
 	if srcFileStat.IsDir() {
 		newDstDir := filepath.Join(dstPath, filepath.Base(srcPath))
-		err = util.CreateIfNotExists(newDstDir, 0755)
+		err = util.CreateDirectoryIfNotExists(newDstDir, 0755)
 		if err != nil {
 			return
 		}
 		err = util.CopyDirectory(srcPath, newDstDir)
 		return
 	}
-	err = util.Copy(srcPath, dstPath)
+	err = util.CopyFile(srcPath, dstPath)
 	return
 }
 
