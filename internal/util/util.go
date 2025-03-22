@@ -106,7 +106,7 @@ func CopyDirectory(scrDir, dest string) error {
 		}
 		if fileInfo.Mode().IsDir() {
 			// Create the subdirectory in the destination directory
-			if err := CreateIfNotExists(destPath, 0755); err != nil {
+			if err := CreateDirectoryIfNotExists(destPath, 0755); err != nil {
 				return err
 			}
 			// Recursively copy the contents of the subdirectory
@@ -115,7 +115,7 @@ func CopyDirectory(scrDir, dest string) error {
 			}
 		} else if fileInfo.Mode().IsRegular() {
 			// Copy the file to the destination directory
-			if err := Copy(sourcePath, destPath); err != nil {
+			if err := CopyFile(sourcePath, destPath); err != nil {
 				return err
 			}
 		}
@@ -123,10 +123,10 @@ func CopyDirectory(scrDir, dest string) error {
 	return nil
 }
 
-// Copy copies a file from the source path to the destination path.
+// CopyFile copies a file from the source path to the destination path.
 // If the destination path is a directory, the file will be copied with the same name to that directory.
 // The file permissions of the source file will be preserved in the destination file.
-func Copy(srcFile, dstFile string) error {
+func CopyFile(srcFile, dstFile string) error {
 	// Open the source file
 	srcFileStat, err := os.Stat(srcFile)
 	if err != nil {
@@ -157,44 +157,26 @@ func Copy(srcFile, dstFile string) error {
 	return err
 }
 
-// Exists checks if a file or directory exists at the given file path.
+// FileOrDirectoryExists checks if a file or directory exists at the given file path.
 // It returns true if the file or directory exists, and false otherwise.
-func Exists(filePath string) bool {
+func FileOrDirectoryExists(filePath string) bool {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		return false
 	}
 	return true
 }
 
-// CreateIfNotExists creates a directory at the specified path if it does not already exist.
+// CreateDirectoryIfNotExists creates a directory at the specified path if it does not already exist.
 // If the directory already exists, it does nothing and returns nil.
 // If there is an error while creating the directory, it returns an error with a descriptive message.
-func CreateIfNotExists(dir string, perm os.FileMode) error {
-	if Exists(dir) {
+func CreateDirectoryIfNotExists(dir string, perm os.FileMode) error {
+	if FileOrDirectoryExists(dir) {
 		return nil
 	}
 	if err := os.MkdirAll(dir, perm); err != nil {
 		return fmt.Errorf("failed to create directory: '%s', error: '%s'", dir, err.Error())
 	}
 	return nil
-}
-
-// StringIndexInList returns the index of the given string in the given list of
-// strings and error if not found
-func StringIndexInList(s string, l []string) (idx int, err error) {
-	var item string
-	for idx, item = range l {
-		if item == s {
-			return
-		}
-	}
-	err = fmt.Errorf("%s not found in %s", s, strings.Join(l, ", "))
-	return
-}
-
-// StringInList confirms if string is in list of strings
-func StringInList(s string, l []string) bool {
-	return slices.Contains(l, s)
 }
 
 // GeoMean calculates the geomean of a slice of floats
@@ -259,7 +241,7 @@ func ExtractResource(resources embed.FS, resourcePath string, tempDir string) (s
 }
 
 // UniqueAppend appends an item to a slice if it is not already present
-func UniqueAppend(slice []string, item string) []string {
+func UniqueAppend[T comparable](slice []T, item T) []T {
 	if slices.Contains(slice, item) {
 		return slice
 	}

@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"math"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -18,7 +19,6 @@ import (
 	"perfspect/internal/cpudb"
 	"perfspect/internal/script"
 	"perfspect/internal/target"
-	"perfspect/internal/util"
 
 	"github.com/xuri/excelize/v2"
 )
@@ -175,13 +175,13 @@ func TableForTarget(name string, myTarget target.Target) bool {
 		slog.Error("failed to get model for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
 		return false
 	}
-	if len(table.Architectures) > 0 && !util.StringInList(architecture, table.Architectures) {
+	if len(table.Architectures) > 0 && !slices.Contains(table.Architectures, architecture) {
 		return false
 	}
-	if len(table.Families) > 0 && !util.StringInList(family, table.Families) {
+	if len(table.Families) > 0 && !slices.Contains(table.Families, family) {
 		return false
 	}
-	if len(table.Models) > 0 && !util.StringInList(model, table.Models) {
+	if len(table.Models) > 0 && !slices.Contains(table.Models, model) {
 		return false
 	}
 	return true

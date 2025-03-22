@@ -12,11 +12,11 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"perfspect/internal/util"
 	"regexp"
 	"strings"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"golang.org/x/exp/slices"
 )
 
 // EventDefinition represents a single perf event
@@ -134,7 +134,7 @@ func isCollectableEvent(event EventDefinition, metadata Metadata) bool {
 	}
 	// PEBS events (not supported on GCP c4 VMs)
 	pebsEventNames := []string{"INT_MISC.UNKNOWN_BRANCH_CYCLES", "UOPS_RETIRED.MS"}
-	if !metadata.SupportsPEBS && util.StringInList(event.Name, pebsEventNames) {
+	if !metadata.SupportsPEBS && slices.Contains(pebsEventNames, event.Name) {
 		slog.Debug("PEBS events not supported on target", slog.String("event", event.Name))
 		return false
 	}
@@ -260,7 +260,7 @@ func expandUncoreGroups(groups []GroupDefinition, metadata Metadata) (expandedGr
 	}
 	for _, group := range groups {
 		device := group[0].Device
-		if util.StringInList(device, deviceTypes) {
+		if slices.Contains(deviceTypes, device) {
 			var newGroups []GroupDefinition
 			if len(metadata.UncoreDeviceIDs[device]) == 0 {
 				slog.Warn("No uncore devices found", slog.String("type", device))

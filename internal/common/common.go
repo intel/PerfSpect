@@ -17,8 +17,9 @@ import (
 	"perfspect/internal/util"
 	"syscall"
 
-	"github.com/spf13/cobra"
 	"slices"
+
+	"github.com/spf13/cobra"
 )
 
 var AppName = filepath.Base(os.Args[0])
@@ -128,7 +129,7 @@ func (rc *ReportingCommand) Run() error {
 	}
 	// check report formats
 	formats := FlagFormat
-	if util.StringInList(report.FormatAll, formats) {
+	if slices.Contains(formats, report.FormatAll) {
 		formats = report.FormatOptions
 	}
 	// process the collected data and create the requested report(s)
@@ -277,7 +278,7 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 		}
 		multiTargetFormats := []string{report.FormatHtml, report.FormatXlsx}
 		for _, format := range multiTargetFormats {
-			if !util.StringInList(format, formats) {
+			if !slices.Contains(formats, format) {
 				continue
 			}
 			reportBytes, err := report.CreateMultiTarget(format, allTargetsTableValues, targetNames, rc.TableNames)

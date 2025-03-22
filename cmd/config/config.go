@@ -14,8 +14,8 @@ import (
 	"perfspect/internal/report"
 	"perfspect/internal/script"
 	"perfspect/internal/target"
-	"perfspect/internal/util"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -222,10 +222,10 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	if cmd.Flags().Lookup(flagEppName).Changed && (flagEpp < 0 || flagEpp > 255) {
 		return fmt.Errorf("invalid epp: %d", flagEpp)
 	}
-	if cmd.Flags().Lookup(flagGovernorName).Changed && !util.StringInList(flagGovernor, governorOptions) {
+	if cmd.Flags().Lookup(flagGovernorName).Changed && !slices.Contains(governorOptions, flagGovernor) {
 		return fmt.Errorf("invalid governor: %s", flagGovernor)
 	}
-	if cmd.Flags().Lookup(flagElcName).Changed && !util.StringInList(flagElc, elcOptions) {
+	if cmd.Flags().Lookup(flagElcName).Changed && !slices.Contains(elcOptions, flagElc) {
 		return fmt.Errorf("invalid elc mode: %s", flagElc)
 	}
 	return nil

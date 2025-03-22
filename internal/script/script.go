@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -45,9 +46,9 @@ func RunScript(myTarget target.Target, script ScriptDefinition, localTempDir str
 		err = fmt.Errorf("error getting target model: %v", err)
 		return
 	}
-	if len(script.Architectures) > 0 && !util.StringInList(targetArchitecture, script.Architectures) ||
-		len(script.Families) > 0 && !util.StringInList(targetFamily, script.Families) ||
-		len(script.Models) > 0 && !util.StringInList(targetModel, script.Models) {
+	if len(script.Architectures) > 0 && !slices.Contains(script.Architectures, targetArchitecture) ||
+		len(script.Families) > 0 && !slices.Contains(script.Families, targetFamily) ||
+		len(script.Models) > 0 && !slices.Contains(script.Models, targetModel) {
 		err = fmt.Errorf("the \"%s\" script is not intended for the target processor (arch: %s, family: %s, model: %s)", script.Name, targetArchitecture, targetFamily, targetModel)
 		return
 	}
@@ -87,9 +88,9 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 	var sequentialScripts []ScriptDefinition
 	var parallelScripts []ScriptDefinition
 	for _, script := range scripts {
-		if len(script.Architectures) > 0 && !util.StringInList(targetArchitecture, script.Architectures) ||
-			len(script.Families) > 0 && !util.StringInList(targetFamily, script.Families) ||
-			len(script.Models) > 0 && !util.StringInList(targetModel, script.Models) {
+		if len(script.Architectures) > 0 && !slices.Contains(script.Architectures, targetArchitecture) ||
+			len(script.Families) > 0 && !slices.Contains(script.Families, targetFamily) ||
+			len(script.Models) > 0 && !slices.Contains(script.Models, targetModel) {
 			slog.Info("skipping script because it is not intended to run on the target processor", slog.String("target", myTarget.GetName()), slog.String("script", script.Name), slog.String("targetArchitecture", targetArchitecture), slog.String("targetFamily", targetFamily), slog.String("targetModel", targetModel))
 			continue
 		}
@@ -232,7 +233,7 @@ func RunScriptAsync(myTarget target.Target, script ScriptDefinition, localTempDi
 		errorChannel <- err
 		return
 	}
-	if len(script.Architectures) > 0 && !util.StringInList(targetArchitecture, script.Architectures) {
+	if len(script.Architectures) > 0 && !slices.Contains(script.Architectures, targetArchitecture) {
 		err = fmt.Errorf("skipping script because it is not meant for this architecture: %s", targetArchitecture)
 		errorChannel <- err
 		return
@@ -473,7 +474,7 @@ func prepareTargetToRunScripts(myTarget target.Target, scripts []ScriptDefinitio
 		}
 		// add dependencies to list of dependencies to copy to target
 		for _, dependency := range script.Depends {
-			if len(script.Architectures) == 0 || util.StringInList(targetArchitecture, script.Architectures) {
+			if len(script.Architectures) == 0 || slices.Contains(script.Architectures, targetArchitecture) {
 				dependenciesToCopy[path.Join(targetArchitecture, dependency)] = 1
 			}
 		}
@@ -501,7 +502,7 @@ func prepareTargetToRunScripts(myTarget target.Target, scripts []ScriptDefinitio
 		var localDependencyPath string
 		// first look for the dependency in the "tools" directory
 		appDir := util.GetAppDir()
-		if util.Exists(path.Join(appDir, "tools", dependency)) {
+		if util.FileOrDirectoryExists(path.Join(appDir, "tools", dependency)) {
 			localDependencyPath = path.Join(appDir, "tools", dependency)
 		} else { // not found in the tools directory, so extract it from resources
 			localDependencyPath, err = util.ExtractResource(Resources, path.Join("resources", dependency), localTempDir)

@@ -9,7 +9,7 @@ import (
 	"html"
 	"log/slog"
 	"math"
-	"perfspect/internal/util"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -823,7 +823,7 @@ func telemetryTableHTMLRenderer(tableValues TableValues, data [][]float64, datas
 	var timestamps []string
 	for i := range tableValues.Fields[0].Values {
 		timestamp := tableValues.Fields[tsFieldIdx].Values[i]
-		if !util.StringInList(timestamp, timestamps) { // could be slow if list is long
+		if !slices.Contains(timestamps, timestamp) { // could be slow if list is long
 			timestamps = append(timestamps, timestamp)
 		}
 	}

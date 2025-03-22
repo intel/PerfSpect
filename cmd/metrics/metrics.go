@@ -26,9 +26,10 @@ import (
 	"perfspect/internal/target"
 	"perfspect/internal/util"
 
+	"slices"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"slices"
 )
 
 const cmdName = "metrics"
@@ -358,7 +359,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	// confirm valid scope
-	if cmd.Flags().Lookup(flagScopeName).Changed && !util.StringInList(flagScope, scopeOptions) {
+	if cmd.Flags().Lookup(flagScopeName).Changed && !slices.Contains(scopeOptions, flagScope) {
 		err := fmt.Errorf("invalid scope: %s, valid options are: %s", flagScope, strings.Join(scopeOptions, ", "))
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
@@ -432,7 +433,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 
 	// output options
 	// confirm valid granularity
-	if cmd.Flags().Lookup(flagGranularityName).Changed && !util.StringInList(flagGranularity, granularityOptions) {
+	if cmd.Flags().Lookup(flagGranularityName).Changed && !slices.Contains(granularityOptions, flagGranularity) {
 		err := fmt.Errorf("invalid granularity: %s, valid options are: %s", flagGranularity, strings.Join(granularityOptions, ", "))
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
@@ -445,7 +446,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	}
 	// confirm valid output format
 	for _, format := range flagOutputFormat {
-		if !util.StringInList(format, formatOptions) {
+		if !slices.Contains(formatOptions, format) {
 			err := fmt.Errorf("invalid output format: %s, valid options are: %s", format, strings.Join(formatOptions, ", "))
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			return err
@@ -1189,14 +1190,14 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 }
 
 func printMetrics(metricFrames []MetricFrame, frameCount int, targetName string, collectionStartTime time.Time, outputDir string) (printedFiles []string) {
-	fileName, err := printMetricsTxt(metricFrames, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatTxt, !flagLive && util.StringInList(formatTxt, flagOutputFormat), outputDir)
+	fileName, err := printMetricsTxt(metricFrames, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatTxt, !flagLive && slices.Contains(flagOutputFormat, formatTxt), outputDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
 	} else if fileName != "" {
 		printedFiles = util.UniqueAppend(printedFiles, fileName)
 	}
-	fileName, err = printMetricsJSON(metricFrames, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatJSON, !flagLive && util.StringInList(formatJSON, flagOutputFormat), outputDir)
+	fileName, err = printMetricsJSON(metricFrames, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatJSON, !flagLive && slices.Contains(flagOutputFormat, formatJSON), outputDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
@@ -1211,7 +1212,7 @@ func printMetrics(metricFrames []MetricFrame, frameCount int, targetName string,
 	} else if fileName != "" {
 		printedFiles = util.UniqueAppend(printedFiles, fileName)
 	}
-	fileName, err = printMetricsWide(metricFrames, frameCount, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatWide, !flagLive && util.StringInList(formatWide, flagOutputFormat), outputDir)
+	fileName, err = printMetricsWide(metricFrames, frameCount, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatWide, !flagLive && slices.Contains(flagOutputFormat, formatWide), outputDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())

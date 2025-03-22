@@ -8,13 +8,13 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
 	"perfspect/internal/common"
 	"perfspect/internal/report"
 	"perfspect/internal/script"
-	"perfspect/internal/util"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -211,7 +211,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	for _, format := range common.FlagFormat {
 		formatOptions := []string{report.FormatAll}
 		formatOptions = append(formatOptions, report.FormatOptions...)
-		if !util.StringInList(format, formatOptions) {
+		if !slices.Contains(formatOptions, format) {
 			err := fmt.Errorf("format options are: %s", strings.Join(formatOptions, ", "))
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			return err

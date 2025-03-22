@@ -13,8 +13,6 @@ import (
 	"strconv"
 	"strings"
 
-	"perfspect/internal/util"
-
 	"golang.org/x/exp/slices"
 )
 
@@ -233,7 +231,7 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 		var cgroups []string
 		for _, event := range allEvents {
 			var cgroupIdx int
-			if cgroupIdx, err = util.StringIndexInList(event.Cgroup, cgroups); err != nil {
+			if cgroupIdx = slices.Index(cgroups, event.Cgroup); cgroupIdx == -1 {
 				cgroups = append(cgroups, event.Cgroup)
 				cgroupIdx = len(cgroups) - 1
 				allCgroupEvents = append(allCgroupEvents, []Event{})
