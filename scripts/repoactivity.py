@@ -39,11 +39,15 @@ headers = {
 if args.token:
     headers['Authorization'] = f'token {args.token}'
 
-# Get commits
+# Get commits with pagination
 commits_url = f'https://api.github.com/repos/{args.owner}/{args.repo}/commits'
-commits_params = {'since': start_date, 'until': end_date}
-commits_response = requests.get(commits_url, headers=headers, params=commits_params)
-commits = commits_response.json()
+commits_params = {'since': start_date, 'until': end_date, 'per_page': 100}
+commits = []
+while commits_url:
+    commits_response = requests.get(commits_url, headers=headers, params=commits_params)
+    commits_page = commits_response.json()
+    commits.extend(commits_page)
+    commits_url = commits_response.links.get('next', {}).get('url')
 
 # Get issues with pagination and check dates
 issues_url = f'https://api.github.com/repos/{args.owner}/{args.repo}/issues'
@@ -63,14 +67,16 @@ while issues_url:
 
 # Get pull requests with pagination and check dates
 pulls_url = f'https://api.github.com/repos/{args.owner}/{args.repo}/pulls'
-pulls_params = {'state': 'all', 'direction': 'asc', 'per_page': 100}
+pulls_params = {'state': 'all', 'direction': 'desc', 'per_page': 100}
 pulls = []
-while pulls_url:
+stop_retrieving = False
+while pulls_url and not stop_retrieving:
     pulls_response = requests.get(pulls_url, headers=headers, params=pulls_params)
     pulls_page = pulls_response.json()
     for pull in pulls_page:
         created_at = datetime.strptime(pull['created_at'], '%Y-%m-%dT%H:%M:%SZ')
-        if created_at > datetime.strptime(end_date, '%Y-%m-%dT%H:%M:%SZ'):
+        if created_at < datetime.strptime(start_date, '%Y-%m-%dT%H:%M:%SZ'):
+            stop_retrieving = True
             break
         pulls.append(pull)
     pulls_url = pulls_response.links.get('next', {}).get('url')
