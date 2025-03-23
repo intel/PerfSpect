@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# repoactivity.py
+# Analyze GitHub repository activity
+# Usage: python repoactivity.py owner repo start_date end_date [--output csv|human] [--header-only] [--token token]
+# Example: python repoactivity.py octocat hello-world 2021-01-01 2021-12-31 --output csv --token YOUR_GITHUB_TOKEN
 import requests
 import argparse
 import os
