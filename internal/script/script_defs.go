@@ -1052,7 +1052,7 @@ avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd
 	},
 	TurboFrequencyPowerAndTemperatureScriptName: {
 		Name:           TurboFrequencyPowerAndTemperatureScriptName,
-		ScriptTemplate: `((turbostat -i 2 2>/dev/null &) ; stress-ng --cpu 1 -t 20s 2>&1 ; stress-ng --cpu 0 -t 60s 2>&1 ; pkill -9 -f turbostat) | awk '$0~"stress" {print $0} $1=="Package" || $1=="CPU" || $1=="Core" || $1=="Node" {if(f!=1) print $0;f=1} $1=="-" {print $0}'		`,
+		ScriptTemplate: `((turbostat --show PkgTmp,PkgWatt -i 2 2>/dev/null &) ; stress-ng --cpu 0 --bsearch 0 -t 120s >/dev/null 2>&1 ; pkill -9 -f turbostat) | awk '$1=="PkgTmp" {if(f!=1) print $0;f=1} $1!="PkgTmp" {print $0}'`,
 		Superuser:      true,
 		Lkms:           []string{"msr"},
 		Depends:        []string{"turbostat", "stress-ng"},
