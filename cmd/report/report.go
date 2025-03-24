@@ -360,9 +360,9 @@ func benchmarkSummaryFromTableValues(allTableValues []report.TableValues, output
 			TextTableRendererFunc: summaryTextTableRenderer,
 		},
 		Fields: []report.Field{
-			{Name: "CPU Speed", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUSpeedTableName), "Ops/s", 0) + (" Ops/s")}},
-			{Name: "Single-core Maximum frequency"},
-			{Name: "All-core Maximum frequency"},
+			{Name: "CPU Speed", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUSpeedTableName), "Ops/s", 0) + " Ops/s"}},
+			{Name: "Single-core Maximum frequency", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUFrequencyTableName), "non-avx", 0) + " GHz"}},
+			{Name: "All-core Maximum frequency", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUFrequencyTableName), "non-avx", -1) + " GHz"}},
 			{Name: "Maximum Power", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUPowerTableName), "Maximum Power", 0)}},
 			{Name: "Maximum Temperature", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUTemperatureTableName), "Maximum Temperature", 0)}},
 			{Name: "Minimum Power", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUPowerTableName), "Minimum Power", 0)}},
@@ -374,11 +374,6 @@ func benchmarkSummaryFromTableValues(allTableValues []report.TableValues, output
 			{Name: "Sockets", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.SystemSummaryTableName), "Sockets", 0)}},
 		},
 	}
-	// get the maximum frequencies from turbostat output
-	singleCore, allCore, _, _ := report.ParseTurbostatOutput(outputs[script.TurboFrequencyPowerAndTemperatureScriptName].Stdout)
-	tableValues.Fields[1].Values = []string{singleCore}
-	tableValues.Fields[2].Values = []string{allCore}
-
 	// get the maximum memory bandwidth from the memory latency table
 	memLatTableValues := getTableValues(allTableValues, report.MemoryLatencyTableName)
 	var bandwidthValues []string
