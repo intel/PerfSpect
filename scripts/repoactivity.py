@@ -5,7 +5,6 @@
 # Example: python repoactivity.py octocat hello-world 2021-01-01 2021-12-31 --output csv --token YOUR_GITHUB_TOKEN
 import requests
 import argparse
-import os
 from datetime import datetime
 
 # Parse command line arguments
@@ -29,8 +28,8 @@ if not args.owner or not args.repo or not args.start_date or not args.end_date:
     parser.error("the following arguments are required: owner, repo, start_date, end_date")
 
 # Define the date range
-start_date = f'{args.start_date}T00:00:00Z'
-end_date = f'{args.end_date}T23:59:59Z'
+start_date = datetime.strptime(f'{args.start_date}T00:00:00Z', '%Y-%m-%dT%H:%M:%SZ')
+end_date = datetime.strptime(f'{args.end_date}T23:59:59Z', '%Y-%m-%dT%H:%M:%SZ')
 
 # Define the headers for the API requests
 headers = {
@@ -41,7 +40,7 @@ if args.token:
 
 # Get commits with pagination
 commits_url = f'https://api.github.com/repos/{args.owner}/{args.repo}/commits'
-commits_params = {'since': start_date, 'until': end_date, 'per_page': 100}
+commits_params = {'since': start_date.strftime('%Y-%m-%d'), 'until': end_date.strftime('%Y-%m-%d'), 'per_page': 100}
 commits = []
 while commits_url:
     commits_response = requests.get(commits_url, headers=headers, params=commits_params)
@@ -49,37 +48,23 @@ while commits_url:
     commits.extend(commits_page)
     commits_url = commits_response.links.get('next', {}).get('url')
 
-# Get issues with pagination and check dates
+# Get issues and pull requests (pull requests are a special type of issue) with pagination and check dates
 issues_url = f'https://api.github.com/repos/{args.owner}/{args.repo}/issues'
-issues_params = {'since': start_date, 'state': 'all', 'direction': 'asc', 'per_page': 100}
+issues_params = {'since': start_date.strftime('%Y-%m-%d'), 'state': 'all', 'direction': 'asc', 'per_page': 100}
 issues = []
+pulls = []
 while issues_url:
     issues_response = requests.get(issues_url, headers=headers, params=issues_params)
     issues_page = issues_response.json()
     for issue in issues_page:
-        if 'pull_request' in issue:
-            continue
         created_at = datetime.strptime(issue['created_at'], '%Y-%m-%dT%H:%M:%SZ')
-        if created_at > datetime.strptime(end_date, '%Y-%m-%dT%H:%M:%SZ'):
+        if created_at > end_date:
             break
+        if 'pull_request' in issue:
+            pulls.append(issue)
+            continue
         issues.append(issue)
     issues_url = issues_response.links.get('next', {}).get('url')
-
-# Get pull requests with pagination and check dates
-pulls_url = f'https://api.github.com/repos/{args.owner}/{args.repo}/pulls'
-pulls_params = {'state': 'all', 'direction': 'desc', 'per_page': 100}
-pulls = []
-stop_retrieving = False
-while pulls_url and not stop_retrieving:
-    pulls_response = requests.get(pulls_url, headers=headers, params=pulls_params)
-    pulls_page = pulls_response.json()
-    for pull in pulls_page:
-        created_at = datetime.strptime(pull['created_at'], '%Y-%m-%dT%H:%M:%SZ')
-        if created_at < datetime.strptime(start_date, '%Y-%m-%dT%H:%M:%SZ'):
-            stop_retrieving = True
-            break
-        pulls.append(pull)
-    pulls_url = pulls_response.links.get('next', {}).get('url')
 
 # Count the number of commits
 num_commits = len(commits)
@@ -89,11 +74,11 @@ num_issues_opened = 0
 num_issues_closed = 0
 for issue in issues:
     created_at = datetime.strptime(issue['created_at'], '%Y-%m-%dT%H:%M:%SZ')
-    if start_date <= issue['created_at'] <= end_date:
+    if start_date <= created_at <= end_date:
         num_issues_opened += 1
     if issue['closed_at']:
         closed_at = datetime.strptime(issue['closed_at'], '%Y-%m-%dT%H:%M:%SZ')
-        if start_date <= issue['closed_at'] <= end_date:
+        if start_date <= closed_at <= end_date:
             num_issues_closed += 1
 
 # Count the number of pull requests opened and merged in the date range
@@ -101,11 +86,11 @@ num_pulls_opened = 0
 num_pulls_merged = 0
 for pull in pulls:
     created_at = datetime.strptime(pull['created_at'], '%Y-%m-%dT%H:%M:%SZ')
-    if start_date <= pull['created_at'] <= end_date:
+    if start_date <= created_at <= end_date:
         num_pulls_opened += 1
-    if pull['merged_at']:
-        merged_at = datetime.strptime(pull['merged_at'], '%Y-%m-%dT%H:%M:%SZ')
-        if start_date <= pull['merged_at'] <= end_date:
+    if pull['pull_request']['merged_at']:
+        merged_at = datetime.strptime(pull['pull_request']['merged_at'], '%Y-%m-%dT%H:%M:%SZ')
+        if start_date <= merged_at <= end_date:
             num_pulls_merged += 1
 
 # Print the results
