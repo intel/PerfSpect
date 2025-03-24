@@ -245,7 +245,7 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 		return
 	}
 	for uncoreDeviceName := range metadata.UncoreDeviceIDs {
-		if uncoreDeviceName == "cha" { // could be any uncore device
+		if uncoreDeviceName == "cha" || uncoreDeviceName == "l3" || uncoreDeviceName == "df" { // could be any uncore device
 			metadata.SupportsUncore = true
 			break
 		}
@@ -370,9 +370,9 @@ func ReadJSONFromFile(path string) (md Metadata, err error) {
 // e.g., "upi" -> [0,1,2,3],
 func getUncoreDeviceIDs(myTarget target.Target, localTempDir string) (IDs map[string][]int, err error) {
 	scriptDef := script.ScriptDefinition{
-		Name:           "list uncore devices",
-		ScriptTemplate: "find /sys/bus/event_source/devices/ \\( -name uncore_* -o -name amd_* \\)",
-		Superuser:      false,
+		Name:      "list uncore devices",
+		Script:    "find /sys/bus/event_source/devices/ \\( -name uncore_* -o -name amd_* \\)",
+		Superuser: false,
 	}
 	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
 	if err != nil {
@@ -381,15 +381,17 @@ func getUncoreDeviceIDs(myTarget target.Target, localTempDir string) (IDs map[st
 	}
 	fileNames := strings.Split(scriptOutput.Stdout, "\n")
 	IDs = make(map[string][]int)
-	re := regexp.MustCompile(`(?:uncore_|amd_)(.*)_(\d+)`)
+	re := regexp.MustCompile(`(?:uncore_|amd_)(.*?)(?:_(\d+))?$`)
 	for _, fileName := range fileNames {
 		match := re.FindStringSubmatch(fileName)
 		if match == nil {
 			continue
 		}
 		var id int
-		if id, err = strconv.Atoi(match[2]); err != nil {
-			return
+		if match[2] != "" {
+			if id, err = strconv.Atoi(match[2]); err != nil {
+				return
+			}
 		}
 		IDs[match[1]] = append(IDs[match[1]], id)
 	}
@@ -405,7 +407,7 @@ func getCPUInfo(myTarget target.Target) (cpuInfo []map[string]string, err error)
 		return
 	}
 	oneCPUInfo := make(map[string]string)
-	for line := range strings.SplitSeq(stdout, "\n") {
+	for _, line := range strings.Split(stdout, "\n") {
 		fields := strings.Split(line, ":")
 		if len(fields) < 2 {
 			if len(oneCPUInfo) > 0 {
@@ -437,9 +439,9 @@ func getPerfSupportedEvents(myTarget target.Target, perfPath string) (supportedE
 // getSupportsEvent() - checks if the event is supported by perf
 func getSupportsEvent(myTarget target.Target, event string, noRoot bool, perfPath string, localTempDir string) (supported bool, output string, err error) {
 	scriptDef := script.ScriptDefinition{
-		Name:           "perf stat " + event,
-		ScriptTemplate: perfPath + " stat -a -e " + event + " sleep 1",
-		Superuser:      !noRoot,
+		Name:      "perf stat " + event,
+		Script:    perfPath + " stat -a -e " + event + " sleep 1",
+		Superuser: !noRoot,
 	}
 	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
 	if err != nil {
@@ -456,9 +458,9 @@ func getSupportsEvent(myTarget target.Target, event string, noRoot bool, perfPat
 // it is a PEBS event that we used in EMR metrics.
 func getSupportsPEBS(myTarget target.Target, noRoot bool, perfPath string, localTempDir string) (supported bool, output string, err error) {
 	scriptDef := script.ScriptDefinition{
-		Name:           "perf stat pebs",
-		ScriptTemplate: perfPath + " stat -a -e cpu/event=0xad,umask=0x40,period=1000003,name='INT_MISC.UNKNOWN_BRANCH_CYCLES'/ sleep 1",
-		Superuser:      !noRoot,
+		Name:      "perf stat pebs",
+		Script:    perfPath + " stat -a -e cpu/event=0xad,umask=0x40,period=1000003,name='INT_MISC.UNKNOWN_BRANCH_CYCLES'/ sleep 1",
+		Superuser: !noRoot,
 	}
 	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
 	if err != nil {
@@ -473,9 +475,9 @@ func getSupportsPEBS(myTarget target.Target, noRoot bool, perfPath string, local
 // On some VMs, e.g. GCP C4, offcore response events are not supported and perf returns '<not supported>'
 func getSupportsOCR(myTarget target.Target, noRoot bool, perfPath string, localTempDir string) (supported bool, output string, err error) {
 	scriptDef := script.ScriptDefinition{
-		Name:           "perf stat ocr",
-		ScriptTemplate: perfPath + " stat -a -e cpu/event=0x2a,umask=0x01,offcore_rsp=0x104004477,name='OCR.READS_TO_CORE.LOCAL_DRAM'/ sleep 1",
-		Superuser:      !noRoot,
+		Name:      "perf stat ocr",
+		Script:    perfPath + " stat -a -e cpu/event=0x2a,umask=0x01,offcore_rsp=0x104004477,name='OCR.READS_TO_CORE.LOCAL_DRAM'/ sleep 1",
+		Superuser: !noRoot,
 	}
 	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
 	if err != nil {
@@ -499,9 +501,9 @@ func getSupportsOCR(myTarget target.Target, noRoot bool, perfPath string, localT
 // All three of these failure modes are checked for in this function.
 func getSupportsFixedTMA(myTarget target.Target, noRoot bool, perfPath string, localTempDir string) (supported bool, output string, err error) {
 	scriptDef := script.ScriptDefinition{
-		Name:           "perf stat tma",
-		ScriptTemplate: perfPath + " stat -a -e '{cpu/event=0x00,umask=0x04,period=10000003,name='TOPDOWN.SLOTS'/,cpu/event=0x00,umask=0x81,period=10000003,name='PERF_METRICS.BAD_SPECULATION'/}' sleep 1",
-		Superuser:      !noRoot,
+		Name:      "perf stat tma",
+		Script:    perfPath + " stat -a -e '{cpu/event=0x00,umask=0x04,period=10000003,name='TOPDOWN.SLOTS'/,cpu/event=0x00,umask=0x81,period=10000003,name='PERF_METRICS.BAD_SPECULATION'/}' sleep 1",
+		Superuser: !noRoot,
 	}
 	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
 	if err != nil {
@@ -555,18 +557,22 @@ func getSupportsFixedEvent(myTarget target.Target, event string, uarch string, n
 		fallthrough
 	case "GNR":
 		numGPCounters = 8
+	case "Gen":
+		fallthrough
+	case "Ber":
+		numGPCounters = 5
 	default:
 		err = fmt.Errorf("unsupported uarch: %s", uarch)
 		return
 	}
 	var eventList []string
-	for range numGPCounters {
+	for i := 0; i < numGPCounters; i++ {
 		eventList = append(eventList, event)
 	}
 	scriptDef := script.ScriptDefinition{
-		Name:           "perf stat fixed" + event,
-		ScriptTemplate: perfPath + " stat -a -e '{" + strings.Join(eventList, ",") + "}' sleep 1",
-		Superuser:      !noRoot,
+		Name:      "perf stat fixed" + event,
+		Script:    perfPath + " stat -a -e '{" + strings.Join(eventList, ",") + "}' sleep 1",
+		Superuser: !noRoot,
 	}
 	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
 	if err != nil {
@@ -580,8 +586,8 @@ func getSupportsFixedEvent(myTarget target.Target, event string, uarch string, n
 		return
 	}
 	// on some VMs we get a count of 0
-	lines := strings.SplitSeq(output, "\n")
-	for line := range lines {
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
 		tokens := strings.Fields(line)
 		if len(tokens) == 2 && tokens[0] == "0" {
 			supported = false
@@ -595,9 +601,9 @@ func getSupportsFixedEvent(myTarget target.Target, event string, uarch string, n
 // getPMUDriverVersion - returns the version of the Intel PMU driver
 func getPMUDriverVersion(myTarget target.Target, localTempDir string) (version string, err error) {
 	scriptDef := script.ScriptDefinition{
-		Name:           "pmu driver version",
-		ScriptTemplate: "dmesg | grep -A 1 \"Intel PMU driver\" | tail -1 | awk '{print $NF}'",
-		Superuser:      true,
+		Name:      "pmu driver version",
+		Script:    "dmesg | grep -A 1 \"Intel PMU driver\" | tail -1 | awk '{print $NF}'",
+		Superuser: true,
 	}
 	output, err := script.RunScript(myTarget, scriptDef, localTempDir)
 	if err != nil {
@@ -613,9 +619,9 @@ func getPMUDriverVersion(myTarget target.Target, localTempDir string) (version s
 func getTSCFreqHz(myTarget target.Target, localTempDir string) (freqHz int, err error) {
 	// run tsc app on target to get TSC Frequency in MHz
 	scriptDef := script.ScriptDefinition{
-		Name:           "tsc",
-		ScriptTemplate: "tsc",
-		Depends:        []string{"tsc"},
+		Name:    "tsc",
+		Script:  "tsc",
+		Depends: []string{"tsc"},
 	}
 	output, err := script.RunScript(myTarget, scriptDef, localTempDir)
 	if err != nil {
@@ -632,8 +638,8 @@ func getTSCFreqHz(myTarget target.Target, localTempDir string) (freqHz int, err 
 
 func getKernelVersion(myTarget target.Target, localTempDir string) (version string, err error) {
 	scriptDef := script.ScriptDefinition{
-		Name:           "kernel version",
-		ScriptTemplate: "uname -r",
+		Name:   "kernel version",
+		Script: "uname -r",
 	}
 	output, err := script.RunScript(myTarget, scriptDef, localTempDir)
 	if err != nil {
@@ -656,7 +662,7 @@ func createCPUSocketMap(coresPerSocket int, sockets int, hyperthreading bool) (c
 		totalCPUs *= 2 // hyperthreading doubles the number of logical CPUs
 	}
 	// Assign each CPU to a socket
-	for i := range totalCPUs {
+	for i := 0; i < totalCPUs; i++ {
 		// Assume that the CPUs are evenly distributed between the sockets
 		socket := i / coresPerSocket
 		if hyperthreading {

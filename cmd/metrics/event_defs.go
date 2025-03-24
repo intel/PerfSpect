@@ -226,7 +226,7 @@ func parseEventDefinition(line string) (eventDef EventDefinition, err error) {
 
 // expandUncoreGroup expands a perf event group into a list of groups where each group is
 // associated with an uncore device
-func expandUncoreGroup(group GroupDefinition, ids []int, re *regexp.Regexp) (groups []GroupDefinition, err error) {
+func expandUncoreGroup(group GroupDefinition, ids []int, re *regexp.Regexp, vendor string) (groups []GroupDefinition, err error) {
 	for _, deviceID := range ids {
 		var newGroup GroupDefinition
 		for _, event := range group {
@@ -236,8 +236,13 @@ func expandUncoreGroup(group GroupDefinition, ids []int, re *regexp.Regexp) (gro
 				return
 			}
 			var newEvent EventDefinition
-			newEvent.Name = fmt.Sprintf("%s.%d", match[4], deviceID)
-			newEvent.Raw = fmt.Sprintf("uncore_%s_%d/event=%s,umask=%s,name='%s'/", match[1], deviceID, match[2], match[3], newEvent.Name)
+			if vendor == "AuthenticAMD" {
+				newEvent.Name = match[4]
+				newEvent.Raw = fmt.Sprintf("amd_%s/event=%s,umask=%s,name='%s'/", match[1], match[2], match[3], newEvent.Name)
+			} else {
+				newEvent.Name = fmt.Sprintf("%s.%d", match[4], deviceID)
+				newEvent.Raw = fmt.Sprintf("uncore_%s_%d/event=%s,umask=%s,name='%s'/", match[1], deviceID, match[2], match[3], newEvent.Name)
+			}
 			newEvent.Device = event.Device
 			newGroup = append(newGroup, newEvent)
 		}
@@ -266,7 +271,7 @@ func expandUncoreGroups(groups []GroupDefinition, metadata Metadata) (expandedGr
 				slog.Warn("No uncore devices found", slog.String("type", device))
 				continue
 			}
-			if newGroups, err = expandUncoreGroup(group, metadata.UncoreDeviceIDs[device], re); err != nil {
+			if newGroups, err = expandUncoreGroup(group, metadata.UncoreDeviceIDs[device], re, metadata.Vendor); err != nil {
 				return
 			}
 			expandedGroups = append(expandedGroups, newGroups...)

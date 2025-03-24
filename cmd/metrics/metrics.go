@@ -28,7 +28,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"slices"
 )
 
 const cmdName = "metrics"
@@ -72,7 +71,7 @@ func setSignalReceived() {
 }
 
 func getSignalReceived() bool {
-	for range 10 {
+	for i := 0; i < 10; i++ {
 		gSignalMutex.Lock()
 		received := gSignalReceived
 		gSignalMutex.Unlock()
@@ -734,7 +733,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		if targetErrs[i] != nil {
 			_ = multiSpinner.Status(myTargets[i].GetName(), fmt.Sprintf("Error: %v", targetErrs[i]))
 			// remove target from targets list
-			myTargets = slices.Delete(myTargets, i, i+1)
+			myTargets = append(myTargets[:i], myTargets[i+1:]...)
 		}
 	}
 	// check if any targets remain
@@ -787,7 +786,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 	targetTempRoot, _ := cmd.Flags().GetString(common.FlagTargetTempDirName)
 	for i := range targetContexts {
-		go prepareTarget(&targetContexts[i], targetTempRoot, localTempDir, localPerfPath, channelTargetError, multiSpinner.Status)
+		go prepareTarget(&targetContexts[i], targetTempRoot, localTempDir, localPerfPath, channelTargetError, multiSpinner.Status, !cmd.Flags().Lookup(flagPerfMuxIntervalName).Changed)
 	}
 	// wait for all targets to be prepared
 	numPreparedTargets := 0
@@ -994,7 +993,7 @@ func summarizeMetrics(localOutputDir string, targetName string, metadata Metadat
 	return filesCreated, nil
 }
 
-func prepareTarget(targetContext *targetContext, targetTempRoot string, localTempDir string, localPerfPath string, channelError chan targetError, statusUpdate progress.MultiSpinnerUpdateFunc) {
+func prepareTarget(targetContext *targetContext, targetTempRoot string, localTempDir string, localPerfPath string, channelError chan targetError, statusUpdate progress.MultiSpinnerUpdateFunc, useDefaultMuxInterval bool) {
 	myTarget := targetContext.target
 	var err error
 	// create a temporary directory on the target
@@ -1015,7 +1014,7 @@ func prepareTarget(targetContext *targetContext, targetTempRoot string, localTem
 			channelError <- targetError{target: myTarget, err: err}
 			return
 		}
-		for line := range strings.SplitSeq(output.Stdout, "\n") {
+		for _, line := range strings.Split(output.Stdout, "\n") {
 			// if one of the MSR registers is active (ignore cpu_cycles), then the PMU is in use
 			if strings.Contains(line, "Active") && !strings.Contains(line, "0x30a") {
 				err = fmt.Errorf("PMU in use on target: %s", line)
@@ -1045,6 +1044,13 @@ func prepareTarget(targetContext *targetContext, targetTempRoot string, localTem
 				return
 			}
 			targetContext.nmiDisabled = true
+		}
+	}
+	// update default mux interval to 10ms for AMD architecture
+	if !flagNoRoot && useDefaultMuxInterval {
+		vendor, err := myTarget.GetVendor()
+		if err == nil && vendor == "AuthenticAMD" {
+			flagPerfMuxInterval = 16
 		}
 	}
 	// set perf mux interval to desired value
@@ -1443,7 +1449,7 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 	scriptErrorChannel := make(chan error)
 	cmdChannel := make(chan *exec.Cmd)
 	slog.Debug("running perf stat", slog.String("command", perfCommand))
-	go script.RunScriptAsync(myTarget, script.ScriptDefinition{Name: "perf stat", ScriptTemplate: perfCommand, Superuser: !noRoot}, localTempDir, stdoutChannel, stderrChannel, exitcodeChannel, scriptErrorChannel, cmdChannel)
+	go script.RunScriptAsync(myTarget, script.ScriptDefinition{Name: "perf stat", Script: perfCommand, Superuser: !noRoot}, localTempDir, stdoutChannel, stderrChannel, exitcodeChannel, scriptErrorChannel, cmdChannel)
 	var localCommand *exec.Cmd
 	select {
 	case cmd := <-cmdChannel:
