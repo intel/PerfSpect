@@ -38,7 +38,7 @@ headers = {
 if args.token:
     headers['Authorization'] = f'token {args.token}'
 
-# Get commits with pagination
+# Get commits
 commits_url = f'https://api.github.com/repos/{args.owner}/{args.repo}/commits'
 commits_params = {'since': start_date.strftime('%Y-%m-%d'), 'until': end_date.strftime('%Y-%m-%d'), 'per_page': 100}
 commits = []
@@ -48,23 +48,26 @@ while commits_url:
     commits.extend(commits_page)
     commits_url = commits_response.links.get('next', {}).get('url')
 
-# Get issues and pull requests (pull requests are a special type of issue) with pagination and check dates
+# Get issues and pull requests (pull requests are a special type of issue)
 issues_url = f'https://api.github.com/repos/{args.owner}/{args.repo}/issues'
 issues_params = {'since': start_date.strftime('%Y-%m-%d'), 'state': 'all', 'direction': 'asc', 'per_page': 100}
 issues = []
 pulls = []
-while issues_url:
+get_more = True
+while issues_url and get_more:
     issues_response = requests.get(issues_url, headers=headers, params=issues_params)
     issues_page = issues_response.json()
     for issue in issues_page:
         created_at = datetime.strptime(issue['created_at'], '%Y-%m-%dT%H:%M:%SZ')
         if created_at > end_date:
+            get_more = False
             break
         if 'pull_request' in issue:
             pulls.append(issue)
             continue
         issues.append(issue)
-    issues_url = issues_response.links.get('next', {}).get('url')
+    if get_more:
+        issues_url = issues_response.links.get('next', {}).get('url')
 
 # Count the number of commits
 num_commits = len(commits)
