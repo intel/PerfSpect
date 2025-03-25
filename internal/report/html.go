@@ -541,9 +541,16 @@ func dimmDetails(dimm []string) (details string) {
 			strings.HasSuffix(dimm[PartIdx], dimm[SerialIdx]) {
 			partNumber = dimm[PartIdx][:len(dimm[PartIdx])-len(dimm[SerialIdx])]
 		}
-		details = dimm[SizeIdx] + " @" + dimm[ConfiguredSpeedIdx]
-		details += " " + dimm[TypeIdx] + " " + dimm[DetailIdx]
-		details += " " + dimm[ManufacturerIdx] + " " + partNumber
+		// example: "64GB DDR5 R2 Synchronous Registered (Buffered) Micron Technology MTC78ASF4G72PZ-2G6E1 6400 MT/s [6000 MT/s]"
+		details = fmt.Sprintf("%s %s %s R%s %s %s %s [%s]",
+			strings.ReplaceAll(dimm[SizeIdx], " ", ""),
+			dimm[TypeIdx],
+			dimm[DetailIdx],
+			dimm[RankIdx],
+			dimm[ManufacturerIdx],
+			partNumber,
+			strings.ReplaceAll(dimm[SpeedIdx], " ", ""),
+			strings.ReplaceAll(dimm[ConfiguredSpeedIdx], " ", ""))
 	}
 	return
 }

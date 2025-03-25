@@ -73,8 +73,8 @@ func installedMemoryFromOutput(outputs map[string]script.ScriptOutput) string {
 			sum := count * size
 			unit := match[2]
 			dimmType := fields[0]
-			speed := fields[2]
-			configuredSpeed := fields[3]
+			speed := strings.ReplaceAll(fields[2], " ", "")
+			configuredSpeed := strings.ReplaceAll(fields[3], " ", "")
 			summary := fmt.Sprintf("%d%s (%dx%d%s %s %s [%s])", sum, unit, count, size, unit, dimmType, speed, configuredSpeed)
 			summaries = append(summaries, summary)
 		}

@@ -350,35 +350,14 @@ func runCmd(cmd *cobra.Command, args []string) error {
 }
 
 func benchmarkSummaryFromTableValues(allTableValues []report.TableValues, outputs map[string]script.ScriptOutput) report.TableValues {
-	tableValues := report.TableValues{
-		TableDefinition: report.TableDefinition{
-			Name:                  benchmarkSummaryTableName,
-			HasRows:               false,
-			MenuLabel:             benchmarkSummaryTableName,
-			HTMLTableRendererFunc: summaryHTMLTableRenderer,
-			XlsxTableRendererFunc: summaryXlsxTableRenderer,
-			TextTableRendererFunc: summaryTextTableRenderer,
-		},
-		Fields: []report.Field{
-			{Name: "CPU Speed", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUSpeedTableName), "Ops/s", 0) + (" Ops/s")}},
-			{Name: "Single-core Maximum frequency"},
-			{Name: "All-core Maximum frequency"},
-			{Name: "Maximum Power", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUPowerTableName), "Maximum Power", 0)}},
-			{Name: "Maximum Temperature", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUTemperatureTableName), "Maximum Temperature", 0)}},
-			{Name: "Minimum Power", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUPowerTableName), "Minimum Power", 0)}},
-			{Name: "Memory Peak Bandwidth"},
-			{Name: "Memory Minimum Latency"},
-			{Name: "Disk Read Bandwidth", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.StoragePerfTableName), "Single-Thread Read Bandwidth", 0)}},
-			{Name: "Disk Write Bandwidth", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.StoragePerfTableName), "Single-Thread Write Bandwidth", 0)}},
-			{Name: "Microarchitecture", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.SystemSummaryTableName), "Microarchitecture", 0)}},
-			{Name: "Sockets", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.SystemSummaryTableName), "Sockets", 0)}},
-		},
+	maxFreq := getValueFromTableValues(getTableValues(allTableValues, report.CPUFrequencyTableName), "non-avx", 0)
+	if maxFreq != "" {
+		maxFreq = maxFreq + " GHz"
 	}
-	// get the maximum frequencies from turbostat output
-	singleCore, allCore, _, _ := report.ParseTurbostatOutput(outputs[script.TurboFrequencyPowerAndTemperatureScriptName].Stdout)
-	tableValues.Fields[1].Values = []string{singleCore}
-	tableValues.Fields[2].Values = []string{allCore}
-
+	allCoreMaxFreq := getValueFromTableValues(getTableValues(allTableValues, report.CPUFrequencyTableName), "non-avx", -1)
+	if allCoreMaxFreq != "" {
+		allCoreMaxFreq = allCoreMaxFreq + " GHz"
+	}
 	// get the maximum memory bandwidth from the memory latency table
 	memLatTableValues := getTableValues(allTableValues, report.MemoryLatencyTableName)
 	var bandwidthValues []string
@@ -396,19 +375,40 @@ func benchmarkSummaryFromTableValues(allTableValues []report.TableValues, output
 			maxBandwidth = bandwidth
 		}
 	}
+	maxMemBW := ""
 	if maxBandwidth != 0 {
-		tableValues.Fields[6].Values = []string{fmt.Sprintf("%.1f GB/s", maxBandwidth)}
-	} else {
-		tableValues.Fields[6].Values = []string{""}
+		maxMemBW = fmt.Sprintf("%.1f GB/s", maxBandwidth)
 	}
 	// get the minimum memory latency
 	minLatency := getValueFromTableValues(getTableValues(allTableValues, report.MemoryLatencyTableName), "Latency (ns)", 0)
 	if minLatency != "" {
-		tableValues.Fields[7].Values = []string{minLatency + " ns"}
-	} else {
-		tableValues.Fields[7].Values = []string{""}
+		minLatency = minLatency + " ns"
 	}
-	return tableValues
+
+	return report.TableValues{
+		TableDefinition: report.TableDefinition{
+			Name:                  benchmarkSummaryTableName,
+			HasRows:               false,
+			MenuLabel:             benchmarkSummaryTableName,
+			HTMLTableRendererFunc: summaryHTMLTableRenderer,
+			XlsxTableRendererFunc: summaryXlsxTableRenderer,
+			TextTableRendererFunc: summaryTextTableRenderer,
+		},
+		Fields: []report.Field{
+			{Name: "CPU Speed", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUSpeedTableName), "Ops/s", 0) + " Ops/s"}},
+			{Name: "Single-core Maximum frequency", Values: []string{maxFreq}},
+			{Name: "All-core Maximum frequency", Values: []string{allCoreMaxFreq}},
+			{Name: "Maximum Power", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUPowerTableName), "Maximum Power", 0)}},
+			{Name: "Maximum Temperature", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUTemperatureTableName), "Maximum Temperature", 0)}},
+			{Name: "Minimum Power", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUPowerTableName), "Minimum Power", 0)}},
+			{Name: "Memory Peak Bandwidth", Values: []string{maxMemBW}},
+			{Name: "Memory Minimum Latency", Values: []string{minLatency}},
+			{Name: "Disk Read Bandwidth", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.StoragePerfTableName), "Single-Thread Read Bandwidth", 0)}},
+			{Name: "Disk Write Bandwidth", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.StoragePerfTableName), "Single-Thread Write Bandwidth", 0)}},
+			{Name: "Microarchitecture", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.SystemSummaryTableName), "Microarchitecture", 0)}},
+			{Name: "Sockets", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.SystemSummaryTableName), "Sockets", 0)}},
+		},
+	}
 }
 
 // getTableValues returns the table values for a table with a given name
