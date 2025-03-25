@@ -144,7 +144,7 @@ func ParseTurbostatOutput(output string) (turboPower, turboTemperature string) {
 }
 
 func maxPowerFromOutput(outputs map[string]script.ScriptOutput) string {
-	power, _ := ParseTurbostatOutput(outputs[script.TurboFrequencyPowerAndTemperatureScriptName].Stdout)
+	power, _ := ParseTurbostatOutput(outputs[script.MaxPowerAndTemperatureScriptName].Stdout)
 	return power
 }
 
@@ -157,7 +157,7 @@ func minPowerFromOutput(outputs map[string]script.ScriptOutput) string {
 }
 
 func maxTemperatureFromOutput(outputs map[string]script.ScriptOutput) string {
-	_, temperature := ParseTurbostatOutput(outputs[script.TurboFrequencyPowerAndTemperatureScriptName].Stdout)
+	_, temperature := ParseTurbostatOutput(outputs[script.MaxPowerAndTemperatureScriptName].Stdout)
 	return temperature
 }
 
