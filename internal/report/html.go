@@ -9,13 +9,12 @@ import (
 	"html"
 	"log/slog"
 	"math"
+	"math/rand/v2"
 	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	texttemplate "text/template"
-
-	"golang.org/x/exp/rand"
 )
 
 func getHtmlReportBegin() string {
@@ -760,7 +759,7 @@ func coreTurboFrequencyTableHTMLRenderer(tableValues TableValues, targetName str
 		}
 	}
 	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("turboFrequency%d", rand.Intn(10000)),
+		ID:            fmt.Sprintf("turboFrequency%d", rand.IntN(10000)),
 		XaxisText:     "Core Count",
 		YaxisText:     "Frequency (GHz)",
 		TitleText:     "",
@@ -806,7 +805,7 @@ func memoryLatencyTableMultiTargetHtmlRenderer(allTableValues []TableValues, tar
 		datasetNames = append(datasetNames, targetNames[targetIdx])
 	}
 	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("latencyBandwidth%d", rand.Intn(10000)),
+		ID:            fmt.Sprintf("latencyBandwidth%d", rand.IntN(10000)),
 		XaxisText:     "Bandwidth (MB/s)",
 		YaxisText:     "Latency (ns)",
 		TitleText:     "",
@@ -873,7 +872,7 @@ func cpuUtilizationTableHTMLRenderer(tableValues TableValues, targetName string)
 		}
 	}
 	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.Intn(10000)),
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.IntN(10000)),
 		XaxisText:     "Time",
 		YaxisText:     "% Utilization",
 		TitleText:     "",
@@ -908,7 +907,7 @@ func summaryCPUUtilizationTableHTMLRenderer(tableValues TableValues, targetName 
 		}
 	}
 	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.Intn(10000)),
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.IntN(10000)),
 		XaxisText:     "Time",
 		YaxisText:     "% Utilization",
 		TitleText:     "",
@@ -948,7 +947,7 @@ func irqRateTableHTMLRenderer(tableValues TableValues, targetName string) string
 		data = append(data, points)
 	}
 	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.Intn(10000)),
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.IntN(10000)),
 		XaxisText:     "Time",
 		YaxisText:     "IRQ/s",
 		TitleText:     "",
@@ -1004,7 +1003,7 @@ func driveStatsTableHTMLRenderer(tableValues TableValues, targetName string) str
 			}
 		}
 		chartConfig := chartTemplateStruct{
-			ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.Intn(10000)),
+			ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.IntN(10000)),
 			XaxisText:     "Time",
 			YaxisText:     "",
 			TitleText:     drive,
@@ -1062,7 +1061,7 @@ func networkStatsTableHTMLRenderer(tableValues TableValues, targetName string) s
 			}
 		}
 		chartConfig := chartTemplateStruct{
-			ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.Intn(10000)),
+			ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.IntN(10000)),
 			XaxisText:     "Time",
 			YaxisText:     "",
 			TitleText:     nic,
@@ -1099,7 +1098,7 @@ func memoryStatsTableHTMLRenderer(tableValues TableValues, targetName string) st
 		}
 	}
 	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.Intn(10000)),
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.IntN(10000)),
 		XaxisText:     "Time",
 		YaxisText:     "kilobytes",
 		TitleText:     "",
@@ -1134,7 +1133,7 @@ func summaryCpuFreqTelemetryTableHTMLRenderer(tableValues TableValues, targetNam
 		}
 	}
 	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.Intn(10000)),
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.IntN(10000)),
 		XaxisText:     "Time",
 		YaxisText:     "MHz",
 		TitleText:     "",
@@ -1169,7 +1168,7 @@ func powerStatsTableHTMLRenderer(tableValues TableValues, targetName string) str
 		}
 	}
 	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.Intn(10000)),
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.IntN(10000)),
 		XaxisText:     "Time",
 		YaxisText:     "Watts",
 		TitleText:     "",
@@ -1204,7 +1203,7 @@ func instructionMixTableHTMLRenderer(tableValues TableValues, targetname string)
 		}
 	}
 	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.Intn(10000)),
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.IntN(10000)),
 		XaxisText:     "Time",
 		YaxisText:     "% Samples",
 		TitleText:     "",
@@ -1261,7 +1260,7 @@ func renderGaudiStatsChart(tableValues TableValues, chartStatFieldName string, t
 		}
 	}
 	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.Intn(10000)),
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.IntN(10000)),
 		XaxisText:     "Time",
 		YaxisText:     yAxisText,
 		TitleText:     titleText,

@@ -15,11 +15,10 @@ import (
 	"math"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	texttemplate "text/template"
 	"time"
-
-	"golang.org/x/exp/slices"
 )
 
 // Summarize - generates formatted output from a CSV file containing metric values.
