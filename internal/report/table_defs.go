@@ -591,7 +591,7 @@ var tableDefinitions = map[string]TableDefinition{
 		HasRows:   false,
 		ScriptNames: []string{
 			script.IdlePowerScriptName,
-			script.TurboFrequencyPowerAndTemperatureScriptName,
+			script.MaxPowerAndTemperatureScriptName,
 		},
 		FieldsFunc: cpuPowerTableValues},
 	CPUTemperatureTableName: {
@@ -599,7 +599,7 @@ var tableDefinitions = map[string]TableDefinition{
 		MenuLabel: CPUTemperatureTableName,
 		HasRows:   false,
 		ScriptNames: []string{
-			script.TurboFrequencyPowerAndTemperatureScriptName,
+			script.MaxPowerAndTemperatureScriptName,
 		},
 		FieldsFunc: cpuTemperatureTableValues},
 	CPUFrequencyTableName: {
