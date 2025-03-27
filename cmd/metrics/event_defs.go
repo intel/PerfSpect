@@ -13,10 +13,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"golang.org/x/exp/slices"
 )
 
 // EventDefinition represents a single perf event

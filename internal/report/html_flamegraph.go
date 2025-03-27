@@ -9,11 +9,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand/v2"
 	"strconv"
 	"strings"
 	texttemplate "text/template"
-
-	"golang.org/x/exp/rand"
 )
 
 const flameGraphTemplate = `
@@ -176,7 +175,7 @@ func renderFlameGraph(header string, tableValues TableValues, field string) (out
 	fg := texttemplate.Must(texttemplate.New("flameGraphTemplate").Parse(flameGraphTemplate))
 	buf := new(bytes.Buffer)
 	err = fg.Execute(buf, flameGraphTemplateStruct{
-		ID:     fmt.Sprintf("%d%s", rand.Intn(10000), header),
+		ID:     fmt.Sprintf("%d%s", rand.IntN(10000), header),
 		Data:   jsonStacks,
 		Header: header,
 	})
