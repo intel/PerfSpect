@@ -59,15 +59,6 @@ func RunScript(myTarget target.Target, script ScriptDefinition, localTempDir str
 
 // RunScripts runs a list of scripts on a target and returns the outputs of each script as a map with the script name as the key.
 func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScriptErrors bool, localTempDir string) (map[string]ScriptOutput, error) {
-	// need a unique temp directory for each target to avoid race conditions
-	localTempDirForTarget := path.Join(localTempDir, myTarget.GetName())
-	// if the directory doesn't exist, create it
-	if _, err := os.Stat(localTempDirForTarget); os.IsNotExist(err) {
-		if err := os.Mkdir(localTempDirForTarget, 0755); err != nil {
-			err = fmt.Errorf("error creating directory for target: %v", err)
-			return nil, err
-		}
-	}
 	targetArchitecture, err := myTarget.GetArchitecture()
 	if err != nil {
 		err = fmt.Errorf("error getting target architecture: %v", err)
@@ -104,9 +95,8 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 			parallelScripts = append(parallelScripts, script)
 		}
 	}
-
 	// prepare target to run scripts by copying scripts and dependencies to target and installing LKMs
-	installedLkms, err := prepareTargetToRunScripts(myTarget, append(sequentialScripts, parallelScripts...), localTempDirForTarget, false)
+	installedLkms, err := prepareTargetToRunScripts(myTarget, append(sequentialScripts, parallelScripts...), localTempDir, false)
 	if err != nil {
 		err = fmt.Errorf("error while preparing target to run scripts: %v", err)
 		return nil, err
@@ -119,7 +109,6 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 			}
 		}()
 	}
-
 	// if there's only 1 parallel script, run it sequentially
 	if len(parallelScripts) == 1 {
 		slog.Debug("running single parallel script sequentially", slog.String("script", parallelScripts[0].Name))
@@ -133,7 +122,7 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 		masterScriptName := "parallel_master.sh"
 		masterScript, needsElevatedPrivileges := formMasterScript(myTarget.GetTempDirectory(), parallelScripts)
 		// write master script to local file
-		masterScriptPath := path.Join(localTempDirForTarget, masterScriptName)
+		masterScriptPath := path.Join(localTempDir, myTarget.GetName(), masterScriptName)
 		err = os.WriteFile(masterScriptPath, []byte(masterScript), 0644)
 		if err != nil {
 			err = fmt.Errorf("error writing master script to local file: %v", err)
@@ -211,22 +200,6 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 // RunScriptAsync runs a script on the specified target and returns the output. It is meant to be called
 // in a go routine.
 func RunScriptAsync(myTarget target.Target, script ScriptDefinition, localTempDir string, stdoutChannel chan string, stderrChannel chan string, exitcodeChannel chan int, errorChannel chan error, cmdChannel chan *exec.Cmd) {
-	// need a unique temp directory for each target to avoid race conditions when there are multiple targets
-	localTempDirForTarget := path.Join(localTempDir, myTarget.GetName())
-	// if the directory doesn't exist, create it
-	// we try a few times because there could multiple go routines trying to create the same directory
-	maxTries := 3
-	for i := range maxTries {
-		if _, err := os.Stat(localTempDirForTarget); os.IsNotExist(err) {
-			if err := os.Mkdir(localTempDirForTarget, 0755); err != nil {
-				if i == maxTries-1 {
-					err = fmt.Errorf("error creating local temp directory for target: %v", err)
-					errorChannel <- err
-					return
-				}
-			}
-		}
-	}
 	targetArchitecture, err := myTarget.GetArchitecture()
 	if err != nil {
 		err = fmt.Errorf("error getting target architecture: %v", err)
@@ -238,7 +211,7 @@ func RunScriptAsync(myTarget target.Target, script ScriptDefinition, localTempDi
 		errorChannel <- err
 		return
 	}
-	installedLkms, err := prepareTargetToRunScripts(myTarget, []ScriptDefinition{script}, localTempDirForTarget, true)
+	installedLkms, err := prepareTargetToRunScripts(myTarget, []ScriptDefinition{script}, localTempDir, true)
 	if err != nil {
 		err = fmt.Errorf("error while preparing target to run script: %v", err)
 		errorChannel <- err
@@ -274,6 +247,9 @@ func sanitizeScriptName(name string) string {
 }
 
 func scriptNameToFilename(name string) string {
+	if name == "" {
+		panic("script name cannot be empty")
+	}
 	return sanitizeScriptName(name) + ".sh"
 }
 
@@ -288,7 +264,7 @@ func formMasterScript(targetTempDirectory string, parallelScripts []ScriptDefini
 
 	// set dir var and change working directory to dir in case any of the scripts write out temporary files
 	masterScript.WriteString(fmt.Sprintf("script_dir=%s\n", targetTempDirectory))
-	masterScript.WriteString(fmt.Sprintf("cd %s\n", targetTempDirectory))
+	masterScript.WriteString("cd $script_dir\n")
 
 	// function to print the output of each script
 	masterScript.WriteString("\nprint_output() {\n")
@@ -452,21 +428,27 @@ func prepareTargetToRunScripts(myTarget target.Target, scripts []ScriptDefinitio
 	if targetTempDirectory == "" {
 		panic("target temporary directory cannot be empty")
 	}
-	lkmsToInstall := make(map[string]int)
-	dependenciesToCopy := make(map[string]int)
+	// build the path that will be inserted into the script
+	// to set the PATH variable
 	userPath, err := myTarget.GetUserPath()
 	if err != nil {
 		err = fmt.Errorf("error while retrieving user's path: %v", err)
 		return
 	}
 	userPath = fmt.Sprintf("%s:%s", targetTempDirectory, userPath)
-
+	// get the target architecture
+	// this is used to determine which dependencies to copy to the target
 	targetArchitecture, err := myTarget.GetArchitecture()
 	if err != nil {
 		err = fmt.Errorf("error getting target architecture: %v", err)
 		return
 	}
-	// for each script we will run
+	// for each script that will be run on this target
+	// -- get the unique list of lkms to install on target
+	// -- get the unique list of dependencies to copy to target
+	// -- write the script to the target's local temp dir and then copy it to the target
+	lkmsToInstall := make(map[string]int)
+	dependenciesToCopy := make(map[string]int)
 	for _, script := range scripts {
 		// add lkms to list of lkms to install
 		for _, lkm := range script.Lkms {
@@ -474,17 +456,12 @@ func prepareTargetToRunScripts(myTarget target.Target, scripts []ScriptDefinitio
 		}
 		// add dependencies to list of dependencies to copy to target
 		for _, dependency := range script.Depends {
-			if len(script.Architectures) == 0 || slices.Contains(script.Architectures, targetArchitecture) {
-				dependenciesToCopy[path.Join(targetArchitecture, dependency)] = 1
-			}
+			dependenciesToCopy[path.Join(targetArchitecture, dependency)] = 1
 		}
 		// add user's path to script
 		scriptWithPath := fmt.Sprintf("export PATH=\"%s\"\n%s", userPath, script.ScriptTemplate)
-		if script.Name == "" {
-			panic("script name cannot be empty")
-		}
-		scriptPath := path.Join(localTempDir, scriptNameToFilename(script.Name))
-		// write script to local file
+		// write script to the target's local temp directory
+		scriptPath := path.Join(localTempDir, myTarget.GetName(), scriptNameToFilename(script.Name))
 		err = os.WriteFile(scriptPath, []byte(scriptWithPath), 0644)
 		if err != nil {
 			err = fmt.Errorf("error writing script to local file: %v", err)
@@ -497,32 +474,19 @@ func prepareTargetToRunScripts(myTarget target.Target, scripts []ScriptDefinitio
 			return
 		}
 	}
-	// copy dependencies to target
-	for dependency := range dependenciesToCopy {
-		var localDependencyPath string
-		// first look for the dependency in the "tools" directory
-		appDir := util.GetAppDir()
-		if util.FileOrDirectoryExists(path.Join(appDir, "tools", dependency)) {
-			localDependencyPath = path.Join(appDir, "tools", dependency)
-		} else { // not found in the tools directory, so extract it from resources
-			localDependencyPath, err = util.ExtractResource(Resources, path.Join("resources", dependency), localTempDir)
-			if err != nil {
-				if failIfDependencyNotFound {
-					err = fmt.Errorf("error extracting dependency: %v", err)
-					return
-				}
-				slog.Warn("failed to extract dependency", slog.String("dependency", dependency), slog.String("error", err.Error()))
-				err = nil
-				continue
-			}
-		}
-		// copy dependency to target
-		err = myTarget.PushFile(localDependencyPath, targetTempDirectory)
-		if err != nil {
-			err = fmt.Errorf("error copying dependency to target: %v", err)
-			return
-		}
+	err = copyDependenciesToTarget(myTarget, dependenciesToCopy, localTempDir, targetTempDirectory, failIfDependencyNotFound)
+	if err != nil {
+		return
 	}
+	installedLkms, err = installLkmsOnTarget(myTarget, lkmsToInstall)
+	if err != nil {
+		return
+	}
+	return
+}
+
+// installLkmsOnTarget installs the specified LKMs on the target.
+func installLkmsOnTarget(myTarget target.Target, lkmsToInstall map[string]int) (installedLkms []string, err error) {
 	// install lkms on target
 	var lkms []string
 	for lkm := range lkmsToInstall {
@@ -532,6 +496,38 @@ func prepareTargetToRunScripts(myTarget target.Target, scripts []ScriptDefinitio
 		installedLkms, err = myTarget.InstallLkms(lkms)
 		if err != nil {
 			err = fmt.Errorf("error installing LKMs: %v", err)
+			return
+		}
+	}
+	return
+}
+
+// copyDependenciesToTarget copies the specified dependencies to the target.
+func copyDependenciesToTarget(myTarget target.Target, dependenciesToCopy map[string]int, localTempDir string, targetTempDirectory string, failIfDependencyNotFound bool) (err error) {
+	// copy dependencies to target
+	for dependency := range dependenciesToCopy {
+		var localDependencyPath string
+		// first look for the dependency in the "tools" directory
+		appDir := util.GetAppDir()
+		if util.FileOrDirectoryExists(path.Join(appDir, "tools", dependency)) {
+			localDependencyPath = path.Join(appDir, "tools", dependency)
+		} else { // not found in the tools directory
+			// extract the resource into the target's local temp directory
+			targetLocalTempDir := path.Join(localTempDir, myTarget.GetName())
+			localDependencyPath, err = util.ExtractResource(Resources, path.Join("resources", dependency), targetLocalTempDir)
+			if err != nil {
+				if failIfDependencyNotFound {
+					err = fmt.Errorf("error extracting dependency. Dependency: %s, Error: %v", dependency, err)
+					return
+				}
+				slog.Warn("dependency not found", slog.String("dependency", dependency))
+				continue
+			}
+		}
+		// copy dependency to target
+		err = myTarget.PushFile(localDependencyPath, targetTempDirectory)
+		if err != nil {
+			err = fmt.Errorf("error copying dependency to target: %v", err)
 			return
 		}
 	}
