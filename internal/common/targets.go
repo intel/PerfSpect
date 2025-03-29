@@ -130,8 +130,7 @@ func isNoExec(t target.Target, tempDir string) (bool, error) {
 	}
 	device := fields[0]
 	// Search for the device in the mount output and check for "noexec"
-	mountLines := strings.Split(string(mountOutput), "\n")
-	for _, line := range mountLines {
+	for line := range strings.SplitSeq(string(mountOutput), "\n") {
 		if strings.Contains(line, device) && strings.Contains(line, "noexec") {
 			return true, nil // Found "noexec" for the device
 		}
