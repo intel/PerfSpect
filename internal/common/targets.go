@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"os/user"
 	"path"
 	"perfspect/internal/script"
 	"perfspect/internal/target"
 	"perfspect/internal/util"
 	"runtime"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -84,14 +86,57 @@ func GetTargets(cmd *cobra.Command, needsElevatedPrivileges bool, failIfCantElev
 		if targetErrs[targetIdx] != nil {
 			continue
 		}
-		_, err = myTarget.CreateTempDirectory(targetTempDirRoot)
+		_, err := myTarget.CreateTempDirectory(targetTempDirRoot)
 		if err != nil {
-			slog.Error("failed to create temp directory on target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-			targetErrs[targetIdx] = err
+			targetErrs[targetIdx] = fmt.Errorf("failed to create temp directory on target")
+			slog.Error(targetErrs[targetIdx].Error(), slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+			continue
+		}
+		// confirm that the temp directory was not created on a file system mounted with noexec
+		noExec, err := isNoExec(myTarget, myTarget.GetTempDirectory())
+		if err != nil {
+			targetErrs[targetIdx] = fmt.Errorf("failed to check if temp directory is noexec")
+			slog.Error(targetErrs[targetIdx].Error(), slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+		}
+		if noExec {
+			targetErrs[targetIdx] = fmt.Errorf("target's temp directory must not be on a file system mounted with the 'noexec' option, override the default with --tempdir")
+			slog.Error(targetErrs[targetIdx].Error(), slog.String("target", myTarget.GetName()))
 			continue
 		}
 	}
 	return
+}
+
+// isNoExec checks if the temporary directory is on a file system that is mounted with noexec.
+func isNoExec(t target.Target, tempDir string) (bool, error) {
+	dfCmd := exec.Command("df", "-P", tempDir)
+	dfOutput, _, _, err := t.RunCommand(dfCmd, 0, true)
+	if err != nil {
+		return false, err
+	}
+	mountCmd := exec.Command("mount")
+	mountOutput, _, _, err := t.RunCommand(mountCmd, 0, true)
+	if err != nil {
+		return false, err
+	}
+	// Parse the output of `df` to extract the device name
+	lines := strings.Split(string(dfOutput), "\n")
+	if len(lines) < 2 {
+		return false, fmt.Errorf("unexpected output from df command")
+	}
+	fields := strings.Fields(lines[1]) // Second line contains the device info
+	if len(fields) < 1 {
+		return false, fmt.Errorf("unexpected output format from df command")
+	}
+	device := fields[0]
+	// Search for the device in the mount output and check for "noexec"
+	mountLines := strings.Split(string(mountOutput), "\n")
+	for _, line := range mountLines {
+		if strings.Contains(line, device) && strings.Contains(line, "noexec") {
+			return true, nil // Found "noexec" for the device
+		}
+	}
+	return false, nil // "noexec" not found
 }
 
 // getSingleTarget returns a target.Target object representing the target host and associated details.

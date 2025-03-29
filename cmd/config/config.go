@@ -257,17 +257,17 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}
-	// check for errors in target connections
-	for _, err := range targetErrs {
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			slog.Error(err.Error())
-			cmd.SilenceUsage = true
-			return err
+	// check for errors in target creation
+	for i := range targetErrs {
+		if targetErrs[i] != nil {
+			fmt.Fprintf(os.Stderr, "Error: target: %s, %v\n", myTargets[i].GetName(), targetErrs[i])
+			slog.Error(targetErrs[i].Error())
+			// remove target from targets list
+			myTargets = slices.Delete(myTargets, i, i+1)
 		}
 	}
 	if len(myTargets) == 0 {
-		err := fmt.Errorf("no targets specified")
+		err := fmt.Errorf("no targets remain")
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
 		cmd.SilenceUsage = true

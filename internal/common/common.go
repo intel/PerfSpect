@@ -338,6 +338,7 @@ func (rc *ReportingCommand) retrieveScriptOutputs(localTempDir string) ([]Target
 			}
 		}
 		multiSpinner.Start()
+		defer multiSpinner.Finish()
 		// check for errors in target creation
 		for i := range targetErrs {
 			if targetErrs[i] != nil {
@@ -348,14 +349,13 @@ func (rc *ReportingCommand) retrieveScriptOutputs(localTempDir string) ([]Target
 		}
 		// check if we have any remaining targets to run the scripts on
 		if len(myTargets) == 0 {
-			err := fmt.Errorf("no targets available to collect data on")
+			err := fmt.Errorf("no targets remain")
 			return nil, err
 		}
 		orderedTargetScriptOutputs, err = outputsFromTargets(myTargets, rc, multiSpinner.Status, localTempDir)
 		if err != nil {
 			return nil, err
 		}
-		multiSpinner.Finish()
 		fmt.Println()
 	}
 	return orderedTargetScriptOutputs, nil

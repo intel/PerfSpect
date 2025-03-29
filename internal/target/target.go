@@ -299,15 +299,6 @@ func (t *LocalTarget) CreateTempDirectory(rootDir string) (tempDir string, err e
 	if err != nil {
 		return
 	}
-	// confirm temporary directory isn't on a file system that is mounted with noexec
-	noExec, err := isNoExec(t, tempDir)
-	if err != nil {
-		return
-	}
-	if noExec {
-		err = fmt.Errorf("temporary directory %s is on a file system that is mounted with noexec", tempDir)
-		return
-	}
 	t.tempDir = tempDir
 	return
 }
@@ -326,15 +317,6 @@ func (t *RemoteTarget) CreateTempDirectory(rootDir string) (tempDir string, err 
 		return
 	}
 	tempDir = strings.TrimSpace(tempDir)
-	// confirm temporary directory isn't on a file system that is mounted with noexec
-	noExec, err := isNoExec(t, tempDir)
-	if err != nil {
-		return
-	}
-	if noExec {
-		err = fmt.Errorf("temporary directory %s is on a file system that is mounted with noexec", tempDir)
-		return
-	}
 	t.tempDir = tempDir
 	return
 }
@@ -342,14 +324,20 @@ func (t *RemoteTarget) CreateTempDirectory(rootDir string) (tempDir string, err 
 // RemoveTempDirectory removes the temporary directory created by CreateTempDirectory.
 func (t *LocalTarget) RemoveTempDirectory() (err error) {
 	if t.tempDir != "" {
-		return t.RemoveDirectory(t.tempDir)
+		err = t.RemoveDirectory(t.tempDir)
+		if err == nil {
+			t.tempDir = ""
+		}
 	}
 	return nil
 }
 
 func (t *RemoteTarget) RemoveTempDirectory() (err error) {
 	if t.tempDir != "" {
-		return t.RemoveDirectory(t.tempDir)
+		err = t.RemoveDirectory(t.tempDir)
+		if err == nil {
+			t.tempDir = ""
+		}
 	}
 	return nil
 }
@@ -894,36 +882,4 @@ func uninstallLkms(t Target, lkms []string) (err error) {
 		slog.Debug("kernel module uninstalled", slog.String("lkm", lkm))
 	}
 	return
-}
-
-// isNoExec checks if the temporary directory is on a file system that is mounted with noexec.
-func isNoExec(t Target, tempDir string) (bool, error) {
-	dfCmd := exec.Command("df", "-P", tempDir)
-	dfOutput, _, _, err := t.RunCommand(dfCmd, 0, true)
-	if err != nil {
-		return false, err
-	}
-	mountCmd := exec.Command("mount")
-	mountOutput, _, _, err := t.RunCommand(mountCmd, 0, true)
-	if err != nil {
-		return false, err
-	}
-	// Parse the output of `df` to extract the device name
-	lines := strings.Split(string(dfOutput), "\n")
-	if len(lines) < 2 {
-		return false, fmt.Errorf("unexpected output from df command")
-	}
-	fields := strings.Fields(lines[1]) // Second line contains the device info
-	if len(fields) < 1 {
-		return false, fmt.Errorf("unexpected output format from df command")
-	}
-	device := fields[0]
-	// Search for the device in the mount output and check for "noexec"
-	mountLines := strings.Split(string(mountOutput), "\n")
-	for _, line := range mountLines {
-		if strings.Contains(line, device) && strings.Contains(line, "noexec") {
-			return true, nil // Found "noexec" for the device
-		}
-	}
-	return false, nil // "noexec" not found
 }

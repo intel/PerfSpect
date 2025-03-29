@@ -54,6 +54,7 @@ func (ms *multiSpinner) AddSpinner(label string) (err error) {
 
 // Start starts the spinner
 func (ms *multiSpinner) Start() {
+	ms.draw(true)
 	ms.ticker = time.NewTicker(250 * time.Millisecond)
 	ms.spinning = true
 	go ms.onTick()
