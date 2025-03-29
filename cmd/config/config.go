@@ -234,7 +234,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 func runCmd(cmd *cobra.Command, args []string) error {
 	// appContext is the application context that holds common data and resources.
 	appContext := cmd.Context().Value(common.AppContext{}).(common.AppContext)
-	localTempDir := appContext.TempDir
+	localTempDir := appContext.LocalTempDir
 	// get the targets
 	myTargets, targetErrs, err := common.GetTargets(cmd, true, true, localTempDir)
 	if err != nil {
@@ -242,6 +242,20 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		slog.Error(err.Error())
 		cmd.SilenceUsage = true
 		return err
+	}
+	// schedule the removal of the temp directory on each target (if the debug flag is not set)
+	if cmd.Parent().PersistentFlags().Lookup("debug").Value.String() != "true" {
+		for _, myTarget := range myTargets {
+			if myTarget.GetTempDirectory() != "" {
+				defer func() {
+					err = myTarget.RemoveTempDirectory()
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "Failed to remove target temp directory: %+v\n", err)
+						slog.Error(err.Error())
+					}
+				}()
+			}
+		}
 	}
 	// check for errors in target connections
 	for _, err := range targetErrs {
@@ -258,25 +272,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		slog.Error(err.Error())
 		cmd.SilenceUsage = true
 		return err
-	}
-	// create a temporary directory on each target
-	for _, myTarget := range myTargets {
-		targetTempRoot, _ := cmd.Flags().GetString(common.FlagTargetTempDirName)
-		targetTempDir, err := myTarget.CreateTempDirectory(targetTempRoot)
-		if err != nil {
-			err = fmt.Errorf("failed to create temporary directory: %w", err)
-			fmt.Fprintf(os.Stderr, "Error: %+v\n", err)
-			slog.Error(err.Error())
-			cmd.SilenceUsage = true
-			return err
-		}
-		defer func() {
-			err = myTarget.RemoveDirectory(targetTempDir)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to remove target directory: %+v\n", err)
-				slog.Error(err.Error())
-			}
-		}()
 	}
 	// print config prior to changes
 	if err := printConfig(myTargets, localTempDir); err != nil {

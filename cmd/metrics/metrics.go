@@ -660,7 +660,7 @@ func processRawData(localOutputDir string) error {
 func runCmd(cmd *cobra.Command, args []string) error {
 	// appContext is the application context that holds common data and resources.
 	appContext := cmd.Context().Value(common.AppContext{}).(common.AppContext)
-	localTempDir := appContext.TempDir
+	localTempDir := appContext.LocalTempDir
 	localOutputDir := appContext.OutputDir
 	// handle signals
 	// child processes will exit when the signals are received which will
@@ -708,6 +708,19 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		slog.Error(err.Error())
 		cmd.SilenceUsage = true
 		return err
+	}
+	// schedule the cleanup of the temporary directory on each target (if not debugging)
+	if cmd.Parent().PersistentFlags().Lookup("debug").Value.String() != "true" {
+		for _, myTarget := range myTargets {
+			if myTarget.GetTempDirectory() != "" {
+				defer func() {
+					err := myTarget.RemoveTempDirectory()
+					if err != nil {
+						slog.Error("error removing target temporary directory", slog.String("error", err.Error()))
+					}
+				}()
+			}
+		}
 	}
 	// check for live mode with multiple targets
 	if flagLive && len(myTargets) > 1 {
@@ -786,9 +799,8 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	for _, myTarget := range myTargets {
 		targetContexts = append(targetContexts, targetContext{target: myTarget})
 	}
-	targetTempRoot, _ := cmd.Flags().GetString(common.FlagTargetTempDirName)
 	for i := range targetContexts {
-		go prepareTarget(&targetContexts[i], targetTempRoot, localTempDir, localPerfPath, channelTargetError, multiSpinner.Status)
+		go prepareTarget(&targetContexts[i], appContext.TargetTempRoot, localTempDir, localPerfPath, channelTargetError, multiSpinner.Status)
 	}
 	// wait for all targets to be prepared
 	numPreparedTargets := 0

@@ -66,17 +66,17 @@ var (
 	flagDebug  bool
 	flagSyslog bool
 	// output
-	flagOutputDir     string
-	flagTempDir       string
-	flagNoCheckUpdate bool
+	flagOutputDir      string
+	flagTargetTempRoot string
+	flagNoCheckUpdate  bool
 )
 
 const (
-	flagDebugName         = "debug"
-	flagSyslogName        = "syslog"
-	flagOutputDirName     = "output"
-	flagTempDirName       = "tempdir"
-	flagNoCheckUpdateName = "noupdate"
+	flagDebugName          = "debug"
+	flagSyslogName         = "syslog"
+	flagOutputDirName      = "output"
+	flagTargetTempRootName = "tempdir"
+	flagNoCheckUpdateName  = "noupdate"
 )
 
 func init() {
@@ -121,10 +121,10 @@ Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
 		rootCmd.AddCommand(updateCmd)
 	}
 	// Global (persistent) flags
-	rootCmd.PersistentFlags().BoolVar(&flagDebug, flagDebugName, false, "enable debug logging")
-	rootCmd.PersistentFlags().BoolVar(&flagSyslog, flagSyslogName, false, "log to syslog")
+	rootCmd.PersistentFlags().BoolVar(&flagDebug, flagDebugName, false, "enable debug logging and retain temporary directories")
+	rootCmd.PersistentFlags().BoolVar(&flagSyslog, flagSyslogName, false, "write logs to syslog instead of a file")
 	rootCmd.PersistentFlags().StringVar(&flagOutputDir, flagOutputDirName, "", "override the output directory")
-	rootCmd.PersistentFlags().StringVar(&flagTempDir, flagTempDirName, "", "override the local temp directory")
+	rootCmd.PersistentFlags().StringVar(&flagTargetTempRoot, flagTargetTempRootName, "", "override the temporary target directory, must exist and allow execution")
 	rootCmd.PersistentFlags().BoolVar(&flagNoCheckUpdate, flagNoCheckUpdateName, false, "skip application update check")
 }
 
@@ -196,43 +196,26 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 		slog.SetDefault(slog.New(slog.NewTextHandler(gLogFile, &logOpts)))
 	}
 	slog.Info("Starting up", slog.String("app", common.AppName), slog.String("version", gVersion), slog.Int("PID", os.Getpid()), slog.String("arguments", strings.Join(os.Args, " ")))
-	// verify requested local temp dir exists
-	var localTempDir string
-	if flagTempDir != "" {
-		localTempDir, err = util.AbsPath(flagTempDir)
-		if err != nil {
-			fmt.Printf("Error: failed to expand temp dir path: %v\n", err)
-			os.Exit(1)
-		}
-		exists, err := util.DirectoryExists(localTempDir)
-		if err != nil {
-			fmt.Printf("Error: failed to determine if temp dir path exists: %v\n", err)
-			os.Exit(1)
-		}
-		if !exists {
-			fmt.Printf("Error: requested temp dir, %s, does not exist\n", localTempDir)
-			os.Exit(1)
-		}
-	} else {
-		localTempDir = os.TempDir()
-	}
-	applicationTempDir, err := os.MkdirTemp(localTempDir, fmt.Sprintf("%s.tmp.", common.AppName))
+	// creat local temp directory
+	localTempDir, err := os.MkdirTemp(os.TempDir(), fmt.Sprintf("%s.tmp.", common.AppName))
 	if err != nil {
 		fmt.Printf("Error: failed to create temp dir: %v\n", err)
 		os.Exit(1)
 	}
+	// set app context
 	cmd.SetContext(
 		context.WithValue(
 			context.Background(),
 			common.AppContext{},
 			common.AppContext{
-				OutputDir: outputDir,
-				TempDir:   applicationTempDir,
-				Version:   gVersion},
+				OutputDir:      outputDir,
+				LocalTempDir:   localTempDir,
+				TargetTempRoot: flagTargetTempRoot,
+				Version:        gVersion},
 		),
 	)
 	// check for updates unless the user has disabled this feature or is not on the Intel network or is running the update command
-	if !flagNoCheckUpdate && onIntelNetwork() && cmd.Name() != "update" {
+	if !flagNoCheckUpdate && onIntelNetwork() && cmd.Name() != updateCommandName {
 		// catch signals to allow for graceful shutdown
 		sigChannel := make(chan os.Signal, 1)
 		signal.Notify(sigChannel, syscall.SIGINT, syscall.SIGTERM)
@@ -264,10 +247,10 @@ func terminateApplication(cmd *cobra.Command, args []string) error {
 	appContext := cmd.Context().Value(common.AppContext{}).(common.AppContext)
 
 	// clean up temp directory
-	if appContext.TempDir != "" {
-		err := os.RemoveAll(appContext.TempDir)
+	if appContext.LocalTempDir != "" && !flagDebug {
+		err := os.RemoveAll(appContext.LocalTempDir)
 		if err != nil {
-			slog.Error("error cleaning up temp directory", slog.String("tempDir", appContext.TempDir), slog.String("error", err.Error()))
+			slog.Error("error cleaning up temp directory", slog.String("tempDir", appContext.LocalTempDir), slog.String("error", err.Error()))
 		}
 	}
 
@@ -300,13 +283,17 @@ func checkForUpdates(version string) (bool, manifest, error) {
 	return result == 1, latestManifest, nil
 }
 
+const (
+	updateCommandName = "update"
+)
+
 var updateCmd = &cobra.Command{
 	GroupID: "other",
-	Use:     "update",
+	Use:     updateCommandName,
 	Short:   "Update the application",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		appContext := cmd.Context().Value(common.AppContext{}).(common.AppContext)
-		localTempDir := appContext.TempDir
+		localTempDir := appContext.LocalTempDir
 		updateAvailable, latestManifest, err := checkForUpdates(gVersion)
 		if err != nil {
 			slog.Error("Failed to check for updates", slog.String("error", err.Error()))

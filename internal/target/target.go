@@ -103,6 +103,10 @@ type Target interface {
 	// empty if the temporary directory has not been created yet.
 	GetTempDirectory() string
 
+	// RemoveTempDirectory removes the temporary directory on the target.
+	// It returns any error that occurred.
+	RemoveTempDirectory() error
+
 	// RemoveDirectory removes a directory from the target at the specified path.
 	// It returns any error that occurred.
 	RemoveDirectory(targetDir string) error
@@ -281,27 +285,73 @@ func (t *RemoteTarget) GetStepping() (stepping string, err error) {
 }
 
 // CreateTempDirectory creates a temporary directory under the specified root directory.
+// If the root directory is not specified, the temporary directory will be created in the current directory.
 // It returns the path of the created temporary directory and any error encountered.
 func (t *LocalTarget) CreateTempDirectory(rootDir string) (tempDir string, err error) {
+	if t.tempDir != "" {
+		return t.tempDir, nil
+	}
 	temp, err := os.MkdirTemp(rootDir, "perfspect.tmp.")
 	if err != nil {
 		return
 	}
 	tempDir, err = util.AbsPath(temp)
+	if err != nil {
+		return
+	}
+	// confirm temporary directory isn't on a file system that is mounted with noexec
+	noExec, err := isNoExec(t, tempDir)
+	if err != nil {
+		return
+	}
+	if noExec {
+		err = fmt.Errorf("temporary directory %s is on a file system that is mounted with noexec", tempDir)
+		return
+	}
 	t.tempDir = tempDir
 	return
 }
 
 func (t *RemoteTarget) CreateTempDirectory(rootDir string) (tempDir string, err error) {
+	if t.tempDir != "" {
+		return t.tempDir, nil
+	}
 	var root string
 	if rootDir != "" {
 		root = fmt.Sprintf("--tmpdir=%s", rootDir)
 	}
 	cmd := exec.Command("mktemp", "-d", "-t", root, "perfspect.tmp.XXXXXXXXXX", "|", "xargs", "realpath")
 	tempDir, _, _, err = t.RunCommand(cmd, 0, true)
+	if err != nil {
+		return
+	}
 	tempDir = strings.TrimSpace(tempDir)
+	// confirm temporary directory isn't on a file system that is mounted with noexec
+	noExec, err := isNoExec(t, tempDir)
+	if err != nil {
+		return
+	}
+	if noExec {
+		err = fmt.Errorf("temporary directory %s is on a file system that is mounted with noexec", tempDir)
+		return
+	}
 	t.tempDir = tempDir
 	return
+}
+
+// RemoveTempDirectory removes the temporary directory created by CreateTempDirectory.
+func (t *LocalTarget) RemoveTempDirectory() (err error) {
+	if t.tempDir != "" {
+		return t.RemoveDirectory(t.tempDir)
+	}
+	return nil
+}
+
+func (t *RemoteTarget) RemoveTempDirectory() (err error) {
+	if t.tempDir != "" {
+		return t.RemoveDirectory(t.tempDir)
+	}
+	return nil
 }
 
 func (t *LocalTarget) GetTempDirectory() (tempDir string) {
@@ -844,4 +894,36 @@ func uninstallLkms(t Target, lkms []string) (err error) {
 		slog.Debug("kernel module uninstalled", slog.String("lkm", lkm))
 	}
 	return
+}
+
+// isNoExec checks if the temporary directory is on a file system that is mounted with noexec.
+func isNoExec(t Target, tempDir string) (bool, error) {
+	dfCmd := exec.Command("df", "-P", tempDir)
+	dfOutput, _, _, err := t.RunCommand(dfCmd, 0, true)
+	if err != nil {
+		return false, err
+	}
+	mountCmd := exec.Command("mount")
+	mountOutput, _, _, err := t.RunCommand(mountCmd, 0, true)
+	if err != nil {
+		return false, err
+	}
+	// Parse the output of `df` to extract the device name
+	lines := strings.Split(string(dfOutput), "\n")
+	if len(lines) < 2 {
+		return false, fmt.Errorf("unexpected output from df command")
+	}
+	fields := strings.Fields(lines[1]) // Second line contains the device info
+	if len(fields) < 1 {
+		return false, fmt.Errorf("unexpected output format from df command")
+	}
+	device := fields[0]
+	// Search for the device in the mount output and check for "noexec"
+	mountLines := strings.Split(string(mountOutput), "\n")
+	for _, line := range mountLines {
+		if strings.Contains(line, device) && strings.Contains(line, "noexec") {
+			return true, nil // Found "noexec" for the device
+		}
+	}
+	return false, nil // "noexec" not found
 }
