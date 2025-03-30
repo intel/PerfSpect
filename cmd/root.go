@@ -135,6 +135,11 @@ func Execute() {
 	cobra.EnableCaseInsensitive = true
 	err := rootCmd.Execute()
 	if err != nil {
+		terminateErr := terminateApplication(rootCmd, os.Args)
+		if terminateErr != nil {
+			slog.Error("Error terminating application", slog.String("error", terminateErr.Error()))
+			fmt.Printf("Error: %v\n", terminateErr)
+		}
 		os.Exit(1)
 	}
 }
@@ -203,7 +208,7 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 		os.Exit(1)
 	}
 	// set app context
-	cmd.SetContext(
+	cmd.Parent().SetContext(
 		context.WithValue(
 			context.Background(),
 			common.AppContext{},
@@ -244,7 +249,12 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 }
 
 func terminateApplication(cmd *cobra.Command, args []string) error {
-	appContext := cmd.Context().Value(common.AppContext{}).(common.AppContext)
+	var appContext common.AppContext
+	if cmd.Parent() == nil {
+		appContext = cmd.Context().Value(common.AppContext{}).(common.AppContext)
+	} else {
+		appContext = cmd.Parent().Context().Value(common.AppContext{}).(common.AppContext)
+	}
 
 	// clean up temp directory
 	if appContext.LocalTempDir != "" && !flagDebug {
@@ -292,7 +302,7 @@ var updateCmd = &cobra.Command{
 	Use:     updateCommandName,
 	Short:   "Update the application",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		appContext := cmd.Context().Value(common.AppContext{}).(common.AppContext)
+		appContext := cmd.Parent().Context().Value(common.AppContext{}).(common.AppContext)
 		localTempDir := appContext.LocalTempDir
 		updateAvailable, latestManifest, err := checkForUpdates(gVersion)
 		if err != nil {

@@ -88,7 +88,7 @@ type ReportingCommand struct {
 // and then call this Run function.
 func (rc *ReportingCommand) Run() error {
 	// appContext is the application context that holds common data and resources.
-	appContext := rc.Cmd.Context().Value(AppContext{}).(AppContext)
+	appContext := rc.Cmd.Parent().Context().Value(AppContext{}).(AppContext)
 	localTempDir := appContext.LocalTempDir
 	outputDir := appContext.OutputDir
 	// handle signals

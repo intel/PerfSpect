@@ -658,7 +658,7 @@ func processRawData(localOutputDir string) error {
 }
 func runCmd(cmd *cobra.Command, args []string) error {
 	// appContext is the application context that holds common data and resources.
-	appContext := cmd.Context().Value(common.AppContext{}).(common.AppContext)
+	appContext := cmd.Parent().Context().Value(common.AppContext{}).(common.AppContext)
 	localTempDir := appContext.LocalTempDir
 	localOutputDir := appContext.OutputDir
 	// handle signals

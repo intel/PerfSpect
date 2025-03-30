@@ -233,7 +233,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 
 func runCmd(cmd *cobra.Command, args []string) error {
 	// appContext is the application context that holds common data and resources.
-	appContext := cmd.Context().Value(common.AppContext{}).(common.AppContext)
+	appContext := cmd.Parent().Context().Value(common.AppContext{}).(common.AppContext)
 	localTempDir := appContext.LocalTempDir
 	// get the targets
 	myTargets, targetErrs, err := common.GetTargets(cmd, true, true, localTempDir)
