@@ -1134,7 +1134,7 @@ func clusteringModeFromOutput(outputs map[string]script.ScriptOutput) string {
 		} else if nodesPerSocket == 2 {
 			return "SNC2"
 		} else if nodesPerSocket == 4 {
-			return "Quad"
+			return "UMA 4 (Quad)"
 		}
 	} else if uarch == "GNR_X3" {
 		if nodesPerSocket == 1 {
@@ -1142,7 +1142,21 @@ func clusteringModeFromOutput(outputs map[string]script.ScriptOutput) string {
 		} else if nodesPerSocket == 3 {
 			return "SNC3"
 		} else if nodesPerSocket == 6 {
-			return "HEX"
+			return "UMA 6 (Hex)"
+		}
+	} else if uarch == "SRF_SP" {
+		if nodesPerSocket == 1 {
+			return "Disabled"
+		} else if nodesPerSocket == 2 {
+			return "UMA 2 (Hemi)"
+		}
+	} else if uarch == "SRF_AP" {
+		if nodesPerSocket == 1 {
+			return "Disabled"
+		} else if nodesPerSocket == 2 {
+			return "SNC2"
+		} else if nodesPerSocket == 4 {
+			return "UMA 4 (Quad)"
 		}
 	}
 	return ""
