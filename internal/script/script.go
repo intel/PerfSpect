@@ -521,6 +521,7 @@ func copyDependenciesToTarget(myTarget target.Target, dependenciesToCopy map[str
 					return
 				}
 				slog.Warn("dependency not found", slog.String("dependency", dependency))
+				err = nil
 				continue
 			}
 		}
