@@ -329,7 +329,7 @@ func (t *LocalTarget) RemoveTempDirectory() (err error) {
 			t.tempDir = ""
 		}
 	}
-	return nil
+	return
 }
 
 func (t *RemoteTarget) RemoveTempDirectory() (err error) {
@@ -339,14 +339,14 @@ func (t *RemoteTarget) RemoveTempDirectory() (err error) {
 			t.tempDir = ""
 		}
 	}
-	return nil
+	return
 }
 
-func (t *LocalTarget) GetTempDirectory() (tempDir string) {
+func (t *LocalTarget) GetTempDirectory() string {
 	return t.tempDir
 }
 
-func (t *RemoteTarget) GetTempDirectory() (tempDir string) {
+func (t *RemoteTarget) GetTempDirectory() string {
 	return t.tempDir
 }
 
