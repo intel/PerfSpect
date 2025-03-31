@@ -484,7 +484,6 @@ type targetContext struct {
 	target              target.Target
 	err                 error
 	perfPath            string
-	tempDir             string
 	metadata            Metadata
 	nmiDisabled         bool
 	perfMuxIntervalsSet bool
@@ -659,8 +658,8 @@ func processRawData(localOutputDir string) error {
 }
 func runCmd(cmd *cobra.Command, args []string) error {
 	// appContext is the application context that holds common data and resources.
-	appContext := cmd.Context().Value(common.AppContext{}).(common.AppContext)
-	localTempDir := appContext.TempDir
+	appContext := cmd.Parent().Context().Value(common.AppContext{}).(common.AppContext)
+	localTempDir := appContext.LocalTempDir
 	localOutputDir := appContext.OutputDir
 	// handle signals
 	// child processes will exit when the signals are received which will
@@ -709,6 +708,19 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		cmd.SilenceUsage = true
 		return err
 	}
+	// schedule the cleanup of the temporary directory on each target (if not debugging)
+	if cmd.Parent().PersistentFlags().Lookup("debug").Value.String() != "true" {
+		for _, myTarget := range myTargets {
+			if myTarget.GetTempDirectory() != "" {
+				defer func() {
+					err := myTarget.RemoveTempDirectory()
+					if err != nil {
+						slog.Error("error removing target temporary directory", slog.String("error", err.Error()))
+					}
+				}()
+			}
+		}
+	}
 	// check for live mode with multiple targets
 	if flagLive && len(myTargets) > 1 {
 		err := fmt.Errorf("live mode is only supported for a single target")
@@ -740,7 +752,8 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 	// check if any targets remain
 	if len(myTargets) == 0 {
-		err := fmt.Errorf("no targets specified")
+		multiSpinner.Finish() // force print the spinner before printing the error
+		err := fmt.Errorf("no targets remain")
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
 		cmd.SilenceUsage = true
@@ -786,9 +799,8 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	for _, myTarget := range myTargets {
 		targetContexts = append(targetContexts, targetContext{target: myTarget})
 	}
-	targetTempRoot, _ := cmd.Flags().GetString(common.FlagTargetTempDirName)
 	for i := range targetContexts {
-		go prepareTarget(&targetContexts[i], targetTempRoot, localTempDir, localPerfPath, channelTargetError, multiSpinner.Status)
+		go prepareTarget(&targetContexts[i], localTempDir, localPerfPath, channelTargetError, multiSpinner.Status)
 	}
 	// wait for all targets to be prepared
 	numPreparedTargets := 0
@@ -799,19 +811,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		} else {
 			numPreparedTargets++
 		}
-	}
-	// schedule temporary directory cleanup
-	if cmd.Parent().PersistentFlags().Lookup("debug").Value.String() != "true" { // don't remove the directory if we're debugging
-		defer func() {
-			for _, targetContext := range targetContexts {
-				if targetContext.tempDir != "" {
-					err := targetContext.target.RemoveDirectory(targetContext.tempDir)
-					if err != nil {
-						slog.Error("failed to remove temp directory", slog.String("directory", targetContext.tempDir), slog.String("error", err.Error()))
-					}
-				}
-			}
-		}()
 	}
 	// schedule NMI watchdog reset
 	defer func() {
@@ -995,17 +994,10 @@ func summarizeMetrics(localOutputDir string, targetName string, metadata Metadat
 	return filesCreated, nil
 }
 
-func prepareTarget(targetContext *targetContext, targetTempRoot string, localTempDir string, localPerfPath string, channelError chan targetError, statusUpdate progress.MultiSpinnerUpdateFunc) {
+func prepareTarget(targetContext *targetContext, localTempDir string, localPerfPath string, channelError chan targetError, statusUpdate progress.MultiSpinnerUpdateFunc) {
 	myTarget := targetContext.target
 	var err error
-	// create a temporary directory on the target
 	_ = statusUpdate(myTarget.GetName(), "configuring target")
-	if targetContext.tempDir, err = myTarget.CreateTempDirectory(targetTempRoot); err != nil {
-		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %v", err))
-		targetContext.err = err
-		channelError <- targetError{target: myTarget, err: err}
-		return
-	}
 	// make sure PMUs are not in use on target
 	if family, err := myTarget.GetFamily(); err == nil && family == "6" {
 		output, err := script.RunScript(myTarget, script.GetScriptByName(script.PMUBusyScriptName), localTempDir)

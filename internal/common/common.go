@@ -26,9 +26,10 @@ var AppName = filepath.Base(os.Args[0])
 
 // AppContext represents the application context that can be accessed from all commands.
 type AppContext struct {
-	OutputDir string // OutputDir is the directory where the application will write output files.
-	TempDir   string // TempDir is the local host's temp directory.
-	Version   string // Version is the version of the application.
+	OutputDir      string // OutputDir is the directory where the application will write output files.
+	LocalTempDir   string // LocalTempDir is the temp directory on the local host (created by the application).
+	TargetTempRoot string // TargetTempRoot is the path to a directory on the target host where the application can create temporary directories.
+	Version        string // Version is the version of the application.
 }
 
 type Flag struct {
@@ -87,8 +88,8 @@ type ReportingCommand struct {
 // and then call this Run function.
 func (rc *ReportingCommand) Run() error {
 	// appContext is the application context that holds common data and resources.
-	appContext := rc.Cmd.Context().Value(AppContext{}).(AppContext)
-	localTempDir := appContext.TempDir
+	appContext := rc.Cmd.Parent().Context().Value(AppContext{}).(AppContext)
+	localTempDir := appContext.LocalTempDir
 	outputDir := appContext.OutputDir
 	// handle signals
 	// child processes will exit when the signals are received which will
@@ -314,6 +315,20 @@ func (rc *ReportingCommand) retrieveScriptOutputs(localTempDir string) ([]Target
 		if err != nil {
 			return nil, err
 		}
+		// schedule the cleanup of the temporary directory on each target (if not debugging)
+		if rc.Cmd.Parent().PersistentFlags().Lookup("debug").Value.String() != "true" {
+			for _, myTarget := range myTargets {
+				if myTarget.GetTempDirectory() != "" {
+					defer func() {
+						err := myTarget.RemoveTempDirectory()
+						if err != nil {
+							slog.Error("error removing target temporary directory", slog.String("error", err.Error()))
+						}
+					}()
+				}
+			}
+		}
+
 		// setup and start the progress indicator
 		multiSpinner := progress.NewMultiSpinner()
 		for _, target := range myTargets {
@@ -323,6 +338,7 @@ func (rc *ReportingCommand) retrieveScriptOutputs(localTempDir string) ([]Target
 			}
 		}
 		multiSpinner.Start()
+		defer multiSpinner.Finish()
 		// check for errors in target creation
 		for i := range targetErrs {
 			if targetErrs[i] != nil {
@@ -333,14 +349,13 @@ func (rc *ReportingCommand) retrieveScriptOutputs(localTempDir string) ([]Target
 		}
 		// check if we have any remaining targets to run the scripts on
 		if len(myTargets) == 0 {
-			err := fmt.Errorf("no targets available to collect data on")
+			err := fmt.Errorf("no targets remain")
 			return nil, err
 		}
 		orderedTargetScriptOutputs, err = outputsFromTargets(myTargets, rc, multiSpinner.Status, localTempDir)
 		if err != nil {
 			return nil, err
 		}
-		multiSpinner.Finish()
 		fmt.Println()
 	}
 	return orderedTargetScriptOutputs, nil
@@ -372,9 +387,9 @@ func outputsFromInput(summaryTableName string) ([]TargetScriptOutputs, error) {
 // outputsFromTargets runs the scripts on the targets and returns the data in the order of the targets
 func outputsFromTargets(myTargets []target.Target, rc *ReportingCommand, statusUpdate progress.MultiSpinnerUpdateFunc, localTempDir string) ([]TargetScriptOutputs, error) {
 	orderedTargetScriptOutputs := []TargetScriptOutputs{}
-	// create the list of tables and scripts to run and then run them on the targets
 	channelTargetScriptOutputs := make(chan TargetScriptOutputs)
 	channelError := make(chan error)
+	// create the list of tables and associated scripts for each target
 	targetTableNames := [][]string{}
 	targetScriptNames := [][]string{}
 	for targetIdx, target := range myTargets {
@@ -392,6 +407,9 @@ func outputsFromTargets(myTargets []target.Target, rc *ReportingCommand, statusU
 				slog.Info("table not supported for target", slog.String("table", tableName), slog.String("target", target.GetName()))
 			}
 		}
+	}
+	// run the scripts on the targets
+	for targetIdx, target := range myTargets {
 		scriptsToRunOnTarget := []script.ScriptDefinition{}
 		for _, scriptName := range targetScriptNames[targetIdx] {
 			script := script.GetParameterizedScriptByName(scriptName, rc.ScriptParams)
@@ -440,26 +458,6 @@ func elevatedPrivilegesRequired(tableNames []string) bool {
 
 // collectOnTarget runs the scripts on the target and sends the results to the appropriate channels
 func collectOnTarget(cmd *cobra.Command, duration int, myTarget target.Target, scriptsToRun []script.ScriptDefinition, localTempDir string, channelTargetScriptOutputs chan TargetScriptOutputs, channelError chan error, statusUpdate progress.MultiSpinnerUpdateFunc) {
-	// create a temporary directory on the target
-	var targetTempDir string
-	var err error
-	_ = statusUpdate(myTarget.GetName(), "creating temporary directory")
-	targetTempRoot, _ := cmd.Flags().GetString(FlagTargetTempDirName)
-	if targetTempDir, err = myTarget.CreateTempDirectory(targetTempRoot); err != nil {
-		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("error creating temporary directory: %v", err))
-		err = fmt.Errorf("error creating temporary directory on %s: %v", myTarget.GetName(), err)
-		channelError <- err
-		return
-	}
-	// don't remove the directory if we're debugging
-	if cmd.Parent().PersistentFlags().Lookup("debug").Value.String() != "true" {
-		defer func() {
-			err := myTarget.RemoveDirectory(targetTempDir)
-			if err != nil {
-				slog.Error("error removing target temporary directory", slog.String("error", err.Error()))
-			}
-		}()
-	}
 	// run the scripts on the target
 	status := "collecting data"
 	if cmd.Name() == "telemetry" && duration == 0 { // telemetry is the only command that uses this common code that can run indefinitely

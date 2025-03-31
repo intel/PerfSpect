@@ -233,8 +233,8 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 
 func runCmd(cmd *cobra.Command, args []string) error {
 	// appContext is the application context that holds common data and resources.
-	appContext := cmd.Context().Value(common.AppContext{}).(common.AppContext)
-	localTempDir := appContext.TempDir
+	appContext := cmd.Parent().Context().Value(common.AppContext{}).(common.AppContext)
+	localTempDir := appContext.LocalTempDir
 	// get the targets
 	myTargets, targetErrs, err := common.GetTargets(cmd, true, true, localTempDir)
 	if err != nil {
@@ -243,40 +243,35 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		cmd.SilenceUsage = true
 		return err
 	}
-	// check for errors in target connections
-	for _, err := range targetErrs {
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			slog.Error(err.Error())
-			cmd.SilenceUsage = true
-			return err
+	// schedule the removal of the temp directory on each target (if the debug flag is not set)
+	if cmd.Parent().PersistentFlags().Lookup("debug").Value.String() != "true" {
+		for _, myTarget := range myTargets {
+			if myTarget.GetTempDirectory() != "" {
+				defer func() {
+					err = myTarget.RemoveTempDirectory()
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "Failed to remove target temp directory: %+v\n", err)
+						slog.Error(err.Error())
+					}
+				}()
+			}
+		}
+	}
+	// check for errors in target creation
+	for i := range targetErrs {
+		if targetErrs[i] != nil {
+			fmt.Fprintf(os.Stderr, "Error: target: %s, %v\n", myTargets[i].GetName(), targetErrs[i])
+			slog.Error(targetErrs[i].Error())
+			// remove target from targets list
+			myTargets = slices.Delete(myTargets, i, i+1)
 		}
 	}
 	if len(myTargets) == 0 {
-		err := fmt.Errorf("no targets specified")
+		err := fmt.Errorf("no targets remain")
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
 		cmd.SilenceUsage = true
 		return err
-	}
-	// create a temporary directory on each target
-	for _, myTarget := range myTargets {
-		targetTempRoot, _ := cmd.Flags().GetString(common.FlagTargetTempDirName)
-		targetTempDir, err := myTarget.CreateTempDirectory(targetTempRoot)
-		if err != nil {
-			err = fmt.Errorf("failed to create temporary directory: %w", err)
-			fmt.Fprintf(os.Stderr, "Error: %+v\n", err)
-			slog.Error(err.Error())
-			cmd.SilenceUsage = true
-			return err
-		}
-		defer func() {
-			err = myTarget.RemoveDirectory(targetTempDir)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to remove target directory: %+v\n", err)
-				slog.Error(err.Error())
-			}
-		}()
 	}
 	// print config prior to changes
 	if err := printConfig(myTargets, localTempDir); err != nil {

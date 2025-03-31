@@ -103,6 +103,10 @@ type Target interface {
 	// empty if the temporary directory has not been created yet.
 	GetTempDirectory() string
 
+	// RemoveTempDirectory removes the temporary directory on the target.
+	// It returns any error that occurred.
+	RemoveTempDirectory() error
+
 	// RemoveDirectory removes a directory from the target at the specified path.
 	// It returns any error that occurred.
 	RemoveDirectory(targetDir string) error
@@ -281,34 +285,68 @@ func (t *RemoteTarget) GetStepping() (stepping string, err error) {
 }
 
 // CreateTempDirectory creates a temporary directory under the specified root directory.
+// If the root directory is not specified, the temporary directory will be created in the current directory.
 // It returns the path of the created temporary directory and any error encountered.
 func (t *LocalTarget) CreateTempDirectory(rootDir string) (tempDir string, err error) {
+	if t.tempDir != "" {
+		return t.tempDir, nil
+	}
 	temp, err := os.MkdirTemp(rootDir, "perfspect.tmp.")
 	if err != nil {
 		return
 	}
 	tempDir, err = util.AbsPath(temp)
+	if err != nil {
+		return
+	}
 	t.tempDir = tempDir
 	return
 }
 
 func (t *RemoteTarget) CreateTempDirectory(rootDir string) (tempDir string, err error) {
+	if t.tempDir != "" {
+		return t.tempDir, nil
+	}
 	var root string
 	if rootDir != "" {
 		root = fmt.Sprintf("--tmpdir=%s", rootDir)
 	}
 	cmd := exec.Command("mktemp", "-d", "-t", root, "perfspect.tmp.XXXXXXXXXX", "|", "xargs", "realpath")
 	tempDir, _, _, err = t.RunCommand(cmd, 0, true)
+	if err != nil {
+		return
+	}
 	tempDir = strings.TrimSpace(tempDir)
 	t.tempDir = tempDir
 	return
 }
 
-func (t *LocalTarget) GetTempDirectory() (tempDir string) {
+// RemoveTempDirectory removes the temporary directory created by CreateTempDirectory.
+func (t *LocalTarget) RemoveTempDirectory() (err error) {
+	if t.tempDir != "" {
+		err = t.RemoveDirectory(t.tempDir)
+		if err == nil {
+			t.tempDir = ""
+		}
+	}
+	return
+}
+
+func (t *RemoteTarget) RemoveTempDirectory() (err error) {
+	if t.tempDir != "" {
+		err = t.RemoveDirectory(t.tempDir)
+		if err == nil {
+			t.tempDir = ""
+		}
+	}
+	return
+}
+
+func (t *LocalTarget) GetTempDirectory() string {
 	return t.tempDir
 }
 
-func (t *RemoteTarget) GetTempDirectory() (tempDir string) {
+func (t *RemoteTarget) GetTempDirectory() string {
 	return t.tempDir
 }
 
