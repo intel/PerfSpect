@@ -1130,33 +1130,23 @@ func clusteringModeFromOutput(outputs map[string]script.ScriptOutput) string {
 		return "All2All"
 	} else if uarch == "GNR_X2" {
 		if nodesPerSocket == 1 {
-			return "Disabled"
-		} else if nodesPerSocket == 2 {
-			return "SNC2"
-		} else if nodesPerSocket == 4 {
 			return "UMA 4 (Quad)"
+		} else if nodesPerSocket == 2 {
+			return "SNC 2"
 		}
 	} else if uarch == "GNR_X3" {
 		if nodesPerSocket == 1 {
-			return "Disabled"
-		} else if nodesPerSocket == 3 {
-			return "SNC3"
-		} else if nodesPerSocket == 6 {
 			return "UMA 6 (Hex)"
+		} else if nodesPerSocket == 3 {
+			return "SNC 3"
 		}
 	} else if uarch == "SRF_SP" {
-		if nodesPerSocket == 1 {
-			return "Disabled"
-		} else if nodesPerSocket == 2 {
-			return "UMA 2 (Hemi)"
-		}
+		return "UMA 2 (Hemi)"
 	} else if uarch == "SRF_AP" {
 		if nodesPerSocket == 1 {
-			return "Disabled"
-		} else if nodesPerSocket == 2 {
-			return "SNC2"
-		} else if nodesPerSocket == 4 {
 			return "UMA 4 (Quad)"
+		} else if nodesPerSocket == 2 {
+			return "SNC 2"
 		}
 	}
 	return ""
