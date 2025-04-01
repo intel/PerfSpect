@@ -89,6 +89,15 @@ func DirectoryExists(path string) (exists bool, err error) {
 	return
 }
 
+// IsValidDirectoryName checks if the provided string is a valid directory name.
+// A valid directory name can contain alphanumeric characters, dots (.), underscores (_),
+// forward slashes (/), and hyphens (-). It must match the regular expression `^[a-zA-Z0-9._/-]+$`.
+//
+// Parameters:
+//   - name: The directory name to validate.
+//
+// Returns:
+//   - true if the directory name is valid, false otherwise.
 func IsValidDirectoryName(name string) bool {
 	// Regular expression to match valid directory names
 	re := regexp.MustCompile(`^[a-zA-Z0-9._/-]+$`)
