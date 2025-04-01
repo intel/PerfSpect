@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -234,6 +235,16 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		err := fmt.Errorf("duration must be greater than 0 when collecting from a remote target")
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
+	}
+	if cmd.Flags().Lookup(flagInstrMixFilterName).Changed {
+		re := regexp.MustCompile("^[A-Z0-9_]+$")
+		for _, filter := range flagInstrMixFilter {
+			if !re.MatchString(filter) {
+				err := fmt.Errorf("invalid filter: %s, must be uppercase letters, numbers, and underscores", filter)
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				return err
+			}
+		}
 	}
 	// common target flags
 	if err := common.ValidateTargetFlags(cmd); err != nil {
