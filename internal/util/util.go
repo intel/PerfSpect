@@ -89,6 +89,12 @@ func DirectoryExists(path string) (exists bool, err error) {
 	return
 }
 
+func IsValidDirectoryName(name string) bool {
+	// Regular expression to match valid directory names
+	re := regexp.MustCompile(`^[a-zA-Z0-9._/-]+$`)
+	return re.MatchString(name)
+}
+
 // CopyDirectory copies the contents of a directory from the source path to the destination path.
 // It recursively copies all subdirectories and files within the directory.
 // The function returns an error if any error occurs during the copying process.

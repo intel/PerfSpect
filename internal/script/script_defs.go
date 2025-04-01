@@ -1069,30 +1069,29 @@ avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd
 	StoragePerfScriptName: {
 		Name: StoragePerfScriptName,
 		ScriptTemplate: `
-file_dir={{.StorageDir}}
-test_dir="$file_dir"/fio_test
 file_size_g=5
 numjobs=1
 total_file_size_g=$(($file_size_g * $numjobs))
 ramp_time=5s
 runtime=120s
 ioengine=sync
-# confirm the file_dir is a directory, is writeable, and has enough space
-if [[ -d "$file_dir" && -w "$file_dir" ]]; then
-	available_space=$(df -hP "$file_dir")
+# confirm that .StorageDir is a directory, is writeable, and has enough space
+if [[ -d "{{.StorageDir}}" && -w "{{.StorageDir}}" ]]; then
+	available_space=$(df -hP "{{.StorageDir}}")
 	count=$( echo "$available_space" | awk '/[0-9]%%/{print substr($4,1,length($4)-1)}' )
 	unit=$( echo "$available_space" | awk '/[0-9]%%/{print substr($4,length($4),1)}' )
 	is_enough_gigabytes=$(awk -v c="$count" -v f=$total_file_size_g 'BEGIN{print (c>f)?1:0}')
 	is_terabyte_or_more=$(echo "TPEZY" | grep -F -q "$unit" && echo 1 || echo 0)
 	if [[ ("$unit" == "G" && "$is_enough_gigabytes" == 0) && "$is_terabyte_or_more" == 1 ]]; then
-		echo "ERROR: $file_dir does not have enough available space - $total_file_size_g GB required"
+		echo "ERROR: {{.StorageDir}} does not have enough available space - $total_file_size_g GB required"
 		exit 1
 	fi
 else
-	echo "ERROR: $file_dir does not exist or is not writeable"
+	echo "ERROR: {{.StorageDir}} does not exist or is not writeable"
 	exit 1
 fi
 # single-threaded read & write bandwidth test
+test_dir="{{.StorageDir}}"/fio_test
 rm -rf $test_dir
 mkdir -p $test_dir
 sync
