@@ -228,6 +228,11 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	if cmd.Flags().Lookup(flagElcName).Changed && !slices.Contains(elcOptions, flagElc) {
 		return fmt.Errorf("invalid elc mode: %s", flagElc)
 	}
+	// common target flags
+	if err := common.ValidateTargetFlags(cmd); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return err
+	}
 	return nil
 }
 
