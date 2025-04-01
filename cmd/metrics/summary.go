@@ -269,11 +269,16 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata) (templateVals
 	}
 	// hack to determine the architecture of the metrics source
 	var archIndex int
-	if _, ok := stats["Macro-ops Retired"]; ok { // a metric that only exists in the AMD metric definitions
-		archIndex = 1 // AMD
+	if _, ok := stats["Macro-ops Retired PTI"]; ok { // a metric that only exists in the AMD metric definitions
+		archIndex = 1
 	} else {
 		archIndex = 0 // Intel
 	}
+
+	if _, ok := stats["Macro-ops Retired txn"]; ok { // a metric that only exists in the AMD metric definitions
+		archIndex = 1
+	}
+
 	type tmplReplace struct {
 		tmplVar     string
 		metricNames []string // names per architecture, 0=Intel, 1=AMD
@@ -282,6 +287,30 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata) (templateVals
 	templateVals["TRANSACTIONS"] = "false" // no transactions for now
 
 	// TMA Tab's pie chart
+	// these are intended to be replaced with pie headers in html report
+	templateNameReplace := []tmplReplace{
+		{"TMA_FRONTEND", []string{"Frontend", "Frontend"}},
+		{"TMA_FETCHLATENCY", []string{"Fetch Latency", "Latency"}},
+		{"TMA_FETCHBANDWIDTH", []string{"Fetch Bandwidth", "Bandwidth"}},
+		{"TMA_BADSPECULATION", []string{"Bad Speculation", "Bad Speculation"}},
+		{"TMA_BRANCHMISPREDICTS", []string{"Branch Mispredicts", "Mispredicts"}},
+		{"TMA_MACHINECLEARS", []string{"Machine Clears", "Pipeline Restarts"}},
+		{"TMA_BACKEND", []string{"Backend", "Backend"}},
+		{"TMA_CORE", []string{"Core", "CPU"}},
+		{"TMA_MEMORY", []string{"Memory", "Memory"}},
+		{"TMA_RETIRING", []string{"Retiring", "Retiring"}},
+		{"TMA_LIGHTOPS", []string{"Light Operations", "Fastpath"}},
+		{"TMA_HEAVYOPS", []string{"Heavy Operations", "Microcode"}},
+	}
+	// replace the template variables with the name header of the metric
+	for _, tmpl := range templateNameReplace {
+		var headerName string
+		if len(tmpl.metricNames) > archIndex {
+			headerName = tmpl.metricNames[archIndex]
+		}
+		templateVals[tmpl.tmplVar] = headerName
+	}
+	// TMA Tab's pie chart
 	// these are intended to be replaced with the mean value of the metric
 	templateReplace := []tmplReplace{
 		{"FRONTEND", []string{"TMA_Frontend_Bound(%)", "Pipeline Utilization - Frontend Bound (%)"}},
@@ -289,13 +318,13 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata) (templateVals
 		{"FETCHBANDWIDTH", []string{"TMA_..Fetch_Bandwidth(%)", "Pipeline Utilization - Frontend Bound - Bandwidth (%)"}},
 		{"BADSPECULATION", []string{"TMA_Bad_Speculation(%)", "Pipeline Utilization - Bad Speculation (%)"}},
 		{"BRANCHMISPREDICTS", []string{"TMA_..Branch_Mispredicts(%)", "Pipeline Utilization - Bad Speculation - Mispredicts (%)"}},
-		{"MACHINECLEARS", []string{"TMA_..Machine_Clears(%)"}},
+		{"MACHINECLEARS", []string{"TMA_..Machine_Clears(%)", "Pipeline Utilization - Bad Speculation - Pipeline Restarts (%)"}},
 		{"BACKEND", []string{"TMA_Backend_Bound(%)", "Pipeline Utilization - Backend Bound (%)"}},
 		{"COREDATA", []string{"TMA_..Core_Bound(%)", "Pipeline Utilization - Backend Bound - CPU (%)"}},
 		{"MEMORY", []string{"TMA_..Memory_Bound(%)", "Pipeline Utilization - Backend Bound - Memory (%)"}},
 		{"RETIRING", []string{"TMA_Retiring(%)", "Pipeline Utilization - Retiring (%)"}},
-		{"LIGHTOPS", []string{"TMA_..Light_Operations(%)"}},
-		{"HEAVYOPS", []string{"TMA_..Heavy_Operations(%)"}},
+		{"LIGHTOPS", []string{"TMA_..Light_Operations(%)", "Pipeline Utilization - Retiring - Fastpath (%)"}},
+		{"HEAVYOPS", []string{"TMA_..Heavy_Operations(%)", "Pipeline Utilization - Retiring - Microcode (%)"}},
 	}
 	// replace the template variables with the mean value of the metric
 	for _, tmpl := range templateReplace {
@@ -326,10 +355,10 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata) (templateVals
 		{"L1DATA", []string{"L1D MPI (includes data+rfo w/ prefetches)", ""}},
 		{"L2DATA", []string{"L2 MPI (includes code+data+rfo w/ prefetches)", ""}},
 		{"LLCDATA", []string{"LLC data read MPI (demand+prefetch)", ""}},
-		{"READDATA", []string{"memory bandwidth read (MB/sec)", "DRAM read bandwidth for local processor"}},
-		{"WRITEDATA", []string{"memory bandwidth write (MB/sec)", "DRAM write bandwidth for local processor"}},
-		{"TOTALDATA", []string{"memory bandwidth total (MB/sec)", ""}},
-		{"REMOTENUMA", []string{"NUMA %_Reads addressed to remote DRAM", ""}},
+		{"READDATA", []string{"memory bandwidth read (MB/sec)", "Read Memory Bandwidth (MB/s)"}},
+		{"WRITEDATA", []string{"memory bandwidth write (MB/sec)", "Write Memory Bandwidth (MB/s)"}},
+		{"TOTALDATA", []string{"memory bandwidth total (MB/sec)", "Total Memory Bandwidth (MB/s)"}},
+		{"REMOTENUMA", []string{"NUMA %_Reads addressed to remote DRAM", "Remote DRAM Reads %"}},
 		// Power Tab
 		{"PKGPOWER", []string{"package power (watts)", "package power (watts)"}},
 		{"DRAMPOWER", []string{"DRAM power (watts)", ""}},

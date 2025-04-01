@@ -245,7 +245,7 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 		return
 	}
 	for uncoreDeviceName := range metadata.UncoreDeviceIDs {
-		if uncoreDeviceName == "cha" { // could be any uncore device
+		if uncoreDeviceName == "cha" || uncoreDeviceName == "l3" || uncoreDeviceName == "df" { // could be any uncore device
 			metadata.SupportsUncore = true
 			break
 		}
@@ -381,15 +381,17 @@ func getUncoreDeviceIDs(myTarget target.Target, localTempDir string) (IDs map[st
 	}
 	fileNames := strings.Split(scriptOutput.Stdout, "\n")
 	IDs = make(map[string][]int)
-	re := regexp.MustCompile(`(?:uncore_|amd_)(.*)_(\d+)`)
+	re := regexp.MustCompile(`(?:uncore_|amd_)(.*?)(?:_(\d+))?$`)
 	for _, fileName := range fileNames {
 		match := re.FindStringSubmatch(fileName)
 		if match == nil {
 			continue
 		}
 		var id int
-		if id, err = strconv.Atoi(match[2]); err != nil {
-			return
+		if match[2] != "" {
+			if id, err = strconv.Atoi(match[2]); err != nil {
+				return
+			}
 		}
 		IDs[match[1]] = append(IDs[match[1]], id)
 	}
@@ -555,6 +557,12 @@ func getSupportsFixedEvent(myTarget target.Target, event string, uarch string, n
 		fallthrough
 	case "GNR":
 		numGPCounters = 8
+	case "Gen":
+		fallthrough
+	case "Ber":
+		fallthrough
+	case "Tur":
+		numGPCounters = 5
 	default:
 		err = fmt.Errorf("unsupported uarch: %s", uarch)
 		return
