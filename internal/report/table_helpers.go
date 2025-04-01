@@ -1104,6 +1104,54 @@ func numaBalancingFromOutput(outputs map[string]script.ScriptOutput) string {
 	return ""
 }
 
+func clusteringModeFromOutput(outputs map[string]script.ScriptOutput) string {
+	uarch := uarchFromOutput(outputs)
+	sockets := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)
+	nodes := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^NUMA node\(s\):\s*(.+)$`)
+	if uarch == "" || sockets == "" || nodes == "" {
+		return ""
+	}
+	socketCount, err := strconv.Atoi(sockets)
+	if err != nil {
+		slog.Error("failed to parse socket count", slog.String("error", err.Error()))
+		return ""
+	}
+	nodeCount, err := strconv.Atoi(nodes)
+	if err != nil {
+		slog.Error("failed to parse node count", slog.String("error", err.Error()))
+		return ""
+	}
+	if nodeCount == 0 || socketCount == 0 {
+		slog.Error("node count or socket count is zero")
+		return ""
+	}
+	nodesPerSocket := nodeCount / socketCount
+	if uarch == "GNR_X1" {
+		return "All2All"
+	} else if uarch == "GNR_X2" {
+		if nodesPerSocket == 1 {
+			return "UMA 4 (Quad)"
+		} else if nodesPerSocket == 2 {
+			return "SNC 2"
+		}
+	} else if uarch == "GNR_X3" {
+		if nodesPerSocket == 1 {
+			return "UMA 6 (Hex)"
+		} else if nodesPerSocket == 3 {
+			return "SNC 3"
+		}
+	} else if uarch == "SRF_SP" {
+		return "UMA 2 (Hemi)"
+	} else if uarch == "SRF_AP" {
+		if nodesPerSocket == 1 {
+			return "UMA 4 (Quad)"
+		} else if nodesPerSocket == 2 {
+			return "SNC 2"
+		}
+	}
+	return ""
+}
+
 type nicInfo struct {
 	Name            string
 	Model           string
