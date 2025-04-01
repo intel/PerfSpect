@@ -96,9 +96,10 @@ func ValidateTargetFlags(cmd *cobra.Command) error {
 			return fmt.Errorf("key file %s does not exist", flagTargetKeyFile)
 		}
 	}
-	// confirm that user is a valid user name, i.e., doesn't contain shell metacharacters
+	// confirm that user is a valid user name
 	if flagTargetUser != "" {
-		if strings.ContainsAny(flagTargetUser, "!@#$%^&*()_+[]{}|;':\",.<>?`~") {
+		re := regexp.MustCompile(`^([a-zA-Z0-9_-]+)$`)
+		if !re.MatchString(flagTargetUser) {
 			return fmt.Errorf("user name %s contains invalid characters", flagTargetUser)
 		}
 	}
