@@ -13,7 +13,9 @@ import (
 	"perfspect/internal/script"
 	"perfspect/internal/target"
 	"perfspect/internal/util"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -62,6 +64,53 @@ func GetTargetFlagGroup() FlagGroup {
 		GroupName: "Remote Target Options",
 		Flags:     targetFlags,
 	}
+}
+
+func ValidateTargetFlags(cmd *cobra.Command) error {
+	if flagTargetsFile != "" && flagTargetHost != "" {
+		return fmt.Errorf("only one of --%s or --%s can be specified", flagTargetsFileName, flagTargetHostName)
+	}
+	if flagTargetsFile != "" && (flagTargetPort != "" || flagTargetUser != "" || flagTargetKeyFile != "") {
+		return fmt.Errorf("if --%s is specified, --%s, --%s, and --%s must not be specified", flagTargetsFileName, flagTargetPortName, flagTargetUserName, flagTargetKeyName)
+	}
+	if (flagTargetPort != "" || flagTargetUser != "" || flagTargetKeyFile != "") && flagTargetHost == "" {
+		return fmt.Errorf("if --%s, --%s, or --%s is specified, --%s must also be specified", flagTargetPortName, flagTargetUserName, flagTargetKeyName, flagTargetHostName)
+	}
+	// confirm that the targets file exists
+	if flagTargetsFile != "" {
+		if _, err := os.Stat(flagTargetsFile); os.IsNotExist(err) {
+			return fmt.Errorf("targets file %s does not exist", flagTargetsFile)
+		}
+	}
+	// confirm that port is a positive integer
+	if flagTargetPort != "" {
+		var port int
+		var err error
+		if port, err = strconv.Atoi(flagTargetPort); err != nil || port <= 0 {
+			return fmt.Errorf("port %s is not a positive integer", flagTargetPort)
+		}
+	}
+	// confirm that the key file exists
+	if flagTargetKeyFile != "" {
+		if _, err := os.Stat(flagTargetKeyFile); os.IsNotExist(err) {
+			return fmt.Errorf("key file %s does not exist", flagTargetKeyFile)
+		}
+	}
+	// confirm that user is a valid user name
+	if flagTargetUser != "" {
+		re := regexp.MustCompile(`^([a-zA-Z0-9_-]+)$`)
+		if !re.MatchString(flagTargetUser) {
+			return fmt.Errorf("user name %s contains invalid characters", flagTargetUser)
+		}
+	}
+	// confirm that host is a valid host name or IP address
+	if flagTargetHost != "" {
+		re := regexp.MustCompile(`^([a-zA-Z0-9.-]+)$`)
+		if !re.MatchString(flagTargetHost) {
+			return fmt.Errorf("host name %s is not a valid host name or IP address", flagTargetHost)
+		}
+	}
+	return nil
 }
 
 // GetTargets retrieves the list of targets based on the provided command and parameters. It creates
