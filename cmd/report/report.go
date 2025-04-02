@@ -310,6 +310,28 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	if slices.Contains(flagBenchmark, benchmarkAll) {
 		flagBenchmark = benchmarkOptions
 	}
+
+	// validate storage dir
+	if flagStorageDir != "" {
+		if !util.IsValidDirectoryName(flagStorageDir) {
+			err := fmt.Errorf("invalid storage directory name: %s", flagStorageDir)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
+		// if no target is specified, i.e., we have a local target only, check if the directory exists
+		if !cmd.Flags().Lookup("targets").Changed && !cmd.Flags().Lookup("target").Changed {
+			if _, err := os.Stat(flagStorageDir); os.IsNotExist(err) {
+				err := fmt.Errorf("storage dir does not exist: %s", flagStorageDir)
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				return err
+			}
+		}
+	}
+	// common target flags
+	if err := common.ValidateTargetFlags(cmd); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return err
+	}
 	return nil
 }
 
