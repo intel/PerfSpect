@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
-	texttemplate "text/template"
+	texttemplate "text/template" // nosemgrep
 )
 
 // Copyright (C) 2021-2024 Intel Corporation

@@ -10,6 +10,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	htmltemplate "html/template"
 	"io"
 	"log/slog"
 	"math"
@@ -17,7 +18,6 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
-	texttemplate "text/template"
 	"time"
 )
 
@@ -252,7 +252,7 @@ func (m *metricsFromCSV) getHTML(metadata Metadata) (out string, err error) {
 		slog.Error("failed to load template values", slog.String("error", err.Error()))
 		return
 	}
-	fg := texttemplate.Must(texttemplate.New("metricsSummaryTemplate").Delims("<<", ">>").Parse(string(htmlTemplateBytes)))
+	fg := htmltemplate.Must(htmltemplate.New("metricsSummaryTemplate").Delims("<<", ">>").Parse(string(htmlTemplateBytes)))
 	buf := new(bytes.Buffer)
 	if err = fg.Execute(buf, templateVals); err != nil {
 		slog.Error("failed to render metrics template", slog.String("error", err.Error()))

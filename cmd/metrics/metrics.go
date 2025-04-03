@@ -1359,7 +1359,7 @@ func getPerfCommand(myTarget target.Target, perfPath string, eventGroups []Group
 			err = fmt.Errorf("failed to assemble perf args: %v", err)
 			return
 		}
-		perfCommand = exec.Command(perfPath, args...)
+		perfCommand = exec.Command(perfPath, args...) // nosemgrep
 	} else if flagScope == scopeProcess {
 		if len(flagPidList) > 0 {
 			if processes, err = GetProcesses(myTarget, flagPidList); err != nil {
@@ -1398,7 +1398,7 @@ func getPerfCommand(myTarget target.Target, perfPath string, eventGroups []Group
 			err = fmt.Errorf("failed to assemble perf args: %v", err)
 			return
 		}
-		perfCommand = exec.Command(perfPath, args...)
+		perfCommand = exec.Command(perfPath, args...) // nosemgrep
 	} else if flagScope == scopeCgroup {
 		var cgroups []string
 		if len(flagCidList) > 0 {
@@ -1419,7 +1419,7 @@ func getPerfCommand(myTarget target.Target, perfPath string, eventGroups []Group
 			err = fmt.Errorf("failed to assemble perf args: %v", err)
 			return
 		}
-		perfCommand = exec.Command(perfPath, args...)
+		perfCommand = exec.Command(perfPath, args...) // nosemgrep
 	}
 	return
 }

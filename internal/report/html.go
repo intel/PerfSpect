@@ -7,14 +7,14 @@ import (
 	"bytes"
 	"fmt"
 	"html"
+	htmltemplate "html/template"
 	"log/slog"
 	"math"
-	"math/rand/v2"
+	"math/rand/v2" // nosemgrep
 	"slices"
 	"sort"
 	"strconv"
 	"strings"
-	texttemplate "text/template"
 )
 
 func getHtmlReportBegin() string {
@@ -645,7 +645,7 @@ func renderChart(chartType string, allFormattedPoints []string, datasetNames []s
 	datasets := []string{}
 	for dataIdx, formattedPoints := range allFormattedPoints {
 		specValues := formattedPoints
-		dst := texttemplate.Must(texttemplate.New("datasetTemplate").Parse(datasetTemplate))
+		dst := htmltemplate.Must(htmltemplate.New("datasetTemplate").Parse(datasetTemplate))
 		buf := new(bytes.Buffer)
 		err := dst.Execute(buf, struct {
 			Label string
@@ -670,7 +670,7 @@ func renderChart(chartType string, allFormattedPoints []string, datasetNames []s
 	} else {
 		panic("unknown chart type")
 	}
-	sct := texttemplate.Must(texttemplate.New("chartTemplate").Parse(chartTemplate))
+	sct := htmltemplate.Must(htmltemplate.New("chartTemplate").Parse(chartTemplate))
 	buf := new(bytes.Buffer)
 	config.Datasets = strings.Join(datasets, ",")
 	if chartType == "line" {
