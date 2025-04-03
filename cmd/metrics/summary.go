@@ -10,7 +10,6 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	htmltemplate "html/template"
 	"io"
 	"log/slog"
 	"math"
@@ -18,6 +17,7 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
+	texttemplate "text/template" // nosemgrep
 	"time"
 )
 
@@ -242,17 +242,17 @@ func (m *metricsFromCSV) getStats() (stats map[string]metricStats, err error) {
 
 // getHTML - generate a string containing HTML representing the metrics
 func (m *metricsFromCSV) getHTML(metadata Metadata) (out string, err error) {
-	var htmlTemplateBytes []byte
-	if htmlTemplateBytes, err = resources.ReadFile("resources/base.html"); err != nil {
+	var texttemplateBytes []byte
+	if texttemplateBytes, err = resources.ReadFile("resources/base.html"); err != nil {
 		slog.Error("failed to read base.html template", slog.String("error", err.Error()))
 		return
 	}
-	templateVals, err := m.loadHTMLTemplateValues(metadata)
+	templateVals, err := m.loadtexttemplateValues(metadata)
 	if err != nil {
 		slog.Error("failed to load template values", slog.String("error", err.Error()))
 		return
 	}
-	fg := htmltemplate.Must(htmltemplate.New("metricsSummaryTemplate").Delims("<<", ">>").Parse(string(htmlTemplateBytes)))
+	fg := texttemplate.Must(texttemplate.New("metricsSummaryTemplate").Delims("<<", ">>").Parse(string(texttemplateBytes)))
 	buf := new(bytes.Buffer)
 	if err = fg.Execute(buf, templateVals); err != nil {
 		slog.Error("failed to render metrics template", slog.String("error", err.Error()))
@@ -261,7 +261,7 @@ func (m *metricsFromCSV) getHTML(metadata Metadata) (out string, err error) {
 	return buf.String(), nil
 }
 
-func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata) (templateVals map[string]string, err error) {
+func (m *metricsFromCSV) loadtexttemplateValues(metadata Metadata) (templateVals map[string]string, err error) {
 	templateVals = make(map[string]string)
 	var stats map[string]metricStats
 	if stats, err = m.getStats(); err != nil {

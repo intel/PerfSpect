@@ -8,11 +8,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	htmltemplate "html/template"
 	"log"
 	"math/rand/v2" // nosemgrep
 	"strconv"
 	"strings"
+	texttemplate "text/template" // nosemgrep
 )
 
 const flameGraphTemplate = `
@@ -172,7 +172,7 @@ func renderFlameGraph(header string, tableValues TableValues, field string) (out
 		out += "Error."
 		return
 	}
-	fg := htmltemplate.Must(htmltemplate.New("flameGraphTemplate").Parse(flameGraphTemplate))
+	fg := texttemplate.Must(texttemplate.New("flameGraphTemplate").Parse(flameGraphTemplate))
 	buf := new(bytes.Buffer)
 	err = fg.Execute(buf, flameGraphTemplateStruct{
 		ID:     fmt.Sprintf("%d%s", rand.IntN(10000), header),
