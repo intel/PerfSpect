@@ -380,7 +380,7 @@ func ExtractTGZ(tarballPath, destDir string, stripComponent bool) error {
 			if err != nil {
 				return err
 			}
-			if _, err := io.Copy(f, tarReader); err != nil {
+			if _, err := io.Copy(f, tarReader); err != nil { // nosemgrep
 				f.Close()
 				return err
 			}

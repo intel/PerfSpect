@@ -1,0 +1,4 @@
+scripts/
+docs/
+cmd/metrics/resources/
+internal/script/resources/

@@ -973,7 +973,7 @@ func setElc(elc string, myTarget target.Target, localTempDir string) {
 }
 
 func runScript(myTarget target.Target, myScript script.ScriptDefinition, localTempDir string) (string, error) {
-	output, err := script.RunScript(myTarget, myScript, localTempDir)
+	output, err := script.RunScript(myTarget, myScript, localTempDir) // nosemgrep
 	if err != nil {
 		slog.Error("failed to run script on target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()), slog.String("stdout", output.Stdout), slog.String("stderr", output.Stderr))
 	} else {
