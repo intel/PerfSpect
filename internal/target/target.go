@@ -55,6 +55,10 @@ type Target interface {
 	// It returns a string representing the stepping and any error that occurred.
 	GetStepping() (stepping string, err error)
 
+	// GetVendor returns the vendor of the target system.
+	// It returns a string representing the vendor and any error that occurred.
+	GetVendor() (vendor string, err error)
+
 	// GetName returns the name of the target system.
 	// It returns a string representing the host.
 	GetName() (name string)
@@ -130,6 +134,7 @@ type LocalTarget struct {
 	stepping   string
 	userPath   string
 	canElevate int // zero indicates unknown, 1 indicates yes, -1 indicates no
+	vendor     string
 }
 
 type RemoteTarget struct {
@@ -147,6 +152,7 @@ type RemoteTarget struct {
 	stepping    string
 	userPath    string
 	canElevate  int
+	vendor      string
 }
 
 // NewLocalTarget creates a new LocalTarget
@@ -282,6 +288,22 @@ func (t *RemoteTarget) GetStepping() (stepping string, err error) {
 		t.stepping, err = getStepping(t)
 	}
 	return t.stepping, err
+}
+
+// GetVendor returns the vendor of the target.
+// It retrieves the vendor by calling the GetVendor function.
+func (t *LocalTarget) GetVendor() (arch string, err error) {
+	if t.vendor == "" {
+		t.vendor, err = GetVendor(t)
+	}
+	return t.vendor, err
+}
+
+func (t *RemoteTarget) GetVendor() (arch string, err error) {
+	if t.vendor == "" {
+		t.vendor, err = GetVendor(t)
+	}
+	return t.vendor, err
 }
 
 // CreateTempDirectory creates a temporary directory under the specified root directory.
@@ -846,6 +868,16 @@ func getStepping(t Target) (stepping string, err error) {
 		return
 	}
 	stepping = strings.TrimSpace(stepping)
+	return
+}
+
+func GetVendor(t Target) (vendor string, err error) {
+	cmd := exec.Command("bash", "-c", "lscpu | grep -i \"^Vendor ID:\" | awk '{print $NF}'")
+	vendor, _, _, err = t.RunCommand(cmd, 0, true)
+	if err != nil {
+		return
+	}
+	vendor = strings.TrimSpace(vendor)
 	return
 }
 

@@ -38,6 +38,7 @@ func LoadMetricDefinitions(metricDefinitionOverridePath string, selectedMetrics 
 		}
 	} else {
 		uarch := strings.ToLower(strings.Split(metadata.Microarchitecture, "_")[0])
+		uarch = strings.Split(uarch, " ")[0]
 		// use alternate events/metrics when TMA fixed counters are not supported
 		alternate := ""
 		if (uarch == "icx" || uarch == "spr" || uarch == "emr") && !metadata.SupportsFixedTMA {
