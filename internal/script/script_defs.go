@@ -54,6 +54,7 @@ const (
 	CstatesScriptName                          = "c-states"
 	SpecTurboFrequenciesScriptName             = "spec turbo frequencies"
 	SpecTurboCoresScriptName                   = "spec turbo cores"
+	SpecCoreFrequenciesScriptName              = "spec core frequencies"
 	PPINName                                   = "ppin"
 	PrefetchControlName                        = "prefetch control"
 	PrefetchersName                            = "prefetchers"
@@ -341,6 +342,40 @@ if [ "$supported" -eq 1 ]; then
 fi
 rdmsr 0x1ad # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
 `,
+		Architectures: []string{x86_64},
+		Families:      []string{"6"}, // Intel
+		Lkms:          []string{"msr"},
+		Depends:       []string{"rdmsr", "pcm-tpmi"},
+		Superuser:     true,
+	},
+	SpecCoreFrequenciesScriptName: {
+		Name: SpecCoreFrequenciesScriptName,
+		ScriptTemplate: `lscpu=$(lscpu)
+family=$(echo "$lscpu" | grep -E "^CPU family:" | awk '{print $3}')
+model=$(echo "$lscpu" | grep -E "^Model:" | awk '{print $2}')
+# if family is Intel
+if [ "$family" -eq 6 ]; then
+    # if model is SRF or GNR
+    if [ "$model" -eq 175 ] || [ "$model" -eq 173 ]; then
+        cores=$(pcm-tpmi 0x5 0xD8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_10
+        sse=$(pcm-tpmi 0x5 0xA8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_4
+        avx2=$(pcm-tpmi 0x5 0xB0 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_5
+        avx512=$(pcm-tpmi 0x5 0xB8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_6
+        avx512h=$(pcm-tpmi 0x5 0xC0 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_7
+        amx=$(pcm-tpmi 0x5 0xC8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_8
+    else
+        cores=$(rdmsr 0x1ae) # MSR_TURBO_GROUP_CORE_CNT: Group Size of Active Cores for Turbo Mode Operation
+        sse=$(rdmsr 0x1ad) # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
+        avx2=0
+        avx512=0
+        avx512h=0
+        amx=0
+    fi
+else
+    exit 1
+fi
+echo "cores sse avx2 avx512 avx512h amx"
+echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		Architectures: []string{x86_64},
 		Families:      []string{"6"}, // Intel
 		Lkms:          []string{"msr"},

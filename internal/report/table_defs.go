@@ -84,6 +84,7 @@ const (
 	PowerTableName              = "Power"
 	CstateTableName             = "C-states"
 	CoreTurboFrequencyTableName = "Core Turbo Frequency"
+	SpecCoreFrequencyTableName  = "Spec Core Frequency"
 	SSTTFHPTableName            = "Speed Select Turbo Frequency - High Priority Cores"
 	SSTTFLPTableName            = "Speed Select Turbo Frequency - Low Priority Cores"
 	UncoreTableName             = "Uncore"
@@ -301,6 +302,16 @@ var tableDefinitions = map[string]TableDefinition{
 		},
 		FieldsFunc:            coreTurboFrequencyTableValues,
 		HTMLTableRendererFunc: coreTurboFrequencyTableHTMLRenderer},
+	SpecCoreFrequencyTableName: {
+		Name:    SpecCoreFrequencyTableName,
+		HasRows: true,
+		ScriptNames: []string{
+			script.SpecCoreFrequenciesScriptName,
+			script.LscpuScriptName,
+			script.LspciBitsScriptName,
+			script.LspciDevicesScriptName,
+		},
+		FieldsFunc: specCoreFrequencyTableValues},
 	UncoreTableName: {
 		Name:          UncoreTableName,
 		Architectures: []string{"x86_64"},
@@ -1225,6 +1236,29 @@ func coreTurboFrequencyTableValues(outputs map[string]script.ScriptOutput) []Fie
 	}
 	fields[0].Values = counts
 	fields[1].Values = frequencies
+	return fields
+}
+
+func specCoreFrequencyTableValues(outputs map[string]script.ScriptOutput) []Field {
+	specCoreFrequencies, err := getSpecCoreFrequencies(outputs)
+	if err != nil {
+		slog.Warn("unable to get spec core frequencies", slog.String("error", err.Error()))
+		return []Field{}
+	}
+	var fields []Field
+	for i, row := range specCoreFrequencies {
+		// first row is field names
+		if i == 0 {
+			for _, fieldName := range row {
+				fields = append(fields, Field{Name: fieldName})
+			}
+			continue
+		}
+		// following rows are field values
+		for i, fieldValue := range row {
+			fields[i].Values = append(fields[i].Values, fieldValue)
+		}
+	}
 	return fields
 }
 
