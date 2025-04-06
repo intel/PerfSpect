@@ -161,7 +161,7 @@ var categories = []common.Category{
 	{FlagName: flagAcceleratorName, FlagVar: &flagAccelerator, Help: "On-board Accelerators", TableNames: []string{report.AcceleratorTableName}},
 	{FlagName: flagPowerName, FlagVar: &flagPower, Help: "Power Settings", TableNames: []string{report.PowerTableName}},
 	{FlagName: flagCstatesName, FlagVar: &flagCstates, Help: "C-states", TableNames: []string{report.CstateTableName}},
-	{FlagName: flagTurboName, FlagVar: &flagTurbo, Help: "Turbo Frequency", TableNames: []string{report.CoreTurboFrequencyTableName, report.SpecCoreFrequencyTableName}},
+	{FlagName: flagTurboName, FlagVar: &flagTurbo, Help: "Turbo Frequency", TableNames: []string{report.SpecCoreFrequencyTableName}},
 	{FlagName: flagSSTName, FlagVar: &flagSST, Help: "Speed Select Technology Settings", TableNames: []string{report.SSTTFHPTableName, report.SSTTFLPTableName}},
 	{FlagName: flagUncoreName, FlagVar: &flagUncore, Help: "Uncore Configuration", TableNames: []string{report.UncoreTableName}},
 	{FlagName: flagElcName, FlagVar: &flagElc, Help: "Efficiency Latency Control Settings", TableNames: []string{report.ElcTableName}},

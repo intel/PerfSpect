@@ -738,7 +738,7 @@ func renderFrequencyTable(tableValues TableValues) (out string) {
 	return
 }
 
-func coreTurboFrequencyTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func coreTurboFrequencyTableHTMLRenderer(tableValues TableValues) string {
 	data := [][]scatterPoint{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -777,7 +777,7 @@ func coreTurboFrequencyTableHTMLRenderer(tableValues TableValues, targetName str
 }
 
 func cpuFrequencyTableHtmlRenderer(tableValues TableValues, targetName string) string {
-	return coreTurboFrequencyTableHTMLRenderer(tableValues, targetName)
+	return coreTurboFrequencyTableHTMLRenderer(tableValues)
 }
 
 func memoryLatencyTableHtmlRenderer(tableValues TableValues, targetName string) string {
