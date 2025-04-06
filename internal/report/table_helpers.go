@@ -251,6 +251,104 @@ func getSpecCountFrequencies(outputs map[string]script.ScriptOutput) (countFreqs
 	return
 }
 
+// getSpecCoreFrequencies
+// returns slice of rows
+// first row is header
+// each row is a slice of strings
+// "cores", "sse", "avx2", "avx512", "avx512h", "amx"
+// "0-41", "3.5", "3.5", "3.3", "3.2", "3.1"
+// "42-63", "3.5", "3.5", "3.3", "3.2", "3.1"
+// "64-85", "3.5", "3.5", "3.3", "3.2", "3.1"
+// ...
+func getSpecCoreFrequencies(outputs map[string]script.ScriptOutput) ([][]string, error) {
+	arch := uarchFromOutput(outputs)
+	if arch == "" {
+		return nil, fmt.Errorf("uarch is required")
+	}
+	out := outputs[script.SpecCoreFrequenciesScriptName].Stdout
+	// expected script output format, the number of fields may vary:
+	// "cores sse avx2 avx512 avx512h amx"
+	// "hex hex hex hex hex hex"
+	if out == "" {
+		return nil, fmt.Errorf("no core frequencies found")
+	}
+	lines := strings.Split(out, "\n")
+	if len(lines) < 2 {
+		return nil, fmt.Errorf("unexpected output format")
+	}
+	fieldNames := strings.Fields(lines[0])
+	if len(fieldNames) < 2 {
+		return nil, fmt.Errorf("unexpected output format")
+	}
+	values := strings.Fields(lines[1])
+	if len(values) != len(fieldNames) {
+		return nil, fmt.Errorf("unexpected output format")
+	}
+	// get list of buckets
+	bucketCoreCounts, _ := convertMsrToDecimals(values[0])
+	// create buckets
+	var buckets []string
+	startRange := 1
+	var archMultiplier int
+	if strings.Contains(arch, "SRF") {
+		archMultiplier = 4
+	} else if strings.Contains(arch, "GNR") {
+		archMultiplier = 2
+	} else {
+		archMultiplier = 1
+	}
+	for _, count := range bucketCoreCounts {
+		adjustedCount := count * int64(archMultiplier)
+		if startRange > int(adjustedCount) {
+			break
+		}
+		bucketRange := fmt.Sprintf("%d-%d", startRange, adjustedCount)
+		buckets = append(buckets, bucketRange)
+		startRange = int(adjustedCount) + 1
+	}
+	// get the frequencies for each isa
+	var allIsaFreqs [][]string
+	for _, isaHex := range values[1:] {
+		var isaFreqs []string
+		var freqs []int64
+		if isaHex != "0" {
+			var err error
+			freqs, err = convertMsrToDecimals(isaHex)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			// if the ISA is not supported, set the frequency to zero for all buckets
+			freqs = make([]int64, len(bucketCoreCounts))
+			for i := range freqs {
+				freqs[i] = 0
+			}
+		}
+		for _, freq := range freqs {
+			// convert freq to GHz
+			freqf := float64(freq) / 10.0
+			isaFreqs = append(isaFreqs, fmt.Sprintf("%.1f", freqf))
+		}
+		allIsaFreqs = append(allIsaFreqs, isaFreqs)
+	}
+	// format the output
+	var specCoreFreqs [][]string
+	// add fields to the first row
+	specCoreFreqs = append(specCoreFreqs, fieldNames)
+	for i, bucket := range buckets {
+		row := []string{bucket}
+		for _, isaFreqs := range allIsaFreqs {
+			if isaFreqs[0] == "0.0" {
+				row = append(row, "N/A")
+			} else {
+				row = append(row, isaFreqs[i])
+			}
+		}
+		specCoreFreqs = append(specCoreFreqs, row)
+	}
+	return specCoreFreqs, nil
+}
+
 // maxFrequencyFromOutputs gets max core frequency
 //
 //	1st option) /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq
