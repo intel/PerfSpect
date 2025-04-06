@@ -52,8 +52,6 @@ const (
 	ScalingGovernorScriptName                  = "scaling governor"
 	MaxCStateScriptName                        = "max c-state"
 	CstatesScriptName                          = "c-states"
-	SpecTurboFrequenciesScriptName             = "spec turbo frequencies"
-	SpecTurboCoresScriptName                   = "spec turbo cores"
 	SpecCoreFrequenciesScriptName              = "spec core frequencies"
 	PPINName                                   = "ppin"
 	PrefetchControlName                        = "prefetch control"
@@ -311,42 +309,6 @@ else
 	echo "C-state directory not found."
 fi
 `,
-	},
-	SpecTurboCoresScriptName: {
-		Name: SpecTurboCoresScriptName,
-		ScriptTemplate: `# if SST-TF is supported and enabled, then the MSR values are not valid
-supported=$(pcm-tpmi 5 0xF8 -d -b 12:12 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
-if [ "$supported" -eq 1 ]; then
-	enabled=$(pcm-tpmi 5 0x78 -d -b 9:9 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
-	if [ "$enabled" -eq 1 ]; then
-		exit 0
-	fi
-fi
-rdmsr 0x1ae # MSR_TURBO_GROUP_CORE_CNT: Group Size of Active Cores for Turbo Mode Operation
-`,
-		Architectures: []string{x86_64},
-		Families:      []string{"6"}, // Intel
-		Lkms:          []string{"msr"},
-		Depends:       []string{"rdmsr", "pcm-tpmi"},
-		Superuser:     true,
-	},
-	SpecTurboFrequenciesScriptName: {
-		Name: SpecTurboFrequenciesScriptName,
-		ScriptTemplate: `# if SST-TF is supported and enabled, then the MSR values are not valid
-supported=$(pcm-tpmi 5 0xF8 -d -b 12:12 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
-if [ "$supported" -eq 1 ]; then
-	enabled=$(pcm-tpmi 5 0x78 -d -b 9:9 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
-	if [ "$enabled" -eq 1 ]; then
-		exit 0
-	fi
-fi
-rdmsr 0x1ad # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
-`,
-		Architectures: []string{x86_64},
-		Families:      []string{"6"}, // Intel
-		Lkms:          []string{"msr"},
-		Depends:       []string{"rdmsr", "pcm-tpmi"},
-		Superuser:     true,
 	},
 	SpecCoreFrequenciesScriptName: {
 		Name: SpecCoreFrequenciesScriptName,
