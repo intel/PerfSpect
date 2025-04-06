@@ -333,13 +333,20 @@ func getSpecCoreFrequencies(outputs map[string]script.ScriptOutput) ([][]string,
 	}
 	// format the output
 	var specCoreFreqs [][]string
-	// add fields to the first row
-	specCoreFreqs = append(specCoreFreqs, fieldNames)
+	// add bucket field name
+	specCoreFreqs = append(specCoreFreqs, []string{fieldNames[0]})
+	// add fieldNames for ISAs that have frequencies
+	for i := 0; i < len(allIsaFreqs); i++ {
+		if allIsaFreqs[i][0] == "0.0" {
+			continue
+		}
+		specCoreFreqs[0] = append(specCoreFreqs[0], fieldNames[i+1])
+	}
 	for i, bucket := range buckets {
 		row := []string{bucket}
 		for _, isaFreqs := range allIsaFreqs {
 			if isaFreqs[0] == "0.0" {
-				row = append(row, "N/A")
+				continue
 			} else {
 				row = append(row, isaFreqs[i])
 			}
