@@ -1057,7 +1057,7 @@ avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd
 	},
 	IdlePowerScriptName: {
 		Name:           IdlePowerScriptName,
-		ScriptTemplate: `turbostat --show PkgWatt -n 1 | sed -n 2p`,
+		ScriptTemplate: `turbostat --show PkgWatt -i 2 -n 2 2>/dev/null | sed -n '$p'`,
 		Superuser:      true,
 		Lkms:           []string{"msr"},
 		Depends:        []string{"turbostat"},

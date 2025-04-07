@@ -288,8 +288,10 @@ var tableDefinitions = map[string]TableDefinition{
 		},
 		FieldsFunc: cstateTableValues},
 	MaximumFrequencyTableName: {
-		Name:    MaximumFrequencyTableName,
-		HasRows: true,
+		Name:          MaximumFrequencyTableName,
+		Architectures: []string{"x86_64"},
+		Families:      []string{"6"}, // Intel CPUs only
+		HasRows:       true,
 		ScriptNames: []string{
 			script.SpecCoreFrequenciesScriptName,
 			script.LscpuScriptName,
