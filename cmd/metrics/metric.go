@@ -72,11 +72,6 @@ func ProcessEvents(perfEvents [][]byte, eventGroupDefinitions []GroupDefinition,
 					err = nil
 				} else {
 					metric.Value = result.(float64)
-					// if the metric value is NaN, set it to 0
-					if math.IsNaN(metric.Value) {
-						slog.Debug("metric value is NaN", slog.String("name", metricDef.Name), slog.String("expression", metricDef.Expression))
-						metric.Value = 0.0
-					}
 				}
 			}
 			metricFrame.Metrics = append(metricFrame.Metrics, metric)

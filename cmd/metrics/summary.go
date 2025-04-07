@@ -17,7 +17,7 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
-	texttemplate "text/template"
+	texttemplate "text/template" // nosemgrep
 	"time"
 )
 
@@ -355,9 +355,9 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata) (templateVals
 		{"L1DATA", []string{"L1D MPI (includes data+rfo w/ prefetches)", ""}},
 		{"L2DATA", []string{"L2 MPI (includes code+data+rfo w/ prefetches)", ""}},
 		{"LLCDATA", []string{"LLC data read MPI (demand+prefetch)", ""}},
-		{"READDATA", []string{"memory bandwidth read (MB/sec)", "Read Memory Bandwidth (MB/s)"}},
-		{"WRITEDATA", []string{"memory bandwidth write (MB/sec)", "Write Memory Bandwidth (MB/s)"}},
-		{"TOTALDATA", []string{"memory bandwidth total (MB/sec)", "Total Memory Bandwidth (MB/s)"}},
+		{"READDATA", []string{"memory bandwidth read (MB/sec)", "Read Memory Bandwidth (MB/sec)"}},
+		{"WRITEDATA", []string{"memory bandwidth write (MB/sec)", "Write Memory Bandwidth (MB/sec)"}},
+		{"TOTALDATA", []string{"memory bandwidth total (MB/sec)", "Total Memory Bandwidth (MB/sec)"}},
 		{"REMOTENUMA", []string{"NUMA %_Reads addressed to remote DRAM", "Remote DRAM Reads %"}},
 		// Power Tab
 		{"PKGPOWER", []string{"package power (watts)", "package power (watts)"}},

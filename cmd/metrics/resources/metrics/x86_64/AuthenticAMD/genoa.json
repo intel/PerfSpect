@@ -13,21 +13,27 @@
     },
     {
         "name": "CPI",
-        "name-txn": "cycles per txn",
-        "expression": "[cpu-cycles] / [instructions]",
-        "expression-txn": "[cpu-cycles] / [TXN]"
+        "expression": "[cpu-cycles] / [instructions]"
+    },
+    {
+        "name": "cycles per txn",
+        "expression": "[cpu-cycles] / [TXN]"
     },
     {
         "name": "kernel_CPI",
-        "name-txn": "kernel_cycles per txn",
-        "expression": "[cpu-cycles:k] / [instructions:k]",
-        "expression-txn": "[cpu-cycles:k] / [TXN]"
+        "expression": "[cpu-cycles:k] / [instructions:k]"
+    },
+    {
+        "name": "kernel_cycles per txn",
+        "expression": "[cpu-cycles:k] / [TXN]"
     },
     {
         "name": "IPC",
-        "name-txn": "txn per cycle",
-        "expression": "[instructions] / [cpu-cycles]",
-        "expression-txn": "[TXN] / [cpu-cycles]"
+        "expression": "[instructions] / [cpu-cycles]"
+    },
+    {
+        "name": "txn per cycle",
+        "expression": "[TXN] / [cpu-cycles]"
     },
     {
         "name": "giga_instructions_per_sec",
@@ -39,99 +45,131 @@
     },
     {
         "name": "All Data Cache Accesses PTI",
-	"name-txn": "All Data Cache Accesses txn",
-        "expression": "([ls_dispatch.any] / [instructions]) * 1000",
-        "expression-txn": "[ls_dispatch.any] / [TXN]"
+        "expression": "([ls_dispatch.any] / [instructions]) * 1000"
+    },
+    {
+	"name": "All Data Cache Accesses txn",
+        "expression": "[ls_dispatch.any] / [TXN]"
     },
     {
         "name": "All L2 Cache Accesses PTI",
-        "name-txn": "All L2 Cache Accesses txn",
-        "expression": "(([l2_request_g1.all_no_prefetch] + [l2_pf_hit_l2.all] + [l2_pf_miss_l2_hit_l3.all] + [l2_pf_miss_l2_l3.all]) / [instructions]) * 1000",
-        "expression-txn": "([l2_request_g1.all_no_prefetch] + [l2_pf_hit_l2.all] + [l2_pf_miss_l2_hit_l3.all] + [l2_pf_miss_l2_l3.all]) / [TXN]"
+        "expression": "(([l2_request_g1.all_no_prefetch] + [l2_pf_hit_l2.all] + [l2_pf_miss_l2_hit_l3.all] + [l2_pf_miss_l2_l3.all]) / [instructions]) * 1000"
+    },
+    {
+        "name": "All L2 Cache Accesses txn",
+        "expression": "([l2_request_g1.all_no_prefetch] + [l2_pf_hit_l2.all] + [l2_pf_miss_l2_hit_l3.all] + [l2_pf_miss_l2_l3.all]) / [TXN]"
     },
     {
         "name": "L2 Cache Accesses from L1 Instruction Cache Misses PTI",
-        "name-txn": "L2 Cache Accesses from L1 Instruction Cache Misses txn",
-        "expression": "([l2_request_g1.cacheable_ic_read] / [instructions]) * 1000",
-        "expression-txn": "[l2_request_g1.cacheable_ic_read] / [TXN]"
+        "expression": "([l2_request_g1.cacheable_ic_read] / [instructions]) * 1000"
+    },
+    {
+        "name": "L2 Cache Accesses from L1 Instruction Cache Misses txn",
+        "expression": "[l2_request_g1.cacheable_ic_read] / [TXN]"
     },
     {
         "name": "L2 Cache Accesses from L1 Data Cache Misses PTI",
-        "name-txn": "L2 Cache Accesses from L1 Data Cache Misses txn",
-        "expression": "([l2_request_g1.all_dc] / [instructions]) * 1000",
-        "expression-txn": "[l2_request_g1.all_dc] / [TXN]"
+        "expression": "([l2_request_g1.all_dc] / [instructions]) * 1000"
+    },
+    {
+        "name": "L2 Cache Accesses from L1 Data Cache Misses txn",
+        "expression": "[l2_request_g1.all_dc] / [TXN]"
     },
     {
         "name": "L2 Cache Accesses from L2 Cache Hardware Prefetches PTI",
-        "name-txn": "L2 Cache Accesses from L2 Cache Hardware Prefetches txn",        
-        "expression": "(([l2_pf_hit_l2.all] + [l2_pf_miss_l2_hit_l3.all] + [l2_pf_miss_l2_l3.all]) / [instructions]) * 1000",
-        "expression-txn": "([l2_pf_hit_l2.all] + [l2_pf_miss_l2_hit_l3.all] + [l2_pf_miss_l2_l3.all]) / [TXN]"
+        "expression": "(([l2_pf_hit_l2.all] + [l2_pf_miss_l2_hit_l3.all] + [l2_pf_miss_l2_l3.all]) / [instructions]) * 1000"
+    },
+    {
+        "name": "L2 Cache Accesses from L2 Cache Hardware Prefetches txn",
+        "expression": "([l2_pf_hit_l2.all] + [l2_pf_miss_l2_hit_l3.all] + [l2_pf_miss_l2_l3.all]) / [TXN]"
     },
     {
         "name": "All L2 Cache Misses PTI",
-        "name-txn": "All L2 Cache Misses txn",
-        "expression": "(([l2_cache_req_stat.ic_dc_miss_in_l2] + [l2_pf_miss_l2_hit_l3.all] + [l2_pf_miss_l2_l3.all]) / [instructions]) * 1000",
-        "expression-txn": "([l2_cache_req_stat.ic_dc_miss_in_l2] + [l2_pf_miss_l2_hit_l3.all] + [l2_pf_miss_l2_l3.all]) / [TXN]"
+        "expression": "(([l2_cache_req_stat.ic_dc_miss_in_l2] + [l2_pf_miss_l2_hit_l3.all] + [l2_pf_miss_l2_l3.all]) / [instructions]) * 1000"
+    },
+    {
+        "name": "All L2 Cache Misses txn",
+        "expression": "([l2_cache_req_stat.ic_dc_miss_in_l2] + [l2_pf_miss_l2_hit_l3.all] + [l2_pf_miss_l2_l3.all]) / [TXN]"
     },
     {
         "name": "L2 Cache Misses from L1 Instruction Cache Misses PTI",
-        "name-txn": "L2 Cache Misses from L1 Instruction Cache Misses txn",
-        "expression": "([l2_cache_req_stat.ic_fill_miss] / [instructions]) * 1000",
-        "expression-txn": "[l2_cache_req_stat.ic_fill_miss] / [TXN]"
+        "expression": "([l2_cache_req_stat.ic_fill_miss] / [instructions]) * 1000"
+    },
+    {
+        "name": "L2 Cache Misses from L1 Instruction Cache Misses txn",
+        "expression": "[l2_cache_req_stat.ic_fill_miss] / [TXN]"
     },
     {
         "name": "L2 Cache Misses from L1 Data Cache Misses PTI",
-        "name-txn": "L2 Cache Misses from L1 Data Cache Misses txn",
-        "expression": "([l2_cache_req_stat.ls_rd_blk_c] / [instructions]) * 1000",
-        "expression-txn": "[l2_cache_req_stat.ls_rd_blk_c] / [TXN]"
+        "expression": "([l2_cache_req_stat.ls_rd_blk_c] / [instructions]) * 1000"
+    },
+    {
+        "name": "L2 Cache Misses from L1 Data Cache Misses txn",
+        "expression": "[l2_cache_req_stat.ls_rd_blk_c] / [TXN]"
     },
     {
         "name": "L2 Cache Misses from L2 Cache Hardware Prefetches PTI",
-        "name-txn": "L2 Cache Misses from L2 Cache Hardware Prefetches txn",
-        "expression": "(([l2_pf_miss_l2_hit_l3.all] + [l2_pf_miss_l2_l3.all]) / [instructions]) * 1000",
-        "expression-txn": "([l2_pf_miss_l2_hit_l3.all] + [l2_pf_miss_l2_l3.all]) / [TXN]"
+        "expression": "(([l2_pf_miss_l2_hit_l3.all] + [l2_pf_miss_l2_l3.all]) / [instructions]) * 1000"
+    },
+    {
+        "name": "L2 Cache Misses from L2 Cache Hardware Prefetches txn",
+        "expression": "([l2_pf_miss_l2_hit_l3.all] + [l2_pf_miss_l2_l3.all]) / [TXN]"
     },
     {
         "name": "All L2 Cache Hits PTI",
-        "name-txn": "All L2 Cache Hits txn",
-        "expression": "(([l2_cache_req_stat.ic_dc_hit_in_l2] + [l2_pf_hit_l2.all]) / [instructions]) * 1000",
-        "expression-txn": "([l2_cache_req_stat.ic_dc_hit_in_l2] + [l2_pf_hit_l2.all]) / [TXN]"
+        "expression": "(([l2_cache_req_stat.ic_dc_hit_in_l2] + [l2_pf_hit_l2.all]) / [instructions]) * 1000"
+    },
+    {
+        "name": "All L2 Cache Hits txn",
+        "expression": "([l2_cache_req_stat.ic_dc_hit_in_l2] + [l2_pf_hit_l2.all]) / [TXN]"
     },
     {
         "name": "L2 Cache Hits from L1 Instruction Cache Misses PTI",
-        "name-txn": "L2 Cache Hits from L1 Instruction Cache Misses txn",
-        "expression": "([l2_cache_req_stat.ic_hit_in_l2] / [instructions]) * 1000",
-        "expression-txn": "[l2_cache_req_stat.ic_hit_in_l2] / [TXN]"
+        "expression": "([l2_cache_req_stat.ic_hit_in_l2] / [instructions]) * 1000"
+    },
+    {
+        "name": "L2 Cache Hits from L1 Instruction Cache Misses txn",
+        "expression": "[l2_cache_req_stat.ic_hit_in_l2] / [TXN]"
     },
     {
         "name": "L2 Cache Hits from L1 Data Cache Misses PTI",
-        "name-txn": "L2 Cache Hits from L1 Data Cache Misses txn",
-        "expression": "([l2_cache_req_stat.dc_hit_in_l2] / [instructions]) * 1000",
-        "expression-txn": "[l2_cache_req_stat.dc_hit_in_l2] / [TXN]"
+        "expression": "([l2_cache_req_stat.dc_hit_in_l2] / [instructions]) * 1000"
+    },
+    {
+        "name": "L2 Cache Hits from L1 Data Cache Misses txn",
+        "expression": "[l2_cache_req_stat.dc_hit_in_l2] / [TXN]"
     },
     {
         "name": "L2 Cache Hits from L2 Cache Hardware Prefetches PTI",
-        "name-txn": "metric_L2 Cache Hits from L2 Cache Hardware Prefetches txn",
-        "expression": "([l2_pf_hit_l2.all] / [instructions]) * 1000",
-        "expression-txn": "[l2_pf_hit_l2.all] / [TXN]"
+        "expression": "([l2_pf_hit_l2.all] / [instructions]) * 1000"
+    },
+    {
+        "name": "L2 Cache Hits from L2 Cache Hardware Prefetches txn",
+        "expression": "[l2_pf_hit_l2.all] / [TXN]"
     },
     {
         "name": "L3 Cache Accesses PTI",
-        "name-txn": "L3 Cache Accesses txn",
-        "expression": "([l3_lookup_state.all_coherent_accesses_to_l3] / [instructions]) * 1000",
-        "expression-txn": "[l3_lookup_state.all_coherent_accesses_to_l3] / [TXN]"
+        "expression": "([l3_lookup_state.all_coherent_accesses_to_l3] / [instructions]) * 1000"
+    },
+    {
+        "name": "L3 Cache Accesses txn",
+        "expression": "[l3_lookup_state.all_coherent_accesses_to_l3] / [TXN]"
     },
     {
         "name": "L3 Cache Misses PTI",
-        "name-txn": "L3 Cache Misses txn",
-        "expression": "([l3_lookup_state.l3_miss] / [instructions]) * 1000",
-        "expression-txn": "[l3_lookup_state.l3_miss] / [TXN]"
+        "expression": "([l3_lookup_state.l3_miss] / [instructions]) * 1000"
+    },
+    {
+        "name": "L3 Cache Misses txn",
+        "expression": "[l3_lookup_state.l3_miss] / [TXN]"
     },
     {
         "name": "L3 Cache Hits PTI",
-        "name-txn": "L3 Cache Hits txn",
-        "expression": "([l3_lookup_state.l3_hit] / [instructions]) * 1000",
-        "expression-txn": "[l3_lookup_state.l3_hit] / [TXN]"
+        "expression": "([l3_lookup_state.l3_hit] / [instructions]) * 1000"
+    },
+    {
+        "name": "L3 Cache Hits txn",
+        "expression": "[l3_lookup_state.l3_hit] / [TXN]"
     },
     {
         "name": "Average L3 Cache Read Miss Latency (in ns)",
@@ -147,139 +185,183 @@
     },
     {
         "name": "L1 Data Cache Fills from DRAM or IO in any NUMA node PTI",
-        "name-txn": "L1 Data Cache Fills from DRAM or IO in any NUMA node txn",
-        "expression": "([ls_any_fills_from_sys.dram_io_all] / [instructions]) * 1000",
-        "expression-txn": "[ls_any_fills_from_sys.dram_io_all] / [TXN]"
+        "expression": "([ls_any_fills_from_sys.dram_io_all] / [instructions]) * 1000"
+    },
+    {
+        "name": "L1 Data Cache Fills from DRAM or IO in any NUMA node txn",
+        "expression": "[ls_any_fills_from_sys.dram_io_all] / [TXN]"
     },
     {
         "name": "L1 Data Cache Fills from a different NUMA node PTI",
-        "name-txn": "L1 Data Cache Fills from a different NUMA node txn",
-        "expression": "([ls_any_fills_from_sys.far_all] / [instructions]) * 1000",
-        "expression-txn": "[ls_any_fills_from_sys.far_all] / [TXN]"
+        "expression": "([ls_any_fills_from_sys.far_all] / [instructions]) * 1000"
+    },
+    {
+        "name": "L1 Data Cache Fills from a different NUMA node txn",
+        "expression": "[ls_any_fills_from_sys.far_all] / [TXN]"
     },
     {
         "name": "L1 Data Cache Fills from within the same CCX PTI",
-        "name-txn": "L1 Data Cache Fills from within the same CCX txn",
-        "expression": "([ls_any_fills_from_sys.local_all] / [instructions]) * 1000",
-        "expression-txn": "[ls_any_fills_from_sys.local_all] / [TXN]"
+        "expression": "([ls_any_fills_from_sys.local_all] / [instructions]) * 1000"
+    },
+    {
+        "name": "L1 Data Cache Fills from within the same CCX txn",
+        "expression": "[ls_any_fills_from_sys.local_all] / [TXN]"
     },
     {
         "name": "L1 Data Cache Fills from another CCX cache in any NUMA node PTI",
-        "name-txn": "L1 Data Cache Fills from another CCX cache in any NUMA node txn",
-        "expression": "([ls_any_fills_from_sys.remote_cache] / [instructions]) * 1000",
-        "expression-txn": "[ls_any_fills_from_sys.remote_cache] / [TXN]"
+        "expression": "([ls_any_fills_from_sys.remote_cache] / [instructions]) * 1000"
+    },
+    {
+        "name": "L1 Data Cache Fills from another CCX cache in any NUMA node txn",
+        "expression": "[ls_any_fills_from_sys.remote_cache] / [TXN]"
     },
     {
         "name": "All L1 Data Cache Fills PTI",
-        "name-txn": "All L1 Data Cache Fills txn",
-        "expression": "([ls_any_fills_from_sys.all] / [instructions]) * 1000",
-        "expression-txn": "[ls_any_fills_from_sys.all] / [TXN]"
+        "expression": "([ls_any_fills_from_sys.all] / [instructions]) * 1000"
+    },
+    {
+        "name": "All L1 Data Cache Fills txn",
+        "expression": "[ls_any_fills_from_sys.all] / [TXN]"
     },
     {
         "name": "Remote DRAM Reads %",
-        "expression": "([ls_any_fills_from_sys.dram_io_far] * 100) / [ls_any_fills_from_sys.all1]"
+        "expression": "([ls_any_fills_from_sys.dram_io_far] * 100) / max([ls_any_fills_from_sys.all1], ( 1 ))"
     },
     {
         "name": "Demand L1 Data Cache Fills from local L2 PTI",
-        "name-txn": "Demand L1 Data Cache Fills from local L2 txn",
-        "expression": "([ls_dmnd_fills_from_sys.local_l2] / [instructions]) * 1000",
-        "expression-txn": "[ls_dmnd_fills_from_sys.local_l2] / [TXN]"
+        "expression": "([ls_dmnd_fills_from_sys.local_l2] / [instructions]) * 1000"
+    },
+    {
+        "name": "Demand L1 Data Cache Fills from local L2 txn",
+        "expression": "[ls_dmnd_fills_from_sys.local_l2] / [TXN]"
     },
     {
         "name": "Demand L1 Data Cache Fills from local L3 or different L2 in same CCX PTI",
-        "name-txn": "Demand L1 Data Cache Fills from local L3 or different L2 in same CCX txn",
-        "expression": "([ls_dmnd_fills_from_sys.local_ccx] / [instructions]) * 1000",
-        "expression-txn": "[ls_dmnd_fills_from_sys.local_ccx] / [TXN]"
+        "expression": "([ls_dmnd_fills_from_sys.local_ccx] / [instructions]) * 1000"
+    },
+    {
+        "name": "Demand L1 Data Cache Fills from local L3 or different L2 in same CCX txn",
+        "expression": "[ls_dmnd_fills_from_sys.local_ccx] / [TXN]"
     },
     {
         "name": "Demand L1 Data Cache Fills from another CCX cache in the same NUMA node PTI",
-        "name-txn": "Demand L1 Data Cache Fills from another CCX cache in the same NUMA node txn",
-        "expression": "([ls_dmnd_fills_from_sys.near_cache] / [instructions]) * 1000",
-        "expression-txn": "[ls_dmnd_fills_from_sys.near_cache] / [TXN]"
+        "expression": "([ls_dmnd_fills_from_sys.near_cache] / [instructions]) * 1000"
+    },
+    {
+        "name": "Demand L1 Data Cache Fills from another CCX cache in the same NUMA node txn",
+        "expression": "[ls_dmnd_fills_from_sys.near_cache] / [TXN]"
     },
     {
         "name": "Demand L1 Data Cache Fills from DRAM or MMIO in the same NUMA node PTI",
-        "name-txn": "Demand L1 Data Cache Fills from DRAM or MMIO in the same NUMA node txn",
-        "expression": "([ls_dmnd_fills_from_sys.dram_io_near] / [instructions]) * 1000",
-        "expression-txn": "[ls_dmnd_fills_from_sys.dram_io_near] / [TXN]"
+        "expression": "([ls_dmnd_fills_from_sys.dram_io_near] / [instructions]) * 1000"
+    },
+    {
+        "name": "Demand L1 Data Cache Fills from DRAM or MMIO in the same NUMA node txn",
+        "expression": "[ls_dmnd_fills_from_sys.dram_io_near] / [TXN]"
     },
     {
         "name": "Demand L1 Data Cache Fills from another CCX cache in a different NUMA node PTI",
-        "name-txn": "Demand L1 Data Cache Fills from another CCX cache in a different NUMA node txn",
-        "expression": "([ls_dmnd_fills_from_sys.far_cache] / [instructions]) * 1000",
-        "expression-txn": "[ls_dmnd_fills_from_sys.far_cache] / [TXN]"
+        "expression": "([ls_dmnd_fills_from_sys.far_cache] / [instructions]) * 1000"
+    },
+    {
+        "name": "Demand L1 Data Cache Fills from another CCX cache in a different NUMA node txn",
+        "expression": "[ls_dmnd_fills_from_sys.far_cache] / [TXN]"
     },
     {
         "name": "Demand L1 Data Cache Fills from Remote Memory or IO PTI",
-        "name-txn": "Demand L1 Data Cache Fills from Remote Memory or IO txn",
-        "expression": "([ls_dmnd_fills_from_sys.dram_io_far] / [instructions]) * 1000",
-        "expression-txn": "[ls_dmnd_fills_from_sys.dram_io_far] / [TXN]"
+        "expression": "([ls_dmnd_fills_from_sys.dram_io_far] / [instructions]) * 1000"
+    },
+    {
+        "name": "Demand L1 Data Cache Fills from Remote Memory or IO txn",
+        "expression": "[ls_dmnd_fills_from_sys.dram_io_far] / [TXN]"
     },
     {
         "name": "L1 ITLB Misses PTI",
-        "name-txn": "L1 ITLB Misses txn",
-        "expression": "(([bp_l1_tlb_miss_l2_tlb_hit] + [bp_l1_tlb_miss_l2_tlb_miss.all]) / [instructions]) * 1000",
-        "expression-txn": "([bp_l1_tlb_miss_l2_tlb_hit] + [bp_l1_tlb_miss_l2_tlb_miss.all]) / [TXN]"
+        "expression": "(([bp_l1_tlb_miss_l2_tlb_hit] + [bp_l1_tlb_miss_l2_tlb_miss.all]) / [instructions]) * 1000"
+    },
+    {
+        "name": "L1 ITLB Misses txn",
+        "expression": "([bp_l1_tlb_miss_l2_tlb_hit] + [bp_l1_tlb_miss_l2_tlb_miss.all]) / [TXN]"
     },
     {
         "name": "L2 ITLB Misses and Instruction Page Walks PTI",
-        "name-txn": "L2 ITLB Misses and Instruction Page Walks txn",
-        "expression": "([bp_l1_tlb_miss_l2_tlb_miss.all] / [instructions]) * 1000",
-        "expression-txn": "[bp_l1_tlb_miss_l2_tlb_miss.all] / [TXN]"
+        "expression": "([bp_l1_tlb_miss_l2_tlb_miss.all] / [instructions]) * 1000"
+    },
+    {
+        "name": "L2 ITLB Misses and Instruction Page Walks txn",
+        "expression": "[bp_l1_tlb_miss_l2_tlb_miss.all] / [TXN]"
     },
     {
         "name": "L1 DTLB Misses PTI",
-        "name-txn": "L1 DTLB Misses txn",
-        "expression": "([ls_l1_d_tlb_miss.all] / [instructions]) * 1000",
-        "expression-txn": "[ls_l1_d_tlb_miss.all] / [TXN]"
+        "expression": "([ls_l1_d_tlb_miss.all] / [instructions]) * 1000"
+    },
+    {
+        "name": "L1 DTLB Misses txn",
+        "expression": "[ls_l1_d_tlb_miss.all] / [TXN]"
     },
     {
         "name": "L2 DTLB Hit PTI",
-        "name-txn": "L2 DTLB Hit txn",
-        "expression": "([ls_l2_d_tlb_hit.all] / [instructions]) * 1000",
-        "expression-txn": "[ls_l2_d_tlb_hit.all] / [TXN]"
+        "expression": "([ls_l2_d_tlb_hit.all] / [instructions]) * 1000"
+    },
+    {
+        "name": "L2 DTLB Hit txn",
+        "expression": "[ls_l2_d_tlb_hit.all] / [TXN]"
     },
     {
         "name": "L2 DTLB Hit 4k PTI",
-        "name-txn": "L2 DTLB Hit 4k txn",
-        "expression": "([ls_l2_d_tlb_hit.4k] / [instructions]) * 1000",
-        "expression-txn": "[ls_l2_d_tlb_hit.4k] / [TXN]"
+        "expression": "([ls_l2_d_tlb_hit.4k] / [instructions]) * 1000"
+    },
+    {
+        "name": "L2 DTLB Hit 4k txn",
+        "expression": "[ls_l2_d_tlb_hit.4k] / [TXN]"
     },
     {
         "name": "L2 DTLB Hit 4k+ PTI",
-        "name-txn": "L2 DTLB Hit 4k+ txn",
-        "expression": "([ls_l2_d_tlb_hit.coalesced] / [instructions]) * 1000",
-        "expression-txn": "[ls_l2_d_tlb_hit.coalesced] / [TXN]"
+        "expression": "([ls_l2_d_tlb_hit.coalesced] / [instructions]) * 1000"
+    },
+    {
+        "name": "L2 DTLB Hit 4k+ txn",
+        "expression": "[ls_l2_d_tlb_hit.coalesced] / [TXN]"
     },
     {
         "name": "L2 DTLB Hit 2M PTI",
-        "name-txn": "L2 DTLB Hit 2M txn",
-        "expression": "([ls_l2_d_tlb_hit.2M] / [instructions]) * 1000",
-        "expression-txn": "[ls_l2_d_tlb_hit.2M] / [TXN]"
+        "expression": "([ls_l2_d_tlb_hit.2M] / [instructions]) * 1000"
+    },
+    {
+        "name": "L2 DTLB Hit 2M txn",
+        "expression": "[ls_l2_d_tlb_hit.2M] / [TXN]"
     },
     {
         "name": "L2 DTLB Misses PTI",
-        "name-txn": "L2 DTLB Misses txn",
-        "expression": "([ls_l2_d_tlb_miss.all] / [instructions]) * 1000",
-        "expression-txn": "[ls_l2_d_tlb_miss.all] / [TXN]"
+        "expression": "([ls_l2_d_tlb_miss.all] / [instructions]) * 1000"
+    },
+    {
+        "name": "L2 DTLB Misses txn",
+        "expression": "[ls_l2_d_tlb_miss.all] / [TXN]"
     },
     {
         "name": "L2 DTLB Misses 4k PTI",
-        "name-txn": "L2 DTLB Misses 4k txn",
-        "expression": "([ls_l2_d_tlb_miss.4k] / [instructions]) * 1000",
-        "expression-txn": "[ls_l2_d_tlb_miss.4k] / [TXN]"
+        "expression": "([ls_l2_d_tlb_miss.4k] / [instructions]) * 1000"
+    },
+    {
+        "name": "L2 DTLB Misses 4k txn",
+        "expression": "[ls_l2_d_tlb_miss.4k] / [TXN]"
     },
     {
         "name": "L2 DTLB Misses 4k+ PTI",
-        "name-txn": "L2 DTLB Misses 4k+ txn",
-        "expression": "([ls_l2_d_tlb_miss.coalesced] / [instructions]) * 1000",
-        "expression-txn": "[ls_l2_d_tlb_miss.coalesced] / [TXN]"
+        "expression": "([ls_l2_d_tlb_miss.coalesced] / [instructions]) * 1000"
+    },
+    {
+        "name": "L2 DTLB Misses 4k+ txn",
+        "expression": "[ls_l2_d_tlb_miss.coalesced] / [TXN]"
     },
     {
         "name": "L2 DTLB Misses 2M PTI",
-        "name-txn": "L2 DTLB Misses 2M txn",
-        "expression": "([ls_l2_d_tlb_miss.2M] / [instructions]) * 1000",
-        "expression-txn": "[ls_l2_d_tlb_miss.2M] / [TXN]"
+        "expression": "([ls_l2_d_tlb_miss.2M] / [instructions]) * 1000"
+    },
+    {
+        "name": "L2 DTLB Misses 2M txn",
+        "expression": "[ls_l2_d_tlb_miss.2M] / [TXN]"
     },
     {
         "name": "4KB Page DTLB Activity %",
@@ -287,33 +369,43 @@
     },
     {
         "name": "L2 DTLB Misses and Data Page Walks PTI",
-        "name-txn": "L2 DTLB Misses and Data Page Walks txn",
-        "expression": "([ls_l1_d_tlb_miss.all_l2_miss] / [instructions]) * 1000",
-        "expression-txn": "[ls_l1_d_tlb_miss.all_l2_miss] / [TXN]"
+        "expression": "([ls_l1_d_tlb_miss.all_l2_miss] / [instructions]) * 1000"
+    },
+    {
+        "name": "L2 DTLB Misses and Data Page Walks txn",
+        "expression": "[ls_l1_d_tlb_miss.all_l2_miss] / [TXN]"
     },
     {
         "name": "All TLBs Flushed PTI",
-        "name-txn": "All TLBs Flushed txn",
-        "expression": "([ls_tlb_flush.all] / [instructions]) * 1000",
-        "expression-txn": "[ls_tlb_flush.all] / [TXN]"
+        "expression": "([ls_tlb_flush.all] / [instructions]) * 1000"
+    },
+    {
+        "name": "All TLBs Flushed txn",
+        "expression": "[ls_tlb_flush.all] / [TXN]"
     },
     {
         "name": "Macro-ops Dispatched PTI",
-        "name-txn": "Macro-ops Dispatched txn",
-        "expression": "([de_src_op_disp.all] / [instructions]) * 1000",
-        "expression-txn": "[de_src_op_disp.all] / [TXN]"
+        "expression": "([de_src_op_disp.all] / [instructions]) * 1000"
+    },
+    {
+        "name": "Macro-ops Dispatched txn",
+        "expression": "[de_src_op_disp.all] / [TXN]"
     },
     {
         "name": "Mixed SSE and AVX Stalls",
-        "name-txn": "Mixed SSE and AVX Stalls txn",
-        "expression": "([fp_disp_faults.sse_avx_all] / [cpu-cycles])",
-        "expression-txn": "[fp_disp_faults.sse_avx_all] / [TXN]"
+        "expression": "([fp_disp_faults.sse_avx_all] / [cpu-cycles])"
+    },
+    {
+        "name": "Mixed SSE and AVX Stalls txn",
+        "expression": "[fp_disp_faults.sse_avx_all] / [TXN]"
     },
     {
         "name": "Macro-ops Retired PTI",
-        "name-txn": "Macro-ops Retired txn",
-        "expression": "([ex_ret_ops0] / [instructions]) * 1000",
-        "expression-txn": "[ex_ret_ops0] / [TXN]"
+        "expression": "([ex_ret_ops0] / [instructions]) * 1000"
+    },
+    {
+        "name": "Macro-ops Retired txn",
+        "expression": "[ex_ret_ops0] / [TXN]"
     },
     {
         "name": "Total Memory Bandwidth (MB/sec)",

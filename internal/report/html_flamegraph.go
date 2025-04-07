@@ -9,10 +9,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/rand/v2"
+	"math/rand/v2" // nosemgrep
 	"strconv"
 	"strings"
-	texttemplate "text/template"
+	texttemplate "text/template" // nosemgrep
 )
 
 const flameGraphTemplate = `

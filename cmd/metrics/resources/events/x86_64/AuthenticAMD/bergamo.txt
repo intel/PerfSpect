@@ -90,8 +90,11 @@ instructions;
 
 # Demand L1 Data Cache Fills from another CCX cache in a different NUMA node
 # Demand L1 Data Cache Fills from DRAM or MMIO in a different NUMA node
+# Remote DRAM Reads %
 cpu/event=0x43,umask=0x10,name='ls_dmnd_fills_from_sys.far_cache'/,
 cpu/event=0x43,umask=0x40,name='ls_dmnd_fills_from_sys.dram_io_far'/,
+cpu/event=0x44,umask=0x40,name='ls_any_fills_from_sys.dram_io_far'/,
+cpu/event=0x44,umask=0xff,name='ls_any_fills_from_sys.all1'/,
 instructions;
 
 # L1 ITLB Misses
@@ -306,36 +309,36 @@ df/event=0xc9f,umask=0xf3e,name='local_socket_outbound_data_beats_link5'/,
 df/event=0xcdf,umask=0xf3e,name='local_socket_outbound_data_beats_link6'/,
 df/event=0xd1f,umask=0xf3e,name='local_socket_outbound_data_beats_link7'/;
 
-# pipeline utilization - frontend bound (%)
-# pipeline utilization - frontend bound - latency (%)
-# pipeline utilization - frontend bound - bandwidth (%)
-# pipeline utilization - smt contention (%)
+# Pipeline Utilization - Frontend Bound (%)
+# Pipeline Utilization - Frontend Bound - Latency (%)
+# Pipeline Utilization - Frontend Bound - Bandwidth (%)
+# Pipeline Utilization - SMT Contention (%)
 cpu/event=0x1a0,umask=0x1,name='de_no_dispatch_per_slot.no_ops_from_frontend'/,
 cpu/event=0x1a0,umask=0x1,cmask=0x6,name='de_no_dispatch_per_cycle.no_ops_from_frontend'/,
 cpu/event=0x1a0,umask=0x60,name='de_no_dispatch_per_slot.smt_contention'/,
 cpu/event=0x1a2,umask=0x30,name='de_no_dispatch_per_slot.above_ldq_or_intsched_lmt'/,
 cpu/event=0x76,name='ls_not_halted_cyc0'/;
 
-# pipeline utilization - bad speculation (%)
-# pipeline utilization - bad speculation - pipeline restarts (%)
-# pipeline utilization - bad speculation - mispredicts (%)
+# Pipeline Utilization - Bad Speculation (%)
+# Pipeline Utilization - Bad Speculation - Pipeline Restarts (%)
+# Pipeline Utilization - Bad Speculation - Mispredicts (%)
 cpu/event=0xaa,umask=0x7,name='de_src_op_disp.all'/,
 cpu/event=0xc1,name='ex_ret_ops1'/,
 cpu/event=0xc3,name='ex_ret_brn_misp'/,
 cpu/event=0x96,name='resyncs_or_nc_redirects'/,
 cpu/event=0x76,name='ls_not_halted_cyc1'/;
 
-# pipeline utilization - backend bound (%)
-# pipeline utilization - backend bound - memory (%)
-# pipeline utilization - backend bound - cpu (%)
+# Pipeline Utilization - Backend Bound (%)
+# Pipeline Utilization - Backend Bound - Memory (%)
+# Pipeline Utilization - Backend Bound - CPU (%)
 cpu/event=0x1a0,umask=0x1e,name='de_no_dispatch_per_slot.backend_stalls'/,
 cpu/event=0xd6,umask=0xa2,name='ex_no_retire.load_not_complete'/,
 cpu/event=0xd6,umask=0x2,name='ex_no_retire.not_complete'/,
 cpu/event=0x76,name='ls_not_halted_cyc2'/;
 
-# pipeline utilization - retiring (%)
-# pipeline utilization - retiring - microcode (%)
-# pipeline utilization - retiring - fastpath (%)
+# Pipeline Utilization - Retiring (%)
+# Pipeline Utilization - Retiring - Microcode (%)
+# Pipeline Utilization - Retiring - Fastpath (%)
 cpu/event=0xc1,name='ex_ret_ops2'/,
 cpu/event=0x1c2,name='ex_ret_ucode_ops'/,
 cpu/event=0x76,name='ls_not_halted_cyc3'/;

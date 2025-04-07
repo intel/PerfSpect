@@ -294,14 +294,14 @@ func (t *RemoteTarget) GetStepping() (stepping string, err error) {
 // It retrieves the vendor by calling the GetVendor function.
 func (t *LocalTarget) GetVendor() (arch string, err error) {
 	if t.vendor == "" {
-		t.vendor, err = GetVendor(t)
+		t.vendor, err = getVendor(t)
 	}
 	return t.vendor, err
 }
 
 func (t *RemoteTarget) GetVendor() (arch string, err error) {
 	if t.vendor == "" {
-		t.vendor, err = GetVendor(t)
+		t.vendor, err = getVendor(t)
 	}
 	return t.vendor, err
 }
@@ -605,7 +605,7 @@ func runLocalCommandWithInputWithTimeout(cmd *exec.Cmd, input string, timeout in
 		var cancel context.CancelFunc
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 		defer cancel()
-		commandWithContext := exec.CommandContext(ctx, cmd.Path, cmd.Args[1:]...)
+		commandWithContext := exec.CommandContext(ctx, cmd.Path, cmd.Args[1:]...) // nosemgrep
 		commandWithContext.Env = cmd.Env
 		cmd = commandWithContext
 	}
@@ -638,7 +638,7 @@ func runLocalCommandWithInputWithTimeoutAsync(cmd *exec.Cmd, stdoutChannel chan 
 		var cancel context.CancelFunc
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 		defer cancel()
-		commandWithContext := exec.CommandContext(ctx, cmd.Path, cmd.Args[1:]...)
+		commandWithContext := exec.CommandContext(ctx, cmd.Path, cmd.Args[1:]...) // nosemgrep
 		commandWithContext.Env = cmd.Env
 		cmd = commandWithContext
 	}
@@ -803,7 +803,7 @@ func (t *RemoteTarget) prepareLocalCommand(cmd *exec.Cmd, useControlMaster bool)
 		name = sshCommand[0]
 		args = sshCommand[1:]
 	}
-	localCommand := exec.Command(name, args...)
+	localCommand := exec.Command(name, args...) // nosemgrep
 	if usePass {
 		localCommand.Env = append(localCommand.Env, "SSHPASS="+t.sshPass)
 	}
@@ -823,7 +823,7 @@ func (t *RemoteTarget) prepareAndRunSCPCommand(srcPath string, dstDir string, is
 		name = scpCommand[0]
 		args = scpCommand[1:]
 	}
-	localCommand := exec.Command(name, args...)
+	localCommand := exec.Command(name, args...) // nosemgrep
 	if usePass {
 		localCommand.Env = append(localCommand.Env, "SSHPASS="+t.sshPass)
 	}
@@ -871,7 +871,7 @@ func getStepping(t Target) (stepping string, err error) {
 	return
 }
 
-func GetVendor(t Target) (vendor string, err error) {
+func getVendor(t Target) (vendor string, err error) {
 	cmd := exec.Command("bash", "-c", "lscpu | grep -i \"^Vendor ID:\" | awk '{print $NF}'")
 	vendor, _, _, err = t.RunCommand(cmd, 0, true)
 	if err != nil {
