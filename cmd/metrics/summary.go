@@ -267,15 +267,9 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata) (templateVals
 	if stats, err = m.getStats(); err != nil {
 		return
 	}
-	// hack to determine the architecture of the metrics source
-	var archIndex int
-	if _, ok := stats["Macro-ops Retired PTI"]; ok { // a metric that only exists in the AMD metric definitions
-		archIndex = 1
-	} else {
-		archIndex = 0 // Intel
-	}
-
-	if _, ok := stats["Macro-ops Retired txn"]; ok { // a metric that only exists in the AMD metric definitions
+	//0 -> Intel, 1 -> AMD
+	archIndex := 0
+	if metadata.Vendor == "AuthenticAMD" {
 		archIndex = 1
 	}
 

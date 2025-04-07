@@ -240,12 +240,16 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 	}
 	// calculate TSC
 	metadata.TSC = metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore * metadata.TSCFrequencyHz
+	isAMDArchitecture := (metadata.Vendor == "AuthenticAMD")
 	// uncore device IDs
-	if metadata.UncoreDeviceIDs, err = getUncoreDeviceIDs(myTarget, localTempDir, metadata.Vendor == "AuthenticAMD"); err != nil {
+	if metadata.UncoreDeviceIDs, err = getUncoreDeviceIDs(myTarget, localTempDir, isAMDArchitecture); err != nil {
 		return
 	}
 	for uncoreDeviceName := range metadata.UncoreDeviceIDs {
-		if uncoreDeviceName == "cha" || uncoreDeviceName == "l3" || uncoreDeviceName == "df" { // could be any uncore device
+		if !isAMDArchitecture && uncoreDeviceName == "cha" { // could be any uncore device
+			metadata.SupportsUncore = true
+			break
+		} else if isAMDArchitecture && (uncoreDeviceName == "l3" || uncoreDeviceName == "df") { // could be any uncore device
 			metadata.SupportsUncore = true
 			break
 		}
