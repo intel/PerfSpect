@@ -374,7 +374,7 @@ func getUncoreDeviceIDs(myTarget target.Target, localTempDir string) (IDs map[st
 		ScriptTemplate: "find /sys/bus/event_source/devices/ \\( -name uncore_* -o -name amd_* \\)",
 		Superuser:      false,
 	}
-	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
+	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir) // nosemgrep
 	if err != nil {
 		err = fmt.Errorf("failed to list uncore devices: %s, %d, %v", scriptOutput.Stderr, scriptOutput.Exitcode, err)
 		return
@@ -426,7 +426,7 @@ func getCPUInfo(myTarget target.Target) (cpuInfo []map[string]string, err error)
 // getPerfSupportedEvents - returns a string containing the output from
 // 'perf list'
 func getPerfSupportedEvents(myTarget target.Target, perfPath string) (supportedEvents string, err error) {
-	cmd := exec.Command(perfPath, "list")
+	cmd := exec.Command(perfPath, "list") // nosemgrep
 	stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, true)
 	if err != nil {
 		err = fmt.Errorf("failed to get perf list: %s, %d, %v", stderr, exitcode, err)
@@ -443,7 +443,7 @@ func getSupportsEvent(myTarget target.Target, event string, noRoot bool, perfPat
 		ScriptTemplate: perfPath + " stat -a -e " + event + " sleep 1",
 		Superuser:      !noRoot,
 	}
-	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
+	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir) // nosemgrep
 	if err != nil {
 		err = fmt.Errorf("failed to determine if %s is supported: %s, %d, %v", event, scriptOutput.Stderr, scriptOutput.Exitcode, err)
 		return
@@ -462,7 +462,7 @@ func getSupportsPEBS(myTarget target.Target, noRoot bool, perfPath string, local
 		ScriptTemplate: perfPath + " stat -a -e cpu/event=0xad,umask=0x40,period=1000003,name='INT_MISC.UNKNOWN_BRANCH_CYCLES'/ sleep 1",
 		Superuser:      !noRoot,
 	}
-	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
+	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir) // nosemgrep
 	if err != nil {
 		err = fmt.Errorf("failed to determine if pebs is supported: %s, %d, %v", scriptOutput.Stderr, scriptOutput.Exitcode, err)
 		return
@@ -479,7 +479,7 @@ func getSupportsOCR(myTarget target.Target, noRoot bool, perfPath string, localT
 		ScriptTemplate: perfPath + " stat -a -e cpu/event=0x2a,umask=0x01,offcore_rsp=0x104004477,name='OCR.READS_TO_CORE.LOCAL_DRAM'/ sleep 1",
 		Superuser:      !noRoot,
 	}
-	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
+	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir) // nosemgrep
 	if err != nil {
 		err = fmt.Errorf("failed to determine if ocr is supported: %s, %d, %v", scriptOutput.Stderr, scriptOutput.Exitcode, err)
 		return

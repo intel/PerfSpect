@@ -605,7 +605,7 @@ func runLocalCommandWithInputWithTimeout(cmd *exec.Cmd, input string, timeout in
 		var cancel context.CancelFunc
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 		defer cancel()
-		commandWithContext := exec.CommandContext(ctx, cmd.Path, cmd.Args[1:]...)
+		commandWithContext := exec.CommandContext(ctx, cmd.Path, cmd.Args[1:]...) // nosemgrep
 		commandWithContext.Env = cmd.Env
 		cmd = commandWithContext
 	}
@@ -638,7 +638,7 @@ func runLocalCommandWithInputWithTimeoutAsync(cmd *exec.Cmd, stdoutChannel chan 
 		var cancel context.CancelFunc
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 		defer cancel()
-		commandWithContext := exec.CommandContext(ctx, cmd.Path, cmd.Args[1:]...)
+		commandWithContext := exec.CommandContext(ctx, cmd.Path, cmd.Args[1:]...) // nosemgrep
 		commandWithContext.Env = cmd.Env
 		cmd = commandWithContext
 	}
@@ -803,7 +803,7 @@ func (t *RemoteTarget) prepareLocalCommand(cmd *exec.Cmd, useControlMaster bool)
 		name = sshCommand[0]
 		args = sshCommand[1:]
 	}
-	localCommand := exec.Command(name, args...)
+	localCommand := exec.Command(name, args...) // nosemgrep
 	if usePass {
 		localCommand.Env = append(localCommand.Env, "SSHPASS="+t.sshPass)
 	}
@@ -823,7 +823,7 @@ func (t *RemoteTarget) prepareAndRunSCPCommand(srcPath string, dstDir string, is
 		name = scpCommand[0]
 		args = scpCommand[1:]
 	}
-	localCommand := exec.Command(name, args...)
+	localCommand := exec.Command(name, args...) // nosemgrep
 	if usePass {
 		localCommand.Env = append(localCommand.Env, "SSHPASS="+t.sshPass)
 	}

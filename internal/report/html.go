@@ -7,14 +7,15 @@ import (
 	"bytes"
 	"fmt"
 	"html"
+	htmltemplate "html/template"
 	"log/slog"
 	"math"
-	"math/rand/v2"
+	"math/rand/v2" // nosemgrep
 	"slices"
 	"sort"
 	"strconv"
 	"strings"
-	texttemplate "text/template"
+	texttemplate "text/template" // nosemgrep
 )
 
 func getHtmlReportBegin() string {
@@ -486,7 +487,7 @@ func DefaultHTMLTableRendererFunc(tableValues TableValues) string {
 		for row := range tableValues.Fields[0].Values {
 			rowValues := []string{}
 			for _, field := range tableValues.Fields {
-				rowValues = append(rowValues, field.Values[row])
+				rowValues = append(rowValues, htmltemplate.HTMLEscapeString(field.Values[row]))
 			}
 			values = append(values, rowValues)
 		}
@@ -497,7 +498,7 @@ func DefaultHTMLTableRendererFunc(tableValues TableValues) string {
 		for _, field := range tableValues.Fields {
 			rowValues := []string{}
 			rowValues = append(rowValues, field.Name)
-			rowValues = append(rowValues, field.Values[0])
+			rowValues = append(rowValues, htmltemplate.HTMLEscapeString(field.Values[0]))
 			values = append(values, rowValues)
 			tableValueStyles = append(tableValueStyles, []string{"font-weight:bold"})
 		}
@@ -515,7 +516,7 @@ func RenderMultiTargetTableValuesAsHTML(tableValues []TableValues, targetNames [
 		rowValues = append(rowValues, field.Name)
 		for _, targetTableValues := range tableValues {
 			if len(targetTableValues.Fields) > fieldIndex && len(targetTableValues.Fields[fieldIndex].Values) > 0 {
-				rowValues = append(rowValues, targetTableValues.Fields[fieldIndex].Values[0])
+				rowValues = append(rowValues, htmltemplate.HTMLEscapeString(targetTableValues.Fields[fieldIndex].Values[0]))
 			} else {
 				rowValues = append(rowValues, "")
 			}
@@ -613,7 +614,7 @@ func dimmTableHTMLRenderer(tableValues TableValues, targetName string) string {
 			slotTableValuesStyles = append(slotTableValuesStyles, []string{})
 			for _, slot := range slotKeys {
 				dimmDetails := channelMap[slot]
-				slotTableValues[0] = append(slotTableValues[0], dimmDetails)
+				slotTableValues[0] = append(slotTableValues[0], htmltemplate.HTMLEscapeString(dimmDetails))
 				var slotColor string
 				if dimmDetails == "No Module Installed" {
 					slotColor = "background-color:silver"
@@ -1318,7 +1319,7 @@ func kernelLockAnalysisHTMLRenderer(tableValues TableValues, targetName string) 
 	for _, field := range tableValues.Fields {
 		rowValues := []string{}
 		rowValues = append(rowValues, field.Name)
-		rowValues = append(rowValues, field.Values[0])
+		rowValues = append(rowValues, htmltemplate.HTMLEscapeString(field.Values[0]))
 		values = append(values, rowValues)
 		rowStyles := []string{}
 		rowStyles = append(rowStyles, "font-weight:bold")

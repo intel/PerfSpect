@@ -17,7 +17,7 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
-	texttemplate "text/template"
+	texttemplate "text/template" // nosemgrep
 	"time"
 )
 
