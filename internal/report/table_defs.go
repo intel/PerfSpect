@@ -82,7 +82,7 @@ const (
 	AcceleratorTableName       = "Accelerator"
 	PowerTableName             = "Power"
 	CstateTableName            = "C-states"
-	SpecCoreFrequencyTableName = "Spec Core Frequency"
+	MaximumFrequencyTableName  = "Maximum Frequency"
 	SSTTFHPTableName           = "Speed Select Turbo Frequency - High Priority Cores"
 	SSTTFLPTableName           = "Speed Select Turbo Frequency - Low Priority Cores"
 	UncoreTableName            = "Uncore"
@@ -287,8 +287,8 @@ var tableDefinitions = map[string]TableDefinition{
 			script.CstatesScriptName,
 		},
 		FieldsFunc: cstateTableValues},
-	SpecCoreFrequencyTableName: {
-		Name:    SpecCoreFrequencyTableName,
+	MaximumFrequencyTableName: {
+		Name:    MaximumFrequencyTableName,
 		HasRows: true,
 		ScriptNames: []string{
 			script.SpecCoreFrequenciesScriptName,
@@ -296,7 +296,7 @@ var tableDefinitions = map[string]TableDefinition{
 			script.LspciBitsScriptName,
 			script.LspciDevicesScriptName,
 		},
-		FieldsFunc: specCoreFrequencyTableValues},
+		FieldsFunc: maximumFrequencyTableValues},
 	UncoreTableName: {
 		Name:          UncoreTableName,
 		Architectures: []string{"x86_64"},
@@ -327,7 +327,8 @@ var tableDefinitions = map[string]TableDefinition{
 	SSTTFHPTableName: {
 		Name:          SSTTFHPTableName,
 		Architectures: []string{"x86_64"},
-		Families:      []string{"6"}, // Intel CPUs only
+		Families:      []string{"6"},          // Intel CPUs only
+		Models:        []string{"173", "175"}, // Granite Rapids, Sierra Forest
 		HasRows:       true,
 		ScriptNames: []string{
 			script.SstTfHighPriorityCoreFrequenciesScriptName,
@@ -336,7 +337,8 @@ var tableDefinitions = map[string]TableDefinition{
 	SSTTFLPTableName: {
 		Name:          SSTTFLPTableName,
 		Architectures: []string{"x86_64"},
-		Families:      []string{"6"}, // Intel CPUs only
+		Families:      []string{"6"},          // Intel CPUs only
+		Models:        []string{"173", "175"}, // Granite Rapids, Sierra Forest
 		HasRows:       true,
 		ScriptNames: []string{
 			script.SstTfLowPriorityCoreFrequenciesScriptName,
@@ -1180,7 +1182,7 @@ func elcTableInsights(outputs map[string]script.ScriptOutput, tableValues TableV
 	return insights
 }
 
-func specCoreFrequencyTableValues(outputs map[string]script.ScriptOutput) []Field {
+func maximumFrequencyTableValues(outputs map[string]script.ScriptOutput) []Field {
 	specCoreFrequencies, err := getSpecCoreFrequenciesFromOutput(outputs)
 	if err != nil {
 		slog.Warn("unable to get spec core frequencies", slog.String("error", err.Error()))
