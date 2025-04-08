@@ -260,17 +260,18 @@ func terminateApplication(cmd *cobra.Command, args []string) error {
 	if ctx != nil {
 		ctxValue := ctx.Value(common.AppContext{})
 		if ctxValue != nil {
-			appContext := ctxValue.(common.AppContext)
-			// clean up temp directory if debug flag is not set
-			if appContext.LocalTempDir != "" && !flagDebug {
-				err := os.RemoveAll(appContext.LocalTempDir)
-				if err != nil {
-					slog.Error("error cleaning up temp directory", slog.String("tempDir", appContext.LocalTempDir), slog.String("error", err.Error()))
+			if appContext, ok := ctxValue.(common.AppContext); ok {
+				// clean up temp directory if debug flag is not set
+				if appContext.LocalTempDir != "" && !flagDebug {
+					err := os.RemoveAll(appContext.LocalTempDir)
+					if err != nil {
+						slog.Error("error cleaning up temp directory", slog.String("tempDir", appContext.LocalTempDir), slog.String("error", err.Error()))
+					}
 				}
-			}
-			slog.Info("Shutting down", slog.String("app", common.AppName), slog.String("version", gVersion), slog.Int("PID", os.Getpid()), slog.String("arguments", strings.Join(os.Args, " ")))
-			if gLogFile != nil {
-				gLogFile.Close()
+				slog.Info("Shutting down", slog.String("app", common.AppName), slog.String("version", gVersion), slog.Int("PID", os.Getpid()), slog.String("arguments", strings.Join(os.Args, " ")))
+				if gLogFile != nil {
+					gLogFile.Close()
+				}
 			}
 		}
 	}
