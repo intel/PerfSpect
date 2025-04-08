@@ -1223,26 +1223,53 @@ fi
 	// profile (flamegraph) scripts
 	ProfileJavaScriptName: {
 		Name: ProfileJavaScriptName,
-		ScriptTemplate: `interval={{.Interval}}
+		ScriptTemplate: `# JAVA app (async profiler) call stack collection
+pid={{.PID}}
 duration={{.Duration}}
 frequency={{.Frequency}}
+
 ap_interval=0
-if [ $frequency -ne 0 ]; then
+if [ "$frequency" -ne 0 ]; then
 	ap_interval=$((1000000000 / frequency))
 fi
-# JAVA app call stack collection (run in background)
+
+# if pid is provided, use it
+if [ "$pid" -ne 0 ]; then
+    # check if the provided pid is running
+    if [ ! -d "/proc/$pid" ]; then
+        echo "pid $pid not running"
+        exit 1
+    fi
+    # check if pid is a java process, i.e., command line contains java
+    if ! tr '\000' ' ' < /proc/"$pid"/cmdline | grep -q java; then
+        echo "pid $pid is not a java process"
+        exit 1
+    fi
+    pids="$pid"
+else
+    # get all java pids
+    pids=$( pgrep java )
+fi
+
+# check if any java pids are found
+if [ -z "$pids" ]; then
+    echo "no java processes found"
+    exit 1
+fi
+
+# start java profiling for each java pid
 declare -a java_pids=()
 declare -a java_cmds=()
-for pid in $( pgrep java ) ; do
-	# verify pid is still running
-	if [ -d "/proc/$pid" ]; then
-		java_pids+=($pid)
-		java_cmds+=("$( tr '\000' ' ' <  /proc/$pid/cmdline )")
-		# profile pid in background
-		async-profiler/profiler.sh start -i "$ap_interval" -o collapsed "$pid"
-	fi
+for pid in $pids ; do
+    java_pids+=("$pid")
+    java_cmds+=("$( tr '\000' ' ' <  /proc/"$pid"/cmdline )")
+    # profile pid in background
+    async-profiler/profiler.sh start -i "$ap_interval" -o collapsed "$pid"
 done
-sleep $duration
+
+# wait for the specified duration
+sleep "$duration"
+
 # stop java profiling for each java pid
 for idx in "${!java_pids[@]}"; do
 	pid="${java_pids[$idx]}"
@@ -1250,22 +1277,40 @@ for idx in "${!java_pids[@]}"; do
 	echo "########## async-profiler $pid $cmd ##########"
 	async-profiler/profiler.sh stop -o collapsed "$pid"
 done
+
 `,
 		Superuser: true,
 		Depends:   []string{"async-profiler"},
 	},
 	ProfileSystemScriptName: {
 		Name: ProfileSystemScriptName,
-		ScriptTemplate: `frequency={{.Frequency}}
+		ScriptTemplate: `# native (perf record) call stack collection
+pid={{.PID}}
 duration={{.Duration}}
+frequency={{.Frequency}}
 
-# system-wide call stack collection
-
-# Function to restore original settings
+# Function to restore original settings and clean up
+# This function will be called on exit
 restore_settings() {
 	echo "$PERF_EVENT_PARANOID" > /proc/sys/kernel/perf_event_paranoid
 	echo "$KPTR_RESTRICT" > /proc/sys/kernel/kptr_restrict
+    rm -f "$perf_fp_data"
+    rm -f "$perf_dwarf_data"
+    rm -f "$perf_dwarf_folded"
+    rm -f "$perf_fp_folded"
+    if [ -n "$perf_fp_pid" ]; then
+        kill -0 $perf_fp_pid 2>/dev/null && kill -INT $perf_fp_pid
+    fi
+    if [ -n "$perf_dwarf_pid" ]; then
+        kill -0 $perf_dwarf_pid 2>/dev/null && kill -INT $perf_dwarf_pid
+    fi
 }
+
+# create temporary output files
+perf_fp_data=$(mktemp)
+perf_dwarf_data=$(mktemp)
+perf_dwarf_folded=$(mktemp)
+perf_fp_folded=$(mktemp)
 
 # adjust perf_event_paranoid and kptr_restrict
 PERF_EVENT_PARANOID=$( cat /proc/sys/kernel/perf_event_paranoid )
@@ -1276,31 +1321,61 @@ echo 0 >/proc/sys/kernel/kptr_restrict
 # Ensure settings are restored on exit
 trap restore_settings EXIT
 
-# system-wide call stack collection - frame pointer mode
-perf_fp_data=$(mktemp /tmp/perf_fp.XXXXXX)
-perf record -F $frequency -a -g -o "$perf_fp_data" -m 129 -- sleep $duration &
-PERF_FP_PID=$!
-if ! kill -0 $PERF_FP_PID 2>/dev/null; then
-	echo "Failed to start perf record for frame pointer mode"
+# if pid is not zero, check if the process is running
+if [ "$pid" -ne 0 ]; then
+    if ! ps -p "$pid" > /dev/null; then
+        echo "Error: Process $pid is not running."
+        exit 1
+    fi
+fi
+
+# frame pointer mode
+# if pid was provided, use it
+if [ "$pid" -ne 0 ]; then
+    perf record -F "$frequency" -p "$pid" -g -o "$perf_fp_data" -m 129 &
+else
+    # if no pid was provided, use system-wide profiling
+    perf record -F "$frequency" -a -g -o "$perf_fp_data" -m 129 &
+fi
+perf_fp_pid=$!
+if ! kill -0 $perf_fp_pid 2>/dev/null; then
+	echo "Failed to start perf record in frame pointer mode"
 	exit 1
 fi
 
-# system-wide call stack collection - dwarf mode
-perf_dwarf_data=$(mktemp /tmp/perf_dwarf.XXXXXX)
-perf record -F $frequency -a -g -o "$perf_dwarf_data" -m 257 --call-graph dwarf,8192 -- sleep $duration &
-PERF_DWARF_PID=$!
-if ! kill -0 $PERF_DWARF_PID 2>/dev/null; then
-	echo "Failed to start perf record for dwarf mode"
-	kill $PERF_FP_PID
+# dwarf mode
+# if pid was provided, use it
+if [ "$pid" -ne 0 ]; then
+    perf record -F "$frequency" -p "$pid" -g -o "$perf_dwarf_data" -m 257 --call-graph dwarf,8192 &
+else
+    # if no pid was provided, use system-wide profiling
+    perf record -F "$frequency" -a -g -o "$perf_dwarf_data" -m 257 --call-graph dwarf,8192 &
+fi
+perf_dwarf_pid=$!
+if ! kill -0 $perf_dwarf_pid 2>/dev/null; then
+	echo "Failed to start perf record in dwarf mode"
 	exit 1
+fi
+
+# wait for the specified duration
+sleep "$duration"
+
+# stop perf recording
+if ! kill -0 $perf_fp_pid 2>/dev/null; then
+    echo "Frame pointer mode already stopped"
+else
+    kill -INT $perf_fp_pid
+fi
+if ! kill -0 $perf_dwarf_pid 2>/dev/null; then
+    echo "Dwarf mode already stopped"
+else
+    kill -INT $perf_dwarf_pid
 fi
 
 # wait for perf to finish
-wait ${PERF_FP_PID} ${PERF_DWARF_PID}
+wait ${perf_fp_pid} ${perf_dwarf_pid}
 
 # collapse perf data
-perf_dwarf_folded=$(mktemp /tmp/perf_dwarf_folded.XXXXXX)
-perf_fp_folded=$(mktemp /tmp/perf_fp_folded.XXXXXX)
 perf script -i "$perf_dwarf_data" | stackcollapse-perf.pl > "$perf_dwarf_folded"
 perf script -i "$perf_fp_data" | stackcollapse-perf.pl > "$perf_fp_folded"
 
