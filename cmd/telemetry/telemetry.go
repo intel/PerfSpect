@@ -272,9 +272,14 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		insightsFunc = common.DefaultInsightsFunc
 	}
 	reportingCommand := common.ReportingCommand{
-		Cmd:              cmd,
-		ReportNamePost:   "telem",
-		ScriptParams:     script.ScriptParams{Interval: flagInterval, Duration: flagDuration, PID: flagInstrMixPid, Filter: flagInstrMixFilter},
+		Cmd:            cmd,
+		ReportNamePost: "telem",
+		ScriptParams: map[string]string{
+			"Interval": strconv.Itoa(flagInterval),
+			"Duration": strconv.Itoa(flagDuration),
+			"PID":      strconv.Itoa(flagInstrMixPid),
+			"Filter":   strings.Join(flagInstrMixFilter, " "),
+		},
 		TableNames:       tableNames,
 		SummaryFunc:      summaryFunc,
 		SummaryTableName: telemetrySummaryTableName,
