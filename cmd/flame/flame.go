@@ -9,8 +9,8 @@ import (
 	"os"
 	"perfspect/internal/common"
 	"perfspect/internal/report"
-	"perfspect/internal/script"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -144,8 +144,11 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	reportingCommand := common.ReportingCommand{
 		Cmd:            cmd,
 		ReportNamePost: "flame",
-		ScriptParams:   script.ScriptParams{Frequency: flagFrequency, Duration: flagDuration},
-		TableNames:     []string{report.CodePathFrequencyTableName},
+		ScriptParams: map[string]string{
+			"Frequency": strconv.Itoa(flagFrequency),
+			"Duration":  strconv.Itoa(flagDuration),
+		},
+		TableNames: []string{report.CodePathFrequencyTableName},
 	}
 	return reportingCommand.Run()
 }

@@ -362,7 +362,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 	reportingCommand := common.ReportingCommand{
 		Cmd:              cmd,
-		ScriptParams:     script.ScriptParams{StorageDir: flagStorageDir},
+		ScriptParams:     map[string]string{"StorageDir": flagStorageDir},
 		TableNames:       tableNames,
 		SummaryFunc:      summaryFunc,
 		SummaryTableName: benchmarkSummaryTableName,
