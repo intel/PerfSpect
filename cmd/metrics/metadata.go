@@ -240,12 +240,16 @@ func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTem
 	}
 	// calculate TSC
 	metadata.TSC = metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore * metadata.TSCFrequencyHz
+	isAMDArchitecture := (metadata.Vendor == "AuthenticAMD")
 	// uncore device IDs
-	if metadata.UncoreDeviceIDs, err = getUncoreDeviceIDs(myTarget, localTempDir); err != nil {
+	if metadata.UncoreDeviceIDs, err = getUncoreDeviceIDs(myTarget, localTempDir, isAMDArchitecture); err != nil {
 		return
 	}
 	for uncoreDeviceName := range metadata.UncoreDeviceIDs {
-		if uncoreDeviceName == "cha" { // could be any uncore device
+		if !isAMDArchitecture && uncoreDeviceName == "cha" { // could be any uncore device
+			metadata.SupportsUncore = true
+			break
+		} else if isAMDArchitecture && (uncoreDeviceName == "l3" || uncoreDeviceName == "df") { // could be any uncore device
 			metadata.SupportsUncore = true
 			break
 		}
@@ -368,7 +372,7 @@ func ReadJSONFromFile(path string) (md Metadata, err error) {
 
 // getUncoreDeviceIDs - returns a map of device type to list of device indices
 // e.g., "upi" -> [0,1,2,3],
-func getUncoreDeviceIDs(myTarget target.Target, localTempDir string) (IDs map[string][]int, err error) {
+func getUncoreDeviceIDs(myTarget target.Target, localTempDir string, isAMDArchitecture bool) (IDs map[string][]int, err error) {
 	scriptDef := script.ScriptDefinition{
 		Name:           "list uncore devices",
 		ScriptTemplate: "find /sys/bus/event_source/devices/ \\( -name uncore_* -o -name amd_* \\)",
@@ -382,14 +386,20 @@ func getUncoreDeviceIDs(myTarget target.Target, localTempDir string) (IDs map[st
 	fileNames := strings.Split(scriptOutput.Stdout, "\n")
 	IDs = make(map[string][]int)
 	re := regexp.MustCompile(`(?:uncore_|amd_)(.*)_(\d+)`)
+	if isAMDArchitecture {
+		re = regexp.MustCompile(`(?:uncore_|amd_)(.*?)(?:_(\d+))?$`)
+	}
 	for _, fileName := range fileNames {
 		match := re.FindStringSubmatch(fileName)
 		if match == nil {
 			continue
 		}
 		var id int
-		if id, err = strconv.Atoi(match[2]); err != nil {
-			return
+		//match[2] will never be empty for Intel Architecture due to regex filtering
+		if match[2] != "" {
+			if id, err = strconv.Atoi(match[2]); err != nil {
+				return
+			}
 		}
 		IDs[match[1]] = append(IDs[match[1]], id)
 	}
@@ -555,6 +565,12 @@ func getSupportsFixedEvent(myTarget target.Target, event string, uarch string, n
 		fallthrough
 	case "GNR":
 		numGPCounters = 8
+	case "Gen":
+		fallthrough
+	case "Ber":
+		fallthrough
+	case "Tur":
+		numGPCounters = 5
 	default:
 		err = fmt.Errorf("unsupported uarch: %s", uarch)
 		return

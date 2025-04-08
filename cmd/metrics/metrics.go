@@ -805,7 +805,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		targetContexts = append(targetContexts, targetContext{target: myTarget})
 	}
 	for i := range targetContexts {
-		go prepareTarget(&targetContexts[i], localTempDir, localPerfPath, channelTargetError, multiSpinner.Status)
+		go prepareTarget(&targetContexts[i], localTempDir, localPerfPath, channelTargetError, multiSpinner.Status, !cmd.Flags().Lookup(flagPerfMuxIntervalName).Changed)
 	}
 	// wait for all targets to be prepared
 	numPreparedTargets := 0
@@ -999,7 +999,7 @@ func summarizeMetrics(localOutputDir string, targetName string, metadata Metadat
 	return filesCreated, nil
 }
 
-func prepareTarget(targetContext *targetContext, localTempDir string, localPerfPath string, channelError chan targetError, statusUpdate progress.MultiSpinnerUpdateFunc) {
+func prepareTarget(targetContext *targetContext, localTempDir string, localPerfPath string, channelError chan targetError, statusUpdate progress.MultiSpinnerUpdateFunc, useDefaultMuxInterval bool) {
 	myTarget := targetContext.target
 	var err error
 	_ = statusUpdate(myTarget.GetName(), "configuring target")
@@ -1043,6 +1043,13 @@ func prepareTarget(targetContext *targetContext, localTempDir string, localPerfP
 				return
 			}
 			targetContext.nmiDisabled = true
+		}
+	}
+	// update default mux interval to 16ms for AMD architecture
+	if !flagNoRoot && useDefaultMuxInterval {
+		vendor, err := myTarget.GetVendor()
+		if err == nil && vendor == "AuthenticAMD" {
+			flagPerfMuxInterval = 16
 		}
 	}
 	// set perf mux interval to desired value
