@@ -2,8 +2,6 @@ package script
 
 import (
 	"bytes"
-	"fmt"
-	"strings"
 	texttemplate "text/template" // nosemgrep
 )
 
@@ -123,47 +121,24 @@ const (
 
 // GetScriptByName returns the script definition with the given name. It will panic if the script is not found.
 func GetScriptByName(name string) ScriptDefinition {
-	return GetParameterizedScriptByName(name, ScriptParams{})
-}
-
-type ScriptParams struct {
-	Duration   int
-	Interval   int
-	Frequency  int
-	StorageDir string
-	PID        int
-	Filter     []string
-}
-
-type ScriptTemplateParams struct {
-	Duration   string
-	Interval   string
-	Frequency  string
-	StorageDir string
-	PID        string
-	Filter     string
-	ScriptName string
+	return GetParameterizedScriptByName(name, nil)
 }
 
 // GetParameterizedScriptByName returns the script definition with the given name. It will panic if the script is not found.
-func GetParameterizedScriptByName(name string, params ScriptParams) ScriptDefinition {
+func GetParameterizedScriptByName(name string, params map[string]string) ScriptDefinition {
 	// if the script doesn't exist, panic
 	if _, ok := scripts[name]; !ok {
 		panic("script not found: " + name)
 	}
-	// convert ScriptParams to ScriptTemplateParams
-	templateParams := ScriptTemplateParams{
-		Duration:   fmt.Sprintf("%d", params.Duration),
-		Interval:   fmt.Sprintf("%d", params.Interval),
-		Frequency:  fmt.Sprintf("%d", params.Frequency),
-		StorageDir: params.StorageDir,
-		PID:        fmt.Sprintf("%d", params.PID),
-		Filter:     strings.Join(params.Filter, " "),
-		ScriptName: sanitizeScriptName(name),
+	if params == nil {
+		params = make(map[string]string)
 	}
+	// augment params with script name
+	params["ScriptName"] = sanitizeScriptName(name)
+	// replace the script template with the parameterized version
 	scriptTemplate := texttemplate.Must(texttemplate.New("scriptTemplate").Parse(scripts[name].ScriptTemplate))
 	buf := new(bytes.Buffer)
-	err := scriptTemplate.Execute(buf, templateParams)
+	err := scriptTemplate.Execute(buf, params)
 	if err != nil {
 		panic(err)
 	}
