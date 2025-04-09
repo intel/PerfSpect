@@ -136,6 +136,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		ScriptParams: map[string]string{
 			"Frequency": strconv.Itoa(flagFrequency),
 			"Duration":  strconv.Itoa(flagDuration),
+			"Package":   strconv.FormatBool(flagPackage),
 		},
 		TableNames: []string{report.KernelLockAnalysisTableName},
 	}
