@@ -1407,8 +1407,11 @@ echo -1 >/proc/sys/kernel/perf_event_paranoid
 KPTR_RESTRICT=$( cat /proc/sys/kernel/kptr_restrict )
 echo 0 >/proc/sys/kernel/kptr_restrict
 
+PERF_HOTSPOT_DATA=$(mktemp -d)/perf_hotspot.data
+PERF_CONTENTION_DATA=$(mktemp -d)/perf_lock_contention.txt
+
 # collect hotspot
-perf record -F $frequency -a -g --call-graph dwarf -W -d --phys-data --sample-cpu -e cycles:pp,instructions:pp,cpu/mem-loads,ldlat=30/P,cpu/mem-stores/P -o perf_hotspot.data -- sleep $duration &
+perf record -F $frequency -a -g --call-graph dwarf -W -d --phys-data --sample-cpu -e cycles:pp,instructions:pp,cpu/mem-loads,ldlat=30/P,cpu/mem-stores/P -o ${PERF_HOTSPOT_DATA} -- sleep $duration &
 PERF_HOTSPOT_PID=$!
 
 # check the availability perf lock -b option 
@@ -1417,7 +1420,7 @@ PERF_LOCK_CONTENTION_BPF=$?
 
 # collect lock
 if [ ${PERF_LOCK_CONTENTION_BPF} -eq 0 ]; then
-	perf lock contention -a -bv --max-stack 20 2>perf_lock_contention.txt -- sleep $duration &
+	perf lock contention -a -bv --max-stack 20 2>${PERF_CONTENTION_DATA} -- sleep $duration &
 	PERF_LOCK_PID=$!
 fi
 
@@ -1432,21 +1435,21 @@ echo "$PERF_EVENT_PARANOID" > /proc/sys/kernel/perf_event_paranoid
 echo "$KPTR_RESTRICT" > /proc/sys/kernel/kptr_restrict
 
 # collapse perf data
-if [ -f "perf_hotspot.data" ]; then
+if [ -f "${PERF_HOTSPOT_DATA}" ]; then
 	echo "########## perf_hotspot_no_children ##########"
-	perf report -i perf_hotspot.data --no-children --call-graph none --stdio
+	perf report -i ${PERF_HOTSPOT_DATA} --no-children --call-graph none --stdio
 	echo "########## perf_hotspot_callgraph ##########"
-	perf report -i perf_hotspot.data --stdio
+	perf report -i ${PERF_HOTSPOT_DATA} --stdio
 fi
-if [ -f "perf_hotspot.data" ]; then
+if [ -f "${PERF_HOTSPOT_DATA}" ]; then
 	echo "########## perf_c2c_no_children ##########"
-	perf c2c report  -i perf_hotspot.data --call-graph none --stdio
+	perf c2c report  -i ${PERF_HOTSPOT_DATA} --call-graph none --stdio
 	echo "########## perf_c2c_callgraph ##########"
-	perf c2c report  -i perf_hotspot.data --stdio
+	perf c2c report  -i ${PERF_HOTSPOT_DATA} --stdio
 fi
-if [ -f "perf_lock_contention.txt" ]; then
+if [ -f "${PERF_CONTENTION_DATA}" ]; then
 	echo "########## perf_lock_contention ##########"
-	cat perf_lock_contention.txt
+	cat ${PERF_CONTENTION_DATA}
 fi
 `,
 		Superuser: true,
