@@ -39,11 +39,13 @@ var Cmd = &cobra.Command{
 var (
 	flagDuration  int
 	flagFrequency int
+	flagPackage   bool
 )
 
 const (
 	flagDurationName  = "duration"
 	flagFrequencyName = "frequency"
+	flagPackageName   = "package"
 )
 
 func init() {
@@ -51,6 +53,7 @@ func init() {
 	Cmd.Flags().StringSliceVar(&common.FlagFormat, common.FlagFormatName, []string{report.FormatAll}, "")
 	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 10, "")
 	Cmd.Flags().IntVar(&flagFrequency, flagFrequencyName, 11, "")
+	Cmd.PersistentFlags().BoolVar(&flagPackage, flagPackageName, false, "")
 
 	common.AddTargetFlags(Cmd)
 
@@ -93,6 +96,10 @@ func getFlagGroups() []common.FlagGroup {
 			Name: flagFrequencyName,
 			Help: "number of samples taken per second",
 		},
+		{
+			Name: flagPackageName,
+			Help: "create raw data package",
+		},
 	}
 	groups = append(groups, common.FlagGroup{
 		GroupName: "Options",
@@ -118,6 +125,11 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 }
 
 func runCmd(cmd *cobra.Command, args []string) error {
+	// appContext is the application context that holds common data and resources.
+	// appContext := cmd.Parent().Context().Value(common.AppContext{}).(common.AppContext)
+	// localTempDir := appContext.LocalTempDir
+	// localOutputDir := appContext.OutputDir
+
 	reportingCommand := common.ReportingCommand{
 		Cmd:            cmd,
 		ReportNamePost: "lock",
