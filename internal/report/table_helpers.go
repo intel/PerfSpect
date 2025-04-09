@@ -219,42 +219,115 @@ func convertMsrToDecimals(msr string) (decVals []int64, err error) {
 	return
 }
 
-func getSpecCountFrequencies(outputs map[string]script.ScriptOutput) (countFreqs [][]string, err error) {
-	hexCounts := valFromRegexSubmatch(outputs[script.SpecTurboCoresScriptName].Stdout, `^([0-9a-fA-F]+)`)
-	hexFreqs := valFromRegexSubmatch(outputs[script.SpecTurboFrequenciesScriptName].Stdout, `^([0-9a-fA-F]+)`)
-	if hexCounts == "" || hexFreqs == "" {
-		err = fmt.Errorf("no hex counts or frequencies found")
-		return
+// getSpecCoreFrequenciesFromOutput
+// returns slice of rows
+// first row is header
+// each row is a slice of strings
+// "cores", "sse", "avx2", "avx512", "avx512h", "amx"
+// "0-41", "3.5", "3.5", "3.3", "3.2", "3.1"
+// "42-63", "3.5", "3.5", "3.3", "3.2", "3.1"
+// "64-85", "3.5", "3.5", "3.3", "3.2", "3.1"
+// ...
+func getSpecCoreFrequenciesFromOutput(outputs map[string]script.ScriptOutput) ([][]string, error) {
+	arch := uarchFromOutput(outputs)
+	if arch == "" {
+		return nil, fmt.Errorf("uarch is required")
 	}
-	var decCounts, decFreqs []int64
-	decCounts, err = convertMsrToDecimals(hexCounts)
-	if err != nil {
-		return
+	out := outputs[script.SpecCoreFrequenciesScriptName].Stdout
+	// expected script output format, the number of fields may vary:
+	// "cores sse avx2 avx512 avx512h amx"
+	// "hex hex hex hex hex hex"
+	if out == "" {
+		return nil, fmt.Errorf("no core frequencies found")
 	}
-	uarch := uarchFromOutput(outputs)
-	if strings.Contains(uarch, "SRF") {
-		for i, count := range decCounts[:] {
-			decCounts[i] = count * 4 // 4 cores per count
+	lines := strings.Split(out, "\n")
+	if len(lines) < 2 {
+		return nil, fmt.Errorf("unexpected output format")
+	}
+	fieldNames := strings.Fields(lines[0])
+	if len(fieldNames) < 2 {
+		return nil, fmt.Errorf("unexpected output format")
+	}
+	values := strings.Fields(lines[1])
+	if len(values) != len(fieldNames) {
+		return nil, fmt.Errorf("unexpected output format")
+	}
+	// get list of buckets
+	bucketCoreCounts, _ := convertMsrToDecimals(values[0])
+	// create buckets
+	var buckets []string
+	startRange := 1
+	var archMultiplier int
+	if strings.Contains(arch, "SRF") {
+		archMultiplier = 4
+	} else if strings.Contains(arch, "GNR") {
+		archMultiplier = 2
+	} else {
+		archMultiplier = 1
+	}
+	for _, count := range bucketCoreCounts {
+		adjustedCount := count * int64(archMultiplier)
+		if startRange > int(adjustedCount) {
+			break
 		}
+		bucketRange := fmt.Sprintf("%d-%d", startRange, adjustedCount)
+		buckets = append(buckets, bucketRange)
+		startRange = int(adjustedCount) + 1
 	}
-	decFreqs, err = convertMsrToDecimals(hexFreqs)
-	if err != nil {
-		return
+	// get the frequencies for each isa
+	var allIsaFreqs [][]string
+	for _, isaHex := range values[1:] {
+		var isaFreqs []string
+		var freqs []int64
+		if isaHex != "0" {
+			var err error
+			freqs, err = convertMsrToDecimals(isaHex)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			// if the ISA is not supported, set the frequency to zero for all buckets
+			freqs = make([]int64, len(bucketCoreCounts))
+			for i := range freqs {
+				freqs[i] = 0
+			}
+		}
+		for _, freq := range freqs {
+			// convert freq to GHz
+			freqf := float64(freq) / 10.0
+			isaFreqs = append(isaFreqs, fmt.Sprintf("%.1f", freqf))
+		}
+		allIsaFreqs = append(allIsaFreqs, isaFreqs)
 	}
-	if len(decCounts) != 8 || len(decFreqs) != 8 {
-		err = fmt.Errorf("unexpected number of core counts or frequencies")
-		return
+	// format the output
+	var specCoreFreqs [][]string
+	// add bucket field name
+	specCoreFreqs = append(specCoreFreqs, []string{fieldNames[0]})
+	// add fieldNames for ISAs that have frequencies
+	for i := range allIsaFreqs {
+		if allIsaFreqs[i][0] == "0.0" {
+			continue
+		}
+		specCoreFreqs[0] = append(specCoreFreqs[0], fieldNames[i+1])
 	}
-	for i, decCount := range decCounts {
-		countFreqs = append(countFreqs, []string{fmt.Sprintf("%d", decCount), fmt.Sprintf("%.1f", float64(decFreqs[i])/10.0)})
+	for i, bucket := range buckets {
+		row := []string{bucket}
+		for _, isaFreqs := range allIsaFreqs {
+			if isaFreqs[0] == "0.0" {
+				continue
+			} else {
+				row = append(row, isaFreqs[i])
+			}
+		}
+		specCoreFreqs = append(specCoreFreqs, row)
 	}
-	return
+	return specCoreFreqs, nil
 }
 
 // maxFrequencyFromOutputs gets max core frequency
 //
 //	1st option) /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq
-//	2nd option) from MSR
+//	2nd option) from MSR/tpmi
 //	3rd option) from dmidecode "Max Speed"
 func maxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 	cmdout := strings.TrimSpace(outputs[script.MaximumFrequencyScriptName].Stdout)
@@ -265,20 +338,19 @@ func maxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 			return fmt.Sprintf("%.1fGHz", freqf)
 		}
 	}
-	countFreqs, err := getSpecCountFrequencies(outputs)
-	// the first entry is the max single-core frequency
-	if err == nil && len(countFreqs) > 0 && len(countFreqs[0]) > 1 {
-		return countFreqs[0][1]
+	// get the max frequency from the MSR/tpmi
+	specCoreFrequencies, err := getSpecCoreFrequenciesFromOutput(outputs)
+	if err == nil && len(specCoreFrequencies) > 2 && len(specCoreFrequencies[1]) > 1 {
+		return specCoreFrequencies[len(specCoreFrequencies)-1][1] + "GHz"
 	}
-
 	return valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "4", `Max Speed:\s(.*)`)
 }
 
 func allCoreMaxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
-	countFreqs, err := getSpecCountFrequencies(outputs)
-	// the last entry is the max all-core frequency
-	if err == nil && len(countFreqs) > 0 && len(countFreqs[len(countFreqs)-1]) > 1 {
-		return countFreqs[len(countFreqs)-1][1] + "GHz"
+	specCoreFrequencies, err := getSpecCoreFrequenciesFromOutput(outputs)
+	if err == nil && len(specCoreFrequencies) >= 2 && len(specCoreFrequencies[1]) > 1 {
+		// the last entry in the 2nd column is the max all-core frequency
+		return specCoreFrequencies[len(specCoreFrequencies)-1][1] + "GHz"
 	}
 	return ""
 }

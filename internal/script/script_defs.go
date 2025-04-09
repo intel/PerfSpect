@@ -2,9 +2,7 @@ package script
 
 import (
 	"bytes"
-	"fmt"
-	"strings"
-	texttemplate "text/template"
+	texttemplate "text/template" // nosemgrep
 )
 
 // Copyright (C) 2021-2024 Intel Corporation
@@ -52,8 +50,7 @@ const (
 	ScalingGovernorScriptName                  = "scaling governor"
 	MaxCStateScriptName                        = "max c-state"
 	CstatesScriptName                          = "c-states"
-	SpecTurboFrequenciesScriptName             = "spec turbo frequencies"
-	SpecTurboCoresScriptName                   = "spec turbo cores"
+	SpecCoreFrequenciesScriptName              = "spec core frequencies"
 	PPINName                                   = "ppin"
 	PrefetchControlName                        = "prefetch control"
 	PrefetchersName                            = "prefetchers"
@@ -124,47 +121,24 @@ const (
 
 // GetScriptByName returns the script definition with the given name. It will panic if the script is not found.
 func GetScriptByName(name string) ScriptDefinition {
-	return GetParameterizedScriptByName(name, ScriptParams{})
-}
-
-type ScriptParams struct {
-	Duration   int
-	Interval   int
-	Frequency  int
-	StorageDir string
-	PID        int
-	Filter     []string
-}
-
-type ScriptTemplateParams struct {
-	Duration   string
-	Interval   string
-	Frequency  string
-	StorageDir string
-	PID        string
-	Filter     string
-	ScriptName string
+	return GetParameterizedScriptByName(name, nil)
 }
 
 // GetParameterizedScriptByName returns the script definition with the given name. It will panic if the script is not found.
-func GetParameterizedScriptByName(name string, params ScriptParams) ScriptDefinition {
+func GetParameterizedScriptByName(name string, params map[string]string) ScriptDefinition {
 	// if the script doesn't exist, panic
 	if _, ok := scripts[name]; !ok {
 		panic("script not found: " + name)
 	}
-	// convert ScriptParams to ScriptTemplateParams
-	templateParams := ScriptTemplateParams{
-		Duration:   fmt.Sprintf("%d", params.Duration),
-		Interval:   fmt.Sprintf("%d", params.Interval),
-		Frequency:  fmt.Sprintf("%d", params.Frequency),
-		StorageDir: params.StorageDir,
-		PID:        fmt.Sprintf("%d", params.PID),
-		Filter:     strings.Join(params.Filter, " "),
-		ScriptName: sanitizeScriptName(name),
+	if params == nil {
+		params = make(map[string]string)
 	}
+	// augment params with script name
+	params["ScriptName"] = sanitizeScriptName(name)
+	// replace the script template with the parameterized version
 	scriptTemplate := texttemplate.Must(texttemplate.New("scriptTemplate").Parse(scripts[name].ScriptTemplate))
 	buf := new(bytes.Buffer)
-	err := scriptTemplate.Execute(buf, templateParams)
+	err := scriptTemplate.Execute(buf, params)
 	if err != nil {
 		panic(err)
 	}
@@ -311,36 +285,34 @@ else
 fi
 `,
 	},
-	SpecTurboCoresScriptName: {
-		Name: SpecTurboCoresScriptName,
-		ScriptTemplate: `# if SST-TF is supported and enabled, then the MSR values are not valid
-supported=$(pcm-tpmi 5 0xF8 -d -b 12:12 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
-if [ "$supported" -eq 1 ]; then
-	enabled=$(pcm-tpmi 5 0x78 -d -b 9:9 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
-	if [ "$enabled" -eq 1 ]; then
-		exit 0
-	fi
+	SpecCoreFrequenciesScriptName: {
+		Name: SpecCoreFrequenciesScriptName,
+		ScriptTemplate: `lscpu=$(lscpu)
+family=$(echo "$lscpu" | grep -E "^CPU family:" | awk '{print $3}')
+model=$(echo "$lscpu" | grep -E "^Model:" | awk '{print $2}')
+# if family is Intel
+if [ "$family" -eq 6 ]; then
+    # if model is SRF or GNR
+    if [ "$model" -eq 175 ] || [ "$model" -eq 173 ]; then
+        cores=$(pcm-tpmi 0x5 0xD8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_10
+        sse=$(pcm-tpmi 0x5 0xA8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_4
+        avx2=$(pcm-tpmi 0x5 0xB0 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_5
+        avx512=$(pcm-tpmi 0x5 0xB8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_6
+        avx512h=$(pcm-tpmi 0x5 0xC0 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_7
+        amx=$(pcm-tpmi 0x5 0xC8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_8
+    else
+        cores=$(rdmsr 0x1ae) # MSR_TURBO_GROUP_CORE_CNT: Group Size of Active Cores for Turbo Mode Operation
+        sse=$(rdmsr 0x1ad) # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
+        avx2=0
+        avx512=0
+        avx512h=0
+        amx=0
+    fi
+else
+    exit 1
 fi
-rdmsr 0x1ae # MSR_TURBO_GROUP_CORE_CNT: Group Size of Active Cores for Turbo Mode Operation
-`,
-		Architectures: []string{x86_64},
-		Families:      []string{"6"}, // Intel
-		Lkms:          []string{"msr"},
-		Depends:       []string{"rdmsr", "pcm-tpmi"},
-		Superuser:     true,
-	},
-	SpecTurboFrequenciesScriptName: {
-		Name: SpecTurboFrequenciesScriptName,
-		ScriptTemplate: `# if SST-TF is supported and enabled, then the MSR values are not valid
-supported=$(pcm-tpmi 5 0xF8 -d -b 12:12 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
-if [ "$supported" -eq 1 ]; then
-	enabled=$(pcm-tpmi 5 0x78 -d -b 9:9 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
-	if [ "$enabled" -eq 1 ]; then
-		exit 0
-	fi
-fi
-rdmsr 0x1ad # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
-`,
+echo "cores sse avx2 avx512 avx512h amx"
+echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		Architectures: []string{x86_64},
 		Families:      []string{"6"}, // Intel
 		Lkms:          []string{"msr"},
@@ -1060,7 +1032,7 @@ avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd
 	},
 	IdlePowerScriptName: {
 		Name:           IdlePowerScriptName,
-		ScriptTemplate: `turbostat --show PkgWatt -n 1 | sed -n 2p`,
+		ScriptTemplate: `turbostat --show PkgWatt -i 2 -n 2 2>/dev/null | sed -n '$p'`,
 		Superuser:      true,
 		Lkms:           []string{"msr"},
 		Depends:        []string{"turbostat"},
@@ -1251,26 +1223,53 @@ fi
 	// profile (flamegraph) scripts
 	ProfileJavaScriptName: {
 		Name: ProfileJavaScriptName,
-		ScriptTemplate: `interval={{.Interval}}
+		ScriptTemplate: `# JAVA app (async profiler) call stack collection
+pid={{.PID}}
 duration={{.Duration}}
 frequency={{.Frequency}}
+
 ap_interval=0
-if [ $frequency -ne 0 ]; then
+if [ "$frequency" -ne 0 ]; then
 	ap_interval=$((1000000000 / frequency))
 fi
-# JAVA app call stack collection (run in background)
+
+# if pid is provided, use it
+if [ "$pid" -ne 0 ]; then
+    # check if the provided pid is running
+    if [ ! -d "/proc/$pid" ]; then
+        echo "pid $pid not running"
+        exit 1
+    fi
+    # check if pid is a java process, i.e., command line contains java
+    if ! tr '\000' ' ' < /proc/"$pid"/cmdline | grep -q java; then
+        echo "pid $pid is not a java process"
+        exit 1
+    fi
+    pids="$pid"
+else
+    # get all java pids
+    pids=$( pgrep java )
+fi
+
+# check if any java pids are found
+if [ -z "$pids" ]; then
+    echo "no java processes found"
+    exit 1
+fi
+
+# start java profiling for each java pid
 declare -a java_pids=()
 declare -a java_cmds=()
-for pid in $( pgrep java ) ; do
-	# verify pid is still running
-	if [ -d "/proc/$pid" ]; then
-		java_pids+=($pid)
-		java_cmds+=("$( tr '\000' ' ' <  /proc/$pid/cmdline )")
-		# profile pid in background
-		async-profiler/profiler.sh start -i "$ap_interval" -o collapsed "$pid"
-	fi
+for pid in $pids ; do
+    java_pids+=("$pid")
+    java_cmds+=("$( tr '\000' ' ' <  /proc/"$pid"/cmdline )")
+    # profile pid in background
+    async-profiler/profiler.sh start -i "$ap_interval" -o collapsed "$pid"
 done
-sleep $duration
+
+# wait for the specified duration
+sleep "$duration"
+
 # stop java profiling for each java pid
 for idx in "${!java_pids[@]}"; do
 	pid="${java_pids[$idx]}"
@@ -1278,22 +1277,40 @@ for idx in "${!java_pids[@]}"; do
 	echo "########## async-profiler $pid $cmd ##########"
 	async-profiler/profiler.sh stop -o collapsed "$pid"
 done
+
 `,
 		Superuser: true,
 		Depends:   []string{"async-profiler"},
 	},
 	ProfileSystemScriptName: {
 		Name: ProfileSystemScriptName,
-		ScriptTemplate: `frequency={{.Frequency}}
+		ScriptTemplate: `# native (perf record) call stack collection
+pid={{.PID}}
 duration={{.Duration}}
+frequency={{.Frequency}}
 
-# system-wide call stack collection
-
-# Function to restore original settings
+# Function to restore original settings and clean up
+# This function will be called on exit
 restore_settings() {
 	echo "$PERF_EVENT_PARANOID" > /proc/sys/kernel/perf_event_paranoid
 	echo "$KPTR_RESTRICT" > /proc/sys/kernel/kptr_restrict
+    rm -f "$perf_fp_data"
+    rm -f "$perf_dwarf_data"
+    rm -f "$perf_dwarf_folded"
+    rm -f "$perf_fp_folded"
+    if [ -n "$perf_fp_pid" ]; then
+        kill -0 $perf_fp_pid 2>/dev/null && kill -INT $perf_fp_pid
+    fi
+    if [ -n "$perf_dwarf_pid" ]; then
+        kill -0 $perf_dwarf_pid 2>/dev/null && kill -INT $perf_dwarf_pid
+    fi
 }
+
+# create temporary output files
+perf_fp_data=$(mktemp)
+perf_dwarf_data=$(mktemp)
+perf_dwarf_folded=$(mktemp)
+perf_fp_folded=$(mktemp)
 
 # adjust perf_event_paranoid and kptr_restrict
 PERF_EVENT_PARANOID=$( cat /proc/sys/kernel/perf_event_paranoid )
@@ -1304,31 +1321,61 @@ echo 0 >/proc/sys/kernel/kptr_restrict
 # Ensure settings are restored on exit
 trap restore_settings EXIT
 
-# system-wide call stack collection - frame pointer mode
-perf_fp_data=$(mktemp /tmp/perf_fp.XXXXXX)
-perf record -F $frequency -a -g -o "$perf_fp_data" -m 129 -- sleep $duration &
-PERF_FP_PID=$!
-if ! kill -0 $PERF_FP_PID 2>/dev/null; then
-	echo "Failed to start perf record for frame pointer mode"
+# if pid is not zero, check if the process is running
+if [ "$pid" -ne 0 ]; then
+    if ! ps -p "$pid" > /dev/null; then
+        echo "Error: Process $pid is not running."
+        exit 1
+    fi
+fi
+
+# frame pointer mode
+# if pid was provided, use it
+if [ "$pid" -ne 0 ]; then
+    perf record -F "$frequency" -p "$pid" -g -o "$perf_fp_data" -m 129 &
+else
+    # if no pid was provided, use system-wide profiling
+    perf record -F "$frequency" -a -g -o "$perf_fp_data" -m 129 &
+fi
+perf_fp_pid=$!
+if ! kill -0 $perf_fp_pid 2>/dev/null; then
+	echo "Failed to start perf record in frame pointer mode"
 	exit 1
 fi
 
-# system-wide call stack collection - dwarf mode
-perf_dwarf_data=$(mktemp /tmp/perf_dwarf.XXXXXX)
-perf record -F $frequency -a -g -o "$perf_dwarf_data" -m 257 --call-graph dwarf,8192 -- sleep $duration &
-PERF_DWARF_PID=$!
-if ! kill -0 $PERF_DWARF_PID 2>/dev/null; then
-	echo "Failed to start perf record for dwarf mode"
-	kill $PERF_FP_PID
+# dwarf mode
+# if pid was provided, use it
+if [ "$pid" -ne 0 ]; then
+    perf record -F "$frequency" -p "$pid" -g -o "$perf_dwarf_data" -m 257 --call-graph dwarf,8192 &
+else
+    # if no pid was provided, use system-wide profiling
+    perf record -F "$frequency" -a -g -o "$perf_dwarf_data" -m 257 --call-graph dwarf,8192 &
+fi
+perf_dwarf_pid=$!
+if ! kill -0 $perf_dwarf_pid 2>/dev/null; then
+	echo "Failed to start perf record in dwarf mode"
 	exit 1
+fi
+
+# wait for the specified duration
+sleep "$duration"
+
+# stop perf recording
+if ! kill -0 $perf_fp_pid 2>/dev/null; then
+    echo "Frame pointer mode already stopped"
+else
+    kill -INT $perf_fp_pid
+fi
+if ! kill -0 $perf_dwarf_pid 2>/dev/null; then
+    echo "Dwarf mode already stopped"
+else
+    kill -INT $perf_dwarf_pid
 fi
 
 # wait for perf to finish
-wait ${PERF_FP_PID} ${PERF_DWARF_PID}
+wait ${perf_fp_pid} ${perf_dwarf_pid}
 
 # collapse perf data
-perf_dwarf_folded=$(mktemp /tmp/perf_dwarf_folded.XXXXXX)
-perf_fp_folded=$(mktemp /tmp/perf_fp_folded.XXXXXX)
 perf script -i "$perf_dwarf_data" | stackcollapse-perf.pl > "$perf_dwarf_folded"
 perf script -i "$perf_fp_data" | stackcollapse-perf.pl > "$perf_fp_folded"
 

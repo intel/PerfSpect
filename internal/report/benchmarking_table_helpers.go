@@ -82,7 +82,7 @@ func storagePerfFromOutput(outputs map[string]script.ScriptOutput) (readBW, writ
 func ParseTurbostatOutput(output string) (turboPower, turboTemperature string) {
 	// confirm output is in expected format
 	var fieldNames []string
-	var tmps []float64
+	var temps []float64
 	var watts []float64
 	lines := strings.Split(output, "\n")
 	for i, line := range lines {
@@ -108,7 +108,7 @@ func ParseTurbostatOutput(output string) (turboPower, turboTemperature string) {
 				slog.Warn("unexpected turbostat output format", slog.String("line", line))
 				return
 			}
-			tmps = append(tmps, tmp)
+			temps = append(temps, tmp)
 			watt, err := strconv.ParseFloat(fields[1], 64)
 			if err != nil {
 				slog.Warn("unexpected turbostat output format", slog.String("line", line))
@@ -123,7 +123,7 @@ func ParseTurbostatOutput(output string) (turboPower, turboTemperature string) {
 					slog.Warn("unexpected turbostat output format", slog.String("line", line))
 					return
 				}
-				tmps = append(tmps, tmp)
+				temps = append(temps, tmp)
 			} else {
 				watt, err := strconv.ParseFloat(fields[0], 64)
 				if err != nil {
@@ -134,11 +134,17 @@ func ParseTurbostatOutput(output string) (turboPower, turboTemperature string) {
 			}
 		}
 	}
-	if len(tmps) > 0 {
-		turboTemperature = fmt.Sprintf("%.0f C", slices.Max(tmps))
+	if len(temps) > 1 {
+		maxTemp := slices.Max(temps[1:]) // max temperature, skip first entry as it can be misleading
+		if maxTemp > 0 {
+			turboTemperature = fmt.Sprintf("%.0f C", maxTemp)
+		}
 	}
-	if len(watts) > 0 {
-		turboPower = fmt.Sprintf("%.2f Watts", slices.Max(watts))
+	if len(watts) > 1 {
+		maxWatt := slices.Max(watts[1:]) // max power, skip first entry as it can be misleading
+		if maxWatt > 0 {
+			turboPower = fmt.Sprintf("%.2f Watts", maxWatt)
+		}
 	}
 	return
 }

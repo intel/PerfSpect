@@ -9,7 +9,7 @@ import (
 	"os"
 	"perfspect/internal/common"
 	"perfspect/internal/report"
-	"perfspect/internal/script"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -133,8 +133,11 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	reportingCommand := common.ReportingCommand{
 		Cmd:            cmd,
 		ReportNamePost: "lock",
-		ScriptParams:   script.ScriptParams{Frequency: flagFrequency, Duration: flagDuration},
-		TableNames:     []string{report.KernelLockAnalysisTableName},
+		ScriptParams: map[string]string{
+			"Frequency": strconv.Itoa(flagFrequency),
+			"Duration":  strconv.Itoa(flagDuration),
+		},
+		TableNames: []string{report.KernelLockAnalysisTableName},
 	}
 	return reportingCommand.Run()
 }

@@ -24,7 +24,7 @@ args = parser.parse_args()
 
 # Print the CSV header if the --header-only option is specified
 if args.header_only:
-    print("Start Date,End Date,Commits,Issues Opened,Issues Closed,Pull Requests Opened,Pull Requests Merged")
+    print("Start Date,End Date,Commits,Issues Opened,Issues Closed,Pull Requests Opened,Pull Requests Merged,Releases")
     exit(0)
 
 # Ensure owner, repo, start_date, and end_date are provided if --header-only is not specified
@@ -100,9 +100,24 @@ for pull in pulls:
         if start_date <= merged_at <= end_date:
             num_pulls_merged += 1
 
+# Count the number of releases published in the date range
+releases_url = f'https://api.github.com/repos/{args.owner}/{args.repo}/releases'
+releases_params = {'per_page': 100}
+releases = []
+while releases_url:
+    releases_response = requests.get(releases_url, headers=headers, params=releases_params)
+    releases_page = releases_response.json()
+    for release in releases_page:
+        published_at = datetime.strptime(release['published_at'], '%Y-%m-%dT%H:%M:%SZ')
+        if start_date <= published_at <= end_date:
+            # print(f"Release: {release['name']} - Published at: {published_at}")
+            releases.append(release)
+    releases_url = releases_response.links.get('next', {}).get('url')
+num_releases = len(releases)
+
 # Print the results
 if args.output == 'csv':
-    print(f"{args.start_date},{args.end_date},{num_commits},{num_issues_opened},{num_issues_closed},{num_pulls_opened},{num_pulls_merged}")
+   print(f"{args.start_date},{args.end_date},{num_commits},{num_issues_opened},{num_issues_closed},{num_pulls_opened},{num_pulls_merged},{num_releases}")
 else:
     print(f"Start Date: {args.start_date}")
     print(f"End Date: {args.end_date}")
@@ -111,3 +126,4 @@ else:
     print(f"Number of issues closed: {num_issues_closed}")
     print(f"Number of pull requests opened: {num_pulls_opened}")
     print(f"Number of pull requests merged: {num_pulls_merged}")
+    print(f"Number of releases published: {num_releases}")

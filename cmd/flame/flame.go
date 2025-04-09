@@ -9,8 +9,8 @@ import (
 	"os"
 	"perfspect/internal/common"
 	"perfspect/internal/report"
-	"perfspect/internal/script"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -40,11 +40,13 @@ var Cmd = &cobra.Command{
 var (
 	flagDuration  int
 	flagFrequency int
+	flagPid       int
 )
 
 const (
 	flagDurationName  = "duration"
 	flagFrequencyName = "frequency"
+	flagPidName       = "pid"
 )
 
 func init() {
@@ -52,6 +54,7 @@ func init() {
 	Cmd.Flags().StringSliceVar(&common.FlagFormat, common.FlagFormatName, []string{report.FormatAll}, "")
 	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 30, "")
 	Cmd.Flags().IntVar(&flagFrequency, flagFrequencyName, 11, "")
+	Cmd.Flags().IntVar(&flagPid, flagPidName, 0, "")
 
 	common.AddTargetFlags(Cmd)
 
@@ -95,6 +98,10 @@ func getFlagGroups() []common.FlagGroup {
 			Help: "number of samples taken per second",
 		},
 		{
+			Name: flagPidName,
+			Help: "pid to collect data from. If not specified, all pids will be collected",
+		},
+		{
 			Name: common.FlagFormatName,
 			Help: fmt.Sprintf("choose output format(s) from: %s", strings.Join(append([]string{report.FormatAll}, report.FormatHtml, report.FormatTxt, report.FormatJson), ", ")),
 		},
@@ -127,8 +134,26 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
+	// validate input file
+	if common.FlagInput != "" {
+		if _, err := os.Stat(common.FlagInput); os.IsNotExist(err) {
+			err := fmt.Errorf("input file %s does not exist", common.FlagInput)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
+	}
 	if flagDuration <= 0 {
 		err := fmt.Errorf("duration must be greater than 0")
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return err
+	}
+	if flagFrequency <= 0 {
+		err := fmt.Errorf("frequency must be greater than 0")
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return err
+	}
+	if flagPid < 0 {
+		err := fmt.Errorf("pid must be greater than or equal to 0")
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
 	}
@@ -144,8 +169,12 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	reportingCommand := common.ReportingCommand{
 		Cmd:            cmd,
 		ReportNamePost: "flame",
-		ScriptParams:   script.ScriptParams{Frequency: flagFrequency, Duration: flagDuration},
-		TableNames:     []string{report.CodePathFrequencyTableName},
+		ScriptParams: map[string]string{
+			"Frequency": strconv.Itoa(flagFrequency),
+			"Duration":  strconv.Itoa(flagDuration),
+			"PID":       strconv.Itoa(flagPid),
+		},
+		TableNames: []string{report.CodePathFrequencyTableName},
 	}
 	return reportingCommand.Run()
 }

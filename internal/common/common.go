@@ -77,7 +77,7 @@ type ReportingCommand struct {
 	Cmd              *cobra.Command
 	ReportNamePost   string
 	TableNames       []string
-	ScriptParams     script.ScriptParams
+	ScriptParams     map[string]string
 	SummaryFunc      SummaryFunc
 	SummaryTableName string
 	InsightsFunc     InsightsFunc
@@ -416,7 +416,7 @@ func outputsFromTargets(myTargets []target.Target, rc *ReportingCommand, statusU
 			scriptsToRunOnTarget = append(scriptsToRunOnTarget, script)
 		}
 		// run the selected scripts on the target
-		go collectOnTarget(rc.Cmd, rc.ScriptParams.Duration, target, scriptsToRunOnTarget, localTempDir, channelTargetScriptOutputs, channelError, statusUpdate)
+		go collectOnTarget(rc.Cmd, rc.ScriptParams["Duration"], target, scriptsToRunOnTarget, localTempDir, channelTargetScriptOutputs, channelError, statusUpdate)
 	}
 	// wait for scripts to run on all targets
 	var allTargetScriptOutputs []TargetScriptOutputs
@@ -457,13 +457,13 @@ func elevatedPrivilegesRequired(tableNames []string) bool {
 }
 
 // collectOnTarget runs the scripts on the target and sends the results to the appropriate channels
-func collectOnTarget(cmd *cobra.Command, duration int, myTarget target.Target, scriptsToRun []script.ScriptDefinition, localTempDir string, channelTargetScriptOutputs chan TargetScriptOutputs, channelError chan error, statusUpdate progress.MultiSpinnerUpdateFunc) {
+func collectOnTarget(cmd *cobra.Command, duration string, myTarget target.Target, scriptsToRun []script.ScriptDefinition, localTempDir string, channelTargetScriptOutputs chan TargetScriptOutputs, channelError chan error, statusUpdate progress.MultiSpinnerUpdateFunc) {
 	// run the scripts on the target
 	status := "collecting data"
-	if cmd.Name() == "telemetry" && duration == 0 { // telemetry is the only command that uses this common code that can run indefinitely
+	if cmd.Name() == "telemetry" && duration == "0" { // telemetry is the only command that uses this common code that can run indefinitely
 		status += ", press Ctrl+c to stop"
-	} else if duration != 0 {
-		status += fmt.Sprintf(" for %d seconds", duration)
+	} else if duration != "0" {
+		status += fmt.Sprintf(" for %s seconds", duration)
 	}
 	_ = statusUpdate(myTarget.GetName(), status)
 	scriptOutputs, err := script.RunScripts(myTarget, scriptsToRun, true, localTempDir)

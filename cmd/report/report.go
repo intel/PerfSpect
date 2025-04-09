@@ -58,7 +58,7 @@ var (
 	flagAccelerator    bool
 	flagPower          bool
 	flagCstates        bool
-	flagTurbo          bool
+	flagFrequency      bool
 	flagUncore         bool
 	flagElc            bool
 	flagSST            bool
@@ -99,7 +99,7 @@ const (
 	flagAcceleratorName    = "accelerator"
 	flagPowerName          = "power"
 	flagCstatesName        = "cstates"
-	flagTurboName          = "turbo"
+	flagFrequencyName      = "frequency"
 	flagUncoreName         = "uncore"
 	flagElcName            = "elc"
 	flagSSTName            = "sst"
@@ -161,7 +161,7 @@ var categories = []common.Category{
 	{FlagName: flagAcceleratorName, FlagVar: &flagAccelerator, Help: "On-board Accelerators", TableNames: []string{report.AcceleratorTableName}},
 	{FlagName: flagPowerName, FlagVar: &flagPower, Help: "Power Settings", TableNames: []string{report.PowerTableName}},
 	{FlagName: flagCstatesName, FlagVar: &flagCstates, Help: "C-states", TableNames: []string{report.CstateTableName}},
-	{FlagName: flagTurboName, FlagVar: &flagTurbo, Help: "Turbo Frequency", TableNames: []string{report.CoreTurboFrequencyTableName}},
+	{FlagName: flagFrequencyName, FlagVar: &flagFrequency, Help: "Maximum Frequencies", TableNames: []string{report.MaximumFrequencyTableName}},
 	{FlagName: flagSSTName, FlagVar: &flagSST, Help: "Speed Select Technology Settings", TableNames: []string{report.SSTTFHPTableName, report.SSTTFLPTableName}},
 	{FlagName: flagUncoreName, FlagVar: &flagUncore, Help: "Uncore Configuration", TableNames: []string{report.UncoreTableName}},
 	{FlagName: flagElcName, FlagVar: &flagElc, Help: "Efficiency Latency Control Settings", TableNames: []string{report.ElcTableName}},
@@ -362,7 +362,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 	reportingCommand := common.ReportingCommand{
 		Cmd:              cmd,
-		ScriptParams:     script.ScriptParams{StorageDir: flagStorageDir},
+		ScriptParams:     map[string]string{"StorageDir": flagStorageDir},
 		TableNames:       tableNames,
 		SummaryFunc:      summaryFunc,
 		SummaryTableName: benchmarkSummaryTableName,
@@ -372,11 +372,11 @@ func runCmd(cmd *cobra.Command, args []string) error {
 }
 
 func benchmarkSummaryFromTableValues(allTableValues []report.TableValues, outputs map[string]script.ScriptOutput) report.TableValues {
-	maxFreq := getValueFromTableValues(getTableValues(allTableValues, report.CPUFrequencyTableName), "non-avx", 0)
+	maxFreq := getValueFromTableValues(getTableValues(allTableValues, report.CPUFrequencyTableName), "sse", 0)
 	if maxFreq != "" {
 		maxFreq = maxFreq + " GHz"
 	}
-	allCoreMaxFreq := getValueFromTableValues(getTableValues(allTableValues, report.CPUFrequencyTableName), "non-avx", -1)
+	allCoreMaxFreq := getValueFromTableValues(getTableValues(allTableValues, report.CPUFrequencyTableName), "sse", -1)
 	if allCoreMaxFreq != "" {
 		allCoreMaxFreq = allCoreMaxFreq + " GHz"
 	}

@@ -9,7 +9,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"log/slog"
-	"math"
 	"regexp"
 	"slices"
 	"strconv"
@@ -70,42 +69,42 @@ type TableValues struct {
 
 const (
 	// report table names
-	HostTableName               = "Host"
-	SystemTableName             = "System"
-	BaseboardTableName          = "Baseboard"
-	ChassisTableName            = "Chassis"
-	PCIeSlotsTableName          = "PCIe Slots"
-	BIOSTableName               = "BIOS"
-	OperatingSystemTableName    = "Operating System"
-	SoftwareVersionTableName    = "Software Version"
-	CPUTableName                = "CPU"
-	ISATableName                = "ISA"
-	AcceleratorTableName        = "Accelerator"
-	PowerTableName              = "Power"
-	CstateTableName             = "C-states"
-	CoreTurboFrequencyTableName = "Core Turbo Frequency"
-	SSTTFHPTableName            = "Speed Select Turbo Frequency - High Priority Cores"
-	SSTTFLPTableName            = "Speed Select Turbo Frequency - Low Priority Cores"
-	UncoreTableName             = "Uncore"
-	ElcTableName                = "Efficiency Latency Control"
-	MemoryTableName             = "Memory"
-	DIMMTableName               = "DIMM"
-	NICTableName                = "NIC"
-	NetworkIRQMappingTableName  = "Network IRQ Mapping"
-	NetworkConfigTableName      = "Network Configuration"
-	DiskTableName               = "Disk"
-	FilesystemTableName         = "Filesystem"
-	GPUTableName                = "GPU"
-	GaudiTableName              = "Gaudi"
-	CXLDeviceTableName          = "CXL Device"
-	CVETableName                = "CVE"
-	ProcessTableName            = "Process"
-	SensorTableName             = "Sensor"
-	ChassisStatusTableName      = "Chassis Status"
-	PMUTableName                = "PMU"
-	SystemEventLogTableName     = "System Event Log"
-	KernelLogTableName          = "Kernel Log"
-	SystemSummaryTableName      = "System Summary"
+	HostTableName              = "Host"
+	SystemTableName            = "System"
+	BaseboardTableName         = "Baseboard"
+	ChassisTableName           = "Chassis"
+	PCIeSlotsTableName         = "PCIe Slots"
+	BIOSTableName              = "BIOS"
+	OperatingSystemTableName   = "Operating System"
+	SoftwareVersionTableName   = "Software Version"
+	CPUTableName               = "CPU"
+	ISATableName               = "ISA"
+	AcceleratorTableName       = "Accelerator"
+	PowerTableName             = "Power"
+	CstateTableName            = "C-states"
+	MaximumFrequencyTableName  = "Maximum Frequency"
+	SSTTFHPTableName           = "Speed Select Turbo Frequency - High Priority Cores"
+	SSTTFLPTableName           = "Speed Select Turbo Frequency - Low Priority Cores"
+	UncoreTableName            = "Uncore"
+	ElcTableName               = "Efficiency Latency Control"
+	MemoryTableName            = "Memory"
+	DIMMTableName              = "DIMM"
+	NICTableName               = "NIC"
+	NetworkIRQMappingTableName = "Network IRQ Mapping"
+	NetworkConfigTableName     = "Network Configuration"
+	DiskTableName              = "Disk"
+	FilesystemTableName        = "Filesystem"
+	GPUTableName               = "GPU"
+	GaudiTableName             = "Gaudi"
+	CXLDeviceTableName         = "CXL Device"
+	CVETableName               = "CVE"
+	ProcessTableName           = "Process"
+	SensorTableName            = "Sensor"
+	ChassisStatusTableName     = "Chassis Status"
+	PMUTableName               = "PMU"
+	SystemEventLogTableName    = "System Event Log"
+	KernelLogTableName         = "Kernel Log"
+	SystemSummaryTableName     = "System Summary"
 	// benchmark table names
 	CPUSpeedTableName       = "CPU Speed"
 	CPUPowerTableName       = "CPU Power"
@@ -240,8 +239,7 @@ var tableDefinitions = map[string]TableDefinition{
 			script.CpuidScriptName,
 			script.BaseFrequencyScriptName,
 			script.MaximumFrequencyScriptName,
-			script.SpecTurboFrequenciesScriptName,
-			script.SpecTurboCoresScriptName,
+			script.SpecCoreFrequenciesScriptName,
 			script.PPINName,
 			script.PrefetchControlName,
 			script.PrefetchersName,
@@ -289,18 +287,18 @@ var tableDefinitions = map[string]TableDefinition{
 			script.CstatesScriptName,
 		},
 		FieldsFunc: cstateTableValues},
-	CoreTurboFrequencyTableName: {
-		Name:    CoreTurboFrequencyTableName,
-		HasRows: true,
+	MaximumFrequencyTableName: {
+		Name:          MaximumFrequencyTableName,
+		Architectures: []string{"x86_64"},
+		Families:      []string{"6"}, // Intel CPUs only
+		HasRows:       true,
 		ScriptNames: []string{
-			script.SpecTurboFrequenciesScriptName,
-			script.SpecTurboCoresScriptName,
+			script.SpecCoreFrequenciesScriptName,
 			script.LscpuScriptName,
 			script.LspciBitsScriptName,
 			script.LspciDevicesScriptName,
 		},
-		FieldsFunc:            coreTurboFrequencyTableValues,
-		HTMLTableRendererFunc: coreTurboFrequencyTableHTMLRenderer},
+		FieldsFunc: maximumFrequencyTableValues},
 	UncoreTableName: {
 		Name:          UncoreTableName,
 		Architectures: []string{"x86_64"},
@@ -331,7 +329,8 @@ var tableDefinitions = map[string]TableDefinition{
 	SSTTFHPTableName: {
 		Name:          SSTTFHPTableName,
 		Architectures: []string{"x86_64"},
-		Families:      []string{"6"}, // Intel CPUs only
+		Families:      []string{"6"},          // Intel CPUs only
+		Models:        []string{"173", "175"}, // Granite Rapids, Sierra Forest
 		HasRows:       true,
 		ScriptNames: []string{
 			script.SstTfHighPriorityCoreFrequenciesScriptName,
@@ -340,7 +339,8 @@ var tableDefinitions = map[string]TableDefinition{
 	SSTTFLPTableName: {
 		Name:          SSTTFLPTableName,
 		Architectures: []string{"x86_64"},
-		Families:      []string{"6"}, // Intel CPUs only
+		Families:      []string{"6"},          // Intel CPUs only
+		Models:        []string{"173", "175"}, // Granite Rapids, Sierra Forest
 		HasRows:       true,
 		ScriptNames: []string{
 			script.SstTfLowPriorityCoreFrequenciesScriptName,
@@ -517,8 +517,7 @@ var tableDefinitions = map[string]TableDefinition{
 			script.L3WaySizeName,
 			script.CpuidScriptName,
 			script.BaseFrequencyScriptName,
-			script.SpecTurboCoresScriptName,
-			script.SpecTurboFrequenciesScriptName,
+			script.SpecCoreFrequenciesScriptName,
 			script.PrefetchControlName,
 			script.PrefetchersName,
 			script.PPINName,
@@ -569,8 +568,7 @@ var tableDefinitions = map[string]TableDefinition{
 			script.UncoreMaxFromTPMIScriptName,
 			script.UncoreMinFromTPMIScriptName,
 			script.UncoreDieTypesFromTPMIScriptName,
-			script.SpecTurboFrequenciesScriptName,
-			script.SpecTurboCoresScriptName,
+			script.SpecCoreFrequenciesScriptName,
 			script.ElcScriptName,
 		},
 		FieldsFunc: configurationTableValues},
@@ -607,8 +605,7 @@ var tableDefinitions = map[string]TableDefinition{
 		MenuLabel: CPUFrequencyTableName,
 		HasRows:   true,
 		ScriptNames: []string{
-			script.SpecTurboFrequenciesScriptName,
-			script.SpecTurboCoresScriptName,
+			script.SpecCoreFrequenciesScriptName,
 			script.LscpuScriptName,
 			script.LspciBitsScriptName,
 			script.LspciDevicesScriptName,
@@ -1187,44 +1184,26 @@ func elcTableInsights(outputs map[string]script.ScriptOutput, tableValues TableV
 	return insights
 }
 
-func coreTurboFrequencyTableValues(outputs map[string]script.ScriptOutput) []Field {
-	fields := []Field{
-		{Name: "Active Cores", Values: []string{}},
-		{Name: "non-avx:spec", Values: []string{}},
-	}
-	bins, err := getSpecCountFrequencies(outputs)
+func maximumFrequencyTableValues(outputs map[string]script.ScriptOutput) []Field {
+	specCoreFrequencies, err := getSpecCoreFrequenciesFromOutput(outputs)
 	if err != nil {
-		slog.Warn("unable to get spec count frequencies", slog.String("error", err.Error()))
-		return fields
+		slog.Warn("unable to get spec core frequencies", slog.String("error", err.Error()))
+		return []Field{}
 	}
-	coresPerSocket := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(\d+)$`)
-	coreCount, err := strconv.Atoi(coresPerSocket)
-	if err != nil {
-		slog.Warn("unable to get core count", slog.String("error", err.Error()))
-		return fields
-	}
-	counts := []string{}
-	frequencies := []string{}
-	for i := 1; i <= coreCount; i++ {
-		counts = append(counts, strconv.Itoa(i))
-	}
-	beginInt := 0
-	for _, bin := range bins {
-		count := bin[0]
-		endInt, err := strconv.Atoi(count)
-		if err != nil {
-			slog.Warn("unable to convert count to int", slog.String("count", count), slog.String("error", err.Error()))
-			return fields
+	var fields []Field
+	for i, row := range specCoreFrequencies {
+		// first row is field names
+		if i == 0 {
+			for _, fieldName := range row {
+				fields = append(fields, Field{Name: fieldName})
+			}
+			continue
 		}
-		endInt -= 1
-		endInt = int(math.Min(float64(endInt), float64(coreCount-1)))
-		for i := beginInt; i <= endInt; i++ {
-			frequencies = append(frequencies, bin[1])
+		// following rows are field values
+		for i, fieldValue := range row {
+			fields[i].Values = append(fields[i].Values, fieldValue)
 		}
-		beginInt = endInt + 1
 	}
-	fields[0].Values = counts
-	fields[1].Values = frequencies
 	return fields
 }
 
@@ -1919,46 +1898,78 @@ func cpuTemperatureTableValues(outputs map[string]script.ScriptOutput) []Field {
 	}
 }
 
-func cpuFrequencyTableValues(outputs map[string]script.ScriptOutput) []Field {
-	fields := coreTurboFrequencyTableValues(outputs) // may result in no values within the two fields
-	if len(fields) != 2 {
-		panic("coreTurboFrequencyTableValues must return 2 fields")
+// bucketsToCounts expands the core frequency buckets to a list of core counts (from column 1) and associated spec sse frequencies (from column 2)
+func bucketsToCoresFreqs(specCoreFreqs [][]string) (cores []string, freqs []string, err error) {
+	// the first column is the core count, the second column is the spec sse frequency
+	for i := 1; i < len(specCoreFreqs); i++ {
+		// parse the bucket into start/end parts
+		bucket := strings.Split(specCoreFreqs[i][0], "-")
+		if len(bucket) != 2 {
+			err = fmt.Errorf("unable to parse bucket %s", specCoreFreqs[i][0])
+			return
+		}
+		// parse the start and end parts into integers
+		var start int
+		var end int
+		start, err = strconv.Atoi(strings.TrimSpace(bucket[0]))
+		if err != nil {
+			err = fmt.Errorf("unable to parse start %s", bucket[0])
+			return
+		}
+		end, err = strconv.Atoi(strings.TrimSpace(bucket[1]))
+		if err != nil {
+			err = fmt.Errorf("unable to parse end %s", bucket[1])
+			return
+		}
+		// add the core count to the list
+		for j := start; j <= end; j++ {
+			cores = append(cores, strconv.Itoa(j))
+			freqs = append(freqs, specCoreFreqs[i][1])
+		}
 	}
-	fields = append(fields, []Field{
-		{Name: "non-avx"},
+	return
+}
+
+func cpuFrequencyTableValues(outputs map[string]script.ScriptOutput) []Field {
+	specCoreFrequencies, err := getSpecCoreFrequenciesFromOutput(outputs)
+	if err != nil {
+		slog.Warn("unable to get spec core frequencies", slog.String("error", err.Error()))
+		return []Field{}
+	}
+	// get the core counts from the buckets
+	cores, specSSEFreqs, err := bucketsToCoresFreqs(specCoreFrequencies)
+	if err != nil {
+		slog.Error("unable to convert buckets to counts", slog.String("error", err.Error()))
+		return []Field{}
+	}
+	// get the sse, avx128, avx256, and avx512 frequencies from the avx-turbo output
+	sseFreqs, avx128Freqs, avx256Freqs, avx512Freqs, err := avxTurboFrequenciesFromOutput(outputs[script.TurboFrequenciesScriptName].Stdout)
+	fields := []Field{
+		{Name: "cores"},
+		{Name: "spec sse"},
+		{Name: "sse"},
 		{Name: "avx128"},
 		{Name: "avx256"},
 		{Name: "avx512"},
-	}...)
-	nonavxFreqs, avx128Freqs, avx256Freqs, avx512Freqs, err := avxTurboFrequenciesFromOutput(outputs[script.TurboFrequenciesScriptName].Stdout)
+	}
 	if err != nil {
-		slog.Warn(err.Error())
-		fields[0].Values = []string{}
-		fields[1].Values = []string{}
-		return fields
-	} else {
-		// pad core counts and spec frequency (field 0 and 1)
-		for i := range 2 {
-			for j := len(fields[i].Values); j < len(nonavxFreqs); j++ {
-				pad := ""
-				if i == 0 {
-					pad = strconv.Itoa(j + 1)
-				}
-				fields[i].Values = append(fields[i].Values, pad)
-			}
-		}
-		for i := range nonavxFreqs {
-			fields[2].Values = append(fields[2].Values, fmt.Sprintf("%.1f", nonavxFreqs[i]))
-		}
-		for i := range avx128Freqs {
-			fields[3].Values = append(fields[3].Values, fmt.Sprintf("%.1f", avx128Freqs[i]))
-		}
-		for i := range avx256Freqs {
-			fields[4].Values = append(fields[4].Values, fmt.Sprintf("%.1f", avx256Freqs[i]))
-		}
-		for i := range avx512Freqs {
-			fields[5].Values = append(fields[5].Values, fmt.Sprintf("%.1f", avx512Freqs[i]))
-		}
+		slog.Error("unable to get avx turbo frequencies", slog.String("error", err.Error()))
+		return []Field{}
+	}
+	// add the core counts and spec sse frequencies to the fields
+	fields[0].Values = cores
+	fields[1].Values = specSSEFreqs
+	for i := range sseFreqs {
+		fields[2].Values = append(fields[2].Values, fmt.Sprintf("%.1f", sseFreqs[i]))
+	}
+	for i := range avx128Freqs {
+		fields[3].Values = append(fields[3].Values, fmt.Sprintf("%.1f", avx128Freqs[i]))
+	}
+	for i := range avx256Freqs {
+		fields[4].Values = append(fields[4].Values, fmt.Sprintf("%.1f", avx256Freqs[i]))
+	}
+	for i := range avx512Freqs {
+		fields[5].Values = append(fields[5].Values, fmt.Sprintf("%.1f", avx512Freqs[i]))
 	}
 	// pad frequency fields with empty string
 	for i := 2; i < len(fields); i++ {
