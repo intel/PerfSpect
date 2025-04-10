@@ -145,7 +145,8 @@ func GetTargets(cmd *cobra.Command, needsElevatedPrivileges bool, failIfCantElev
 		noExec, err := isNoExec(myTarget, myTarget.GetTempDirectory())
 		if err != nil {
 			// log the error but don't reject the target just in case our check is wrong
-			slog.Error("failed to check if temp directory is no exec", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+			slog.Error("failed to check if temp directory is mounted on 'noexec' file system", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+			continue
 		}
 		if noExec {
 			targetErrs[targetIdx] = fmt.Errorf("target's temp directory must not be on a file system mounted with the 'noexec' option, override the default with --tempdir")
