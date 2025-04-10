@@ -9,6 +9,7 @@ import (
 	"os"
 	"perfspect/internal/common"
 	"perfspect/internal/report"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -40,6 +41,7 @@ var (
 	flagDuration  int
 	flagFrequency int
 	flagPackage   bool
+	flagFormat    []string
 )
 
 const (
@@ -50,7 +52,7 @@ const (
 
 func init() {
 	Cmd.Flags().StringVar(&common.FlagInput, common.FlagInputName, "", "")
-	Cmd.Flags().StringSliceVar(&common.FlagFormat, common.FlagFormatName, []string{report.FormatAll}, "")
+	Cmd.Flags().StringSliceVar(&flagFormat, common.FlagFormatName, []string{report.FormatAll}, "")
 	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 10, "")
 	Cmd.Flags().IntVar(&flagFrequency, flagFrequencyName, 11, "")
 	Cmd.PersistentFlags().BoolVar(&flagPackage, flagPackageName, false, "")
@@ -100,6 +102,10 @@ func getFlagGroups() []common.FlagGroup {
 			Name: flagPackageName,
 			Help: "create raw data package",
 		},
+		{
+			Name: common.FlagFormatName,
+			Help: fmt.Sprintf("choose output format(s) from: %s", strings.Join(append([]string{report.FormatAll}, report.FormatHtml, report.FormatTxt), ", ")),
+		},
 	}
 	groups = append(groups, common.FlagGroup{
 		GroupName: "Options",
@@ -111,6 +117,16 @@ func getFlagGroups() []common.FlagGroup {
 }
 
 func validateFlags(cmd *cobra.Command, args []string) error {
+	// validate format options
+	formatOptions := append([]string{report.FormatAll}, report.FormatHtml, report.FormatTxt)
+	for _, format := range flagFormat {
+		if !slices.Contains(formatOptions, format) {
+			err := fmt.Errorf("format options are: %s", strings.Join(formatOptions, ", "))
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
+	}
+
 	if flagDuration <= 0 {
 		err := fmt.Errorf("duration must be greater than 0")
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -122,6 +138,22 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	return nil
+}
+
+func formalizeOutputFormat(outputFormat []string) []string {
+	result := []string{}
+	for _, format := range outputFormat {
+		switch format {
+		case report.FormatAll:
+			return []string{report.FormatHtml, report.FormatTxt}
+		case report.FormatTxt:
+			result = append(result, report.FormatTxt)
+		case report.FormatHtml:
+			result = append(result, report.FormatHtml)
+		}
+	}
+
+	return result
 }
 
 func runCmd(cmd *cobra.Command, args []string) error {
@@ -140,5 +172,11 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		},
 		TableNames: []string{report.KernelLockAnalysisTableName},
 	}
+
+	// The common.FlagFormat designed to hold the output formats, but as a global variable,
+	// it would be overwrite by other command's initialization function. So the current
+	// workaround is to make an assignment to ensure the current command's output format
+	// flag takes effect as expected.
+	common.FlagFormat = formalizeOutputFormat(flagFormat)
 	return reportingCommand.Run()
 }
