@@ -9,6 +9,8 @@ import (
 	"os"
 	"perfspect/internal/common"
 	"perfspect/internal/report"
+	"perfspect/internal/script"
+	"perfspect/internal/target"
 	"slices"
 	"strconv"
 	"strings"
@@ -156,12 +158,32 @@ func formalizeOutputFormat(outputFormat []string) []string {
 	return result
 }
 
-func runCmd(cmd *cobra.Command, args []string) error {
-	// appContext is the application context that holds common data and resources.
-	// appContext := cmd.Parent().Context().Value(common.AppContext{}).(common.AppContext)
-	// localTempDir := appContext.LocalTempDir
-	// localOutputDir := appContext.OutputDir
+func pullDataFiles(appContext common.AppContext, scriptOutputs map[string]script.ScriptOutput, myTarget target.Target) error {
+	// if target is nil, the scriptOutputs may retrieved from a input file, which hints we should not be able to pull the
+	// perf archive file.
+	if myTarget == nil {
+		err := fmt.Errorf("can not package data from input")
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return err
+	}
 
+	localOutputDir := appContext.OutputDir
+	tableValues := report.GetValuesForTable(report.KernelLockAnalysisTableName, scriptOutputs)
+	for _, field := range tableValues.Fields {
+		if field.Name == "Perf Package Path" {
+			for _, remoteFile := range field.Values {
+				err := myTarget.PullFile(remoteFile, localOutputDir)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func runCmd(cmd *cobra.Command, args []string) error {
 	reportingCommand := common.ReportingCommand{
 		Cmd:            cmd,
 		ReportNamePost: "lock",
@@ -171,6 +193,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			"Package":   strconv.FormatBool(flagPackage),
 		},
 		TableNames: []string{report.KernelLockAnalysisTableName},
+		AdhocFunc:  pullDataFiles,
 	}
 
 	// The common.FlagFormat designed to hold the output formats, but as a global variable,

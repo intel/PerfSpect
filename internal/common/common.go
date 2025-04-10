@@ -43,6 +43,7 @@ type FlagGroup struct {
 
 type TargetScriptOutputs struct {
 	targetName    string
+	target        target.Target
 	scriptOutputs map[string]script.ScriptOutput
 	tableNames    []string
 }
@@ -72,6 +73,7 @@ const (
 
 type SummaryFunc func([]report.TableValues, map[string]script.ScriptOutput) report.TableValues
 type InsightsFunc SummaryFunc
+type AdhocFunc func(AppContext, map[string]script.ScriptOutput, target.Target) error
 
 type ReportingCommand struct {
 	Cmd              *cobra.Command
@@ -81,6 +83,7 @@ type ReportingCommand struct {
 	SummaryFunc      SummaryFunc
 	SummaryTableName string
 	InsightsFunc     InsightsFunc
+	AdhocFunc        AdhocFunc
 }
 
 // Run is the common flow/logic for all reporting commands, i.e., 'report', 'telemetry', 'flame', 'lock'
@@ -234,6 +237,10 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 		if rc.InsightsFunc != nil {
 			insightsTableValues := rc.InsightsFunc(allTableValues, targetScriptOutputs.scriptOutputs)
 			allTableValues = append(allTableValues, insightsTableValues)
+		}
+		// special case - do some adhoc actions
+		if rc.AdhocFunc != nil {
+			rc.AdhocFunc(appContext, targetScriptOutputs.scriptOutputs, targetScriptOutputs.target)
 		}
 		// special case - add tableValues for the application version
 		allTableValues = append(allTableValues, report.TableValues{
@@ -474,5 +481,5 @@ func collectOnTarget(cmd *cobra.Command, duration string, myTarget target.Target
 		return
 	}
 	_ = statusUpdate(myTarget.GetName(), "collection complete")
-	channelTargetScriptOutputs <- TargetScriptOutputs{targetName: myTarget.GetName(), scriptOutputs: scriptOutputs}
+	channelTargetScriptOutputs <- TargetScriptOutputs{targetName: myTarget.GetName(), target: myTarget, scriptOutputs: scriptOutputs}
 }
