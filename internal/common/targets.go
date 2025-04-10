@@ -173,15 +173,27 @@ func isNoExec(t target.Target, tempDir string) (bool, error) {
 	if len(lines) < 2 {
 		return false, fmt.Errorf("unexpected output from df command")
 	}
-	fields := strings.Fields(lines[1]) // Second line contains the device info
-	if len(fields) < 1 {
+	dfFields := strings.Fields(lines[1]) // Second line contains the device info
+	if len(dfFields) < 6 {
 		return false, fmt.Errorf("unexpected output format from df command")
 	}
-	device := fields[0]
+	filesystem := dfFields[0]
+	mountedOn := dfFields[5]
 	// Search for the device in the mount output and check for "noexec"
 	for line := range strings.SplitSeq(string(mountOutput), "\n") {
-		if strings.Contains(line, device) && strings.Contains(line, "noexec") {
-			return true, nil // Found "noexec" for the device
+		mountFields := strings.Fields(line)
+		if len(mountFields) < 6 {
+			continue // Skip lines that don't have enough fields
+		}
+		device := mountFields[0]
+		mountPoint := mountFields[2]
+		mountOptions := strings.Join(mountFields[5:], " ")
+		if device == filesystem && mountPoint == mountedOn {
+			if strings.Contains(mountOptions, "noexec") {
+				return true, nil // Found "noexec" for the device
+			} else {
+				break
+			}
 		}
 	}
 	return false, nil // "noexec" not found
