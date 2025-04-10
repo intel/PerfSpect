@@ -144,8 +144,9 @@ func GetTargets(cmd *cobra.Command, needsElevatedPrivileges bool, failIfCantElev
 		// confirm that the temp directory was not created on a file system mounted with noexec
 		noExec, err := isNoExec(myTarget, myTarget.GetTempDirectory())
 		if err != nil {
-			targetErrs[targetIdx] = fmt.Errorf("failed to check if temp directory is noexec")
-			slog.Error(targetErrs[targetIdx].Error(), slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+			// log the error but don't reject the target just in case our check is wrong
+			slog.Error("failed to check if temp directory is mounted on 'noexec' file system", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+			continue
 		}
 		if noExec {
 			targetErrs[targetIdx] = fmt.Errorf("target's temp directory must not be on a file system mounted with the 'noexec' option, override the default with --tempdir")
@@ -161,28 +162,47 @@ func isNoExec(t target.Target, tempDir string) (bool, error) {
 	dfCmd := exec.Command("df", "-P", tempDir)
 	dfOutput, _, _, err := t.RunCommand(dfCmd, 0, true)
 	if err != nil {
+		err = fmt.Errorf("failed to run df command: %w", err)
 		return false, err
 	}
 	mountCmd := exec.Command("mount")
 	mountOutput, _, _, err := t.RunCommand(mountCmd, 0, true)
 	if err != nil {
+		err = fmt.Errorf("failed to run mount command: %w", err)
 		return false, err
 	}
 	// Parse the output of `df` to extract the device name
-	lines := strings.Split(string(dfOutput), "\n")
+	lines := strings.Split(dfOutput, "\n")
 	if len(lines) < 2 {
-		return false, fmt.Errorf("unexpected output from df command")
+		return false, fmt.Errorf("unexpected output from df command: %s", dfOutput)
 	}
-	fields := strings.Fields(lines[1]) // Second line contains the device info
-	if len(fields) < 1 {
-		return false, fmt.Errorf("unexpected output format from df command")
+	dfFields := strings.Fields(lines[1]) // Second line contains the device info
+	if len(dfFields) < 6 {
+		return false, fmt.Errorf("unexpected output format from df command: %s", dfOutput)
 	}
-	device := fields[0]
+	filesystem := dfFields[0]
+	mountedOn := dfFields[5]
 	// Search for the device in the mount output and check for "noexec"
-	for line := range strings.SplitSeq(string(mountOutput), "\n") {
-		if strings.Contains(line, device) && strings.Contains(line, "noexec") {
-			return true, nil // Found "noexec" for the device
+	var found bool
+	for line := range strings.SplitSeq(mountOutput, "\n") {
+		mountFields := strings.Fields(line)
+		if len(mountFields) < 6 {
+			continue // Skip lines that don't have enough fields
 		}
+		device := mountFields[0]
+		mountPoint := mountFields[2]
+		mountOptions := strings.Join(mountFields[5:], " ")
+		if device == filesystem && mountPoint == mountedOn {
+			found = true
+			if strings.Contains(mountOptions, "noexec") {
+				return true, nil // Found "noexec" for the device
+			} else {
+				break
+			}
+		}
+	}
+	if !found {
+		return false, fmt.Errorf("device %s not found in mount output", filesystem)
 	}
 	return false, nil // "noexec" not found
 }
