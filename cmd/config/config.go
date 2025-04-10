@@ -333,42 +333,42 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if cmd.Flags().Lookup(flagPrefetcherL2AdjName).Changed && !slices.Contains(prefetcherOptions, flagPrefetcherL2Adj) {
-		err := fmt.Errorf("invalid L2 Adj prefetcher: %s", flagPrefetcherL2Adj)
+		err := fmt.Errorf("invalid L2 Adj prefetcher: %s, valid options are: %s", flagPrefetcherL2Adj, strings.Join(prefetcherOptions, ", "))
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
 	}
 	if cmd.Flags().Lookup(flagPrefetcherDCUHWName).Changed && !slices.Contains(prefetcherOptions, flagPrefetcherDCUHW) {
-		err := fmt.Errorf("invalid DCU HW prefetcher: %s", flagPrefetcherDCUHW)
+		err := fmt.Errorf("invalid DCU HW prefetcher: %s, valid options are: %s", flagPrefetcherDCUHW, strings.Join(prefetcherOptions, ", "))
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
 	}
 	if cmd.Flags().Lookup(flagPrefetcherDCUIPName).Changed && !slices.Contains(prefetcherOptions, flagPrefetcherDCUIP) {
-		err := fmt.Errorf("invalid DCU IP prefetcher: %s", flagPrefetcherDCUIP)
+		err := fmt.Errorf("invalid DCU IP prefetcher: %s, valid options are: %s", flagPrefetcherDCUIP, strings.Join(prefetcherOptions, ", "))
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
 	}
 	if cmd.Flags().Lookup(flagPrefetcherAMPName).Changed && !slices.Contains(prefetcherOptions, flagPrefetcherAMP) {
-		err := fmt.Errorf("invalid AMP prefetcher: %s", flagPrefetcherAMP)
+		err := fmt.Errorf("invalid AMP prefetcher: %s, valid options are: %s", flagPrefetcherAMP, strings.Join(prefetcherOptions, ", "))
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
 	}
 	if cmd.Flags().Lookup(flagPrefetcherLLCPPName).Changed && !slices.Contains(prefetcherOptions, flagPrefetcherLLCPP) {
-		err := fmt.Errorf("invalid LLCPP prefetcher: %s", flagPrefetcherLLCPP)
+		err := fmt.Errorf("invalid LLCPP prefetcher: %s, valid options are: %s", flagPrefetcherLLCPP, strings.Join(prefetcherOptions, ", "))
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
 	}
 	if cmd.Flags().Lookup(flagPrefetcherAOPName).Changed && !slices.Contains(prefetcherOptions, flagPrefetcherAOP) {
-		err := fmt.Errorf("invalid AOP prefetcher: %s", flagPrefetcherAOP)
+		err := fmt.Errorf("invalid AOP prefetcher: %s, valid options are: %s", flagPrefetcherAOP, strings.Join(prefetcherOptions, ", "))
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
 	}
 	if cmd.Flags().Lookup(flagPrefetcherHomelessName).Changed && !slices.Contains(prefetcherOptions, flagPrefetcherHomeless) {
-		err := fmt.Errorf("invalid homeless prefetcher: %s", flagPrefetcherHomeless)
+		err := fmt.Errorf("invalid homeless prefetcher: %s, valid options are: %s", flagPrefetcherHomeless, strings.Join(prefetcherOptions, ", "))
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
 	}
 	if cmd.Flags().Lookup(flagPrefetcherLLCName).Changed && !slices.Contains(prefetcherOptions, flagPrefetcherLLC) {
-		err := fmt.Errorf("invalid LLC prefetcher: %s", flagPrefetcherLLC)
+		err := fmt.Errorf("invalid LLC prefetcher: %s, valid options are: %s", flagPrefetcherLLC, strings.Join(prefetcherOptions, ", "))
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
 	}
@@ -432,7 +432,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	// were any changes requested?
 	changeRequested := false
 	flagGroups := getFlagGroups()
-	for i := 0; i < 3; i++ {
+	for i := range len(flagGroups) - 1 {
 		for _, flag := range flagGroups[i].Flags {
 			if cmd.Flags().Lookup(flag.Name).Changed {
 				changeRequested = true
