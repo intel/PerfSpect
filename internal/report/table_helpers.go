@@ -461,7 +461,7 @@ func isPrefetcherEnabled(msrValue string, bit int) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to parse msrValue: %s, %v", msrValue, err)
 	}
-	bitMask := int64(math.Pow(2, float64(bit)))
+	bitMask := int64(1) << bit
 	// enabled if bit is zero
 	return bitMask&msrInt == 0, nil
 }
