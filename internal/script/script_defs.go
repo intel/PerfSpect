@@ -1400,6 +1400,7 @@ rm -f "$perf_fp_data" "$perf_dwarf_data" "$perf_dwarf_folded" "$perf_fp_folded"
 		Name: ProfileKernelLockScriptName,
 		ScriptTemplate: `frequency={{.Frequency}}
 duration={{.Duration}}
+package={{.Package}}
 # system-wide lock profile collection
 # adjust perf_event_paranoid and kptr_restrict
 PERF_EVENT_PARANOID=$( cat /proc/sys/kernel/perf_event_paranoid )
@@ -1411,7 +1412,7 @@ PERF_HOTSPOT_DATA=$(mktemp -d)/perf_hotspot.data
 PERF_CONTENTION_DATA=$(mktemp -d)/perf_lock_contention.txt
 
 # collect hotspot
-perf record -F $frequency -a -g --call-graph dwarf -W -d --phys-data --sample-cpu -e cycles:pp,instructions:pp,cpu/mem-loads,ldlat=30/P,cpu/mem-stores/P -o ${PERF_HOTSPOT_DATA} -- sleep $duration &
+perf record -m 256M --kcore -F $frequency -a -g --call-graph dwarf,512 -W -d --phys-data --sample-cpu -e cycles:pp,instructions:pp,cpu/mem-loads,ldlat=30/P,cpu/mem-stores/P -o ${PERF_HOTSPOT_DATA} -- sleep $duration &
 PERF_HOTSPOT_PID=$!
 
 # check the availability perf lock -b option 
@@ -1435,17 +1436,22 @@ echo "$PERF_EVENT_PARANOID" > /proc/sys/kernel/perf_event_paranoid
 echo "$KPTR_RESTRICT" > /proc/sys/kernel/kptr_restrict
 
 # collapse perf data
-if [ -f "${PERF_HOTSPOT_DATA}" ]; then
+if [ -d "${PERF_HOTSPOT_DATA}" ]; then
 	echo "########## perf_hotspot_no_children ##########"
 	perf report -i ${PERF_HOTSPOT_DATA} --no-children --call-graph none --stdio
 	echo "########## perf_hotspot_callgraph ##########"
 	perf report -i ${PERF_HOTSPOT_DATA} --stdio
-fi
-if [ -f "${PERF_HOTSPOT_DATA}" ]; then
 	echo "########## perf_c2c_no_children ##########"
 	perf c2c report  -i ${PERF_HOTSPOT_DATA} --call-graph none --stdio
 	echo "########## perf_c2c_callgraph ##########"
 	perf c2c report  -i ${PERF_HOTSPOT_DATA} --stdio
+
+	if [ "${package,,}" = "true" ]; then
+		echo "########## perf_package_path ##########"
+		PERF_HOTSPOT_DATA_DIR=$(dirname "${PERF_HOTSPOT_DATA}")
+		( cd ${PERF_HOTSPOT_DATA_DIR}; perf archive --all ${PERF_HOTSPOT_DATA} > /dev/null 2>&1; chown ${SUDO_UID}.${SUDO_UID} -R ${PERF_HOTSPOT_DATA_DIR} )
+		ls ${PERF_HOTSPOT_DATA_DIR}/perf.all*.tar.bz2
+	fi
 fi
 if [ -f "${PERF_CONTENTION_DATA}" ]; then
 	echo "########## perf_lock_contention ##########"

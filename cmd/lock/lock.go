@@ -9,6 +9,8 @@ import (
 	"os"
 	"perfspect/internal/common"
 	"perfspect/internal/report"
+	"perfspect/internal/script"
+	"perfspect/internal/target"
 	"slices"
 	"strconv"
 	"strings"
@@ -40,12 +42,14 @@ var Cmd = &cobra.Command{
 var (
 	flagDuration  int
 	flagFrequency int
+	flagPackage   bool
 	flagFormat    []string
 )
 
 const (
 	flagDurationName  = "duration"
 	flagFrequencyName = "frequency"
+	flagPackageName   = "package"
 )
 
 func init() {
@@ -53,6 +57,7 @@ func init() {
 	Cmd.Flags().StringSliceVar(&flagFormat, common.FlagFormatName, []string{report.FormatAll}, "")
 	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 10, "")
 	Cmd.Flags().IntVar(&flagFrequency, flagFrequencyName, 11, "")
+	Cmd.PersistentFlags().BoolVar(&flagPackage, flagPackageName, false, "")
 
 	common.AddTargetFlags(Cmd)
 
@@ -94,6 +99,10 @@ func getFlagGroups() []common.FlagGroup {
 		{
 			Name: flagFrequencyName,
 			Help: "number of samples taken per second",
+		},
+		{
+			Name: flagPackageName,
+			Help: "create raw data package",
 		},
 		{
 			Name: common.FlagFormatName,
@@ -149,6 +158,33 @@ func formalizeOutputFormat(outputFormat []string) []string {
 	return result
 }
 
+func pullDataFiles(appContext common.AppContext, scriptOutputs map[string]script.ScriptOutput, myTarget target.Target) error {
+	// if target is RawTarget, the scriptOutputs may retrieved from a input file, which hints we should not be able to pull the
+	// perf archive file. In this situation, we don't treat it as an error.
+	_, isRawTarget := myTarget.(*target.RawTarget)
+	if isRawTarget {
+		return nil
+	}
+
+	localOutputDir := appContext.OutputDir
+	tableValues := report.GetValuesForTable(report.KernelLockAnalysisTableName, scriptOutputs)
+	for _, field := range tableValues.Fields {
+		if field.Name == "Perf Package Path" {
+			for _, remoteFile := range field.Values {
+				if len(remoteFile) == 0 {
+					continue
+				}
+				err := myTarget.PullFile(remoteFile, localOutputDir)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func runCmd(cmd *cobra.Command, args []string) error {
 	reportingCommand := common.ReportingCommand{
 		Cmd:            cmd,
@@ -156,8 +192,14 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		ScriptParams: map[string]string{
 			"Frequency": strconv.Itoa(flagFrequency),
 			"Duration":  strconv.Itoa(flagDuration),
+			"Package":   strconv.FormatBool(flagPackage),
 		},
 		TableNames: []string{report.KernelLockAnalysisTableName},
+	}
+
+	// only try to download package when option specified
+	if flagPackage {
+		reportingCommand.AdhocFunc = pullDataFiles
 	}
 
 	// The common.FlagFormat designed to hold the output formats, but as a global variable,
