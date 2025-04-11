@@ -42,7 +42,6 @@ type FlagGroup struct {
 }
 
 type TargetScriptOutputs struct {
-	targetName    string
 	target        target.Target
 	scriptOutputs map[string]script.ScriptOutput
 	tableNames    []string
@@ -186,7 +185,7 @@ func DefaultInsightsFunc(allTableValues []report.TableValues, scriptOutputs map[
 // createRawReports creates the raw report(s) from the collected data
 func (rc *ReportingCommand) createRawReports(appContext AppContext, orderedTargetScriptOutputs []TargetScriptOutputs) error {
 	for _, targetScriptOutputs := range orderedTargetScriptOutputs {
-		reportBytes, err := report.CreateRawReport(rc.TableNames, targetScriptOutputs.scriptOutputs, targetScriptOutputs.targetName)
+		reportBytes, err := report.CreateRawReport(rc.TableNames, targetScriptOutputs.scriptOutputs, targetScriptOutputs.target.GetName())
 		if err != nil {
 			err = fmt.Errorf("failed to create raw report: %w", err)
 			fmt.Fprintf(os.Stderr, "Error: %+v\n", err)
@@ -198,7 +197,7 @@ func (rc *ReportingCommand) createRawReports(appContext AppContext, orderedTarge
 		if rc.ReportNamePost != "" {
 			post = "_" + rc.ReportNamePost
 		}
-		reportFilename := fmt.Sprintf("%s%s.%s", targetScriptOutputs.targetName, post, "raw")
+		reportFilename := fmt.Sprintf("%s%s.%s", targetScriptOutputs.target.GetName(), post, "raw")
 		reportPath := filepath.Join(appContext.OutputDir, reportFilename)
 		if err = report.WriteReport(reportBytes, reportPath); err != nil {
 			err = fmt.Errorf("failed to write report: %w", err)
@@ -240,7 +239,10 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 		}
 		// special case - do some adhoc actions
 		if rc.AdhocFunc != nil {
-			rc.AdhocFunc(appContext, targetScriptOutputs.scriptOutputs, targetScriptOutputs.target)
+			err = rc.AdhocFunc(appContext, targetScriptOutputs.scriptOutputs, targetScriptOutputs.target)
+			if err != nil {
+				return nil, err
+			}
 		}
 		// special case - add tableValues for the application version
 		allTableValues = append(allTableValues, report.TableValues{
@@ -253,20 +255,20 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 		})
 		// create the report(s)
 		for _, format := range formats {
-			reportBytes, err := report.Create(format, allTableValues, targetScriptOutputs.scriptOutputs, targetScriptOutputs.targetName)
+			reportBytes, err := report.Create(format, allTableValues, targetScriptOutputs.scriptOutputs, targetScriptOutputs.target.GetName())
 			if err != nil {
 				err = fmt.Errorf("failed to create report: %w", err)
 				return nil, err
 			}
 			if len(formats) == 1 && format == report.FormatTxt {
-				fmt.Printf("%s:\n", targetScriptOutputs.targetName)
+				fmt.Printf("%s:\n", targetScriptOutputs.target.GetName())
 				fmt.Print(string(reportBytes))
 			}
 			post := ""
 			if rc.ReportNamePost != "" {
 				post = "_" + rc.ReportNamePost
 			}
-			reportFilename := fmt.Sprintf("%s%s.%s", targetScriptOutputs.targetName, post, format)
+			reportFilename := fmt.Sprintf("%s%s.%s", targetScriptOutputs.target.GetName(), post, format)
 			reportPath := filepath.Join(appContext.OutputDir, reportFilename)
 			if err = report.WriteReport(reportBytes, reportPath); err != nil {
 				err = fmt.Errorf("failed to write report: %w", err)
@@ -282,7 +284,7 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 		// - only those that we received output from
 		targetNames := make([]string, 0)
 		for _, targetScriptOutputs := range orderedTargetScriptOutputs {
-			targetNames = append(targetNames, targetScriptOutputs.targetName)
+			targetNames = append(targetNames, targetScriptOutputs.target.GetName())
 		}
 		multiTargetFormats := []string{report.FormatHtml, report.FormatXlsx}
 		for _, format := range multiTargetFormats {
@@ -386,7 +388,8 @@ func outputsFromInput(summaryTableName string) ([]TargetScriptOutputs, error) {
 			}
 			tableNames = util.UniqueAppend(tableNames, tableName)
 		}
-		orderedTargetScriptOutputs = append(orderedTargetScriptOutputs, TargetScriptOutputs{targetName: rawReport.TargetName, scriptOutputs: rawReport.ScriptOutputs, tableNames: tableNames})
+		rawTarget := target.NewRawTarget(rawReport.TargetName)
+		orderedTargetScriptOutputs = append(orderedTargetScriptOutputs, TargetScriptOutputs{target: rawTarget, scriptOutputs: rawReport.ScriptOutputs, tableNames: tableNames})
 	}
 	return orderedTargetScriptOutputs, nil
 }
@@ -439,7 +442,7 @@ func outputsFromTargets(myTargets []target.Target, rc *ReportingCommand, statusU
 	// reorder to match order of myTargets
 	for targetIdx, target := range myTargets {
 		for _, targetScriptOutputs := range allTargetScriptOutputs {
-			if targetScriptOutputs.targetName == target.GetName() {
+			if targetScriptOutputs.target.GetName() == target.GetName() {
 				targetScriptOutputs.tableNames = targetTableNames[targetIdx]
 				orderedTargetScriptOutputs = append(orderedTargetScriptOutputs, targetScriptOutputs)
 				break
@@ -481,5 +484,5 @@ func collectOnTarget(cmd *cobra.Command, duration string, myTarget target.Target
 		return
 	}
 	_ = statusUpdate(myTarget.GetName(), "collection complete")
-	channelTargetScriptOutputs <- TargetScriptOutputs{targetName: myTarget.GetName(), target: myTarget, scriptOutputs: scriptOutputs}
+	channelTargetScriptOutputs <- TargetScriptOutputs{target: myTarget, scriptOutputs: scriptOutputs}
 }

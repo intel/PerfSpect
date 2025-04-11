@@ -159,12 +159,11 @@ func formalizeOutputFormat(outputFormat []string) []string {
 }
 
 func pullDataFiles(appContext common.AppContext, scriptOutputs map[string]script.ScriptOutput, myTarget target.Target) error {
-	// if target is nil, the scriptOutputs may retrieved from a input file, which hints we should not be able to pull the
-	// perf archive file.
-	if myTarget == nil {
-		err := fmt.Errorf("can not package data from input")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+	// if target is RawTarget, the scriptOutputs may retrieved from a input file, which hints we should not be able to pull the
+	// perf archive file. In this situation, we don't treat it as an error.
+	_, isRawTarget := myTarget.(*target.RawTarget)
+	if isRawTarget {
+		return nil
 	}
 
 	localOutputDir := appContext.OutputDir
@@ -172,6 +171,9 @@ func pullDataFiles(appContext common.AppContext, scriptOutputs map[string]script
 	for _, field := range tableValues.Fields {
 		if field.Name == "Perf Package Path" {
 			for _, remoteFile := range field.Values {
+				if len(remoteFile) == 0 {
+					continue
+				}
 				err := myTarget.PullFile(remoteFile, localOutputDir)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -193,7 +195,11 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			"Package":   strconv.FormatBool(flagPackage),
 		},
 		TableNames: []string{report.KernelLockAnalysisTableName},
-		AdhocFunc:  pullDataFiles,
+	}
+
+	// only try to download package when option specified
+	if flagPackage {
+		reportingCommand.AdhocFunc = pullDataFiles
 	}
 
 	// The common.FlagFormat designed to hold the output formats, but as a global variable,
