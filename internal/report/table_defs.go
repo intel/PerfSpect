@@ -570,6 +570,8 @@ var tableDefinitions = map[string]TableDefinition{
 			script.UncoreDieTypesFromTPMIScriptName,
 			script.SpecCoreFrequenciesScriptName,
 			script.ElcScriptName,
+			script.PrefetchControlName,
+			script.PrefetchersName,
 		},
 		FieldsFunc: configurationTableValues},
 	//
@@ -1871,9 +1873,38 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Energy Performance Bias", Values: []string{epbFromOutput(outputs)}},
 		{Name: "Energy Performance Preference", Values: []string{eppFromOutput(outputs)}},
 		{Name: "Scaling Governor", Values: []string{strings.TrimSpace(outputs[script.ScalingGovernorScriptName].Stdout)}},
-		{Name: "Efficiency Latency Control", Values: []string{elcSummaryFromOutput(outputs)}},
 	}...)
-
+	// add ELC (for SRF and GNR only)
+	if strings.Contains(uarch, "SRF") || strings.Contains(uarch, "GNR") {
+		fields = append(fields, Field{Name: "Efficiency Latency Control", Values: []string{elcSummaryFromOutput(outputs)}})
+	}
+	// add prefetchers
+	for _, pf := range PrefetcherDefs {
+		if slices.Contains(pf.Uarchs, "all") || slices.Contains(pf.Uarchs, uarch[:3]) {
+			var scriptName string
+			if pf.Msr == MsrPrefetchControl {
+				scriptName = script.PrefetchControlName
+			} else if pf.Msr == MsrPrefetchers {
+				scriptName = script.PrefetchersName
+			} else {
+				slog.Error("unknown msr for prefetcher", slog.String("msr", fmt.Sprintf("0x%x", pf.Msr)))
+				continue
+			}
+			msrVal := valFromRegexSubmatch(outputs[scriptName].Stdout, `^([0-9a-fA-F]+)`)
+			var enabledDisabled string
+			enabled, err := isPrefetcherEnabled(msrVal, pf.Bit)
+			if err != nil {
+				slog.Warn("error checking prefetcher enabled status", slog.String("error", err.Error()))
+				continue
+			}
+			if enabled {
+				enabledDisabled = "Enabled"
+			} else {
+				enabledDisabled = "Disabled"
+			}
+			fields = append(fields, Field{Name: pf.ShortName + " prefetcher", Values: []string{enabledDisabled}})
+		}
+	}
 	return fields
 }
 
