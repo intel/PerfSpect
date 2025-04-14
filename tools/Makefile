@@ -154,7 +154,7 @@ endif
 	cd pcm/build &&	cmake -DNO_ASAN=1 ..
 	cd pcm/build && cmake --build .
 
-PERF_LINUX_VERSION := 6.1.52
+PERF_LINUX_VERSION := 6.8.12
 perf:
 	wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$(PERF_LINUX_VERSION).tar.xz
 	tar -xf linux-$(PERF_LINUX_VERSION).tar.xz && mv linux-$(PERF_LINUX_VERSION)/ linux_perf/
