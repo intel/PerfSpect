@@ -162,6 +162,8 @@ perf:
 	mkdir -p bin
 	cp linux_perf/tools/perf/perf bin/
 	strip --strip-unneeded bin/perf
+	cp linux_perf/tools/perf/perf-archive.sh bin/perf-archive
+	chmod +x bin/perf-archive
 
 processwatch:
 ifeq ("$(wildcard processwatch)","")

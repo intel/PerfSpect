@@ -1453,6 +1453,6 @@ if [ -f "${PERF_CONTENTION_DATA}" ]; then
 fi
 `,
 		Superuser: true,
-		Depends:   []string{"perf"},
+		Depends:   []string{"perf", "perf-archive"},
 	},
 }
