@@ -14,6 +14,7 @@ type ScriptDefinition struct {
 	Name           string   // just a name
 	ScriptTemplate string   // the bash script that will be run
 	Architectures  []string // architectures, i.e., x86_64, arm64. If empty, it will run on all architectures.
+	Vendors        []string // vendors, i.e., GenuineIntel, AuthenticAMD. If empty, it will run on all vendors.
 	Families       []string // families, e.g., 6, 7. If empty, it will run on all families.
 	Models         []string // models, e.g., 62, 63. If empty, it will run on all models.
 	Lkms           []string // loadable kernel modules
@@ -290,31 +291,31 @@ fi
 		ScriptTemplate: `lscpu=$(lscpu)
 family=$(echo "$lscpu" | grep -E "^CPU family:" | awk '{print $3}')
 model=$(echo "$lscpu" | grep -E "^Model:" | awk '{print $2}')
-# if family is Intel
-if [ "$family" -eq 6 ]; then
-    # if model is SRF or GNR
-    if [ "$model" -eq 175 ] || [ "$model" -eq 173 ]; then
-        cores=$(pcm-tpmi 0x5 0xD8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_10
-        sse=$(pcm-tpmi 0x5 0xA8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_4
-        avx2=$(pcm-tpmi 0x5 0xB0 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_5
-        avx512=$(pcm-tpmi 0x5 0xB8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_6
-        avx512h=$(pcm-tpmi 0x5 0xC0 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_7
-        amx=$(pcm-tpmi 0x5 0xC8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_8
-    else
-        cores=$(rdmsr 0x1ae) # MSR_TURBO_GROUP_CORE_CNT: Group Size of Active Cores for Turbo Mode Operation
-        sse=$(rdmsr 0x1ad) # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
-        avx2=0
-        avx512=0
-        avx512h=0
-        amx=0
-    fi
-else
-    exit 1
+vendor=$(echo "$lscpu" | grep -E "^Vendor ID:" | awk '{print $3}')
+# if vendor isn't Intel
+if [ "$vendor" != "GenuineIntel" ]; then
+	exit 1
+fi
+# if cpu is SRF or GNR get the frequencies from tpmi
+if [ "$family" -eq 6 ] && ( [ "$model" -eq 175 ] || [ "$model" -eq 173 ] ); then
+	cores=$(pcm-tpmi 0x5 0xD8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_10
+	sse=$(pcm-tpmi 0x5 0xA8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_4
+	avx2=$(pcm-tpmi 0x5 0xB0 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_5
+	avx512=$(pcm-tpmi 0x5 0xB8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_6
+	avx512h=$(pcm-tpmi 0x5 0xC0 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_7
+	amx=$(pcm-tpmi 0x5 0xC8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_8
+else # if cpu is not SRF or GNR get the frequencies from msr
+	cores=$(rdmsr 0x1ae) # MSR_TURBO_GROUP_CORE_CNT: Group Size of Active Cores for Turbo Mode Operation
+	sse=$(rdmsr 0x1ad) # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
+	avx2=0
+	avx512=0
+	avx512h=0
+	amx=0
 fi
 echo "cores sse avx2 avx512 avx512h amx"
 echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		Architectures: []string{x86_64},
-		Families:      []string{"6"}, // Intel
+		Vendors:       []string{"GenuineIntel"},
 		Lkms:          []string{"msr"},
 		Depends:       []string{"rdmsr", "pcm-tpmi"},
 		Superuser:     true,
@@ -323,7 +324,7 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		Name:           PPINName,
 		ScriptTemplate: "rdmsr -a 0x4f", // MSR_PPIN: Protected Processor Inventory Number
 		Architectures:  []string{x86_64},
-		Families:       []string{"6"}, // Intel
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -332,7 +333,7 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		Name:           PrefetchControlName,
 		ScriptTemplate: "rdmsr -f 7:0 0x1a4", // MSR_PREFETCH_CONTROL: L2, DCU, and AMP Prefetchers enabled/disabled
 		Architectures:  []string{x86_64},
-		Families:       []string{"6"}, // Intel
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -341,7 +342,7 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		Name:           PrefetchersName,
 		ScriptTemplate: "rdmsr 0x6d", // TODO: get name, used to read prefetchers
 		Architectures:  []string{x86_64},
-		Families:       []string{"6"}, // Intel
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -350,7 +351,7 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		Name:           L3WaySizeName,
 		ScriptTemplate: "rdmsr 0xc90", // TODO: get name, used to read l3 size
 		Architectures:  []string{x86_64},
-		Families:       []string{"6"}, // Intel
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -359,7 +360,7 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		Name:           PackagePowerLimitName,
 		ScriptTemplate: "rdmsr -f 14:0 0x610", // MSR_PKG_POWER_LIMIT: Package limit in bits 14:0
 		Architectures:  []string{x86_64},
-		Families:       []string{"6"}, // Intel
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -368,7 +369,7 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		Name:           EpbSourceScriptName,
 		ScriptTemplate: "rdmsr -f 34:34 0x1FC", // MSR_POWER_CTL, PWR_PERF_TUNING_ALT_EPB: Energy Performance Bias Hint Source (1 is from BIOS, 0 is from OS)
 		Architectures:  []string{x86_64},
-		Families:       []string{"6"}, // Intel
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -377,7 +378,7 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		Name:           EpbOSScriptName,
 		ScriptTemplate: "rdmsr -f 3:0 0x1B0", // IA32_ENERGY_PERF_BIAS: Energy Performance Bias Hint (0 is highest perf, 15 is highest energy saving)
 		Architectures:  []string{x86_64},
-		Families:       []string{"6"}, // Intel
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -386,7 +387,7 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		Name:           EpbBIOSScriptName,
 		ScriptTemplate: "rdmsr -f 6:3 0xA01", // ENERGY_PERF_BIAS_CONFIG, ALT_ENERGY_PERF_BIAS: Energy Performance Bias Hint from BIOS (0 is highest perf, 15 is highest energy saving)
 		Architectures:  []string{x86_64},
-		Families:       []string{"6"}, // Intel
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -395,7 +396,7 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		Name:           EppValidScriptName,
 		ScriptTemplate: "rdmsr -a -f 60:60 0x774", // IA32_HWP_REQUEST: Energy Performance Preference, bit 60 indicates if per-cpu EPP is valid
 		Architectures:  []string{x86_64},
-		Families:       []string{"6"}, // Intel
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -404,7 +405,7 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		Name:           EppPackageControlScriptName,
 		ScriptTemplate: "rdmsr -a -f 42:42 0x774", // IA32_HWP_REQUEST: Energy Performance Preference, bit 42 indicates if package control is enabled
 		Architectures:  []string{x86_64},
-		Families:       []string{"6"}, // Intel
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -413,7 +414,7 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		Name:           EppScriptName,
 		ScriptTemplate: "rdmsr -a -f 31:24 0x774", // IA32_HWP_REQUEST: Energy Performance Preference, bits 24-31 (0 is highest perf, 255 is highest energy saving)
 		Architectures:  []string{x86_64},
-		Families:       []string{"6"}, // Intel
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -422,7 +423,7 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		Name:           EppPackageScriptName,
 		ScriptTemplate: "rdmsr -f 31:24 0x772", // IA32_HWP_REQUEST_PKG: Energy Performance Preference, bits 24-31 (0 is highest perf, 255 is highest energy saving)
 		Architectures:  []string{x86_64},
-		Families:       []string{"6"}, // Intel
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -431,7 +432,7 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		Name:           UncoreMaxFromMSRScriptName,
 		ScriptTemplate: "rdmsr -f 6:0 0x620", // MSR_UNCORE_RATIO_LIMIT: MAX_RATIO in bits 6:0
 		Architectures:  []string{x86_64},
-		Families:       []string{"6"}, // Intel
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -440,7 +441,7 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		Name:           UncoreMinFromMSRScriptName,
 		ScriptTemplate: "rdmsr -f 14:8 0x620", // MSR_UNCORE_RATIO_LIMIT: MAX_RATIO in bits 14:8
 		Architectures:  []string{x86_64},
-		Families:       []string{"6"}, // Intel
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -635,7 +636,7 @@ rdmsr 0x702
 rdmsr 0x2FFE
 `, // uncore client cha count, uncore cha count, uncore cha count spr
 		Architectures: []string{x86_64},
-		Families:      []string{"6"}, // Intel
+		Vendors:       []string{"GenuineIntel"},
 		Lkms:          []string{"msr"},
 		Depends:       []string{"rdmsr"},
 		Superuser:     true,
@@ -814,7 +815,7 @@ fi`,
 		ScriptTemplate: `dmesg | grep -A 1 "Intel PMU driver" | tail -1 | awk '{print $NF}'`,
 		Superuser:      true,
 		Architectures:  []string{x86_64},
-		Families:       []string{"6"}, // Intel
+		Vendors:        []string{"GenuineIntel"},
 	},
 	PMUBusyScriptName: {
 		Name: PMUBusyScriptName,
@@ -856,27 +857,24 @@ done
 `,
 		Superuser:     true,
 		Architectures: []string{x86_64},
-		Families:      []string{"6"}, // Intel
+		Vendors:       []string{"GenuineIntel"},
 		Lkms:          []string{"msr"},
 		Depends:       []string{"rdmsr"},
 	},
 	GaudiInfoScriptName: {
 		Name:           GaudiInfoScriptName,
 		ScriptTemplate: `hl-smi -Q module_id,serial,bus_id,driver_version -f csv`,
-		Architectures:  []string{"x86_64"},
-		Families:       []string{"6"}, // Intel
+		Vendors:        []string{"GenuineIntel"},
 	},
 	GaudiFirmwareScriptName: {
 		Name:           GaudiFirmwareScriptName,
 		ScriptTemplate: `hl-smi --fw-version`,
-		Architectures:  []string{"x86_64"},
-		Families:       []string{"6"}, // Intel
+		Vendors:        []string{"GenuineIntel"},
 	},
 	GaudiNumaScriptName: {
 		Name:           GaudiNumaScriptName,
 		ScriptTemplate: `hl-smi topo -N`,
-		Architectures:  []string{"x86_64"},
-		Families:       []string{"6"}, // Intel
+		Vendors:        []string{"GenuineIntel"},
 	},
 	MemoryBandwidthAndLatencyScriptName: {
 		Name: MemoryBandwidthAndLatencyScriptName,

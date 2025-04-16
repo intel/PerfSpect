@@ -248,7 +248,7 @@ func getFlagGroups() []common.FlagGroup {
 		},
 		{
 			Name: flagPrefetcherAMPName,
-			Help: "AMP prefetcher (" + strings.Join(prefetcherOptions, ", ") + ") [SPR,EMR,GNR]",
+			Help: "Adaptive multipath probability prefetcher (" + strings.Join(prefetcherOptions, ", ") + ") [SPR,EMR,GNR]",
 		},
 		{
 			Name: flagPrefetcherLLCPPName,
@@ -264,7 +264,7 @@ func getFlagGroups() []common.FlagGroup {
 		},
 		{
 			Name: flagPrefetcherLLCName,
-			Help: "LLC prefetcher (" + strings.Join(prefetcherOptions, ", ") + ") [SPR,EMR,GNR]",
+			Help: "Last level cache prefetcher (" + strings.Join(prefetcherOptions, ", ") + ") [SPR,EMR,GNR]",
 		},
 	}
 	groups = append(groups, common.FlagGroup{
@@ -720,7 +720,6 @@ func setLlcSize(llcSize float64, myTarget target.Target, localTempDir string) {
 		Name:           "set LLC size",
 		ScriptTemplate: fmt.Sprintf("wrmsr -a 0xC90 %d", cacheWays[waysToSet]),
 		Superuser:      true,
-		Architectures:  []string{"x86_64"},
 		Families:       []string{"6"},                                                // Intel only
 		Models:         []string{"63", "79", "86", "85", "106", "108", "143", "207"}, // not SRF, GNR
 		Depends:        []string{"wrmsr"},
@@ -743,8 +742,7 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 		Name:           "set frequency bins",
 		ScriptTemplate: fmt.Sprintf("wrmsr -a 0x1AD %d", msr),
 		Superuser:      true,
-		Architectures:  []string{"x86_64"},
-		Families:       []string{"6"}, // Intel only
+		Vendors:        []string{"GenuineIntel"},
 		Depends:        []string{"wrmsr"},
 	}
 	_, err := runScript(myTarget, setScript, localTempDir)
@@ -824,8 +822,7 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 		setScript := script.ScriptDefinition{
 			Name:           "write max and min uncore frequency TPMI",
 			ScriptTemplate: fmt.Sprintf("pcm-tpmi 2 0x18 -d -b %s -w %d -i %s -e %s", bits, value, die.instance, die.entry),
-			Architectures:  []string{"x86_64"},
-			Families:       []string{"6"}, // Intel only
+			Vendors:        []string{"GenuineIntel"},
 			Depends:        []string{"pcm-tpmi"},
 			Superuser:      true,
 		}
@@ -849,10 +846,9 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 	scripts = append(scripts, script.ScriptDefinition{
 		Name:           "get uncore frequency MSR",
 		ScriptTemplate: "rdmsr 0x620",
-		Lkms:           []string{"msr"},
-		Architectures:  []string{"x86_64"},
-		Families:       []string{"6"}, // Intel only
+		Vendors:        []string{"GenuineIntel"},
 		Depends:        []string{"rdmsr"},
+		Lkms:           []string{"msr"},
 		Superuser:      true,
 	})
 	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir)
@@ -903,8 +899,7 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 		Name:           "set uncore frequency MSR",
 		ScriptTemplate: fmt.Sprintf("wrmsr -a 0x620 %d", newVal),
 		Superuser:      true,
-		Architectures:  []string{"x86_64"},
-		Families:       []string{"6"}, // Intel only
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"wrmsr"},
 	}
@@ -920,8 +915,7 @@ func setPower(power int, myTarget target.Target, localTempDir string) {
 		Name:           "get power MSR",
 		ScriptTemplate: "rdmsr 0x610",
 		Superuser:      true,
-		Architectures:  []string{"x86_64"},
-		Families:       []string{"6"}, // Intel only
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 	}
@@ -944,8 +938,7 @@ func setPower(power int, myTarget target.Target, localTempDir string) {
 				Name:           "set tdp",
 				ScriptTemplate: fmt.Sprintf("wrmsr -a 0x610 %d", newVal),
 				Superuser:      true,
-				Architectures:  []string{"x86_64"},
-				Families:       []string{"6"}, // Intel only
+				Vendors:        []string{"GenuineIntel"},
 				Lkms:           []string{"msr"},
 				Depends:        []string{"wrmsr"},
 			}
@@ -983,8 +976,7 @@ func setEpb(epb int, myTarget target.Target, localTempDir string) {
 	readScript := script.ScriptDefinition{
 		Name:           "read " + msr,
 		ScriptTemplate: "rdmsr " + msr,
-		Architectures:  []string{"x86_64"},
-		Families:       []string{"6"}, // Intel
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -1008,8 +1000,7 @@ func setEpb(epb int, myTarget target.Target, localTempDir string) {
 		Name:           "set epb",
 		ScriptTemplate: fmt.Sprintf("wrmsr -a %s %d", msr, msrValue),
 		Superuser:      true,
-		Architectures:  []string{"x86_64"},
-		Families:       []string{"6"}, // Intel only
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"wrmsr"},
 	}
@@ -1028,8 +1019,7 @@ func setEpp(epp int, myTarget target.Target, localTempDir string) {
 	getScript := script.ScriptDefinition{
 		Name:           "get epp msr",
 		ScriptTemplate: "rdmsr 0x774", // IA32_HWP_REQUEST
-		Architectures:  []string{"x86_64"},
-		Families:       []string{"6"}, // Intel only
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -1053,8 +1043,7 @@ func setEpp(epp int, myTarget target.Target, localTempDir string) {
 		Name:           "set epp",
 		ScriptTemplate: fmt.Sprintf("wrmsr -a 0x774 %d", eppValue),
 		Superuser:      true,
-		Architectures:  []string{"x86_64"},
-		Families:       []string{"6"}, // Intel only
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"wrmsr"},
 	}
@@ -1068,8 +1057,7 @@ func setEpp(epp int, myTarget target.Target, localTempDir string) {
 	getScript = script.ScriptDefinition{
 		Name:           "get epp pkg msr",
 		ScriptTemplate: "rdmsr 0x772", // IA32_HWP_REQUEST_PKG
-		Architectures:  []string{"x86_64"},
-		Families:       []string{"6"}, // Intel only
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -1094,8 +1082,7 @@ func setEpp(epp int, myTarget target.Target, localTempDir string) {
 		Name:           "set epp",
 		ScriptTemplate: fmt.Sprintf("wrmsr -a 0x772 %d", eppValue),
 		Superuser:      true,
-		Architectures:  []string{"x86_64"},
-		Families:       []string{"6"}, // Intel only
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"wrmsr"},
 	}
@@ -1134,8 +1121,7 @@ func setElc(elc string, myTarget target.Target, localTempDir string) {
 		Name:           "set elc",
 		ScriptTemplate: fmt.Sprintf("bhs-power-mode.sh --%s", mode),
 		Superuser:      true,
-		Architectures:  []string{"x86_64"},
-		Families:       []string{"6"},          // Intel only
+		Vendors:        []string{"GenuineIntel"},
 		Models:         []string{"173", "175"}, // GNR and SRF only
 		Depends:        []string{"bhs-power-mode.sh"},
 	}
@@ -1181,8 +1167,7 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 	getScript := script.ScriptDefinition{
 		Name:           "get prefetcher msr",
 		ScriptTemplate: fmt.Sprintf("rdmsr %d", pf.Msr),
-		Architectures:  []string{"x86_64"},
-		Families:       []string{"6"}, // Intel only
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -1217,8 +1202,7 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 	setScript := script.ScriptDefinition{
 		Name:           "set prefetcher",
 		ScriptTemplate: fmt.Sprintf("wrmsr -a %d %d", pf.Msr, newVal),
-		Architectures:  []string{"x86_64"},
-		Families:       []string{"6"}, // Intel only
+		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"wrmsr"},
 		Superuser:      true,
