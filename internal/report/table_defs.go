@@ -1929,38 +1929,6 @@ func cpuTemperatureTableValues(outputs map[string]script.ScriptOutput) []Field {
 	}
 }
 
-// bucketsToCounts expands the core frequency buckets to a list of core counts (from column 1) and associated spec sse frequencies (from column 2)
-func bucketsToCoresFreqs(specCoreFreqs [][]string) (cores []string, freqs []string, err error) {
-	// the first column is the core count, the second column is the spec sse frequency
-	for i := 1; i < len(specCoreFreqs); i++ {
-		// parse the bucket into start/end parts
-		bucket := strings.Split(specCoreFreqs[i][0], "-")
-		if len(bucket) != 2 {
-			err = fmt.Errorf("unable to parse bucket %s", specCoreFreqs[i][0])
-			return
-		}
-		// parse the start and end parts into integers
-		var start int
-		var end int
-		start, err = strconv.Atoi(strings.TrimSpace(bucket[0]))
-		if err != nil {
-			err = fmt.Errorf("unable to parse start %s", bucket[0])
-			return
-		}
-		end, err = strconv.Atoi(strings.TrimSpace(bucket[1]))
-		if err != nil {
-			err = fmt.Errorf("unable to parse end %s", bucket[1])
-			return
-		}
-		// add the core count to the list
-		for j := start; j <= end; j++ {
-			cores = append(cores, strconv.Itoa(j))
-			freqs = append(freqs, specCoreFreqs[i][1])
-		}
-	}
-	return
-}
-
 func cpuFrequencyTableValues(outputs map[string]script.ScriptOutput) []Field {
 	specCoreFrequencies, err := getSpecCoreFrequenciesFromOutput(outputs)
 	if err != nil {
@@ -1973,40 +1941,37 @@ func cpuFrequencyTableValues(outputs map[string]script.ScriptOutput) []Field {
 		slog.Error("unable to convert buckets to counts", slog.String("error", err.Error()))
 		return []Field{}
 	}
-	// get the sse, avx128, avx256, and avx512 frequencies from the avx-turbo output
-	sseFreqs, avx128Freqs, avx256Freqs, avx512Freqs, err := avxTurboFrequenciesFromOutput(outputs[script.TurboFrequenciesScriptName].Stdout)
-	fields := []Field{
-		{Name: "cores"},
-		{Name: "spec sse"},
-		{Name: "sse"},
-		{Name: "avx128"},
-		{Name: "avx256"},
-		{Name: "avx512"},
-	}
+	// get the sse, avx256, and avx512 frequencies from the avx-turbo output
+	instructionFreqs, err := avxTurboFrequenciesFromOutput(outputs[script.TurboFrequenciesScriptName].Stdout)
 	if err != nil {
 		slog.Error("unable to get avx turbo frequencies", slog.String("error", err.Error()))
 		return []Field{}
 	}
-	// add the core counts and spec sse frequencies to the fields
+	// we're expecting scalar_iadd, avx256_fma, avx512_fma, all associated slices should be of the same length
+	scalarIaddFreqs := instructionFreqs["scalar_iadd"]
+	avx256FmaFreqs := instructionFreqs["avx256_fma"]
+	avx512FmaFreqs := instructionFreqs["avx512_fma"]
+	// check that we have the same number of frequencies as cores (sanity check)
+	numCores := len(cores)
+	if len(specSSEFreqs) != numCores || len(scalarIaddFreqs) != numCores || len(avx256FmaFreqs) != numCores || len(avx512FmaFreqs) != numCores {
+		slog.Error("mismatched number of frequencies and core counts", slog.Int("numCores", numCores), slog.Int("numSpecSSEFreqs", len(specSSEFreqs)), slog.Int("numScalarIaddFreqs", len(scalarIaddFreqs)), slog.Int("numAvx256FmaFreqs", len(avx256FmaFreqs)), slog.Int("numAvx512FmaFreqs", len(avx512FmaFreqs)))
+		return []Field{}
+	}
+	// create the fields
+	fields := []Field{
+		{Name: "cores"},
+		{Name: "sse (expected)"},
+		{Name: "sse"},    // scalar_iadd
+		{Name: "avx2"},   // avx256_fma
+		{Name: "avx512"}, // avx512_fma
+	}
+	// add the data to the fields
 	fields[0].Values = cores
 	fields[1].Values = specSSEFreqs
-	for i := range sseFreqs {
-		fields[2].Values = append(fields[2].Values, fmt.Sprintf("%.1f", sseFreqs[i]))
-	}
-	for i := range avx128Freqs {
-		fields[3].Values = append(fields[3].Values, fmt.Sprintf("%.1f", avx128Freqs[i]))
-	}
-	for i := range avx256Freqs {
-		fields[4].Values = append(fields[4].Values, fmt.Sprintf("%.1f", avx256Freqs[i]))
-	}
-	for i := range avx512Freqs {
-		fields[5].Values = append(fields[5].Values, fmt.Sprintf("%.1f", avx512Freqs[i]))
-	}
-	// pad frequency fields with empty string
-	for i := 2; i < len(fields); i++ {
-		for j := len(fields[i].Values); j < len(fields[0].Values); j++ {
-			fields[i].Values = append(fields[i].Values, "")
-		}
+	for i := range cores {
+		fields[2].Values = append(fields[2].Values, fmt.Sprintf("%.1f", scalarIaddFreqs[i]))
+		fields[3].Values = append(fields[3].Values, fmt.Sprintf("%.1f", avx256FmaFreqs[i]))
+		fields[4].Values = append(fields[4].Values, fmt.Sprintf("%.1f", avx512FmaFreqs[i]))
 	}
 	return fields
 }
