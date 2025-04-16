@@ -30,71 +30,25 @@ type ScriptOutput struct {
 }
 
 // RunScript runs a script on the specified target and returns the output.
-func RunScript(myTarget target.Target, script ScriptDefinition, localTempDir string) (scriptOutput ScriptOutput, err error) {
-	targetArchitecture, err := myTarget.GetArchitecture()
-	if err != nil {
-		err = fmt.Errorf("error getting target architecture: %v", err)
-		return
-	}
-	targetFamily, err := myTarget.GetFamily()
-	if err != nil {
-		err = fmt.Errorf("error getting target family: %v", err)
-		return
-	}
-	targetModel, err := myTarget.GetModel()
-	if err != nil {
-		err = fmt.Errorf("error getting target model: %v", err)
-		return
-	}
-	targetVendor, err := myTarget.GetVendor()
-	if err != nil {
-		err = fmt.Errorf("error getting target vendor: %v", err)
-		return
-	}
-	if len(script.Architectures) > 0 && !slices.Contains(script.Architectures, targetArchitecture) ||
-		len(script.Vendors) > 0 && !slices.Contains(script.Vendors, targetVendor) ||
-		len(script.Families) > 0 && !slices.Contains(script.Families, targetFamily) ||
-		len(script.Models) > 0 && !slices.Contains(script.Models, targetModel) {
-		err = fmt.Errorf("the \"%s\" script is not intended for the target processor (arch: %s, vendor: %s, family: %s, model: %s)", script.Name, targetArchitecture, targetVendor, targetFamily, targetModel)
-		return
+func RunScript(myTarget target.Target, script ScriptDefinition, localTempDir string) (ScriptOutput, error) {
+	if !scriptForTarget(script, myTarget) {
+		err := fmt.Errorf("the \"%s\" script is not intended for the target processor", script.Name)
+		return ScriptOutput{}, err
 	}
 	scriptOutputs, err := RunScripts(myTarget, []ScriptDefinition{script}, false, localTempDir)
-	scriptOutput = scriptOutputs[script.Name]
-	return
+	scriptOutput := scriptOutputs[script.Name]
+	return scriptOutput, err
 }
 
 // RunScripts runs a list of scripts on a target and returns the outputs of each script as a map with the script name as the key.
 func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScriptErrors bool, localTempDir string) (map[string]ScriptOutput, error) {
-	targetArchitecture, err := myTarget.GetArchitecture()
-	if err != nil {
-		err = fmt.Errorf("error getting target architecture: %v", err)
-		return nil, err
-	}
-	targetFamily, err := myTarget.GetFamily()
-	if err != nil {
-		err = fmt.Errorf("error getting target family: %v", err)
-		return nil, err
-	}
-	targetModel, err := myTarget.GetModel()
-	if err != nil {
-		err = fmt.Errorf("error getting target model: %v", err)
-		return nil, err
-	}
-	targetVendor, err := myTarget.GetVendor()
-	if err != nil {
-		err = fmt.Errorf("error getting target vendor: %v", err)
-		return nil, err
-	}
 	// drop scripts that should not be run and separate scripts that must run sequentially from those that can be run in parallel
 	canElevate := myTarget.CanElevatePrivileges()
 	var sequentialScripts []ScriptDefinition
 	var parallelScripts []ScriptDefinition
 	for _, script := range scripts {
-		if len(script.Architectures) > 0 && !slices.Contains(script.Architectures, targetArchitecture) ||
-			len(script.Vendors) > 0 && !slices.Contains(script.Vendors, targetVendor) ||
-			len(script.Families) > 0 && !slices.Contains(script.Families, targetFamily) ||
-			len(script.Models) > 0 && !slices.Contains(script.Models, targetModel) {
-			slog.Info("skipping script because it is not intended to run on the target processor", slog.String("target", myTarget.GetName()), slog.String("script", script.Name), slog.String("targetArchitecture", targetArchitecture), slog.String("targetVendor", targetVendor), slog.String("targetFamily", targetFamily), slog.String("targetModel", targetModel))
+		if !scriptForTarget(script, myTarget) {
+			slog.Info("skipping script because it is not intended to run on the target processor", slog.String("target", myTarget.GetName()), slog.String("script", script.Name))
 			continue
 		}
 		if script.Superuser && !canElevate {
@@ -240,6 +194,51 @@ func RunScriptAsync(myTarget target.Target, script ScriptDefinition, localTempDi
 	cmd := prepareCommand(script, myTarget.GetTempDirectory())
 	err = myTarget.RunCommandAsync(cmd, 0, false, stdoutChannel, stderrChannel, exitcodeChannel, cmdChannel)
 	errorChannel <- err
+}
+
+// scriptForTarget checks if the script is intended for the target processor.
+func scriptForTarget(script ScriptDefinition, myTarget target.Target) bool {
+	if len(script.Architectures) > 0 {
+		architecture, err := myTarget.GetArchitecture()
+		if err != nil {
+			slog.Error("failed to get architecture for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+			return false
+		}
+		if !slices.Contains(script.Architectures, architecture) {
+			return false
+		}
+	}
+	if len(script.Vendors) > 0 {
+		vendor, err := myTarget.GetVendor()
+		if err != nil {
+			slog.Error("failed to get vendor for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+			return false
+		}
+		if !slices.Contains(script.Vendors, vendor) {
+			return false
+		}
+	}
+	if len(script.Families) > 0 {
+		family, err := myTarget.GetFamily()
+		if err != nil {
+			slog.Error("failed to get family for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+			return false
+		}
+		if !slices.Contains(script.Families, family) {
+			return false
+		}
+	}
+	if len(script.Models) > 0 {
+		model, err := myTarget.GetModel()
+		if err != nil {
+			slog.Error("failed to get model for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+			return false
+		}
+		if !slices.Contains(script.Models, model) {
+			return false
+		}
+	}
+	return true
 }
 
 func prepareCommand(script ScriptDefinition, targetTempDirectory string) (cmd *exec.Cmd) {
