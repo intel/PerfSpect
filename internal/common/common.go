@@ -338,7 +338,10 @@ func (rc *ReportingCommand) retrieveScriptOutputs(localTempDir string) ([]Target
 			}
 		}
 		multiSpinner.Start()
-		defer multiSpinner.Finish()
+		defer func() {
+			multiSpinner.Finish()
+			fmt.Println()
+		}()
 		// check for errors in target creation
 		for i := range targetErrs {
 			if targetErrs[i] != nil {
@@ -356,7 +359,6 @@ func (rc *ReportingCommand) retrieveScriptOutputs(localTempDir string) ([]Target
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println()
 	}
 	return orderedTargetScriptOutputs, nil
 }
@@ -462,7 +464,7 @@ func collectOnTarget(cmd *cobra.Command, duration string, myTarget target.Target
 	status := "collecting data"
 	if cmd.Name() == "telemetry" && duration == "0" { // telemetry is the only command that uses this common code that can run indefinitely
 		status += ", press Ctrl+c to stop"
-	} else if duration != "0" {
+	} else if duration != "0" && duration != "" {
 		status += fmt.Sprintf(" for %s seconds", duration)
 	}
 	_ = statusUpdate(myTarget.GetName(), status)
