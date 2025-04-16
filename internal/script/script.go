@@ -46,10 +46,16 @@ func RunScript(myTarget target.Target, script ScriptDefinition, localTempDir str
 		err = fmt.Errorf("error getting target model: %v", err)
 		return
 	}
+	targetVendor, err := myTarget.GetVendor()
+	if err != nil {
+		err = fmt.Errorf("error getting target vendor: %v", err)
+		return
+	}
 	if len(script.Architectures) > 0 && !slices.Contains(script.Architectures, targetArchitecture) ||
+		len(script.Vendors) > 0 && !slices.Contains(script.Vendors, targetVendor) ||
 		len(script.Families) > 0 && !slices.Contains(script.Families, targetFamily) ||
 		len(script.Models) > 0 && !slices.Contains(script.Models, targetModel) {
-		err = fmt.Errorf("the \"%s\" script is not intended for the target processor (arch: %s, family: %s, model: %s)", script.Name, targetArchitecture, targetFamily, targetModel)
+		err = fmt.Errorf("the \"%s\" script is not intended for the target processor (arch: %s, vendor: %s, family: %s, model: %s)", script.Name, targetArchitecture, targetVendor, targetFamily, targetModel)
 		return
 	}
 	scriptOutputs, err := RunScripts(myTarget, []ScriptDefinition{script}, false, localTempDir)
@@ -74,15 +80,21 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 		err = fmt.Errorf("error getting target model: %v", err)
 		return nil, err
 	}
+	targetVendor, err := myTarget.GetVendor()
+	if err != nil {
+		err = fmt.Errorf("error getting target vendor: %v", err)
+		return nil, err
+	}
 	// drop scripts that should not be run and separate scripts that must run sequentially from those that can be run in parallel
 	canElevate := myTarget.CanElevatePrivileges()
 	var sequentialScripts []ScriptDefinition
 	var parallelScripts []ScriptDefinition
 	for _, script := range scripts {
 		if len(script.Architectures) > 0 && !slices.Contains(script.Architectures, targetArchitecture) ||
+			len(script.Vendors) > 0 && !slices.Contains(script.Vendors, targetVendor) ||
 			len(script.Families) > 0 && !slices.Contains(script.Families, targetFamily) ||
 			len(script.Models) > 0 && !slices.Contains(script.Models, targetModel) {
-			slog.Info("skipping script because it is not intended to run on the target processor", slog.String("target", myTarget.GetName()), slog.String("script", script.Name), slog.String("targetArchitecture", targetArchitecture), slog.String("targetFamily", targetFamily), slog.String("targetModel", targetModel))
+			slog.Info("skipping script because it is not intended to run on the target processor", slog.String("target", myTarget.GetName()), slog.String("script", script.Name), slog.String("targetArchitecture", targetArchitecture), slog.String("targetVendor", targetVendor), slog.String("targetFamily", targetFamily), slog.String("targetModel", targetModel))
 			continue
 		}
 		if script.Superuser && !canElevate {
