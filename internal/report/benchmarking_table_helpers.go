@@ -167,25 +167,24 @@ func maxTemperatureFromOutput(outputs map[string]script.ScriptOutput) string {
 	return temperature
 }
 
+// avxTurboFrequenciesFromOutput parses the output of avx-turbo and returns the turbo frequencies as a map of instruction type to frequencies
 // Sample avx-turbo output
 // ...
-// Will test up to 64 CPUs
 // Cores | ID          | Description            | OVRLP3 | Mops | A/M-ratio | A/M-MHz | M/tsc-ratio
 // 1     | scalar_iadd | Scalar integer adds    |  1.000 | 3901 |      1.95 |    3900 |        1.00
 // 1     | avx256_fma  | 256-bit serial DP FMAs |  1.000 |  974 |      1.95 |    3900 |        1.00
 // 1     | avx512_fma  | 512-bit serial DP FMAs |  1.000 |  974 |      1.95 |    3900 |        1.00
-
 // Cores | ID          | Description            | OVRLP3 |       Mops |    A/M-ratio |    A/M-MHz | M/tsc-ratio
 // 2     | scalar_iadd | Scalar integer adds    |  1.000 | 3901, 3901 |  1.95,  1.95 | 3900, 3900 |  1.00, 1.00
 // 2     | avx256_fma  | 256-bit serial DP FMAs |  1.000 |  974,  974 |  1.95,  1.95 | 3900, 3900 |  1.00, 1.00
 // 2     | avx512_fma  | 512-bit serial DP FMAs |  1.000 |  974,  974 |  1.95,  1.95 | 3900, 3900 |  1.00, 1.00
-
 // Cores | ID          | Description            | OVRLP3 |             Mops |           A/M-ratio |          A/M-MHz |      M/tsc-ratio
 // 3     | scalar_iadd | Scalar integer adds    |  1.000 | 3900, 3901, 3901 |  1.95,  1.95,  1.95 | 3900, 3900, 3900 | 1.00, 1.00, 1.00
 // 3     | avx256_fma  | 256-bit serial DP FMAs |  1.000 |  974,  975,  975 |  1.95,  1.95,  1.95 | 3900, 3900, 3900 | 1.00, 1.00, 1.00
 // 3     | avx512_fma  | 512-bit serial DP FMAs |  1.000 |  974,  975,  974 |  1.95,  1.95,  1.95 | 3900, 3900, 3900 | 1.00, 1.00, 1.00
 // ...
-func avxTurboFrequenciesFromOutput(output string) (nonavxFreqs, avx256Freqs, avx512Freqs []float64, err error) {
+func avxTurboFrequenciesFromOutput(output string) (instructionFreqs map[string][]float64, err error) {
+	instructionFreqs = make(map[string][]float64)
 	started := false
 	for line := range strings.SplitSeq(output, "\n") {
 		if strings.HasPrefix(line, "Cores | ID") {
@@ -215,15 +214,11 @@ func avxTurboFrequenciesFromOutput(output string) (nonavxFreqs, avx256Freqs, avx
 			sumFreqs += f
 		}
 		avgFreq := sumFreqs / float64(len(freqs))
-		if strings.Contains(fields[1], "scalar_iadd") {
-			nonavxFreqs = append(nonavxFreqs, avgFreq/1000.0)
-		} else if strings.Contains(fields[1], "avx256_fma") {
-			avx256Freqs = append(avx256Freqs, avgFreq/1000.0)
-		} else if strings.Contains(fields[1], "avx512_fma") {
-			avx512Freqs = append(avx512Freqs, avgFreq/1000.0)
-		} else {
-			slog.Warn("unexpected data from avx-turbo, unknown instruction type", slog.String("line", line))
+		instructionType := strings.TrimSpace(fields[1])
+		if _, ok := instructionFreqs[instructionType]; !ok {
+			instructionFreqs[instructionType] = []float64{}
 		}
+		instructionFreqs[instructionType] = append(instructionFreqs[instructionType], avgFreq/1000.0)
 	}
 	return
 }
