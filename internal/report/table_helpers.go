@@ -259,7 +259,9 @@ func getSpecCoreFrequenciesFromOutput(outputs map[string]script.ScriptOutput) ([
 	var archMultiplier int
 	if strings.Contains(arch, "SRF") {
 		archMultiplier = 4
-	} else if strings.Contains(arch, "GNR") {
+	} else if strings.Contains(arch, "GNR_X3") {
+		archMultiplier = 3
+	} else if strings.Contains(arch, "GNR_X2") {
 		archMultiplier = 2
 	} else {
 		archMultiplier = 1
