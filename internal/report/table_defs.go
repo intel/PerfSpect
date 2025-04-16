@@ -156,41 +156,47 @@ func GetTableByName(name string) TableDefinition {
 	panic(fmt.Sprintf("table not found: %s", name))
 }
 
-func TableForTarget(name string, myTarget target.Target) bool {
-	table := GetTableByName(name)
-	var err error
-	var architecture, family, model string
-	architecture, err = myTarget.GetArchitecture()
-	if err != nil {
-		slog.Error("failed to get architecture for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-		return false
+func TableForTarget(tableName string, myTarget target.Target) bool {
+	table := GetTableByName(tableName)
+	if len(table.Architectures) > 0 {
+		architecture, err := myTarget.GetArchitecture()
+		if err != nil {
+			slog.Error("failed to get architecture for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+			return false
+		}
+		if !slices.Contains(table.Architectures, architecture) {
+			return false
+		}
 	}
-	family, err = myTarget.GetFamily()
-	if err != nil {
-		slog.Error("failed to get family for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-		return false
+	if len(table.Vendors) > 0 {
+		vendor, err := myTarget.GetVendor()
+		if err != nil {
+			slog.Error("failed to get vendor for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+			return false
+		}
+		if !slices.Contains(table.Vendors, vendor) {
+			return false
+		}
 	}
-	model, err = myTarget.GetModel()
-	if err != nil {
-		slog.Error("failed to get model for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-		return false
+	if len(table.Families) > 0 {
+		family, err := myTarget.GetFamily()
+		if err != nil {
+			slog.Error("failed to get family for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+			return false
+		}
+		if !slices.Contains(table.Families, family) {
+			return false
+		}
 	}
-	vendor, err := myTarget.GetVendor()
-	if err != nil {
-		slog.Error("failed to get vendor for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-		return false
-	}
-	if len(table.Architectures) > 0 && !slices.Contains(table.Architectures, architecture) {
-		return false
-	}
-	if len(table.Vendors) > 0 && !slices.Contains(table.Vendors, vendor) {
-		return false
-	}
-	if len(table.Families) > 0 && !slices.Contains(table.Families, family) {
-		return false
-	}
-	if len(table.Models) > 0 && !slices.Contains(table.Models, model) {
-		return false
+	if len(table.Models) > 0 {
+		model, err := myTarget.GetModel()
+		if err != nil {
+			slog.Error("failed to get model for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+			return false
+		}
+		if !slices.Contains(table.Models, model) {
+			return false
+		}
 	}
 	return true
 }
