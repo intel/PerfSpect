@@ -172,23 +172,20 @@ func maxTemperatureFromOutput(outputs map[string]script.ScriptOutput) string {
 // Will test up to 64 CPUs
 // Cores | ID          | Description            | OVRLP3 | Mops | A/M-ratio | A/M-MHz | M/tsc-ratio
 // 1     | scalar_iadd | Scalar integer adds    |  1.000 | 3901 |      1.95 |    3900 |        1.00
-// 1     | avx128_fma  | 128-bit serial DP FMAs |  1.000 |  974 |      1.95 |    3900 |        1.00
 // 1     | avx256_fma  | 256-bit serial DP FMAs |  1.000 |  974 |      1.95 |    3900 |        1.00
 // 1     | avx512_fma  | 512-bit serial DP FMAs |  1.000 |  974 |      1.95 |    3900 |        1.00
 
 // Cores | ID          | Description            | OVRLP3 |       Mops |    A/M-ratio |    A/M-MHz | M/tsc-ratio
 // 2     | scalar_iadd | Scalar integer adds    |  1.000 | 3901, 3901 |  1.95,  1.95 | 3900, 3900 |  1.00, 1.00
-// 2     | avx128_fma  | 128-bit serial DP FMAs |  1.000 |  974,  974 |  1.95,  1.95 | 3900, 3900 |  1.00, 1.00
 // 2     | avx256_fma  | 256-bit serial DP FMAs |  1.000 |  974,  974 |  1.95,  1.95 | 3900, 3900 |  1.00, 1.00
 // 2     | avx512_fma  | 512-bit serial DP FMAs |  1.000 |  974,  974 |  1.95,  1.95 | 3900, 3900 |  1.00, 1.00
 
 // Cores | ID          | Description            | OVRLP3 |             Mops |           A/M-ratio |          A/M-MHz |      M/tsc-ratio
 // 3     | scalar_iadd | Scalar integer adds    |  1.000 | 3900, 3901, 3901 |  1.95,  1.95,  1.95 | 3900, 3900, 3900 | 1.00, 1.00, 1.00
-// 3     | avx128_fma  | 128-bit serial DP FMAs |  1.000 |  974,  975,  975 |  1.95,  1.95,  1.95 | 3900, 3900, 3900 | 1.00, 1.00, 1.00
 // 3     | avx256_fma  | 256-bit serial DP FMAs |  1.000 |  974,  975,  975 |  1.95,  1.95,  1.95 | 3900, 3900, 3900 | 1.00, 1.00, 1.00
 // 3     | avx512_fma  | 512-bit serial DP FMAs |  1.000 |  974,  975,  974 |  1.95,  1.95,  1.95 | 3900, 3900, 3900 | 1.00, 1.00, 1.00
 // ...
-func avxTurboFrequenciesFromOutput(output string) (nonavxFreqs, avx128Freqs, avx256Freqs, avx512Freqs []float64, err error) {
+func avxTurboFrequenciesFromOutput(output string) (nonavxFreqs, avx256Freqs, avx512Freqs []float64, err error) {
 	started := false
 	for line := range strings.SplitSeq(output, "\n") {
 		if strings.HasPrefix(line, "Cores | ID") {
@@ -220,15 +217,44 @@ func avxTurboFrequenciesFromOutput(output string) (nonavxFreqs, avx128Freqs, avx
 		avgFreq := sumFreqs / float64(len(freqs))
 		if strings.Contains(fields[1], "scalar_iadd") {
 			nonavxFreqs = append(nonavxFreqs, avgFreq/1000.0)
-		} else if strings.Contains(fields[1], "avx128_fma") {
-			avx128Freqs = append(avx128Freqs, avgFreq/1000.0)
 		} else if strings.Contains(fields[1], "avx256_fma") {
 			avx256Freqs = append(avx256Freqs, avgFreq/1000.0)
 		} else if strings.Contains(fields[1], "avx512_fma") {
 			avx512Freqs = append(avx512Freqs, avgFreq/1000.0)
 		} else {
-			err = fmt.Errorf("unexpected data from avx-turbo, unknown instruction type")
+			slog.Warn("unexpected data from avx-turbo, unknown instruction type", slog.String("line", line))
+		}
+	}
+	return
+}
+
+// bucketsToCounts expands the core frequency buckets to a list of core counts (from column 1) and associated spec sse frequencies (from column 2)
+func bucketsToCoresFreqs(specCoreFreqs [][]string) (cores []string, freqs []string, err error) {
+	// the first column is the core count, the second column is the spec sse frequency
+	for i := 1; i < len(specCoreFreqs); i++ {
+		// parse the bucket into start/end parts
+		bucket := strings.Split(specCoreFreqs[i][0], "-")
+		if len(bucket) != 2 {
+			err = fmt.Errorf("unable to parse bucket %s", specCoreFreqs[i][0])
 			return
+		}
+		// parse the start and end parts into integers
+		var start int
+		var end int
+		start, err = strconv.Atoi(strings.TrimSpace(bucket[0]))
+		if err != nil {
+			err = fmt.Errorf("unable to parse start %s", bucket[0])
+			return
+		}
+		end, err = strconv.Atoi(strings.TrimSpace(bucket[1]))
+		if err != nil {
+			err = fmt.Errorf("unable to parse end %s", bucket[1])
+			return
+		}
+		// add the core count to the list
+		for j := start; j <= end; j++ {
+			cores = append(cores, strconv.Itoa(j))
+			freqs = append(freqs, specCoreFreqs[i][1])
 		}
 	}
 	return
