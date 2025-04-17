@@ -7,7 +7,7 @@
 # build the perfspect Go components using this image
 #    $ docker run --rm -v "$PWD":/workdir -w /workdir perfspect-builder:v1 make dist
 
-FROM golang:1.24.1@sha256:af0bb3052d6700e1bc70a37bca483dc8d76994fd16ae441ad72390eea6016d03
+FROM golang:1.24.2@sha256:1ecc479bc712a6bdb56df3e346e33edcc141f469f82840bab9f4bc2bc41bf91d
 WORKDIR /workdir
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY go.mod go.sum ./

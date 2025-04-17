@@ -18,5 +18,6 @@ FROM ${REGISTRY}${PREFIX}perfspect-builder:${TAG} AS perfspect
 RUN mkdir /prebuilt
 RUN mkdir /prebuilt/tools
 COPY --from=tools /bin/ /prebuilt/tools
-COPY --from=tools /oss_source* /prebuilt
+COPY --from=tools /oss_source.tgz /prebuilt/
+COPY --from=tools /oss_source.tgz.md5 /prebuilt/
 RUN git config --global --add safe.directory /localrepo
