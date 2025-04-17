@@ -31,14 +31,14 @@ var PrefetcherDefs = []Prefetcher{
 	},
 	{
 		ShortName:   "L2 Adj",
-		Description: "Adjacent Cache Line (MLC Spatial) fetches the cache line that comprises a cache line pair.",
+		Description: "L2 Adjacent Cache Line (MLC Spatial) fetches the cache line that comprises a cache line pair.",
 		Msr:         MsrPrefetchControl,
 		Bit:         1,
 		Uarchs:      []string{"all"},
 	},
 	{
 		ShortName:   "DCU HW",
-		Description: "L1 Data Cache Unit Hardware (DCU Streamer) fetches the next cache line into the L1 cache.",
+		Description: "DCU Hardware (DCU Streamer) fetches the next cache line into the L1 cache.",
 		Msr:         MsrPrefetchControl,
 		Bit:         2,
 		Uarchs:      []string{"all"},
@@ -52,7 +52,7 @@ var PrefetcherDefs = []Prefetcher{
 	},
 	{
 		ShortName:   "DCU NP",
-		Description: "DCU Next Page (DCU Next Page) is an L1 data cache prefetcher",
+		Description: "DCU Next Page is an L1 data cache prefetcher.",
 		Msr:         MsrPrefetchControl,
 		Bit:         4,
 		Uarchs:      []string{"all"},

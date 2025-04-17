@@ -38,6 +38,7 @@ type TableDefinition struct {
 	Name          string
 	ScriptNames   []string
 	Architectures []string // architectures, i.e., x86_64, arm64. If empty, it will be present for all architectures.
+	Vendors       []string // vendors, e.g., GenuineIntel, AuthenticAMD. If empty, it will be present for all vendors.
 	Families      []string // families, e.g., 6, 7. If empty, it will be present for all families.
 	Models        []string // models, e.g., 62, 63. If empty, it will be present for all models.
 	// Fields function is called to retrieve field values from the script outputs
@@ -156,33 +157,47 @@ func GetTableByName(name string) TableDefinition {
 	panic(fmt.Sprintf("table not found: %s", name))
 }
 
-func TableForTarget(name string, myTarget target.Target) bool {
-	table := GetTableByName(name)
-	var err error
-	var architecture, family, model string
-	architecture, err = myTarget.GetArchitecture()
-	if err != nil {
-		slog.Error("failed to get architecture for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-		return false
+func TableForTarget(tableName string, myTarget target.Target) bool {
+	table := GetTableByName(tableName)
+	if len(table.Architectures) > 0 {
+		architecture, err := myTarget.GetArchitecture()
+		if err != nil {
+			slog.Error("failed to get architecture for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+			return false
+		}
+		if !slices.Contains(table.Architectures, architecture) {
+			return false
+		}
 	}
-	family, err = myTarget.GetFamily()
-	if err != nil {
-		slog.Error("failed to get family for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-		return false
+	if len(table.Vendors) > 0 {
+		vendor, err := myTarget.GetVendor()
+		if err != nil {
+			slog.Error("failed to get vendor for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+			return false
+		}
+		if !slices.Contains(table.Vendors, vendor) {
+			return false
+		}
 	}
-	model, err = myTarget.GetModel()
-	if err != nil {
-		slog.Error("failed to get model for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-		return false
+	if len(table.Families) > 0 {
+		family, err := myTarget.GetFamily()
+		if err != nil {
+			slog.Error("failed to get family for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+			return false
+		}
+		if !slices.Contains(table.Families, family) {
+			return false
+		}
 	}
-	if len(table.Architectures) > 0 && !slices.Contains(table.Architectures, architecture) {
-		return false
-	}
-	if len(table.Families) > 0 && !slices.Contains(table.Families, family) {
-		return false
-	}
-	if len(table.Models) > 0 && !slices.Contains(table.Models, model) {
-		return false
+	if len(table.Models) > 0 {
+		model, err := myTarget.GetModel()
+		if err != nil {
+			slog.Error("failed to get model for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+			return false
+		}
+		if !slices.Contains(table.Models, model) {
+			return false
+		}
 	}
 	return true
 }
@@ -264,10 +279,9 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{script.CpuidScriptName},
 		FieldsFunc:  isaTableValues},
 	AcceleratorTableName: {
-		Name:          AcceleratorTableName,
-		Architectures: []string{"x86_64"},
-		Families:      []string{"6"}, // Intel CPUs only
-		HasRows:       true,
+		Name:    AcceleratorTableName,
+		Vendors: []string{"GenuineIntel"},
+		HasRows: true,
 		ScriptNames: []string{
 			script.LshwScriptName,
 			script.IaaDevicesScriptName,
@@ -275,11 +289,10 @@ var tableDefinitions = map[string]TableDefinition{
 		FieldsFunc:   acceleratorTableValues,
 		InsightsFunc: acceleratorTableInsights},
 	PowerTableName: {
-		Name:          PowerTableName,
-		Architectures: []string{"x86_64"},
-		Families:      []string{"6"}, // Intel CPUs only
-		HasRows:       false,
-		MenuLabel:     PowerMenuLabel,
+		Name:      PowerTableName,
+		Vendors:   []string{"GenuineIntel"},
+		HasRows:   false,
+		MenuLabel: PowerMenuLabel,
 		ScriptNames: []string{
 			script.PackagePowerLimitName,
 			script.EpbSourceScriptName,
@@ -301,10 +314,9 @@ var tableDefinitions = map[string]TableDefinition{
 		},
 		FieldsFunc: cstateTableValues},
 	MaximumFrequencyTableName: {
-		Name:          MaximumFrequencyTableName,
-		Architectures: []string{"x86_64"},
-		Families:      []string{"6"}, // Intel CPUs only
-		HasRows:       true,
+		Name:    MaximumFrequencyTableName,
+		Vendors: []string{"GenuineIntel"},
+		HasRows: true,
 		ScriptNames: []string{
 			script.SpecCoreFrequenciesScriptName,
 			script.LscpuScriptName,
@@ -313,10 +325,9 @@ var tableDefinitions = map[string]TableDefinition{
 		},
 		FieldsFunc: maximumFrequencyTableValues},
 	UncoreTableName: {
-		Name:          UncoreTableName,
-		Architectures: []string{"x86_64"},
-		Families:      []string{"6"}, // Intel CPUs only
-		HasRows:       false,
+		Name:    UncoreTableName,
+		Vendors: []string{"GenuineIntel"},
+		HasRows: false,
 		ScriptNames: []string{
 			script.UncoreMaxFromMSRScriptName,
 			script.UncoreMinFromMSRScriptName,
@@ -329,32 +340,29 @@ var tableDefinitions = map[string]TableDefinition{
 			script.LspciDevicesScriptName},
 		FieldsFunc: uncoreTableValues},
 	ElcTableName: {
-		Name:          ElcTableName,
-		Architectures: []string{"x86_64"},
-		Families:      []string{"6"},          // Intel CPUs only
-		Models:        []string{"173", "175"}, // Granite Rapids, Sierra Forest
-		HasRows:       true,
+		Name:     ElcTableName,
+		Families: []string{"6"},          // Intel CPUs only
+		Models:   []string{"173", "175"}, // Granite Rapids, Sierra Forest
+		HasRows:  true,
 		ScriptNames: []string{
 			script.ElcScriptName,
 		},
 		FieldsFunc:   elcTableValues,
 		InsightsFunc: elcTableInsights},
 	SSTTFHPTableName: {
-		Name:          SSTTFHPTableName,
-		Architectures: []string{"x86_64"},
-		Families:      []string{"6"},          // Intel CPUs only
-		Models:        []string{"173", "175"}, // Granite Rapids, Sierra Forest
-		HasRows:       true,
+		Name:     SSTTFHPTableName,
+		Families: []string{"6"},          // Intel CPUs only
+		Models:   []string{"173", "175"}, // Granite Rapids, Sierra Forest
+		HasRows:  true,
 		ScriptNames: []string{
 			script.SstTfHighPriorityCoreFrequenciesScriptName,
 		},
 		FieldsFunc: sstTFHPTableValues},
 	SSTTFLPTableName: {
-		Name:          SSTTFLPTableName,
-		Architectures: []string{"x86_64"},
-		Families:      []string{"6"},          // Intel CPUs only
-		Models:        []string{"173", "175"}, // Granite Rapids, Sierra Forest
-		HasRows:       true,
+		Name:     SSTTFLPTableName,
+		Families: []string{"6"},          // Intel CPUs only
+		Models:   []string{"173", "175"}, // Granite Rapids, Sierra Forest
+		HasRows:  true,
 		ScriptNames: []string{
 			script.SstTfLowPriorityCoreFrequenciesScriptName,
 		},
@@ -491,10 +499,9 @@ var tableDefinitions = map[string]TableDefinition{
 		},
 		FieldsFunc: chassisStatusTableValues},
 	PMUTableName: {
-		Name:          PMUTableName,
-		Architectures: []string{"x86_64"},
-		Families:      []string{"6"}, // Intel CPUs only
-		HasRows:       false,
+		Name:    PMUTableName,
+		Vendors: []string{"GenuineIntel"},
+		HasRows: false,
 		ScriptNames: []string{
 			script.PMUBusyScriptName,
 			script.PMUDriverVersionScriptName,
@@ -558,10 +565,9 @@ var tableDefinitions = map[string]TableDefinition{
 	// configuration set table
 	//
 	ConfigurationTableName: {
-		Name:          ConfigurationTableName,
-		Architectures: []string{"x86_64"},
-		Families:      []string{"6"}, // Intel CPUs only
-		HasRows:       false,
+		Name:    ConfigurationTableName,
+		Vendors: []string{"GenuineIntel"},
+		HasRows: false,
 		ScriptNames: []string{
 			script.LscpuScriptName,
 			script.LspciBitsScriptName,
