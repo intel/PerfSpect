@@ -472,7 +472,7 @@ func prefetchersFromOutput(outputs map[string]script.ScriptOutput) [][]string {
 	uarch := uarchFromOutput(outputs)
 	if uarch == "" {
 		// uarch is required
-		return nil
+		return [][]string{}
 	}
 	for _, pf := range PrefetcherDefs {
 		if slices.Contains(pf.Uarchs, "all") || slices.Contains(pf.Uarchs, uarch[:3]) {
