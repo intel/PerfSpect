@@ -155,6 +155,10 @@ type RemoteTarget struct {
 	vendor      string
 }
 
+type RawTarget struct {
+	name string
+}
+
 // NewLocalTarget creates a new LocalTarget
 func NewLocalTarget() *LocalTarget {
 	hostName, err := os.Hostname()
@@ -176,6 +180,15 @@ func NewRemoteTarget(name string, host string, port string, user string, key str
 		port: port,
 		user: user,
 		key:  key,
+	}
+	return t
+}
+
+// NewRawTarget creates a new RawTarget instance with the provided parameters.
+// This could be useful as when use file as input but no actual target available
+func NewRawTarget(name string) *RawTarget {
+	t := &RawTarget{
+		name: name,
 	}
 	return t
 }
@@ -914,4 +927,142 @@ func uninstallLkms(t Target, lkms []string) (err error) {
 		slog.Debug("kernel module uninstalled", slog.String("lkm", lkm))
 	}
 	return
+}
+
+// CanConnect checks if a connection can be established with the target.
+// It returns true if a connection can be established, false otherwise.
+func (t *RawTarget) CanConnect() bool {
+	panic("not implemented") // TODO: Implement
+}
+
+// CanElevatePrivileges checks if the current user can elevate privileges.
+// It returns true if the user can elevate privileges, false otherwise.
+func (t *RawTarget) CanElevatePrivileges() bool {
+	panic("not implemented") // TODO: Implement
+}
+
+// IsSuperUser checks if the current user is a superuser.
+// It returns true if the user is a superuser, false otherwise.
+func (t *RawTarget) IsSuperUser() bool {
+	panic("not implemented") // TODO: Implement
+}
+
+// GetArchitecture returns the architecture of the target system.
+// It returns a string representing the architecture and any error that occurred.
+func (t *RawTarget) GetArchitecture() (arch string, err error) {
+	panic("not implemented") // TODO: Implement
+}
+
+// GetFamily returns the family of the target system's CPU.
+// It returns a string representing the family and any error that occurred.
+func (t *RawTarget) GetFamily() (family string, err error) {
+	panic("not implemented") // TODO: Implement
+}
+
+// GetModel returns the model of the target system's CPU.
+// It returns a string representing the model and any error that occurred.
+func (t *RawTarget) GetModel() (model string, err error) {
+	panic("not implemented") // TODO: Implement
+}
+
+// GetStepping returns the stepping of the target system's CPU.
+// It returns a string representing the stepping and any error that occurred.
+func (t *RawTarget) GetStepping() (stepping string, err error) {
+	panic("not implemented") // TODO: Implement
+}
+
+// GetVendor returns the vendor of the target system.
+// It returns a string representing the vendor and any error that occurred.
+func (t *RawTarget) GetVendor() (vendor string, err error) {
+	panic("not implemented") // TODO: Implement
+}
+
+// GetName returns the name of the target system.
+// It returns a string representing the host.
+func (t *RawTarget) GetName() (name string) {
+	return t.name
+}
+
+// GetUserPath returns the path of the current user on the target system.
+// It returns a string representing the path and any error that occurred.
+func (t *RawTarget) GetUserPath() (path string, err error) {
+	panic("not implemented") // TODO: Implement
+}
+
+// RunCommand runs the specified command on the target.
+// Arguments:
+// - cmd: the command to run
+// - timeout: the maximum time allowed for the command to run (zero means no timeout)
+// - reuseSSHConnection: whether to reuse the SSH connection for the command (only relevant for RemoteTarget)
+// It returns the standard output, standard error, exit code, and any error that occurred.
+func (t *RawTarget) RunCommand(cmd *exec.Cmd, timeout int, reuseSSHConnection bool) (stdout string, stderr string, exitCode int, err error) {
+	panic("not implemented") // TODO: Implement
+}
+
+// RunCommandAsync runs the specified command on the target in an asynchronous manner.
+// Arguments:
+// - cmd: the command to run
+// - timeout: the maximum time allowed for the command to run (zero means no timeout)
+// - reuseSSHConnection: whether to reuse the SSH connection for the command (only relevant for RemoteTarget)
+// - stdoutChannel: a channel to send the standard output of the command
+// - stderrChannel: a channel to send the standard error of the command
+// - exitcodeChannel: a channel to send the exit code of the command
+// - cmdChannel: a channel to send the command that was run
+// It returns any error that occurred.
+func (t *RawTarget) RunCommandAsync(cmd *exec.Cmd, timeout int, reuseSSHConnection bool, stdoutChannel chan string, stderrChannel chan string, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) error {
+	panic("not implemented") // TODO: Implement
+}
+
+// PushFile transfers a file from the local system to the target.
+// It returns any error that occurred.
+func (t *RawTarget) PushFile(srcPath string, dstPath string) error {
+	panic("not implemented") // TODO: Implement
+}
+
+// PullFile transfers a file from the target to the local system.
+// It returns any error that occurred.
+func (t *RawTarget) PullFile(srcPath string, dstDir string) error {
+	panic("not implemented") // TODO: Implement
+}
+
+// CreateDirectory creates a directory on the target at the specified path with the specified permissions.
+// It returns the path of the created directory and any error that occurred.
+func (t *RawTarget) CreateDirectory(baseDir string, targetDir string) (dir string, err error) {
+	panic("not implemented") // TODO: Implement
+}
+
+// CreateTempDirectory creates a temporary directory on the target with the specified prefix.
+// It returns the path of the created directory and any error that occurred.
+func (t *RawTarget) CreateTempDirectory(rootDir string) (tempDir string, err error) {
+	panic("not implemented") // TODO: Implement
+}
+
+// GetTempDirectory returns the path of the temporary directory on the target. It will be
+// empty if the temporary directory has not been created yet.
+func (t *RawTarget) GetTempDirectory() string {
+	panic("not implemented") // TODO: Implement
+}
+
+// RemoveTempDirectory removes the temporary directory on the target.
+// It returns any error that occurred.
+func (t *RawTarget) RemoveTempDirectory() error {
+	panic("not implemented") // TODO: Implement
+}
+
+// RemoveDirectory removes a directory from the target at the specified path.
+// It returns any error that occurred.
+func (t *RawTarget) RemoveDirectory(targetDir string) error {
+	panic("not implemented") // TODO: Implement
+}
+
+// InstallLkms installs the specified Linux Kernel Modules (LKMs) on the target.
+// It returns a list of installed LKMs and any error that occurred.
+func (t *RawTarget) InstallLkms(lkms []string) (installedLkms []string, err error) {
+	panic("not implemented") // TODO: Implement
+}
+
+// UninstallLkms uninstalls the specified Linux Kernel Modules (LKMs) from the target.
+// It returns any error that occurred.
+func (t *RawTarget) UninstallLkms(lkms []string) error {
+	panic("not implemented") // TODO: Implement
 }
