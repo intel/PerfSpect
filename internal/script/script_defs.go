@@ -1015,7 +1015,7 @@ else
     cpu_ids=""
 fi
 
-avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd,avx128_fma,avx256_fma,avx512_fma --iters=100000 $cpu_ids
+avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd,avx256_fma,avx512_fma --iters=100000 $cpu_ids
 `,
 		Superuser:  true,
 		Lkms:       []string{"msr"},

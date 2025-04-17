@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
-	"math"
 	"regexp"
 	"sort"
 	"strconv"
@@ -260,7 +259,9 @@ func getSpecCoreFrequenciesFromOutput(outputs map[string]script.ScriptOutput) ([
 	var archMultiplier int
 	if strings.Contains(arch, "SRF") {
 		archMultiplier = 4
-	} else if strings.Contains(arch, "GNR") {
+	} else if strings.Contains(arch, "GNR_X3") {
+		archMultiplier = 3
+	} else if strings.Contains(arch, "GNR_X2") {
 		archMultiplier = 2
 	} else {
 		archMultiplier = 1
@@ -453,50 +454,53 @@ func turboEnabledFromOutput(outputs map[string]script.ScriptOutput) string {
 	return ""
 }
 
+func isPrefetcherEnabled(msrValue string, bit int) (bool, error) {
+	if msrValue == "" {
+		return false, fmt.Errorf("msrValue is empty")
+	}
+	msrInt, err := strconv.ParseInt(msrValue, 16, 64)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse msrValue: %s, %v", msrValue, err)
+	}
+	bitMask := int64(1) << bit
+	// enabled if bit is zero
+	return bitMask&msrInt == 0, nil
+}
+
 func prefetchersFromOutput(outputs map[string]script.ScriptOutput) string {
 	uarch := uarchFromOutput(outputs)
 	if uarch == "" {
 		// uarch is required
 		return ""
 	}
-	// MSR_PREFETCH_CONTROL
-	// prefetchers are enabled when associated bit is 0
-	prefetcherDefs := []struct {
-		name   string
-		msr    string
-		bit    int
-		uarchs string
-	}{
-		{name: "L2 HW", msr: script.PrefetchControlName, bit: 0, uarchs: "all"},
-		{name: "L2 Adj.", msr: script.PrefetchControlName, bit: 1, uarchs: "all"},
-		{name: "DCU HW", msr: script.PrefetchControlName, bit: 2, uarchs: "all"},
-		{name: "DCU IP", msr: script.PrefetchControlName, bit: 3, uarchs: "all"},
-		{name: "AMP", msr: script.PrefetchControlName, bit: 5, uarchs: "SPR_EMR_GNR"},
-		{name: "LLCPP", msr: script.PrefetchControlName, bit: 6, uarchs: "GNR"},
-		{name: "AOP", msr: script.PrefetchControlName, bit: 7, uarchs: "GNR"},
-		{name: "Homeless", msr: script.PrefetchersName, bit: 14, uarchs: "SPR_EMR_GNR"},
-		{name: "LLC", msr: script.PrefetchersName, bit: 42, uarchs: "SPR_EMR_GNR"},
-	}
 	var prefList []string
-	for _, pf := range prefetcherDefs {
-		if pf.uarchs == "all" || strings.Contains(pf.uarchs, uarch[:3]) {
-			msrVal := valFromRegexSubmatch(outputs[pf.msr].Stdout, `^([0-9a-fA-F]+)`)
+	for _, pf := range PrefetcherDefs {
+		if slices.Contains(pf.Uarchs, "all") || slices.Contains(pf.Uarchs, uarch[:3]) {
+			var scriptName string
+			if pf.Msr == MsrPrefetchControl {
+				scriptName = script.PrefetchControlName
+			} else if pf.Msr == MsrPrefetchers {
+				scriptName = script.PrefetchersName
+			} else {
+				slog.Error("unknown msr for prefetcher", slog.String("msr", fmt.Sprintf("0x%x", pf.Msr)))
+				continue
+			}
+			msrVal := valFromRegexSubmatch(outputs[scriptName].Stdout, `^([0-9a-fA-F]+)`)
 			if msrVal == "" {
 				continue
 			}
-			msrInt, err := strconv.ParseInt(msrVal, 16, 64)
+			var enabledDisabled string
+			enabled, err := isPrefetcherEnabled(msrVal, pf.Bit)
 			if err != nil {
+				slog.Warn("error checking prefetcher enabled status", slog.String("error", err.Error()))
 				continue
 			}
-			bitMask := int64(math.Pow(2, float64(pf.bit)))
-			var enabledDisabled string
-			// enabled if bit is zero
-			if bitMask&msrInt == 0 {
+			if enabled {
 				enabledDisabled = "Enabled"
 			} else {
 				enabledDisabled = "Disabled"
 			}
-			prefList = append(prefList, fmt.Sprintf("%s: %s", pf.name, enabledDisabled))
+			prefList = append(prefList, fmt.Sprintf("%s: %s", pf.ShortName, enabledDisabled))
 		}
 	}
 	if len(prefList) > 0 {
