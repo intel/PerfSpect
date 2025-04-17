@@ -54,6 +54,7 @@ var (
 	flagOs             bool
 	flagSoftware       bool
 	flagCpu            bool
+	flagPrefetcher     bool
 	flagIsa            bool
 	flagAccelerator    bool
 	flagPower          bool
@@ -95,6 +96,7 @@ const (
 	flagOsName             = "os"
 	flagSoftwareName       = "software"
 	flagCpuName            = "cpu"
+	flagPrefetcherName     = "prefetcher"
 	flagIsaName            = "isa"
 	flagAcceleratorName    = "accelerator"
 	flagPowerName          = "power"
@@ -157,6 +159,7 @@ var categories = []common.Category{
 	{FlagName: flagOsName, FlagVar: &flagOs, Help: "Operating System", TableNames: []string{report.OperatingSystemTableName}},
 	{FlagName: flagSoftwareName, FlagVar: &flagSoftware, Help: "Software Versions", TableNames: []string{report.SoftwareVersionTableName}},
 	{FlagName: flagCpuName, FlagVar: &flagCpu, Help: "Processor Details", TableNames: []string{report.CPUTableName}},
+	{FlagName: flagPrefetcherName, FlagVar: &flagPrefetcher, Help: "Prefetchers", TableNames: []string{report.PrefetcherTableName}},
 	{FlagName: flagIsaName, FlagVar: &flagIsa, Help: "Instruction Sets", TableNames: []string{report.ISATableName}},
 	{FlagName: flagAcceleratorName, FlagVar: &flagAccelerator, Help: "On-board Accelerators", TableNames: []string{report.AcceleratorTableName}},
 	{FlagName: flagPowerName, FlagVar: &flagPower, Help: "Power Settings", TableNames: []string{report.PowerTableName}},
