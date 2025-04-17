@@ -52,7 +52,7 @@ var PrefetcherDefs = []Prefetcher{
 	},
 	{
 		ShortName:   "DCU NP",
-		Description: "DCU Next Page (DCU Next Page) is an L1 data cache prefetcher",
+		Description: "DCU Next Page is an L1 data cache prefetcher.",
 		Msr:         MsrPrefetchControl,
 		Bit:         4,
 		Uarchs:      []string{"all"},
