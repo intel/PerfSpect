@@ -467,7 +467,46 @@ func isPrefetcherEnabled(msrValue string, bit int) (bool, error) {
 	return bitMask&msrInt == 0, nil
 }
 
-func prefetchersFromOutput(outputs map[string]script.ScriptOutput) string {
+func prefetchersFromOutput(outputs map[string]script.ScriptOutput) [][]string {
+	out := make([][]string, 0)
+	uarch := uarchFromOutput(outputs)
+	if uarch == "" {
+		// uarch is required
+		return [][]string{}
+	}
+	for _, pf := range PrefetcherDefs {
+		if slices.Contains(pf.Uarchs, "all") || slices.Contains(pf.Uarchs, uarch[:3]) {
+			var scriptName string
+			if pf.Msr == MsrPrefetchControl {
+				scriptName = script.PrefetchControlName
+			} else if pf.Msr == MsrPrefetchers {
+				scriptName = script.PrefetchersName
+			} else {
+				slog.Error("unknown msr for prefetcher", slog.String("msr", fmt.Sprintf("0x%x", pf.Msr)))
+				continue
+			}
+			msrVal := valFromRegexSubmatch(outputs[scriptName].Stdout, `^([0-9a-fA-F]+)`)
+			if msrVal == "" {
+				continue
+			}
+			var enabledDisabled string
+			enabled, err := isPrefetcherEnabled(msrVal, pf.Bit)
+			if err != nil {
+				slog.Warn("error checking prefetcher enabled status", slog.String("error", err.Error()))
+				continue
+			}
+			if enabled {
+				enabledDisabled = "Enabled"
+			} else {
+				enabledDisabled = "Disabled"
+			}
+			out = append(out, []string{pf.ShortName, pf.Description, fmt.Sprintf("0x%04X", pf.Msr), strconv.Itoa(pf.Bit), enabledDisabled})
+		}
+	}
+	return out
+}
+
+func prefetchersSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 	uarch := uarchFromOutput(outputs)
 	if uarch == "" {
 		// uarch is required

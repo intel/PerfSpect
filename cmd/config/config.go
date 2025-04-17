@@ -42,6 +42,7 @@ var (
 	flagPrefetcherL2Adj           string
 	flagPrefetcherDCUHW           string
 	flagPrefetcherDCUIP           string
+	flagPrefetcherDCUNP           string
 	flagPrefetcherAMP             string
 	flagPrefetcherLLCPP           string
 	flagPrefetcherAOP             string
@@ -68,6 +69,7 @@ const (
 	flagPrefetcherL2AdjName           = "pref-l2adj"
 	flagPrefetcherDCUHWName           = "pref-dcuhw"
 	flagPrefetcherDCUIPName           = "pref-dcuip"
+	flagPrefetcherDCUNPName           = "pref-dcunp"
 	flagPrefetcherAMPName             = "pref-amp"
 	flagPrefetcherLLCPPName           = "pref-llcpp"
 	flagPrefetcherAOPName             = "pref-aop"
@@ -127,6 +129,7 @@ func init() {
 	Cmd.Flags().StringVar(&flagPrefetcherL2Adj, flagPrefetcherL2AdjName, "", "")
 	Cmd.Flags().StringVar(&flagPrefetcherDCUHW, flagPrefetcherDCUHWName, "", "")
 	Cmd.Flags().StringVar(&flagPrefetcherDCUIP, flagPrefetcherDCUIPName, "", "")
+	Cmd.Flags().StringVar(&flagPrefetcherDCUNP, flagPrefetcherDCUNPName, "", "")
 	Cmd.Flags().StringVar(&flagPrefetcherAMP, flagPrefetcherAMPName, "", "")
 	Cmd.Flags().StringVar(&flagPrefetcherLLCPP, flagPrefetcherLLCPPName, "", "")
 	Cmd.Flags().StringVar(&flagPrefetcherAOP, flagPrefetcherAOPName, "", "")
@@ -247,6 +250,10 @@ func getFlagGroups() []common.FlagGroup {
 			Help: "L1 data cache unit instruction prefetcher (" + strings.Join(prefetcherOptions, ", ") + ")",
 		},
 		{
+			Name: flagPrefetcherDCUNPName,
+			Help: "L1 data cache unit next page prefetcher (" + strings.Join(prefetcherOptions, ", ") + ")",
+		},
+		{
 			Name: flagPrefetcherAMPName,
 			Help: "AMP prefetcher (" + strings.Join(prefetcherOptions, ", ") + ") [SPR,EMR,GNR]",
 		},
@@ -344,6 +351,11 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	}
 	if cmd.Flags().Lookup(flagPrefetcherDCUIPName).Changed && !slices.Contains(prefetcherOptions, flagPrefetcherDCUIP) {
 		err := fmt.Errorf("invalid DCU IP prefetcher: %s, valid options are: %s", flagPrefetcherDCUIP, strings.Join(prefetcherOptions, ", "))
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return err
+	}
+	if cmd.Flags().Lookup(flagPrefetcherDCUNPName).Changed && !slices.Contains(prefetcherOptions, flagPrefetcherDCUNP) {
+		err := fmt.Errorf("invalid DCU NP prefetcher: %s, valid options are: %s", flagPrefetcherDCUNP, strings.Join(prefetcherOptions, ", "))
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
 	}
@@ -494,7 +506,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			setElc(flagELC, myTarget, localTempDir)
 		}
 		if cmd.Flags().Lookup(flagPrefetcherL2HWName).Changed {
-			setPrefetcher(flagPrefetcherL2HW, myTarget, localTempDir, "L2 HW") // this must match the short Name in prefetcher_defs.go
+			setPrefetcher(flagPrefetcherL2HW, myTarget, localTempDir, "L2 HW") // these prefetcher names must match the shortName in prefetcher_defs.go
 		}
 		if cmd.Flags().Lookup(flagPrefetcherL2AdjName).Changed {
 			setPrefetcher(flagPrefetcherL2Adj, myTarget, localTempDir, "L2 Adj")
@@ -504,6 +516,9 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		}
 		if cmd.Flags().Lookup(flagPrefetcherDCUIPName).Changed {
 			setPrefetcher(flagPrefetcherDCUIP, myTarget, localTempDir, "DCU IP")
+		}
+		if cmd.Flags().Lookup(flagPrefetcherDCUNPName).Changed {
+			setPrefetcher(flagPrefetcherDCUNP, myTarget, localTempDir, "DCU NP")
 		}
 		if cmd.Flags().Lookup(flagPrefetcherAMPName).Changed {
 			setPrefetcher(flagPrefetcherAMP, myTarget, localTempDir, "AMP")
