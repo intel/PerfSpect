@@ -24,28 +24,28 @@ type Prefetcher struct {
 var PrefetcherDefs = []Prefetcher{
 	{
 		ShortName:   "L2 HW",
-		Description: "L2 Hardware (MLC Streamer) is an L2 cache prefetcher",
+		Description: "L2 Hardware (MLC Streamer) fetches additional lines of code or data into the L2 cache.",
 		Msr:         MsrPrefetchControl,
 		Bit:         0,
 		Uarchs:      []string{"all"},
 	},
 	{
 		ShortName:   "L2 Adj",
-		Description: "Adjacent Cache Line (MLC Spatial) is an L2 cache prefetcher",
+		Description: "Adjacent Cache Line (MLC Spatial) fetches the cache line that comprises a cache line pair.",
 		Msr:         MsrPrefetchControl,
 		Bit:         1,
 		Uarchs:      []string{"all"},
 	},
 	{
 		ShortName:   "DCU HW",
-		Description: "L1 Data Cache Unit Hardware (DCU Streamer) Prefetcher",
+		Description: "L1 Data Cache Unit Hardware (DCU Streamer) fetches the next cache line into the L1 cache.",
 		Msr:         MsrPrefetchControl,
 		Bit:         2,
 		Uarchs:      []string{"all"},
 	},
 	{
 		ShortName:   "DCU IP",
-		Description: "DCU Instruction Pointer prefetcher is an L1 cache prefetcher",
+		Description: "DCU Instruction Pointer prefetcher uses sequential load history to determine the cache lines to prefetch.",
 		Msr:         MsrPrefetchControl,
 		Bit:         3,
 		Uarchs:      []string{"all"},
@@ -59,7 +59,7 @@ var PrefetcherDefs = []Prefetcher{
 	},
 	{
 		ShortName:   "AMP",
-		Description: "Adaptive Multipath Probability (MLC AMP) is an L2 cache prefetcher. It predicts access patterns based on previous patterns and prefetches the corresponding cache lines.",
+		Description: "Adaptive Multipath Probability (MLC AMP) predicts access patterns based on previous patterns and fetches the corresponding cache lines into the L2 cache.",
 		Msr:         MsrPrefetchControl,
 		Bit:         5,
 		Uarchs:      []string{"SPR", "EMR", "GNR"},
