@@ -243,15 +243,15 @@ func getFlagGroups() []common.FlagGroup {
 		},
 		{
 			Name: flagPrefetcherDCUHWName,
-			Help: "L1 data cache unit hardware prefetcher (" + strings.Join(prefetcherOptions, ", ") + ")",
+			Help: "DCU hardware prefetcher (" + strings.Join(prefetcherOptions, ", ") + ")",
 		},
 		{
 			Name: flagPrefetcherDCUIPName,
-			Help: "L1 data cache unit instruction prefetcher (" + strings.Join(prefetcherOptions, ", ") + ")",
+			Help: "DCU instruction pointer prefetcher (" + strings.Join(prefetcherOptions, ", ") + ")",
 		},
 		{
 			Name: flagPrefetcherDCUNPName,
-			Help: "L1 data cache unit next page prefetcher (" + strings.Join(prefetcherOptions, ", ") + ")",
+			Help: "DCU next page prefetcher (" + strings.Join(prefetcherOptions, ", ") + ")",
 		},
 		{
 			Name: flagPrefetcherAMPName,
@@ -263,11 +263,11 @@ func getFlagGroups() []common.FlagGroup {
 		},
 		{
 			Name: flagPrefetcherAOPName,
-			Help: "array of pointers prefetcher (" + strings.Join(prefetcherOptions, ", ") + ") [GNR]",
+			Help: "Array of pointers prefetcher (" + strings.Join(prefetcherOptions, ", ") + ") [GNR]",
 		},
 		{
 			Name: flagPrefetcherHomelessName,
-			Help: "homeless prefetcher (" + strings.Join(prefetcherOptions, ", ") + ") [SPR,EMR,GNR]",
+			Help: "Homeless prefetcher (" + strings.Join(prefetcherOptions, ", ") + ") [SPR,EMR,GNR]",
 		},
 		{
 			Name: flagPrefetcherLLCName,
