@@ -78,6 +78,7 @@ const (
 	OperatingSystemTableName   = "Operating System"
 	SoftwareVersionTableName   = "Software Version"
 	CPUTableName               = "CPU"
+	PrefetcherTableName        = "Prefetcher"
 	ISATableName               = "ISA"
 	AcceleratorTableName       = "Accelerator"
 	PowerTableName             = "Power"
@@ -246,6 +247,18 @@ var tableDefinitions = map[string]TableDefinition{
 			script.L3WaySizeName},
 		FieldsFunc:   cpuTableValues,
 		InsightsFunc: cpuTableInsights},
+	PrefetcherTableName: {
+		Name:    PrefetcherTableName,
+		HasRows: true,
+		// TODO: Vendors: []string{"GenuineIntel"},
+		ScriptNames: []string{
+			script.LscpuScriptName,
+			script.LspciBitsScriptName,
+			script.LspciDevicesScriptName,
+			script.PrefetchControlName,
+			script.PrefetchersName,
+		},
+		FieldsFunc: prefetcherTableValues},
 	ISATableName: {
 		Name:        ISATableName,
 		ScriptNames: []string{script.CpuidScriptName},
@@ -935,11 +948,32 @@ func cpuTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "L3 Cache", Values: []string{l3FromOutput(outputs)}},
 		{Name: "L3 per Core", Values: []string{l3PerCoreFromOutput(outputs)}},
 		{Name: "Memory Channels", Values: []string{channelsFromOutput(outputs)}},
-		{Name: "Prefetchers", Values: []string{prefetchersFromOutput(outputs)}},
 		{Name: "Intel Turbo Boost", Values: []string{turboEnabledFromOutput(outputs)}},
 		{Name: "Virtualization", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Virtualization:\s*(.+)$`)}},
 		{Name: "PPINs", Values: []string{ppinsFromOutput(outputs)}},
 	}
+}
+
+func prefetcherTableValues(outputs map[string]script.ScriptOutput) []Field {
+	prefetchers := prefetchersFromOutput(outputs)
+	if len(prefetchers) == 0 {
+		return []Field{}
+	}
+	fields := []Field{
+		{Name: "Prefetcher"},
+		{Name: "Description"},
+		{Name: "MSR"},
+		{Name: "Bit"},
+		{Name: "Status"},
+	}
+	for _, pref := range prefetchers {
+		for i := range pref {
+			if i < len(fields) {
+				fields[i].Values = append(fields[i].Values, pref[i])
+			}
+		}
+	}
+	return fields
 }
 
 func cpuTableInsights(outputs map[string]script.ScriptOutput, tableValues TableValues) []Insight {
@@ -1819,7 +1853,7 @@ func systemSummaryTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "All-core Maximum Frequency", Values: []string{allCoreMaxFrequencyFromOutput(outputs)}},
 		{Name: "Maximum Frequency", Values: []string{maxFrequencyFromOutput(outputs)}},
 		{Name: "NUMA Nodes", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^NUMA node\(s\):\s*(.+)$`)}},
-		{Name: "Prefetchers", Values: []string{prefetchersFromOutput(outputs)}},
+		{Name: "Prefetchers", Values: []string{prefetchersSummaryFromOutput(outputs)}},
 		{Name: "PPINs", Values: []string{ppinsFromOutput(outputs)}},
 		{Name: "Accelerators Available [used]", Values: []string{acceleratorSummaryFromOutput(outputs)}},
 		{Name: "Installed Memory", Values: []string{installedMemoryFromOutput(outputs)}},
