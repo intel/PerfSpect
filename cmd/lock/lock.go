@@ -198,9 +198,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		tableNames = append(tableNames, report.BriefSysSummaryTableName)
 	}
 	tableNames = append(tableNames, report.KernelLockAnalysisTableName)
-	if !flagNoSystemSummary {
-		tableNames = append(tableNames, report.BriefSysSummaryTableName)
-	}
 	reportingCommand := common.ReportingCommand{
 		Cmd:            cmd,
 		ReportNamePost: "lock",
