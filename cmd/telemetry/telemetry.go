@@ -59,6 +59,8 @@ var (
 	flagInstrMix bool
 	flagGaudi    bool
 
+	flagNoSystemSummary bool
+
 	flagInstrMixPid    int
 	flagInstrMixFilter []string
 )
@@ -76,6 +78,8 @@ const (
 	flagPowerName    = "power"
 	flagInstrMixName = "instrmix"
 	flagGaudiName    = "gaudi"
+
+	flagNoSystemSummaryName = "no-summary"
 
 	flagInstrMixPidName    = "instrmix-pid"
 	flagInstrMixFilterName = "instrmix-filter"
@@ -105,6 +109,7 @@ func init() {
 	Cmd.Flags().IntVar(&flagInterval, flagIntervalName, 2, "")
 	Cmd.Flags().IntVar(&flagInstrMixPid, flagInstrMixPidName, 0, "")
 	Cmd.Flags().StringSliceVar(&flagInstrMixFilter, flagInstrMixFilterName, []string{"SSE", "AVX", "AVX2", "AVX512", "AMX_TILE"}, "")
+	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
 
 	common.AddTargetFlags(Cmd)
 
@@ -175,9 +180,13 @@ func getFlagGroups() []common.FlagGroup {
 			Name: flagInstrMixFilterName,
 			Help: "filter to apply to instruction mix",
 		},
+		{
+			Name: flagNoSystemSummaryName,
+			Help: "do not include system summary table in report",
+		},
 	}
 	groups = append(groups, common.FlagGroup{
-		GroupName: "Others Options",
+		GroupName: "Other Options",
 		Flags:     flags,
 	})
 	groups = append(groups, common.GetTargetFlagGroup())
@@ -256,6 +265,9 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 
 func runCmd(cmd *cobra.Command, args []string) error {
 	var tableNames []string
+	if !flagNoSystemSummary {
+		tableNames = append(tableNames, report.BriefSysSummaryTableName)
+	}
 	for _, cat := range categories {
 		if *cat.FlagVar || flagAll {
 			tableNames = append(tableNames, cat.TableNames...)

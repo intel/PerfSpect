@@ -40,16 +40,18 @@ var Cmd = &cobra.Command{
 }
 
 var (
-	flagDuration  int
-	flagFrequency int
-	flagPackage   bool
-	flagFormat    []string
+	flagDuration        int
+	flagFrequency       int
+	flagPackage         bool
+	flagFormat          []string
+	flagNoSystemSummary bool
 )
 
 const (
-	flagDurationName  = "duration"
-	flagFrequencyName = "frequency"
-	flagPackageName   = "package"
+	flagDurationName        = "duration"
+	flagFrequencyName       = "frequency"
+	flagPackageName         = "package"
+	flagNoSystemSummaryName = "no-summary"
 )
 
 func init() {
@@ -58,6 +60,7 @@ func init() {
 	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 10, "")
 	Cmd.Flags().IntVar(&flagFrequency, flagFrequencyName, 11, "")
 	Cmd.PersistentFlags().BoolVar(&flagPackage, flagPackageName, false, "")
+	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
 
 	common.AddTargetFlags(Cmd)
 
@@ -107,6 +110,10 @@ func getFlagGroups() []common.FlagGroup {
 		{
 			Name: common.FlagFormatName,
 			Help: fmt.Sprintf("choose output format(s) from: %s", strings.Join(append([]string{report.FormatAll}, report.FormatHtml, report.FormatTxt), ", ")),
+		},
+		{
+			Name: flagNoSystemSummaryName,
+			Help: "do not include system summary table in report",
 		},
 	}
 	groups = append(groups, common.FlagGroup{
@@ -186,6 +193,14 @@ func pullDataFiles(appContext common.AppContext, scriptOutputs map[string]script
 }
 
 func runCmd(cmd *cobra.Command, args []string) error {
+	var tableNames []string
+	if !flagNoSystemSummary {
+		tableNames = append(tableNames, report.BriefSysSummaryTableName)
+	}
+	tableNames = append(tableNames, report.KernelLockAnalysisTableName)
+	if !flagNoSystemSummary {
+		tableNames = append(tableNames, report.BriefSysSummaryTableName)
+	}
 	reportingCommand := common.ReportingCommand{
 		Cmd:            cmd,
 		ReportNamePost: "lock",
@@ -194,7 +209,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			"Duration":  strconv.Itoa(flagDuration),
 			"Package":   strconv.FormatBool(flagPackage),
 		},
-		TableNames: []string{report.KernelLockAnalysisTableName},
+		TableNames: tableNames,
 	}
 
 	// only try to download package when option specified
