@@ -567,6 +567,7 @@ var tableDefinitions = map[string]TableDefinition{
 			script.LscpuScriptName,
 			script.LspciBitsScriptName,
 			script.LspciDevicesScriptName,
+			script.MaximumFrequencyScriptName,
 			script.SpecCoreFrequenciesScriptName,
 			script.LshwScriptName,
 			script.MeminfoScriptName,
@@ -581,7 +582,7 @@ var tableDefinitions = map[string]TableDefinition{
 			script.CstatesScriptName,
 			script.ElcScriptName,
 		},
-		FieldsFunc: quickSummaryTableValues},
+		FieldsFunc: briefSummaryTableValues},
 	//
 	// configuration set table
 	//
@@ -1902,7 +1903,7 @@ func systemSummaryTableValues(outputs map[string]script.ScriptOutput) []Field {
 	}
 }
 
-func quickSummaryTableValues(outputs map[string]script.ScriptOutput) []Field {
+func briefSummaryTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return []Field{
 		{Name: "Host Name", Values: []string{strings.TrimSpace(outputs[script.HostnameScriptName].Stdout)}},                                          // Hostname
 		{Name: "Time", Values: []string{strings.TrimSpace(outputs[script.DateScriptName].Stdout)}},                                                   // Date
@@ -1917,7 +1918,7 @@ func quickSummaryTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Scaling Driver", Values: []string{strings.TrimSpace(outputs[script.ScalingDriverScriptName].Stdout)}},                                // ScalingDriver
 		{Name: "Scaling Governor", Values: []string{strings.TrimSpace(outputs[script.ScalingGovernorScriptName].Stdout)}},                            // ScalingGovernor
 		{Name: "C-states", Values: []string{cstatesSummaryFromOutput(outputs)}},                                                                      // Cstates
-		{Name: "Maximum Frequency", Values: []string{maxFrequencyFromOutput(outputs)}},                                                               // MaxFrequency
+		{Name: "Maximum Frequency", Values: []string{maxFrequencyFromOutput(outputs)}},                                                               // MaximumFrequency, SpecCoreFrequencies,
 		{Name: "All-core Maximum Frequency", Values: []string{allCoreMaxFrequencyFromOutput(outputs)}},                                               // Lscpu, LspciBits, LspciDevices, SpecCoreFrequencies
 		{Name: "Energy Performance Bias", Values: []string{epbFromOutput(outputs)}},                                                                  // EpbSource, EpbBIOS, EpbOS
 		{Name: "Efficiency Latency Control", Values: []string{elcSummaryFromOutput(outputs)}},                                                        // Elc

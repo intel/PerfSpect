@@ -17,9 +17,13 @@ import (
 	"strings"
 	"time"
 
+	"perfspect/internal/common"
 	"perfspect/internal/cpudb"
+	"perfspect/internal/report"
 	"perfspect/internal/script"
 	"perfspect/internal/target"
+
+	"github.com/spf13/cobra"
 )
 
 // Metadata is the representation of the platform's state and capabilities
@@ -48,11 +52,20 @@ type Metadata struct {
 	ThreadsPerCore            int
 	TSC                       int
 	TSCFrequencyHz            int
+	SystemSummaryFields       [][]string // slice of key-value pairs
 }
 
 // LoadMetadata - populates and returns a Metadata structure containing state of the
 // system.
-func LoadMetadata(myTarget target.Target, noRoot bool, perfPath string, localTempDir string) (metadata Metadata, err error) {
+func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, perfPath string, localTempDir string, cmd *cobra.Command) (metadata Metadata, err error) {
+	// System Summary Values
+	if !noSystemSummary {
+		metadata.SystemSummaryFields, err = getSystemSummary(myTarget, localTempDir, cmd)
+		if err != nil {
+			err = fmt.Errorf("failed to get system summary: %w", err)
+			return
+		}
+	}
 	// CPU Info
 	var cpuInfo []map[string]string
 	cpuInfo, err = getCPUInfo(myTarget)
@@ -319,8 +332,6 @@ func (md Metadata) String() string {
 }
 
 // JSON converts the Metadata struct to a JSON-encoded byte slice.
-// It creates a copy of the Metadata, sets the PerfSupportedEvents field to an empty string,
-// and then marshals the copy to JSON format.
 //
 // Returns:
 // - out: JSON-encoded byte slice representation of the Metadata.
@@ -366,6 +377,31 @@ func ReadJSONFromFile(path string) (md Metadata, err error) {
 	if err = json.Unmarshal(rawBytes, &md); err != nil {
 		slog.Error("failed to unmarshal metadata json", slog.String("error", err.Error()))
 		return
+	}
+	return
+}
+
+// getSystemSummary - retrieves the system summary from the target
+// and returns it as a slice of key-value pairs.
+func getSystemSummary(myTarget target.Target, localTempDir string, cmd *cobra.Command) (summaryFields [][]string, err error) {
+	rc := common.ReportingCommand{}
+	rc.TableNames = []string{report.BriefSysSummaryTableName}
+	rc.Cmd = cmd
+	allScriptOutputs, err := rc.RetrieveScriptOutputs(localTempDir, []target.Target{myTarget}, nil)
+	if err != nil {
+		err = fmt.Errorf("failed to retrieve script outputs: %w", err)
+		return
+	} else {
+		var allTableValues []report.TableValues
+		allTableValues, err = report.Process([]string{report.BriefSysSummaryTableName}, allScriptOutputs[0].GetScriptOutputs())
+		if err != nil {
+			err = fmt.Errorf("failed to process script outputs: %w", err)
+			return
+		} else {
+			for _, field := range allTableValues[0].Fields {
+				summaryFields = append(summaryFields, []string{field.Name, field.Values[0]})
+			}
+		}
 	}
 	return
 }

@@ -401,15 +401,24 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata) (templateVals
 	}
 	jsonMetrics := string(jsonMetricsBytes)
 	templateVals["ALLMETRICS"] = jsonMetrics
-	// System Information Tab
+	// Metadata tab
 	jsonMetadata, err := metadata.JSON()
 	if err != nil {
 		return
 	}
 	// remove PerfSupportedEvents from json
 	re := regexp.MustCompile(`"PerfSupportedEvents":".*?",`)
-	jsonMetadataNoPerfEvents := re.ReplaceAll(jsonMetadata, []byte(""))
-	templateVals["METADATA"] = string(jsonMetadataNoPerfEvents)
+	jsonMetadataPurged := re.ReplaceAll(jsonMetadata, []byte(""))
+	// remove SystemSummaryFields from json
+	re = regexp.MustCompile(`,"SystemSummaryFields":\[\[.*?\]\]`)
+	jsonMetadataPurged = re.ReplaceAll(jsonMetadataPurged, []byte(""))
+	templateVals["METADATA"] = string(jsonMetadataPurged)
+	// system info tab
+	jsonSystemInfo, err := json.Marshal(metadata.SystemSummaryFields)
+	if err != nil {
+		return
+	}
+	templateVals["SYSTEMINFO"] = string(jsonSystemInfo)
 	return
 }
 

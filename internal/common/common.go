@@ -47,6 +47,16 @@ type TargetScriptOutputs struct {
 	tableNames    []string
 }
 
+func (tso *TargetScriptOutputs) GetTarget() target.Target {
+	return tso.target
+}
+func (tso *TargetScriptOutputs) GetScriptOutputs() map[string]script.ScriptOutput {
+	return tso.scriptOutputs
+}
+func (tso *TargetScriptOutputs) GetTableNames() []string {
+	return tso.tableNames
+}
+
 const (
 	TableNameInsights  = "Insights"
 	TableNamePerfspect = "PerfSpect Version"
@@ -106,14 +116,71 @@ func (rc *ReportingCommand) Run() error {
 		// then receives SIGINT, e.g., from a script, we need to send the signal to our children
 		util.SignalChildren(syscall.SIGINT)
 	}()
-	// get the data we need to generate reports
-	orderedTargetScriptOutputs, err := rc.retrieveScriptOutputs(localTempDir)
+
+	// get the targets
+	myTargets, targetErrs, err := GetTargets(rc.Cmd, elevatedPrivilegesRequired(rc.TableNames), false, localTempDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
 		rc.Cmd.SilenceUsage = true
 		return err
 	}
+	// schedule the cleanup of the temporary directory on each target (if not debugging)
+	if rc.Cmd.Parent().PersistentFlags().Lookup("debug").Value.String() != "true" {
+		for _, myTarget := range myTargets {
+			if myTarget.GetTempDirectory() != "" {
+				defer func() {
+					err := myTarget.RemoveTempDirectory()
+					if err != nil {
+						slog.Error("error removing target temporary directory", slog.String("error", err.Error()))
+					}
+				}()
+			}
+		}
+	}
+
+	// setup and start the progress indicator
+	multiSpinner := progress.NewMultiSpinner()
+	for _, target := range myTargets {
+		err := multiSpinner.AddSpinner(target.GetName())
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			rc.Cmd.SilenceUsage = true
+			return err
+		}
+	}
+	multiSpinner.Start()
+
+	// get the data we need to generate reports
+	orderedTargetScriptOutputs, err := rc.RetrieveScriptOutputs(localTempDir, myTargets, multiSpinner.Status)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		slog.Error(err.Error())
+		rc.Cmd.SilenceUsage = true
+		return err
+	}
+
+	for i := range targetErrs {
+		if targetErrs[i] != nil {
+			_ = multiSpinner.Status(myTargets[i].GetName(), fmt.Sprintf("Error: %v", targetErrs[i]))
+			// remove target from targets list
+			myTargets = slices.Delete(myTargets, i, i+1)
+		}
+	}
+	// check if we have any remaining targets to run the scripts on
+	if len(myTargets) == 0 {
+		err := fmt.Errorf("no targets remain")
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		slog.Error(err.Error())
+		rc.Cmd.SilenceUsage = true
+		return err
+	}
+
+	// stop the progress indicator
+	multiSpinner.Finish()
+	fmt.Println()
+
 	// we have output data so create the output directory
 	err = CreateOutputDir(outputDir)
 	if err != nil {
@@ -188,9 +255,6 @@ func (rc *ReportingCommand) createRawReports(appContext AppContext, orderedTarge
 		reportBytes, err := report.CreateRawReport(rc.TableNames, targetScriptOutputs.scriptOutputs, targetScriptOutputs.target.GetName())
 		if err != nil {
 			err = fmt.Errorf("failed to create raw report: %w", err)
-			fmt.Fprintf(os.Stderr, "Error: %+v\n", err)
-			slog.Error(err.Error())
-			rc.Cmd.SilenceUsage = true
 			return err
 		}
 		post := ""
@@ -201,9 +265,6 @@ func (rc *ReportingCommand) createRawReports(appContext AppContext, orderedTarge
 		reportPath := filepath.Join(appContext.OutputDir, reportFilename)
 		if err = report.WriteReport(reportBytes, reportPath); err != nil {
 			err = fmt.Errorf("failed to write report: %w", err)
-			fmt.Fprintf(os.Stderr, "Error: %+v\n", err)
-			slog.Error(err.Error())
-			rc.Cmd.SilenceUsage = true
 			return err
 		}
 	}
@@ -308,8 +369,8 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 	return reportFilePaths, nil
 }
 
-// retrieveScriptOutputs gets the data from the targets or from the input file(s)
-func (rc *ReportingCommand) retrieveScriptOutputs(localTempDir string) ([]TargetScriptOutputs, error) {
+// RetrieveScriptOutputs gets the data from the targets or from the input file(s)
+func (rc *ReportingCommand) RetrieveScriptOutputs(localTempDir string, myTargets []target.Target, statusUpdate progress.MultiSpinnerUpdateFunc) ([]TargetScriptOutputs, error) {
 	var orderedTargetScriptOutputs []TargetScriptOutputs
 	// check if we are reading from a file or running on targets
 	if FlagInput != "" {
@@ -319,52 +380,8 @@ func (rc *ReportingCommand) retrieveScriptOutputs(localTempDir string) ([]Target
 			return nil, err
 		}
 	} else {
-		// get the targets
-		myTargets, targetErrs, err := GetTargets(rc.Cmd, elevatedPrivilegesRequired(rc.TableNames), false, localTempDir)
-		if err != nil {
-			return nil, err
-		}
-		// schedule the cleanup of the temporary directory on each target (if not debugging)
-		if rc.Cmd.Parent().PersistentFlags().Lookup("debug").Value.String() != "true" {
-			for _, myTarget := range myTargets {
-				if myTarget.GetTempDirectory() != "" {
-					defer func() {
-						err := myTarget.RemoveTempDirectory()
-						if err != nil {
-							slog.Error("error removing target temporary directory", slog.String("error", err.Error()))
-						}
-					}()
-				}
-			}
-		}
-
-		// setup and start the progress indicator
-		multiSpinner := progress.NewMultiSpinner()
-		for _, target := range myTargets {
-			err := multiSpinner.AddSpinner(target.GetName())
-			if err != nil {
-				return nil, err
-			}
-		}
-		multiSpinner.Start()
-		defer func() {
-			multiSpinner.Finish()
-			fmt.Println()
-		}()
-		// check for errors in target creation
-		for i := range targetErrs {
-			if targetErrs[i] != nil {
-				_ = multiSpinner.Status(myTargets[i].GetName(), fmt.Sprintf("Error: %v", targetErrs[i]))
-				// remove target from targets list
-				myTargets = slices.Delete(myTargets, i, i+1)
-			}
-		}
-		// check if we have any remaining targets to run the scripts on
-		if len(myTargets) == 0 {
-			err := fmt.Errorf("no targets remain")
-			return nil, err
-		}
-		orderedTargetScriptOutputs, err = outputsFromTargets(myTargets, rc, multiSpinner.Status, localTempDir)
+		var err error
+		orderedTargetScriptOutputs, err = outputsFromTargets(rc.Cmd, myTargets, rc.TableNames, rc.ScriptParams, statusUpdate, localTempDir)
 		if err != nil {
 			return nil, err
 		}
@@ -397,7 +414,7 @@ func outputsFromInput(summaryTableName string) ([]TargetScriptOutputs, error) {
 }
 
 // outputsFromTargets runs the scripts on the targets and returns the data in the order of the targets
-func outputsFromTargets(myTargets []target.Target, rc *ReportingCommand, statusUpdate progress.MultiSpinnerUpdateFunc, localTempDir string) ([]TargetScriptOutputs, error) {
+func outputsFromTargets(cmd *cobra.Command, myTargets []target.Target, tableNames []string, scriptParams map[string]string, statusUpdate progress.MultiSpinnerUpdateFunc, localTempDir string) ([]TargetScriptOutputs, error) {
 	orderedTargetScriptOutputs := []TargetScriptOutputs{}
 	channelTargetScriptOutputs := make(chan TargetScriptOutputs)
 	channelError := make(chan error)
@@ -407,7 +424,7 @@ func outputsFromTargets(myTargets []target.Target, rc *ReportingCommand, statusU
 	for targetIdx, target := range myTargets {
 		targetTableNames = append(targetTableNames, []string{})
 		targetScriptNames = append(targetScriptNames, []string{})
-		for _, tableName := range rc.TableNames {
+		for _, tableName := range tableNames {
 			if report.TableForTarget(tableName, target) {
 				// add table to list of tables to collect
 				targetTableNames[targetIdx] = util.UniqueAppend(targetTableNames[targetIdx], tableName)
@@ -424,11 +441,11 @@ func outputsFromTargets(myTargets []target.Target, rc *ReportingCommand, statusU
 	for targetIdx, target := range myTargets {
 		scriptsToRunOnTarget := []script.ScriptDefinition{}
 		for _, scriptName := range targetScriptNames[targetIdx] {
-			script := script.GetParameterizedScriptByName(scriptName, rc.ScriptParams)
+			script := script.GetParameterizedScriptByName(scriptName, scriptParams)
 			scriptsToRunOnTarget = append(scriptsToRunOnTarget, script)
 		}
 		// run the selected scripts on the target
-		go collectOnTarget(rc.Cmd, rc.ScriptParams["Duration"], target, scriptsToRunOnTarget, localTempDir, channelTargetScriptOutputs, channelError, statusUpdate)
+		go collectOnTarget(target, scriptsToRunOnTarget, localTempDir, scriptParams["Duration"], cmd.Name() == "telemetry", channelTargetScriptOutputs, channelError, statusUpdate)
 	}
 	// wait for scripts to run on all targets
 	var allTargetScriptOutputs []TargetScriptOutputs
@@ -469,22 +486,28 @@ func elevatedPrivilegesRequired(tableNames []string) bool {
 }
 
 // collectOnTarget runs the scripts on the target and sends the results to the appropriate channels
-func collectOnTarget(cmd *cobra.Command, duration string, myTarget target.Target, scriptsToRun []script.ScriptDefinition, localTempDir string, channelTargetScriptOutputs chan TargetScriptOutputs, channelError chan error, statusUpdate progress.MultiSpinnerUpdateFunc) {
+func collectOnTarget(myTarget target.Target, scriptsToRun []script.ScriptDefinition, localTempDir string, duration string, isTelemetry bool, channelTargetScriptOutputs chan TargetScriptOutputs, channelError chan error, statusUpdate progress.MultiSpinnerUpdateFunc) {
 	// run the scripts on the target
 	status := "collecting data"
-	if cmd.Name() == "telemetry" && duration == "0" { // telemetry is the only command that uses this common code that can run indefinitely
+	if isTelemetry && duration == "0" { // telemetry is the only command that uses this common code that can run indefinitely
 		status += ", press Ctrl+c to stop"
 	} else if duration != "0" && duration != "" {
 		status += fmt.Sprintf(" for %s seconds", duration)
 	}
-	_ = statusUpdate(myTarget.GetName(), status)
+	if statusUpdate != nil {
+		_ = statusUpdate(myTarget.GetName(), status)
+	}
 	scriptOutputs, err := script.RunScripts(myTarget, scriptsToRun, true, localTempDir)
 	if err != nil {
-		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("error collecting data: %v", err))
+		if statusUpdate != nil {
+			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("error collecting data: %v", err))
+		}
 		err = fmt.Errorf("error running data collection scripts on %s: %v", myTarget.GetName(), err)
 		channelError <- err
 		return
 	}
-	_ = statusUpdate(myTarget.GetName(), "collection complete")
+	if statusUpdate != nil {
+		_ = statusUpdate(myTarget.GetName(), "collection complete")
+	}
 	channelTargetScriptOutputs <- TargetScriptOutputs{target: myTarget, scriptOutputs: scriptOutputs}
 }

@@ -341,8 +341,8 @@ func maxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 	}
 	// get the max frequency from the MSR/tpmi
 	specCoreFrequencies, err := getSpecCoreFrequenciesFromOutput(outputs)
-	if err == nil && len(specCoreFrequencies) > 2 && len(specCoreFrequencies[1]) > 1 {
-		return specCoreFrequencies[len(specCoreFrequencies)-1][1] + "GHz"
+	if err == nil && len(specCoreFrequencies) > 1 && len(specCoreFrequencies[1]) > 1 {
+		return specCoreFrequencies[1][1] + "GHz"
 	}
 	return valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "4", `Max Speed:\s(.*)`)
 }

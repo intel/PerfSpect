@@ -109,6 +109,7 @@ var (
 	flagNoRoot            bool
 	flagWriteEventsToFile bool
 	flagInput             string
+	flagNoSystemSummary   bool
 
 	// positional arguments
 	argsApplication []string
@@ -137,6 +138,7 @@ const (
 	flagNoRootName            = "noroot"
 	flagWriteEventsToFileName = "raw"
 	flagInputName             = "input"
+	flagNoSystemSummaryName   = "no-summary"
 )
 
 const (
@@ -187,6 +189,7 @@ func init() {
 	Cmd.Flags().BoolVar(&flagNoRoot, flagNoRootName, false, "")
 	Cmd.Flags().BoolVar(&flagWriteEventsToFile, flagWriteEventsToFileName, false, "")
 	Cmd.Flags().StringVar(&flagInput, flagInputName, "", "")
+	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
 
 	common.AddTargetFlags(Cmd)
 
@@ -317,6 +320,10 @@ func getFlagGroups() []common.FlagGroup {
 		{
 			Name: flagInputName,
 			Help: "path to a file or directory with json file containing raw perf events. Will skip data collection and use raw data for reports.",
+		},
+		{
+			Name: flagNoSystemSummaryName,
+			Help: "do not include system summary table in report",
 		},
 	}
 	groups = append(groups, common.FlagGroup{
@@ -848,7 +855,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 	// prepare the metrics for each target
 	for i := range targetContexts {
-		go prepareMetrics(&targetContexts[i], localTempDir, channelTargetError, multiSpinner.Status)
+		go prepareMetrics(cmd, &targetContexts[i], localTempDir, channelTargetError, multiSpinner.Status)
 	}
 	// wait for all metrics to be prepared
 	numTargetsWithPreparedMetrics := 0
@@ -1082,7 +1089,7 @@ func prepareTarget(targetContext *targetContext, localTempDir string, localPerfP
 	channelError <- targetError{target: myTarget, err: nil}
 }
 
-func prepareMetrics(targetContext *targetContext, localTempDir string, channelError chan targetError, statusUpdate progress.MultiSpinnerUpdateFunc) {
+func prepareMetrics(cmd *cobra.Command, targetContext *targetContext, localTempDir string, channelError chan targetError, statusUpdate progress.MultiSpinnerUpdateFunc) {
 	myTarget := targetContext.target
 	if targetContext.err != nil {
 		channelError <- targetError{target: myTarget, err: nil}
@@ -1091,7 +1098,7 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 	// load metadata
 	_ = statusUpdate(myTarget.GetName(), "collecting metadata")
 	var err error
-	if targetContext.metadata, err = LoadMetadata(myTarget, flagNoRoot, targetContext.perfPath, localTempDir); err != nil {
+	if targetContext.metadata, err = LoadMetadata(myTarget, flagNoRoot, flagNoSystemSummary, targetContext.perfPath, localTempDir, cmd); err != nil {
 		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}

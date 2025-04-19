@@ -258,9 +258,8 @@
       }
 
       const metadata = <<.METADATA>>
-
-      const transactions = <<.TRANSACTIONS>>;
-
+      const system_info = <<.SYSTEMINFO>>
+      const transactions = <<.TRANSACTIONS>>
       const base_line = {
         xAxis: {
           type: "category",
@@ -422,6 +421,7 @@
               <Tab label="Memory" />
               <Tab label="Power" />
               <Tab label="All Metrics" />
+              <Tab label="System Info" />
               <Tab label="Metadata" />
             </Tabs>
           </Box>
@@ -740,6 +740,33 @@
             <TabPanel
               value={systemTabs}
               index={5}
+            >
+            <TableContainer component={Paper} sx={{ width: "fit-content" }}>
+                <Table size="small" style={{ tableLayout: 'auto' }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Key</TableCell>
+                      <TableCell>Value</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {system_info.map(([key, value]) => (
+                      <TableRow key={key}>
+                      <TableCell sx={{ fontFamily: 'Monospace' }} component="th" scope="row" >
+                        {JSON.stringify(key)}
+                      </TableCell>
+                      <TableCell sx={{ fontFamily: 'Monospace' }} align="left">
+                        {JSON.stringify(value)}
+                      </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </TabPanel>
+            <TabPanel
+              value={systemTabs}
+              index={6}
             >
             <TableContainer component={Paper} sx={{ width: "fit-content" }}>
                 <Table size="small" style={{ tableLayout: 'auto' }}>
