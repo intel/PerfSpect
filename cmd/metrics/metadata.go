@@ -58,55 +58,41 @@ type Metadata struct {
 // LoadMetadata - populates and returns a Metadata structure containing state of the
 // system.
 func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, perfPath string, localTempDir string, cmd *cobra.Command) (metadata Metadata, err error) {
-	// System Summary Values
-	if !noSystemSummary {
-		metadata.SystemSummaryFields, err = getSystemSummary(myTarget, localTempDir, cmd)
-		if err != nil {
-			err = fmt.Errorf("failed to get system summary: %w", err)
-			return
-		}
-	}
-	// CPU Info
+	// Hostname
+	metadata.Hostname = myTarget.GetName()
+	// CPU Info (from /proc/cpuinfo)
 	var cpuInfo []map[string]string
 	cpuInfo, err = getCPUInfo(myTarget)
 	if err != nil || len(cpuInfo) < 1 {
 		err = fmt.Errorf("failed to read cpu info: %v", err)
 		return
 	}
-	// Core Count (per socket)
+	// Core Count (per socket) (from cpuInfo)
 	metadata.CoresPerSocket, err = strconv.Atoi(cpuInfo[0]["cpu cores"])
 	if err != nil || metadata.CoresPerSocket == 0 {
 		err = fmt.Errorf("failed to retrieve cores per socket: %v", err)
 		return
 	}
-	// Socket Count
+	// Socket Count (from cpuInfo)
 	var maxPhysicalID int
 	if maxPhysicalID, err = strconv.Atoi(cpuInfo[len(cpuInfo)-1]["physical id"]); err != nil {
 		err = fmt.Errorf("failed to retrieve max physical id: %v", err)
 		return
 	}
 	metadata.SocketCount = maxPhysicalID + 1
-	// Hyperthreading - threads per core
+	// Hyperthreading - threads per core (from cpuInfo)
 	if cpuInfo[0]["siblings"] != cpuInfo[0]["cpu cores"] {
 		metadata.ThreadsPerCore = 2
 	} else {
 		metadata.ThreadsPerCore = 1
 	}
-	// CPUSocketMap
+	// CPUSocketMap (from cpuInfo)
 	metadata.CPUSocketMap = createCPUSocketMap(metadata.CoresPerSocket, metadata.SocketCount, metadata.ThreadsPerCore == 2)
-	// Model Name
+	// Model Name (from cpuInfo)
 	metadata.ModelName = cpuInfo[0]["model name"]
-	// Hostname
-	metadata.Hostname = myTarget.GetName()
-	// Architecture
-	metadata.Architecture, err = myTarget.GetArchitecture()
-	if err != nil {
-		err = fmt.Errorf("failed to retrieve architecture: %v", err)
-		return
-	}
-	// Vendor
+	// Vendor (from cpuInfo)
 	metadata.Vendor = cpuInfo[0]["vendor_id"]
-	// CPU microarchitecture
+	// CPU microarchitecture (from cpuInfo)
 	cpuDb := cpudb.NewCPUDB()
 	cpu, err := cpuDb.GetCPU(cpuInfo[0]["cpu family"], cpuInfo[0]["model"], cpuInfo[0]["stepping"])
 	if err != nil {
@@ -114,15 +100,39 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 	}
 	metadata.Microarchitecture = cpu.MicroArchitecture
 
-	// PMU driver version
-	metadata.PMUDriverVersion, err = getPMUDriverVersion(myTarget, localTempDir)
-	if err != nil {
-		err = fmt.Errorf("failed to retrieve PMU driver version: %v", err)
-		return
-	}
-	// reduce startup time by running the perf commands in their own threads
+	// reduce startup time by running commands in their own threads
 	slowFuncChannel := make(chan error)
+	numSlowFuncs := 0
+	// System Summary Values
+	if !noSystemSummary {
+		numSlowFuncs++
+		go func() {
+			if metadata.SystemSummaryFields, err = getSystemSummary(myTarget, localTempDir, cmd); err != nil {
+				err = fmt.Errorf("failed to get system summary: %w", err)
+			}
+			slowFuncChannel <- err
+		}()
+	}
+	// Architecture
+	numSlowFuncs++
+	go func() {
+		var err error
+		if metadata.Architecture, err = myTarget.GetArchitecture(); err != nil {
+			err = fmt.Errorf("failed to retrieve architecture: %v", err)
+		}
+		slowFuncChannel <- err
+	}()
+	// PMU Driver Version
+	numSlowFuncs++
+	go func() {
+		var err error
+		if metadata.PMUDriverVersion, err = getPMUDriverVersion(myTarget, localTempDir); err != nil {
+			err = fmt.Errorf("failed to retrieve PMU driver version: %v", err)
+		}
+		slowFuncChannel <- err
+	}()
 	// perf list
+	numSlowFuncs++
 	go func() {
 		var err error
 		if metadata.PerfSupportedEvents, err = getPerfSupportedEvents(myTarget, perfPath); err != nil {
@@ -131,6 +141,7 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 		slowFuncChannel <- err
 	}()
 	// instructions
+	numSlowFuncs++
 	go func() {
 		var err error
 		var output string
@@ -145,6 +156,7 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 		slowFuncChannel <- err
 	}()
 	// ref_cycles
+	numSlowFuncs++
 	go func() {
 		var err error
 		var output string
@@ -159,6 +171,7 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 		slowFuncChannel <- err
 	}()
 	// Fixed-counter TMA events
+	numSlowFuncs++
 	go func() {
 		var err error
 		var output string
@@ -173,6 +186,7 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 		slowFuncChannel <- err
 	}()
 	// Fixed-counter cycles events
+	numSlowFuncs++
 	go func() {
 		var err error
 		var output string
@@ -187,6 +201,7 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 		slowFuncChannel <- err
 	}()
 	// Fixed-counter instructions events
+	numSlowFuncs++
 	go func() {
 		var err error
 		var output string
@@ -201,6 +216,7 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 		slowFuncChannel <- err
 	}()
 	// PEBS
+	numSlowFuncs++
 	go func() {
 		var err error
 		var output string
@@ -215,6 +231,7 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 		slowFuncChannel <- err
 	}()
 	// Offcore response
+	numSlowFuncs++
 	go func() {
 		var err error
 		var output string
@@ -228,50 +245,62 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 		}
 		slowFuncChannel <- err
 	}()
-	defer func() {
-		var errs []error
-		errs = append(errs, <-slowFuncChannel)
-		errs = append(errs, <-slowFuncChannel)
-		errs = append(errs, <-slowFuncChannel)
-		errs = append(errs, <-slowFuncChannel)
-		errs = append(errs, <-slowFuncChannel)
-		errs = append(errs, <-slowFuncChannel)
-		errs = append(errs, <-slowFuncChannel)
-		errs = append(errs, <-slowFuncChannel)
-		for _, errInside := range errs {
-			if errInside != nil {
-				slog.Error("error loading metadata", slog.String("error", errInside.Error()), slog.String("target", myTarget.GetName()))
-				err = fmt.Errorf("target not supported, see log for details")
-			}
+	// Kernel Version
+	numSlowFuncs++
+	go func() {
+		var err error
+		if metadata.KernelVersion, err = getKernelVersion(myTarget, localTempDir); err != nil {
+			err = fmt.Errorf("failed to retrieve kernel version: %v", err)
 		}
+		slowFuncChannel <- err
 	}()
 	// System TSC Frequency
-	metadata.TSCFrequencyHz, err = getTSCFreqHz(myTarget, localTempDir)
-	if err != nil {
-		err = fmt.Errorf("failed to retrieve TSC frequency: %v", err)
-		return
-	}
-	// calculate TSC
-	metadata.TSC = metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore * metadata.TSCFrequencyHz
-	isAMDArchitecture := (metadata.Vendor == "AuthenticAMD")
+	numSlowFuncs++
+	go func() {
+		var err error
+		if metadata.TSCFrequencyHz, err = getTSCFreqHz(myTarget, localTempDir); err != nil {
+			err = fmt.Errorf("failed to retrieve TSC frequency: %v", err)
+		} else {
+			metadata.TSC = metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore * metadata.TSCFrequencyHz
+		}
+		slowFuncChannel <- err
+	}()
 	// uncore device IDs
-	if metadata.UncoreDeviceIDs, err = getUncoreDeviceIDs(myTarget, localTempDir, isAMDArchitecture); err != nil {
-		return
+	numSlowFuncs++
+	go func() {
+		var err error
+		isAMDArchitecture := metadata.Vendor == "AuthenticAMD"
+		if metadata.UncoreDeviceIDs, err = getUncoreDeviceIDs(myTarget, localTempDir, isAMDArchitecture); err != nil {
+			err = fmt.Errorf("failed to retrieve uncore device IDs: %v", err)
+		} else {
+			for uncoreDeviceName := range metadata.UncoreDeviceIDs {
+				if !isAMDArchitecture && uncoreDeviceName == "cha" { // could be any uncore device
+					metadata.SupportsUncore = true
+					break
+				} else if isAMDArchitecture && (uncoreDeviceName == "l3" || uncoreDeviceName == "df") { // could be any uncore device
+					metadata.SupportsUncore = true
+					break
+				}
+			}
+			if !metadata.SupportsUncore {
+				slog.Warn("Uncore devices not supported")
+			}
+		}
+		slowFuncChannel <- err
+	}()
+	// wait for all slow functions to finish
+	var errs []error
+	for range numSlowFuncs {
+		errs = append(errs, <-slowFuncChannel)
 	}
-	for uncoreDeviceName := range metadata.UncoreDeviceIDs {
-		if !isAMDArchitecture && uncoreDeviceName == "cha" { // could be any uncore device
-			metadata.SupportsUncore = true
-			break
-		} else if isAMDArchitecture && (uncoreDeviceName == "l3" || uncoreDeviceName == "df") { // could be any uncore device
-			metadata.SupportsUncore = true
-			break
+	// if any errors occurred, log them and return an error
+	for _, errInside := range errs {
+		if errInside != nil {
+			slog.Error("error loading metadata", slog.String("error", errInside.Error()), slog.String("target", myTarget.GetName()))
+			err = fmt.Errorf("target not supported, see log for details")
+			return
 		}
 	}
-	if !metadata.SupportsUncore {
-		slog.Warn("Uncore devices not supported")
-	}
-	// Kernel Version
-	metadata.KernelVersion, err = getKernelVersion(myTarget, localTempDir)
 	return
 }
 
