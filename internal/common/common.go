@@ -129,12 +129,13 @@ func (rc *ReportingCommand) Run() error {
 	if rc.Cmd.Parent().PersistentFlags().Lookup("debug").Value.String() != "true" {
 		for _, myTarget := range myTargets {
 			if myTarget.GetTempDirectory() != "" {
-				defer func() {
-					err := myTarget.RemoveTempDirectory()
+				target := myTarget // create a new variable to capture the current value
+				defer func(target target.Target) {
+					err := target.RemoveTempDirectory()
 					if err != nil {
 						slog.Error("error removing target temporary directory", slog.String("error", err.Error()))
 					}
-				}()
+				}(target)
 			}
 		}
 	}
