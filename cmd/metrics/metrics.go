@@ -724,12 +724,13 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	if cmd.Parent().PersistentFlags().Lookup("debug").Value.String() != "true" {
 		for _, myTarget := range myTargets {
 			if myTarget.GetTempDirectory() != "" {
-				defer func() {
+				deferTarget := myTarget // create a new variable to capture the current value
+				defer func(deferTarget target.Target) {
 					err := myTarget.RemoveTempDirectory()
 					if err != nil {
 						slog.Error("error removing target temporary directory", slog.String("error", err.Error()))
 					}
-				}()
+				}(deferTarget)
 			}
 		}
 	}
