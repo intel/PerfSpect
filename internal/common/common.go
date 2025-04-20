@@ -162,12 +162,17 @@ func (rc *ReportingCommand) Run() error {
 		return err
 	}
 
+	// Collect indices of targets to remove
+	var indicesToRemove []int
 	for i := range targetErrs {
 		if targetErrs[i] != nil {
 			_ = multiSpinner.Status(myTargets[i].GetName(), fmt.Sprintf("Error: %v", targetErrs[i]))
-			// remove target from targets list
-			myTargets = slices.Delete(myTargets, i, i+1)
+			indicesToRemove = append(indicesToRemove, i)
 		}
+	}
+	// Remove targets in reverse order of indices to avoid shifting issues
+	for i := len(indicesToRemove) - 1; i >= 0; i-- {
+		myTargets = slices.Delete(myTargets, indicesToRemove[i], indicesToRemove[i]+1)
 	}
 	// check if we have any remaining targets to run the scripts on
 	if len(myTargets) == 0 {
