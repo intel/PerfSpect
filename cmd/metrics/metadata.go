@@ -251,12 +251,12 @@ func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSumm
 		},
 		{
 			Name:           "perf stat instructions",
-			ScriptTemplate: perfPath + " stat -a -e instructions" + " sleep 1",
+			ScriptTemplate: perfPath + " stat -a -e instructions sleep 1",
 			Superuser:      !noRoot,
 		},
 		{
 			Name:           "perf stat ref-cycles",
-			ScriptTemplate: perfPath + " stat -a -e ref-cycles" + " sleep 1",
+			ScriptTemplate: perfPath + " stat -a -e ref-cycles sleep 1",
 			Superuser:      !noRoot,
 		},
 		{
@@ -276,12 +276,12 @@ func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSumm
 		},
 		{
 			Name:           "perf stat fixed instructions",
-			ScriptTemplate: perfPath + " stat -a -e '{" + "{{.InstructionsList}}" + "}' sleep 1",
+			ScriptTemplate: perfPath + " stat -a -e '{{{.InstructionsList}}}' sleep 1",
 			Superuser:      !noRoot,
 		},
 		{
 			Name:           "perf stat fixed cpu-cycles",
-			ScriptTemplate: perfPath + " stat -a -e '{" + "{{.CpuCyclesList}}" + "}' sleep 1",
+			ScriptTemplate: perfPath + " stat -a -e '{{{.CpuCyclesList}}}' sleep 1",
 			Superuser:      !noRoot,
 		},
 		{
