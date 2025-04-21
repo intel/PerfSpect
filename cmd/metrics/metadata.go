@@ -17,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	"perfspect/internal/common"
 	"perfspect/internal/cpudb"
 	"perfspect/internal/report"
 	"perfspect/internal/script"
@@ -99,206 +98,237 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 		return
 	}
 	metadata.Microarchitecture = cpu.MicroArchitecture
-
-	// reduce startup time by running commands in their own threads
-	slowFuncChannel := make(chan error)
-	numSlowFuncs := 0
+	// the rest of the metadata is retrieved by running scripts in parallel
+	metadataScripts, err := getMetadataScripts(noRoot, perfPath, metadata.Microarchitecture, noSystemSummary)
+	if err != nil {
+		err = fmt.Errorf("failed to get metadata scripts: %v", err)
+		return
+	}
+	// run the scripts
+	scriptOutputs, err := script.RunScripts(myTarget, metadataScripts, true, localTempDir) // nosemgrep
+	if err != nil {
+		err = fmt.Errorf("failed to run metadata scripts: %v", err)
+		return
+	}
 	// System Summary Values
 	if !noSystemSummary {
-		numSlowFuncs++
-		go func() {
-			if metadata.SystemSummaryFields, err = getSystemSummary(myTarget, localTempDir, cmd); err != nil {
-				err = fmt.Errorf("failed to get system summary: %w", err)
-			}
-			slowFuncChannel <- err
-		}()
+		if metadata.SystemSummaryFields, err = getSystemSummary(scriptOutputs); err != nil {
+			err = fmt.Errorf("failed to get system summary: %w", err)
+			return
+		}
 	}
 	// Architecture
-	numSlowFuncs++
-	go func() {
-		var err error
-		if metadata.Architecture, err = myTarget.GetArchitecture(); err != nil {
-			err = fmt.Errorf("failed to retrieve architecture: %v", err)
-		}
-		slowFuncChannel <- err
-	}()
-	// PMU Driver Version
-	numSlowFuncs++
-	go func() {
-		var err error
-		if metadata.PMUDriverVersion, err = getPMUDriverVersion(myTarget, localTempDir); err != nil {
-			err = fmt.Errorf("failed to retrieve PMU driver version: %v", err)
-		}
-		slowFuncChannel <- err
-	}()
-	// perf list
-	numSlowFuncs++
-	go func() {
-		var err error
-		if metadata.PerfSupportedEvents, err = getPerfSupportedEvents(myTarget, perfPath); err != nil {
-			err = fmt.Errorf("failed to load perf list: %v", err)
-		}
-		slowFuncChannel <- err
-	}()
-	// instructions
-	numSlowFuncs++
-	go func() {
-		var err error
-		var output string
-		if metadata.SupportsInstructions, output, err = getSupportsEvent(myTarget, "instructions", noRoot, perfPath, localTempDir); err != nil {
-			slog.Warn("failed to determine if instructions event is supported, assuming not supported", slog.String("error", err.Error()))
-			err = nil
-		} else {
-			if !metadata.SupportsInstructions {
-				slog.Warn("instructions event not supported", slog.String("output", output))
-			}
-		}
-		slowFuncChannel <- err
-	}()
-	// ref_cycles
-	numSlowFuncs++
-	go func() {
-		var err error
-		var output string
-		if metadata.SupportsRefCycles, output, err = getSupportsEvent(myTarget, "ref-cycles", noRoot, perfPath, localTempDir); err != nil {
-			slog.Warn("failed to determine if ref_cycles is supported, assuming not supported", slog.String("error", err.Error()))
-			err = nil
-		} else {
-			if !metadata.SupportsRefCycles {
-				slog.Warn("ref-cycles not supported", slog.String("output", output))
-			}
-		}
-		slowFuncChannel <- err
-	}()
-	// Fixed-counter TMA events
-	numSlowFuncs++
-	go func() {
-		var err error
-		var output string
-		if metadata.SupportsFixedTMA, output, err = getSupportsFixedTMA(myTarget, noRoot, perfPath, localTempDir); err != nil {
-			slog.Warn("failed to determine if fixed-counter TMA is supported, assuming not supported", slog.String("error", err.Error()))
-			err = nil
-		} else {
-			if !metadata.SupportsFixedTMA {
-				slog.Warn("Fixed-counter TMA events not supported", slog.String("output", output))
-			}
-		}
-		slowFuncChannel <- err
-	}()
-	// Fixed-counter cycles events
-	numSlowFuncs++
-	go func() {
-		var err error
-		var output string
-		if metadata.SupportsFixedCycles, output, err = getSupportsFixedEvent(myTarget, "cpu-cycles", cpu.MicroArchitecture, noRoot, perfPath, localTempDir); err != nil {
-			slog.Warn("failed to determine if fixed-counter 'cpu-cycles' is supported, assuming not supported", slog.String("error", err.Error()))
-			err = nil
-		} else {
-			if !metadata.SupportsFixedCycles {
-				slog.Warn("Fixed-counter 'cpu-cycles' events not supported", slog.String("output", output))
-			}
-		}
-		slowFuncChannel <- err
-	}()
-	// Fixed-counter instructions events
-	numSlowFuncs++
-	go func() {
-		var err error
-		var output string
-		if metadata.SupportsFixedInstructions, output, err = getSupportsFixedEvent(myTarget, "instructions", cpu.MicroArchitecture, noRoot, perfPath, localTempDir); err != nil {
-			slog.Warn("failed to determine if fixed-counter 'instructions' is supported, assuming not supported", slog.String("error", err.Error()))
-			err = nil
-		} else {
-			if !metadata.SupportsFixedInstructions {
-				slog.Warn("Fixed-counter 'instructions' events not supported", slog.String("output", output))
-			}
-		}
-		slowFuncChannel <- err
-	}()
-	// PEBS
-	numSlowFuncs++
-	go func() {
-		var err error
-		var output string
-		if metadata.SupportsPEBS, output, err = getSupportsPEBS(myTarget, noRoot, perfPath, localTempDir); err != nil {
-			slog.Warn("failed to determine if 'PEBS' is supported, assuming not supported", slog.String("error", err.Error()))
-			err = nil
-		} else {
-			if !metadata.SupportsPEBS {
-				slog.Warn("'PEBS' events not supported", slog.String("output", output))
-			}
-		}
-		slowFuncChannel <- err
-	}()
-	// Offcore response
-	numSlowFuncs++
-	go func() {
-		var err error
-		var output string
-		if metadata.SupportsOCR, output, err = getSupportsOCR(myTarget, noRoot, perfPath, localTempDir); err != nil {
-			slog.Warn("failed to determine if 'OCR' is supported, assuming not supported", slog.String("error", err.Error()))
-			err = nil
-		} else {
-			if !metadata.SupportsOCR {
-				slog.Warn("'OCR' events not supported", slog.String("output", output))
-			}
-		}
-		slowFuncChannel <- err
-	}()
-	// Kernel Version
-	numSlowFuncs++
-	go func() {
-		var err error
-		if metadata.KernelVersion, err = getKernelVersion(myTarget, localTempDir); err != nil {
-			err = fmt.Errorf("failed to retrieve kernel version: %v", err)
-		}
-		slowFuncChannel <- err
-	}()
-	// System TSC Frequency
-	numSlowFuncs++
-	go func() {
-		var err error
-		if metadata.TSCFrequencyHz, err = getTSCFreqHz(myTarget, localTempDir); err != nil {
-			err = fmt.Errorf("failed to retrieve TSC frequency: %v", err)
-		} else {
-			metadata.TSC = metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore * metadata.TSCFrequencyHz
-		}
-		slowFuncChannel <- err
-	}()
-	// uncore device IDs
-	numSlowFuncs++
-	go func() {
-		var err error
-		isAMDArchitecture := metadata.Vendor == "AuthenticAMD"
-		if metadata.UncoreDeviceIDs, err = getUncoreDeviceIDs(myTarget, localTempDir, isAMDArchitecture); err != nil {
-			err = fmt.Errorf("failed to retrieve uncore device IDs: %v", err)
-		} else {
-			for uncoreDeviceName := range metadata.UncoreDeviceIDs {
-				if !isAMDArchitecture && uncoreDeviceName == "cha" { // could be any uncore device
-					metadata.SupportsUncore = true
-					break
-				} else if isAMDArchitecture && (uncoreDeviceName == "l3" || uncoreDeviceName == "df") { // could be any uncore device
-					metadata.SupportsUncore = true
-					break
-				}
-			}
-			if !metadata.SupportsUncore {
-				slog.Warn("Uncore devices not supported")
-			}
-		}
-		slowFuncChannel <- err
-	}()
-	// wait for all slow functions to finish
-	var errs []error
-	for range numSlowFuncs {
-		errs = append(errs, <-slowFuncChannel)
+	if metadata.Architecture, err = getArchitecture(scriptOutputs); err != nil {
+		err = fmt.Errorf("failed to retrieve architecture: %v", err)
+		return
 	}
-	// if any errors occurred, log them and return an error
-	for _, errInside := range errs {
-		if errInside != nil {
-			slog.Error("error loading metadata", slog.String("error", errInside.Error()), slog.String("target", myTarget.GetName()))
-			err = fmt.Errorf("target not supported, see log for details")
-			return
+	// PMU Driver Version
+	if metadata.PMUDriverVersion, err = getPMUDriverVersion(scriptOutputs); err != nil {
+		err = fmt.Errorf("failed to retrieve PMU driver version: %v", err)
+		return
+	}
+	// perf list
+	if metadata.PerfSupportedEvents, err = getPerfSupportedEvents(scriptOutputs); err != nil {
+		err = fmt.Errorf("failed to load perf list: %v", err)
+		return
+	}
+	// instructions
+	var output string
+	if metadata.SupportsInstructions, output, err = getSupportsEvent("instructions", scriptOutputs); err != nil {
+		slog.Warn("failed to determine if instructions event is supported, assuming not supported", slog.String("error", err.Error()))
+		err = nil
+	} else {
+		if !metadata.SupportsInstructions {
+			slog.Warn("instructions event not supported", slog.String("output", output))
+		}
+	}
+	// ref_cycles
+	if metadata.SupportsRefCycles, output, err = getSupportsEvent("ref-cycles", scriptOutputs); err != nil {
+		slog.Warn("failed to determine if ref_cycles is supported, assuming not supported", slog.String("error", err.Error()))
+		err = nil
+	} else {
+		if !metadata.SupportsRefCycles {
+			slog.Warn("ref-cycles not supported", slog.String("output", output))
+		}
+	}
+	// Fixed-counter TMA events
+	if metadata.SupportsFixedTMA, output, err = getSupportsFixedTMA(scriptOutputs); err != nil {
+		slog.Warn("failed to determine if fixed-counter TMA is supported, assuming not supported", slog.String("error", err.Error()))
+		err = nil
+	} else {
+		if !metadata.SupportsFixedTMA {
+			slog.Warn("Fixed-counter TMA events not supported", slog.String("output", output))
+		}
+	}
+	// Fixed-counter cycles events
+	if metadata.SupportsFixedCycles, output, err = getSupportsFixedEvent("cpu-cycles", scriptOutputs); err != nil {
+		slog.Warn("failed to determine if fixed-counter 'cpu-cycles' is supported, assuming not supported", slog.String("error", err.Error()))
+		err = nil
+	} else {
+		if !metadata.SupportsFixedCycles {
+			slog.Warn("Fixed-counter 'cpu-cycles' events not supported", slog.String("output", output))
+		}
+	}
+	// Fixed-counter instructions events
+	if metadata.SupportsFixedInstructions, output, err = getSupportsFixedEvent("instructions", scriptOutputs); err != nil {
+		slog.Warn("failed to determine if fixed-counter 'instructions' is supported, assuming not supported", slog.String("error", err.Error()))
+		err = nil
+	} else {
+		if !metadata.SupportsFixedInstructions {
+			slog.Warn("Fixed-counter 'instructions' events not supported", slog.String("output", output))
+		}
+	}
+	// PEBS
+	if metadata.SupportsPEBS, output, err = getSupportsPEBS(scriptOutputs); err != nil {
+		slog.Warn("failed to determine if 'PEBS' is supported, assuming not supported", slog.String("error", err.Error()))
+		err = nil
+	} else {
+		if !metadata.SupportsPEBS {
+			slog.Warn("'PEBS' events not supported", slog.String("output", output))
+		}
+	}
+	// Offcore response
+	if metadata.SupportsOCR, output, err = getSupportsOCR(scriptOutputs); err != nil {
+		slog.Warn("failed to determine if 'OCR' is supported, assuming not supported", slog.String("error", err.Error()))
+		err = nil
+	} else {
+		if !metadata.SupportsOCR {
+			slog.Warn("'OCR' events not supported", slog.String("output", output))
+		}
+	}
+	// Kernel Version
+	if metadata.KernelVersion, err = getKernelVersion(scriptOutputs); err != nil {
+		err = fmt.Errorf("failed to retrieve kernel version: %v", err)
+		return
+	}
+	// System TSC Frequency
+	if metadata.TSCFrequencyHz, err = getTSCFreqHz(scriptOutputs); err != nil {
+		err = fmt.Errorf("failed to retrieve TSC frequency: %v", err)
+		return
+	} else {
+		metadata.TSC = metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore * metadata.TSCFrequencyHz
+	}
+	// uncore device IDs and uncore support
+	isAMDArchitecture := metadata.Vendor == "AuthenticAMD"
+	if metadata.UncoreDeviceIDs, err = getUncoreDeviceIDs(isAMDArchitecture, scriptOutputs); err != nil {
+		err = fmt.Errorf("failed to retrieve uncore device IDs: %v", err)
+		return
+	} else {
+		for uncoreDeviceName := range metadata.UncoreDeviceIDs {
+			if !isAMDArchitecture && uncoreDeviceName == "cha" { // could be any uncore device
+				metadata.SupportsUncore = true
+				break
+			} else if isAMDArchitecture && (uncoreDeviceName == "l3" || uncoreDeviceName == "df") { // could be any uncore device
+				metadata.SupportsUncore = true
+				break
+			}
+		}
+		if !metadata.SupportsUncore {
+			slog.Warn("Uncore devices not supported")
+		}
+	}
+	err = nil
+	return
+}
+
+func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSummary bool) (metadataScripts []script.ScriptDefinition, err error) {
+	// reduce startup time by running the metadata scripts in parallel
+	metadataScriptDefs := []script.ScriptDefinition{
+		{
+			Name:           "get architecture",
+			ScriptTemplate: "uname -m",
+			Superuser:      !noRoot,
+		},
+		{
+			Name:           "perf supported events",
+			ScriptTemplate: "perf list",
+			Superuser:      !noRoot,
+		},
+		{
+			Name:           "list uncore devices",
+			ScriptTemplate: "find /sys/bus/event_source/devices/ \\( -name uncore_* -o -name amd_* \\)",
+			Superuser:      !noRoot,
+		},
+		{
+			Name:           "perf stat instructions",
+			ScriptTemplate: perfPath + " stat -a -e instructions" + " sleep 1",
+			Superuser:      !noRoot,
+		},
+		{
+			Name:           "perf stat ref-cycles",
+			ScriptTemplate: perfPath + " stat -a -e ref-cycles" + " sleep 1",
+			Superuser:      !noRoot,
+		},
+		{
+			Name:           "perf stat pebs",
+			ScriptTemplate: perfPath + " stat -a -e cpu/event=0xad,umask=0x40,period=1000003,name='INT_MISC.UNKNOWN_BRANCH_CYCLES'/ sleep 1",
+			Superuser:      !noRoot,
+		},
+		{
+			Name:           "perf stat ocr",
+			ScriptTemplate: perfPath + " stat -a -e cpu/event=0x2a,umask=0x01,offcore_rsp=0x104004477,name='OCR.READS_TO_CORE.LOCAL_DRAM'/ sleep 1",
+			Superuser:      !noRoot,
+		},
+		{
+			Name:           "perf stat tma",
+			ScriptTemplate: perfPath + " stat -a -e '{cpu/event=0x00,umask=0x04,period=10000003,name='TOPDOWN.SLOTS'/,cpu/event=0x00,umask=0x81,period=10000003,name='PERF_METRICS.BAD_SPECULATION'/}' sleep 1",
+			Superuser:      !noRoot,
+		},
+		{
+			Name:           "perf stat fixed instructions",
+			ScriptTemplate: perfPath + " stat -a -e '{" + "{{.InstructionsList}}" + "}' sleep 1",
+			Superuser:      !noRoot,
+		},
+		{
+			Name:           "perf stat fixed cpu-cycles",
+			ScriptTemplate: perfPath + " stat -a -e '{" + "{{.CpuCyclesList}}" + "}' sleep 1",
+			Superuser:      !noRoot,
+		},
+		{
+			Name:           "pmu driver version",
+			ScriptTemplate: "dmesg | grep -A 1 \"Intel PMU driver\" | tail -1 | awk '{print $NF}'",
+			Superuser:      !noRoot,
+		},
+		{
+			Name:           "tsc",
+			ScriptTemplate: "tsc && echo",
+			Depends:        []string{"tsc"},
+			Superuser:      !noRoot,
+		},
+		{
+			Name:           "kernel version",
+			ScriptTemplate: "uname -r",
+			Superuser:      !noRoot,
+		},
+	}
+	// replace script template vars
+	numGPCounters, err := getNumGPCounters(uarch)
+	if err != nil {
+		err = fmt.Errorf("failed to get number of GP counters: %v", err)
+		return
+	}
+	for _, scriptDef := range metadataScriptDefs {
+		if scriptDef.Name == "perf stat fixed instructions" {
+			var eventList []string
+			for range numGPCounters {
+				eventList = append(eventList, "instructions")
+			}
+			scriptDef.ScriptTemplate = strings.Replace(scriptDef.ScriptTemplate, "{{.InstructionsList}}", strings.Join(eventList, ","), -1)
+		} else if scriptDef.Name == "perf stat fixed cpu-cycles" {
+			var eventList []string
+			for range numGPCounters {
+				eventList = append(eventList, "cpu-cycles")
+			}
+			scriptDef.ScriptTemplate = strings.Replace(scriptDef.ScriptTemplate, "{{.CpuCyclesList}}", strings.Join(eventList, ","), -1)
+		}
+		metadataScripts = append(metadataScripts, scriptDef)
+	}
+	// add the system summary table scripts to the list
+	if !noSystemSummary {
+		table := report.GetTableByName(report.BriefSysSummaryTableName)
+		for _, scriptName := range table.ScriptNames {
+			scriptDef := script.GetScriptByName(scriptName)
+			metadataScripts = append(metadataScripts, scriptDef)
 		}
 	}
 	return
@@ -411,44 +441,38 @@ func ReadJSONFromFile(path string) (md Metadata, err error) {
 }
 
 // getSystemSummary - retrieves the system summary from the target
-// and returns it as a slice of key-value pairs.
-func getSystemSummary(myTarget target.Target, localTempDir string, cmd *cobra.Command) (summaryFields [][]string, err error) {
-	rc := common.ReportingCommand{}
-	rc.TableNames = []string{report.BriefSysSummaryTableName}
-	rc.Cmd = cmd
-	allScriptOutputs, err := rc.RetrieveScriptOutputs(localTempDir, []target.Target{myTarget}, nil)
+func getSystemSummary(scriptOutputs map[string]script.ScriptOutput) (summaryFields [][]string, err error) {
+	var allTableValues []report.TableValues
+	allTableValues, err = report.Process([]string{report.BriefSysSummaryTableName}, scriptOutputs)
 	if err != nil {
-		err = fmt.Errorf("failed to retrieve script outputs: %w", err)
+		err = fmt.Errorf("failed to process script outputs: %w", err)
 		return
 	} else {
-		var allTableValues []report.TableValues
-		allTableValues, err = report.Process([]string{report.BriefSysSummaryTableName}, allScriptOutputs[0].GetScriptOutputs())
-		if err != nil {
-			err = fmt.Errorf("failed to process script outputs: %w", err)
-			return
-		} else {
-			for _, field := range allTableValues[0].Fields {
-				summaryFields = append(summaryFields, []string{field.Name, field.Values[0]})
-			}
+		for _, field := range allTableValues[0].Fields {
+			summaryFields = append(summaryFields, []string{field.Name, field.Values[0]})
 		}
 	}
 	return
 }
 
-// getUncoreDeviceIDs - returns a map of device type to list of device indices
-// e.g., "upi" -> [0,1,2,3],
-func getUncoreDeviceIDs(myTarget target.Target, localTempDir string, isAMDArchitecture bool) (IDs map[string][]int, err error) {
-	scriptDef := script.ScriptDefinition{
-		Name:           "list uncore devices",
-		ScriptTemplate: "find /sys/bus/event_source/devices/ \\( -name uncore_* -o -name amd_* \\)",
-		Superuser:      false,
-	}
-	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir) // nosemgrep
-	if err != nil {
-		err = fmt.Errorf("failed to list uncore devices: %s, %d, %v", scriptOutput.Stderr, scriptOutput.Exitcode, err)
+// getArchitecture - retrieves the architecture from the target
+func getArchitecture(scriptOutputs map[string]script.ScriptOutput) (arch string, err error) {
+	if scriptOutputs["get architecture"].Exitcode != 0 {
+		err = fmt.Errorf("failed to retrieve architecture: %s", scriptOutputs["get architecture"].Stderr)
 		return
 	}
-	fileNames := strings.Split(scriptOutput.Stdout, "\n")
+	arch = strings.TrimSpace(scriptOutputs["get architecture"].Stdout)
+	return
+}
+
+// getUncoreDeviceIDs - returns a map of device type to list of device indices
+// e.g., "upi" -> [0,1,2,3],
+func getUncoreDeviceIDs(isAMDArchitecture bool, scriptOutputs map[string]script.ScriptOutput) (IDs map[string][]int, err error) {
+	if scriptOutputs["list uncore devices"].Exitcode != 0 {
+		err = fmt.Errorf("failed to list uncore devices: %s", scriptOutputs["list uncore devices"].Stderr)
+		return
+	}
+	fileNames := strings.Split(scriptOutputs["list uncore devices"].Stdout, "\n")
 	IDs = make(map[string][]int)
 	re := regexp.MustCompile(`(?:uncore_|amd_)(.*)_(\d+)`)
 	if isAMDArchitecture {
@@ -498,30 +522,23 @@ func getCPUInfo(myTarget target.Target) (cpuInfo []map[string]string, err error)
 
 // getPerfSupportedEvents - returns a string containing the output from
 // 'perf list'
-func getPerfSupportedEvents(myTarget target.Target, perfPath string) (supportedEvents string, err error) {
-	cmd := exec.Command(perfPath, "list") // nosemgrep
-	stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, true)
-	if err != nil {
-		err = fmt.Errorf("failed to get perf list: %s, %d, %v", stderr, exitcode, err)
+func getPerfSupportedEvents(scriptOutputs map[string]script.ScriptOutput) (supportedEvents string, err error) {
+	supportedEvents = scriptOutputs["perf supported events"].Stdout
+	if scriptOutputs["perf supported events"].Exitcode != 0 {
+		err = fmt.Errorf("failed to get perf supported events: %s", scriptOutputs["perf supported events"].Stderr)
 		return
 	}
-	supportedEvents = stdout
 	return
 }
 
 // getSupportsEvent() - checks if the event is supported by perf
-func getSupportsEvent(myTarget target.Target, event string, noRoot bool, perfPath string, localTempDir string) (supported bool, output string, err error) {
-	scriptDef := script.ScriptDefinition{
-		Name:           "perf stat " + event,
-		ScriptTemplate: perfPath + " stat -a -e " + event + " sleep 1",
-		Superuser:      !noRoot,
-	}
-	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir) // nosemgrep
-	if err != nil {
-		err = fmt.Errorf("failed to determine if %s is supported: %s, %d, %v", event, scriptOutput.Stderr, scriptOutput.Exitcode, err)
+func getSupportsEvent(event string, scriptOutputs map[string]script.ScriptOutput) (supported bool, output string, err error) {
+	output = scriptOutputs["perf stat "+event].Stderr
+	if scriptOutputs["perf stat "+event].Exitcode != 0 {
+		err = fmt.Errorf("failed to determine if %s is supported: %s", event, output)
 		return
 	}
-	supported = !strings.Contains(scriptOutput.Stderr, "<not supported>")
+	supported = !strings.Contains(output, "<not supported>")
 	return
 }
 
@@ -529,35 +546,26 @@ func getSupportsEvent(myTarget target.Target, event string, noRoot bool, perfPat
 // On some VMs, e.g. GCP C4, PEBS events are not supported and perf returns '<not supported>'
 // Events that use MSR 0x3F7 are PEBS events. We use the INT_MISC.UNKNOWN_BRANCH_CYCLES event since
 // it is a PEBS event that we used in EMR metrics.
-func getSupportsPEBS(myTarget target.Target, noRoot bool, perfPath string, localTempDir string) (supported bool, output string, err error) {
-	scriptDef := script.ScriptDefinition{
-		Name:           "perf stat pebs",
-		ScriptTemplate: perfPath + " stat -a -e cpu/event=0xad,umask=0x40,period=1000003,name='INT_MISC.UNKNOWN_BRANCH_CYCLES'/ sleep 1",
-		Superuser:      !noRoot,
-	}
-	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir) // nosemgrep
-	if err != nil {
-		err = fmt.Errorf("failed to determine if pebs is supported: %s, %d, %v", scriptOutput.Stderr, scriptOutput.Exitcode, err)
+func getSupportsPEBS(scriptOutputs map[string]script.ScriptOutput) (supported bool, output string, err error) {
+	output = scriptOutputs["perf stat pebs"].Stderr
+	if scriptOutputs["perf stat pebs"].Exitcode != 0 {
+		err = fmt.Errorf("failed to determine if pebs is supported: %s", output)
 		return
 	}
-	supported = !strings.Contains(scriptOutput.Stderr, "<not supported>")
+	supported = !strings.Contains(output, "<not supported>")
 	return
 }
 
 // getSupportsOCR() - checks if the offcore response events are supported on the target
 // On some VMs, e.g. GCP C4, offcore response events are not supported and perf returns '<not supported>'
-func getSupportsOCR(myTarget target.Target, noRoot bool, perfPath string, localTempDir string) (supported bool, output string, err error) {
-	scriptDef := script.ScriptDefinition{
-		Name:           "perf stat ocr",
-		ScriptTemplate: perfPath + " stat -a -e cpu/event=0x2a,umask=0x01,offcore_rsp=0x104004477,name='OCR.READS_TO_CORE.LOCAL_DRAM'/ sleep 1",
-		Superuser:      !noRoot,
-	}
-	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir) // nosemgrep
-	if err != nil {
-		err = fmt.Errorf("failed to determine if ocr is supported: %s, %d, %v", scriptOutput.Stderr, scriptOutput.Exitcode, err)
+func getSupportsOCR(scriptOutputs map[string]script.ScriptOutput) (supported bool, output string, err error) {
+	output = scriptOutputs["perf stat ocr"].Stderr
+	if scriptOutputs["perf stat ocr"].Exitcode != 0 {
+		supported = false
+		err = nil
 		return
 	}
-	supported = !strings.Contains(scriptOutput.Stderr, "<not supported>")
+	supported = !strings.Contains(output, "<not supported>")
 	return
 }
 
@@ -572,24 +580,16 @@ func getSupportsOCR(myTarget target.Target, noRoot bool, perfPath string, localT
 // In some other situations (need to find/document) the event count values are
 // zero.
 // All three of these failure modes are checked for in this function.
-func getSupportsFixedTMA(myTarget target.Target, noRoot bool, perfPath string, localTempDir string) (supported bool, output string, err error) {
-	scriptDef := script.ScriptDefinition{
-		Name:           "perf stat tma",
-		ScriptTemplate: perfPath + " stat -a -e '{cpu/event=0x00,umask=0x04,period=10000003,name='TOPDOWN.SLOTS'/,cpu/event=0x00,umask=0x81,period=10000003,name='PERF_METRICS.BAD_SPECULATION'/}' sleep 1",
-		Superuser:      !noRoot,
-	}
-	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
-	if err != nil {
-		// err from perf stat is 1st indication that these events are not supported, so return a nil error
+func getSupportsFixedTMA(scriptOutputs map[string]script.ScriptOutput) (supported bool, output string, err error) {
+	output = scriptOutputs["perf stat tma"].Stderr
+	if scriptOutputs["perf stat tma"].Exitcode != 0 {
 		supported = false
-		output = fmt.Sprint(err)
 		err = nil
 		return
 	}
 	// event values being zero or equal to each other is 2nd indication that these events are not (properly) supported
-	output = scriptOutput.Stderr
 	vals := make(map[string]float64)
-	lines := strings.Split(scriptOutput.Stderr, "\n")
+	lines := strings.Split(output, "\n")
 	// example line: "         784333932      TOPDOWN.SLOTS                                                        (59.75%)"
 	re := regexp.MustCompile(`\s+(\d+)\s+(\w*\.*\w*)\s+.*`)
 	for _, line := range lines {
@@ -610,9 +610,8 @@ func getSupportsFixedTMA(myTarget target.Target, noRoot bool, perfPath string, l
 	return
 }
 
-func getSupportsFixedEvent(myTarget target.Target, event string, uarch string, noRoot bool, perfPath string, localTempDir string) (supported bool, output string, err error) {
+func getNumGPCounters(uarch string) (numGPCounters int, err error) {
 	shortUarch := uarch[:3]
-	var numGPCounters int
 	switch shortUarch {
 	case "BDX":
 		fallthrough
@@ -640,21 +639,15 @@ func getSupportsFixedEvent(myTarget target.Target, event string, uarch string, n
 		err = fmt.Errorf("unsupported uarch: %s", uarch)
 		return
 	}
-	var eventList []string
-	for range numGPCounters {
-		eventList = append(eventList, event)
-	}
-	scriptDef := script.ScriptDefinition{
-		Name:           "perf stat fixed" + event,
-		ScriptTemplate: perfPath + " stat -a -e '{" + strings.Join(eventList, ",") + "}' sleep 1",
-		Superuser:      !noRoot,
-	}
-	scriptOutput, err := script.RunScript(myTarget, scriptDef, localTempDir)
-	if err != nil {
+	return
+}
+
+func getSupportsFixedEvent(event string, scriptOutputs map[string]script.ScriptOutput) (supported bool, output string, err error) {
+	output = scriptOutputs["perf stat fixed "+event].Stderr
+	if scriptOutputs["perf stat fixed "+event].Exitcode != 0 {
 		supported = false
 		return
 	}
-	output = scriptOutput.Stderr
 	// on some VMs we see "<not counted>" or "<not supported>" in the perf output
 	if strings.Contains(output, "<not counted>") || strings.Contains(output, "<not supported") {
 		supported = false
@@ -674,35 +667,24 @@ func getSupportsFixedEvent(myTarget target.Target, event string, uarch string, n
 }
 
 // getPMUDriverVersion - returns the version of the Intel PMU driver
-func getPMUDriverVersion(myTarget target.Target, localTempDir string) (version string, err error) {
-	scriptDef := script.ScriptDefinition{
-		Name:           "pmu driver version",
-		ScriptTemplate: "dmesg | grep -A 1 \"Intel PMU driver\" | tail -1 | awk '{print $NF}'",
-		Superuser:      true,
-	}
-	output, err := script.RunScript(myTarget, scriptDef, localTempDir)
-	if err != nil {
+func getPMUDriverVersion(scriptOutputs map[string]script.ScriptOutput) (version string, err error) {
+	if scriptOutputs["pmu driver version"].Exitcode != 0 {
+		err = fmt.Errorf("failed to retrieve PMU driver version: %s", scriptOutputs["pmu driver version"].Stderr)
 		return
 	}
-	version = strings.TrimSpace(output.Stdout)
+	version = strings.TrimSpace(scriptOutputs["pmu driver version"].Stdout)
 	return
 }
 
 // getTSCFreqHz returns the frequency of the Time Stamp Counter (TSC) in hertz.
 // It takes a myTarget parameter of type target.Target and returns the frequency
 // in hertz and an error if any.
-func getTSCFreqHz(myTarget target.Target, localTempDir string) (freqHz int, err error) {
-	// run tsc app on target to get TSC Frequency in MHz
-	scriptDef := script.ScriptDefinition{
-		Name:           "tsc",
-		ScriptTemplate: "tsc",
-		Depends:        []string{"tsc"},
-	}
-	output, err := script.RunScript(myTarget, scriptDef, localTempDir)
-	if err != nil {
+func getTSCFreqHz(scriptOutputs map[string]script.ScriptOutput) (freqHz int, err error) {
+	if scriptOutputs["tsc"].Exitcode != 0 {
+		err = fmt.Errorf("failed to retrieve TSC frequency: %s", scriptOutputs["tsc"].Stderr)
 		return
 	}
-	freqMhz, err := strconv.Atoi(output.Stdout)
+	freqMhz, err := strconv.Atoi(strings.TrimSpace(scriptOutputs["tsc"].Stdout))
 	if err != nil {
 		return
 	}
@@ -711,16 +693,13 @@ func getTSCFreqHz(myTarget target.Target, localTempDir string) (freqHz int, err 
 	return
 }
 
-func getKernelVersion(myTarget target.Target, localTempDir string) (version string, err error) {
-	scriptDef := script.ScriptDefinition{
-		Name:           "kernel version",
-		ScriptTemplate: "uname -r",
-	}
-	output, err := script.RunScript(myTarget, scriptDef, localTempDir)
-	if err != nil {
+// getKernelVersion returns the kernel version of the system.
+func getKernelVersion(scriptOutputs map[string]script.ScriptOutput) (version string, err error) {
+	if scriptOutputs["kernel version"].Exitcode != 0 {
+		err = fmt.Errorf("failed to retrieve kernel version: %s", scriptOutputs["kernel version"].Stderr)
 		return
 	}
-	version = strings.TrimSpace(output.Stdout)
+	version = strings.TrimSpace(scriptOutputs["kernel version"].Stdout)
 	return
 }
 
