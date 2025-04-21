@@ -341,8 +341,8 @@ func maxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 	}
 	// get the max frequency from the MSR/tpmi
 	specCoreFrequencies, err := getSpecCoreFrequenciesFromOutput(outputs)
-	if err == nil && len(specCoreFrequencies) > 2 && len(specCoreFrequencies[1]) > 1 {
-		return specCoreFrequencies[len(specCoreFrequencies)-1][1] + "GHz"
+	if err == nil && len(specCoreFrequencies) > 1 && len(specCoreFrequencies[1]) > 1 {
+		return specCoreFrequencies[1][1] + "GHz"
 	}
 	return valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "4", `Max Speed:\s(.*)`)
 }
@@ -968,38 +968,15 @@ func elcSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 
 // epbFromOutput gets EPB value from script outputs
 func epbFromOutput(outputs map[string]script.ScriptOutput) string {
-	// if we couldn't read the EPB related MSR values, return empty string
-	if outputs[script.EpbSourceScriptName].Exitcode != 0 || len(outputs[script.EpbSourceScriptName].Stdout) == 0 ||
-		outputs[script.EpbOSScriptName].Exitcode != 0 || len(outputs[script.EpbOSScriptName].Stdout) == 0 ||
-		outputs[script.EpbBIOSScriptName].Exitcode != 0 || len(outputs[script.EpbBIOSScriptName].Stdout) == 0 {
+	if outputs[script.EpbScriptName].Exitcode != 0 || len(outputs[script.EpbScriptName].Stdout) == 0 {
 		slog.Warn("EPB scripts failed or produced no output")
 		return ""
 	}
-	// read the EPB source value
-	epbSource := strings.TrimSpace(outputs[script.EpbSourceScriptName].Stdout)
-	msr, err := strconv.ParseInt(epbSource, 16, 0)
+	epb := strings.TrimSpace(outputs[script.EpbScriptName].Stdout)
+	msr, err := strconv.ParseInt(epb, 16, 0)
 	if err != nil {
-		slog.Error("failed to parse EPB Source value", slog.String("error", err.Error()), slog.String("epbSource", epbSource))
+		slog.Error("failed to parse EPB value", slog.String("error", err.Error()), slog.String("epb", epb))
 		return ""
-	}
-	if msr == 1 { // BIOS
-		// read the EPB BIOS value
-		epbBIOS := strings.TrimSpace(outputs[script.EpbBIOSScriptName].Stdout)
-		msr, err = strconv.ParseInt(epbBIOS, 16, 0)
-		if err != nil {
-			slog.Error("failed to parse EPB BIOS value", slog.String("error", err.Error()), slog.String("epbBIOS", epbBIOS))
-			return ""
-		}
-		slog.Debug("EPB value from BIOS", slog.Int("msr", int(msr)))
-	} else { // OS
-		// read the EPB OS value
-		epbOS := strings.TrimSpace(outputs[script.EpbOSScriptName].Stdout)
-		msr, err = strconv.ParseInt(epbOS, 16, 0)
-		if err != nil {
-			slog.Error("failed to parse EPB OS value", slog.String("error", err.Error()), slog.String("epbOS", epbOS))
-			return ""
-		}
-		slog.Debug("EPB value from OS", slog.Int("msr", int(msr)))
 	}
 	return epbValToLabel(int(msr))
 }

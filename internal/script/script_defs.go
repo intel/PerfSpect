@@ -57,8 +57,7 @@ const (
 	PrefetchersName                            = "prefetchers"
 	L3WaySizeName                              = "l3 way size"
 	PackagePowerLimitName                      = "package power limit"
-	EpbOSScriptName                            = "energy performance bias OS"
-	EpbBIOSScriptName                          = "energy performance bias BIOS"
+	EpbScriptName                              = "energy performance bias"
 	EpbSourceScriptName                        = "energy performance bias source"
 	EppScriptName                              = "energy performance preference"
 	EppValidScriptName                         = "epp valid"
@@ -373,24 +372,35 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
-	},
-	EpbOSScriptName: {
-		Name:           EpbOSScriptName,
-		ScriptTemplate: "rdmsr -f 3:0 0x1B0", // IA32_ENERGY_PERF_BIAS: Energy Performance Bias Hint (0 is highest perf, 15 is highest energy saving)
-		Architectures:  []string{x86_64},
-		Vendors:        []string{"GenuineIntel"},
-		Lkms:           []string{"msr"},
-		Depends:        []string{"rdmsr"},
-		Superuser:      true,
-	},
-	EpbBIOSScriptName: {
-		Name:           EpbBIOSScriptName,
-		ScriptTemplate: "rdmsr -f 6:3 0xA01", // ENERGY_PERF_BIAS_CONFIG, ALT_ENERGY_PERF_BIAS: Energy Performance Bias Hint from BIOS (0 is highest perf, 15 is highest energy saving)
-		Architectures:  []string{x86_64},
-		Vendors:        []string{"GenuineIntel"},
-		Lkms:           []string{"msr"},
-		Depends:        []string{"rdmsr"},
-		Superuser:      true,
+	}, EpbScriptName: {
+		Name: EpbScriptName,
+		ScriptTemplate: `# get EPB source
+# MSR_POWER_CTL, PWR_PERF_TUNING_ALT_EPB: Energy Performance Bias Hint Source (1 is from BIOS, 0 is from OS)
+if ! source=$(rdmsr -f 34:34 0x1FC); then
+    echo "Error: Failed to read MSR 0x1FC" >&2
+    exit 1
+fi
+if [ "$source" -eq 1 ]; then
+    # get EPB from BIOS
+    # ENERGY_PERF_BIAS_CONFIG, ALT_ENERGY_PERF_BIAS: Energy Performance Bias Hint from BIOS (0 is highest perf, 15 is highest energy saving)
+    if ! epb=$(rdmsr -f 6:3 0xA01); then
+        echo "Error: Failed to read MSR 0xA01" >&2
+        exit 1
+    fi
+else
+    # get EPB from OS
+    # IA32_ENERGY_PERF_BIAS: Energy Performance Bias Hint (0 is highest perf, 15 is highest energy saving))
+    if ! epb=$(rdmsr -f 3:0 0x1B0); then
+        echo "Error: Failed to read MSR 0x1B0" >&2
+        exit 1
+    fi
+fi
+echo "$epb"`,
+		Architectures: []string{x86_64},
+		Vendors:       []string{"GenuineIntel"},
+		Lkms:          []string{"msr"},
+		Depends:       []string{"rdmsr"},
+		Superuser:     true,
 	},
 	EppValidScriptName: {
 		Name:           EppValidScriptName,

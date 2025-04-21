@@ -107,6 +107,7 @@ const (
 	SystemEventLogTableName    = "System Event Log"
 	KernelLogTableName         = "Kernel Log"
 	SystemSummaryTableName     = "System Summary"
+	BriefSysSummaryTableName   = "Brief System Summary"
 	// benchmark table names
 	CPUSpeedTableName       = "CPU Speed"
 	CPUPowerTableName       = "CPU Power"
@@ -295,9 +296,7 @@ var tableDefinitions = map[string]TableDefinition{
 		MenuLabel: PowerMenuLabel,
 		ScriptNames: []string{
 			script.PackagePowerLimitName,
-			script.EpbSourceScriptName,
-			script.EpbOSScriptName,
-			script.EpbBIOSScriptName,
+			script.EpbScriptName,
 			script.EppScriptName,
 			script.EppValidScriptName,
 			script.EppPackageControlScriptName,
@@ -551,9 +550,7 @@ var tableDefinitions = map[string]TableDefinition{
 			script.UnameScriptName,
 			script.EtcReleaseScriptName,
 			script.PackagePowerLimitName,
-			script.EpbSourceScriptName,
-			script.EpbOSScriptName,
-			script.EpbBIOSScriptName,
+			script.EpbScriptName,
 			script.ScalingDriverScriptName,
 			script.ScalingGovernorScriptName,
 			script.CstatesScriptName,
@@ -561,6 +558,31 @@ var tableDefinitions = map[string]TableDefinition{
 			script.CveScriptName,
 		},
 		FieldsFunc: systemSummaryTableValues},
+	BriefSysSummaryTableName: {
+		Name:    BriefSysSummaryTableName,
+		HasRows: false,
+		ScriptNames: []string{
+			script.HostnameScriptName,
+			script.DateScriptName,
+			script.LscpuScriptName,
+			script.LspciBitsScriptName,
+			script.LspciDevicesScriptName,
+			script.MaximumFrequencyScriptName,
+			script.SpecCoreFrequenciesScriptName,
+			script.LshwScriptName,
+			script.MeminfoScriptName,
+			script.NicInfoScriptName,
+			script.DiskInfoScriptName,
+			script.UnameScriptName,
+			script.EtcReleaseScriptName,
+			script.PackagePowerLimitName,
+			script.EpbScriptName,
+			script.ScalingDriverScriptName,
+			script.ScalingGovernorScriptName,
+			script.CstatesScriptName,
+			script.ElcScriptName,
+		},
+		FieldsFunc: briefSummaryTableValues},
 	//
 	// configuration set table
 	//
@@ -574,9 +596,7 @@ var tableDefinitions = map[string]TableDefinition{
 			script.LspciDevicesScriptName,
 			script.L3WaySizeName,
 			script.PackagePowerLimitName,
-			script.EpbSourceScriptName,
-			script.EpbOSScriptName,
-			script.EpbBIOSScriptName,
+			script.EpbScriptName,
 			script.EppScriptName,
 			script.EppValidScriptName,
 			script.EppPackageControlScriptName,
@@ -1880,6 +1900,33 @@ func systemSummaryTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Efficiency Latency Control", Values: []string{elcSummaryFromOutput(outputs)}},
 		{Name: "CVEs", Values: []string{cveSummaryFromOutput(outputs)}},
 		{Name: "System Summary", Values: []string{systemSummaryFromOutput(outputs)}},
+	}
+}
+
+func briefSummaryTableValues(outputs map[string]script.ScriptOutput) []Field {
+	return []Field{
+		{Name: "Host Name", Values: []string{strings.TrimSpace(outputs[script.HostnameScriptName].Stdout)}},                                          // Hostname
+		{Name: "Time", Values: []string{strings.TrimSpace(outputs[script.DateScriptName].Stdout)}},                                                   // Date
+		{Name: "CPU Model", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^[Mm]odel name:\s*(.+)$`)}},               // Lscpu
+		{Name: "Microarchitecture", Values: []string{uarchFromOutput(outputs)}},                                                                      // Lscpu, LspciBits, LspciDevices
+		{Name: "TDP", Values: []string{tdpFromOutput(outputs)}},                                                                                      // PackagePowerLimit
+		{Name: "Sockets", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)}},                   // Lscpu
+		{Name: "Cores per Socket", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)}}, // Lscpu
+		{Name: "Hyperthreading", Values: []string{hyperthreadingFromOutput(outputs)}},                                                                // Lscpu, LspciBits, LspciDevices
+		{Name: "CPUs", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU\(s\):\s*(.+)$`)}},                         // Lscpu
+		{Name: "NUMA Nodes", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^NUMA node\(s\):\s*(.+)$`)}},             // Lscpu
+		{Name: "Scaling Driver", Values: []string{strings.TrimSpace(outputs[script.ScalingDriverScriptName].Stdout)}},                                // ScalingDriver
+		{Name: "Scaling Governor", Values: []string{strings.TrimSpace(outputs[script.ScalingGovernorScriptName].Stdout)}},                            // ScalingGovernor
+		{Name: "C-states", Values: []string{cstatesSummaryFromOutput(outputs)}},                                                                      // Cstates
+		{Name: "Maximum Frequency", Values: []string{maxFrequencyFromOutput(outputs)}},                                                               // MaximumFrequency, SpecCoreFrequencies,
+		{Name: "All-core Maximum Frequency", Values: []string{allCoreMaxFrequencyFromOutput(outputs)}},                                               // Lscpu, LspciBits, LspciDevices, SpecCoreFrequencies
+		{Name: "Energy Performance Bias", Values: []string{epbFromOutput(outputs)}},                                                                  // EpbSource, EpbBIOS, EpbOS
+		{Name: "Efficiency Latency Control", Values: []string{elcSummaryFromOutput(outputs)}},                                                        // Elc
+		{Name: "MemTotal", Values: []string{valFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^MemTotal:\s*(.+?)$`)}},                  // Meminfo
+		{Name: "NIC", Values: []string{nicSummaryFromOutput(outputs)}},                                                                               // Lshw, NicInfo
+		{Name: "Disk", Values: []string{diskSummaryFromOutput(outputs)}},                                                                             // DiskInfo, Hdparm
+		{Name: "OS", Values: []string{operatingSystemFromOutput(outputs)}},                                                                           // EtcRelease
+		{Name: "Kernel", Values: []string{valFromRegexSubmatch(outputs[script.UnameScriptName].Stdout, `^Linux \S+ (\S+)`)}},                         // Uname
 	}
 }
 

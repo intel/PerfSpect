@@ -38,15 +38,17 @@ var Cmd = &cobra.Command{
 }
 
 var (
-	flagDuration  int
-	flagFrequency int
-	flagPid       int
+	flagDuration        int
+	flagFrequency       int
+	flagPid             int
+	flagNoSystemSummary bool
 )
 
 const (
-	flagDurationName  = "duration"
-	flagFrequencyName = "frequency"
-	flagPidName       = "pid"
+	flagDurationName        = "duration"
+	flagFrequencyName       = "frequency"
+	flagPidName             = "pid"
+	flagNoSystemSummaryName = "no-summary"
 )
 
 func init() {
@@ -55,6 +57,7 @@ func init() {
 	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 30, "")
 	Cmd.Flags().IntVar(&flagFrequency, flagFrequencyName, 11, "")
 	Cmd.Flags().IntVar(&flagPid, flagPidName, 0, "")
+	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
 
 	common.AddTargetFlags(Cmd)
 
@@ -104,6 +107,10 @@ func getFlagGroups() []common.FlagGroup {
 		{
 			Name: common.FlagFormatName,
 			Help: fmt.Sprintf("choose output format(s) from: %s", strings.Join(append([]string{report.FormatAll}, report.FormatHtml, report.FormatTxt, report.FormatJson), ", ")),
+		},
+		{
+			Name: flagNoSystemSummaryName,
+			Help: "do not include system summary table in report",
 		},
 	}
 	groups = append(groups, common.FlagGroup{
@@ -166,6 +173,11 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 }
 
 func runCmd(cmd *cobra.Command, args []string) error {
+	var tableNames []string
+	if !flagNoSystemSummary {
+		tableNames = append(tableNames, report.BriefSysSummaryTableName)
+	}
+	tableNames = append(tableNames, report.CodePathFrequencyTableName)
 	reportingCommand := common.ReportingCommand{
 		Cmd:            cmd,
 		ReportNamePost: "flame",
@@ -174,7 +186,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			"Duration":  strconv.Itoa(flagDuration),
 			"PID":       strconv.Itoa(flagPid),
 		},
-		TableNames: []string{report.CodePathFrequencyTableName},
+		TableNames: tableNames,
 	}
 	return reportingCommand.Run()
 }
