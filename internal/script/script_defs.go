@@ -295,15 +295,23 @@ vendor=$(echo "$lscpu" | grep -E "^Vendor ID:" | awk '{print $3}')
 if [ "$vendor" != "GenuineIntel" ]; then
 	exit 1
 fi
-# if cpu is SRF or GNR get the frequencies from tpmi
-if [ "$family" -eq 6 ] && ( [ "$model" -eq 175 ] || [ "$model" -eq 173 ] ); then
+# if cpu is GNR get the frequencies from tpmi
+if [ "$family" -eq 6 ] && [ "$model" -eq 173 ]; then  # GNR
 	cores=$(pcm-tpmi 0x5 0xD8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_10
-	sse=$(pcm-tpmi 0x5 0xA8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_4
+	# this works unless the TRL is overridden on MSR 0x1AD --> sse=$(pcm-tpmi 0x5 0xA8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_4
+	sse=$(rdmsr 0x1ad) # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
 	avx2=$(pcm-tpmi 0x5 0xB0 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_5
 	avx512=$(pcm-tpmi 0x5 0xB8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_6
 	avx512h=$(pcm-tpmi 0x5 0xC0 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_7
 	amx=$(pcm-tpmi 0x5 0xC8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_8
-else # if cpu is not SRF or GNR get the frequencies from msr
+elif [ "$family" -eq 6 ] && [ "$model" -eq 175 ]; then  # SRF
+	cores=$(rdmsr 0x1ae) # MSR_TURBO_GROUP_CORE_CNT: Group Size of Active Cores for Turbo Mode Operation
+	sse=$(rdmsr 0x774 -f 7:0) # IA32_HWP_REQUEST
+	avx2=0
+	avx512=0
+	avx512h=0
+	amx=0
+else # not SRF or GNR
 	cores=$(rdmsr 0x1ae) # MSR_TURBO_GROUP_CORE_CNT: Group Size of Active Cores for Turbo Mode Operation
 	sse=$(rdmsr 0x1ad) # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
 	avx2=0
