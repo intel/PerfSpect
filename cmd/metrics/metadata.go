@@ -241,7 +241,7 @@ func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSumm
 		},
 		{
 			Name:           "perf supported events",
-			ScriptTemplate: "perf list",
+			ScriptTemplate: perfPath + " list",
 			Superuser:      !noRoot,
 		},
 		{
