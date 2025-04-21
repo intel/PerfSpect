@@ -306,7 +306,13 @@ if [ "$family" -eq 6 ] && [ "$model" -eq 173 ]; then  # GNR
 	amx=$(pcm-tpmi 0x5 0xC8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_8
 elif [ "$family" -eq 6 ] && [ "$model" -eq 175 ]; then  # SRF
 	cores=$(rdmsr 0x1ae) # MSR_TURBO_GROUP_CORE_CNT: Group Size of Active Cores for Turbo Mode Operation
-	sse=$(rdmsr 0x774 -f 7:0) # IA32_HWP_REQUEST
+	# if pstate driver is intel_pstate use 0x774 else use 0x199
+	driver=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver)
+	if [ "$driver" = "intel_pstate" ]; then
+		sse=$(rdmsr 0x774 -f 15:8) # IA32_HWP_REQUEST
+	else
+		sse=$(rdmsr 0x199 -f 15:8) # IA32_PERF_CTL
+	fi
 	avx2=0
 	avx512=0
 	avx512h=0

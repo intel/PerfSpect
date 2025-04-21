@@ -776,16 +776,39 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 	var setScript script.ScriptDefinition
 	freqInt := uint64(coreFrequency * 10)
 	if targetFamily == "6" && targetModel == "175" { // SRF
-		var value uint64
-		for i := range 2 {
-			value = value | freqInt<<uint(i*8)
-		}
-		setScript = script.ScriptDefinition{
-			Name:           "set frequency bins",
-			ScriptTemplate: fmt.Sprintf("wrmsr 0x774 %d", value),
-			Superuser:      true,
+		// get the pstate driver
+		getScript := script.ScriptDefinition{
+			Name:           "get pstate driver",
+			ScriptTemplate: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver",
 			Vendors:        []string{"GenuineIntel"},
-			Depends:        []string{"pcm-tpmi"},
+		}
+		output, err := runScript(myTarget, getScript, localTempDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: failed to get pstate driver: %v\n", err)
+			slog.Error("failed to get pstate driver", slog.String("error", err.Error()))
+			return
+		}
+		if strings.Contains(output, "intel_pstate") {
+			var value uint64
+			for i := range 2 {
+				value = value | freqInt<<uint(i*8)
+			}
+			setScript = script.ScriptDefinition{
+				Name:           "set frequency bins",
+				ScriptTemplate: fmt.Sprintf("wrmsr 0x774 %d", value),
+				Superuser:      true,
+				Vendors:        []string{"GenuineIntel"},
+				Depends:        []string{"wrmsr"},
+			}
+		} else {
+			value := freqInt << uint(2*8)
+			setScript = script.ScriptDefinition{
+				Name:           "set frequency bins",
+				ScriptTemplate: fmt.Sprintf("wrmsr 0x199 %d", value),
+				Superuser:      true,
+				Vendors:        []string{"GenuineIntel"},
+				Depends:        []string{"wrmsr"},
+			}
 		}
 	} else {
 		var value uint64
