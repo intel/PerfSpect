@@ -340,8 +340,8 @@ var tableDefinitions = map[string]TableDefinition{
 		FieldsFunc: uncoreTableValues},
 	ElcTableName: {
 		Name:     ElcTableName,
-		Families: []string{"6"},          // Intel CPUs only
-		Models:   []string{"173", "175"}, // Granite Rapids, Sierra Forest
+		Families: []string{"6"},                 // Intel CPUs only
+		Models:   []string{"173", "175", "221"}, // Granite Rapids, Sierra Forest, Clearwater Forest
 		HasRows:  true,
 		ScriptNames: []string{
 			script.ElcScriptName,
@@ -350,8 +350,8 @@ var tableDefinitions = map[string]TableDefinition{
 		InsightsFunc: elcTableInsights},
 	SSTTFHPTableName: {
 		Name:     SSTTFHPTableName,
-		Families: []string{"6"},          // Intel CPUs only
-		Models:   []string{"173", "175"}, // Granite Rapids, Sierra Forest
+		Families: []string{"6"},                 // Intel CPUs only
+		Models:   []string{"173", "175", "221"}, // Granite Rapids, Sierra Forest, Clearwater Forest
 		HasRows:  true,
 		ScriptNames: []string{
 			script.SstTfHighPriorityCoreFrequenciesScriptName,
@@ -359,8 +359,8 @@ var tableDefinitions = map[string]TableDefinition{
 		FieldsFunc: sstTFHPTableValues},
 	SSTTFLPTableName: {
 		Name:     SSTTFLPTableName,
-		Families: []string{"6"},          // Intel CPUs only
-		Models:   []string{"173", "175"}, // Granite Rapids, Sierra Forest
+		Families: []string{"6"},                 // Intel CPUs only
+		Models:   []string{"173", "175", "221"}, // Granite Rapids, Sierra Forest, Clearwater Forest
 		HasRows:  true,
 		ScriptNames: []string{
 			script.SstTfLowPriorityCoreFrequenciesScriptName,

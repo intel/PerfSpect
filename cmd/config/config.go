@@ -792,7 +792,7 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 		slog.Error("failed to get target model", slog.String("error", err.Error()))
 		return
 	}
-	if targetFamily != "6" || (targetFamily == "6" && targetModel != "173" && targetModel != "175") {
+	if targetFamily != "6" || (targetFamily == "6" && targetModel != "173" && targetModel != "175" && targetModel != "221") {
 		err := fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())
 		slog.Error(err.Error())
 		fmt.Fprintf(os.Stderr, "Error: failed to set uncore frequency: %v\n", err)
@@ -885,7 +885,7 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 		slog.Error("failed to get target model", slog.String("error", err.Error()))
 		return
 	}
-	if targetFamily != "6" || (targetFamily == "6" && (targetModel == "173" || targetModel == "175")) {
+	if targetFamily != "6" || (targetFamily == "6" && (targetModel == "173" || targetModel == "175" || targetModel == "221")) {
 		err := fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())
 		slog.Error(err.Error())
 		fmt.Fprintf(os.Stderr, "Error: failed to set uncore frequency: %v\n", err)
@@ -1138,7 +1138,7 @@ func setElc(elc string, myTarget target.Target, localTempDir string) {
 		ScriptTemplate: fmt.Sprintf("bhs-power-mode.sh --%s", mode),
 		Superuser:      true,
 		Vendors:        []string{"GenuineIntel"},
-		Models:         []string{"173", "175"}, // GNR and SRF only
+		Models:         []string{"173", "175", "221"}, // GNR, SRF, CWF
 		Depends:        []string{"bhs-power-mode.sh"},
 	}
 	_, err := runScript(myTarget, setScript, localTempDir)

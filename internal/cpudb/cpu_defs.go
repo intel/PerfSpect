@@ -49,7 +49,8 @@ var cpus = CPUDB{
 	{MicroArchitecture: "GNR_X1", Family: "6", Model: "173", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 16},        // Granite Rapids - SP (MCC/LCC)
 	{MicroArchitecture: "GNR_X2", Family: "6", Model: "173", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 16},        // Granite Rapids - SP (XCC)
 	{MicroArchitecture: "GNR_X3", Family: "6", Model: "173", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 16},       // Granite Rapids - AP (UCC)
-	{MicroArchitecture: "GNR_D", Family: "6", Model: "174", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 0, LogicalThreadCount: 2, CacheWayCount: 16},         // Granite Rapids - D (generic)
+	{MicroArchitecture: "GNR_D", Family: "6", Model: "174", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 0, LogicalThreadCount: 2, CacheWayCount: 16},         // Granite Rapids - D
+	{MicroArchitecture: "CWF", Family: "6", Model: "221", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 12, LogicalThreadCount: 1, CacheWayCount: 0},           // Clearwater Forest - generic
 	// AMD CPUs
 	{MicroArchitecture: "Naples", Family: "23", Model: "1", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 0},                     // Naples
 	{MicroArchitecture: "Rome", Family: "23", Model: "49", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 0},                      // Rome
