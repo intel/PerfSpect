@@ -474,8 +474,8 @@ echo "$epb"`,
 		Name:           UncoreMaxFromTPMIScriptName,
 		ScriptTemplate: "pcm-tpmi 2 0x18 -d -b 8:14",
 		Architectures:  []string{x86_64},
-		Families:       []string{"6"},          // Intel
-		Models:         []string{"173", "175"}, // GNR, SRF
+		Families:       []string{"6"},                 // Intel
+		Models:         []string{"173", "175", "221"}, // GNR, SRF, CWF
 		Depends:        []string{"pcm-tpmi"},
 		Superuser:      true,
 	},
@@ -483,8 +483,8 @@ echo "$epb"`,
 		Name:           UncoreMinFromTPMIScriptName,
 		ScriptTemplate: "pcm-tpmi 2 0x18 -d -b 15:21",
 		Architectures:  []string{x86_64},
-		Families:       []string{"6"},          // Intel
-		Models:         []string{"173", "175"}, // GNR, SRF
+		Families:       []string{"6"},                 // Intel
+		Models:         []string{"173", "175", "221"}, // GNR, SRF, CWF
 		Depends:        []string{"pcm-tpmi"},
 		Superuser:      true,
 	},
@@ -492,8 +492,8 @@ echo "$epb"`,
 		Name:           UncoreDieTypesFromTPMIScriptName,
 		ScriptTemplate: "pcm-tpmi 2 0x10 -d -b 26:26",
 		Architectures:  []string{x86_64},
-		Families:       []string{"6"},          // Intel
-		Models:         []string{"173", "175"}, // GNR, SRF
+		Families:       []string{"6"},                 // Intel
+		Models:         []string{"173", "175", "221"}, // GNR, SRF, CWF
 		Depends:        []string{"pcm-tpmi"},
 		Superuser:      true,
 	},
@@ -565,8 +565,8 @@ for die in "${!die_types[@]}"; do
 done
 `,
 		Architectures: []string{x86_64},
-		Families:      []string{"6"},          // Intel
-		Models:        []string{"173", "175"}, // GNR, SRF
+		Families:      []string{"6"},                 // Intel
+		Models:        []string{"173", "175", "221"}, // GNR, SRF, CWF
 		Depends:       []string{"pcm-tpmi"},
 		Superuser:     true,
 	},
