@@ -435,8 +435,8 @@ func channelsFromOutput(outputs map[string]script.ScriptOutput) string {
 }
 
 func turboEnabledFromOutput(outputs map[string]script.ScriptOutput) string {
-	family := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU family:\s*(.+)$`)
-	if family == "6" { // Intel
+	vendor := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Vendor ID:\s*(.+)$`)
+	if vendor == "GenuineIntel" {
 		val := valFromRegexSubmatch(outputs[script.CpuidScriptName].Stdout, `^Intel Turbo Boost Technology\s*= (.+?)$`)
 		if val == "true" {
 			return "Enabled"
@@ -445,7 +445,7 @@ func turboEnabledFromOutput(outputs map[string]script.ScriptOutput) string {
 			return "Disabled"
 		}
 		return "" // unknown value
-	} else if family == "23" || family == "25" { // AMD
+	} else if vendor == "AuthenticAMD" {
 		val := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Frequency boost.*:\s*(.+?)$`)
 		if val != "" {
 			return val + " (AMD Frequency Boost)"
