@@ -749,19 +749,81 @@ func setLlcSize(llcSize float64, myTarget target.Target, localTempDir string) {
 
 func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDir string) {
 	fmt.Printf("set core frequency to %.1f GHz on %s\n", coreFrequency, myTarget.GetName())
+	targetFamily, err := myTarget.GetFamily()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error getting target family: %v\n", err)
+		slog.Error("failed to get target family", slog.String("error", err.Error()))
+		return
+	}
+	targetModel, err := myTarget.GetModel()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error getting target model: %v\n", err)
+		slog.Error("failed to get target model", slog.String("error", err.Error()))
+		return
+	}
+	targetVendor, err := myTarget.GetVendor()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error getting target vendor: %v\n", err)
+		slog.Error("failed to get target vendor", slog.String("error", err.Error()))
+		return
+	}
+	if targetVendor != "GenuineIntel" {
+		err := fmt.Errorf("core frequency setting not supported on %s due to vendor mismatch", myTarget.GetName())
+		slog.Error(err.Error())
+		fmt.Fprintf(os.Stderr, "Error: failed to set core frequency: %v\n", err)
+		return
+	}
+	var setScript script.ScriptDefinition
 	freqInt := uint64(coreFrequency * 10)
-	var msr uint64
-	for i := range 8 {
-		msr = msr | freqInt<<uint(i*8)
+	if targetFamily == "6" && targetModel == "175" { // SRF
+		// get the pstate driver
+		getScript := script.ScriptDefinition{
+			Name:           "get pstate driver",
+			ScriptTemplate: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver",
+			Vendors:        []string{"GenuineIntel"},
+		}
+		output, err := runScript(myTarget, getScript, localTempDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: failed to get pstate driver: %v\n", err)
+			slog.Error("failed to get pstate driver", slog.String("error", err.Error()))
+			return
+		}
+		if strings.Contains(output, "intel_pstate") {
+			var value uint64
+			for i := range 2 {
+				value = value | freqInt<<uint(i*8)
+			}
+			setScript = script.ScriptDefinition{
+				Name:           "set frequency bins",
+				ScriptTemplate: fmt.Sprintf("wrmsr 0x774 %d", value),
+				Superuser:      true,
+				Vendors:        []string{"GenuineIntel"},
+				Depends:        []string{"wrmsr"},
+			}
+		} else {
+			value := freqInt << uint(2*8)
+			setScript = script.ScriptDefinition{
+				Name:           "set frequency bins",
+				ScriptTemplate: fmt.Sprintf("wrmsr 0x199 %d", value),
+				Superuser:      true,
+				Vendors:        []string{"GenuineIntel"},
+				Depends:        []string{"wrmsr"},
+			}
+		}
+	} else {
+		var value uint64
+		for i := range 8 {
+			value = value | freqInt<<uint(i*8)
+		}
+		setScript = script.ScriptDefinition{
+			Name:           "set frequency bins",
+			ScriptTemplate: fmt.Sprintf("wrmsr -a 0x1AD %d", value),
+			Superuser:      true,
+			Vendors:        []string{"GenuineIntel"},
+			Depends:        []string{"wrmsr"},
+		}
 	}
-	setScript := script.ScriptDefinition{
-		Name:           "set frequency bins",
-		ScriptTemplate: fmt.Sprintf("wrmsr -a 0x1AD %d", msr),
-		Superuser:      true,
-		Vendors:        []string{"GenuineIntel"},
-		Depends:        []string{"wrmsr"},
-	}
-	_, err := runScript(myTarget, setScript, localTempDir)
+	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to set core frequency: %v\n", err)
 	}
@@ -885,7 +947,7 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 		slog.Error("failed to get target model", slog.String("error", err.Error()))
 		return
 	}
-	if targetFamily != "6" || (targetFamily == "6" && (targetModel == "173" || targetModel == "175")) {
+	if targetFamily != "6" || (targetFamily == "6" && (targetModel == "173" || targetModel == "175")) { // SRF, GNR
 		err := fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())
 		slog.Error(err.Error())
 		fmt.Fprintf(os.Stderr, "Error: failed to set uncore frequency: %v\n", err)
