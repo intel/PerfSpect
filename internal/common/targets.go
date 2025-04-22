@@ -157,56 +157,6 @@ func GetTargets(cmd *cobra.Command, needsElevatedPrivileges bool, failIfCantElev
 	return
 }
 
-// isNoExec checks if the temporary directory is on a file system that is mounted with noexec.
-func isNoExec(t target.Target, tempDir string) (bool, error) {
-	dfCmd := exec.Command("df", "-P", tempDir)
-	dfOutput, _, _, err := t.RunCommand(dfCmd, 0, true)
-	if err != nil {
-		err = fmt.Errorf("failed to run df command: %w", err)
-		return false, err
-	}
-	mountCmd := exec.Command("mount")
-	mountOutput, _, _, err := t.RunCommand(mountCmd, 0, true)
-	if err != nil {
-		err = fmt.Errorf("failed to run mount command: %w", err)
-		return false, err
-	}
-	// Parse the output of `df` to extract the device name
-	lines := strings.Split(dfOutput, "\n")
-	if len(lines) < 2 {
-		return false, fmt.Errorf("unexpected output from df command: %s", dfOutput)
-	}
-	dfFields := strings.Fields(lines[1]) // Second line contains the device info
-	if len(dfFields) < 6 {
-		return false, fmt.Errorf("unexpected output format from df command: %s", dfOutput)
-	}
-	filesystem := dfFields[0]
-	mountedOn := dfFields[5]
-	// Search for the device in the mount output and check for "noexec"
-	var found bool
-	for line := range strings.SplitSeq(mountOutput, "\n") {
-		mountFields := strings.Fields(line)
-		if len(mountFields) < 6 {
-			continue // Skip lines that don't have enough fields
-		}
-		device := mountFields[0]
-		mountPoint := mountFields[2]
-		mountOptions := strings.Join(mountFields[5:], " ")
-		if device == filesystem && mountPoint == mountedOn {
-			found = true
-			if strings.Contains(mountOptions, "noexec") {
-				return true, nil // Found "noexec" for the device
-			} else {
-				break
-			}
-		}
-	}
-	if !found {
-		return false, fmt.Errorf("device %s not found in mount output", filesystem)
-	}
-	return false, nil // "noexec" not found
-}
-
 // getSingleTarget returns a target.Target object representing the target host and associated details.
 // The function takes the following parameters:
 // - cmd: A pointer to the cobra.Command object representing the command.
@@ -370,24 +320,25 @@ func getTargetsFromFile(targetsFilePath string, localTempDir string) (targets []
 		return
 	}
 	for _, t := range targetsFile.Targets {
-		// create a sub-directory for each target in the localTempDir
-		localTargetDir := path.Join(localTempDir, t.Name)
+		// create a target object
+		newTarget := target.NewRemoteTarget(t.Name, t.Host, t.Port, t.User, t.Key)
+		newTarget.SetSshPass(t.Pwd)
+		// create a sub-directory for the target in the localTempDir
+		localTargetDir := path.Join(localTempDir, newTarget.GetName())
 		err = os.MkdirAll(localTargetDir, 0755)
 		if err != nil {
 			return
 		}
-		// extract sshpass resource if password is provided
+		// if the target has a password, extract sshpass into the target-specific temp dir and set the path
 		var sshPassPath string
 		if t.Pwd != "" {
 			sshPassPath, err = util.ExtractResource(script.Resources, path.Join("resources", hostArchitecture, "sshpass"), localTargetDir)
 			if err != nil {
 				return
 			}
+			newTarget.SetSshPassPath(sshPassPath)
 		}
-		// create a target object
-		newTarget := target.NewRemoteTarget(t.Name, t.Host, t.Port, t.User, t.Key)
-		newTarget.SetSshPassPath(sshPassPath)
-		newTarget.SetSshPass(t.Pwd)
+		// try to connect to the target
 		if !newTarget.CanConnect() {
 			targetErrs = append(targetErrs, fmt.Errorf("failed to connect to target host (%s)", newTarget.GetName()))
 		} else {
@@ -422,4 +373,54 @@ func getHostArchitecture() (string, error) {
 		err := fmt.Errorf("unsupported architecture: %s", runtime.GOARCH)
 		return "", err
 	}
+}
+
+// isNoExec checks if the temporary directory is on a file system that is mounted with noexec.
+func isNoExec(t target.Target, tempDir string) (bool, error) {
+	dfCmd := exec.Command("df", "-P", tempDir)
+	dfOutput, _, _, err := t.RunCommand(dfCmd, 0, true)
+	if err != nil {
+		err = fmt.Errorf("failed to run df command: %w", err)
+		return false, err
+	}
+	mountCmd := exec.Command("mount")
+	mountOutput, _, _, err := t.RunCommand(mountCmd, 0, true)
+	if err != nil {
+		err = fmt.Errorf("failed to run mount command: %w", err)
+		return false, err
+	}
+	// Parse the output of `df` to extract the device name
+	lines := strings.Split(dfOutput, "\n")
+	if len(lines) < 2 {
+		return false, fmt.Errorf("unexpected output from df command: %s", dfOutput)
+	}
+	dfFields := strings.Fields(lines[1]) // Second line contains the device info
+	if len(dfFields) < 6 {
+		return false, fmt.Errorf("unexpected output format from df command: %s", dfOutput)
+	}
+	filesystem := dfFields[0]
+	mountedOn := dfFields[5]
+	// Search for the device in the mount output and check for "noexec"
+	var found bool
+	for line := range strings.SplitSeq(mountOutput, "\n") {
+		mountFields := strings.Fields(line)
+		if len(mountFields) < 6 {
+			continue // Skip lines that don't have enough fields
+		}
+		device := mountFields[0]
+		mountPoint := mountFields[2]
+		mountOptions := strings.Join(mountFields[5:], " ")
+		if device == filesystem && mountPoint == mountedOn {
+			found = true
+			if strings.Contains(mountOptions, "noexec") {
+				return true, nil // Found "noexec" for the device
+			} else {
+				break
+			}
+		}
+	}
+	if !found {
+		return false, fmt.Errorf("device %s not found in mount output", filesystem)
+	}
+	return false, nil // "noexec" not found
 }
