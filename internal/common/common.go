@@ -117,78 +117,85 @@ func (rc *ReportingCommand) Run() error {
 		util.SignalChildren(syscall.SIGINT)
 	}()
 
-	// get the targets
-	myTargets, targetErrs, err := GetTargets(rc.Cmd, elevatedPrivilegesRequired(rc.TableNames), false, localTempDir)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		slog.Error(err.Error())
-		rc.Cmd.SilenceUsage = true
-		return err
-	}
-	// schedule the cleanup of the temporary directory on each target (if not debugging)
-	if rc.Cmd.Parent().PersistentFlags().Lookup("debug").Value.String() != "true" {
-		for _, myTarget := range myTargets {
-			if myTarget.GetTempDirectory() != "" {
-				deferTarget := myTarget // create a new variable to capture the current value
-				defer func(deferTarget target.Target) {
-					err := deferTarget.RemoveTempDirectory()
-					if err != nil {
-						slog.Error("error removing target temporary directory", slog.String("error", err.Error()))
-					}
-				}(deferTarget)
-			}
-		}
-	}
-
-	// setup and start the progress indicator
-	multiSpinner := progress.NewMultiSpinner()
-	for _, target := range myTargets {
-		err := multiSpinner.AddSpinner(target.GetName())
+	var orderedTargetScriptOutputs []TargetScriptOutputs
+	if FlagInput != "" {
+		var err error
+		orderedTargetScriptOutputs, err = outputsFromInput(rc.SummaryTableName)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			slog.Error(err.Error())
 			rc.Cmd.SilenceUsage = true
 			return err
 		}
-	}
-	multiSpinner.Start()
-
-	// get the data we need to generate reports
-	orderedTargetScriptOutputs, err := rc.RetrieveScriptOutputs(localTempDir, myTargets, multiSpinner.Status)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		slog.Error(err.Error())
-		rc.Cmd.SilenceUsage = true
-		return err
-	}
-
-	// Collect indices of targets to remove
-	var indicesToRemove []int
-	for i := range targetErrs {
-		if targetErrs[i] != nil {
-			_ = multiSpinner.Status(myTargets[i].GetName(), fmt.Sprintf("Error: %v", targetErrs[i]))
-			indicesToRemove = append(indicesToRemove, i)
+	} else {
+		// get the targets
+		myTargets, targetErrs, err := GetTargets(rc.Cmd, elevatedPrivilegesRequired(rc.TableNames), false, localTempDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			rc.Cmd.SilenceUsage = true
+			return err
 		}
+		// schedule the cleanup of the temporary directory on each target (if not debugging)
+		if rc.Cmd.Parent().PersistentFlags().Lookup("debug").Value.String() != "true" {
+			for _, myTarget := range myTargets {
+				if myTarget.GetTempDirectory() != "" {
+					deferTarget := myTarget // create a new variable to capture the current value
+					defer func(deferTarget target.Target) {
+						err := deferTarget.RemoveTempDirectory()
+						if err != nil {
+							slog.Error("error removing target temporary directory", slog.String("error", err.Error()))
+						}
+					}(deferTarget)
+				}
+			}
+		}
+		// setup and start the progress indicator
+		multiSpinner := progress.NewMultiSpinner()
+		for _, target := range myTargets {
+			err := multiSpinner.AddSpinner(target.GetName())
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				slog.Error(err.Error())
+				rc.Cmd.SilenceUsage = true
+				return err
+			}
+		}
+		multiSpinner.Start()
+		// get the data we need to generate reports
+		orderedTargetScriptOutputs, err = outputsFromTargets(rc.Cmd, myTargets, rc.TableNames, rc.ScriptParams, multiSpinner.Status, localTempDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			rc.Cmd.SilenceUsage = true
+			return err
+		}
+		// Collect indices of targets to remove
+		var indicesToRemove []int
+		for i := range targetErrs {
+			if targetErrs[i] != nil {
+				_ = multiSpinner.Status(myTargets[i].GetName(), fmt.Sprintf("Error: %v", targetErrs[i]))
+				indicesToRemove = append(indicesToRemove, i)
+			}
+		}
+		// Remove targets in reverse order of indices to avoid shifting issues
+		for i := len(indicesToRemove) - 1; i >= 0; i-- {
+			myTargets = slices.Delete(myTargets, indicesToRemove[i], indicesToRemove[i]+1)
+		}
+		// check if we have any remaining targets to run the scripts on
+		if len(myTargets) == 0 {
+			err := fmt.Errorf("no targets remain")
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			rc.Cmd.SilenceUsage = true
+			return err
+		}
+		// stop the progress indicator
+		multiSpinner.Finish()
+		fmt.Println()
 	}
-	// Remove targets in reverse order of indices to avoid shifting issues
-	for i := len(indicesToRemove) - 1; i >= 0; i-- {
-		myTargets = slices.Delete(myTargets, indicesToRemove[i], indicesToRemove[i]+1)
-	}
-	// check if we have any remaining targets to run the scripts on
-	if len(myTargets) == 0 {
-		err := fmt.Errorf("no targets remain")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		slog.Error(err.Error())
-		rc.Cmd.SilenceUsage = true
-		return err
-	}
-
-	// stop the progress indicator
-	multiSpinner.Finish()
-	fmt.Println()
-
 	// we have output data so create the output directory
-	err = CreateOutputDir(outputDir)
+	err := CreateOutputDir(outputDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
@@ -373,26 +380,6 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 		}
 	}
 	return reportFilePaths, nil
-}
-
-// RetrieveScriptOutputs gets the data from the targets or from the input file(s)
-func (rc *ReportingCommand) RetrieveScriptOutputs(localTempDir string, myTargets []target.Target, statusUpdate progress.MultiSpinnerUpdateFunc) ([]TargetScriptOutputs, error) {
-	var orderedTargetScriptOutputs []TargetScriptOutputs
-	// check if we are reading from a file or running on targets
-	if FlagInput != "" {
-		var err error
-		orderedTargetScriptOutputs, err = outputsFromInput(rc.SummaryTableName)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		var err error
-		orderedTargetScriptOutputs, err = outputsFromTargets(rc.Cmd, myTargets, rc.TableNames, rc.ScriptParams, statusUpdate, localTempDir)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return orderedTargetScriptOutputs, nil
 }
 
 // outputsFromInput reads the raw file(s) and returns the data in the order of the raw files
