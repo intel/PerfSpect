@@ -258,8 +258,6 @@ var tableDefinitions = map[string]TableDefinition{
 			script.MaximumFrequencyScriptName,
 			script.SpecCoreFrequenciesScriptName,
 			script.PPINName,
-			script.PrefetchControlName,
-			script.PrefetchersName,
 			script.L3WaySizeName},
 		FieldsFunc:   cpuTableValues,
 		InsightsFunc: cpuTableInsights},
@@ -1040,6 +1038,7 @@ func cpuTableInsights(outputs map[string]script.ScriptOutput, tableValues TableV
 					"SPR": 6,
 					"EMR": 7,
 					"SRF": 8,
+					"CWF": 8,
 					"GNR": 8,
 				}
 				uarch := tableValues.Fields[uarchIndex].Values[0]
@@ -1175,7 +1174,7 @@ func uncoreTableValues(outputs map[string]script.ScriptOutput) []Field {
 		slog.Error("failed to get uarch from script outputs")
 		return []Field{}
 	}
-	if strings.Contains(uarch, "SRF") || strings.Contains(uarch, "GNR") {
+	if strings.Contains(uarch, "SRF") || strings.Contains(uarch, "GNR") || strings.Contains(uarch, "CWF") {
 		return []Field{
 			{Name: "Min Frequency (Compute)", Values: []string{uncoreMinMaxDieFrequencyFromOutput(false, true, outputs)}},
 			{Name: "Min Frequency (I/O)", Values: []string{uncoreMinMaxDieFrequencyFromOutput(false, false, outputs)}},
@@ -1943,7 +1942,7 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Package Power / TDP", Values: []string{tdpFromOutput(outputs)}},
 		{Name: "All-Core Max Frequency", Values: []string{allCoreMaxFrequencyFromOutput(outputs)}},
 	}
-	if strings.Contains(uarch, "SRF") || strings.Contains(uarch, "GNR") {
+	if strings.Contains(uarch, "SRF") || strings.Contains(uarch, "GNR") || strings.Contains(uarch, "CWF") {
 		fields = append(fields, []Field{
 			{Name: "Uncore Min Frequency (Compute)", Values: []string{uncoreMinMaxDieFrequencyFromOutput(false, true, outputs)}},
 			{Name: "Uncore Min Frequency (I/O)", Values: []string{uncoreMinMaxDieFrequencyFromOutput(false, false, outputs)}},
@@ -1962,7 +1961,7 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Scaling Governor", Values: []string{strings.TrimSpace(outputs[script.ScalingGovernorScriptName].Stdout)}},
 	}...)
 	// add ELC (for SRF and GNR only)
-	if strings.Contains(uarch, "SRF") || strings.Contains(uarch, "GNR") {
+	if strings.Contains(uarch, "SRF") || strings.Contains(uarch, "GNR") || strings.Contains(uarch, "CWF") {
 		fields = append(fields, Field{Name: "Efficiency Latency Control", Values: []string{elcSummaryFromOutput(outputs)}})
 	}
 	// add prefetchers
