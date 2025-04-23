@@ -257,7 +257,7 @@ func getSpecCoreFrequenciesFromOutput(outputs map[string]script.ScriptOutput) ([
 	var buckets []string
 	startRange := 1
 	var archMultiplier int
-	if strings.Contains(arch, "SRF") {
+	if strings.Contains(arch, "SRF") || strings.Contains(arch, "CWF") {
 		archMultiplier = 4
 	} else if strings.Contains(arch, "GNR_X3") {
 		archMultiplier = 3
@@ -1239,6 +1239,12 @@ func clusteringModeFromOutput(outputs map[string]script.ScriptOutput) string {
 			return "UMA 4 (Quad)"
 		} else if nodesPerSocket == 2 {
 			return "SNC 2"
+		}
+	} else if uarch == "CWF" {
+		if nodesPerSocket == 1 {
+			return "UMA 6 (Hex)"
+		} else if nodesPerSocket == 3 {
+			return "SNC 3"
 		}
 	}
 	return ""

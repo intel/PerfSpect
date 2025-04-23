@@ -627,6 +627,8 @@ func getNumGPCounters(uarch string) (numGPCounters int, err error) {
 		fallthrough
 	case "SRF":
 		fallthrough
+	case "CWF":
+		fallthrough
 	case "GNR":
 		numGPCounters = 8
 	case "Gen":
