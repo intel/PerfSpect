@@ -1,6 +1,6 @@
 package report
 
-// Copyright (C) 2021-2024 Intel Corporation
+// Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
 import (
@@ -776,15 +776,15 @@ func coreTurboFrequencyTableHTMLRenderer(tableValues TableValues) string {
 	return out
 }
 
-func cpuFrequencyTableHtmlRenderer(tableValues TableValues, targetName string) string {
+func frequencyBenchmarkTableHtmlRenderer(tableValues TableValues, targetName string) string {
 	return coreTurboFrequencyTableHTMLRenderer(tableValues)
 }
 
-func memoryLatencyTableHtmlRenderer(tableValues TableValues, targetName string) string {
-	return memoryLatencyTableMultiTargetHtmlRenderer([]TableValues{tableValues}, []string{targetName})
+func memoryBenchmarkTableHtmlRenderer(tableValues TableValues, targetName string) string {
+	return memoryBenchmarkTableMultiTargetHtmlRenderer([]TableValues{tableValues}, []string{targetName})
 }
 
-func memoryLatencyTableMultiTargetHtmlRenderer(allTableValues []TableValues, targetNames []string) string {
+func memoryBenchmarkTableMultiTargetHtmlRenderer(allTableValues []TableValues, targetNames []string) string {
 	data := [][]scatterPoint{}
 	datasetNames := []string{}
 	for targetIdx, tableValues := range allTableValues {
@@ -837,7 +837,7 @@ func telemetryTableHTMLRenderer(tableValues TableValues, data [][]float64, datas
 	return renderLineChart(timestamps, data, datasetNames, chartConfig)
 }
 
-func cpuUtilizationTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func cpuUtilizationTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
 	// collect the busy (100 - idle) values for each CPU
@@ -886,7 +886,7 @@ func cpuUtilizationTableHTMLRenderer(tableValues TableValues, targetName string)
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
 }
 
-func summaryCPUUtilizationTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func utilizationCategoriesTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -921,7 +921,7 @@ func summaryCPUUtilizationTableHTMLRenderer(tableValues TableValues, targetName 
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
 }
 
-func irqRateTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func irqRateTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[2:] { // 1 data set per field, e.g., %usr, %nice, etc., skip Time and CPU fields
@@ -961,10 +961,10 @@ func irqRateTableHTMLRenderer(tableValues TableValues, targetName string) string
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
 }
 
-// driveStatsTableHTMLRenderer renders charts of drive statistics
+// driveTelemetryTableHTMLRenderer renders charts of drive statistics
 // - one scatter chart per drive, showing the drive's utilization over time
 // - each drive stat is a separate dataset within the chart
-func driveStatsTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func driveTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	var out string
 	driveStats := make(map[string][][]string)
 	for i := range tableValues.Fields[0].Values {
@@ -1019,10 +1019,10 @@ func driveStatsTableHTMLRenderer(tableValues TableValues, targetName string) str
 	return out
 }
 
-// networkStatsTableHTMLRenderer renders charts of network device statistics
+// networkTelemetryTableHTMLRenderer renders charts of network device statistics
 // - one scatter chart per network device, showing the device's utilization over time
 // - each network stat is a separate dataset within the chart
-func networkStatsTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func networkTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	var out string
 	nicStats := make(map[string][][]string)
 	for i := range tableValues.Fields[0].Values {
@@ -1077,7 +1077,7 @@ func networkStatsTableHTMLRenderer(tableValues TableValues, targetName string) s
 	return out
 }
 
-func memoryStatsTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func memoryTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -1112,7 +1112,7 @@ func memoryStatsTableHTMLRenderer(tableValues TableValues, targetName string) st
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
 }
 
-func summaryCpuFreqTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func averageFrequencyTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -1147,7 +1147,7 @@ func summaryCpuFreqTelemetryTableHTMLRenderer(tableValues TableValues, targetNam
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
 }
 
-func powerStatsTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func powerTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -1182,7 +1182,7 @@ func powerStatsTableHTMLRenderer(tableValues TableValues, targetName string) str
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
 }
 
-func instructionMixTableHTMLRenderer(tableValues TableValues, targetname string) string {
+func instructionTelemetryTableHTMLRenderer(tableValues TableValues, targetname string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -1274,7 +1274,7 @@ func renderGaudiStatsChart(tableValues TableValues, chartStatFieldName string, t
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
 }
 
-func gaudiStatsTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func gaudiTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	out := ""
 	out += renderGaudiStatsChart(tableValues, "utilization.aip [%]", "Utilization", "% Utilization", "100")
 	out += renderGaudiStatsChart(tableValues, "memory.free [MiB]", "Memory Free", "Memory (MiB)", "0")

@@ -5,7 +5,7 @@ import (
 	texttemplate "text/template" // nosemgrep
 )
 
-// Copyright (C) 2021-2024 Intel Corporation
+// Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
 // script_defs.go defines the bash scripts that are used to collect information from target systems
@@ -24,95 +24,100 @@ type ScriptDefinition struct {
 	NeedsKill      bool     // process/script needs to be killed after run without a duration specified, i.e., it doesn't stop through SIGINT
 }
 
+// script names, these must be unique
 const (
-	HostnameScriptName                         = "hostname"
-	DateScriptName                             = "date"
-	DmidecodeScriptName                        = "dmidecode"
-	LscpuScriptName                            = "lscpu"
-	LspciBitsScriptName                        = "lspci bits"
-	LspciDevicesScriptName                     = "lspci devices"
-	LspciVmmScriptName                         = "lspci vmm"
-	UnameScriptName                            = "uname"
-	ProcCmdlineScriptName                      = "proc cmdline"
-	ProcCpuinfoScriptName                      = "proc cpuinfo"
-	SysctlScriptName                           = "sysctl"
-	EtcReleaseScriptName                       = "etc release"
-	GccVersionScriptName                       = "gcc version"
-	BinutilsVersionScriptName                  = "binutils version"
-	GlibcVersionScriptName                     = "glibc version"
-	PythonVersionScriptName                    = "python version"
-	Python3VersionScriptName                   = "python3 version"
-	JavaVersionScriptName                      = "java version"
-	OpensslVersionScriptName                   = "openssl version"
-	CpuidScriptName                            = "cpuid"
-	BaseFrequencyScriptName                    = "base frequency"
-	MaximumFrequencyScriptName                 = "maximum frequency"
-	ScalingDriverScriptName                    = "scaling driver"
-	ScalingGovernorScriptName                  = "scaling governor"
-	MaxCStateScriptName                        = "max c-state"
-	CstatesScriptName                          = "c-states"
-	SpecCoreFrequenciesScriptName              = "spec core frequencies"
-	PPINName                                   = "ppin"
-	PrefetchControlName                        = "prefetch control"
-	PrefetchersName                            = "prefetchers"
-	L3WaySizeName                              = "l3 way size"
-	PackagePowerLimitName                      = "package power limit"
-	EpbScriptName                              = "energy performance bias"
-	EpbSourceScriptName                        = "energy performance bias source"
-	EppScriptName                              = "energy performance preference"
-	EppValidScriptName                         = "epp valid"
-	EppPackageControlScriptName                = "epp package control"
-	EppPackageScriptName                       = "energy performance preference package"
-	IaaDevicesScriptName                       = "iaa devices"
-	DsaDevicesScriptName                       = "dsa devices"
-	LshwScriptName                             = "lshw"
-	MemoryBandwidthAndLatencyScriptName        = "memory bandwidth and latency"
-	NumaBandwidthScriptName                    = "numa bandwidth"
-	CpuSpeedScriptName                         = "cpu speed"
-	TurboFrequenciesScriptName                 = "turbo frequencies"
-	MaxPowerAndTemperatureScriptName           = "max power and temperature"
-	IdlePowerScriptName                        = "idle power"
-	StoragePerfScriptName                      = "storage perf"
-	MpstatScriptName                           = "mpstat"
-	IostatScriptName                           = "iostat"
-	SarMemoryScriptName                        = "sar-memory"
-	SarNetworkScriptName                       = "sar-network"
-	TurbostatScriptName                        = "turbostat"
-	UncoreMaxFromMSRScriptName                 = "uncore max from msr"
-	UncoreMinFromMSRScriptName                 = "uncore min from msr"
-	UncoreMaxFromTPMIScriptName                = "uncore max from tpmi"
-	UncoreMinFromTPMIScriptName                = "uncore min from tpmi"
-	UncoreDieTypesFromTPMIScriptName           = "uncore die types from tpmi"
-	ElcScriptName                              = "efficiency latency control"
-	SstTfHighPriorityCoreFrequenciesScriptName = "sst tf high priority core frequencies"
-	SstTfLowPriorityCoreFrequenciesScriptName  = "sst tf low priority core frequencies"
-	ChaCountScriptName                         = "cha count"
-	MeminfoScriptName                          = "meminfo"
-	TransparentHugePagesScriptName             = "transparent huge pages"
-	NumaBalancingScriptName                    = "numa balancing"
-	NicInfoScriptName                          = "nic info"
-	DiskInfoScriptName                         = "disk info"
-	HdparmScriptName                           = "hdparm"
-	DfScriptName                               = "df"
-	FindMntScriptName                          = "findmnt"
-	CveScriptName                              = "cve"
-	ProcessListScriptName                      = "process list"
-	IpmitoolSensorsScriptName                  = "ipmitool sensors"
-	IpmitoolChassisScriptName                  = "ipmitool chassis"
-	IpmitoolEventsScriptName                   = "ipmitool events"
-	IpmitoolEventTimeScriptName                = "ipmitool event time"
-	TmeScriptName                              = "tme"
-	KernelLogScriptName                        = "kernel log"
-	PMUDriverVersionScriptName                 = "pmu driver version"
-	PMUBusyScriptName                          = "pmu busy"
-	ProfileJavaScriptName                      = "profile java"
-	ProfileSystemScriptName                    = "profile system"
-	ProfileKernelLockScriptName                = "profile kernel lock"
-	GaudiInfoScriptName                        = "gaudi info"
-	GaudiFirmwareScriptName                    = "gaudi firmware"
-	GaudiNumaScriptName                        = "gaudi numa"
-	InstructionMixScriptName                   = "instruction mix"
-	GaudiStatsScriptName                       = "gaudi stats"
+	// report and configuration (reading) scripts
+	HostnameScriptName               = "hostname"
+	DateScriptName                   = "date"
+	DmidecodeScriptName              = "dmidecode"
+	LscpuScriptName                  = "lscpu"
+	LspciBitsScriptName              = "lspci bits"
+	LspciDevicesScriptName           = "lspci devices"
+	LspciVmmScriptName               = "lspci vmm"
+	UnameScriptName                  = "uname"
+	ProcCmdlineScriptName            = "proc cmdline"
+	ProcCpuinfoScriptName            = "proc cpuinfo"
+	SysctlScriptName                 = "sysctl"
+	EtcReleaseScriptName             = "etc release"
+	GccVersionScriptName             = "gcc version"
+	BinutilsVersionScriptName        = "binutils version"
+	GlibcVersionScriptName           = "glibc version"
+	PythonVersionScriptName          = "python version"
+	Python3VersionScriptName         = "python3 version"
+	JavaVersionScriptName            = "java version"
+	OpensslVersionScriptName         = "openssl version"
+	CpuidScriptName                  = "cpuid"
+	BaseFrequencyScriptName          = "base frequency"
+	MaximumFrequencyScriptName       = "maximum frequency"
+	ScalingDriverScriptName          = "scaling driver"
+	ScalingGovernorScriptName        = "scaling governor"
+	CstatesScriptName                = "c-states"
+	SpecCoreFrequenciesScriptName    = "spec core frequencies"
+	PPINName                         = "ppin"
+	PrefetchControlName              = "prefetch control"
+	PrefetchersName                  = "prefetchers"
+	L3WaySizeName                    = "l3 way size"
+	PackagePowerLimitName            = "package power limit"
+	EpbScriptName                    = "energy performance bias"
+	EpbSourceScriptName              = "energy performance bias source"
+	EppScriptName                    = "energy performance preference"
+	EppValidScriptName               = "epp valid"
+	EppPackageControlScriptName      = "epp package control"
+	EppPackageScriptName             = "energy performance preference package"
+	IaaDevicesScriptName             = "iaa devices"
+	DsaDevicesScriptName             = "dsa devices"
+	LshwScriptName                   = "lshw"
+	UncoreMaxFromMSRScriptName       = "uncore max from msr"
+	UncoreMinFromMSRScriptName       = "uncore min from msr"
+	UncoreMaxFromTPMIScriptName      = "uncore max from tpmi"
+	UncoreMinFromTPMIScriptName      = "uncore min from tpmi"
+	UncoreDieTypesFromTPMIScriptName = "uncore die types from tpmi"
+	ElcScriptName                    = "efficiency latency control"
+	SSTTFHPScriptName                = "ssttf hp frequencies"
+	SSTTFLPScriptName                = "ssttf lp frequencies"
+	ChaCountScriptName               = "cha count"
+	MeminfoScriptName                = "meminfo"
+	TransparentHugePagesScriptName   = "transparent huge pages"
+	NumaBalancingScriptName          = "numa balancing"
+	NicInfoScriptName                = "nic info"
+	DiskInfoScriptName               = "disk info"
+	HdparmScriptName                 = "hdparm"
+	DfScriptName                     = "df"
+	FindMntScriptName                = "findmnt"
+	CveScriptName                    = "cve"
+	ProcessListScriptName            = "process list"
+	IpmitoolSensorsScriptName        = "ipmitool sensors"
+	IpmitoolChassisScriptName        = "ipmitool chassis"
+	IpmitoolEventsScriptName         = "ipmitool events"
+	TmeScriptName                    = "tme"
+	KernelLogScriptName              = "kernel log"
+	PMUDriverVersionScriptName       = "pmu driver version"
+	PMUBusyScriptName                = "pmu busy"
+	GaudiInfoScriptName              = "gaudi info"
+	GaudiFirmwareScriptName          = "gaudi firmware"
+	GaudiNumaScriptName              = "gaudi numa"
+	// benchmark scripts
+	MemoryBenchmarkScriptName    = "memory benchmark"
+	NumaBenchmarkScriptName      = "numa benchmark"
+	SpeedBenchmarkScriptName     = "speed benchmark"
+	FrequencyBenchmarkScriptName = "frequency benchmark"
+	PowerBenchmarkScriptName     = "power benchmark"
+	IdlePowerBenchmarkScriptName = "idle power benchmark"
+	StorageBenchmarkScriptName   = "storage benchmark"
+	// telemetry scripts
+	MpstatTelemetryScriptName      = "mpstat telemetry"
+	IostatTelemetryScriptName      = "iostat telemetry"
+	MemoryTelemetryScriptName      = "memory telemetry"
+	NetworkTelemetryScriptName     = "network telemetry"
+	TurbostatTelemetryScriptName   = "turbostat telemetry"
+	InstructionTelemetryScriptName = "instruction telemetry"
+	GaudiTelemetryScriptName       = "gaudi telemetry"
+
+	// flamegraph scripts
+	ProfileJavaScriptName   = "profile java"
+	ProfileSystemScriptName = "profile system"
+	// lock scripts
+	ProfileKernelLockScriptName = "profile kernel lock"
 )
 
 const (
@@ -127,7 +132,7 @@ func GetScriptByName(name string) ScriptDefinition {
 // GetParameterizedScriptByName returns the script definition with the given name. It will panic if the script is not found.
 func GetParameterizedScriptByName(name string, params map[string]string) ScriptDefinition {
 	// if the script doesn't exist, panic
-	if _, ok := scripts[name]; !ok {
+	if _, ok := scriptDefinitions[name]; !ok {
 		panic("script not found: " + name)
 	}
 	if params == nil {
@@ -136,20 +141,20 @@ func GetParameterizedScriptByName(name string, params map[string]string) ScriptD
 	// augment params with script name
 	params["ScriptName"] = sanitizeScriptName(name)
 	// replace the script template with the parameterized version
-	scriptTemplate := texttemplate.Must(texttemplate.New("scriptTemplate").Parse(scripts[name].ScriptTemplate))
+	scriptTemplate := texttemplate.Must(texttemplate.New("scriptTemplate").Parse(scriptDefinitions[name].ScriptTemplate))
 	buf := new(bytes.Buffer)
 	err := scriptTemplate.Execute(buf, params)
 	if err != nil {
 		panic(err)
 	}
-	ScriptDefinition := scripts[name]
-	ScriptDefinition.ScriptTemplate = buf.String()
-	return ScriptDefinition
+	scriptDefinition := scriptDefinitions[name]
+	scriptDefinition.ScriptTemplate = buf.String()
+	return scriptDefinition
 }
 
 // script definitions
-var scripts = map[string]ScriptDefinition{
-	// configuration scripts
+var scriptDefinitions = map[string]ScriptDefinition{
+	// report and configuration (read) scripts
 	HostnameScriptName: {
 		Name:           HostnameScriptName,
 		ScriptTemplate: "hostname",
@@ -258,10 +263,6 @@ var scripts = map[string]ScriptDefinition{
 	ScalingGovernorScriptName: {
 		Name:           ScalingGovernorScriptName,
 		ScriptTemplate: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor",
-	},
-	MaxCStateScriptName: {
-		Name:           MaxCStateScriptName,
-		ScriptTemplate: "cat /sys/module/intel_idle/parameters/max_cstate",
 	},
 	CstatesScriptName: {
 		Name: CstatesScriptName,
@@ -570,8 +571,8 @@ done
 		Depends:       []string{"pcm-tpmi"},
 		Superuser:     true,
 	},
-	SstTfHighPriorityCoreFrequenciesScriptName: {
-		Name: SstTfHighPriorityCoreFrequenciesScriptName,
+	SSTTFHPScriptName: {
+		Name: SSTTFHPScriptName,
 		ScriptTemplate: `# Is SST-TF supported?
 supported=$(pcm-tpmi 5 0xF8 -d -b 12:12 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
 if [ "$supported" -eq 0 ]; then
@@ -619,8 +620,8 @@ done
 		Depends:       []string{"pcm-tpmi"},
 		Superuser:     true,
 	},
-	SstTfLowPriorityCoreFrequenciesScriptName: {
-		Name: SstTfLowPriorityCoreFrequenciesScriptName,
+	SSTTFLPScriptName: {
+		Name: SSTTFLPScriptName,
 		ScriptTemplate: `# Is SST-TF supported?
 supported=$(pcm-tpmi 5 0xF8 -d -b 12:12 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
 if [ "$supported" -eq 0 ]; then
@@ -811,12 +812,6 @@ done
 		Lkms:           []string{"ipmi_devintf", "ipmi_si"},
 		Depends:        []string{"ipmitool"},
 	},
-	IpmitoolEventTimeScriptName: {
-		Name:           IpmitoolEventTimeScriptName,
-		ScriptTemplate: "LC_ALL=C timeout 30 ipmitool sel time get",
-		Superuser:      true,
-		Depends:        []string{"ipmitool"},
-	},
 	TmeScriptName: {
 		Name: TmeScriptName,
 		ScriptTemplate: `output=$(dmesg | grep -i "x86/tme")
@@ -900,8 +895,8 @@ done
 		ScriptTemplate: `hl-smi topo -N`,
 		Vendors:        []string{"GenuineIntel"},
 	},
-	MemoryBandwidthAndLatencyScriptName: {
-		Name: MemoryBandwidthAndLatencyScriptName,
+	MemoryBenchmarkScriptName: {
+		Name: MemoryBenchmarkScriptName,
 		ScriptTemplate: `# measure memory loaded latency
 #  need at least 2 GB (2,097,152 KB) of huge pages per NUMA node
 min_kb=2097152
@@ -921,8 +916,8 @@ echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages
 		Depends:       []string{"mlc"},
 		Sequential:    true,
 	},
-	NumaBandwidthScriptName: {
-		Name: NumaBandwidthScriptName,
+	NumaBenchmarkScriptName: {
+		Name: NumaBenchmarkScriptName,
 		ScriptTemplate: `# measure memory bandwidth matrix
 #  need at least 2 GB (2,097,152 KB) of huge pages per NUMA node
 min_kb=2097152
@@ -942,8 +937,8 @@ echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages
 		Depends:       []string{"mlc"},
 		Sequential:    true,
 	},
-	CpuSpeedScriptName: {
-		Name: CpuSpeedScriptName,
+	SpeedBenchmarkScriptName: {
+		Name: SpeedBenchmarkScriptName,
 		ScriptTemplate: `methods=$( stress-ng --cpu 1 --cpu-method x 2>&1 | cut -d":" -f2 | cut -c 6- )
 for method in $methods; do
 	printf "%s " "$method"
@@ -954,8 +949,8 @@ done
 		Depends:    []string{"stress-ng"},
 		Sequential: true,
 	},
-	TurboFrequenciesScriptName: {
-		Name: TurboFrequenciesScriptName,
+	FrequencyBenchmarkScriptName: {
+		Name: FrequencyBenchmarkScriptName,
 		ScriptTemplate: `# Function to expand a range of numbers, e.g. "0-24", into an array of numbers
 expand_range() {
 	local range=$1
@@ -1044,24 +1039,24 @@ avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd
 		Depends:    []string{"avx-turbo", "lspci"},
 		Sequential: true,
 	},
-	MaxPowerAndTemperatureScriptName: {
-		Name:           MaxPowerAndTemperatureScriptName,
+	PowerBenchmarkScriptName: {
+		Name:           PowerBenchmarkScriptName,
 		ScriptTemplate: `((turbostat --show PkgTmp,PkgWatt -i 2 2>/dev/null &) ; stress-ng --cpu 0 --bsearch 0 -t 60s >/dev/null 2>&1 ; pkill -9 -f turbostat) | awk '$1=="PkgTmp" {if(f!=1) print $0;f=1} $1!="PkgTmp" {print $0}'`,
 		Superuser:      true,
 		Lkms:           []string{"msr"},
 		Depends:        []string{"turbostat", "stress-ng"},
 		Sequential:     true,
 	},
-	IdlePowerScriptName: {
-		Name:           IdlePowerScriptName,
+	IdlePowerBenchmarkScriptName: {
+		Name:           IdlePowerBenchmarkScriptName,
 		ScriptTemplate: `turbostat --show PkgWatt -i 2 -n 2 2>/dev/null | sed -n '$p'`,
 		Superuser:      true,
 		Lkms:           []string{"msr"},
 		Depends:        []string{"turbostat"},
 		Sequential:     true,
 	},
-	StoragePerfScriptName: {
-		Name: StoragePerfScriptName,
+	StorageBenchmarkScriptName: {
+		Name: StorageBenchmarkScriptName,
 		ScriptTemplate: `
 file_size_g=5
 numjobs=1
@@ -1102,8 +1097,8 @@ rm -rf $test_dir
 		Depends:    []string{"fio"},
 	},
 	// telemetry scripts
-	MpstatScriptName: {
-		Name: MpstatScriptName,
+	MpstatTelemetryScriptName: {
+		Name: MpstatTelemetryScriptName,
 		ScriptTemplate: `interval={{.Interval}}
 duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
@@ -1118,8 +1113,8 @@ wait
 		Depends:   []string{"mpstat"},
 		NeedsKill: true,
 	},
-	IostatScriptName: {
-		Name: IostatScriptName,
+	IostatTelemetryScriptName: {
+		Name: IostatTelemetryScriptName,
 		ScriptTemplate: `interval={{.Interval}}
 duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
@@ -1134,8 +1129,8 @@ wait
 		Depends:   []string{"iostat"},
 		NeedsKill: true,
 	},
-	SarMemoryScriptName: {
-		Name: SarMemoryScriptName,
+	MemoryTelemetryScriptName: {
+		Name: MemoryTelemetryScriptName,
 		ScriptTemplate: `interval={{.Interval}}
 duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
@@ -1150,8 +1145,8 @@ wait
 		Depends:   []string{"sar", "sadc"},
 		NeedsKill: true,
 	},
-	SarNetworkScriptName: {
-		Name: SarNetworkScriptName,
+	NetworkTelemetryScriptName: {
+		Name: NetworkTelemetryScriptName,
 		ScriptTemplate: `interval={{.Interval}}
 duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
@@ -1166,8 +1161,8 @@ wait
 		Depends:   []string{"sar", "sadc"},
 		NeedsKill: true,
 	},
-	TurbostatScriptName: {
-		Name: TurbostatScriptName,
+	TurbostatTelemetryScriptName: {
+		Name: TurbostatTelemetryScriptName,
 		ScriptTemplate: `interval={{.Interval}}
 duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
@@ -1187,8 +1182,8 @@ wait
 		Depends:   []string{"turbostat"},
 		NeedsKill: true,
 	},
-	InstructionMixScriptName: {
-		Name: InstructionMixScriptName,
+	InstructionTelemetryScriptName: {
+		Name: InstructionTelemetryScriptName,
 		ScriptTemplate: `interval={{.Interval}}
 duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
@@ -1221,8 +1216,8 @@ wait
 		Depends:   []string{"processwatch"},
 		NeedsKill: true,
 	},
-	GaudiStatsScriptName: {
-		Name: GaudiStatsScriptName,
+	GaudiTelemetryScriptName: {
+		Name: GaudiTelemetryScriptName,
 		ScriptTemplate: `
 # if the hl-smi program is in the path
 if command -v hl-smi &> /dev/null; then

@@ -1,7 +1,7 @@
 // Package telemetry is a subcommand of the root command. It collects system telemetry from target(s).
 package telemetry
 
-// Copyright (C) 2021-2024 Intel Corporation
+// Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
 import (
@@ -88,13 +88,13 @@ const (
 var telemetrySummaryTableName = "Telemetry Summary"
 
 var categories = []common.Category{
-	{FlagName: flagCpuName, FlagVar: &flagCpu, DefaultValue: false, Help: "monitor cpu", TableNames: []string{report.CPUUtilizationTableName, report.SummaryCPUUtilizationTableName, report.SummaryCpuFreqTelemetryTableName, report.IRQRateTableName}},
-	{FlagName: flagMemoryName, FlagVar: &flagMemory, DefaultValue: false, Help: "monitor memory", TableNames: []string{report.MemoryStatsTableName}},
-	{FlagName: flagNetworkName, FlagVar: &flagNetwork, DefaultValue: false, Help: "monitor network", TableNames: []string{report.NetworkStatsTableName}},
-	{FlagName: flagStorageName, FlagVar: &flagStorage, DefaultValue: false, Help: "monitor storage", TableNames: []string{report.DriveStatsTableName}},
-	{FlagName: flagPowerName, FlagVar: &flagPower, DefaultValue: false, Help: "monitor power", TableNames: []string{report.PowerStatsTableName}},
-	{FlagName: flagInstrMixName, FlagVar: &flagInstrMix, DefaultValue: false, Help: "monitor instruction mix", TableNames: []string{report.InstructionMixTableName}},
-	{FlagName: flagGaudiName, FlagVar: &flagGaudi, DefaultValue: false, Help: "monitor gaudi", TableNames: []string{report.GaudiStatsTableName}},
+	{FlagName: flagCpuName, FlagVar: &flagCpu, DefaultValue: false, Help: "monitor cpu", TableNames: []string{report.CPUUtilizationTelemetryTableName, report.UtilizationCategoriesTelemetryTableName, report.AverageFrequencyTelemetryTableName, report.IRQRateTelemetryTableName}},
+	{FlagName: flagMemoryName, FlagVar: &flagMemory, DefaultValue: false, Help: "monitor memory", TableNames: []string{report.MemoryTelemetryTableName}},
+	{FlagName: flagNetworkName, FlagVar: &flagNetwork, DefaultValue: false, Help: "monitor network", TableNames: []string{report.NetworkTelemetryTableName}},
+	{FlagName: flagStorageName, FlagVar: &flagStorage, DefaultValue: false, Help: "monitor storage", TableNames: []string{report.DriveTelemetryTableName}},
+	{FlagName: flagPowerName, FlagVar: &flagPower, DefaultValue: false, Help: "monitor power", TableNames: []string{report.PowerTelemetryTableName}},
+	{FlagName: flagInstrMixName, FlagVar: &flagInstrMix, DefaultValue: false, Help: "monitor instruction mix", TableNames: []string{report.InstructionTelemetryTableName}},
+	{FlagName: flagGaudiName, FlagVar: &flagGaudi, DefaultValue: false, Help: "monitor gaudi", TableNames: []string{report.GaudiTelemetryTableName}},
 }
 
 func init() {
@@ -310,14 +310,14 @@ func getTableValues(allTableValues []report.TableValues, tableName string) repor
 }
 
 func summaryFromTableValues(allTableValues []report.TableValues, _ map[string]script.ScriptOutput) report.TableValues {
-	cpuUtil := getCPUAveragePercentage(getTableValues(allTableValues, report.SummaryCPUUtilizationTableName), "%idle", true)
-	cpuFreq := getMetricAverage(getTableValues(allTableValues, report.SummaryCpuFreqTelemetryTableName), []string{"Frequency"}, "Time")
-	pkgPower := getMetricAverage(getTableValues(allTableValues, report.PowerStatsTableName), []string{"Package"}, "")
-	driveReads := getMetricAverage(getTableValues(allTableValues, report.DriveStatsTableName), []string{"kB_read/s"}, "Device")
-	driveWrites := getMetricAverage(getTableValues(allTableValues, report.DriveStatsTableName), []string{"kB_wrtn/s"}, "Device")
-	networkReads := getMetricAverage(getTableValues(allTableValues, report.NetworkStatsTableName), []string{"rxkB/s"}, "Time")
-	networkWrites := getMetricAverage(getTableValues(allTableValues, report.NetworkStatsTableName), []string{"txkB/s"}, "Time")
-	memAvail := getMetricAverage(getTableValues(allTableValues, report.MemoryStatsTableName), []string{"avail"}, "Time")
+	cpuUtil := getCPUAveragePercentage(getTableValues(allTableValues, report.UtilizationCategoriesTelemetryTableName), "%idle", true)
+	cpuFreq := getMetricAverage(getTableValues(allTableValues, report.AverageFrequencyTelemetryTableName), []string{"Frequency"}, "Time")
+	pkgPower := getMetricAverage(getTableValues(allTableValues, report.PowerTelemetryTableName), []string{"Package"}, "")
+	driveReads := getMetricAverage(getTableValues(allTableValues, report.DriveTelemetryTableName), []string{"kB_read/s"}, "Device")
+	driveWrites := getMetricAverage(getTableValues(allTableValues, report.DriveTelemetryTableName), []string{"kB_wrtn/s"}, "Device")
+	networkReads := getMetricAverage(getTableValues(allTableValues, report.NetworkTelemetryTableName), []string{"rxkB/s"}, "Time")
+	networkWrites := getMetricAverage(getTableValues(allTableValues, report.NetworkTelemetryTableName), []string{"txkB/s"}, "Time")
+	memAvail := getMetricAverage(getTableValues(allTableValues, report.MemoryTelemetryTableName), []string{"avail"}, "Time")
 	return report.TableValues{
 		TableDefinition: report.TableDefinition{
 			Name:      telemetrySummaryTableName,

@@ -1,6 +1,6 @@
 package report
 
-// Copyright (C) 2021-2024 Intel Corporation
+// Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
 // table_defs.go defines the tables used for generating reports
@@ -15,13 +15,25 @@ import (
 	"strings"
 	"time"
 
-	"perfspect/internal/cpudb"
 	"perfspect/internal/script"
-	"perfspect/internal/target"
 
 	"github.com/xuri/excelize/v2"
 )
 
+// Field represents the values for a field in a table
+type Field struct {
+	Name   string
+	Values []string
+}
+
+// TableValues combines the table definition with the resulting fields and their values
+type TableValues struct {
+	TableDefinition
+	Fields   []Field
+	Insights []Insight
+}
+
+// Insight represents an insight about the data in a table
 type Insight struct {
 	Recommendation string
 	Justification  string
@@ -34,6 +46,7 @@ type HTMLMultiTargetTableRenderer func([]TableValues, []string) string
 type TextTableRenderer func(TableValues) string
 type XlsxTableRenderer func(TableValues, *excelize.File, string, *int)
 
+// TableDefinition defines the structure of a table in the report
 type TableDefinition struct {
 	Name          string
 	ScriptNames   []string
@@ -55,26 +68,12 @@ type TableDefinition struct {
 	InsightsFunc InsightsRetriever
 }
 
-// Field represents the values for a field in a table
-type Field struct {
-	Name   string
-	Values []string
-}
-
-// TableValues combines the table definition with the resulting fields and their values
-type TableValues struct {
-	TableDefinition
-	Fields   []Field
-	Insights []Insight
-}
-
 const (
 	// report table names
 	HostTableName              = "Host"
 	SystemTableName            = "System"
 	BaseboardTableName         = "Baseboard"
 	ChassisTableName           = "Chassis"
-	PCIeSlotsTableName         = "PCIe Slots"
 	BIOSTableName              = "BIOS"
 	OperatingSystemTableName   = "Operating System"
 	SoftwareVersionTableName   = "Software Version"
@@ -83,10 +82,10 @@ const (
 	ISATableName               = "ISA"
 	AcceleratorTableName       = "Accelerator"
 	PowerTableName             = "Power"
-	CstateTableName            = "C-states"
+	CstateTableName            = "C-state"
 	MaximumFrequencyTableName  = "Maximum Frequency"
-	SSTTFHPTableName           = "Speed Select Turbo Frequency - High Priority Cores"
-	SSTTFLPTableName           = "Speed Select Turbo Frequency - Low Priority Cores"
+	SSTTFHPTableName           = "Speed Select Turbo Frequency - High Priority"
+	SSTTFLPTableName           = "Speed Select Turbo Frequency - Low Priority"
 	UncoreTableName            = "Uncore"
 	ElcTableName               = "Efficiency Latency Control"
 	MemoryTableName            = "Memory"
@@ -98,7 +97,8 @@ const (
 	FilesystemTableName        = "Filesystem"
 	GPUTableName               = "GPU"
 	GaudiTableName             = "Gaudi"
-	CXLDeviceTableName         = "CXL Device"
+	CXLTableName               = "CXL"
+	PCIeTableName              = "PCIe"
 	CVETableName               = "CVE"
 	ProcessTableName           = "Process"
 	SensorTableName            = "Sensor"
@@ -109,24 +109,24 @@ const (
 	SystemSummaryTableName     = "System Summary"
 	BriefSysSummaryTableName   = "Brief System Summary"
 	// benchmark table names
-	CPUSpeedTableName       = "CPU Speed"
-	CPUPowerTableName       = "CPU Power"
-	CPUTemperatureTableName = "CPU Temperature"
-	CPUFrequencyTableName   = "CPU Frequency"
-	MemoryLatencyTableName  = "Memory Latency"
-	NUMABandwidthTableName  = "NUMA Bandwidth"
-	StoragePerfTableName    = "Storage Performance"
+	SpeedBenchmarkTableName       = "Speed Benchmark"
+	PowerBenchmarkTableName       = "Power Benchmark"
+	TemperatureBenchmarkTableName = "Temperature Benchmark"
+	FrequencyBenchmarkTableName   = "Frequency Benchmark"
+	MemoryBenchmarkTableName      = "Memory Benchmark"
+	NUMABenchmarkTableName        = "NUMA Benchmark"
+	StorageBenchmarkTableName     = "Storage Benchmark"
 	// telemetry table names
-	CPUUtilizationTableName          = "CPU Utilization"
-	SummaryCPUUtilizationTableName   = "Summary CPU Utilization"
-	SummaryCpuFreqTelemetryTableName = "Summary CPU Frequency"
-	IRQRateTableName                 = "IRQ Rate"
-	InstructionMixTableName          = "Instruction Mix"
-	DriveStatsTableName              = "Drive Stats"
-	NetworkStatsTableName            = "Network Stats"
-	MemoryStatsTableName             = "Memory Stats"
-	PowerStatsTableName              = "Power Stats"
-	GaudiStatsTableName              = "Gaudi Stats"
+	CPUUtilizationTelemetryTableName        = "CPU Utilization Telemetry"
+	UtilizationCategoriesTelemetryTableName = "Utilization Categories Telemetry"
+	AverageFrequencyTelemetryTableName      = "Average Frequency Telemetry"
+	IRQRateTelemetryTableName               = "IRQ Rate Telemetry"
+	InstructionTelemetryTableName           = "Instruction Telemetry"
+	DriveTelemetryTableName                 = "Drive Telemetry"
+	NetworkTelemetryTableName               = "Network Telemetry"
+	MemoryTelemetryTableName                = "Memory Telemetry"
+	PowerTelemetryTableName                 = "Power Telemetry"
+	GaudiTelemetryTableName                 = "Gaudi Telemetry"
 	// config  table names
 	ConfigurationTableName = "Configuration"
 	// flamegraph table names
@@ -150,58 +150,6 @@ const (
 	LogsMenuLabel          = "Logs"
 	SystemSummaryMenuLabel = "System Summary"
 )
-
-func GetTableByName(name string) TableDefinition {
-	if table, ok := tableDefinitions[name]; ok {
-		return table
-	}
-	panic(fmt.Sprintf("table not found: %s", name))
-}
-
-func TableForTarget(tableName string, myTarget target.Target) bool {
-	table := GetTableByName(tableName)
-	if len(table.Architectures) > 0 {
-		architecture, err := myTarget.GetArchitecture()
-		if err != nil {
-			slog.Error("failed to get architecture for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-			return false
-		}
-		if !slices.Contains(table.Architectures, architecture) {
-			return false
-		}
-	}
-	if len(table.Vendors) > 0 {
-		vendor, err := myTarget.GetVendor()
-		if err != nil {
-			slog.Error("failed to get vendor for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-			return false
-		}
-		if !slices.Contains(table.Vendors, vendor) {
-			return false
-		}
-	}
-	if len(table.Families) > 0 {
-		family, err := myTarget.GetFamily()
-		if err != nil {
-			slog.Error("failed to get family for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-			return false
-		}
-		if !slices.Contains(table.Families, family) {
-			return false
-		}
-	}
-	if len(table.Models) > 0 {
-		model, err := myTarget.GetModel()
-		if err != nil {
-			slog.Error("failed to get model for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-			return false
-		}
-		if !slices.Contains(table.Models, model) {
-			return false
-		}
-	}
-	return true
-}
 
 var tableDefinitions = map[string]TableDefinition{
 	//
@@ -353,7 +301,7 @@ var tableDefinitions = map[string]TableDefinition{
 		Models:   []string{"173", "175", "221"}, // Granite Rapids, Sierra Forest, Clearwater Forest
 		HasRows:  true,
 		ScriptNames: []string{
-			script.SstTfHighPriorityCoreFrequenciesScriptName,
+			script.SSTTFHPScriptName,
 		},
 		FieldsFunc: sstTFHPTableValues},
 	SSTTFLPTableName: {
@@ -362,7 +310,7 @@ var tableDefinitions = map[string]TableDefinition{
 		Models:   []string{"173", "175", "221"}, // Granite Rapids, Sierra Forest, Clearwater Forest
 		HasRows:  true,
 		ScriptNames: []string{
-			script.SstTfLowPriorityCoreFrequenciesScriptName,
+			script.SSTTFLPScriptName,
 		},
 		FieldsFunc: sstTFLPTableValues},
 	MemoryTableName: {
@@ -451,15 +399,15 @@ var tableDefinitions = map[string]TableDefinition{
 			script.GaudiNumaScriptName,
 		},
 		FieldsFunc: gaudiTableValues},
-	CXLDeviceTableName: {
-		Name:    CXLDeviceTableName,
+	CXLTableName: {
+		Name:    CXLTableName,
 		HasRows: true,
 		ScriptNames: []string{
 			script.LspciVmmScriptName,
 		},
-		FieldsFunc: cxlDeviceTableValues},
-	PCIeSlotsTableName: {
-		Name:    PCIeSlotsTableName,
+		FieldsFunc: cxlTableValues},
+	PCIeTableName: {
+		Name:    PCIeTableName,
 		HasRows: true,
 		ScriptNames: []string{
 			script.DmidecodeScriptName,
@@ -493,7 +441,6 @@ var tableDefinitions = map[string]TableDefinition{
 		HasRows: false,
 		ScriptNames: []string{
 			script.IpmitoolChassisScriptName,
-			script.IpmitoolEventTimeScriptName,
 		},
 		FieldsFunc: chassisStatusTableValues},
 	PMUTableName: {
@@ -615,166 +562,166 @@ var tableDefinitions = map[string]TableDefinition{
 	//
 	// benchmarking tables
 	//
-	CPUSpeedTableName: {
-		Name:      CPUSpeedTableName,
-		MenuLabel: CPUSpeedTableName,
+	SpeedBenchmarkTableName: {
+		Name:      SpeedBenchmarkTableName,
+		MenuLabel: SpeedBenchmarkTableName,
 		HasRows:   false,
 		ScriptNames: []string{
-			script.CpuSpeedScriptName,
+			script.SpeedBenchmarkScriptName,
 		},
-		FieldsFunc: cpuSpeedTableValues},
-	CPUPowerTableName: {
-		Name:      CPUPowerTableName,
-		MenuLabel: CPUPowerTableName,
+		FieldsFunc: speedBenchmarkTableValues},
+	PowerBenchmarkTableName: {
+		Name:      PowerBenchmarkTableName,
+		MenuLabel: PowerBenchmarkTableName,
 		HasRows:   false,
 		ScriptNames: []string{
-			script.IdlePowerScriptName,
-			script.MaxPowerAndTemperatureScriptName,
+			script.IdlePowerBenchmarkScriptName,
+			script.PowerBenchmarkScriptName,
 		},
-		FieldsFunc: cpuPowerTableValues},
-	CPUTemperatureTableName: {
-		Name:      CPUTemperatureTableName,
-		MenuLabel: CPUTemperatureTableName,
+		FieldsFunc: powerBenchmarkTableValues},
+	TemperatureBenchmarkTableName: {
+		Name:      TemperatureBenchmarkTableName,
+		MenuLabel: TemperatureBenchmarkTableName,
 		HasRows:   false,
 		ScriptNames: []string{
-			script.MaxPowerAndTemperatureScriptName,
+			script.PowerBenchmarkScriptName,
 		},
-		FieldsFunc: cpuTemperatureTableValues},
-	CPUFrequencyTableName: {
-		Name:      CPUFrequencyTableName,
-		MenuLabel: CPUFrequencyTableName,
+		FieldsFunc: temperatureBenchmarkTableValues},
+	FrequencyBenchmarkTableName: {
+		Name:      FrequencyBenchmarkTableName,
+		MenuLabel: FrequencyBenchmarkTableName,
 		HasRows:   true,
 		ScriptNames: []string{
 			script.SpecCoreFrequenciesScriptName,
 			script.LscpuScriptName,
 			script.LspciBitsScriptName,
 			script.LspciDevicesScriptName,
-			script.TurboFrequenciesScriptName,
+			script.FrequencyBenchmarkScriptName,
 		},
-		FieldsFunc:            cpuFrequencyTableValues,
-		HTMLTableRendererFunc: cpuFrequencyTableHtmlRenderer},
-	MemoryLatencyTableName: {
-		Name:      MemoryLatencyTableName,
-		MenuLabel: MemoryLatencyTableName,
+		FieldsFunc:            frequencyBenchmarkTableValues,
+		HTMLTableRendererFunc: frequencyBenchmarkTableHtmlRenderer},
+	MemoryBenchmarkTableName: {
+		Name:      MemoryBenchmarkTableName,
+		MenuLabel: MemoryBenchmarkTableName,
 		HasRows:   true,
 		ScriptNames: []string{
-			script.MemoryBandwidthAndLatencyScriptName,
+			script.MemoryBenchmarkScriptName,
 		},
-		NoDataFound:                      "No memory latency data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
-		FieldsFunc:                       memoryLatencyTableValues,
-		HTMLTableRendererFunc:            memoryLatencyTableHtmlRenderer,
-		HTMLMultiTargetTableRendererFunc: memoryLatencyTableMultiTargetHtmlRenderer},
-	NUMABandwidthTableName: {
-		Name:      NUMABandwidthTableName,
-		MenuLabel: NUMABandwidthTableName,
+		NoDataFound:                      "No memory benchmark data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
+		FieldsFunc:                       memoryBenchmarkTableValues,
+		HTMLTableRendererFunc:            memoryBenchmarkTableHtmlRenderer,
+		HTMLMultiTargetTableRendererFunc: memoryBenchmarkTableMultiTargetHtmlRenderer},
+	NUMABenchmarkTableName: {
+		Name:      NUMABenchmarkTableName,
+		MenuLabel: NUMABenchmarkTableName,
 		HasRows:   true,
 		ScriptNames: []string{
-			script.NumaBandwidthScriptName,
+			script.NumaBenchmarkScriptName,
 		},
-		NoDataFound: "No NUMA bandwidth data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
-		FieldsFunc:  numaBandwidthTableValues},
-	StoragePerfTableName: {
-		Name:      StoragePerfTableName,
-		MenuLabel: StoragePerfTableName,
+		NoDataFound: "No NUMA benchmark data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
+		FieldsFunc:  numaBenchmarkTableValues},
+	StorageBenchmarkTableName: {
+		Name:      StorageBenchmarkTableName,
+		MenuLabel: StorageBenchmarkTableName,
 		HasRows:   false,
 		ScriptNames: []string{
-			script.StoragePerfScriptName,
+			script.StorageBenchmarkScriptName,
 		},
-		FieldsFunc: storagePerfTableValues},
+		FieldsFunc: storageBenchmarkTableValues},
 	//
 	// telemetry tables
 	//
-	CPUUtilizationTableName: {
-		Name:      CPUUtilizationTableName,
-		MenuLabel: CPUUtilizationTableName,
+	CPUUtilizationTelemetryTableName: {
+		Name:      CPUUtilizationTelemetryTableName,
+		MenuLabel: CPUUtilizationTelemetryTableName,
 		HasRows:   true,
 		ScriptNames: []string{
-			script.MpstatScriptName,
+			script.MpstatTelemetryScriptName,
 		},
-		FieldsFunc:            cpuUtilizationTableValues,
-		HTMLTableRendererFunc: cpuUtilizationTableHTMLRenderer},
-	SummaryCPUUtilizationTableName: {
-		Name:      SummaryCPUUtilizationTableName,
-		MenuLabel: SummaryCPUUtilizationTableName,
+		FieldsFunc:            cpuUtilizationTelemetryTableValues,
+		HTMLTableRendererFunc: cpuUtilizationTelemetryTableHTMLRenderer},
+	UtilizationCategoriesTelemetryTableName: {
+		Name:      UtilizationCategoriesTelemetryTableName,
+		MenuLabel: UtilizationCategoriesTelemetryTableName,
 		HasRows:   true,
 		ScriptNames: []string{
-			script.MpstatScriptName,
+			script.MpstatTelemetryScriptName,
 		},
-		FieldsFunc:            summaryCPUUtilizationTableValues,
-		HTMLTableRendererFunc: summaryCPUUtilizationTableHTMLRenderer},
-	SummaryCpuFreqTelemetryTableName: {
-		Name:      SummaryCpuFreqTelemetryTableName,
-		MenuLabel: SummaryCpuFreqTelemetryTableName,
+		FieldsFunc:            utilizationCategoriesTelemetryTableValues,
+		HTMLTableRendererFunc: utilizationCategoriesTelemetryTableHTMLRenderer},
+	AverageFrequencyTelemetryTableName: {
+		Name:      AverageFrequencyTelemetryTableName,
+		MenuLabel: AverageFrequencyTelemetryTableName,
 		HasRows:   true,
 		ScriptNames: []string{
-			script.TurbostatScriptName,
+			script.TurbostatTelemetryScriptName,
 		},
-		FieldsFunc:            summaryCpuFreqTelemetryTableValues,
-		HTMLTableRendererFunc: summaryCpuFreqTelemetryTableHTMLRenderer},
-	IRQRateTableName: {
-		Name:      IRQRateTableName,
-		MenuLabel: IRQRateTableName,
+		FieldsFunc:            averageFrequencyTelemetryTableValues,
+		HTMLTableRendererFunc: averageFrequencyTelemetryTableHTMLRenderer},
+	IRQRateTelemetryTableName: {
+		Name:      IRQRateTelemetryTableName,
+		MenuLabel: IRQRateTelemetryTableName,
 		HasRows:   true,
 		ScriptNames: []string{
-			script.MpstatScriptName,
+			script.MpstatTelemetryScriptName,
 		},
-		FieldsFunc:            irqRateTableValues,
-		HTMLTableRendererFunc: irqRateTableHTMLRenderer},
-	DriveStatsTableName: {
-		Name:      DriveStatsTableName,
-		MenuLabel: DriveStatsTableName,
+		FieldsFunc:            irqRateTelemetryTableValues,
+		HTMLTableRendererFunc: irqRateTelemetryTableHTMLRenderer},
+	DriveTelemetryTableName: {
+		Name:      DriveTelemetryTableName,
+		MenuLabel: DriveTelemetryTableName,
 		HasRows:   true,
 		ScriptNames: []string{
-			script.IostatScriptName,
+			script.IostatTelemetryScriptName,
 		},
-		FieldsFunc:            driveStatsTableValues,
-		HTMLTableRendererFunc: driveStatsTableHTMLRenderer},
-	NetworkStatsTableName: {
-		Name:      NetworkStatsTableName,
-		MenuLabel: NetworkStatsTableName,
+		FieldsFunc:            driveTelemetryTableValues,
+		HTMLTableRendererFunc: driveTelemetryTableHTMLRenderer},
+	NetworkTelemetryTableName: {
+		Name:      NetworkTelemetryTableName,
+		MenuLabel: NetworkTelemetryTableName,
 		HasRows:   true,
 		ScriptNames: []string{
-			script.SarNetworkScriptName,
+			script.NetworkTelemetryScriptName,
 		},
-		FieldsFunc:            networkStatsTableValues,
-		HTMLTableRendererFunc: networkStatsTableHTMLRenderer},
-	MemoryStatsTableName: {
-		Name:      MemoryStatsTableName,
-		MenuLabel: MemoryStatsTableName,
+		FieldsFunc:            networkTelemetryTableValues,
+		HTMLTableRendererFunc: networkTelemetryTableHTMLRenderer},
+	MemoryTelemetryTableName: {
+		Name:      MemoryTelemetryTableName,
+		MenuLabel: MemoryTelemetryTableName,
 		HasRows:   true,
 		ScriptNames: []string{
-			script.SarMemoryScriptName,
+			script.MemoryTelemetryScriptName,
 		},
-		FieldsFunc:            memoryStatsTableValues,
-		HTMLTableRendererFunc: memoryStatsTableHTMLRenderer},
-	PowerStatsTableName: {
-		Name:      PowerStatsTableName,
-		MenuLabel: PowerStatsTableName,
+		FieldsFunc:            memoryTelemetryTableValues,
+		HTMLTableRendererFunc: memoryTelemetryTableHTMLRenderer},
+	PowerTelemetryTableName: {
+		Name:      PowerTelemetryTableName,
+		MenuLabel: PowerTelemetryTableName,
 		HasRows:   true,
 		ScriptNames: []string{
-			script.TurbostatScriptName,
+			script.TurbostatTelemetryScriptName,
 		},
-		FieldsFunc:            powerStatsTableValues,
-		HTMLTableRendererFunc: powerStatsTableHTMLRenderer},
-	InstructionMixTableName: {
-		Name:      InstructionMixTableName,
-		MenuLabel: InstructionMixTableName,
+		FieldsFunc:            powerTelemetryTableValues,
+		HTMLTableRendererFunc: powerTelemetryTableHTMLRenderer},
+	InstructionTelemetryTableName: {
+		Name:      InstructionTelemetryTableName,
+		MenuLabel: InstructionTelemetryTableName,
 		HasRows:   true,
 		ScriptNames: []string{
-			script.InstructionMixScriptName,
+			script.InstructionTelemetryScriptName,
 		},
-		FieldsFunc:            instructionMixTableValues,
-		HTMLTableRendererFunc: instructionMixTableHTMLRenderer},
-	GaudiStatsTableName: {
-		Name:      GaudiStatsTableName,
-		MenuLabel: GaudiStatsTableName,
+		FieldsFunc:            instructionTelemetryTableValues,
+		HTMLTableRendererFunc: instructionTelemetryTableHTMLRenderer},
+	GaudiTelemetryTableName: {
+		Name:      GaudiTelemetryTableName,
+		MenuLabel: GaudiTelemetryTableName,
 		HasRows:   true,
 		ScriptNames: []string{
-			script.GaudiStatsScriptName,
+			script.GaudiTelemetryScriptName,
 		},
-		NoDataFound:           "No Gaudi stats data found. Gaudi devices and the hl-smi tool must be installed on the target system to collect Gaudi stats.",
-		FieldsFunc:            gaudiStatsTableValues,
-		HTMLTableRendererFunc: gaudiStatsTableHTMLRenderer},
+		NoDataFound:           "No Gaudi telemetry found. Gaudi devices and the hl-smi tool must be installed on the target system to collect Gaudi stats.",
+		FieldsFunc:            gaudiTelemetryTableValues,
+		HTMLTableRendererFunc: gaudiTelemetryTableHTMLRenderer},
 	//
 	// flamegraph tables
 	//
@@ -1270,7 +1217,7 @@ func maximumFrequencyTableValues(outputs map[string]script.ScriptOutput) []Field
 }
 
 func sstTFHPTableValues(outputs map[string]script.ScriptOutput) []Field {
-	output := outputs[script.SstTfHighPriorityCoreFrequenciesScriptName].Stdout
+	output := outputs[script.SSTTFHPScriptName].Stdout
 	if len(output) == 0 {
 		return []Field{}
 	}
@@ -1312,7 +1259,7 @@ func sstTFHPTableValues(outputs map[string]script.ScriptOutput) []Field {
 }
 
 func sstTFLPTableValues(outputs map[string]script.ScriptOutput) []Field {
-	output := outputs[script.SstTfLowPriorityCoreFrequenciesScriptName].Stdout
+	output := outputs[script.SSTTFLPScriptName].Stdout
 	if len(output) == 0 {
 		return []Field{}
 	}
@@ -1376,8 +1323,7 @@ func memoryTableInsights(outputs map[string]script.ScriptOutput, tableValues Tab
 		if populatedChannels != "" {
 			uarch := uarchFromOutput(outputs)
 			if uarch != "" {
-				CPUdb := cpudb.NewCPUDB()
-				cpu, err := CPUdb.GetCPUByMicroArchitecture(uarch)
+				cpu, err := getCPUByMicroArchitecture(uarch)
 				if err != nil {
 					slog.Warn(err.Error())
 				} else {
@@ -1693,7 +1639,7 @@ func gaudiTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return fields
 }
 
-func cxlDeviceTableValues(outputs map[string]script.ScriptOutput) []Field {
+func cxlTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
 		{Name: "Slot"},
 		{Name: "Class"},
@@ -1780,15 +1726,20 @@ func sensorTableValues(outputs map[string]script.ScriptOutput) []Field {
 }
 
 func chassisStatusTableValues(outputs map[string]script.ScriptOutput) []Field {
-	return []Field{
-		{Name: "Last Power Event", Values: []string{valFromRegexSubmatch(outputs[script.IpmitoolChassisScriptName].Stdout, `^Last Power Event\s*: (.+?)$`)}},
-		{Name: "Power Overload", Values: []string{valFromRegexSubmatch(outputs[script.IpmitoolChassisScriptName].Stdout, `^Power Overload\s*: (.+?)$`)}},
-		{Name: "Main Power Fault", Values: []string{valFromRegexSubmatch(outputs[script.IpmitoolChassisScriptName].Stdout, `^Main Power Fault\s*: (.+?)$`)}},
-		{Name: "Power Restore Policy", Values: []string{valFromRegexSubmatch(outputs[script.IpmitoolChassisScriptName].Stdout, `^Power Restore Policy\s*: (.+?)$`)}},
-		{Name: "Drive Fault", Values: []string{valFromRegexSubmatch(outputs[script.IpmitoolChassisScriptName].Stdout, `^Drive Fault\s*: (.+?)$`)}},
-		{Name: "Cooling/Fan Fault", Values: []string{valFromRegexSubmatch(outputs[script.IpmitoolChassisScriptName].Stdout, `^Cooling/Fan Fault\s*: (.+?)$`)}},
-		{Name: "System Time", Values: []string{strings.TrimSpace(outputs[script.IpmitoolEventTimeScriptName].Stdout)}},
+	fields := []Field{}
+	for line := range strings.SplitSeq(outputs[script.IpmitoolChassisScriptName].Stdout, "\n") {
+		tokens := strings.Split(line, ":")
+		if len(tokens) != 2 {
+			continue
+		}
+		fieldName := strings.TrimSpace(tokens[0])
+		fieldValue := strings.TrimSpace(tokens[1])
+		if strings.Contains(fieldName, "Button") { // skip button status
+			continue
+		}
+		fields = append(fields, Field{Name: fieldName, Values: []string{fieldValue}})
 	}
+	return fields
 }
 
 func systemEventLogTableValues(outputs map[string]script.ScriptOutput) []Field {
@@ -1966,7 +1917,7 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []Field {
 		fields = append(fields, Field{Name: "Efficiency Latency Control", Values: []string{elcSummaryFromOutput(outputs)}})
 	}
 	// add prefetchers
-	for _, pf := range PrefetcherDefs {
+	for _, pf := range prefetcherDefinitions {
 		if slices.Contains(pf.Uarchs, "all") || slices.Contains(pf.Uarchs, uarch[:3]) {
 			var scriptName string
 			if pf.Msr == MsrPrefetchControl {
@@ -1997,28 +1948,28 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []Field {
 
 // benchmarking
 
-func cpuSpeedTableValues(outputs map[string]script.ScriptOutput) []Field {
+func speedBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return []Field{
 		{Name: "Ops/s", Values: []string{cpuSpeedFromOutput(outputs)}},
 	}
 }
 
-func cpuPowerTableValues(outputs map[string]script.ScriptOutput) []Field {
+func powerBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return []Field{
 		{Name: "Maximum Power", Values: []string{maxPowerFromOutput(outputs)}},
 		{Name: "Minimum Power", Values: []string{minPowerFromOutput(outputs)}},
 	}
 }
 
-func cpuTemperatureTableValues(outputs map[string]script.ScriptOutput) []Field {
+func temperatureBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return []Field{
 		{Name: "Maximum Temperature", Values: []string{maxTemperatureFromOutput(outputs)}},
 	}
 }
 
-func cpuFrequencyTableValues(outputs map[string]script.ScriptOutput) []Field {
+func frequencyBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
 	// get the sse, avx256, and avx512 frequencies from the avx-turbo output
-	instructionFreqs, err := avxTurboFrequenciesFromOutput(outputs[script.TurboFrequenciesScriptName].Stdout)
+	instructionFreqs, err := avxTurboFrequenciesFromOutput(outputs[script.FrequencyBenchmarkScriptName].Stdout)
 	if err != nil {
 		slog.Error("unable to get avx turbo frequencies", slog.String("error", err.Error()))
 		return []Field{}
@@ -2092,7 +2043,7 @@ func cpuFrequencyTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return fields
 }
 
-func memoryLatencyTableValues(outputs map[string]script.ScriptOutput) []Field {
+func memoryBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
 		{Name: "Latency (ns)"},
 		{Name: "Bandwidth (GB/s)"},
@@ -2106,7 +2057,7 @@ func memoryLatencyTableValues(outputs map[string]script.ScriptOutput) []Field {
 	 00008	261.54	 225073.3
 	 ...
 	*/
-	latencyBandwidthPairs := valsArrayFromRegexSubmatch(outputs[script.MemoryBandwidthAndLatencyScriptName].Stdout, `\s*[0-9]*\s*([0-9]*\.[0-9]+)\s*([0-9]*\.[0-9]+)`)
+	latencyBandwidthPairs := valsArrayFromRegexSubmatch(outputs[script.MemoryBenchmarkScriptName].Stdout, `\s*[0-9]*\s*([0-9]*\.[0-9]+)\s*([0-9]*\.[0-9]+)`)
 	for _, latencyBandwidth := range latencyBandwidthPairs {
 		latency := latencyBandwidth[0]
 		bandwidth, err := strconv.ParseFloat(latencyBandwidth[1], 32)
@@ -2121,7 +2072,7 @@ func memoryLatencyTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return fields
 }
 
-func numaBandwidthTableValues(outputs map[string]script.ScriptOutput) []Field {
+func numaBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
 		{Name: "Node"},
 	}
@@ -2131,7 +2082,7 @@ func numaBandwidthTableValues(outputs map[string]script.ScriptOutput) []Field {
 	       0	175610.3	55579.7
 	       1	55575.2	175656.7
 	*/
-	nodeBandwidthsPairs := valsArrayFromRegexSubmatch(outputs[script.NumaBandwidthScriptName].Stdout, `^\s+(\d)\s+(\d.*)$`)
+	nodeBandwidthsPairs := valsArrayFromRegexSubmatch(outputs[script.NumaBenchmarkScriptName].Stdout, `^\s+(\d)\s+(\d.*)$`)
 	// add 1 field per numa node
 	for _, nodeBandwidthsPair := range nodeBandwidthsPairs {
 		fields = append(fields, Field{Name: nodeBandwidthsPair[0]})
@@ -2156,7 +2107,7 @@ func numaBandwidthTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return fields
 }
 
-func storagePerfTableValues(outputs map[string]script.ScriptOutput) []Field {
+func storageBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
 	readBW, writeBW := storagePerfFromOutput(outputs)
 	return []Field{
 		{Name: "Single-Thread Read Bandwidth", Values: []string{readBW}},
@@ -2166,7 +2117,7 @@ func storagePerfTableValues(outputs map[string]script.ScriptOutput) []Field {
 
 // telemetry
 
-func cpuUtilizationTableValues(outputs map[string]script.ScriptOutput) []Field {
+func cpuUtilizationTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
 		{Name: "Time"},
 		{Name: "CPU"},
@@ -2185,7 +2136,7 @@ func cpuUtilizationTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "%idle"},
 	}
 	reStat := regexp.MustCompile(`^(\d\d:\d\d:\d\d)\s+(\d+)\s+(\d+)\s+(\d+)\s+(-*\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)$`)
-	for line := range strings.SplitSeq(outputs[script.MpstatScriptName].Stdout, "\n") {
+	for line := range strings.SplitSeq(outputs[script.MpstatTelemetryScriptName].Stdout, "\n") {
 		match := reStat.FindStringSubmatch(line)
 		if len(match) == 0 {
 			continue
@@ -2197,7 +2148,7 @@ func cpuUtilizationTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return fields
 }
 
-func summaryCPUUtilizationTableValues(outputs map[string]script.ScriptOutput) []Field {
+func utilizationCategoriesTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
 		{Name: "Time"},
 		{Name: "%usr"},
@@ -2212,7 +2163,7 @@ func summaryCPUUtilizationTableValues(outputs map[string]script.ScriptOutput) []
 		{Name: "%idle"},
 	}
 	reStat := regexp.MustCompile(`^(\d\d:\d\d:\d\d)\s+all\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)$`)
-	for line := range strings.SplitSeq(outputs[script.MpstatScriptName].Stdout, "\n") {
+	for line := range strings.SplitSeq(outputs[script.MpstatTelemetryScriptName].Stdout, "\n") {
 		match := reStat.FindStringSubmatch(line)
 		if len(match) == 0 {
 			continue
@@ -2224,7 +2175,7 @@ func summaryCPUUtilizationTableValues(outputs map[string]script.ScriptOutput) []
 	return fields
 }
 
-func irqRateTableValues(outputs map[string]script.ScriptOutput) []Field {
+func irqRateTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
 		{Name: "Time"},
 		{Name: "CPU"},
@@ -2240,7 +2191,7 @@ func irqRateTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "RCU/s"},
 	}
 	reStat := regexp.MustCompile(`^(\d\d:\d\d:\d\d)\s+(\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)$`)
-	for line := range strings.SplitSeq(outputs[script.MpstatScriptName].Stdout, "\n") {
+	for line := range strings.SplitSeq(outputs[script.MpstatTelemetryScriptName].Stdout, "\n") {
 		match := reStat.FindStringSubmatch(line)
 		if len(match) == 0 {
 			continue
@@ -2252,7 +2203,7 @@ func irqRateTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return fields
 }
 
-func driveStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
+func driveTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
 		{Name: "Time"},
 		{Name: "Device"},
@@ -2266,7 +2217,7 @@ func driveStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
 	// don't capture the last three vals: "kB_read","kB_wrtn","kB_dscd" -- they aren't the same scale as the others
 	reStat := regexp.MustCompile(`^(\w+)\s*(\d+.\d+)\s*(\d+.\d+)\s*(\d+.\d+)\s*(\d+.\d+)\s*\d+\s*\d+\s*\d+$`)
 	var time string
-	for line := range strings.SplitSeq(outputs[script.IostatScriptName].Stdout, "\n") {
+	for line := range strings.SplitSeq(outputs[script.IostatTelemetryScriptName].Stdout, "\n") {
 		match := reTime.FindStringSubmatch(line)
 		if len(match) > 0 {
 			time = match[1]
@@ -2283,7 +2234,7 @@ func driveStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return fields
 }
 
-func networkStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
+func networkTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
 		{Name: "Time"},
 		{Name: "IFACE"},
@@ -2294,7 +2245,7 @@ func networkStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
 	}
 	// don't capture the last four vals: "rxcmp/s","txcmp/s","rxcmt/s","%ifutil" -- obscure more important vals
 	reStat := regexp.MustCompile(`^(\d+:\d+:\d+)\s*(\w*)\s*(\d+.\d+)\s*(\d+.\d+)\s*(\d+.\d+)\s*(\d+.\d+)\s*\d+.\d+\s*\d+.\d+\s*\d+.\d+\s*\d+.\d+$`)
-	for line := range strings.SplitSeq(outputs[script.SarNetworkScriptName].Stdout, "\n") {
+	for line := range strings.SplitSeq(outputs[script.NetworkTelemetryScriptName].Stdout, "\n") {
 		match := reStat.FindStringSubmatch(line)
 		if len(match) == 0 {
 			continue
@@ -2306,7 +2257,7 @@ func networkStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return fields
 }
 
-func memoryStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
+func memoryTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
 		{Name: "Time"},
 		{Name: "free"},
@@ -2320,7 +2271,7 @@ func memoryStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "dirty"},
 	}
 	reStat := regexp.MustCompile(`^(\d+:\d+:\d+)\s*(\d+)\s*(\d+)\s*(\d+)\s*\d+\.\d+\s*(\d+)\s*(\d+)\s*(\d+)\s*\d+\.\d+\s*(\d+)\s*(\d+)\s*(\d+)$`)
-	for line := range strings.SplitSeq(outputs[script.SarMemoryScriptName].Stdout, "\n") {
+	for line := range strings.SplitSeq(outputs[script.MemoryTelemetryScriptName].Stdout, "\n") {
 		match := reStat.FindStringSubmatch(line)
 		if len(match) == 0 {
 			continue
@@ -2332,13 +2283,13 @@ func memoryStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return fields
 }
 
-func powerStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
+func powerTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
 		{Name: "Time"},
 		{Name: "Package"},
 		{Name: "DRAM"},
 	}
-	tsRowValues, err := turbostatSummaryRows(outputs, []string{"PkgWatt", "RAMWatt"})
+	tsRowValues, err := turbostatSummaryRows(outputs[script.TurbostatTelemetryScriptName], []string{"PkgWatt", "RAMWatt"})
 	if err != nil {
 		slog.Error(err.Error())
 		return []Field{}
@@ -2351,12 +2302,12 @@ func powerStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return fields
 }
 
-func summaryCpuFreqTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
+func averageFrequencyTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
 		{Name: "Time"},
 		{Name: "Frequency"},
 	}
-	tsRowValues, err := turbostatSummaryRows(outputs, []string{"Bzy_MHz"})
+	tsRowValues, err := turbostatSummaryRows(outputs[script.TurbostatTelemetryScriptName], []string{"Bzy_MHz"})
 	if err != nil {
 		slog.Error(err.Error())
 		return []Field{}
@@ -2368,9 +2319,9 @@ func summaryCpuFreqTelemetryTableValues(outputs map[string]script.ScriptOutput) 
 	return fields
 }
 
-func gaudiStatsTableValues(outputs map[string]script.ScriptOutput) []Field {
+func gaudiTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
 	// parse the CSV output
-	csvOutput := outputs[script.GaudiStatsScriptName].Stdout
+	csvOutput := outputs[script.GaudiTelemetryScriptName].Stdout
 	if csvOutput == "" {
 		return []Field{}
 	}
@@ -2433,11 +2384,11 @@ func kernelLockAnalysisTableValues(outputs map[string]script.ScriptOutput) []Fie
 	return fields
 }
 
-func instructionMixTableValues(outputs map[string]script.ScriptOutput) []Field {
+func instructionTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
 	// first two lines are not part of the CSV output, they are the start time and interval
 	var startTime time.Time
 	var interval int
-	lines := strings.Split(outputs[script.InstructionMixScriptName].Stdout, "\n")
+	lines := strings.Split(outputs[script.InstructionTelemetryScriptName].Stdout, "\n")
 	if len(lines) < 4 {
 		slog.Warn("no data found in instruction mix output")
 		return []Field{}

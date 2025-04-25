@@ -1,6 +1,6 @@
 package metrics
 
-// Copyright (C) 2021-2024 Intel Corporation
+// Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
 // Linux perf event output, i.e., from 'perf stat' parsing and processing helper functions

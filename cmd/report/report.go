@@ -1,7 +1,7 @@
 // Package report is a subcommand of the root command. It generates a configuration report for target(s).
 package report
 
-// Copyright (C) 2021-2024 Intel Corporation
+// Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
 import (
@@ -141,13 +141,13 @@ var benchmarkOptions = []string{
 var benchmarkAll = "all"
 
 var benchmarkTableNames = map[string][]string{
-	"speed":       {report.CPUSpeedTableName},
-	"power":       {report.CPUPowerTableName},
-	"temperature": {report.CPUTemperatureTableName},
-	"frequency":   {report.CPUFrequencyTableName},
-	"memory":      {report.MemoryLatencyTableName},
-	"numa":        {report.NUMABandwidthTableName},
-	"storage":     {report.StoragePerfTableName},
+	"speed":       {report.SpeedBenchmarkTableName},
+	"power":       {report.PowerBenchmarkTableName},
+	"temperature": {report.TemperatureBenchmarkTableName},
+	"frequency":   {report.FrequencyBenchmarkTableName},
+	"memory":      {report.MemoryBenchmarkTableName},
+	"numa":        {report.NUMABenchmarkTableName},
+	"storage":     {report.StorageBenchmarkTableName},
 }
 
 var benchmarkSummaryTableName = "Benchmark Summary"
@@ -177,8 +177,8 @@ var categories = []common.Category{
 	{FlagName: flagFilesystemName, FlagVar: &flagFilesystem, Help: "File Systems", TableNames: []string{report.FilesystemTableName}},
 	{FlagName: flagGpuName, FlagVar: &flagGpu, Help: "GPUs", TableNames: []string{report.GPUTableName}},
 	{FlagName: flagGaudiName, FlagVar: &flagGaudi, Help: "Gaudi Devices", TableNames: []string{report.GaudiTableName}},
-	{FlagName: flagCxlName, FlagVar: &flagCxl, Help: "CXL Devices", TableNames: []string{report.CXLDeviceTableName}},
-	{FlagName: flagPcieName, FlagVar: &flagPcie, Help: "PCIE Slots", TableNames: []string{report.PCIeSlotsTableName}},
+	{FlagName: flagCxlName, FlagVar: &flagCxl, Help: "CXL Devices", TableNames: []string{report.CXLTableName}},
+	{FlagName: flagPcieName, FlagVar: &flagPcie, Help: "PCIE Slots", TableNames: []string{report.PCIeTableName}},
 	{FlagName: flagCveName, FlagVar: &flagCve, Help: "Vulnerabilities", TableNames: []string{report.CVETableName}},
 	{FlagName: flagProcessName, FlagVar: &flagProcess, Help: "Process List", TableNames: []string{report.ProcessTableName}},
 	{FlagName: flagSensorName, FlagVar: &flagSensor, Help: "Sensor Status", TableNames: []string{report.SensorTableName}},
@@ -375,19 +375,19 @@ func runCmd(cmd *cobra.Command, args []string) error {
 }
 
 func benchmarkSummaryFromTableValues(allTableValues []report.TableValues, outputs map[string]script.ScriptOutput) report.TableValues {
-	maxFreq := getValueFromTableValues(getTableValues(allTableValues, report.CPUFrequencyTableName), "sse", 0)
+	maxFreq := getValueFromTableValues(getTableValues(allTableValues, report.FrequencyBenchmarkTableName), "SSE", 0)
 	if maxFreq != "" {
 		maxFreq = maxFreq + " GHz"
 	}
-	allCoreMaxFreq := getValueFromTableValues(getTableValues(allTableValues, report.CPUFrequencyTableName), "sse", -1)
+	allCoreMaxFreq := getValueFromTableValues(getTableValues(allTableValues, report.FrequencyBenchmarkTableName), "SSE", -1)
 	if allCoreMaxFreq != "" {
 		allCoreMaxFreq = allCoreMaxFreq + " GHz"
 	}
 	// get the maximum memory bandwidth from the memory latency table
-	memLatTableValues := getTableValues(allTableValues, report.MemoryLatencyTableName)
+	memLatTableValues := getTableValues(allTableValues, report.MemoryBenchmarkTableName)
 	var bandwidthValues []string
 	if len(memLatTableValues.Fields) > 1 {
-		bandwidthValues = getTableValues(allTableValues, report.MemoryLatencyTableName).Fields[1].Values
+		bandwidthValues = getTableValues(allTableValues, report.MemoryBenchmarkTableName).Fields[1].Values
 	}
 	maxBandwidth := 0.0
 	for _, bandwidthValue := range bandwidthValues {
@@ -405,7 +405,7 @@ func benchmarkSummaryFromTableValues(allTableValues []report.TableValues, output
 		maxMemBW = fmt.Sprintf("%.1f GB/s", maxBandwidth)
 	}
 	// get the minimum memory latency
-	minLatency := getValueFromTableValues(getTableValues(allTableValues, report.MemoryLatencyTableName), "Latency (ns)", 0)
+	minLatency := getValueFromTableValues(getTableValues(allTableValues, report.MemoryBenchmarkTableName), "Latency (ns)", 0)
 	if minLatency != "" {
 		minLatency = minLatency + " ns"
 	}
@@ -420,16 +420,16 @@ func benchmarkSummaryFromTableValues(allTableValues []report.TableValues, output
 			TextTableRendererFunc: summaryTextTableRenderer,
 		},
 		Fields: []report.Field{
-			{Name: "CPU Speed", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUSpeedTableName), "Ops/s", 0) + " Ops/s"}},
+			{Name: "CPU Speed", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.SpeedBenchmarkTableName), "Ops/s", 0) + " Ops/s"}},
 			{Name: "Single-core Maximum frequency", Values: []string{maxFreq}},
 			{Name: "All-core Maximum frequency", Values: []string{allCoreMaxFreq}},
-			{Name: "Maximum Power", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUPowerTableName), "Maximum Power", 0)}},
-			{Name: "Maximum Temperature", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUTemperatureTableName), "Maximum Temperature", 0)}},
-			{Name: "Minimum Power", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.CPUPowerTableName), "Minimum Power", 0)}},
+			{Name: "Maximum Power", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.PowerBenchmarkTableName), "Maximum Power", 0)}},
+			{Name: "Maximum Temperature", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.TemperatureBenchmarkTableName), "Maximum Temperature", 0)}},
+			{Name: "Minimum Power", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.PowerBenchmarkTableName), "Minimum Power", 0)}},
 			{Name: "Memory Peak Bandwidth", Values: []string{maxMemBW}},
 			{Name: "Memory Minimum Latency", Values: []string{minLatency}},
-			{Name: "Disk Read Bandwidth", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.StoragePerfTableName), "Single-Thread Read Bandwidth", 0)}},
-			{Name: "Disk Write Bandwidth", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.StoragePerfTableName), "Single-Thread Write Bandwidth", 0)}},
+			{Name: "Disk Read Bandwidth", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.StorageBenchmarkTableName), "Single-Thread Read Bandwidth", 0)}},
+			{Name: "Disk Write Bandwidth", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.StorageBenchmarkTableName), "Single-Thread Write Bandwidth", 0)}},
 			{Name: "Microarchitecture", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.SystemSummaryTableName), "Microarchitecture", 0)}},
 			{Name: "Sockets", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.SystemSummaryTableName), "Sockets", 0)}},
 		},

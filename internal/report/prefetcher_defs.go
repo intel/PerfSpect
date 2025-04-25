@@ -8,12 +8,7 @@ import "fmt"
 // prefetcher_defs.go
 // prefetchers are enabled when associated bit in msr is 0
 
-const (
-	MsrPrefetchControl = 0x1a4
-	MsrPrefetchers     = 0x6d
-)
-
-type Prefetcher struct {
+type PrefetcherDefinition struct {
 	ShortName   string
 	Description string
 	Msr         int
@@ -21,7 +16,12 @@ type Prefetcher struct {
 	Uarchs      []string
 }
 
-var PrefetcherDefs = []Prefetcher{
+const (
+	MsrPrefetchControl = 0x1a4
+	MsrPrefetchers     = 0x6d
+)
+
+var prefetcherDefinitions = []PrefetcherDefinition{
 	{
 		ShortName:   "L2 HW",
 		Description: "L2 Hardware (MLC Streamer) fetches additional lines of code or data into the L2 cache.",
@@ -96,11 +96,11 @@ var PrefetcherDefs = []Prefetcher{
 
 // GetPrefetcherDefByName returns the Prefetcher definition by its short name.
 // It returns error if the Prefetcher is not found.
-func GetPrefetcherDefByName(name string) (Prefetcher, error) {
-	for _, p := range PrefetcherDefs {
+func GetPrefetcherDefByName(name string) (PrefetcherDefinition, error) {
+	for _, p := range prefetcherDefinitions {
 		if p.ShortName == name {
 			return p, nil
 		}
 	}
-	return Prefetcher{}, fmt.Errorf("prefetcher %s not found", name)
+	return PrefetcherDefinition{}, fmt.Errorf("prefetcher %s not found", name)
 }

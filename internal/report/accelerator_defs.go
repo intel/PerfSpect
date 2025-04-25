@@ -1,13 +1,13 @@
 package report
 
-// Copyright (C) 2021-2024 Intel Corporation
+// Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
 // Intel Accelerators (sorted by devid)
 // references:
 //   https://pci-ids.ucw.cz/read/PC/8086
 
-type Accelerator struct {
+type AcceleratorDefinition struct {
 	MfgID       string
 	DevID       string
 	Name        string
@@ -15,7 +15,7 @@ type Accelerator struct {
 	Description string
 }
 
-var accelDefs = []Accelerator{
+var acceleratorDefinitions = []AcceleratorDefinition{
 	{
 		MfgID:       "8086",
 		DevID:       "(2710|2714)",

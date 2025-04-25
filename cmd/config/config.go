@@ -1,7 +1,7 @@
 // Package config is a subcommand of the root command. It sets system configuration items on target platform(s).
 package config
 
-// Copyright (C) 2021-2024 Intel Corporation
+// Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
 import (
@@ -575,7 +575,7 @@ func printConfig(myTargets []target.Target, localTempDir string) (err error) {
 		// process the tables, i.e., get field values from raw script output
 		tableNames := []string{report.ConfigurationTableName}
 		var tableValues []report.TableValues
-		if tableValues, err = report.Process(tableNames, scriptOutputs); err != nil {
+		if tableValues, err = report.ProcessTables(tableNames, scriptOutputs); err != nil {
 			err = fmt.Errorf("failed to process collected data: %v", err)
 			return
 		}

@@ -1,6 +1,6 @@
 package report
 
-// Copyright (C) 2021-2024 Intel Corporation
+// Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
 // table_helpers.go contains helper functions that are used to extract values from the output of the scripts.
@@ -16,7 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"perfspect/internal/cpudb"
 	"perfspect/internal/script"
 	"slices"
 )
@@ -145,8 +144,7 @@ func uarchFromOutput(outputs map[string]script.ScriptOutput) string {
 	stepping := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Stepping:\s*(.+)$`)
 	capid4 := valFromRegexSubmatch(outputs[script.LspciBitsScriptName].Stdout, `^([0-9a-fA-F]+)`)
 	devices := valFromRegexSubmatch(outputs[script.LspciDevicesScriptName].Stdout, `^([0-9]+)`)
-	CPUdb := cpudb.NewCPUDB()
-	cpu, err := CPUdb.GetCPUExtended(family, model, stepping, capid4, devices)
+	cpu, err := getCPUExtended(family, model, stepping, capid4, devices)
 	if err == nil {
 		return cpu.MicroArchitecture
 	}
@@ -395,8 +393,7 @@ func hyperthreadingFromOutput(outputs map[string]script.ScriptOutput) string {
 		slog.Error("error parsing cores per sockets from lscpu")
 		return ""
 	}
-	CPUdb := cpudb.NewCPUDB()
-	cpu, err := CPUdb.GetCPUExtended(family, model, stepping, "", "")
+	cpu, err := getCPUExtended(family, model, stepping, "", "")
 	if err != nil {
 		return ""
 	}
@@ -442,8 +439,7 @@ func channelsFromOutput(outputs map[string]script.ScriptOutput) string {
 	stepping := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Stepping:\s*(.+)$`)
 	capid4 := valFromRegexSubmatch(outputs[script.LspciBitsScriptName].Stdout, `^([0-9a-fA-F]+)`)
 	devices := valFromRegexSubmatch(outputs[script.LspciDevicesScriptName].Stdout, `^([0-9]+)`)
-	CPUdb := cpudb.NewCPUDB()
-	cpu, err := CPUdb.GetCPUExtended(family, model, stepping, capid4, devices)
+	cpu, err := getCPUExtended(family, model, stepping, capid4, devices)
 	if err != nil {
 		slog.Error("error getting CPU from CPUdb", slog.String("error", err.Error()))
 		return ""
@@ -491,7 +487,7 @@ func prefetchersFromOutput(outputs map[string]script.ScriptOutput) [][]string {
 		// uarch is required
 		return [][]string{}
 	}
-	for _, pf := range PrefetcherDefs {
+	for _, pf := range prefetcherDefinitions {
 		if slices.Contains(pf.Uarchs, "all") || slices.Contains(pf.Uarchs, uarch[:3]) {
 			var scriptName string
 			if pf.Msr == MsrPrefetchControl {
@@ -530,7 +526,7 @@ func prefetchersSummaryFromOutput(outputs map[string]script.ScriptOutput) string
 		return ""
 	}
 	var prefList []string
-	for _, pf := range PrefetcherDefs {
+	for _, pf := range prefetcherDefinitions {
 		if slices.Contains(pf.Uarchs, "all") || slices.Contains(pf.Uarchs, uarch[:3]) {
 			var scriptName string
 			if pf.Msr == MsrPrefetchControl {
@@ -626,12 +622,11 @@ func GetL3LscpuMB(outputs map[string]script.ScriptOutput) (instanceSizeMB float6
 }
 
 func getCacheWays(uArch string) (cacheWays []int64) {
-	CPUdb := cpudb.NewCPUDB()
-	cpu, err := CPUdb.GetCPUByMicroArchitecture(uArch)
+	cpu, err := getCPUByMicroArchitecture(uArch)
 	if err != nil {
 		return
 	}
-	return cpu.GetCacheWays()
+	return getCPUCacheWays(cpu)
 }
 
 // GetCacheWays exports the getCacheWays function
@@ -733,7 +728,7 @@ func l3PerCoreFromOutput(outputs map[string]script.ScriptOutput) string {
 
 func acceleratorNames() []string {
 	var names []string
-	for _, accel := range accelDefs {
+	for _, accel := range acceleratorDefinitions {
 		names = append(names, accel.Name)
 	}
 	return names
@@ -742,7 +737,7 @@ func acceleratorNames() []string {
 func acceleratorCountsFromOutput(outputs map[string]script.ScriptOutput) []string {
 	var counts []string
 	lshw := outputs[script.LshwScriptName].Stdout
-	for _, accel := range accelDefs {
+	for _, accel := range acceleratorDefinitions {
 		regex := fmt.Sprintf("%s:%s", accel.MfgID, accel.DevID)
 		re := regexp.MustCompile(regex)
 		count := len(re.FindAllString(lshw, -1))
@@ -753,7 +748,7 @@ func acceleratorCountsFromOutput(outputs map[string]script.ScriptOutput) []strin
 
 func acceleratorWorkQueuesFromOutput(outputs map[string]script.ScriptOutput) []string {
 	var queues []string
-	for _, accel := range accelDefs {
+	for _, accel := range acceleratorDefinitions {
 		if accel.Name == "IAA" || accel.Name == "DSA" {
 			var scriptName string
 			if accel.Name == "IAA" {
@@ -784,7 +779,7 @@ func acceleratorWorkQueuesFromOutput(outputs map[string]script.ScriptOutput) []s
 
 func acceleratorFullNamesFromYaml() []string {
 	var fullNames []string
-	for _, accel := range accelDefs {
+	for _, accel := range acceleratorDefinitions {
 		fullNames = append(fullNames, accel.FullName)
 	}
 	return fullNames
@@ -792,7 +787,7 @@ func acceleratorFullNamesFromYaml() []string {
 
 func acceleratorDescriptionsFromYaml() []string {
 	var descriptions []string
-	for _, accel := range accelDefs {
+	for _, accel := range acceleratorDefinitions {
 		descriptions = append(descriptions, accel.Description)
 	}
 	return descriptions
@@ -1476,7 +1471,7 @@ func gpuInfoFromOutput(outputs map[string]script.ScriptOutput) []GPU {
 	for _, gpu := range gpusLshw {
 		// Find GPU in GPU defs, note the model
 		var model string
-		for _, intelGPU := range IntelGPUs {
+		for _, intelGPU := range gpuDefinitions {
 			if gpu[idxMfgID] == intelGPU.MfgID {
 				model = intelGPU.Model
 				break
@@ -1736,7 +1731,7 @@ func expandCPUList(cpuList string) (cpus []int) {
 	return
 }
 
-func turbostatSummaryRows(outputs map[string]script.ScriptOutput, fieldNames []string) ([][]string, error) {
+func turbostatSummaryRows(turboStatScriptOutput script.ScriptOutput, fieldNames []string) ([][]string, error) {
 	var fieldValues [][]string
 	// initialize indices with -1
 	fieldIndices := make([]int, len(fieldNames))
@@ -1748,7 +1743,7 @@ func turbostatSummaryRows(outputs map[string]script.ScriptOutput, fieldNames []s
 	var sampleTime time.Time
 	sampleCount := 0
 	// parse the turbostat output
-	for i, line := range strings.Split(outputs[script.TurbostatScriptName].Stdout, "\n") {
+	for i, line := range strings.Split(turboStatScriptOutput.Stdout, "\n") {
 		if i == 0 { // first line is the time stamp, e.g., TIME: 15:04:05
 			var err error
 			startTime, err = time.Parse("15:04:05", strings.TrimPrefix(line, "TIME: "))

@@ -1,6 +1,6 @@
 package report
 
-// Copyright (C) 2021-2024 Intel Corporation
+// Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
 // Intel Discrete GPUs (sorted by devid)
@@ -10,13 +10,13 @@ package report
 //
 //   The devid field will be interpreted as a regular expression.
 
-type GPUDef struct {
+type GPUDefinition struct {
 	Model string
 	MfgID string
 	DevID string
 }
 
-var IntelGPUs = []GPUDef{
+var gpuDefinitions = []GPUDefinition{
 	{
 		Model: "ATS-P",
 		MfgID: "8086",

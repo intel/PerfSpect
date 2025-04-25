@@ -1,7 +1,7 @@
 // Package flame is a subcommand of the root command. It is used to generate flamegraphs from target(s).
 package flame
 
-// Copyright (C) 2021-2024 Intel Corporation
+// Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
 import (

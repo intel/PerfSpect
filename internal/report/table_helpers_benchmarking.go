@@ -1,6 +1,6 @@
 package report
 
-// Copyright (C) 2021-2024 Intel Corporation
+// Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
 import (
@@ -16,7 +16,7 @@ import (
 
 func cpuSpeedFromOutput(outputs map[string]script.ScriptOutput) string {
 	var vals []float64
-	for line := range strings.SplitSeq(strings.TrimSpace(outputs[script.CpuSpeedScriptName].Stdout), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(outputs[script.SpeedBenchmarkScriptName].Stdout), "\n") {
 		tokens := strings.Split(line, " ")
 		if len(tokens) != 2 {
 			slog.Error("unexpected stress-ng output format", slog.String("line", line))
@@ -41,7 +41,7 @@ func storagePerfFromOutput(outputs map[string]script.ScriptOutput) (readBW, writ
 	// READ: bw=140MiB/s (146MB/s), 140MiB/s-140MiB/s (146MB/s-146MB/s), io=16.4GiB (17.6GB), run=120004-120004msec
 	// WRITE: bw=139MiB/s (146MB/s), 139MiB/s-139MiB/s (146MB/s-146MB/s), io=16.3GiB (17.5GB), run=120004-120004msec
 	re := regexp.MustCompile(` bw=(\d+[.]?[\d]*\w+\/s)`)
-	for line := range strings.SplitSeq(strings.TrimSpace(outputs[script.StoragePerfScriptName].Stdout), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(outputs[script.StorageBenchmarkScriptName].Stdout), "\n") {
 		if strings.Contains(line, "READ: bw=") {
 			matches := re.FindStringSubmatch(line)
 			if len(matches) != 0 {
@@ -150,12 +150,12 @@ func ParseTurbostatOutput(output string) (turboPower, turboTemperature string) {
 }
 
 func maxPowerFromOutput(outputs map[string]script.ScriptOutput) string {
-	power, _ := ParseTurbostatOutput(outputs[script.MaxPowerAndTemperatureScriptName].Stdout)
+	power, _ := ParseTurbostatOutput(outputs[script.PowerBenchmarkScriptName].Stdout)
 	return power
 }
 
 func minPowerFromOutput(outputs map[string]script.ScriptOutput) string {
-	watts := strings.TrimSpace(outputs[script.IdlePowerScriptName].Stdout)
+	watts := strings.TrimSpace(outputs[script.IdlePowerBenchmarkScriptName].Stdout)
 	if watts == "" || watts == "0.00" {
 		return ""
 	}
@@ -163,7 +163,7 @@ func minPowerFromOutput(outputs map[string]script.ScriptOutput) string {
 }
 
 func maxTemperatureFromOutput(outputs map[string]script.ScriptOutput) string {
-	_, temperature := ParseTurbostatOutput(outputs[script.MaxPowerAndTemperatureScriptName].Stdout)
+	_, temperature := ParseTurbostatOutput(outputs[script.PowerBenchmarkScriptName].Stdout)
 	return temperature
 }
 

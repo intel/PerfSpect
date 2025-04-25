@@ -5,7 +5,7 @@
 # it will use the default values: intel and perfspect, respectively.
 # Example: GITHUB_OWNER=google GITHUB_REPO=protobuf ./repoactivity.sh
 
-# Copyright (C) 2021-2024 Intel Corporation
+# Copyright (C) 2021-2025 Intel Corporation
 # SPDX-License-Identifier: BSD-3-Clause
 
 

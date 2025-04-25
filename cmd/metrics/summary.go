@@ -1,6 +1,6 @@
 package metrics
 
-// Copyright (C) 2021-2024 Intel Corporation
+// Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
 // functions to create summary (mean,min,max,stddev) metrics from metrics CSV
