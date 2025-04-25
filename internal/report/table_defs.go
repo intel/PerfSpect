@@ -1986,7 +1986,7 @@ func frequencyBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Fie
 	// get the spec core frequencies from the spec output
 	var specSSEFreqs []string
 	frequencyBuckets, err := getSpecFrequencyBuckets(outputs)
-	if err == nil && len(frequencyBuckets) > 2 {
+	if err == nil && len(frequencyBuckets) >= 2 {
 		// get the frequencies from the buckets
 		specSSEFreqs, err = frequencyBucketsToFrequencies(frequencyBuckets)
 		if err != nil {
