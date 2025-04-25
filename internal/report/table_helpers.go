@@ -222,7 +222,7 @@ func convertMsrToDecimals(msr string) (decVals []int, err error) {
 // returns slice of rows
 // first row is header
 // each row is a slice of strings
-// "cores", "cores per die" "sse", "avx2", "avx512", "avx512h", "amx"
+// "cores", "cores per die", "sse", "avx2", "avx512", "avx512h", "amx"
 // "0-41", "0-20", "3.5", "3.5", "3.3", "3.2", "3.1"
 // "42-63", "21-31", "3.5", "3.5", "3.3", "3.2", "3.1"
 // "64-85", "32-43", "3.5", "3.5", "3.3", "3.2", "3.1"
