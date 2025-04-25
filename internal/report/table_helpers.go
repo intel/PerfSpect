@@ -197,22 +197,22 @@ func baseFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 	return ""
 }
 
-func convertMsrToDecimals(msr string) (decVals []int64, err error) {
+func convertMsrToDecimals(msr string) (decVals []int, err error) {
 	re := regexp.MustCompile(`[0-9a-fA-F][0-9a-fA-F]`)
 	hexVals := re.FindAll([]byte(msr), -1)
 	if hexVals == nil {
 		err = fmt.Errorf("no hex values found in msr")
 		return
 	}
-	decVals = make([]int64, len(hexVals))
+	decVals = make([]int, len(hexVals))
 	decValsIndex := len(decVals) - 1
 	for _, hexVal := range hexVals {
 		var decVal int64
-		decVal, err = strconv.ParseInt(string(hexVal), 16, 64)
+		decVal, err = strconv.ParseInt(string(hexVal), 16, 0)
 		if err != nil {
 			return
 		}
-		decVals[decValsIndex] = decVal
+		decVals[decValsIndex] = int(decVal)
 		decValsIndex--
 	}
 	return
@@ -271,7 +271,7 @@ func getSpecCoreFrequenciesFromOutput(outputs map[string]script.ScriptOutput) ([
 	}
 	for _, count := range bucketCoreCounts {
 		if archMultiplier > 1 {
-			totalCoreCount := count * int64(archMultiplier)
+			totalCoreCount := count * archMultiplier
 			if totalCoreStartRange > int(totalCoreCount) {
 				break
 			}
@@ -285,7 +285,7 @@ func getSpecCoreFrequenciesFromOutput(outputs map[string]script.ScriptOutput) ([
 	var allIsaFreqs [][]string
 	for _, isaHex := range values[1:] {
 		var isaFreqs []string
-		var freqs []int64
+		var freqs []int
 		if isaHex != "0" {
 			var err error
 			freqs, err = convertMsrToDecimals(isaHex)
@@ -294,7 +294,7 @@ func getSpecCoreFrequenciesFromOutput(outputs map[string]script.ScriptOutput) ([
 			}
 		} else {
 			// if the ISA is not supported, set the frequency to zero for all buckets
-			freqs = make([]int64, len(bucketCoreCounts))
+			freqs = make([]int, len(bucketCoreCounts))
 			for i := range freqs {
 				freqs[i] = 0
 			}
