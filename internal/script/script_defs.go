@@ -49,7 +49,6 @@ const (
 	MaximumFrequencyScriptName                 = "maximum frequency"
 	ScalingDriverScriptName                    = "scaling driver"
 	ScalingGovernorScriptName                  = "scaling governor"
-	MaxCStateScriptName                        = "max c-state"
 	CstatesScriptName                          = "c-states"
 	SpecCoreFrequenciesScriptName              = "spec core frequencies"
 	PPINName                                   = "ppin"
@@ -100,7 +99,6 @@ const (
 	IpmitoolSensorsScriptName                  = "ipmitool sensors"
 	IpmitoolChassisScriptName                  = "ipmitool chassis"
 	IpmitoolEventsScriptName                   = "ipmitool events"
-	IpmitoolEventTimeScriptName                = "ipmitool event time"
 	TmeScriptName                              = "tme"
 	KernelLogScriptName                        = "kernel log"
 	PMUDriverVersionScriptName                 = "pmu driver version"
@@ -258,10 +256,6 @@ var scripts = map[string]ScriptDefinition{
 	ScalingGovernorScriptName: {
 		Name:           ScalingGovernorScriptName,
 		ScriptTemplate: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor",
-	},
-	MaxCStateScriptName: {
-		Name:           MaxCStateScriptName,
-		ScriptTemplate: "cat /sys/module/intel_idle/parameters/max_cstate",
 	},
 	CstatesScriptName: {
 		Name: CstatesScriptName,
@@ -809,12 +803,6 @@ done
 		ScriptTemplate: `LC_ALL=C timeout 30 ipmitool sel elist | tail -n20 | cut -d'|' -f2-`,
 		Superuser:      true,
 		Lkms:           []string{"ipmi_devintf", "ipmi_si"},
-		Depends:        []string{"ipmitool"},
-	},
-	IpmitoolEventTimeScriptName: {
-		Name:           IpmitoolEventTimeScriptName,
-		ScriptTemplate: "LC_ALL=C timeout 30 ipmitool sel time get",
-		Superuser:      true,
 		Depends:        []string{"ipmitool"},
 	},
 	TmeScriptName: {
