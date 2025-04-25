@@ -1,7 +1,7 @@
 // Package telemetry is a subcommand of the root command. It collects system telemetry from target(s).
 package telemetry
 
-// Copyright (C) 2021-2024 Intel Corporation
+// Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
 import (

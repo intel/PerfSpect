@@ -1,7 +1,7 @@
 // Package metrics is a subcommand of the root command. It provides functionality to monitor core and uncore metrics on one target.
 package metrics
 
-// Copyright (C) 2021-2024 Intel Corporation
+// Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
 import (
