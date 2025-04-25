@@ -218,7 +218,7 @@ func convertMsrToDecimals(msr string) (decVals []int, err error) {
 	return
 }
 
-// getSpecCoreFrequenciesFromOutput
+// getSpecFrequencyBuckets
 // returns slice of rows
 // first row is header
 // each row is a slice of strings
@@ -228,7 +228,7 @@ func convertMsrToDecimals(msr string) (decVals []int, err error) {
 // "64-85", "32-43", "3.5", "3.5", "3.3", "3.2", "3.1"
 // ...
 // the "cores per die" column is only present for some architectures
-func getSpecCoreFrequenciesFromOutput(outputs map[string]script.ScriptOutput) ([][]string, error) {
+func getSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string, error) {
 	arch := uarchFromOutput(outputs)
 	if arch == "" {
 		return nil, fmt.Errorf("uarch is required")
@@ -357,7 +357,7 @@ func maxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 		}
 	}
 	// get the max frequency from the MSR/tpmi
-	specCoreFrequencies, err := getSpecCoreFrequenciesFromOutput(outputs)
+	specCoreFrequencies, err := getSpecFrequencyBuckets(outputs)
 	if err == nil && len(specCoreFrequencies) > 1 && len(specCoreFrequencies[1]) > 1 {
 		return specCoreFrequencies[1][1] + "GHz"
 	}
@@ -365,7 +365,7 @@ func maxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 }
 
 func allCoreMaxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
-	specCoreFrequencies, err := getSpecCoreFrequenciesFromOutput(outputs)
+	specCoreFrequencies, err := getSpecFrequencyBuckets(outputs)
 	if err == nil && len(specCoreFrequencies) >= 2 && len(specCoreFrequencies[1]) > 1 {
 		// the last entry in the 2nd column is the max all-core frequency
 		return specCoreFrequencies[len(specCoreFrequencies)-1][1] + "GHz"

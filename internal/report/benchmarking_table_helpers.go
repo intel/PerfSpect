@@ -223,17 +223,24 @@ func avxTurboFrequenciesFromOutput(output string) (instructionFreqs map[string][
 	return
 }
 
-// bucketsToCounts expands the core frequency buckets to a list of core counts (from column 0) and associated spec sse frequencies (from column 1 or 2)
-// the first column is the bucket range, e.g. 1-44, the second (or third) column is the spec sse frequency
-func bucketsToCoresFreqs(specCoreFreqs [][]string) (cores []string, freqs []string, err error) {
+// frequencyBucketsToFrequencies creates a slice of SSE frequencies from the spec core frequency buckets
+// input: the first column is the bucket range, e.g. 1-44, the second (or third) column is the spec sse frequency
+func frequencyBucketsToFrequencies(specCoreFreqs [][]string) (freqs []string, err error) {
 	if len(specCoreFreqs) < 2 || len(specCoreFreqs[0]) < 2 {
 		err = fmt.Errorf("unable to parse core frequency buckets")
 		return
 	}
-	rangeIdx := 0
-	sseIdx := 1
-	if len(specCoreFreqs[0]) > 2 && specCoreFreqs[0][2] == "SSE" {
-		sseIdx = 2
+	rangeIdx := 0 // the first column is the bucket, e.g., 1-44
+	var sseIdx int
+	for i := range specCoreFreqs[0] {
+		if strings.Contains(strings.ToUpper(specCoreFreqs[0][i]), "SSE") {
+			sseIdx = i
+			break
+		}
+	}
+	if sseIdx == 0 {
+		err = fmt.Errorf("unable to find SSE frequency column")
+		return
 	}
 	for i := 1; i < len(specCoreFreqs); i++ {
 		bucketRange := strings.TrimSpace(specCoreFreqs[i][rangeIdx])
@@ -258,7 +265,6 @@ func bucketsToCoresFreqs(specCoreFreqs [][]string) (cores []string, freqs []stri
 		}
 		// add the core count to the list
 		for j := start; j <= end; j++ {
-			cores = append(cores, strconv.Itoa(j))
 			freqs = append(freqs, specCoreFreqs[i][sseIdx])
 		}
 	}
