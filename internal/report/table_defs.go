@@ -659,7 +659,7 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.MemoryBandwidthAndLatencyScriptName,
 		},
-		NoDataFound:                      "No memory latency data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
+		NoDataFound:                      "No memory benchmark data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
 		FieldsFunc:                       memoryBenchmarkTableValues,
 		HTMLTableRendererFunc:            memoryBenchmarkTableHtmlRenderer,
 		HTMLMultiTargetTableRendererFunc: memoryBenchmarkTableMultiTargetHtmlRenderer},
@@ -670,7 +670,7 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.NumaBandwidthScriptName,
 		},
-		NoDataFound: "No NUMA bandwidth data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
+		NoDataFound: "No NUMA benchmark data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
 		FieldsFunc:  numaBenchmarkTableValues},
 	StorageBenchmarkTableName: {
 		Name:      StorageBenchmarkTableName,
@@ -771,7 +771,7 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.GaudiStatsScriptName,
 		},
-		NoDataFound:           "No Gaudi stats data found. Gaudi devices and the hl-smi tool must be installed on the target system to collect Gaudi stats.",
+		NoDataFound:           "No Gaudi telemetry found. Gaudi devices and the hl-smi tool must be installed on the target system to collect Gaudi stats.",
 		FieldsFunc:            gaudiTelemetryTableValues,
 		HTMLTableRendererFunc: gaudiTelemetryTableHTMLRenderer},
 	//
