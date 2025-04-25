@@ -264,7 +264,7 @@ var tableDefinitions = map[string]TableDefinition{
 	PrefetcherTableName: {
 		Name:    PrefetcherTableName,
 		HasRows: true,
-		// TODO: Vendors: []string{"GenuineIntel"},
+		Vendors: []string{"GenuineIntel"},
 		ScriptNames: []string{
 			script.LscpuScriptName,
 			script.LspciBitsScriptName,
@@ -280,6 +280,7 @@ var tableDefinitions = map[string]TableDefinition{
 	AcceleratorTableName: {
 		Name:    AcceleratorTableName,
 		Vendors: []string{"GenuineIntel"},
+		Models:  []string{"143", "207", "173", "175", "221"}, // Sapphire Rapids, Emerald Rapids, Granite Rapids, Sierra Forest, Clearwater Forest
 		HasRows: true,
 		ScriptNames: []string{
 			script.LshwScriptName,
@@ -1246,13 +1247,13 @@ func elcTableInsights(outputs map[string]script.ScriptOutput, tableValues TableV
 }
 
 func maximumFrequencyTableValues(outputs map[string]script.ScriptOutput) []Field {
-	specCoreFrequencies, err := getSpecCoreFrequenciesFromOutput(outputs)
+	frequencyBuckets, err := getSpecFrequencyBuckets(outputs)
 	if err != nil {
 		slog.Warn("unable to get spec core frequencies", slog.String("error", err.Error()))
 		return []Field{}
 	}
 	var fields []Field
-	for i, row := range specCoreFrequencies {
+	for i, row := range frequencyBuckets {
 		// first row is field names
 		if i == 0 {
 			for _, fieldName := range row {
@@ -2016,48 +2017,77 @@ func cpuTemperatureTableValues(outputs map[string]script.ScriptOutput) []Field {
 }
 
 func cpuFrequencyTableValues(outputs map[string]script.ScriptOutput) []Field {
-	specCoreFrequencies, err := getSpecCoreFrequenciesFromOutput(outputs)
-	if err != nil {
-		slog.Warn("unable to get spec core frequencies", slog.String("error", err.Error()))
-		return []Field{}
-	}
-	// get the core counts from the buckets
-	cores, specSSEFreqs, err := bucketsToCoresFreqs(specCoreFrequencies)
-	if err != nil {
-		slog.Error("unable to convert buckets to counts", slog.String("error", err.Error()))
-		return []Field{}
-	}
 	// get the sse, avx256, and avx512 frequencies from the avx-turbo output
 	instructionFreqs, err := avxTurboFrequenciesFromOutput(outputs[script.TurboFrequenciesScriptName].Stdout)
 	if err != nil {
 		slog.Error("unable to get avx turbo frequencies", slog.String("error", err.Error()))
 		return []Field{}
 	}
-	// we're expecting scalar_iadd, avx256_fma, avx512_fma, all associated slices should be of the same length
+	// we're expecting scalar_iadd, avx256_fma, avx512_fma
 	scalarIaddFreqs := instructionFreqs["scalar_iadd"]
 	avx256FmaFreqs := instructionFreqs["avx256_fma"]
 	avx512FmaFreqs := instructionFreqs["avx512_fma"]
-	// check that we have the same number of frequencies as cores (sanity check)
-	numCores := len(cores)
-	if len(specSSEFreqs) != numCores || len(scalarIaddFreqs) != numCores || len(avx256FmaFreqs) != numCores || len(avx512FmaFreqs) != numCores {
-		slog.Error("mismatched number of frequencies and core counts", slog.Int("numCores", numCores), slog.Int("numSpecSSEFreqs", len(specSSEFreqs)), slog.Int("numScalarIaddFreqs", len(scalarIaddFreqs)), slog.Int("numAvx256FmaFreqs", len(avx256FmaFreqs)), slog.Int("numAvx512FmaFreqs", len(avx512FmaFreqs)))
+	// stop if we don't have any scalar_iadd frequencies
+	if len(scalarIaddFreqs) == 0 {
+		slog.Error("no scalar_iadd frequencies found")
 		return []Field{}
+	}
+	// get the spec core frequencies from the spec output
+	var specSSEFreqs []string
+	frequencyBuckets, err := getSpecFrequencyBuckets(outputs)
+	if err == nil && len(frequencyBuckets) > 2 {
+		// get the frequencies from the buckets
+		specSSEFreqs, err = frequencyBucketsToFrequencies(frequencyBuckets)
+		if err != nil {
+			slog.Error("unable to convert buckets to counts", slog.String("error", err.Error()))
+			return []Field{}
+		}
+		// trim the spec frequencies to the length of the scalar_iadd frequencies
+		// this can happen when the actual core count is less than the number of cores in the spec
+		if len(scalarIaddFreqs) < len(specSSEFreqs) {
+			specSSEFreqs = specSSEFreqs[:len(scalarIaddFreqs)]
+		}
 	}
 	// create the fields
 	fields := []Field{
 		{Name: "cores"},
-		{Name: "sse (expected)"},
-		{Name: "sse"},    // scalar_iadd
-		{Name: "avx2"},   // avx256_fma
-		{Name: "avx512"}, // avx512_fma
+	}
+	coresIdx := 0 // always the first field
+	var specSSEFieldIdx int
+	var scalarIaddFieldIdx int
+	var avx2FieldIdx int
+	var avx512FieldIdx int
+	if len(specSSEFreqs) > 0 {
+		fields = append(fields, Field{Name: "SSE (expected)"})
+		specSSEFieldIdx = len(fields) - 1
+	}
+	if len(scalarIaddFreqs) > 0 {
+		fields = append(fields, Field{Name: "SSE"})
+		scalarIaddFieldIdx = len(fields) - 1
+	}
+	if len(avx256FmaFreqs) > 0 {
+		fields = append(fields, Field{Name: "AVX2"})
+		avx2FieldIdx = len(fields) - 1
+	}
+	if len(avx512FmaFreqs) > 0 {
+		fields = append(fields, Field{Name: "AVX512"})
+		avx512FieldIdx = len(fields) - 1
 	}
 	// add the data to the fields
-	fields[0].Values = cores
-	fields[1].Values = specSSEFreqs
-	for i := range cores {
-		fields[2].Values = append(fields[2].Values, fmt.Sprintf("%.1f", scalarIaddFreqs[i]))
-		fields[3].Values = append(fields[3].Values, fmt.Sprintf("%.1f", avx256FmaFreqs[i]))
-		fields[4].Values = append(fields[4].Values, fmt.Sprintf("%.1f", avx512FmaFreqs[i]))
+	for i := range scalarIaddFreqs { // scalarIaddFreqs is required
+		fields[coresIdx].Values = append(fields[coresIdx].Values, fmt.Sprintf("%d", i+1))
+		if specSSEFieldIdx > 0 {
+			fields[specSSEFieldIdx].Values = append(fields[specSSEFieldIdx].Values, specSSEFreqs[i])
+		}
+		if scalarIaddFieldIdx > 0 {
+			fields[scalarIaddFieldIdx].Values = append(fields[scalarIaddFieldIdx].Values, fmt.Sprintf("%.1f", scalarIaddFreqs[i]))
+		}
+		if avx2FieldIdx > 0 {
+			fields[avx2FieldIdx].Values = append(fields[avx2FieldIdx].Values, fmt.Sprintf("%.1f", avx256FmaFreqs[i]))
+		}
+		if avx512FieldIdx > 0 {
+			fields[avx512FieldIdx].Values = append(fields[avx512FieldIdx].Values, fmt.Sprintf("%.1f", avx512FmaFreqs[i]))
+		}
 	}
 	return fields
 }

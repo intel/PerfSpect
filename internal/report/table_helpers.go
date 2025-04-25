@@ -197,37 +197,38 @@ func baseFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 	return ""
 }
 
-func convertMsrToDecimals(msr string) (decVals []int64, err error) {
+func convertMsrToDecimals(msr string) (decVals []int, err error) {
 	re := regexp.MustCompile(`[0-9a-fA-F][0-9a-fA-F]`)
 	hexVals := re.FindAll([]byte(msr), -1)
 	if hexVals == nil {
 		err = fmt.Errorf("no hex values found in msr")
 		return
 	}
-	decVals = make([]int64, len(hexVals))
+	decVals = make([]int, len(hexVals))
 	decValsIndex := len(decVals) - 1
 	for _, hexVal := range hexVals {
 		var decVal int64
-		decVal, err = strconv.ParseInt(string(hexVal), 16, 64)
+		decVal, err = strconv.ParseInt(string(hexVal), 16, 0)
 		if err != nil {
 			return
 		}
-		decVals[decValsIndex] = decVal
+		decVals[decValsIndex] = int(decVal)
 		decValsIndex--
 	}
 	return
 }
 
-// getSpecCoreFrequenciesFromOutput
+// getSpecFrequencyBuckets
 // returns slice of rows
 // first row is header
 // each row is a slice of strings
-// "cores", "sse", "avx2", "avx512", "avx512h", "amx"
-// "0-41", "3.5", "3.5", "3.3", "3.2", "3.1"
-// "42-63", "3.5", "3.5", "3.3", "3.2", "3.1"
-// "64-85", "3.5", "3.5", "3.3", "3.2", "3.1"
+// "cores", "cores per die", "sse", "avx2", "avx512", "avx512h", "amx"
+// "0-41", "0-20", "3.5", "3.5", "3.3", "3.2", "3.1"
+// "42-63", "21-31", "3.5", "3.5", "3.3", "3.2", "3.1"
+// "64-85", "32-43", "3.5", "3.5", "3.3", "3.2", "3.1"
 // ...
-func getSpecCoreFrequenciesFromOutput(outputs map[string]script.ScriptOutput) ([][]string, error) {
+// the "cores per die" column is only present for some architectures
+func getSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string, error) {
 	arch := uarchFromOutput(outputs)
 	if arch == "" {
 		return nil, fmt.Errorf("uarch is required")
@@ -254,7 +255,9 @@ func getSpecCoreFrequenciesFromOutput(outputs map[string]script.ScriptOutput) ([
 	// get list of buckets
 	bucketCoreCounts, _ := convertMsrToDecimals(values[0])
 	// create buckets
-	var buckets []string
+	var totalCoreBuckets []string // only for multi-die architectures
+	var dieCoreBuckets []string
+	totalCoreStartRange := 1
 	startRange := 1
 	var archMultiplier int
 	if strings.Contains(arch, "SRF") || strings.Contains(arch, "CWF") {
@@ -267,19 +270,22 @@ func getSpecCoreFrequenciesFromOutput(outputs map[string]script.ScriptOutput) ([
 		archMultiplier = 1
 	}
 	for _, count := range bucketCoreCounts {
-		adjustedCount := count * int64(archMultiplier)
-		if startRange > int(adjustedCount) {
-			break
+		if archMultiplier > 1 {
+			totalCoreCount := count * archMultiplier
+			if totalCoreStartRange > int(totalCoreCount) {
+				break
+			}
+			totalCoreBuckets = append(totalCoreBuckets, fmt.Sprintf("%d-%d", totalCoreStartRange, totalCoreCount))
+			totalCoreStartRange = int(totalCoreCount) + 1
 		}
-		bucketRange := fmt.Sprintf("%d-%d", startRange, adjustedCount)
-		buckets = append(buckets, bucketRange)
-		startRange = int(adjustedCount) + 1
+		dieCoreBuckets = append(dieCoreBuckets, fmt.Sprintf("%d-%d", startRange, count))
+		startRange = int(count) + 1
 	}
 	// get the frequencies for each isa
 	var allIsaFreqs [][]string
 	for _, isaHex := range values[1:] {
 		var isaFreqs []string
-		var freqs []int64
+		var freqs []int
 		if isaHex != "0" {
 			var err error
 			freqs, err = convertMsrToDecimals(isaHex)
@@ -288,7 +294,7 @@ func getSpecCoreFrequenciesFromOutput(outputs map[string]script.ScriptOutput) ([
 			}
 		} else {
 			// if the ISA is not supported, set the frequency to zero for all buckets
-			freqs = make([]int64, len(bucketCoreCounts))
+			freqs = make([]int, len(bucketCoreCounts))
 			for i := range freqs {
 				freqs[i] = 0
 			}
@@ -302,17 +308,28 @@ func getSpecCoreFrequenciesFromOutput(outputs map[string]script.ScriptOutput) ([
 	}
 	// format the output
 	var specCoreFreqs [][]string
-	// add bucket field name
-	specCoreFreqs = append(specCoreFreqs, []string{fieldNames[0]})
+	specCoreFreqs = make([][]string, 1, len(dieCoreBuckets)+1)
+	// add bucket field name(s)
+	specCoreFreqs[0] = append(specCoreFreqs[0], "Cores")
+	if archMultiplier > 1 {
+		specCoreFreqs[0] = append(specCoreFreqs[0], "Cores per Die")
+	}
 	// add fieldNames for ISAs that have frequencies
 	for i := range allIsaFreqs {
 		if allIsaFreqs[i][0] == "0.0" {
 			continue
 		}
-		specCoreFreqs[0] = append(specCoreFreqs[0], fieldNames[i+1])
+		specCoreFreqs[0] = append(specCoreFreqs[0], strings.ToUpper(fieldNames[i+1]))
 	}
-	for i, bucket := range buckets {
-		row := []string{bucket}
+	for i, bucket := range dieCoreBuckets {
+		row := make([]string, 0, len(allIsaFreqs)+2)
+		// add the total core buckets for multi-die architectures
+		if archMultiplier > 1 {
+			row = append(row, totalCoreBuckets[i])
+		}
+		// add the die core buckets
+		row = append(row, bucket)
+		// add the frequencies for each ISA
 		for _, isaFreqs := range allIsaFreqs {
 			if isaFreqs[0] == "0.0" {
 				continue
@@ -340,7 +357,7 @@ func maxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 		}
 	}
 	// get the max frequency from the MSR/tpmi
-	specCoreFrequencies, err := getSpecCoreFrequenciesFromOutput(outputs)
+	specCoreFrequencies, err := getSpecFrequencyBuckets(outputs)
 	if err == nil && len(specCoreFrequencies) > 1 && len(specCoreFrequencies[1]) > 1 {
 		return specCoreFrequencies[1][1] + "GHz"
 	}
@@ -348,7 +365,7 @@ func maxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 }
 
 func allCoreMaxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
-	specCoreFrequencies, err := getSpecCoreFrequenciesFromOutput(outputs)
+	specCoreFrequencies, err := getSpecFrequencyBuckets(outputs)
 	if err == nil && len(specCoreFrequencies) >= 2 && len(specCoreFrequencies[1]) > 1 {
 		// the last entry in the 2nd column is the max all-core frequency
 		return specCoreFrequencies[len(specCoreFrequencies)-1][1] + "GHz"

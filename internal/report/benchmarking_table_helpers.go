@@ -223,33 +223,49 @@ func avxTurboFrequenciesFromOutput(output string) (instructionFreqs map[string][
 	return
 }
 
-// bucketsToCounts expands the core frequency buckets to a list of core counts (from column 1) and associated spec sse frequencies (from column 2)
-func bucketsToCoresFreqs(specCoreFreqs [][]string) (cores []string, freqs []string, err error) {
-	// the first column is the core count, the second column is the spec sse frequency
+// frequencyBucketsToFrequencies creates a slice of SSE frequencies from the spec core frequency buckets
+// input: the first column is the bucket range, e.g. 1-44, the second (or third) column is the spec sse frequency
+func frequencyBucketsToFrequencies(specCoreFreqs [][]string) (freqs []string, err error) {
+	if len(specCoreFreqs) < 2 || len(specCoreFreqs[0]) < 2 {
+		err = fmt.Errorf("unable to parse core frequency buckets")
+		return
+	}
+	rangeIdx := 0 // the first column is the bucket, e.g., 1-44
+	var sseIdx int
+	for i := range specCoreFreqs[0] {
+		if strings.Contains(strings.ToUpper(specCoreFreqs[0][i]), "SSE") {
+			sseIdx = i
+			break
+		}
+	}
+	if sseIdx == 0 {
+		err = fmt.Errorf("unable to find SSE frequency column")
+		return
+	}
 	for i := 1; i < len(specCoreFreqs); i++ {
-		// parse the bucket into start/end parts
-		bucket := strings.Split(specCoreFreqs[i][0], "-")
-		if len(bucket) != 2 {
-			err = fmt.Errorf("unable to parse bucket %s", specCoreFreqs[i][0])
+		bucketRange := strings.TrimSpace(specCoreFreqs[i][rangeIdx])
+		// parse the bucketParts into start/end parts
+		bucketParts := strings.Split(bucketRange, "-")
+		if len(bucketParts) != 2 {
+			err = fmt.Errorf("unable to parse bucket range %s", bucketRange)
 			return
 		}
 		// parse the start and end parts into integers
 		var start int
 		var end int
-		start, err = strconv.Atoi(strings.TrimSpace(bucket[0]))
+		start, err = strconv.Atoi(strings.TrimSpace(bucketParts[0]))
 		if err != nil {
-			err = fmt.Errorf("unable to parse start %s", bucket[0])
+			err = fmt.Errorf("unable to parse start %s", bucketParts[0])
 			return
 		}
-		end, err = strconv.Atoi(strings.TrimSpace(bucket[1]))
+		end, err = strconv.Atoi(strings.TrimSpace(bucketParts[1]))
 		if err != nil {
-			err = fmt.Errorf("unable to parse end %s", bucket[1])
+			err = fmt.Errorf("unable to parse end %s", bucketParts[1])
 			return
 		}
 		// add the core count to the list
 		for j := start; j <= end; j++ {
-			cores = append(cores, strconv.Itoa(j))
-			freqs = append(freqs, specCoreFreqs[i][1])
+			freqs = append(freqs, specCoreFreqs[i][sseIdx])
 		}
 	}
 	return
