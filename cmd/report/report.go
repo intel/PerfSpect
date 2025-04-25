@@ -375,11 +375,11 @@ func runCmd(cmd *cobra.Command, args []string) error {
 }
 
 func benchmarkSummaryFromTableValues(allTableValues []report.TableValues, outputs map[string]script.ScriptOutput) report.TableValues {
-	maxFreq := getValueFromTableValues(getTableValues(allTableValues, report.FrequencyBenchmarkTableName), "sse", 0)
+	maxFreq := getValueFromTableValues(getTableValues(allTableValues, report.FrequencyBenchmarkTableName), "SSE", 0)
 	if maxFreq != "" {
 		maxFreq = maxFreq + " GHz"
 	}
-	allCoreMaxFreq := getValueFromTableValues(getTableValues(allTableValues, report.FrequencyBenchmarkTableName), "sse", -1)
+	allCoreMaxFreq := getValueFromTableValues(getTableValues(allTableValues, report.FrequencyBenchmarkTableName), "SSE", -1)
 	if allCoreMaxFreq != "" {
 		allCoreMaxFreq = allCoreMaxFreq + " GHz"
 	}
