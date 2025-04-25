@@ -1,5 +1,5 @@
 
-// Copyright (C) 2021-2024 Intel Corporation
+// Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 // Adapted from https://github.com/dterei/gotsc/blob/master/tsc_amd64.s
 // Copyright 2016 David Terei.  All rights reserved.

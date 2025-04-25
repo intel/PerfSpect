@@ -1,6 +1,6 @@
 #!make
 #
-# Copyright (C) 2021-2024 Intel Corporation
+# Copyright (C) 2021-2025 Intel Corporation
 # SPDX-License-Identifier: BSD-3-Clause
 #
 COMMIT_ID := $(shell git rev-parse --short=8 HEAD)

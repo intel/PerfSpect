@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright (C) 2021-2024 Intel Corporation
+# Copyright (C) 2021-2025 Intel Corporation
 # SPDX-License-Identifier: BSD-3-Clause
 
 # Run this script from the root of the repository

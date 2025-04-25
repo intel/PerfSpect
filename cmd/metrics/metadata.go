@@ -1,9 +1,9 @@
 package metrics
 
-// Copyright (C) 2021-2024 Intel Corporation
+// Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
-// defines a structure and a loading funciton to hold information about the platform to be
+// metrics.go defines a structure and a loading function to hold information about the platform to be
 // used during data collection and metric production
 
 import (
@@ -17,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	"perfspect/internal/cpudb"
 	"perfspect/internal/report"
 	"perfspect/internal/script"
 	"perfspect/internal/target"
@@ -92,8 +91,7 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 	// Vendor (from cpuInfo)
 	metadata.Vendor = cpuInfo[0]["vendor_id"]
 	// CPU microarchitecture (from cpuInfo)
-	cpuDb := cpudb.NewCPUDB()
-	cpu, err := cpuDb.GetCPU(cpuInfo[0]["cpu family"], cpuInfo[0]["model"], cpuInfo[0]["stepping"])
+	cpu, err := report.GetCPU(cpuInfo[0]["cpu family"], cpuInfo[0]["model"], cpuInfo[0]["stepping"])
 	if err != nil {
 		return
 	}
@@ -443,7 +441,7 @@ func ReadJSONFromFile(path string) (md Metadata, err error) {
 // getSystemSummary - retrieves the system summary from the target
 func getSystemSummary(scriptOutputs map[string]script.ScriptOutput) (summaryFields [][]string, err error) {
 	var allTableValues []report.TableValues
-	allTableValues, err = report.Process([]string{report.BriefSysSummaryTableName}, scriptOutputs)
+	allTableValues, err = report.ProcessTables([]string{report.BriefSysSummaryTableName}, scriptOutputs)
 	if err != nil {
 		err = fmt.Errorf("failed to process script outputs: %w", err)
 		return

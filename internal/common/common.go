@@ -1,7 +1,8 @@
-// Package common includes functions that are used across the different commands
+// Package common defines data structures and functions that are used by multiple
+// application commands, e.g., report, telemetry, flame, lock.
 package common
 
-// Copyright (C) 2021-2024 Intel Corporation
+// Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
 import (
@@ -276,10 +277,22 @@ func (rc *ReportingCommand) createRawReports(appContext AppContext, orderedTarge
 		}
 		reportFilename := fmt.Sprintf("%s%s.%s", targetScriptOutputs.target.GetName(), post, "raw")
 		reportPath := filepath.Join(appContext.OutputDir, reportFilename)
-		if err = report.WriteReport(reportBytes, reportPath); err != nil {
+		if err = writeReport(reportBytes, reportPath); err != nil {
 			err = fmt.Errorf("failed to write report: %w", err)
 			return err
 		}
+	}
+	return nil
+}
+
+// writeReport writes the report bytes to the specified path.
+func writeReport(reportBytes []byte, reportPath string) error {
+	err := os.WriteFile(reportPath, reportBytes, 0644)
+	if err != nil {
+		err = fmt.Errorf("failed to write report file: %v", err)
+		fmt.Fprintln(os.Stderr, err)
+		slog.Error(err.Error())
+		return err
 	}
 	return nil
 }
@@ -290,7 +303,7 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 	allTargetsTableValues := make([][]report.TableValues, 0)
 	for _, targetScriptOutputs := range orderedTargetScriptOutputs {
 		// process the tables, i.e., get field values from script output
-		allTableValues, err := report.Process(targetScriptOutputs.tableNames, targetScriptOutputs.scriptOutputs)
+		allTableValues, err := report.ProcessTables(targetScriptOutputs.tableNames, targetScriptOutputs.scriptOutputs)
 		if err != nil {
 			err = fmt.Errorf("failed to process collected data: %w", err)
 			return nil, err
@@ -344,7 +357,7 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 			}
 			reportFilename := fmt.Sprintf("%s%s.%s", targetScriptOutputs.target.GetName(), post, format)
 			reportPath := filepath.Join(appContext.OutputDir, reportFilename)
-			if err = report.WriteReport(reportBytes, reportPath); err != nil {
+			if err = writeReport(reportBytes, reportPath); err != nil {
 				err = fmt.Errorf("failed to write report: %w", err)
 				return nil, err
 			}
@@ -372,7 +385,7 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 			}
 			reportFilename := fmt.Sprintf("%s.%s", "all_hosts", format)
 			reportPath := filepath.Join(appContext.OutputDir, reportFilename)
-			if err = report.WriteReport(reportBytes, reportPath); err != nil {
+			if err = writeReport(reportBytes, reportPath); err != nil {
 				err = fmt.Errorf("failed to write multi-target %s report: %w", format, err)
 				return nil, err
 			}
@@ -418,7 +431,7 @@ func outputsFromTargets(cmd *cobra.Command, myTargets []target.Target, tableName
 		targetTableNames = append(targetTableNames, []string{})
 		targetScriptNames = append(targetScriptNames, []string{})
 		for _, tableName := range tableNames {
-			if report.TableForTarget(tableName, target) {
+			if report.IsTableForTarget(tableName, target) {
 				// add table to list of tables to collect
 				targetTableNames[targetIdx] = util.UniqueAppend(targetTableNames[targetIdx], tableName)
 				// add scripts to list of scripts to run

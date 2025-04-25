@@ -3,7 +3,7 @@
 #
 # Usage: check_events.py <perfspect_metrics.json> <perfspect_events.txt> [perfmon_events.json]
 
-# Copyright (C) 2021-2024 Intel Corporation
+# Copyright (C) 2021-2025 Intel Corporation
 # SPDX-License-Identifier: BSD-3-Clause
 
 import sys

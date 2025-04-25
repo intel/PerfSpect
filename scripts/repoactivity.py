@@ -4,7 +4,7 @@
 # Usage: python repoactivity.py owner repo start_date end_date [--output csv|human] [--header-only] [--token token]
 # Example: python repoactivity.py octocat hello-world 2021-01-01 2021-12-31 --output csv --token YOUR_GITHUB_TOKEN
 
-# Copyright (C) 2021-2024 Intel Corporation
+# Copyright (C) 2021-2025 Intel Corporation
 # SPDX-License-Identifier: BSD-3-Clause
 
 import requests

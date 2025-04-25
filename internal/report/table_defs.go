@@ -1,6 +1,6 @@
 package report
 
-// Copyright (C) 2021-2024 Intel Corporation
+// Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
 // table_defs.go defines the tables used for generating reports
@@ -15,13 +15,25 @@ import (
 	"strings"
 	"time"
 
-	"perfspect/internal/cpudb"
 	"perfspect/internal/script"
-	"perfspect/internal/target"
 
 	"github.com/xuri/excelize/v2"
 )
 
+// Field represents the values for a field in a table
+type Field struct {
+	Name   string
+	Values []string
+}
+
+// TableValues combines the table definition with the resulting fields and their values
+type TableValues struct {
+	TableDefinition
+	Fields   []Field
+	Insights []Insight
+}
+
+// Insight represents an insight about the data in a table
 type Insight struct {
 	Recommendation string
 	Justification  string
@@ -34,6 +46,7 @@ type HTMLMultiTargetTableRenderer func([]TableValues, []string) string
 type TextTableRenderer func(TableValues) string
 type XlsxTableRenderer func(TableValues, *excelize.File, string, *int)
 
+// TableDefinition defines the structure of a table in the report
 type TableDefinition struct {
 	Name          string
 	ScriptNames   []string
@@ -53,19 +66,6 @@ type TableDefinition struct {
 	XlsxTableRendererFunc            XlsxTableRenderer
 	// insights function is used to retrieve insights about the data in the table
 	InsightsFunc InsightsRetriever
-}
-
-// Field represents the values for a field in a table
-type Field struct {
-	Name   string
-	Values []string
-}
-
-// TableValues combines the table definition with the resulting fields and their values
-type TableValues struct {
-	TableDefinition
-	Fields   []Field
-	Insights []Insight
 }
 
 const (
@@ -150,58 +150,6 @@ const (
 	LogsMenuLabel          = "Logs"
 	SystemSummaryMenuLabel = "System Summary"
 )
-
-func GetTableByName(name string) TableDefinition {
-	if table, ok := tableDefinitions[name]; ok {
-		return table
-	}
-	panic(fmt.Sprintf("table not found: %s", name))
-}
-
-func TableForTarget(tableName string, myTarget target.Target) bool {
-	table := GetTableByName(tableName)
-	if len(table.Architectures) > 0 {
-		architecture, err := myTarget.GetArchitecture()
-		if err != nil {
-			slog.Error("failed to get architecture for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-			return false
-		}
-		if !slices.Contains(table.Architectures, architecture) {
-			return false
-		}
-	}
-	if len(table.Vendors) > 0 {
-		vendor, err := myTarget.GetVendor()
-		if err != nil {
-			slog.Error("failed to get vendor for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-			return false
-		}
-		if !slices.Contains(table.Vendors, vendor) {
-			return false
-		}
-	}
-	if len(table.Families) > 0 {
-		family, err := myTarget.GetFamily()
-		if err != nil {
-			slog.Error("failed to get family for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-			return false
-		}
-		if !slices.Contains(table.Families, family) {
-			return false
-		}
-	}
-	if len(table.Models) > 0 {
-		model, err := myTarget.GetModel()
-		if err != nil {
-			slog.Error("failed to get model for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-			return false
-		}
-		if !slices.Contains(table.Models, model) {
-			return false
-		}
-	}
-	return true
-}
 
 var tableDefinitions = map[string]TableDefinition{
 	//
@@ -1375,8 +1323,7 @@ func memoryTableInsights(outputs map[string]script.ScriptOutput, tableValues Tab
 		if populatedChannels != "" {
 			uarch := uarchFromOutput(outputs)
 			if uarch != "" {
-				CPUdb := cpudb.NewCPUDB()
-				cpu, err := CPUdb.GetCPUByMicroArchitecture(uarch)
+				cpu, err := getCPUByMicroArchitecture(uarch)
 				if err != nil {
 					slog.Warn(err.Error())
 				} else {
@@ -1970,7 +1917,7 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []Field {
 		fields = append(fields, Field{Name: "Efficiency Latency Control", Values: []string{elcSummaryFromOutput(outputs)}})
 	}
 	// add prefetchers
-	for _, pf := range PrefetcherDefs {
+	for _, pf := range prefetcherDefinitions {
 		if slices.Contains(pf.Uarchs, "all") || slices.Contains(pf.Uarchs, uarch[:3]) {
 			var scriptName string
 			if pf.Msr == MsrPrefetchControl {
