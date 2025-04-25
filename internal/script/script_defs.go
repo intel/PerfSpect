@@ -610,7 +610,7 @@ done
 		Architectures: []string{x86_64},
 		Families:      []string{"6"},   // Intel
 		Models:        []string{"173"}, // GNR
-		Depends:       []string{"pcm-tpmi "},
+		Depends:       []string{"pcm-tpmi"},
 		Superuser:     true,
 	},
 	SstTfLowPriorityCoreFrequenciesScriptName: {
