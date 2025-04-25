@@ -1736,7 +1736,7 @@ func expandCPUList(cpuList string) (cpus []int) {
 	return
 }
 
-func turbostatSummaryRows(outputs map[string]script.ScriptOutput, fieldNames []string) ([][]string, error) {
+func turbostatSummaryRows(turboStatScriptOutput script.ScriptOutput, fieldNames []string) ([][]string, error) {
 	var fieldValues [][]string
 	// initialize indices with -1
 	fieldIndices := make([]int, len(fieldNames))
@@ -1748,7 +1748,7 @@ func turbostatSummaryRows(outputs map[string]script.ScriptOutput, fieldNames []s
 	var sampleTime time.Time
 	sampleCount := 0
 	// parse the turbostat output
-	for i, line := range strings.Split(outputs[script.TurbostatScriptName].Stdout, "\n") {
+	for i, line := range strings.Split(turboStatScriptOutput.Stdout, "\n") {
 		if i == 0 { // first line is the time stamp, e.g., TIME: 15:04:05
 			var err error
 			startTime, err = time.Parse("15:04:05", strings.TrimPrefix(line, "TIME: "))
