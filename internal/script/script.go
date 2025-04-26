@@ -363,8 +363,7 @@ func formMasterScript(targetTempDirectory string, parallelScripts []ScriptDefini
 // It returns a list of ScriptOutput objects, one for each script that was run.
 func parseMasterScriptOutput(masterScriptOutput string) (scriptOutputs []ScriptOutput) {
 	// split output of master script into individual script outputs
-	outputs := strings.SplitSeq(masterScriptOutput, "<---------------------->\n")
-	for output := range outputs {
+	for output := range strings.SplitSeq(masterScriptOutput, "<---------------------->\n") {
 		lines := strings.Split(output, "\n")
 		if len(lines) < 4 { // minimum lines for a script output
 			continue
