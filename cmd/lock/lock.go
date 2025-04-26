@@ -7,7 +7,9 @@ package lock
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"perfspect/internal/common"
+	"perfspect/internal/progress"
 	"perfspect/internal/report"
 	"perfspect/internal/script"
 	"perfspect/internal/target"
@@ -165,29 +167,30 @@ func formalizeOutputFormat(outputFormat []string) []string {
 	return result
 }
 
-func pullDataFiles(appContext common.AppContext, scriptOutputs map[string]script.ScriptOutput, myTarget target.Target) error {
-	// if target is RawTarget, the scriptOutputs may retrieved from a input file, which hints we should not be able to pull the
-	// perf archive file. In this situation, we don't treat it as an error.
-	_, isRawTarget := myTarget.(*target.RawTarget)
-	if isRawTarget {
-		return nil
-	}
-
+func pullDataFiles(appContext common.AppContext, scriptOutputs map[string]script.ScriptOutput, myTarget target.Target, statusUpdate progress.MultiSpinnerUpdateFunc) error {
 	localOutputDir := appContext.OutputDir
 	tableValues := report.GetValuesForTable(report.KernelLockAnalysisTableName, scriptOutputs)
+	found := false
 	for _, field := range tableValues.Fields {
 		if field.Name == "Perf Package Path" {
 			for _, remoteFile := range field.Values {
-				if len(remoteFile) == 0 {
+				if remoteFile == "" {
 					continue
 				}
+				found = true
+				_ = statusUpdate(myTarget.GetName(), "retrieving lock package")
 				err := myTarget.PullFile(remoteFile, localOutputDir)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+					_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("failed to retrieve lock package: %v", err))
 					return err
 				}
+				_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("retrieved lock package (%s)", filepath.Base(remoteFile)))
 			}
+			break
 		}
+	}
+	if !found {
+		_ = statusUpdate(myTarget.GetName(), "no lock package found")
 	}
 	return nil
 }

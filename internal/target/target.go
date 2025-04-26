@@ -141,10 +141,6 @@ type RemoteTarget struct {
 	sshpassPath string
 }
 
-type RawTarget struct {
-	name string
-}
-
 // NewLocalTarget creates a new LocalTarget.
 // It initializes the host name to the local machine's hostname.
 // If the hostname cannot be retrieved, it defaults to "localhost".
@@ -168,15 +164,6 @@ func NewRemoteTarget(name string, host string, port string, user string, key str
 		port: port,
 		user: user,
 		key:  key,
-	}
-	return t
-}
-
-// NewRawTarget creates a new RawTarget instance with the provided parameters.
-// This is useful when we use a ".raw" file as input without an actual target available.
-func NewRawTarget(name string) *RawTarget {
-	t := &RawTarget{
-		name: name,
 	}
 	return t
 }
