@@ -178,7 +178,8 @@ func runLocalCommandWithInputWithTimeoutAsync(cmd *exec.Cmd, stdoutChannel chan 
 		if exitError, ok := err.(*exec.ExitError); ok {
 			exitcodeChannel <- exitError.ExitCode()
 		} else {
-			panic(fmt.Sprintf("err from cmd.Wait is not type exec.ExitError: %v", err))
+			slog.Error("unexpected error type while waiting for command to finish", slog.String("cmd", cmd.String()), slog.String("error", err.Error()))
+			exitcodeChannel <- -1
 		}
 	} else {
 		exitcodeChannel <- 0
