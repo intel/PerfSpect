@@ -43,35 +43,40 @@ func (t *LocalTarget) RunCommandAsync(cmd *exec.Cmd, timeout int, argNotUsed boo
 	return
 }
 
-func (t *LocalTarget) GetArchitecture() (arch string, err error) {
+func (t *LocalTarget) GetArchitecture() (string, error) {
+	var err error
 	if t.arch == "" {
 		t.arch, err = getArchitecture(t)
 	}
 	return t.arch, err
 }
 
-func (t *LocalTarget) GetFamily() (family string, err error) {
+func (t *LocalTarget) GetFamily() (string, error) {
+	var err error
 	if t.family == "" {
 		t.family, err = getFamily(t)
 	}
 	return t.family, err
 }
 
-func (t *LocalTarget) GetModel() (family string, err error) {
+func (t *LocalTarget) GetModel() (string, error) {
+	var err error
 	if t.model == "" {
 		t.model, err = getModel(t)
 	}
 	return t.model, err
 }
 
-func (t *LocalTarget) GetStepping() (stepping string, err error) {
+func (t *LocalTarget) GetStepping() (string, error) {
+	var err error
 	if t.stepping == "" {
 		t.stepping, err = getStepping(t)
 	}
 	return t.stepping, err
 }
 
-func (t *LocalTarget) GetVendor() (arch string, err error) {
+func (t *LocalTarget) GetVendor() (string, error) {
+	var err error
 	if t.vendor == "" {
 		t.vendor, err = getVendor(t)
 	}

@@ -64,35 +64,40 @@ func (t *RemoteTarget) RunCommandAsync(cmd *exec.Cmd, timeout int, reuseSSHConne
 	return
 }
 
-func (t *RemoteTarget) GetArchitecture() (arch string, err error) {
+func (t *RemoteTarget) GetArchitecture() (string, error) {
+	var err error
 	if t.arch == "" {
 		t.arch, err = getArchitecture(t)
 	}
 	return t.arch, err
 }
 
-func (t *RemoteTarget) GetFamily() (family string, err error) {
+func (t *RemoteTarget) GetFamily() (string, error) {
+	var err error
 	if t.family == "" {
 		t.family, err = getFamily(t)
 	}
 	return t.family, err
 }
 
-func (t *RemoteTarget) GetModel() (family string, err error) {
+func (t *RemoteTarget) GetModel() (string, error) {
+	var err error
 	if t.model == "" {
 		t.model, err = getModel(t)
 	}
 	return t.model, err
 }
 
-func (t *RemoteTarget) GetStepping() (stepping string, err error) {
+func (t *RemoteTarget) GetStepping() (string, error) {
+	var err error
 	if t.stepping == "" {
 		t.stepping, err = getStepping(t)
 	}
 	return t.stepping, err
 }
 
-func (t *RemoteTarget) GetVendor() (arch string, err error) {
+func (t *RemoteTarget) GetVendor() (string, error) {
+	var err error
 	if t.vendor == "" {
 		t.vendor, err = getVendor(t)
 	}
