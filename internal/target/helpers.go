@@ -186,6 +186,16 @@ func runLocalCommandWithInputWithTimeoutAsync(cmd *exec.Cmd, stdoutChannel chan 
 	return nil
 }
 
+// getArchitecture determines the architecture of the target system by executing
+// the "uname -m" command. It returns the architecture as a string and an error
+// if the command execution fails.
+//
+// Parameters:
+//   - t: A Target instance that provides the ability to run commands on the target system.
+//
+// Returns:
+//   - arch: A string representing the architecture of the target system (e.g., "x86_64").
+//   - err: An error if the command execution fails or if there is an issue retrieving the architecture.
 func getArchitecture(t Target) (arch string, err error) {
 	cmd := exec.Command("uname", "-m")
 	arch, _, _, err = t.RunCommand(cmd, 0, true)
@@ -196,6 +206,15 @@ func getArchitecture(t Target) (arch string, err error) {
 	return
 }
 
+// getFamily retrieves the CPU family of the target system by executing a shell command.
+// It runs the "lscpu" command to extract the "CPU family" field and returns the value as a string.
+//
+// Parameters:
+//   - t: A Target instance that provides the method to execute the command.
+//
+// Returns:
+//   - family: A string representing the CPU family of the target system.
+//   - err: An error if the command execution or parsing fails.
 func getFamily(t Target) (family string, err error) {
 	cmd := exec.Command("bash", "-c", "lscpu | grep -i \"^CPU family:\" | awk '{print $NF}'")
 	family, _, _, err = t.RunCommand(cmd, 0, true)
@@ -206,6 +225,19 @@ func getFamily(t Target) (family string, err error) {
 	return
 }
 
+// getModel retrieves the CPU model of the target system by executing a shell command.
+// It runs the "lscpu" command, filters the output for the "Model" field, and extracts
+// the last field of the line using "awk". The result is trimmed of any leading or trailing
+// whitespace before being returned.
+//
+// Parameters:
+//
+//	t - The Target interface that provides the ability to execute commands on the target system.
+//
+// Returns:
+//
+//	model - A string representing the CPU model of the target system.
+//	err - An error if the command execution fails or if there is an issue retrieving the model.
 func getModel(t Target) (model string, err error) {
 	cmd := exec.Command("bash", "-c", "lscpu | grep -i model: | awk '{print $NF}'")
 	model, _, _, err = t.RunCommand(cmd, 0, true)
@@ -216,6 +248,16 @@ func getModel(t Target) (model string, err error) {
 	return
 }
 
+// getStepping retrieves the CPU stepping information of the target system.
+// It executes a shell command to parse the output of the `lscpu` command
+// and extracts the stepping value using `grep` and `awk`.
+//
+// Parameters:
+//   - t: A Target instance that provides the ability to execute commands.
+//
+// Returns:
+//   - stepping: A string representing the CPU stepping value.
+//   - err: An error if the command execution or parsing fails.
 func getStepping(t Target) (stepping string, err error) {
 	cmd := exec.Command("bash", "-c", "lscpu | grep -i stepping: | awk '{print $NF}'")
 	stepping, _, _, err = t.RunCommand(cmd, 0, true)
@@ -226,6 +268,19 @@ func getStepping(t Target) (stepping string, err error) {
 	return
 }
 
+// getVendor retrieves the vendor ID of the CPU by executing a shell command.
+// It runs the "lscpu" command, filters the output for the "Vendor ID" field,
+// and extracts the last field using "awk". The result is then trimmed of any
+// leading or trailing whitespace.
+//
+// Parameters:
+//
+//	t Target - The target object that provides the RunCommand method.
+//
+// Returns:
+//
+//	vendor (string) - The vendor ID of the CPU.
+//	err (error) - An error if the command execution or parsing fails.
 func getVendor(t Target) (vendor string, err error) {
 	cmd := exec.Command("bash", "-c", "lscpu | grep -i \"^Vendor ID:\" | awk '{print $NF}'")
 	vendor, _, _, err = t.RunCommand(cmd, 0, true)
