@@ -8,6 +8,7 @@ import (
 )
 
 func TestNew(t *testing.T) {
+	targets := []Target{}
 	localTarget := NewLocalTarget()
 	if localTarget == nil {
 		t.Fatal("failed to create a local target")
@@ -15,5 +16,12 @@ func TestNew(t *testing.T) {
 	remoteTarget := NewRemoteTarget("label", "hostname", "22", "user", "key")
 	if remoteTarget == nil {
 		t.Fatal("failed to create a remote target")
+	}
+	targets = append(targets, localTarget)
+	targets = append(targets, remoteTarget)
+	for _, target := range targets {
+		if target.GetName() == "" {
+			t.Fatal("failed to get target name")
+		}
 	}
 }
