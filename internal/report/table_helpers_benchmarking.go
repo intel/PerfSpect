@@ -59,7 +59,7 @@ func storagePerfFromOutput(outputs map[string]script.ScriptOutput) (readBW, writ
 	return
 }
 
-// ParseTurbostatOutput parses the output of turbostat and returns the turbo frequencies, power and temperature
+// parseTurbostatOutput parses the output of turbostat and returns the turbo frequencies, power and temperature
 // turbostat output format:
 // PkgTmp  PkgWatt
 // 55      537.14
@@ -79,7 +79,7 @@ func storagePerfFromOutput(outputs map[string]script.ScriptOutput) (readBW, writ
 // -- the output includes only one column (PkgTmp or PkgWatt)
 // -- the output includes both columns
 // We capture the max of the power and temperature values
-func ParseTurbostatOutput(output string) (turboPower, turboTemperature string) {
+func parseTurbostatOutput(output string) (turboPower, turboTemperature string) {
 	// confirm output is in expected format
 	var fieldNames []string
 	var temps []float64
@@ -150,7 +150,7 @@ func ParseTurbostatOutput(output string) (turboPower, turboTemperature string) {
 }
 
 func maxPowerFromOutput(outputs map[string]script.ScriptOutput) string {
-	power, _ := ParseTurbostatOutput(outputs[script.PowerBenchmarkScriptName].Stdout)
+	power, _ := parseTurbostatOutput(outputs[script.PowerBenchmarkScriptName].Stdout)
 	return power
 }
 
@@ -163,7 +163,7 @@ func minPowerFromOutput(outputs map[string]script.ScriptOutput) string {
 }
 
 func maxTemperatureFromOutput(outputs map[string]script.ScriptOutput) string {
-	_, temperature := ParseTurbostatOutput(outputs[script.PowerBenchmarkScriptName].Stdout)
+	_, temperature := parseTurbostatOutput(outputs[script.PowerBenchmarkScriptName].Stdout)
 	return temperature
 }
 
