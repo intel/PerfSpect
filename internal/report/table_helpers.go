@@ -1703,8 +1703,7 @@ func cveInfoFromOutput(outputs map[string]script.ScriptOutput) [][]string {
 /* "1,3-5,8" -> [1,3,4,5,8] */
 func expandCPUList(cpuList string) (cpus []int) {
 	if cpuList != "" {
-		tokens := strings.SplitSeq(cpuList, ",")
-		for token := range tokens {
+		for token := range strings.SplitSeq(cpuList, ",") {
 			if strings.Contains(token, "-") {
 				subTokens := strings.Split(token, "-")
 				if len(subTokens) == 2 {
@@ -1805,8 +1804,7 @@ func nicIRQMappingsFromOutput(outputs map[string]script.ScriptOutput) [][]string
 		// which is <irq>:<cpu(s)>
 		// we need to reverse it to <cpu>:<irq(s)>
 		cpuIRQMappings := make(map[int][]int)
-		irqCPUPairs := strings.SplitSeq(nic.CPUAffinity, ";")
-		for pair := range irqCPUPairs {
+		for pair := range strings.SplitSeq(nic.CPUAffinity, ";") {
 			if pair == "" {
 				continue
 			}

@@ -1272,8 +1272,7 @@ func sstTFLPTableValues(outputs map[string]script.ScriptOutput) []Field {
 	for i, line := range lines {
 		// field names are in the header
 		if i == 0 {
-			fieldNames := strings.SplitSeq(line, ",")
-			for fieldName := range fieldNames {
+			for fieldName := range strings.SplitSeq(line, ",") {
 				fields = append(fields, Field{Name: fieldName + " (MHz)"})
 			}
 			continue
