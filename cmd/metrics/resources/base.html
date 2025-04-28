@@ -408,6 +408,42 @@
         ]
       }
 
+
+      const diffreport = (e) => {
+        let reader = new FileReader();
+        reader.onload = (e) => {
+          let new_metrics = JSON.parse(e.target.result.split("\n").filter(e => e.includes("const all_metrics ="))[0].split("const all_metrics =")[1])
+          let copy = JSON.parse(JSON.stringify(current_metrics))
+          let temp_mindiff = 0
+          let temp_maxdiff = 0
+          for (const metric of copy) {
+            for (const other_metric of new_metrics) {
+              if (metric[0] === other_metric[0]) {
+                metric.other = other_metric[1]
+                if (other_metric[1] < metric[1]) {
+                  metric.diff = ((other_metric[1] / metric[1]) - 1) * 100
+                } else {
+                  metric.diff = ((metric[1] / other_metric[1]) - 1) * -100
+                }
+                if (temp_maxdiff == 0 || temp_maxdiff < metric.diff) {
+                  temp_maxdiff = metric.diff
+                }
+                if (temp_mindiff == 0 || temp_mindiff > metric.diff) {
+                  temp_mindiff = metric.diff
+                }
+              }
+            }
+          }
+          set_maxdiff(temp_maxdiff)
+          set_mindiff(temp_mindiff)
+          setCurrent_metrics(copy)
+        };
+
+        reader.readAsText(e.target.files[0]);
+      }
+
+
+
       return (
         <div>
           <Box display="flex" justifyContent="center" width="100%" sx={{ zIndex: 10, borderBottom: 1, borderColor: "divider", position: 'fixed', bgcolor: 'background.paper' }}>
@@ -687,6 +723,7 @@
               value={systemTabs}
               index={4}
             >
+              <TextField id="outlined-basic" onChange={diffreport} inputProps={{ accept: '.html' }} fullWidth label="Compare with other *_metrics_summary.html" InputLabelProps={{ shrink: true }} sx={{ paddingBottom: "24px" }} type="file" variant="outlined" />
               <Alert severity="info" sx={{ marginBottom: "24px" }}>
                 TMA metrics are a hierarchy where each sub-metric contains more periods "..." to designate its depth in the tree
               </Alert>
@@ -699,6 +736,8 @@
                       <TableCell>Min</TableCell>
                       <TableCell>Max</TableCell>
                       <TableCell>Stddev</TableCell>
+                      {current_metrics[0].hasOwnProperty("other") && <TableCell sx={{ fontStyle: 'italic' }}>Other Mean</TableCell>}
+                      {current_metrics[0].hasOwnProperty("other") && <TableCell>Diff</TableCell>}
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -731,6 +770,12 @@
                         <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
                           {Number(row[4]).toFixed(4)}
                         </TableCell>
+                        {row.hasOwnProperty("other") && <TableCell sx={{ fontFamily: 'Monospace', fontStyle: 'italic' }} align="right">
+                          {Number(row["other"]).toFixed(4)}
+                        </TableCell>}
+                        {row.hasOwnProperty("other") && <TableCell align="right" sx={{ fontFamily: 'Monospace', backgroundColor: (row.diff > 0 ? "rgba(255,0,0," + (row.diff / maxdiff * .5) + ")" : "rgba(0,0,255," + (row.diff / mindiff * .5) + ")") }}>
+                          {Math.round(Number(row["diff"]))}%
+                        </TableCell>}
                       </TableRow>
                     ))}
                   </TableBody>
