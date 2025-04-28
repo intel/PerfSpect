@@ -356,19 +356,52 @@ func maxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 	}
 	// get the max frequency from the MSR/tpmi
 	specCoreFrequencies, err := getSpecFrequencyBuckets(outputs)
-	if err == nil && len(specCoreFrequencies) > 1 && len(specCoreFrequencies[1]) > 1 {
-		return specCoreFrequencies[1][1] + "GHz"
+	if err == nil {
+		sseFreqs := getSSEFreqsFromBuckets(specCoreFrequencies)
+		if len(sseFreqs) > 0 {
+			// max (single-core) frequency is the first SSE frequency
+			return sseFreqs[0] + "GHz"
+		}
 	}
 	return valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "4", `Max Speed:\s(.*)`)
 }
 
+func getSSEFreqsFromBuckets(buckets [][]string) []string {
+	if len(buckets) < 2 {
+		return nil
+	}
+	// find the SSE column
+	sseColumn := -1
+	for i, col := range buckets[0] {
+		if col == "SSE" {
+			sseColumn = i
+			break
+		}
+	}
+	if sseColumn == -1 {
+		return nil
+	}
+	// get the SSE values from the buckets
+	sse := make([]string, 0, len(buckets)-1)
+	for i := 1; i < len(buckets); i++ {
+		if len(buckets[i]) > sseColumn {
+			sse = append(sse, buckets[i][sseColumn])
+		}
+	}
+	return sse
+}
+
 func allCoreMaxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 	specCoreFrequencies, err := getSpecFrequencyBuckets(outputs)
-	if err == nil && len(specCoreFrequencies) >= 2 && len(specCoreFrequencies[1]) > 1 {
-		// the last entry in the 2nd column is the max all-core frequency
-		return specCoreFrequencies[len(specCoreFrequencies)-1][1] + "GHz"
+	if err != nil {
+		return ""
 	}
-	return ""
+	sseFreqs := getSSEFreqsFromBuckets(specCoreFrequencies)
+	if len(sseFreqs) < 1 {
+		return ""
+	}
+	// all core max frequency is the last SSE frequency
+	return sseFreqs[len(sseFreqs)-1] + "GHz"
 }
 
 func hyperthreadingFromOutput(outputs map[string]script.ScriptOutput) string {
