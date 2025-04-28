@@ -107,7 +107,6 @@ const (
 	SystemEventLogTableName    = "System Event Log"
 	KernelLogTableName         = "Kernel Log"
 	SystemSummaryTableName     = "System Summary"
-	BriefSysSummaryTableName   = "Brief System Summary"
 	// benchmark table names
 	SpeedBenchmarkTableName       = "Speed Benchmark"
 	PowerBenchmarkTableName       = "Power Benchmark"
@@ -133,6 +132,23 @@ const (
 	CodePathFrequencyTableName = "Code Path Frequency"
 	// lock table names
 	KernelLockAnalysisTableName = "Kernel Lock Analysis"
+	// common table names
+	BriefSysSummaryTableName = "Brief System Summary"
+)
+
+// menu labels
+const (
+	// telemetry table menu labels
+	CPUUtilizationTelemetryMenuLabel        = "CPU Utilization"
+	UtilizationCategoriesTelemetryMenuLabel = "Utilization Categories"
+	AverageFrequencyTelemetryMenuLabel      = "Average Frequency"
+	IRQRateTelemetryMenuLabel               = "IRQ Rate"
+	InstructionTelemetryMenuLabel           = "Instruction"
+	DriveTelemetryMenuLabel                 = "Drive"
+	NetworkTelemetryMenuLabel               = "Network"
+	MemoryTelemetryMenuLabel                = "Memory"
+	PowerTelemetryMenuLabel                 = "Power"
+	GaudiTelemetryMenuLabel                 = "Gaudi"
 )
 
 const (
@@ -505,8 +521,9 @@ var tableDefinitions = map[string]TableDefinition{
 		},
 		FieldsFunc: systemSummaryTableValues},
 	BriefSysSummaryTableName: {
-		Name:    BriefSysSummaryTableName,
-		HasRows: false,
+		Name:      BriefSysSummaryTableName,
+		MenuLabel: BriefSysSummaryTableName,
+		HasRows:   false,
 		ScriptNames: []string{
 			script.HostnameScriptName,
 			script.DateScriptName,
@@ -633,7 +650,7 @@ var tableDefinitions = map[string]TableDefinition{
 	//
 	CPUUtilizationTelemetryTableName: {
 		Name:      CPUUtilizationTelemetryTableName,
-		MenuLabel: CPUUtilizationTelemetryTableName,
+		MenuLabel: CPUUtilizationTelemetryMenuLabel,
 		HasRows:   true,
 		ScriptNames: []string{
 			script.MpstatTelemetryScriptName,
@@ -642,7 +659,7 @@ var tableDefinitions = map[string]TableDefinition{
 		HTMLTableRendererFunc: cpuUtilizationTelemetryTableHTMLRenderer},
 	UtilizationCategoriesTelemetryTableName: {
 		Name:      UtilizationCategoriesTelemetryTableName,
-		MenuLabel: UtilizationCategoriesTelemetryTableName,
+		MenuLabel: UtilizationCategoriesTelemetryMenuLabel,
 		HasRows:   true,
 		ScriptNames: []string{
 			script.MpstatTelemetryScriptName,
@@ -651,7 +668,7 @@ var tableDefinitions = map[string]TableDefinition{
 		HTMLTableRendererFunc: utilizationCategoriesTelemetryTableHTMLRenderer},
 	AverageFrequencyTelemetryTableName: {
 		Name:      AverageFrequencyTelemetryTableName,
-		MenuLabel: AverageFrequencyTelemetryTableName,
+		MenuLabel: AverageFrequencyTelemetryMenuLabel,
 		HasRows:   true,
 		ScriptNames: []string{
 			script.TurbostatTelemetryScriptName,
@@ -660,7 +677,7 @@ var tableDefinitions = map[string]TableDefinition{
 		HTMLTableRendererFunc: averageFrequencyTelemetryTableHTMLRenderer},
 	IRQRateTelemetryTableName: {
 		Name:      IRQRateTelemetryTableName,
-		MenuLabel: IRQRateTelemetryTableName,
+		MenuLabel: IRQRateTelemetryMenuLabel,
 		HasRows:   true,
 		ScriptNames: []string{
 			script.MpstatTelemetryScriptName,
@@ -669,7 +686,7 @@ var tableDefinitions = map[string]TableDefinition{
 		HTMLTableRendererFunc: irqRateTelemetryTableHTMLRenderer},
 	DriveTelemetryTableName: {
 		Name:      DriveTelemetryTableName,
-		MenuLabel: DriveTelemetryTableName,
+		MenuLabel: DriveTelemetryMenuLabel,
 		HasRows:   true,
 		ScriptNames: []string{
 			script.IostatTelemetryScriptName,
@@ -678,7 +695,7 @@ var tableDefinitions = map[string]TableDefinition{
 		HTMLTableRendererFunc: driveTelemetryTableHTMLRenderer},
 	NetworkTelemetryTableName: {
 		Name:      NetworkTelemetryTableName,
-		MenuLabel: NetworkTelemetryTableName,
+		MenuLabel: NetworkTelemetryMenuLabel,
 		HasRows:   true,
 		ScriptNames: []string{
 			script.NetworkTelemetryScriptName,
@@ -687,7 +704,7 @@ var tableDefinitions = map[string]TableDefinition{
 		HTMLTableRendererFunc: networkTelemetryTableHTMLRenderer},
 	MemoryTelemetryTableName: {
 		Name:      MemoryTelemetryTableName,
-		MenuLabel: MemoryTelemetryTableName,
+		MenuLabel: MemoryTelemetryMenuLabel,
 		HasRows:   true,
 		ScriptNames: []string{
 			script.MemoryTelemetryScriptName,
@@ -696,7 +713,7 @@ var tableDefinitions = map[string]TableDefinition{
 		HTMLTableRendererFunc: memoryTelemetryTableHTMLRenderer},
 	PowerTelemetryTableName: {
 		Name:      PowerTelemetryTableName,
-		MenuLabel: PowerTelemetryTableName,
+		MenuLabel: PowerTelemetryMenuLabel,
 		HasRows:   true,
 		ScriptNames: []string{
 			script.TurbostatTelemetryScriptName,
@@ -705,7 +722,7 @@ var tableDefinitions = map[string]TableDefinition{
 		HTMLTableRendererFunc: powerTelemetryTableHTMLRenderer},
 	InstructionTelemetryTableName: {
 		Name:      InstructionTelemetryTableName,
-		MenuLabel: InstructionTelemetryTableName,
+		MenuLabel: InstructionTelemetryMenuLabel,
 		HasRows:   true,
 		ScriptNames: []string{
 			script.InstructionTelemetryScriptName,
@@ -714,7 +731,7 @@ var tableDefinitions = map[string]TableDefinition{
 		HTMLTableRendererFunc: instructionTelemetryTableHTMLRenderer},
 	GaudiTelemetryTableName: {
 		Name:      GaudiTelemetryTableName,
-		MenuLabel: GaudiTelemetryTableName,
+		MenuLabel: GaudiTelemetryMenuLabel,
 		HasRows:   true,
 		ScriptNames: []string{
 			script.GaudiTelemetryScriptName,
@@ -726,7 +743,8 @@ var tableDefinitions = map[string]TableDefinition{
 	// flamegraph tables
 	//
 	CodePathFrequencyTableName: {
-		Name: CodePathFrequencyTableName,
+		Name:      CodePathFrequencyTableName,
+		MenuLabel: CodePathFrequencyTableName,
 		ScriptNames: []string{
 			script.ProfileJavaScriptName,
 			script.ProfileSystemScriptName,
@@ -737,7 +755,8 @@ var tableDefinitions = map[string]TableDefinition{
 	// kernel lock analysis tables
 	//
 	KernelLockAnalysisTableName: {
-		Name: KernelLockAnalysisTableName,
+		Name:      KernelLockAnalysisTableName,
+		MenuLabel: KernelLockAnalysisTableName,
 		ScriptNames: []string{
 			script.ProfileKernelLockScriptName,
 		},
