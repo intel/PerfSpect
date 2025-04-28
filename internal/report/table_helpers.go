@@ -373,7 +373,7 @@ func getSSEFreqsFromBuckets(buckets [][]string) []string {
 	// find the SSE column
 	sseColumn := -1
 	for i, col := range buckets[0] {
-		if col == "SSE" {
+		if strings.ToUpper(col) == "SSE" {
 			sseColumn = i
 			break
 		}
