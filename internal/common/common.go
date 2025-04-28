@@ -340,12 +340,6 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 		}
 		// special case - the summary table is built from the post-processed data, i.e., table values
 		if rc.SummaryFunc != nil {
-			// override the menu label for the System Summary table to avoid conflict with performance summary table added below
-			for i, tv := range allTableValues {
-				if tv.Name == report.SystemSummaryTableName {
-					allTableValues[i].MenuLabel = "System Summary"
-				}
-			}
 			summaryTableValues := rc.SummaryFunc(allTableValues, targetScriptOutputs.scriptOutputs)
 			allTableValues = append(allTableValues, summaryTableValues)
 		}
