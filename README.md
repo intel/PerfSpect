@@ -9,6 +9,7 @@ Intel&reg; PerfSpect is a command-line tool designed to help you analyze and opt
 We welcome bug reports and enhancement requests, which can be submitted via the [Issues](https://github.com/intel/PerfSpect/issues) section on GitHub. For those interested in contributing to the code, please refer to the guidelines outlined in the [CONTRIBUTING.md](CONTRIBUTING.md) file.
 
 ## Getting PerfSpect
+Pre-built PerfSpect releases are available in the repository's [Releases](https://github.com/intel/PerfSpect/releases). Download and extract perfspect.tgz.
 ```
 wget -qO- https://github.com/intel/PerfSpect/releases/latest/download/perfspect.tgz | tar xvz
 cd perfspect
@@ -23,12 +24,12 @@ Usage:
 ### Commands
 | Command | Description |
 | ------- | ----------- |
-| [`metrics`](#metrics-command) | Report core and uncore metrics |
-| [`report`](#report-command) | Report configuration and health |
-| [`telemetry`](#telemetry-command) | Report system telemetry |
-| [`flame`](#flame-command) | Generate software call-stack flamegraphs |
+| [`metrics`](#metrics-command) | CPU core and uncore metrics |
+| [`report`](#report-command) | System configuration and health |
+| [`telemetry`](#telemetry-command) | System telemetry |
+| [`flame`](#flame-command) | Software call-stacks as flamegraphs |
+| [`lock`](#lock-command) | Software hot spot, cache-to-cache and lock contention |
 | [`config`](#config-command) | Modify system configuration |
-| [`lock`](#lock-command) | Collect system wide hot spot, c2c and lock contention information |
 
 > [!TIP]
 > Run `perfspect [command] -h` to view command-specific help text.
@@ -36,29 +37,29 @@ Usage:
 #### Metrics Command
 The `metrics` command generates reports containing CPU architectural performance characterization metrics in HTML and CSV formats. Run `perfspect metrics`.
 
-![metrics html TMA](docs/metrics_html_tma.png)
+![screenshot of the TMAM page from the metrics command HTML report, provides a description of TMAM on the left and a pie chart showing the 1st and 2nd level TMAM metrics on the right](docs/metrics_html_tma.png)
 
 ##### Live Metrics
 The `metrics` command supports two modes -- default and "live". Default mode behaves as above -- metrics are collected and saved into report files for review.  The "live" mode prints the metrics to stdout where they can be viewed in the console and/or redirected into a file or observability pipeline. Run `perfspect metrics --live`.
 
-![live metrics](docs/metrics_live.png)
+![screenshot of live CSV metrics in a text terminal](docs/metrics_live.png)
 
 ##### Metrics Without Root Permissions
-If sudo is not possible and running as the root user is not possible, the following configuration needs to be applied to the target system(s) by an administrator:
+If neither sudo nor root access is available, an administrator must apply the following configuration to the target system(s):
 - sysctl -w kernel.perf_event_paranoid=0
 - sysctl -w kernel.nmi_watchdog=0
-- write '125' to all perf_event_mux_interval_ms files found under /sys/devices/*, e.g., `for i in $(find /sys/devices -name perf_event_mux_interval_ms); do echo 125 > $i; done`
+- write '125' to all perf_event_mux_interval_ms files found under /sys/devices/*, for example, `for i in $(find /sys/devices -name perf_event_mux_interval_ms); do echo 125 > $i; done`
 
-Once the configuration changes are applied, use the `--noroot` flag on the command line, e.g., `perfspect metrics --noroot`.
+Once the configuration changes are applied, use the `--noroot` flag on the command line, for example, `perfspect metrics --noroot`.
 
 See `perfspect metrics -h` for the extensive set of options and examples.
 
 #### Report Command
-The `report` command generates system configuration reports in a variety of formats. By default, all categories of information are collected. See `perfspect report -h` for all options.
+The `report` command generates system configuration reports in a variety of formats. All categories of information are collected by default. See `perfspect report -h` for all options.
 
-![report html](docs/report_html.png)
+![screenshot of a small section of the HTML report from the report command](docs/report_html.png)
 
-It's possible to collect a subset of information by providing command line options. Note that by specifying only the `txt` format, it is printed to stdout, as well as written to a report file.
+It's possible to report a subset of information by providing command line options. Note that by specifying only the `txt` format, it is printed to stdout, as well as written to a report file.
 <pre>
 $ ./perfspect report --bios --format txt
 BIOS
@@ -68,10 +69,10 @@ Version:      EGSDCRB1.SYS.1752.P05.2401050248
 Release Date: 01/05/2024
 </pre>
 ##### Report Benchmarks
-To assist in evaluating the health of target systems, the `report` command can run a series of micro-benchmarks by applying the `--benchmark` flag, e.g., `perfspect report --benchmark all` The benchmark results will be reported along with the target's configuration details. 
+To assist in evaluating the health of target systems, the `report` command can run a series of micro-benchmarks by applying the `--benchmark` flag, for example, `perfspect report --benchmark all` The benchmark results will be reported along with the target's configuration details. 
 
 > [!IMPORTANT]
-> Benchmarks should be run on idle systems to measure accurately and to avoid interfering with active workloads.
+> Benchmarks should be run on idle systems to ensure accurate measurements and to avoid interfering with active workloads.
 
 | benchmark | Description |
 | --------- | ----------- |
@@ -85,62 +86,79 @@ To assist in evaluating the health of target systems, the `report` command can r
 | storage | runs [fio](https://github.com/axboe/fio) for 2 minutes in read/write mode with a single worker to measure single-thread read and write bandwidth. Use the --storage-dir flag to override the default location. Minimum 5GB disk space required to run test. |
 
 #### Telemetry Command
-The `telemetry` command reports CPU utilization, instruction mix, disk stats, network stats, and more on the specified target(s). By default, all telemetry types are collected. To choose telemetry types, see the additional command line options (`perfspect telemetry -h`).
+The `telemetry` command reports CPU utilization, instruction mix, disk stats, network stats, and more on the specified target(s). All telemetry types are collected by default. To choose telemetry types, see the additional command line options (`perfspect telemetry -h`).
 
-![telemetry html](docs/telemetry_html.png)
+![screenshot of the CPU utilization chart from the HTML output of the telemetry command](docs/telemetry_html.png)
 
 #### Flame Command
 Software flamegraphs are useful in diagnosing software performance bottlenecks. Run `perfspect flame` to capture a system-wide software flamegraph.
 
 > [!NOTE]
-> Perl must be installed on the target system to process the data required for flamegraphs.
+> Perl is required on the target system to process the data needed for flamegraphs.
 
-![flame graph](docs/flamegraph.png)
+![screenshot of a flame graph from the HTML output of the flame command](docs/flamegraph.png)
+
+#### Lock Command
+As systems contain more and more cores, it can be useful to analyze the Linux kernel lock overhead and potential false-sharing that impacts system scalability. Run `perfspect lock` to collect system-wide hot spot, cache-to-cache and lock contention information. Experienced performance engineers can analyze the collected information to identify bottlenecks.
 
 #### Config Command
 The `config` command provides a method to view and change various system configuration parameters. Run `perfspect config -h` to view the parameters that can be modified. 
 
 > [!WARNING]
-> It is possible to configure the system in a way that it will no longer operate. In some cases, a reboot will be required to return to default settings. 
+> Misconfiguring the system may cause it to stop functionining. In some cases, a reboot may be required to restore default settings.
 
 Example:
 <pre>
-$ ./perfspect config --cores 24 --llc 2.0 --uncoremaxfreq 1.8
+$ ./perfspect config --cores 24 --llc 2.0 --uncore-max 1.8
 ...
 </pre>
-
-#### Lock Command
-As systems contain more and more cores, it can be useful to analyze the Linux kernel lock overhead and potential false-sharing that impacts system scalability. Run `perfspect lock` to collect system wide hot spot, cache-to-cache and lock contention information. Experienced performance engineers can analyze the collected information to identify bottlenecks.
 
 ### Common Command Options
 
 #### Local vs. Remote Targets
-By default, PerfSpect targets the local host, i.e., the host where PerfSpect is running. Remote system(s) can also be targetted when the remote systems are reachable through SSH from the local host.
+By default, PerfSpect targets the local host, that is, the host where PerfSpect is running. Remote systems can also be targeted if they are reachable via SSH from the local host.
 
-> [!NOTE]
+> [!IMPORTANT]
 > Ensure the remote user has password-less sudo access (or root privileges) to fully utilize PerfSpect's capabilities.
 
-To target a single remote system using a pre-configured private key:
+To target a single remote system with a pre-configured private key:
 <pre>
 $ ./perfspect report --target 192.168.1.42 --user fred --key ~/.ssh/fredkey
 ...
 </pre>
-To target a single remote system using a password:
+To target a single remote system with a password:
 <pre>
 $ ./perfspect report --target 192.168.1.42 --user fred
 fred@192.168.1.42's password: ******
 ...
 </pre>
-To target more than one remote system, a YAML file with the necessary connection parameters is provided to PerfSpect. See the example YAML file [targets.yaml](targets.yaml).
+To target more than one remote system, a YAML file with the necessary connection parameters is provided to PerfSpect. Refer to the example YAML file: [targets.yaml](targets.yaml).
 <pre>
 $ ./perfspect report --targets mytargets.yaml
 ...
 </pre>
+
+> [!NOTE]
+> All PerfSpect commands support remote targets, but some command options are limited to the local target.
+
+#### Output
+##### Logging
+By default, PerfSpect writes to a log file (perfspect.log) in the user's current working directory. Optionally, PerfSpect can direct logs to the local system's syslog daemon.
+<pre>
+$ ./perfspect metrics --syslog
+</pre>
+
+##### Report Files
+By default, PerfSpect creates a unique directory in the user's current working directory to store output files. Users can specify a custom output directory, but the directory provided must exist; PerfSpect will not create it.
+<pre>
+$./perfspect telemetry --output /home/elaine/perfspect/telemetry
+</pre>
+
 ## Building PerfSpect from Source
 > [!TIP]
 > Skip the build. Pre-built PerfSpect releases are available in the repository's [Releases](https://github.com/intel/PerfSpect/releases). Download and extract perfspect.tgz.
 ### 1st Build
-`builder/build.sh` builds the dependencies and the app in Docker containers that provide the required build environments. Assumes you have Docker installed on your development system.
+Use `builder/build.sh` to build the dependencies and the application in Docker containers with the required build environments. Ensure Docker is properly configured on your build system before running the script.
 
 ### Subsequent Builds
-`make` builds the app. Assumes the dependencies have been built previously and that you have Go installed on your development system.
+`make` builds the app. It assumes the dependencies have been built previously and that you have Go installed on your development system. See [go.mod](go.mod) for the minimum Go version.
