@@ -195,11 +195,34 @@ func baseFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 	return ""
 }
 
-func convertMsrToDecimals(msr string) (decVals []int, err error) {
+// convertHexStringToDecimals converts a hex string to a slice of decimal values.
+//
+// formats:
+// - "0x1212121212121212"
+// - "1212121212121212"
+// we need two hex characters for each decimal value
+// some input strings may need to be padded with a leading zero
+// always return a slice of 8 decimal values
+func convertHexStringToDecimals(hexStr string) (decVals []int, err error) {
+	hexStr = strings.TrimPrefix(hexStr, "0x")
+	hexStr = strings.TrimSpace(hexStr)
+	// no more than 16 characters
+	if len(hexStr) > 16 {
+		err = fmt.Errorf("hex string too long: %s", hexStr)
+		return
+	}
+	// pad up to 16 characters
+	for range 16 - len(hexStr) {
+		hexStr = "0" + hexStr
+	}
 	re := regexp.MustCompile(`[0-9a-fA-F][0-9a-fA-F]`)
-	hexVals := re.FindAll([]byte(msr), -1)
+	hexVals := re.FindAll([]byte(hexStr), -1)
 	if hexVals == nil {
 		err = fmt.Errorf("no hex values found in msr")
+		return
+	}
+	if len(hexVals) != 8 {
+		err = fmt.Errorf("expected 8 hex values, got %d", len(hexVals))
 		return
 	}
 	decVals = make([]int, len(hexVals))
@@ -251,7 +274,7 @@ func getSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 		return nil, fmt.Errorf("unexpected output format")
 	}
 	// get list of buckets
-	bucketCoreCounts, _ := convertMsrToDecimals(values[0])
+	bucketCoreCounts, _ := convertHexStringToDecimals(values[0])
 	// create buckets
 	var totalCoreBuckets []string // only for multi-die architectures
 	var dieCoreBuckets []string
@@ -286,7 +309,7 @@ func getSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 		var freqs []int
 		if isaHex != "0" {
 			var err error
-			freqs, err = convertMsrToDecimals(isaHex)
+			freqs, err = convertHexStringToDecimals(isaHex)
 			if err != nil {
 				return nil, err
 			}
