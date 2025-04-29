@@ -203,9 +203,15 @@ func baseFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 // we need two hex characters for each decimal value
 // some input strings may need to be padded with a leading zero
 // always return a slice of 8 decimal values
+// the first value is the least significant byte
 func convertHexStringToDecimals(hexStr string) (decVals []int, err error) {
 	hexStr = strings.TrimPrefix(hexStr, "0x")
 	hexStr = strings.TrimSpace(hexStr)
+	// check if the hex string is empty
+	if hexStr == "" {
+		err = fmt.Errorf("empty hex string")
+		return
+	}
 	// no more than 16 characters
 	if len(hexStr) > 16 {
 		err = fmt.Errorf("hex string too long: %s", hexStr)
@@ -1756,34 +1762,38 @@ func cveInfoFromOutput(outputs map[string]script.ScriptOutput) [][]string {
 	return cves
 }
 
-/* "1,3-5,8" -> [1,3,4,5,8] */
-func expandCPUList(cpuList string) (cpus []int) {
+// expandCPUList expands a CPU list string into a slice of integers.
+// The CPU list string can contain individual CPU numbers or ranges of CPUs.
+// For example, "1,3-5,8" will be expanded to [1,3,4,5,8].
+// The function returns an error if the CPU list string is invalid.
+func expandCPUList(cpuList string) ([]int, error) {
+	cpus := []int{}
 	if cpuList != "" {
 		for token := range strings.SplitSeq(cpuList, ",") {
 			if strings.Contains(token, "-") {
 				subTokens := strings.Split(token, "-")
 				if len(subTokens) == 2 {
-					begin, errA := strconv.Atoi(subTokens[0])
-					end, errB := strconv.Atoi(subTokens[1])
+					begin, errA := strconv.Atoi(strings.TrimSpace(subTokens[0]))
+					end, errB := strconv.Atoi(strings.TrimSpace(subTokens[1]))
 					if errA != nil || errB != nil {
-						slog.Warn("Failed to parse CPU affinity", slog.String("cpuList", cpuList))
-						return
+						err := fmt.Errorf("failed to parse CPU range: %s", token)
+						return nil, err
 					}
 					for i := begin; i <= end; i++ {
 						cpus = append(cpus, i)
 					}
 				}
 			} else {
-				cpu, err := strconv.Atoi(token)
+				cpu, err := strconv.Atoi(strings.TrimSpace(token))
 				if err != nil {
-					slog.Warn("CPU isn't an integer!", slog.String("cpuList", cpuList))
-					return
+					err := fmt.Errorf("failed to parse CPU: %s", token)
+					return nil, err
 				}
 				cpus = append(cpus, cpu)
 			}
 		}
 	}
-	return
+	return cpus, nil
 }
 
 func turbostatSummaryRows(turboStatScriptOutput script.ScriptOutput, fieldNames []string) ([][]string, error) {
@@ -1870,7 +1880,11 @@ func nicIRQMappingsFromOutput(outputs map[string]script.ScriptOutput) [][]string
 				continue
 			}
 			cpuList := tokens[1]
-			cpus := expandCPUList(cpuList)
+			cpus, err := expandCPUList(cpuList)
+			if err != nil {
+				slog.Warn("failed to parse CPU list", slog.String("cpuList", cpuList), slog.String("error", err.Error()))
+				continue
+			}
 			for _, cpu := range cpus {
 				cpuIRQMappings[cpu] = append(cpuIRQMappings[cpu], irq)
 			}
