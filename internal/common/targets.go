@@ -18,6 +18,8 @@ import (
 	"strconv"
 	"strings"
 
+	"slices"
+
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 	"gopkg.in/yaml.v2"
@@ -132,26 +134,24 @@ func GetTargets(cmd *cobra.Command, needsElevatedPrivileges bool, failIfCantElev
 	}
 	// create a temp directory on each target
 	for targetIdx, myTarget := range targets {
+		// if we already have an error for this target, skip it
 		if targetErrs[targetIdx] != nil {
 			continue
 		}
 		_, err := myTarget.CreateTempDirectory(targetTempDirRoot)
 		if err != nil {
-			targetErrs[targetIdx] = fmt.Errorf("failed to create temp directory on target")
+			targetErrs[targetIdx] = fmt.Errorf("failed to create temp directory on target: %v", err)
 			slog.Error(targetErrs[targetIdx].Error(), slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
 			continue
 		}
-		// confirm that the temp directory was not created on a file system mounted with noexec
-		noExec, err := isNoExec(myTarget, myTarget.GetTempDirectory())
+		// confirm that the temp directory was created on a file system that was not mounted with noexec
+		noExec, err := isDirNoExec(myTarget, myTarget.GetTempDirectory())
 		if err != nil {
 			// log the error but don't reject the target just in case our check is wrong
-			slog.Error("failed to check if temp directory is mounted on 'noexec' file system", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-			continue
-		}
-		if noExec {
+			slog.Warn("failed to check if temp directory is mounted on 'noexec' file system", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+		} else if noExec {
 			targetErrs[targetIdx] = fmt.Errorf("target's temp directory must not be on a file system mounted with the 'noexec' option, override the default with --tempdir")
 			slog.Error(targetErrs[targetIdx].Error(), slog.String("target", myTarget.GetName()))
-			continue
 		}
 	}
 	return
@@ -375,12 +375,86 @@ func getHostArchitecture() (string, error) {
 	}
 }
 
-// isNoExec checks if the temporary directory is on a file system that is mounted with noexec.
-func isNoExec(t target.Target, tempDir string) (bool, error) {
-	dfCmd := exec.Command("df", "-P", tempDir)
+// fieldFromDfpOutput parses the output of the `df -P <dir>` command and returns the specified field value.
+// example output:
+//
+//	Filesystem     1024-blocks     Used  Available Capacity Mounted on
+//	/dev/sda2       1858388360 17247372 1747419536       1% /
+//
+// Returns the value of the specified field from the second line of the output.
+func fieldFromDfpOutput(dfOutput string, fieldName string) (string, error) {
+	lines := strings.Split(dfOutput, "\n")
+	if len(lines) < 2 {
+		return "", fmt.Errorf("unexpected output from df command: %s", dfOutput)
+	}
+	// find the field index from the header
+	headerFields := strings.Fields(lines[0])
+	fieldIndex := -1
+	for i, field := range headerFields {
+		if field == fieldName {
+			fieldIndex = i
+			break
+		}
+	}
+	if fieldIndex == -1 {
+		return "", fmt.Errorf("field %s not found in df output", fieldName)
+	}
+	// get the value from the second line (the actual data)
+	dfFields := strings.Fields(lines[1])
+	if len(dfFields) <= fieldIndex {
+		return "", fmt.Errorf("unexpected output format from df command: %s", dfOutput)
+	}
+	return dfFields[fieldIndex], nil
+}
+
+type mountRecord struct {
+	fileSystem string
+	mountPoint string
+	typeName   string
+	options    []string
+}
+
+// parseMountOutput parses the output of the `mount` command and returns a slice of mountRecord structs.
+// e.g., "sysfs on /sys type sysfs (rw,nosuid,nodev,noexec,relatime)"
+func parseMountOutput(mountOutput string) ([]mountRecord, error) {
+	var mounts []mountRecord
+	for line := range strings.SplitSeq(mountOutput, "\n") {
+		if line == "" {
+			continue
+		}
+		re := regexp.MustCompile(`^([^ ]+) on ([^ ]+) type ([^ ]+) \((.*)\)$`)
+		matches := re.FindStringSubmatch(line)
+		if len(matches) != 5 {
+			return nil, fmt.Errorf("unexpected output format from mount command: %s", line)
+		}
+		// split the options by comma
+		options := strings.Split(matches[4], ",")
+		// create a mountRecord struct and append it to the slice
+		mount := mountRecord{
+			fileSystem: matches[1],
+			mountPoint: matches[2],
+			typeName:   matches[3],
+			options:    options,
+		}
+		mounts = append(mounts, mount)
+	}
+	return mounts, nil
+}
+
+// isDirNoExec checks if the target directory is on a file system that is mounted with noexec.
+func isDirNoExec(t target.Target, dir string) (bool, error) {
+	dfCmd := exec.Command("df", "-P", dir)
 	dfOutput, _, _, err := t.RunCommand(dfCmd, 0, true)
 	if err != nil {
 		err = fmt.Errorf("failed to run df command: %w", err)
+		return false, err
+	}
+	filesystem, err := fieldFromDfpOutput(dfOutput, "Filesystem")
+	if err != nil {
+		return false, err
+	}
+	mountedOn, err := fieldFromDfpOutput(dfOutput, "Mounted")
+	if err != nil {
 		return false, err
 	}
 	mountCmd := exec.Command("mount")
@@ -389,38 +463,32 @@ func isNoExec(t target.Target, tempDir string) (bool, error) {
 		err = fmt.Errorf("failed to run mount command: %w", err)
 		return false, err
 	}
-	// Parse the output of `df` to extract the device name
-	lines := strings.Split(dfOutput, "\n")
-	if len(lines) < 2 {
-		return false, fmt.Errorf("unexpected output from df command: %s", dfOutput)
+	mounts, err := parseMountOutput(mountOutput)
+	if err != nil {
+		return false, err
 	}
-	dfFields := strings.Fields(lines[1]) // Second line contains the device info
-	if len(dfFields) < 6 {
-		return false, fmt.Errorf("unexpected output format from df command: %s", dfOutput)
+	if len(mounts) == 0 {
+		return false, fmt.Errorf("no mount records found")
 	}
-	filesystem := dfFields[0]
-	mountedOn := dfFields[5]
-	// Search for the device in the mount output and check for "noexec"
-	var found bool
-	for line := range strings.SplitSeq(mountOutput, "\n") {
-		mountFields := strings.Fields(line)
-		if len(mountFields) < 6 {
-			continue // Skip lines that don't have enough fields
+	// Check if the filesystem is mounted with noexec
+	foundFilesystem := false
+	foundMountPoint := false
+	for _, mount := range mounts {
+		if mount.fileSystem == filesystem {
+			foundFilesystem = true
 		}
-		device := mountFields[0]
-		mountPoint := mountFields[2]
-		mountOptions := strings.Join(mountFields[5:], " ")
-		if device == filesystem && mountPoint == mountedOn {
-			found = true
-			if strings.Contains(mountOptions, "noexec") {
-				return true, nil // Found "noexec" for the device
-			} else {
-				break
-			}
+		if mount.mountPoint == mountedOn {
+			foundMountPoint = true
+		}
+		if mount.fileSystem == filesystem && mount.mountPoint == mountedOn {
+			return slices.Contains(mount.options, "noexec"), nil
 		}
 	}
-	if !found {
-		return false, fmt.Errorf("device %s not found in mount output", filesystem)
+	if foundMountPoint {
+		return false, fmt.Errorf("mount point %s is found but filesystem %s is not found in mount records", mountedOn, filesystem)
 	}
-	return false, nil // "noexec" not found
+	if foundFilesystem {
+		return false, fmt.Errorf("filesystem %s is found but mount point %s is not found in mount records", filesystem, mountedOn)
+	}
+	return false, fmt.Errorf("filesystem %s and mount point %s are not found in mount records", filesystem, mountedOn)
 }

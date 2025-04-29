@@ -163,15 +163,7 @@ func (rc *ReportingCommand) Run() error {
 			}
 		}
 		multiSpinner.Start()
-		// get the data we need to generate reports
-		orderedTargetScriptOutputs, err = outputsFromTargets(rc.Cmd, myTargets, rc.TableNames, rc.ScriptParams, multiSpinner.Status, localTempDir)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			slog.Error(err.Error())
-			rc.Cmd.SilenceUsage = true
-			return err
-		}
-		// Collect indices of targets to remove
+		// remove targets that had errors
 		var indicesToRemove []int
 		for i := range targetErrs {
 			if targetErrs[i] != nil {
@@ -179,13 +171,12 @@ func (rc *ReportingCommand) Run() error {
 				indicesToRemove = append(indicesToRemove, i)
 			}
 		}
-		// Remove targets in reverse order of indices to avoid shifting issues
 		for i := len(indicesToRemove) - 1; i >= 0; i-- {
 			myTargets = slices.Delete(myTargets, indicesToRemove[i], indicesToRemove[i]+1)
 		}
-		// check if we have any remaining targets to run the scripts on
-		if len(myTargets) == 0 {
-			err := fmt.Errorf("no targets remain")
+		// collect data from targets
+		orderedTargetScriptOutputs, err = outputsFromTargets(rc.Cmd, myTargets, rc.TableNames, rc.ScriptParams, multiSpinner.Status, localTempDir)
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			slog.Error(err.Error())
 			rc.Cmd.SilenceUsage = true
@@ -194,6 +185,13 @@ func (rc *ReportingCommand) Run() error {
 		// stop the progress indicator
 		multiSpinner.Finish()
 		fmt.Println()
+		// exit with error if no targets remain
+		if len(myTargets) == 0 {
+			err := fmt.Errorf("no successful targets found")
+			slog.Error(err.Error())
+			rc.Cmd.SilenceUsage = true
+			return err
+		}
 	}
 	// we have output data so create the output directory
 	err := CreateOutputDir(outputDir)
