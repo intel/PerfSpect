@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"perfspect/internal/script"
+	"perfspect/internal/util"
 	"slices"
 )
 
@@ -195,54 +196,30 @@ func baseFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 	return ""
 }
 
-// convertHexStringToDecimals converts a hex string to a slice of decimal values.
-//
-// formats:
-// - "0x1212121212121212"
-// - "1212121212121212"
-// we need two hex characters for each decimal value
-// some input strings may need to be padded with a leading zero
-// always return a slice of 8 decimal values
-// the first value is the least significant byte
-func convertHexStringToDecimals(hexStr string) (decVals []int, err error) {
-	hexStr = strings.TrimPrefix(hexStr, "0x")
-	hexStr = strings.TrimSpace(hexStr)
-	// check if the hex string is empty
-	if hexStr == "" {
-		err = fmt.Errorf("empty hex string")
-		return
+// getFrequenciesFromMSR
+func getFrequenciesFromMSR(msr string) ([]int, error) {
+	freqs, err := util.HexToIntList(msr)
+	if err != nil {
+		return nil, err
 	}
-	// no more than 16 characters
-	if len(hexStr) > 16 {
-		err = fmt.Errorf("hex string too long: %s", hexStr)
-		return
+	// reverse the order of the frequencies
+	slices.Reverse(freqs)
+	return freqs, nil
+}
+
+// getBucketSizesFromMSR
+func getBucketSizesFromMSR(msr string) ([]int, error) {
+	bucketSizes, err := util.HexToIntList(msr)
+	if err != nil {
+		return nil, err
 	}
-	// pad up to 16 characters
-	for range 16 - len(hexStr) {
-		hexStr = "0" + hexStr
+	if len(bucketSizes) != 8 {
+		err = fmt.Errorf("expected 8 bucket sizes, got %d", len(bucketSizes))
+		return nil, err
 	}
-	re := regexp.MustCompile(`[0-9a-fA-F][0-9a-fA-F]`)
-	hexVals := re.FindAll([]byte(hexStr), -1)
-	if hexVals == nil {
-		err = fmt.Errorf("no hex values found in hex string")
-		return
-	}
-	if len(hexVals) != 8 {
-		err = fmt.Errorf("expected 8 hex values, got %d", len(hexVals))
-		return
-	}
-	decVals = make([]int, len(hexVals))
-	decValsIndex := len(decVals) - 1
-	for _, hexVal := range hexVals {
-		var decVal int64
-		decVal, err = strconv.ParseInt(string(hexVal), 16, 0)
-		if err != nil {
-			return
-		}
-		decVals[decValsIndex] = int(decVal)
-		decValsIndex--
-	}
-	return
+	// reverse the order of the core counts
+	slices.Reverse(bucketSizes)
+	return bucketSizes, nil
 }
 
 // getSpecFrequencyBuckets
@@ -280,7 +257,7 @@ func getSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 		return nil, fmt.Errorf("unexpected output format")
 	}
 	// get list of buckets
-	bucketCoreCounts, _ := convertHexStringToDecimals(values[0])
+	bucketCoreCounts, _ := getBucketSizesFromMSR(values[0])
 	// create buckets
 	var totalCoreBuckets []string // only for multi-die architectures
 	var dieCoreBuckets []string
@@ -315,7 +292,7 @@ func getSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 		var freqs []int
 		if isaHex != "0" {
 			var err error
-			freqs, err = convertHexStringToDecimals(isaHex)
+			freqs, err = getFrequenciesFromMSR(isaHex)
 			if err != nil {
 				return nil, err
 			}
@@ -367,6 +344,45 @@ func getSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 		specCoreFreqs = append(specCoreFreqs, row)
 	}
 	return specCoreFreqs, nil
+}
+
+// expandTurboFrequencies expands the turbo frequencies to a list of frequencies
+// input is the output of getSpecFrequencyBuckets, e.g.:
+// "cores", "cores per die", "sse", "avx2", "avx512", "avx512h", "amx"
+// "0-41", "0-20", "3.5", "3.5", "3.3", "3.2", "3.1"
+// "42-63", "21-31", "3.5", "3.5", "3.3", "3.2", "3.1"
+// ...
+// output is the expanded list of the frequencies for the requested ISA
+func expandTurboFrequencies(specFrequencyBuckets [][]string, isa string) ([]string, error) {
+	if len(specFrequencyBuckets) < 2 || len(specFrequencyBuckets[0]) < 2 {
+		return nil, fmt.Errorf("unable to parse core frequency buckets")
+	}
+	rangeIdx := 0 // the first column is the bucket, e.g., 1-44
+	var isaIdx int
+	for i := range specFrequencyBuckets[0] {
+		if strings.Contains(strings.ToUpper(specFrequencyBuckets[0][i]), strings.ToUpper(isa)) {
+			isaIdx = i
+			break
+		}
+	}
+	if isaIdx == 0 {
+		return nil, fmt.Errorf("unable to find %s frequency column", isa)
+	}
+	var freqs []string
+	for i := 1; i < len(specFrequencyBuckets); i++ {
+		bucketCores, err := util.IntRangeToIntList(strings.TrimSpace(specFrequencyBuckets[i][rangeIdx]))
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse bucket range %s", specFrequencyBuckets[i][rangeIdx])
+		}
+		bucketFreq := strings.TrimSpace(specFrequencyBuckets[i][isaIdx])
+		if bucketFreq == "" {
+			return nil, fmt.Errorf("unable to parse bucket frequency %s", specFrequencyBuckets[i][isaIdx])
+		}
+		for range bucketCores {
+			freqs = append(freqs, bucketFreq)
+		}
+	}
+	return freqs, nil
 }
 
 // maxFrequencyFromOutputs gets max core frequency
@@ -1768,30 +1784,12 @@ func cveInfoFromOutput(outputs map[string]script.ScriptOutput) [][]string {
 // The function returns an error if the CPU list string is invalid.
 func expandCPUList(cpuList string) ([]int, error) {
 	cpus := []int{}
-	if cpuList != "" {
-		for token := range strings.SplitSeq(cpuList, ",") {
-			if strings.Contains(token, "-") {
-				subTokens := strings.Split(token, "-")
-				if len(subTokens) == 2 {
-					begin, errA := strconv.Atoi(strings.TrimSpace(subTokens[0]))
-					end, errB := strconv.Atoi(strings.TrimSpace(subTokens[1]))
-					if errA != nil || errB != nil {
-						err := fmt.Errorf("failed to parse CPU range: %s", token)
-						return nil, err
-					}
-					for i := begin; i <= end; i++ {
-						cpus = append(cpus, i)
-					}
-				}
-			} else {
-				cpu, err := strconv.Atoi(strings.TrimSpace(token))
-				if err != nil {
-					err := fmt.Errorf("failed to parse CPU: %s", token)
-					return nil, err
-				}
-				cpus = append(cpus, cpu)
-			}
+	for token := range strings.SplitSeq(cpuList, ",") {
+		intRange, err := util.IntRangeToIntList(token)
+		if err != nil {
+			return nil, err
 		}
+		cpus = append(cpus, intRange...)
 	}
 	return cpus, nil
 }

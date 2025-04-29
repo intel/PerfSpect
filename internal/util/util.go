@@ -428,3 +428,80 @@ func SignalChildren(sig os.Signal) {
 		}
 	}
 }
+
+// IsValidHex checks if a string is a valid hex string
+// Valid hex strings are non-empty, optionally prefixed with "0x" or "0X",
+// and contain only valid hex characters (0-9, a-f, A-F).
+func IsValidHex(hexStr string) bool {
+	// Check if the string starts with "0x" or "0X"
+	if strings.HasPrefix(hexStr, "0x") || strings.HasPrefix(hexStr, "0X") {
+		hexStr = hexStr[2:]
+	}
+	// Check if the string can be parsed as a hex number
+	_, err := strconv.ParseUint(hexStr, 16, 64)
+	return err == nil
+}
+
+// HexToIntList converts a hex string to a list of integers 16 bits (2 hex chars)
+// at a time. The hex string can be prefixed with "0x" or "0X".
+// If the hex string is not valid, an error is returned.
+func HexToIntList(hexStr string) ([]int, error) {
+	if !IsValidHex(hexStr) {
+		return nil, fmt.Errorf("invalid hex string: %s", hexStr)
+	}
+	// Remove the "0x" or "0X" prefix if present
+	if strings.HasPrefix(hexStr, "0x") || strings.HasPrefix(hexStr, "0X") {
+		hexStr = hexStr[2:]
+	}
+	// Pad the hex string with a leading zero if necessary
+	if len(hexStr)%2 != 0 {
+		hexStr = "0" + hexStr
+	}
+	// Convert the hex string to a list of integers (reverse order)
+	intList := make([]int, len(hexStr)/2)
+	for i := 0; i < len(hexStr); i += 2 {
+		// Convert each pair of hex characters to an integer
+		val, err := strconv.ParseInt(hexStr[i:i+2], 16, 16)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert hex to int: %s", err)
+		}
+		intList[i/2] = int(val)
+	}
+	return intList, nil
+}
+
+// IntRangeToIntList expands a string representing a range of integers into a slice of integers.
+// The function returns a slice of integers representing the expanded range.
+// If the input string is not in a valid format, it returns an error.
+// The input string can contain ranges (e.g., "1-3") and single integers (e.g., "5").
+func IntRangeToIntList(input string) ([]int, error) {
+	// check input format matches "start-end", or "start"
+	re := regexp.MustCompile(`^(\d+)(?:-(\d+))?$`)
+	matches := re.FindStringSubmatch(input)
+	if len(matches) == 0 {
+		err := fmt.Errorf("invalid input format: %s", input)
+		return nil, err
+	}
+	start, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return nil, fmt.Errorf("invalid start value: %s", matches[1])
+	}
+	// if end value is empty, return a slice with the start value
+	if matches[2] == "" {
+		return []int{start}, nil
+	}
+	// if end value is provided, parse it
+	end, err := strconv.Atoi(matches[2])
+	if err != nil {
+		return nil, fmt.Errorf("invalid end value: %s", matches[2])
+	}
+	if start > end {
+		return nil, fmt.Errorf("start value is greater than end value: %d > %d", start, end)
+	}
+	// create a slice of integers from start to end
+	result := make([]int, end-start+1)
+	for i := start; i <= end; i++ {
+		result[i-start] = i
+	}
+	return result, nil
+}

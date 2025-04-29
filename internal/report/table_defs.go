@@ -2006,7 +2006,7 @@ func frequencyBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Fie
 	frequencyBuckets, err := getSpecFrequencyBuckets(outputs)
 	if err == nil && len(frequencyBuckets) >= 2 {
 		// get the frequencies from the buckets
-		specSSEFreqs, err = frequencyBucketsToFrequencies(frequencyBuckets)
+		specSSEFreqs, err = expandTurboFrequencies(frequencyBuckets, "sse")
 		if err != nil {
 			slog.Error("unable to convert buckets to counts", slog.String("error", err.Error()))
 			return []Field{}
