@@ -218,7 +218,7 @@ func convertHexStringToDecimals(hexStr string) (decVals []int, err error) {
 	re := regexp.MustCompile(`[0-9a-fA-F][0-9a-fA-F]`)
 	hexVals := re.FindAll([]byte(hexStr), -1)
 	if hexVals == nil {
-		err = fmt.Errorf("no hex values found in msr")
+		err = fmt.Errorf("no hex values found in hex string")
 		return
 	}
 	if len(hexVals) != 8 {
