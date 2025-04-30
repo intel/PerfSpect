@@ -1778,22 +1778,6 @@ func cveInfoFromOutput(outputs map[string]script.ScriptOutput) [][]string {
 	return cves
 }
 
-// expandCPUList expands a CPU list string into a slice of integers.
-// The CPU list string can contain individual CPU numbers or ranges of CPUs.
-// For example, "1,3-5,8" will be expanded to [1,3,4,5,8].
-// The function returns an error if the CPU list string is invalid.
-func expandCPUList(cpuList string) ([]int, error) {
-	cpus := []int{}
-	for token := range strings.SplitSeq(cpuList, ",") {
-		intRange, err := util.IntRangeToIntList(token)
-		if err != nil {
-			return nil, err
-		}
-		cpus = append(cpus, intRange...)
-	}
-	return cpus, nil
-}
-
 func turbostatSummaryRows(turboStatScriptOutput script.ScriptOutput, fieldNames []string) ([][]string, error) {
 	var fieldValues [][]string
 	// initialize indices with -1
@@ -1878,7 +1862,7 @@ func nicIRQMappingsFromOutput(outputs map[string]script.ScriptOutput) [][]string
 				continue
 			}
 			cpuList := tokens[1]
-			cpus, err := expandCPUList(cpuList)
+			cpus, err := util.SelectiveIntRangeToIntList(cpuList)
 			if err != nil {
 				slog.Warn("failed to parse CPU list", slog.String("cpuList", cpuList), slog.String("error", err.Error()))
 				continue

@@ -15,7 +15,7 @@ find . -name "*.go" | while read -r file; do
             while IFS= read -r line; do
                 echo "$line"
                 if [[ $line == package* ]]; then
-                    echo -e "$COPYRIGHT_HEADER"
+                    echo -e "\n$COPYRIGHT_HEADER"
                 fi
             done
         } < "$file" > temp_file && mv temp_file "$file"

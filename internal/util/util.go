@@ -442,8 +442,9 @@ func IsValidHex(hexStr string) bool {
 	return err == nil
 }
 
-// HexToIntList converts a hex string to a list of integers 16 bits (2 hex chars)
-// at a time. The hex string can be prefixed with "0x" or "0X".
+// HexToIntList converts hex string to a list of integers 16 bits (2 hex chars)
+// at a time. The hex string can, optionally, be prefixed with "0x" or "0X".
+// For example, "0x1234", "0X1234", and "1234" will be converted to [0x12, 0x34].
 // If the hex string is not valid, an error is returned.
 func HexToIntList(hexStr string) ([]int, error) {
 	if !IsValidHex(hexStr) {
@@ -457,7 +458,7 @@ func HexToIntList(hexStr string) ([]int, error) {
 	if len(hexStr)%2 != 0 {
 		hexStr = "0" + hexStr
 	}
-	// Convert the hex string to a list of integers (reverse order)
+	// Convert the hex string to a list of integers
 	intList := make([]int, len(hexStr)/2)
 	for i := 0; i < len(hexStr); i += 2 {
 		// Convert each pair of hex characters to an integer
@@ -472,8 +473,8 @@ func HexToIntList(hexStr string) ([]int, error) {
 
 // IntRangeToIntList expands a string representing a range of integers into a slice of integers.
 // The function returns a slice of integers representing the expanded range.
+// For example, "1-3" will be expanded to [1, 2, 3]. And, "5" will be expanded to [5].
 // If the input string is not in a valid format, it returns an error.
-// The input string can contain ranges (e.g., "1-3") and single integers (e.g., "5").
 func IntRangeToIntList(input string) ([]int, error) {
 	// check input format matches "start-end", or "start"
 	re := regexp.MustCompile(`^(\d+)(?:-(\d+))?$`)
@@ -502,6 +503,21 @@ func IntRangeToIntList(input string) ([]int, error) {
 	result := make([]int, end-start+1)
 	for i := start; i <= end; i++ {
 		result[i-start] = i
+	}
+	return result, nil
+}
+
+// SelectiveIntRangeToIntList expands a string representing a selective range of integers into a slice of integers.
+// For example "1-3,7,9,11-13" will be expanded to [1, 2, 3, 7, 9, 11, 12, 13].
+// An error is returned if the input string is not in a valid format.
+func SelectiveIntRangeToIntList(input string) ([]int, error) {
+	var result []int
+	for r := range strings.SplitSeq(input, ",") {
+		ints, err := IntRangeToIntList(r)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, ints...)
 	}
 	return result, nil
 }

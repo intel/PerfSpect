@@ -1,80 +1,13 @@
 package report
 
+// Copyright (C) 2021-2025 Intel Corporation
+// SPDX-License-Identifier: BSD-3-Clause
+
 import (
 	"reflect"
 	"testing"
 )
 
-func TestExpandCPUList(t *testing.T) {
-	tests := []struct {
-		name      string
-		cpuList   string
-		want      []int
-		expectErr bool
-	}{
-		{
-			name:      "Valid single CPU",
-			cpuList:   "3",
-			want:      []int{3},
-			expectErr: false,
-		},
-		{
-			name:      "Valid range of CPUs",
-			cpuList:   "1-3",
-			want:      []int{1, 2, 3},
-			expectErr: false,
-		},
-		{
-			name:      "Valid mixed single and range",
-			cpuList:   "1,3-5,8",
-			want:      []int{1, 3, 4, 5, 8},
-			expectErr: false,
-		},
-		{
-			name:      "Empty CPU list",
-			cpuList:   "",
-			want:      nil,
-			expectErr: true,
-		},
-		{
-			name:      "Invalid CPU range",
-			cpuList:   "1-",
-			want:      nil,
-			expectErr: true,
-		},
-		{
-			name:      "Invalid CPU number",
-			cpuList:   "1,a",
-			want:      nil,
-			expectErr: true,
-		},
-		{
-			name:      "Overlapping ranges",
-			cpuList:   "1-3,2-4",
-			want:      []int{1, 2, 3, 2, 3, 4},
-			expectErr: false,
-		},
-		{
-			name:      "Whitespace in input",
-			cpuList:   " 1 , 3-5 ",
-			want:      nil,
-			expectErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := expandCPUList(tt.cpuList)
-			if (err != nil) != tt.expectErr {
-				t.Errorf("expandCPUList() error = %v, expectErr %v", err, tt.expectErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("expandCPUList() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
 func TestGetFrequenciesFromMSR(t *testing.T) {
 	tests := []struct {
 		name      string

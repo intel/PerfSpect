@@ -121,3 +121,31 @@ func TestIntRangeToIntList(t *testing.T) {
 		}
 	}
 }
+func TestSelectiveIntRangeToIntList(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected []int
+		err      bool
+	}{
+		{"1-3,5,7-9", []int{1, 2, 3, 5, 7, 8, 9}, false},             // Valid mixed ranges and single values
+		{"10-12,15,20-22", []int{10, 11, 12, 15, 20, 21, 22}, false}, // Valid mixed ranges
+		{"5", []int{5}, false},                                       // Single value
+		{"1-3,5-5,7", []int{1, 2, 3, 5, 7}, false},                   // Mixed ranges with single value range
+		{"", nil, true},            // Empty input
+		{"1-3,abc,7-9", nil, true}, // Invalid input with non-numeric value
+		{"1-3,5-2,7-9", nil, true}, // Invalid range (start > end)
+		{"1-3,,7-9", nil, true},    // Invalid format with empty segment
+		{"1-3,7-9-", nil, true},    // Invalid format with trailing dash
+		{"1-3,7-abc", nil, true},   // Invalid range with non-numeric end
+	}
+
+	for _, test := range tests {
+		result, err := SelectiveIntRangeToIntList(test.input)
+		if (err != nil) != test.err {
+			t.Errorf("expected error: %v, got: %v for input %s, err: %v", test.err, err != nil, test.input, err)
+		}
+		if !test.err && !slices.Equal(result, test.expected) {
+			t.Errorf("expected %v, got %v for input %s", test.expected, result, test.input)
+		}
+	}
+}

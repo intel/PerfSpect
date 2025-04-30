@@ -1,7 +1,11 @@
 package target
 
+// Copyright (C) 2021-2025 Intel Corporation
+// SPDX-License-Identifier: BSD-3-Clause
+
 import (
 	"os"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -63,14 +67,7 @@ func TestGetUserPath(t *testing.T) {
 			}
 
 			for _, expectedPath := range tt.expectedPaths {
-				found := false
-				for _, resultPath := range resultPaths {
-					if resultPath == expectedPath {
-						found = true
-						break
-					}
-				}
-				if !found {
+				if !slices.Contains(resultPaths, expectedPath) {
 					t.Errorf("Expected path %s not found in result", expectedPath)
 				}
 			}

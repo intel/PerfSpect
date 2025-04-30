@@ -427,14 +427,12 @@ func parseMountOutput(mountOutput string) ([]mountRecord, error) {
 		if len(matches) != 5 {
 			return nil, fmt.Errorf("unexpected output format from mount command: %s", line)
 		}
-		// split the options by comma
-		options := strings.Split(matches[4], ",")
 		// create a mountRecord struct and append it to the slice
 		mount := mountRecord{
 			fileSystem: matches[1],
 			mountPoint: matches[2],
 			typeName:   matches[3],
-			options:    options,
+			options:    strings.Split(matches[4], ","),
 		}
 		mounts = append(mounts, mount)
 	}
