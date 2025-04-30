@@ -16,6 +16,7 @@ import (
 	"perfspect/internal/script"
 	"perfspect/internal/target"
 	"perfspect/internal/util"
+	"strings"
 	"syscall"
 
 	"slices"
@@ -57,7 +58,7 @@ func (tso *TargetScriptOutputs) GetTableNames() []string {
 
 const (
 	TableNameInsights  = "Insights"
-	TableNamePerfspect = "PerfSpect Version"
+	TableNamePerfspect = "PerfSpect"
 )
 
 type Category struct {
@@ -353,6 +354,8 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 			},
 			Fields: []report.Field{
 				{Name: "Version", Values: []string{appContext.Version}},
+				{Name: "Args", Values: []string{strings.Join(os.Args, " ")}},
+				{Name: "OutputDir", Values: []string{appContext.OutputDir}},
 			},
 		})
 		// create the report(s)

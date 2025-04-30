@@ -196,9 +196,9 @@ func baseFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 	return ""
 }
 
-// getFrequenciesFromMSR
-func getFrequenciesFromMSR(msr string) ([]int, error) {
-	freqs, err := util.HexToIntList(msr)
+// getFrequenciesFromHex
+func getFrequenciesFromHex(hex string) ([]int, error) {
+	freqs, err := util.HexToIntList(hex)
 	if err != nil {
 		return nil, err
 	}
@@ -207,9 +207,9 @@ func getFrequenciesFromMSR(msr string) ([]int, error) {
 	return freqs, nil
 }
 
-// getBucketSizesFromMSR
-func getBucketSizesFromMSR(msr string) ([]int, error) {
-	bucketSizes, err := util.HexToIntList(msr)
+// getBucketSizesFromHex
+func getBucketSizesFromHex(hex string) ([]int, error) {
+	bucketSizes, err := util.HexToIntList(hex)
 	if err != nil {
 		return nil, err
 	}
@@ -256,8 +256,11 @@ func getSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 	if len(values) != len(fieldNames) {
 		return nil, fmt.Errorf("unexpected output format")
 	}
-	// get list of buckets
-	bucketCoreCounts, _ := getBucketSizesFromMSR(values[0])
+	// get list of buckets sizes
+	bucketCoreCounts, err := getBucketSizesFromHex(values[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to get bucket sizes from Hex string: %w", err)
+	}
 	// create buckets
 	var totalCoreBuckets []string // only for multi-die architectures
 	var dieCoreBuckets []string
@@ -292,9 +295,9 @@ func getSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 		var freqs []int
 		if isaHex != "0" {
 			var err error
-			freqs, err = getFrequenciesFromMSR(isaHex)
+			freqs, err = getFrequenciesFromHex(isaHex)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to get frequencies from Hex string: %w", err)
 			}
 		} else {
 			// if the ISA is not supported, set the frequency to zero for all buckets
@@ -358,9 +361,10 @@ func expandTurboFrequencies(specFrequencyBuckets [][]string, isa string) ([]stri
 		return nil, fmt.Errorf("unable to parse core frequency buckets")
 	}
 	rangeIdx := 0 // the first column is the bucket, e.g., 1-44
+	// find the index of the ISA column
 	var isaIdx int
-	for i := range specFrequencyBuckets[0] {
-		if strings.Contains(strings.ToUpper(specFrequencyBuckets[0][i]), strings.ToUpper(isa)) {
+	for i := 1; i < len(specFrequencyBuckets[0]); i++ {
+		if strings.EqualFold(specFrequencyBuckets[0][i], isa) {
 			isaIdx = i
 			break
 		}

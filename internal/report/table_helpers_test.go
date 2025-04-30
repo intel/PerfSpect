@@ -43,7 +43,7 @@ func TestGetFrequenciesFromMSR(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := getFrequenciesFromMSR(tt.msr)
+			got, err := getFrequenciesFromHex(tt.msr)
 			if (err != nil) != tt.expectErr {
 				t.Errorf("getFrequenciesFromMSR() error = %v, expectErr %v", err, tt.expectErr)
 				return
@@ -101,7 +101,7 @@ func TestGetBucketSizesFromMSR(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := getBucketSizesFromMSR(tt.msr)
+			got, err := getBucketSizesFromHex(tt.msr)
 			if (err != nil) != tt.expectErr {
 				t.Errorf("getBucketSizesFromMSR() error = %v, expectErr %v", err, tt.expectErr)
 				return
