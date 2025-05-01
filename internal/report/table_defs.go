@@ -2397,7 +2397,7 @@ func kernelLockAnalysisTableValues(outputs map[string]script.ScriptOutput) []Fie
 		{Name: "Cache2Cache without Callstack", Values: []string{sectionValueFromOutput(outputs[script.ProfileKernelLockScriptName].Stdout, "perf_c2c_no_children")}},
 		{Name: "Cache2Cache with CallStack", Values: []string{sectionValueFromOutput(outputs[script.ProfileKernelLockScriptName].Stdout, "perf_c2c_callgraph")}},
 		{Name: "Lock Contention", Values: []string{sectionValueFromOutput(outputs[script.ProfileKernelLockScriptName].Stdout, "perf_lock_contention")}},
-		{Name: "Perf Package Path", Values: []string{sectionValueFromOutput(outputs[script.ProfileKernelLockScriptName].Stdout, "perf_package_path")}},
+		{Name: "Perf Package Path", Values: []string{strings.TrimSpace(sectionValueFromOutput(outputs[script.ProfileKernelLockScriptName].Stdout, "perf_package_path"))}},
 	}
 	return fields
 }
