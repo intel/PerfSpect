@@ -227,6 +227,11 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
+	if flagInterval < 1 {
+		err := fmt.Errorf("interval must be 1 or greater")
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return err
+	}
 	if flagDuration < 0 {
 		err := fmt.Errorf("duration must be 0 or greater")
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
