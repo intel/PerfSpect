@@ -8,7 +8,6 @@ package report
 import (
 	"encoding/csv"
 	"fmt"
-	"log"
 	"log/slog"
 	"regexp"
 	"sort"
@@ -2024,39 +2023,68 @@ func systemSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 	return fmt.Sprintf(template, socketCount, cpuModel, coreCount, tdp, htOnOff, turboOnOff, installedMem, biosVersion, uCodeVersion, nics, disks, operatingSystem, kernelVersion, date)
 }
 
-func getSectionsFromOutput(outputs map[string]script.ScriptOutput, scriptName string) map[string]string {
-	reHeader := regexp.MustCompile(`^##########\s+(.+)\s+##########$`)
-	sections := make(map[string]string, 0)
-	var header string
-	var sectionLines []string
-	lines := strings.Split(outputs[scriptName].Stdout, "\n")
-	lineCount := len(lines)
-	if lineCount == 1 && lines[0] == "" {
-		return sections
-	}
-	for idx, line := range lines {
-		match := reHeader.FindStringSubmatch(line)
+// getSectionsFromOutput parses output into sections, where the section name
+// is the key in a map and the section content is the value
+// sections are delimited by lines of the form ########## <section name> ##########
+// example:
+// ########## <section A name> ##########
+// <section content>
+// <section content>
+// ########## <section B name> ##########
+// <section content>
+//
+// returns a map of section name to section content
+// if the output is empty or contains no section headers, returns an empty map
+// if a section contains no content, the value for that section is an empty string
+func getSectionsFromOutput(output string) map[string]string {
+	sections := make(map[string]string)
+	re := regexp.MustCompile(`^########## (.+?) ##########$`)
+	var sectionName string
+	for line := range strings.SplitSeq(output, "\n") {
+		// check if the line is a section header
+		match := re.FindStringSubmatch(line)
 		if match != nil {
-			if header != "" {
-				sections[header] = strings.Join(sectionLines, "\n")
-				sectionLines = []string{}
+			// if the section name isn't in the map yet, add it
+			if _, ok := sections[match[1]]; !ok {
+				sections[match[1]] = ""
 			}
-			header = match[1]
-			if _, ok := sections[header]; ok {
-				log.Panic("can't have same header twice")
-			}
+			// save the section name
+			sectionName = match[1]
 			continue
 		}
-		sectionLines = append(sectionLines, line)
-		if idx == lineCount-1 {
-			sections[header] = strings.Join(sectionLines, "\n")
+		if sectionName != "" {
+			sections[sectionName] += line + "\n"
 		}
 	}
 	return sections
 }
 
+// sectionValueFromOutput returns the content of a section from the output
+// if the section doesn't exist, returns an empty string
+// if the section exists but has no content, returns an empty string
+func sectionValueFromOutput(output string, sectionName string) string {
+	sections := getSectionsFromOutput(output)
+	if len(sections) == 0 {
+		slog.Warn("no sections in output")
+		return ""
+	}
+	if _, ok := sections[sectionName]; !ok {
+		slog.Warn("section not found in output", slog.String("section", sectionName))
+		return ""
+	}
+	if sections[sectionName] == "" {
+		slog.Warn("No content for section:", slog.String("section", sectionName))
+		return ""
+	}
+	return sections[sectionName]
+}
+
 func javaFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
-	sections := getSectionsFromOutput(outputs, script.ProfileJavaScriptName)
+	sections := getSectionsFromOutput(outputs[script.ProfileJavaScriptName].Stdout)
+	if len(sections) == 0 {
+		slog.Warn("no sections in java profiling output")
+		return ""
+	}
 	javaFolded := make(map[string]string)
 	re := regexp.MustCompile(`^async-profiler (\d+) (.*)$`)
 	for header, stacks := range sections {
@@ -2091,7 +2119,11 @@ func javaFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
 }
 
 func systemFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
-	sections := getSectionsFromOutput(outputs, script.ProfileSystemScriptName)
+	sections := getSectionsFromOutput(outputs[script.ProfileSystemScriptName].Stdout)
+	if len(sections) == 0 {
+		slog.Warn("no sections in system profiling output")
+		return ""
+	}
 	var dwarfFolded, fpFolded string
 	for header, content := range sections {
 		if header == "perf_dwarf" {
@@ -2108,14 +2140,4 @@ func systemFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
 		slog.Warn("error merging folded stacks", slog.String("error", err.Error()))
 	}
 	return folded
-}
-
-func sectionValueFromOutput(outputs map[string]script.ScriptOutput, sectionName string) string {
-	sections := getSectionsFromOutput(outputs, script.ProfileKernelLockScriptName)
-
-	value := sections[sectionName]
-	if value == "" {
-		slog.Warn("No content for section:", slog.String("warning", sectionName))
-	}
-	return value
 }
