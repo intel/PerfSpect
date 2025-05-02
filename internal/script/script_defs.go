@@ -1425,8 +1425,9 @@ echo -1 >/proc/sys/kernel/perf_event_paranoid
 KPTR_RESTRICT=$( cat /proc/sys/kernel/kptr_restrict )
 echo 0 >/proc/sys/kernel/kptr_restrict
 
-PERF_HOTSPOT_DATA=$(mktemp -d)/perf_hotspot.data
-PERF_CONTENTION_DATA=$(mktemp -d)/perf_lock_contention.txt
+OUTPUT_DIR=$(mktemp -d)
+PERF_HOTSPOT_DATA=$OUTPUT_DIR/perf_hotspot.data
+PERF_CONTENTION_DATA=$OUTPUT_DIR/perf_lock_contention.txt
 
 # collect hotspot
 perf record -m 256M --kcore -F $frequency -a -g --call-graph dwarf,512 -W -d --phys-data --sample-cpu -e cycles:pp,instructions:pp,cpu/mem-loads,ldlat=30/P,cpu/mem-stores/P -o ${PERF_HOTSPOT_DATA} -- sleep $duration &
@@ -1473,6 +1474,10 @@ fi
 if [ -f "${PERF_CONTENTION_DATA}" ]; then
 	echo "########## perf_lock_contention ##########"
 	cat ${PERF_CONTENTION_DATA}
+fi
+# clean up temporary files
+if [ -d "${OUTPUT_DIR}" ]; then
+	rm -rf ${OUTPUT_DIR}
 fi
 `,
 		Superuser: true,
