@@ -1029,6 +1029,7 @@ func setPower(power int, myTarget target.Target, localTempDir string) {
 }
 
 func setEpb(epb int, myTarget target.Target, localTempDir string) {
+	fmt.Printf("set energy performance bias (EPB) to %d on %s\n", epb, myTarget.GetName())
 	epbSourceScript := script.GetScriptByName(script.EpbSourceScriptName)
 	epbSourceOutput, err := runScript(myTarget, epbSourceScript, localTempDir)
 	if err != nil {
@@ -1041,7 +1042,6 @@ func setEpb(epb int, myTarget target.Target, localTempDir string) {
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}
-	fmt.Printf("set energy performance bias (EPB) to %d on %s\n", epb, myTarget.GetName())
 	var msr string
 	var bitOffset uint
 	if source == 0 { // 0 means the EPB is controlled by the OS
