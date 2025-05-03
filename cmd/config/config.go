@@ -766,7 +766,7 @@ func setELC(elc string, myTarget target.Target, localTempDir string) error {
 }
 
 func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir string, prefetcherType string) error {
-	fmt.Printf("set %s prefetcher to %sd on %s\n", prefetcherType, enableDisable, myTarget.GetName())
+	fmt.Printf("set %s prefetcher to %s on %s\n", prefetcherType, enableDisable, myTarget.GetName())
 	pf, err := report.GetPrefetcherDefByName(prefetcherType)
 	if err != nil {
 		return fmt.Errorf("failed to get prefetcher definition: %w", err)
