@@ -20,71 +20,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
-
-var (
-	flagCoreCount                 int
-	flagLLCSize                   float64
-	flagAllCoreMaxFrequency       float64
-	flagUncoreMaxFrequency        float64
-	flagUncoreMinFrequency        float64
-	flagUncoreMaxComputeFrequency float64
-	flagUncoreMinComputeFrequency float64
-	flagUncoreMaxIOFrequency      float64
-	flagUncoreMinIOFrequency      float64
-	flagTDP                       int
-	flagEPB                       int
-	flagEPP                       int
-	flagGovernor                  string
-	flagELC                       string
-	flagPrefetcherL2HW            string
-	flagPrefetcherL2Adj           string
-	flagPrefetcherDCUHW           string
-	flagPrefetcherDCUIP           string
-	flagPrefetcherDCUNP           string
-	flagPrefetcherAMP             string
-	flagPrefetcherLLCPP           string
-	flagPrefetcherAOP             string
-	flagPrefetcherHomeless        string
-	flagPrefetcherLLC             string
-)
-
-const (
-	flagCoreCountName                 = "cores"
-	flagLLCSizeName                   = "llc"
-	flagAllCoreMaxFrequencyName       = "core-max"
-	flagUncoreMaxFrequencyName        = "uncore-max"
-	flagUncoreMinFrequencyName        = "uncore-min"
-	flagUncoreMaxComputeFrequencyName = "uncore-max-compute"
-	flagUncoreMinComputeFrequencyName = "uncore-min-compute"
-	flagUncoreMaxIOFrequencyName      = "uncore-max-io"
-	flagUncoreMinIOFrequencyName      = "uncore-min-io"
-	flagTDPName                       = "tdp"
-	flagEPBName                       = "epb"
-	flagEPPName                       = "epp"
-	flagGovernorName                  = "gov"
-	flagELCName                       = "elc"
-	flagPrefetcherL2HWName            = "pref-l2hw"
-	flagPrefetcherL2AdjName           = "pref-l2adj"
-	flagPrefetcherDCUHWName           = "pref-dcuhw"
-	flagPrefetcherDCUIPName           = "pref-dcuip"
-	flagPrefetcherDCUNPName           = "pref-dcunp"
-	flagPrefetcherAMPName             = "pref-amp"
-	flagPrefetcherLLCPPName           = "pref-llcpp"
-	flagPrefetcherAOPName             = "pref-aop"
-	flagPrefetcherHomelessName        = "pref-homeless"
-	flagPrefetcherLLCName             = "pref-llc"
-)
-
-// governorOptions - list of valid governor options
-var governorOptions = []string{"performance", "powersave"}
-
-// elcOptions - list of valid elc options
-var elcOptions = []string{"latency-optimized", "default"}
-
-// prefetcherOptions - list of valid prefetcher options
-var prefetcherOptions = []string{"enable", "disable"}
 
 const cmdName = "config"
 
@@ -111,285 +47,7 @@ USE CAUTION! Target may become unstable. It is up to the user to ensure that the
 }
 
 func init() {
-	Cmd.Flags().IntVar(&flagCoreCount, flagCoreCountName, 0, "")
-	Cmd.Flags().Float64Var(&flagLLCSize, flagLLCSizeName, 0, "")
-	Cmd.Flags().Float64Var(&flagAllCoreMaxFrequency, flagAllCoreMaxFrequencyName, 0, "")
-	Cmd.Flags().Float64Var(&flagUncoreMaxFrequency, flagUncoreMaxFrequencyName, 0, "")
-	Cmd.Flags().Float64Var(&flagUncoreMinFrequency, flagUncoreMinFrequencyName, 0, "")
-	Cmd.Flags().Float64Var(&flagUncoreMaxComputeFrequency, flagUncoreMaxComputeFrequencyName, 0, "")
-	Cmd.Flags().Float64Var(&flagUncoreMinComputeFrequency, flagUncoreMinComputeFrequencyName, 0, "")
-	Cmd.Flags().Float64Var(&flagUncoreMaxIOFrequency, flagUncoreMaxIOFrequencyName, 0, "")
-	Cmd.Flags().Float64Var(&flagUncoreMinIOFrequency, flagUncoreMinIOFrequencyName, 0, "")
-	Cmd.Flags().IntVar(&flagTDP, flagTDPName, 0, "")
-	Cmd.Flags().IntVar(&flagEPB, flagEPBName, 0, "")
-	Cmd.Flags().IntVar(&flagEPP, flagEPPName, 0, "")
-	Cmd.Flags().StringVar(&flagGovernor, flagGovernorName, "", "")
-	Cmd.Flags().StringVar(&flagELC, flagELCName, "", "")
-	Cmd.Flags().StringVar(&flagPrefetcherL2HW, flagPrefetcherL2HWName, "", "")
-	Cmd.Flags().StringVar(&flagPrefetcherL2Adj, flagPrefetcherL2AdjName, "", "")
-	Cmd.Flags().StringVar(&flagPrefetcherDCUHW, flagPrefetcherDCUHWName, "", "")
-	Cmd.Flags().StringVar(&flagPrefetcherDCUIP, flagPrefetcherDCUIPName, "", "")
-	Cmd.Flags().StringVar(&flagPrefetcherDCUNP, flagPrefetcherDCUNPName, "", "")
-	Cmd.Flags().StringVar(&flagPrefetcherAMP, flagPrefetcherAMPName, "", "")
-	Cmd.Flags().StringVar(&flagPrefetcherLLCPP, flagPrefetcherLLCPPName, "", "")
-	Cmd.Flags().StringVar(&flagPrefetcherAOP, flagPrefetcherAOPName, "", "")
-	Cmd.Flags().StringVar(&flagPrefetcherHomeless, flagPrefetcherHomelessName, "", "")
-	Cmd.Flags().StringVar(&flagPrefetcherLLC, flagPrefetcherLLCName, "", "")
-
-	common.AddTargetFlags(Cmd)
-
-	Cmd.SetUsageFunc(usageFunc)
-}
-
-func usageFunc(cmd *cobra.Command) error {
-	cmd.Printf("Usage: %s [flags]\n\n", cmd.CommandPath())
-	cmd.Printf("Examples:\n%s\n\n", cmd.Example)
-	cmd.Println("Flags:")
-	for _, group := range getFlagGroups() {
-		cmd.Printf("  %s:\n", group.GroupName)
-		for _, flag := range group.Flags {
-			cmd.Printf("    --%-20s %s\n", flag.Name, flag.Help)
-		}
-	}
-	cmd.Println("\nGlobal Flags:")
-	cmd.Parent().PersistentFlags().VisitAll(func(pf *pflag.Flag) {
-		flagDefault := ""
-		if cmd.Parent().PersistentFlags().Lookup(pf.Name).DefValue != "" {
-			flagDefault = fmt.Sprintf(" (default: %s)", cmd.Flags().Lookup(pf.Name).DefValue)
-		}
-		cmd.Printf("  --%-20s %s%s\n", pf.Name, pf.Usage, flagDefault)
-	})
-	return nil
-}
-
-func getFlagGroups() []common.FlagGroup {
-	generalFlags := []common.Flag{
-		{
-			Name: flagCoreCountName,
-			Help: "number of physical cores per processor",
-		},
-		{
-			Name: flagLLCSizeName,
-			Help: "LLC size in MB",
-		},
-		{
-			Name: flagAllCoreMaxFrequencyName,
-			Help: "all-core max frequency in GHz",
-		},
-		{
-			Name: flagTDPName,
-			Help: "maximum power per processor in Watts",
-		},
-		{
-			Name: flagEPBName,
-			Help: "energy perf bias from best performance (0) to most power savings (15)",
-		},
-		{
-			Name: flagEPPName,
-			Help: "energy perf profile from best performance (0) to most power savings (255)",
-		},
-		{
-			Name: flagGovernorName,
-			Help: "CPU scaling governor (" + strings.Join(governorOptions, ", ") + ")",
-		},
-		{
-			Name: flagELCName,
-			Help: "Efficiency Latency Control (" + strings.Join(elcOptions, ", ") + ") [SRF+]",
-		},
-	}
-	groups := []common.FlagGroup{}
-	groups = append(groups, common.FlagGroup{
-		GroupName: "General Options",
-		Flags:     generalFlags,
-	})
-	uncoreFrequencyFlags := []common.Flag{
-		{
-			Name: flagUncoreMaxFrequencyName,
-			Help: "maximum uncore frequency in GHz [EMR-]",
-		},
-		{
-			Name: flagUncoreMinFrequencyName,
-			Help: "minimum uncore frequency in GHz [EMR-]",
-		},
-		{
-			Name: flagUncoreMaxComputeFrequencyName,
-			Help: "maximum uncore compute die frequency in GHz [SRF+]",
-		},
-		{
-			Name: flagUncoreMinComputeFrequencyName,
-			Help: "minimum uncore compute die frequency in GHz [SRF+]",
-		},
-		{
-			Name: flagUncoreMaxIOFrequencyName,
-			Help: "maximum uncore IO die frequency in GHz [SRF+]",
-		},
-		{
-			Name: flagUncoreMinIOFrequencyName,
-			Help: "minimum uncore IO die frequency in GHz [SRF+]",
-		},
-	}
-	groups = append(groups, common.FlagGroup{
-		GroupName: "Uncore Frequency Options",
-		Flags:     uncoreFrequencyFlags,
-	})
-	prefetcherFlags := []common.Flag{
-		{
-			Name: flagPrefetcherL2HWName,
-			Help: "L2 hardware prefetcher (" + strings.Join(prefetcherOptions, ", ") + ")",
-		},
-		{
-			Name: flagPrefetcherL2AdjName,
-			Help: "L2 adjacent cache line prefetcher (" + strings.Join(prefetcherOptions, ", ") + ")",
-		},
-		{
-			Name: flagPrefetcherDCUHWName,
-			Help: "DCU hardware prefetcher (" + strings.Join(prefetcherOptions, ", ") + ")",
-		},
-		{
-			Name: flagPrefetcherDCUIPName,
-			Help: "DCU instruction pointer prefetcher (" + strings.Join(prefetcherOptions, ", ") + ")",
-		},
-		{
-			Name: flagPrefetcherDCUNPName,
-			Help: "DCU next page prefetcher (" + strings.Join(prefetcherOptions, ", ") + ")",
-		},
-		{
-			Name: flagPrefetcherAMPName,
-			Help: "Adaptive multipath probability prefetcher (" + strings.Join(prefetcherOptions, ", ") + ") [SPR,EMR,GNR]",
-		},
-		{
-			Name: flagPrefetcherLLCPPName,
-			Help: "LLC page prefetcher (" + strings.Join(prefetcherOptions, ", ") + ") [GNR]",
-		},
-		{
-			Name: flagPrefetcherAOPName,
-			Help: "Array of pointers prefetcher (" + strings.Join(prefetcherOptions, ", ") + ") [GNR]",
-		},
-		{
-			Name: flagPrefetcherHomelessName,
-			Help: "Homeless prefetcher (" + strings.Join(prefetcherOptions, ", ") + ") [SPR,EMR,GNR]",
-		},
-		{
-			Name: flagPrefetcherLLCName,
-			Help: "Last level cache prefetcher (" + strings.Join(prefetcherOptions, ", ") + ") [SPR,EMR,GNR]",
-		},
-	}
-	groups = append(groups, common.FlagGroup{
-		GroupName: "Prefetcher Options",
-		Flags:     prefetcherFlags,
-	})
-
-	groups = append(groups, common.GetTargetFlagGroup())
-	return groups
-}
-
-func validateFlags(cmd *cobra.Command, args []string) error {
-	if cmd.Flags().Lookup(flagCoreCountName).Changed && flagCoreCount < 1 {
-		err := fmt.Errorf("invalid core count: %d", flagCoreCount)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	if cmd.Flags().Lookup(flagLLCSizeName).Changed && flagLLCSize < 1 {
-		err := fmt.Errorf("invalid LLC size: %.2f MB", flagLLCSize)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	if cmd.Flags().Lookup(flagAllCoreMaxFrequencyName).Changed && flagAllCoreMaxFrequency < 0.1 {
-		err := fmt.Errorf("invalid core frequency: %.1f GHz", flagAllCoreMaxFrequency)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	if cmd.Flags().Lookup(flagUncoreMaxFrequencyName).Changed && flagUncoreMaxFrequency < 0.1 {
-		err := fmt.Errorf("invalid uncore max frequency: %.1f GHz", flagUncoreMaxFrequency)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	if cmd.Flags().Lookup(flagUncoreMinFrequencyName).Changed && flagUncoreMinFrequency < 0.1 {
-		err := fmt.Errorf("invalid uncore min frequency: %.1f GHz", flagUncoreMinFrequency)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	if cmd.Flags().Lookup(flagTDPName).Changed && flagTDP < 1 {
-		err := fmt.Errorf("invalid power: %d", flagTDP)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	if cmd.Flags().Lookup(flagEPBName).Changed && (flagEPB < 0 || flagEPB > 15) {
-		err := fmt.Errorf("invalid epb: %d, valid values are 0-15", flagEPB)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	if cmd.Flags().Lookup(flagEPPName).Changed && (flagEPP < 0 || flagEPP > 255) {
-		err := fmt.Errorf("invalid epp: %d, valid values are 0-255", flagEPP)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	if cmd.Flags().Lookup(flagGovernorName).Changed && !slices.Contains(governorOptions, flagGovernor) {
-		err := fmt.Errorf("invalid governor: %s, valid options are: %s", flagGovernor, strings.Join(governorOptions, ", "))
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	if cmd.Flags().Lookup(flagELCName).Changed && !slices.Contains(elcOptions, flagELC) {
-		err := fmt.Errorf("invalid elc mode: %s, valid options are: %s", flagELC, strings.Join(elcOptions, ", "))
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	if cmd.Flags().Lookup(flagPrefetcherL2HWName).Changed && !slices.Contains(prefetcherOptions, flagPrefetcherL2HW) {
-		err := fmt.Errorf("invalid prefetcher value: %s, valid options are: %s", flagPrefetcherL2HW, strings.Join(prefetcherOptions, ", "))
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	if cmd.Flags().Lookup(flagPrefetcherL2AdjName).Changed && !slices.Contains(prefetcherOptions, flagPrefetcherL2Adj) {
-		err := fmt.Errorf("invalid L2 Adj prefetcher: %s, valid options are: %s", flagPrefetcherL2Adj, strings.Join(prefetcherOptions, ", "))
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	if cmd.Flags().Lookup(flagPrefetcherDCUHWName).Changed && !slices.Contains(prefetcherOptions, flagPrefetcherDCUHW) {
-		err := fmt.Errorf("invalid DCU HW prefetcher: %s, valid options are: %s", flagPrefetcherDCUHW, strings.Join(prefetcherOptions, ", "))
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	if cmd.Flags().Lookup(flagPrefetcherDCUIPName).Changed && !slices.Contains(prefetcherOptions, flagPrefetcherDCUIP) {
-		err := fmt.Errorf("invalid DCU IP prefetcher: %s, valid options are: %s", flagPrefetcherDCUIP, strings.Join(prefetcherOptions, ", "))
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	if cmd.Flags().Lookup(flagPrefetcherDCUNPName).Changed && !slices.Contains(prefetcherOptions, flagPrefetcherDCUNP) {
-		err := fmt.Errorf("invalid DCU NP prefetcher: %s, valid options are: %s", flagPrefetcherDCUNP, strings.Join(prefetcherOptions, ", "))
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	if cmd.Flags().Lookup(flagPrefetcherAMPName).Changed && !slices.Contains(prefetcherOptions, flagPrefetcherAMP) {
-		err := fmt.Errorf("invalid AMP prefetcher: %s, valid options are: %s", flagPrefetcherAMP, strings.Join(prefetcherOptions, ", "))
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	if cmd.Flags().Lookup(flagPrefetcherLLCPPName).Changed && !slices.Contains(prefetcherOptions, flagPrefetcherLLCPP) {
-		err := fmt.Errorf("invalid LLCPP prefetcher: %s, valid options are: %s", flagPrefetcherLLCPP, strings.Join(prefetcherOptions, ", "))
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	if cmd.Flags().Lookup(flagPrefetcherAOPName).Changed && !slices.Contains(prefetcherOptions, flagPrefetcherAOP) {
-		err := fmt.Errorf("invalid AOP prefetcher: %s, valid options are: %s", flagPrefetcherAOP, strings.Join(prefetcherOptions, ", "))
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	if cmd.Flags().Lookup(flagPrefetcherHomelessName).Changed && !slices.Contains(prefetcherOptions, flagPrefetcherHomeless) {
-		err := fmt.Errorf("invalid homeless prefetcher: %s, valid options are: %s", flagPrefetcherHomeless, strings.Join(prefetcherOptions, ", "))
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	if cmd.Flags().Lookup(flagPrefetcherLLCName).Changed && !slices.Contains(prefetcherOptions, flagPrefetcherLLC) {
-		err := fmt.Errorf("invalid LLC prefetcher: %s, valid options are: %s", flagPrefetcherLLC, strings.Join(prefetcherOptions, ", "))
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	// common target flags
-	if err := common.ValidateTargetFlags(cmd); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	return nil
+	initializeFlags(Cmd)
 }
 
 func runCmd(cmd *cobra.Command, args []string) error {
@@ -442,100 +100,37 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		cmd.SilenceUsage = true
 		return err
 	}
-	// were any changes requested?
+	// make requested changes, one target at a time
 	changeRequested := false
-	flagGroups := getFlagGroups()
-	for i := range len(flagGroups) - 1 {
-		for _, flag := range flagGroups[i].Flags {
-			if cmd.Flags().Lookup(flag.Name).Changed {
-				changeRequested = true
-				break
+	for _, myTarget := range myTargets {
+		for _, group := range flagGroups {
+			for _, flag := range group.flags {
+				if cmd.Flags().Lookup(flag.GetName()).Changed {
+					changeRequested = true
+					switch flag.GetType() {
+					case "int":
+						if flag.intSetFunc != nil {
+							value, _ := cmd.Flags().GetInt(flag.GetName())
+							flag.intSetFunc(value, myTarget, localTempDir)
+						}
+					case "float64":
+						if flag.floatSetFunc != nil {
+							value, _ := cmd.Flags().GetFloat64(flag.GetName())
+							flag.floatSetFunc(value, myTarget, localTempDir)
+						}
+					case "string":
+						if flag.stringSetFunc != nil {
+							value, _ := cmd.Flags().GetString(flag.GetName())
+							flag.stringSetFunc(value, myTarget, localTempDir)
+						}
+					}
+				}
 			}
 		}
 	}
 	if !changeRequested {
 		fmt.Println("No changes requested.")
 		return nil
-	}
-	// make requested changes, one target at a time
-	for _, myTarget := range myTargets {
-		if cmd.Flags().Lookup(flagCoreCountName).Changed {
-			out, err := setCoreCount(flagCoreCount, myTarget, localTempDir)
-			if err != nil {
-				fmt.Printf("Error: %v, %s\n", err, out)
-				cmd.SilenceUsage = true
-				return err
-			}
-		}
-		if cmd.Flags().Lookup(flagLLCSizeName).Changed {
-			setLlcSize(flagLLCSize, myTarget, localTempDir)
-		}
-		if cmd.Flags().Lookup(flagAllCoreMaxFrequencyName).Changed {
-			setCoreFrequency(flagAllCoreMaxFrequency, myTarget, localTempDir)
-		}
-		if cmd.Flags().Lookup(flagUncoreMaxFrequencyName).Changed {
-			setUncoreFrequency(true, flagUncoreMaxFrequency, myTarget, localTempDir)
-		}
-		if cmd.Flags().Lookup(flagUncoreMinFrequencyName).Changed {
-			setUncoreFrequency(false, flagUncoreMinFrequency, myTarget, localTempDir)
-		}
-		if cmd.Flags().Lookup(flagUncoreMaxComputeFrequencyName).Changed {
-			setUncoreDieFrequency(true, true, flagUncoreMaxComputeFrequency, myTarget, localTempDir)
-		}
-		if cmd.Flags().Lookup(flagUncoreMinComputeFrequencyName).Changed {
-			setUncoreDieFrequency(false, true, flagUncoreMinComputeFrequency, myTarget, localTempDir)
-		}
-		if cmd.Flags().Lookup(flagUncoreMaxIOFrequencyName).Changed {
-			setUncoreDieFrequency(true, false, flagUncoreMaxIOFrequency, myTarget, localTempDir)
-		}
-		if cmd.Flags().Lookup(flagUncoreMinIOFrequencyName).Changed {
-			setUncoreDieFrequency(false, false, flagUncoreMinIOFrequency, myTarget, localTempDir)
-		}
-		if cmd.Flags().Lookup(flagTDPName).Changed {
-			setPower(flagTDP, myTarget, localTempDir)
-		}
-		if cmd.Flags().Lookup(flagEPBName).Changed {
-			setEpb(flagEPB, myTarget, localTempDir)
-		}
-		if cmd.Flags().Lookup(flagEPPName).Changed {
-			setEpp(flagEPP, myTarget, localTempDir)
-		}
-		if cmd.Flags().Lookup(flagGovernorName).Changed {
-			setGovernor(flagGovernor, myTarget, localTempDir)
-		}
-		if cmd.Flags().Lookup(flagELCName).Changed {
-			setElc(flagELC, myTarget, localTempDir)
-		}
-		if cmd.Flags().Lookup(flagPrefetcherL2HWName).Changed {
-			setPrefetcher(flagPrefetcherL2HW, myTarget, localTempDir, "L2 HW") // these prefetcher names must match the shortName in prefetcher_defs.go
-		}
-		if cmd.Flags().Lookup(flagPrefetcherL2AdjName).Changed {
-			setPrefetcher(flagPrefetcherL2Adj, myTarget, localTempDir, "L2 Adj")
-		}
-		if cmd.Flags().Lookup(flagPrefetcherDCUHWName).Changed {
-			setPrefetcher(flagPrefetcherDCUHW, myTarget, localTempDir, "DCU HW")
-		}
-		if cmd.Flags().Lookup(flagPrefetcherDCUIPName).Changed {
-			setPrefetcher(flagPrefetcherDCUIP, myTarget, localTempDir, "DCU IP")
-		}
-		if cmd.Flags().Lookup(flagPrefetcherDCUNPName).Changed {
-			setPrefetcher(flagPrefetcherDCUNP, myTarget, localTempDir, "DCU NP")
-		}
-		if cmd.Flags().Lookup(flagPrefetcherAMPName).Changed {
-			setPrefetcher(flagPrefetcherAMP, myTarget, localTempDir, "AMP")
-		}
-		if cmd.Flags().Lookup(flagPrefetcherLLCPPName).Changed {
-			setPrefetcher(flagPrefetcherLLCPP, myTarget, localTempDir, "LLCPP")
-		}
-		if cmd.Flags().Lookup(flagPrefetcherAOPName).Changed {
-			setPrefetcher(flagPrefetcherAOP, myTarget, localTempDir, "AOP")
-		}
-		if cmd.Flags().Lookup(flagPrefetcherHomelessName).Changed {
-			setPrefetcher(flagPrefetcherHomeless, myTarget, localTempDir, "Homeless")
-		}
-		if cmd.Flags().Lookup(flagPrefetcherLLCName).Changed {
-			setPrefetcher(flagPrefetcherLLC, myTarget, localTempDir, "LLC")
-		}
 	}
 	// print config after making changes
 	fmt.Println("") // blank line
@@ -591,7 +186,7 @@ func printConfig(myTargets []target.Target, localTempDir string) (err error) {
 	return
 }
 
-func setCoreCount(cores int, myTarget target.Target, localTempDir string) (string, error) {
+func setCoreCount(cores int, myTarget target.Target, localTempDir string) {
 	fmt.Printf("set core count per processor to %d on %s\n", cores, myTarget.GetName())
 	setScript := script.ScriptDefinition{
 		Name: "set core count",
@@ -681,7 +276,11 @@ done
 `, cores),
 		Superuser: true,
 	}
-	return runScript(myTarget, setScript, localTempDir)
+	_, err := runScript(myTarget, setScript, localTempDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to set core count: %v\n", err)
+		slog.Error("failed to set core count", slog.String("error", err.Error()))
+	}
 }
 
 func setLlcSize(llcSize float64, myTarget target.Target, localTempDir string) {
@@ -744,6 +343,7 @@ func setLlcSize(llcSize float64, myTarget target.Target, localTempDir string) {
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to set LLC size: %v\n", err)
+		slog.Error("failed to set LLC size", slog.String("error", err.Error()))
 	}
 }
 
@@ -987,7 +587,7 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 	}
 }
 
-func setPower(power int, myTarget target.Target, localTempDir string) {
+func setTDP(power int, myTarget target.Target, localTempDir string) {
 	fmt.Printf("set power to %d Watts on %s\n", power, myTarget.GetName())
 	readScript := script.ScriptDefinition{
 		Name:           "get power MSR",
@@ -1028,7 +628,7 @@ func setPower(power int, myTarget target.Target, localTempDir string) {
 	}
 }
 
-func setEpb(epb int, myTarget target.Target, localTempDir string) {
+func setEPB(epb int, myTarget target.Target, localTempDir string) {
 	fmt.Printf("set energy performance bias (EPB) to %d on %s\n", epb, myTarget.GetName())
 	epbSourceScript := script.GetScriptByName(script.EpbSourceScriptName)
 	epbSourceOutput, err := runScript(myTarget, epbSourceScript, localTempDir)
@@ -1088,7 +688,7 @@ func setEpb(epb int, myTarget target.Target, localTempDir string) {
 	}
 }
 
-func setEpp(epp int, myTarget target.Target, localTempDir string) {
+func setEPP(epp int, myTarget target.Target, localTempDir string) {
 	fmt.Printf("set energy performance profile (EPP) to %d on %s\n", epp, myTarget.GetName())
 	// Set both the per-core EPP value and the package EPP value
 	// Reference: 15.4.4 Managing HWP in the Intel SDM
@@ -1183,7 +783,7 @@ func setGovernor(governor string, myTarget target.Target, localTempDir string) {
 	}
 }
 
-func setElc(elc string, myTarget target.Target, localTempDir string) {
+func setELC(elc string, myTarget target.Target, localTempDir string) {
 	fmt.Printf("set efficiency latency control (ELC) mode to %s on %s\n", elc, myTarget.GetName())
 	var mode string
 	if elc == elcOptions[0] {
