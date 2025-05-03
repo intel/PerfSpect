@@ -8,7 +8,6 @@ package report
 import (
 	"encoding/csv"
 	"fmt"
-	"log"
 	"log/slog"
 	"regexp"
 	"sort"
@@ -17,6 +16,7 @@ import (
 	"time"
 
 	"perfspect/internal/script"
+	"perfspect/internal/util"
 	"slices"
 )
 
@@ -195,48 +195,30 @@ func baseFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 	return ""
 }
 
-// convertHexStringToDecimals converts a hex string to a slice of decimal values.
-//
-// formats:
-// - "0x1212121212121212"
-// - "1212121212121212"
-// we need two hex characters for each decimal value
-// some input strings may need to be padded with a leading zero
-// always return a slice of 8 decimal values
-func convertHexStringToDecimals(hexStr string) (decVals []int, err error) {
-	hexStr = strings.TrimPrefix(hexStr, "0x")
-	hexStr = strings.TrimSpace(hexStr)
-	// no more than 16 characters
-	if len(hexStr) > 16 {
-		err = fmt.Errorf("hex string too long: %s", hexStr)
-		return
+// getFrequenciesFromHex
+func getFrequenciesFromHex(hex string) ([]int, error) {
+	freqs, err := util.HexToIntList(hex)
+	if err != nil {
+		return nil, err
 	}
-	// pad up to 16 characters
-	for range 16 - len(hexStr) {
-		hexStr = "0" + hexStr
+	// reverse the order of the frequencies
+	slices.Reverse(freqs)
+	return freqs, nil
+}
+
+// getBucketSizesFromHex
+func getBucketSizesFromHex(hex string) ([]int, error) {
+	bucketSizes, err := util.HexToIntList(hex)
+	if err != nil {
+		return nil, err
 	}
-	re := regexp.MustCompile(`[0-9a-fA-F][0-9a-fA-F]`)
-	hexVals := re.FindAll([]byte(hexStr), -1)
-	if hexVals == nil {
-		err = fmt.Errorf("no hex values found in hex string")
-		return
+	if len(bucketSizes) != 8 {
+		err = fmt.Errorf("expected 8 bucket sizes, got %d", len(bucketSizes))
+		return nil, err
 	}
-	if len(hexVals) != 8 {
-		err = fmt.Errorf("expected 8 hex values, got %d", len(hexVals))
-		return
-	}
-	decVals = make([]int, len(hexVals))
-	decValsIndex := len(decVals) - 1
-	for _, hexVal := range hexVals {
-		var decVal int64
-		decVal, err = strconv.ParseInt(string(hexVal), 16, 0)
-		if err != nil {
-			return
-		}
-		decVals[decValsIndex] = int(decVal)
-		decValsIndex--
-	}
-	return
+	// reverse the order of the core counts
+	slices.Reverse(bucketSizes)
+	return bucketSizes, nil
 }
 
 // getSpecFrequencyBuckets
@@ -273,8 +255,11 @@ func getSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 	if len(values) != len(fieldNames) {
 		return nil, fmt.Errorf("unexpected output format")
 	}
-	// get list of buckets
-	bucketCoreCounts, _ := convertHexStringToDecimals(values[0])
+	// get list of buckets sizes
+	bucketCoreCounts, err := getBucketSizesFromHex(values[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to get bucket sizes from Hex string: %w", err)
+	}
 	// create buckets
 	var totalCoreBuckets []string // only for multi-die architectures
 	var dieCoreBuckets []string
@@ -309,9 +294,9 @@ func getSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 		var freqs []int
 		if isaHex != "0" {
 			var err error
-			freqs, err = convertHexStringToDecimals(isaHex)
+			freqs, err = getFrequenciesFromHex(isaHex)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to get frequencies from Hex string: %w", err)
 			}
 		} else {
 			// if the ISA is not supported, set the frequency to zero for all buckets
@@ -361,6 +346,46 @@ func getSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 		specCoreFreqs = append(specCoreFreqs, row)
 	}
 	return specCoreFreqs, nil
+}
+
+// expandTurboFrequencies expands the turbo frequencies to a list of frequencies
+// input is the output of getSpecFrequencyBuckets, e.g.:
+// "cores", "cores per die", "sse", "avx2", "avx512", "avx512h", "amx"
+// "0-41", "0-20", "3.5", "3.5", "3.3", "3.2", "3.1"
+// "42-63", "21-31", "3.5", "3.5", "3.3", "3.2", "3.1"
+// ...
+// output is the expanded list of the frequencies for the requested ISA
+func expandTurboFrequencies(specFrequencyBuckets [][]string, isa string) ([]string, error) {
+	if len(specFrequencyBuckets) < 2 || len(specFrequencyBuckets[0]) < 2 {
+		return nil, fmt.Errorf("unable to parse core frequency buckets")
+	}
+	rangeIdx := 0 // the first column is the bucket, e.g., 1-44
+	// find the index of the ISA column
+	var isaIdx int
+	for i := 1; i < len(specFrequencyBuckets[0]); i++ {
+		if strings.EqualFold(specFrequencyBuckets[0][i], isa) {
+			isaIdx = i
+			break
+		}
+	}
+	if isaIdx == 0 {
+		return nil, fmt.Errorf("unable to find %s frequency column", isa)
+	}
+	var freqs []string
+	for i := 1; i < len(specFrequencyBuckets); i++ {
+		bucketCores, err := util.IntRangeToIntList(strings.TrimSpace(specFrequencyBuckets[i][rangeIdx]))
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse bucket range %s", specFrequencyBuckets[i][rangeIdx])
+		}
+		bucketFreq := strings.TrimSpace(specFrequencyBuckets[i][isaIdx])
+		if bucketFreq == "" {
+			return nil, fmt.Errorf("unable to parse bucket frequency %s", specFrequencyBuckets[i][isaIdx])
+		}
+		for range bucketCores {
+			freqs = append(freqs, bucketFreq)
+		}
+	}
+	return freqs, nil
 }
 
 // maxFrequencyFromOutputs gets max core frequency
@@ -1756,36 +1781,6 @@ func cveInfoFromOutput(outputs map[string]script.ScriptOutput) [][]string {
 	return cves
 }
 
-/* "1,3-5,8" -> [1,3,4,5,8] */
-func expandCPUList(cpuList string) (cpus []int) {
-	if cpuList != "" {
-		for token := range strings.SplitSeq(cpuList, ",") {
-			if strings.Contains(token, "-") {
-				subTokens := strings.Split(token, "-")
-				if len(subTokens) == 2 {
-					begin, errA := strconv.Atoi(subTokens[0])
-					end, errB := strconv.Atoi(subTokens[1])
-					if errA != nil || errB != nil {
-						slog.Warn("Failed to parse CPU affinity", slog.String("cpuList", cpuList))
-						return
-					}
-					for i := begin; i <= end; i++ {
-						cpus = append(cpus, i)
-					}
-				}
-			} else {
-				cpu, err := strconv.Atoi(token)
-				if err != nil {
-					slog.Warn("CPU isn't an integer!", slog.String("cpuList", cpuList))
-					return
-				}
-				cpus = append(cpus, cpu)
-			}
-		}
-	}
-	return
-}
-
 func turbostatSummaryRows(turboStatScriptOutput script.ScriptOutput, fieldNames []string) ([][]string, error) {
 	var fieldValues [][]string
 	// initialize indices with -1
@@ -1870,7 +1865,11 @@ func nicIRQMappingsFromOutput(outputs map[string]script.ScriptOutput) [][]string
 				continue
 			}
 			cpuList := tokens[1]
-			cpus := expandCPUList(cpuList)
+			cpus, err := util.SelectiveIntRangeToIntList(cpuList)
+			if err != nil {
+				slog.Warn("failed to parse CPU list", slog.String("cpuList", cpuList), slog.String("error", err.Error()))
+				continue
+			}
 			for _, cpu := range cpus {
 				cpuIRQMappings[cpu] = append(cpuIRQMappings[cpu], irq)
 			}
@@ -2024,39 +2023,68 @@ func systemSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 	return fmt.Sprintf(template, socketCount, cpuModel, coreCount, tdp, htOnOff, turboOnOff, installedMem, biosVersion, uCodeVersion, nics, disks, operatingSystem, kernelVersion, date)
 }
 
-func getSectionsFromOutput(outputs map[string]script.ScriptOutput, scriptName string) map[string]string {
-	reHeader := regexp.MustCompile(`^##########\s+(.+)\s+##########$`)
-	sections := make(map[string]string, 0)
-	var header string
-	var sectionLines []string
-	lines := strings.Split(outputs[scriptName].Stdout, "\n")
-	lineCount := len(lines)
-	if lineCount == 1 && lines[0] == "" {
-		return sections
-	}
-	for idx, line := range lines {
-		match := reHeader.FindStringSubmatch(line)
+// getSectionsFromOutput parses output into sections, where the section name
+// is the key in a map and the section content is the value
+// sections are delimited by lines of the form ########## <section name> ##########
+// example:
+// ########## <section A name> ##########
+// <section content>
+// <section content>
+// ########## <section B name> ##########
+// <section content>
+//
+// returns a map of section name to section content
+// if the output is empty or contains no section headers, returns an empty map
+// if a section contains no content, the value for that section is an empty string
+func getSectionsFromOutput(output string) map[string]string {
+	sections := make(map[string]string)
+	re := regexp.MustCompile(`^########## (.+?) ##########$`)
+	var sectionName string
+	for line := range strings.SplitSeq(output, "\n") {
+		// check if the line is a section header
+		match := re.FindStringSubmatch(line)
 		if match != nil {
-			if header != "" {
-				sections[header] = strings.Join(sectionLines, "\n")
-				sectionLines = []string{}
+			// if the section name isn't in the map yet, add it
+			if _, ok := sections[match[1]]; !ok {
+				sections[match[1]] = ""
 			}
-			header = match[1]
-			if _, ok := sections[header]; ok {
-				log.Panic("can't have same header twice")
-			}
+			// save the section name
+			sectionName = match[1]
 			continue
 		}
-		sectionLines = append(sectionLines, line)
-		if idx == lineCount-1 {
-			sections[header] = strings.Join(sectionLines, "\n")
+		if sectionName != "" {
+			sections[sectionName] += line + "\n"
 		}
 	}
 	return sections
 }
 
+// sectionValueFromOutput returns the content of a section from the output
+// if the section doesn't exist, returns an empty string
+// if the section exists but has no content, returns an empty string
+func sectionValueFromOutput(output string, sectionName string) string {
+	sections := getSectionsFromOutput(output)
+	if len(sections) == 0 {
+		slog.Warn("no sections in output")
+		return ""
+	}
+	if _, ok := sections[sectionName]; !ok {
+		slog.Warn("section not found in output", slog.String("section", sectionName))
+		return ""
+	}
+	if sections[sectionName] == "" {
+		slog.Warn("No content for section:", slog.String("section", sectionName))
+		return ""
+	}
+	return sections[sectionName]
+}
+
 func javaFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
-	sections := getSectionsFromOutput(outputs, script.ProfileJavaScriptName)
+	sections := getSectionsFromOutput(outputs[script.ProfileJavaScriptName].Stdout)
+	if len(sections) == 0 {
+		slog.Warn("no sections in java profiling output")
+		return ""
+	}
 	javaFolded := make(map[string]string)
 	re := regexp.MustCompile(`^async-profiler (\d+) (.*)$`)
 	for header, stacks := range sections {
@@ -2091,7 +2119,11 @@ func javaFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
 }
 
 func systemFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
-	sections := getSectionsFromOutput(outputs, script.ProfileSystemScriptName)
+	sections := getSectionsFromOutput(outputs[script.ProfileSystemScriptName].Stdout)
+	if len(sections) == 0 {
+		slog.Warn("no sections in system profiling output")
+		return ""
+	}
 	var dwarfFolded, fpFolded string
 	for header, content := range sections {
 		if header == "perf_dwarf" {
@@ -2108,14 +2140,4 @@ func systemFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
 		slog.Warn("error merging folded stacks", slog.String("error", err.Error()))
 	}
 	return folded
-}
-
-func sectionValueFromOutput(outputs map[string]script.ScriptOutput, sectionName string) string {
-	sections := getSectionsFromOutput(outputs, script.ProfileKernelLockScriptName)
-
-	value := sections[sectionName]
-	if value == "" {
-		slog.Warn("No content for section:", slog.String("warning", sectionName))
-	}
-	return value
 }
