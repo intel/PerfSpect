@@ -107,6 +107,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			for _, flag := range group.flags {
 				if cmd.Flags().Lookup(flag.GetName()).Changed {
 					changeRequested = true
+					fmt.Printf("%s   setting %s to %s\n", myTarget.GetName(), flag.GetName(), flag.GetValueAsString())
 					var err error
 					switch flag.GetType() {
 					case "int":
@@ -126,7 +127,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 						}
 					}
 					if err != nil {
-						fmt.Fprintf(os.Stderr, "Error on %s: %v\n", myTarget.GetName(), err)
+						fmt.Fprintf(os.Stderr, "%s   Error: %v\n", myTarget.GetName(), err)
 						slog.Error(err.Error(), slog.String("target", myTarget.GetName()))
 					}
 				}
@@ -192,7 +193,6 @@ func printConfig(myTargets []target.Target, localTempDir string) (err error) {
 }
 
 func setCoreCount(cores int, myTarget target.Target, localTempDir string) error {
-	fmt.Printf("set core count per processor to %d on %s\n", cores, myTarget.GetName())
 	setScript := script.ScriptDefinition{
 		Name: "set core count",
 		ScriptTemplate: fmt.Sprintf(`
@@ -289,7 +289,6 @@ done
 }
 
 func setLlcSize(llcSize float64, myTarget target.Target, localTempDir string) error {
-	fmt.Printf("set LLC size to %.2f MB on %s\n", llcSize, myTarget.GetName())
 	scripts := []script.ScriptDefinition{}
 	scripts = append(scripts, script.GetScriptByName(script.LscpuScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.LspciBitsScriptName))
@@ -342,7 +341,6 @@ func setLlcSize(llcSize float64, myTarget target.Target, localTempDir string) er
 }
 
 func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDir string) error {
-	fmt.Printf("set core frequency to %.1f GHz on %s\n", coreFrequency, myTarget.GetName())
 	targetFamily, err := myTarget.GetFamily()
 	if err != nil {
 		return fmt.Errorf("failed to get target family: %w", err)
@@ -414,18 +412,6 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 }
 
 func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float64, myTarget target.Target, localTempDir string) error {
-	var minmax, dietype string
-	if maxFreq {
-		minmax = "max"
-	} else {
-		minmax = "min"
-	}
-	if computeDie {
-		dietype = "compute"
-	} else {
-		dietype = "I/O"
-	}
-	fmt.Printf("set uncore %s %s die frequency to %.1f GHz on %s\n", minmax, dietype, uncoreFrequency, myTarget.GetName())
 	targetFamily, err := myTarget.GetFamily()
 	if err != nil {
 		return fmt.Errorf("failed to get target family: %w", err)
@@ -488,13 +474,6 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 }
 
 func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.Target, localTempDir string) error {
-	var minmax string
-	if maxFreq {
-		minmax = "max"
-	} else {
-		minmax = "min"
-	}
-	fmt.Printf("set uncore %s frequency to %.1f GHz on %s\n", minmax, uncoreFrequency, myTarget.GetName())
 	scripts := []script.ScriptDefinition{}
 	scripts = append(scripts, script.ScriptDefinition{
 		Name:           "get uncore frequency MSR",
@@ -553,7 +532,6 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 }
 
 func setTDP(power int, myTarget target.Target, localTempDir string) error {
-	fmt.Printf("set power to %d Watts on %s\n", power, myTarget.GetName())
 	readScript := script.ScriptDefinition{
 		Name:           "get power MSR",
 		ScriptTemplate: "rdmsr 0x610",
@@ -593,7 +571,6 @@ func setTDP(power int, myTarget target.Target, localTempDir string) error {
 }
 
 func setEPB(epb int, myTarget target.Target, localTempDir string) error {
-	fmt.Printf("set energy performance bias (EPB) to %d on %s\n", epb, myTarget.GetName())
 	epbSourceScript := script.GetScriptByName(script.EpbSourceScriptName)
 	epbSourceOutput, err := runScript(myTarget, epbSourceScript, localTempDir)
 	if err != nil {
@@ -650,7 +627,6 @@ func setEPB(epb int, myTarget target.Target, localTempDir string) error {
 }
 
 func setEPP(epp int, myTarget target.Target, localTempDir string) error {
-	fmt.Printf("set energy performance profile (EPP) to %d on %s\n", epp, myTarget.GetName())
 	// Set both the per-core EPP value and the package EPP value
 	// Reference: 15.4.4 Managing HWP in the Intel SDM
 
@@ -727,7 +703,6 @@ func setEPP(epp int, myTarget target.Target, localTempDir string) error {
 }
 
 func setGovernor(governor string, myTarget target.Target, localTempDir string) error {
-	fmt.Printf("set governor to %s on %s\n", governor, myTarget.GetName())
 	setScript := script.ScriptDefinition{
 		Name:           "set governor",
 		ScriptTemplate: fmt.Sprintf("echo %s | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor", governor),
@@ -741,7 +716,6 @@ func setGovernor(governor string, myTarget target.Target, localTempDir string) e
 }
 
 func setELC(elc string, myTarget target.Target, localTempDir string) error {
-	fmt.Printf("set efficiency latency control (ELC) mode to %s on %s\n", elc, myTarget.GetName())
 	var mode string
 	if elc == elcOptions[0] {
 		mode = "latency-optimized-mode"
@@ -766,7 +740,6 @@ func setELC(elc string, myTarget target.Target, localTempDir string) error {
 }
 
 func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir string, prefetcherType string) error {
-	fmt.Printf("set %s prefetcher to %s on %s\n", prefetcherType, enableDisable, myTarget.GetName())
 	pf, err := report.GetPrefetcherDefByName(prefetcherType)
 	if err != nil {
 		return fmt.Errorf("failed to get prefetcher definition: %w", err)
