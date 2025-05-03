@@ -85,284 +85,190 @@ var prefetcherOptions = []string{"enable", "disable"}
 func initializeFlags(cmd *cobra.Command) {
 	// general options
 	group := flagGroup{name: flagGroupGeneralName, flags: []flagDefinition{}}
-	group.flags = append(group.flags, newIntFlag(cmd,
-		flagCoreCountName,
-		0,
-		setCoreCount,
-		"number of physical cores per processor",
-		"greater than 0",
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetInt(flagCoreCountName)
-			return value > 0
-		}))
-	group.flags = append(group.flags, newFloat64Flag(cmd,
-		flagLLCSizeName,
-		0,
-		setLlcSize,
-		"LLC size in MB",
-		"greater than 0",
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetFloat64(flagLLCSizeName)
-			return value > 0
-		}))
-	group.flags = append(group.flags, newFloat64Flag(cmd,
-		flagAllCoreMaxFrequencyName,
-		0,
-		setCoreFrequency,
-		"all-core max frequency in GHz",
-		"greater than 0.1",
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetFloat64(flagAllCoreMaxFrequencyName)
-			return value > 0.1
-		}))
-	group.flags = append(group.flags, newIntFlag(cmd,
-		flagTDPName,
-		0,
-		setTDP,
-		"maximum power per processor in Watts",
-		"greater than 0",
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetInt(flagTDPName)
-			return value > 0
-		}))
-	group.flags = append(group.flags, newIntFlag(cmd,
-		flagEPBName,
-		0,
-		setEPB,
-		"energy perf bias from best performance (0) to most power savings (15)",
-		"0-15",
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetInt(flagEPBName)
-			return value >= 0 && value <= 15
-		}))
-	group.flags = append(group.flags, newIntFlag(cmd,
-		flagEPPName,
-		0,
-		setEPP,
-		"energy perf profile from best performance (0) to most power savings (255)",
-		"0-255",
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetInt(flagEPPName)
-			return value >= 0 && value <= 255
-		}))
-	group.flags = append(group.flags, newStringFlag(cmd,
-		flagGovernorName,
-		"",
-		setGovernor,
-		"CPU scaling governor ("+strings.Join(governorOptions, ", ")+")",
-		strings.Join(governorOptions, ", "),
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetString(flagGovernorName)
-			return slices.Contains(governorOptions, value)
-		}))
-	group.flags = append(group.flags, newStringFlag(cmd,
-		flagELCName,
-		"",
-		setELC,
-		"Efficiency Latency Control ("+strings.Join(elcOptions, ", ")+") [SRF+]",
-		strings.Join(elcOptions, ", "),
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetString(flagELCName)
-			return slices.Contains(elcOptions, value)
-		}))
+	group.flags = append(group.flags,
+		newIntFlag(cmd, flagCoreCountName, 0, setCoreCount, "number of physical cores per processor", "greater than 0",
+			func(cmd *cobra.Command) bool { value, _ := cmd.Flags().GetInt(flagCoreCountName); return value > 0 }),
+		newFloat64Flag(cmd, flagLLCSizeName, 0, setLlcSize, "LLC size in MB", "greater than 0",
+			func(cmd *cobra.Command) bool { value, _ := cmd.Flags().GetFloat64(flagLLCSizeName); return value > 0 }),
+		newFloat64Flag(cmd, flagAllCoreMaxFrequencyName, 0, setCoreFrequency, "all-core max frequency in GHz", "greater than 0.1",
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetFloat64(flagAllCoreMaxFrequencyName)
+				return value > 0.1
+			}),
+		newIntFlag(cmd, flagTDPName, 0, setTDP, "maximum power per processor in Watts", "greater than 0",
+			func(cmd *cobra.Command) bool { value, _ := cmd.Flags().GetInt(flagTDPName); return value > 0 }),
+		newIntFlag(cmd, flagEPBName, 0, setEPB, "energy perf bias from best performance (0) to most power savings (15)", "0-15",
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetInt(flagEPBName)
+				return value >= 0 && value <= 15
+			}),
+		newIntFlag(cmd, flagEPPName, 0, setEPP, "energy perf profile from best performance (0) to most power savings (255)", "0-255",
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetInt(flagEPPName)
+				return value >= 0 && value <= 255
+			}),
+		newStringFlag(cmd, flagGovernorName, "", setGovernor, "CPU scaling governor ("+strings.Join(governorOptions, ", ")+")", strings.Join(governorOptions, ", "),
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetString(flagGovernorName)
+				return slices.Contains(governorOptions, value)
+			}),
+		newStringFlag(cmd, flagELCName, "", setELC, "Efficiency Latency Control ("+strings.Join(elcOptions, ", ")+") [SRF+]", strings.Join(elcOptions, ", "),
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetString(flagELCName)
+				return slices.Contains(elcOptions, value)
+			}))
 	flagGroups = append(flagGroups, group)
 	// uncore frequency options
 	group = flagGroup{name: flagGroupUncoreFrequencyName, flags: []flagDefinition{}}
-	group.flags = append(group.flags, newFloat64Flag(cmd,
-		flagUncoreMaxFrequencyName,
-		0,
-		func(value float64, myTarget target.Target, localTempDir string) {
-			setUncoreFrequency(true, value, myTarget, localTempDir)
-		},
-		"maximum uncore frequency in GHz [EMR-]",
-		"greater than 0.1",
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetFloat64(flagUncoreMaxFrequencyName)
-			return value > 0.1
-		}))
-	group.flags = append(group.flags, newFloat64Flag(cmd,
-		flagUncoreMinFrequencyName,
-		0,
-		func(value float64, myTarget target.Target, localTempDir string) {
-			setUncoreFrequency(false, value, myTarget, localTempDir)
-		},
-		"minimum uncore frequency in GHz [EMR-]",
-		"greater than 0.1",
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetFloat64(flagUncoreMinFrequencyName)
-			return value > 0.1
-		}))
-	group.flags = append(group.flags, newFloat64Flag(cmd,
-		flagUncoreMaxComputeFrequencyName,
-		0,
-		func(value float64, myTarget target.Target, localTempDir string) {
-			setUncoreDieFrequency(true, true, value, myTarget, localTempDir)
-		},
-		"maximum uncore compute die frequency in GHz [SRF+]",
-		"greater than 0.1",
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetFloat64(flagUncoreMaxComputeFrequencyName)
-			return value > 0.1
-		}))
-	group.flags = append(group.flags, newFloat64Flag(cmd,
-		flagUncoreMinComputeFrequencyName,
-		0,
-		func(value float64, myTarget target.Target, localTempDir string) {
-			setUncoreDieFrequency(false, true, value, myTarget, localTempDir)
-		},
-		"minimum uncore compute die frequency in GHz [SRF+]",
-		"greater than 0.1",
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetFloat64(flagUncoreMinComputeFrequencyName)
-			return value > 0.1
-		}))
-	group.flags = append(group.flags, newFloat64Flag(cmd,
-		flagUncoreMaxIOFrequencyName,
-		0,
-		func(value float64, myTarget target.Target, localTempDir string) {
-			setUncoreDieFrequency(true, false, value, myTarget, localTempDir)
-		},
-		"maximum uncore IO die frequency in GHz [SRF+]",
-		"greater than 0.1",
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetFloat64(flagUncoreMaxIOFrequencyName)
-			return value > 0.1
-		}))
-	group.flags = append(group.flags, newFloat64Flag(cmd,
-		flagUncoreMinIOFrequencyName,
-		0,
-		func(value float64, myTarget target.Target, localTempDir string) {
-			setUncoreDieFrequency(false, false, value, myTarget, localTempDir)
-		},
-		"minimum uncore IO die frequency in GHz [SRF+]",
-		"greater than 0.1",
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetFloat64(flagUncoreMinIOFrequencyName)
-			return value > 0.1
-		}))
+	group.flags = append(group.flags,
+		newFloat64Flag(cmd, flagUncoreMaxFrequencyName, 0,
+			func(value float64, myTarget target.Target, localTempDir string) {
+				setUncoreFrequency(true, value, myTarget, localTempDir)
+			},
+			"maximum uncore frequency in GHz [EMR-]", "greater than 0.1",
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetFloat64(flagUncoreMaxFrequencyName)
+				return value > 0.1
+			}),
+		newFloat64Flag(cmd, flagUncoreMinFrequencyName, 0,
+			func(value float64, myTarget target.Target, localTempDir string) {
+				setUncoreFrequency(false, value, myTarget, localTempDir)
+			},
+			"minimum uncore frequency in GHz [EMR-]", "greater than 0.1",
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetFloat64(flagUncoreMinFrequencyName)
+				return value > 0.1
+			}),
+		newFloat64Flag(cmd, flagUncoreMaxComputeFrequencyName, 0,
+			func(value float64, myTarget target.Target, localTempDir string) {
+				setUncoreDieFrequency(true, true, value, myTarget, localTempDir)
+			},
+			"maximum uncore compute die frequency in GHz [SRF+]", "greater than 0.1",
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetFloat64(flagUncoreMaxComputeFrequencyName)
+				return value > 0.1
+			}),
+		newFloat64Flag(cmd, flagUncoreMinComputeFrequencyName, 0,
+			func(value float64, myTarget target.Target, localTempDir string) {
+				setUncoreDieFrequency(false, true, value, myTarget, localTempDir)
+			},
+			"minimum uncore compute die frequency in GHz [SRF+]", "greater than 0.1",
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetFloat64(flagUncoreMinComputeFrequencyName)
+				return value > 0.1
+			}),
+		newFloat64Flag(cmd, flagUncoreMaxIOFrequencyName, 0,
+			func(value float64, myTarget target.Target, localTempDir string) {
+				setUncoreDieFrequency(true, false, value, myTarget, localTempDir)
+			},
+			"maximum uncore IO die frequency in GHz [SRF+]", "greater than 0.1",
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetFloat64(flagUncoreMaxIOFrequencyName)
+				return value > 0.1
+			}),
+		newFloat64Flag(cmd, flagUncoreMinIOFrequencyName, 0,
+			func(value float64, myTarget target.Target, localTempDir string) {
+				setUncoreDieFrequency(false, false, value, myTarget, localTempDir)
+			},
+			"minimum uncore IO die frequency in GHz [SRF+]", "greater than 0.1",
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetFloat64(flagUncoreMinIOFrequencyName)
+				return value > 0.1
+			}))
 	flagGroups = append(flagGroups, group)
 	// prefetcher options
 	group = flagGroup{name: flagGroupPrefetcherName, flags: []flagDefinition{}}
-	group.flags = append(group.flags, newStringFlag(cmd,
-		flagPrefetcherL2HWName,
-		"",
-		func(value string, myTarget target.Target, localTempDir string) {
-			setPrefetcher(value, myTarget, localTempDir, report.PrefetcherL2HWName)
-		},
-		"L2 hardware prefetcher ("+strings.Join(prefetcherOptions, ", ")+")",
-		strings.Join(prefetcherOptions, ", "),
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetString(flagPrefetcherL2HWName)
-			return slices.Contains(prefetcherOptions, value)
-		}))
-	group.flags = append(group.flags, newStringFlag(cmd,
-		flagPrefetcherL2AdjName,
-		"",
-		func(value string, myTarget target.Target, localTempDir string) {
-			setPrefetcher(value, myTarget, localTempDir, report.PrefetcherL2AdjName)
-		},
-		"L2 adjacent cache line prefetcher ("+strings.Join(prefetcherOptions, ", ")+")",
-		strings.Join(prefetcherOptions, ", "),
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetString(flagPrefetcherL2AdjName)
-			return slices.Contains(prefetcherOptions, value)
-		}))
-	group.flags = append(group.flags, newStringFlag(cmd,
-		flagPrefetcherDCUHWName,
-		"",
-		func(value string, myTarget target.Target, localTempDir string) {
-			setPrefetcher(value, myTarget, localTempDir, report.PrefetcherDCUHWName)
-		},
-		"DCU hardware prefetcher ("+strings.Join(prefetcherOptions, ", ")+")",
-		strings.Join(prefetcherOptions, ", "),
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetString(flagPrefetcherDCUHWName)
-			return slices.Contains(prefetcherOptions, value)
-		}))
-	group.flags = append(group.flags, newStringFlag(cmd,
-		flagPrefetcherDCUIPName,
-		"",
-		func(value string, myTarget target.Target, localTempDir string) {
-			setPrefetcher(value, myTarget, localTempDir, report.PrefetcherDCUIPName)
-		},
-		"DCU instruction pointer prefetcher ("+strings.Join(prefetcherOptions, ", ")+")",
-		strings.Join(prefetcherOptions, ", "),
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetString(flagPrefetcherDCUIPName)
-			return slices.Contains(prefetcherOptions, value)
-		}))
-	group.flags = append(group.flags, newStringFlag(cmd,
-		flagPrefetcherDCUNPName,
-		"",
-		func(value string, myTarget target.Target, localTempDir string) {
-			setPrefetcher(value, myTarget, localTempDir, report.PrefetcherDCUNPName)
-		},
-		"DCU next page prefetcher ("+strings.Join(prefetcherOptions, ", ")+")",
-		strings.Join(prefetcherOptions, ", "),
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetString(flagPrefetcherDCUNPName)
-			return slices.Contains(prefetcherOptions, value)
-		}))
-	group.flags = append(group.flags, newStringFlag(cmd,
-		flagPrefetcherAMPName,
-		"",
-		func(value string, myTarget target.Target, localTempDir string) {
-			setPrefetcher(value, myTarget, localTempDir, report.PrefetcherAMPName)
-		},
-		"Adaptive multipath probability prefetcher ("+strings.Join(prefetcherOptions, ", ")+") [SPR,EMR,GNR]",
-		strings.Join(prefetcherOptions, ", "),
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetString(flagPrefetcherAMPName)
-			return slices.Contains(prefetcherOptions, value)
-		}))
-	group.flags = append(group.flags, newStringFlag(cmd,
-		flagPrefetcherLLCPPName,
-		"",
-		func(value string, myTarget target.Target, localTempDir string) {
-			setPrefetcher(value, myTarget, localTempDir, report.PrefetcherLLCPPName)
-		},
-		"LLC page prefetcher ("+strings.Join(prefetcherOptions, ", ")+") [GNR]",
-		strings.Join(prefetcherOptions, ", "),
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetString(flagPrefetcherLLCPPName)
-			return slices.Contains(prefetcherOptions, value)
-		}))
-	group.flags = append(group.flags, newStringFlag(cmd,
-		flagPrefetcherAOPName,
-		"",
-		func(value string, myTarget target.Target, localTempDir string) {
-			setPrefetcher(value, myTarget, localTempDir, report.PrefetcherAOPName)
-		},
-		"Array of pointers prefetcher ("+strings.Join(prefetcherOptions, ", ")+") [GNR]",
-		strings.Join(prefetcherOptions, ", "),
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetString(flagPrefetcherAOPName)
-			return slices.Contains(prefetcherOptions, value)
-		}))
-	group.flags = append(group.flags, newStringFlag(cmd,
-		flagPrefetcherHomelessName,
-		"",
-		func(value string, myTarget target.Target, localTempDir string) {
-			setPrefetcher(value, myTarget, localTempDir, report.PrefetcherHomelessName)
-		},
-		"Homeless prefetcher ("+strings.Join(prefetcherOptions, ", ")+") [SPR,EMR,GNR]",
-		strings.Join(prefetcherOptions, ", "),
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetString(flagPrefetcherHomelessName)
-			return slices.Contains(prefetcherOptions, value)
-		}))
-	group.flags = append(group.flags, newStringFlag(cmd,
-		flagPrefetcherLLCName,
-		"",
-		func(value string, myTarget target.Target, localTempDir string) {
-			setPrefetcher(value, myTarget, localTempDir, report.PrefetcherLLCName)
-		},
-		"Last level cache prefetcher ("+strings.Join(prefetcherOptions, ", ")+") [SPR,EMR,GNR]",
-		strings.Join(prefetcherOptions, ", "),
-		func(cmd *cobra.Command) bool {
-			value, _ := cmd.Flags().GetString(flagPrefetcherLLCName)
-			return slices.Contains(prefetcherOptions, value)
-		}))
+	group.flags = append(group.flags,
+		newStringFlag(cmd, flagPrefetcherL2HWName, "",
+			func(value string, myTarget target.Target, localTempDir string) {
+				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherL2HWName)
+			},
+			"L2 hardware prefetcher ("+strings.Join(prefetcherOptions, ", ")+")", strings.Join(prefetcherOptions, ", "),
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetString(flagPrefetcherL2HWName)
+				return slices.Contains(prefetcherOptions, value)
+			}),
+		newStringFlag(cmd, flagPrefetcherL2AdjName, "",
+			func(value string, myTarget target.Target, localTempDir string) {
+				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherL2AdjName)
+			},
+			"L2 adjacent cache line prefetcher ("+strings.Join(prefetcherOptions, ", ")+")", strings.Join(prefetcherOptions, ", "),
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetString(flagPrefetcherL2AdjName)
+				return slices.Contains(prefetcherOptions, value)
+			}),
+		newStringFlag(cmd, flagPrefetcherDCUHWName, "",
+			func(value string, myTarget target.Target, localTempDir string) {
+				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherDCUHWName)
+			},
+			"DCU hardware prefetcher ("+strings.Join(prefetcherOptions, ", ")+")", strings.Join(prefetcherOptions, ", "),
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetString(flagPrefetcherDCUHWName)
+				return slices.Contains(prefetcherOptions, value)
+			}),
+		newStringFlag(cmd, flagPrefetcherDCUIPName, "",
+			func(value string, myTarget target.Target, localTempDir string) {
+				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherDCUIPName)
+			},
+			"DCU instruction pointer prefetcher ("+strings.Join(prefetcherOptions, ", ")+")", strings.Join(prefetcherOptions, ", "),
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetString(flagPrefetcherDCUIPName)
+				return slices.Contains(prefetcherOptions, value)
+			}),
+		newStringFlag(cmd, flagPrefetcherDCUNPName, "",
+			func(value string, myTarget target.Target, localTempDir string) {
+				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherDCUNPName)
+			},
+			"DCU next page prefetcher ("+strings.Join(prefetcherOptions, ", ")+")", strings.Join(prefetcherOptions, ", "),
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetString(flagPrefetcherDCUNPName)
+				return slices.Contains(prefetcherOptions, value)
+			}),
+		newStringFlag(cmd, flagPrefetcherAMPName, "",
+			func(value string, myTarget target.Target, localTempDir string) {
+				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherAMPName)
+			},
+			"Adaptive multipath probability prefetcher ("+strings.Join(prefetcherOptions, ", ")+") [SPR,EMR,GNR]", strings.Join(prefetcherOptions, ", "),
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetString(flagPrefetcherAMPName)
+				return slices.Contains(prefetcherOptions, value)
+			}),
+		newStringFlag(cmd, flagPrefetcherLLCPPName, "",
+			func(value string, myTarget target.Target, localTempDir string) {
+				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherLLCPPName)
+			},
+			"LLC page prefetcher ("+strings.Join(prefetcherOptions, ", ")+") [GNR]", strings.Join(prefetcherOptions, ", "),
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetString(flagPrefetcherLLCPPName)
+				return slices.Contains(prefetcherOptions, value)
+			}),
+		newStringFlag(cmd, flagPrefetcherAOPName, "",
+			func(value string, myTarget target.Target, localTempDir string) {
+				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherAOPName)
+			},
+			"Array of pointers prefetcher ("+strings.Join(prefetcherOptions, ", ")+") [GNR]", strings.Join(prefetcherOptions, ", "),
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetString(flagPrefetcherAOPName)
+				return slices.Contains(prefetcherOptions, value)
+			}),
+		newStringFlag(cmd, flagPrefetcherHomelessName, "",
+			func(value string, myTarget target.Target, localTempDir string) {
+				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherHomelessName)
+			},
+			"Homeless prefetcher ("+strings.Join(prefetcherOptions, ", ")+") [SPR,EMR,GNR]", strings.Join(prefetcherOptions, ", "),
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetString(flagPrefetcherHomelessName)
+				return slices.Contains(prefetcherOptions, value)
+			}),
+		newStringFlag(cmd, flagPrefetcherLLCName, "",
+			func(value string, myTarget target.Target, localTempDir string) {
+				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherLLCName)
+			},
+			"Last level cache prefetcher ("+strings.Join(prefetcherOptions, ", ")+") [SPR,EMR,GNR]", strings.Join(prefetcherOptions, ", "),
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetString(flagPrefetcherLLCName)
+				return slices.Contains(prefetcherOptions, value)
+			}))
 	flagGroups = append(flagGroups, group)
 
 	common.AddTargetFlags(Cmd)
