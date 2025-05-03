@@ -122,8 +122,8 @@ func initializeFlags(cmd *cobra.Command) {
 	group = flagGroup{name: flagGroupUncoreFrequencyName, flags: []flagDefinition{}}
 	group.flags = append(group.flags,
 		newFloat64Flag(cmd, flagUncoreMaxFrequencyName, 0,
-			func(value float64, myTarget target.Target, localTempDir string) {
-				setUncoreFrequency(true, value, myTarget, localTempDir)
+			func(value float64, myTarget target.Target, localTempDir string) error {
+				return setUncoreFrequency(true, value, myTarget, localTempDir)
 			},
 			"maximum uncore frequency in GHz [EMR-]", "greater than 0.1",
 			func(cmd *cobra.Command) bool {
@@ -131,8 +131,8 @@ func initializeFlags(cmd *cobra.Command) {
 				return value > 0.1
 			}),
 		newFloat64Flag(cmd, flagUncoreMinFrequencyName, 0,
-			func(value float64, myTarget target.Target, localTempDir string) {
-				setUncoreFrequency(false, value, myTarget, localTempDir)
+			func(value float64, myTarget target.Target, localTempDir string) error {
+				return setUncoreFrequency(false, value, myTarget, localTempDir)
 			},
 			"minimum uncore frequency in GHz [EMR-]", "greater than 0.1",
 			func(cmd *cobra.Command) bool {
@@ -140,8 +140,8 @@ func initializeFlags(cmd *cobra.Command) {
 				return value > 0.1
 			}),
 		newFloat64Flag(cmd, flagUncoreMaxComputeFrequencyName, 0,
-			func(value float64, myTarget target.Target, localTempDir string) {
-				setUncoreDieFrequency(true, true, value, myTarget, localTempDir)
+			func(value float64, myTarget target.Target, localTempDir string) error {
+				return setUncoreDieFrequency(true, true, value, myTarget, localTempDir)
 			},
 			"maximum uncore compute die frequency in GHz [SRF+]", "greater than 0.1",
 			func(cmd *cobra.Command) bool {
@@ -149,8 +149,8 @@ func initializeFlags(cmd *cobra.Command) {
 				return value > 0.1
 			}),
 		newFloat64Flag(cmd, flagUncoreMinComputeFrequencyName, 0,
-			func(value float64, myTarget target.Target, localTempDir string) {
-				setUncoreDieFrequency(false, true, value, myTarget, localTempDir)
+			func(value float64, myTarget target.Target, localTempDir string) error {
+				return setUncoreDieFrequency(false, true, value, myTarget, localTempDir)
 			},
 			"minimum uncore compute die frequency in GHz [SRF+]", "greater than 0.1",
 			func(cmd *cobra.Command) bool {
@@ -158,8 +158,8 @@ func initializeFlags(cmd *cobra.Command) {
 				return value > 0.1
 			}),
 		newFloat64Flag(cmd, flagUncoreMaxIOFrequencyName, 0,
-			func(value float64, myTarget target.Target, localTempDir string) {
-				setUncoreDieFrequency(true, false, value, myTarget, localTempDir)
+			func(value float64, myTarget target.Target, localTempDir string) error {
+				return setUncoreDieFrequency(true, false, value, myTarget, localTempDir)
 			},
 			"maximum uncore IO die frequency in GHz [SRF+]", "greater than 0.1",
 			func(cmd *cobra.Command) bool {
@@ -167,8 +167,8 @@ func initializeFlags(cmd *cobra.Command) {
 				return value > 0.1
 			}),
 		newFloat64Flag(cmd, flagUncoreMinIOFrequencyName, 0,
-			func(value float64, myTarget target.Target, localTempDir string) {
-				setUncoreDieFrequency(false, false, value, myTarget, localTempDir)
+			func(value float64, myTarget target.Target, localTempDir string) error {
+				return setUncoreDieFrequency(false, false, value, myTarget, localTempDir)
 			},
 			"minimum uncore IO die frequency in GHz [SRF+]", "greater than 0.1",
 			func(cmd *cobra.Command) bool {
@@ -180,8 +180,8 @@ func initializeFlags(cmd *cobra.Command) {
 	group = flagGroup{name: flagGroupPrefetcherName, flags: []flagDefinition{}}
 	group.flags = append(group.flags,
 		newStringFlag(cmd, flagPrefetcherL2HWName, "",
-			func(value string, myTarget target.Target, localTempDir string) {
-				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherL2HWName)
+			func(value string, myTarget target.Target, localTempDir string) error {
+				return setPrefetcher(value, myTarget, localTempDir, report.PrefetcherL2HWName)
 			},
 			"L2 hardware prefetcher ("+strings.Join(prefetcherOptions, ", ")+")", strings.Join(prefetcherOptions, ", "),
 			func(cmd *cobra.Command) bool {
@@ -189,8 +189,8 @@ func initializeFlags(cmd *cobra.Command) {
 				return slices.Contains(prefetcherOptions, value)
 			}),
 		newStringFlag(cmd, flagPrefetcherL2AdjName, "",
-			func(value string, myTarget target.Target, localTempDir string) {
-				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherL2AdjName)
+			func(value string, myTarget target.Target, localTempDir string) error {
+				return setPrefetcher(value, myTarget, localTempDir, report.PrefetcherL2AdjName)
 			},
 			"L2 adjacent cache line prefetcher ("+strings.Join(prefetcherOptions, ", ")+")", strings.Join(prefetcherOptions, ", "),
 			func(cmd *cobra.Command) bool {
@@ -198,8 +198,8 @@ func initializeFlags(cmd *cobra.Command) {
 				return slices.Contains(prefetcherOptions, value)
 			}),
 		newStringFlag(cmd, flagPrefetcherDCUHWName, "",
-			func(value string, myTarget target.Target, localTempDir string) {
-				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherDCUHWName)
+			func(value string, myTarget target.Target, localTempDir string) error {
+				return setPrefetcher(value, myTarget, localTempDir, report.PrefetcherDCUHWName)
 			},
 			"DCU hardware prefetcher ("+strings.Join(prefetcherOptions, ", ")+")", strings.Join(prefetcherOptions, ", "),
 			func(cmd *cobra.Command) bool {
@@ -207,8 +207,8 @@ func initializeFlags(cmd *cobra.Command) {
 				return slices.Contains(prefetcherOptions, value)
 			}),
 		newStringFlag(cmd, flagPrefetcherDCUIPName, "",
-			func(value string, myTarget target.Target, localTempDir string) {
-				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherDCUIPName)
+			func(value string, myTarget target.Target, localTempDir string) error {
+				return setPrefetcher(value, myTarget, localTempDir, report.PrefetcherDCUIPName)
 			},
 			"DCU instruction pointer prefetcher ("+strings.Join(prefetcherOptions, ", ")+")", strings.Join(prefetcherOptions, ", "),
 			func(cmd *cobra.Command) bool {
@@ -216,8 +216,8 @@ func initializeFlags(cmd *cobra.Command) {
 				return slices.Contains(prefetcherOptions, value)
 			}),
 		newStringFlag(cmd, flagPrefetcherDCUNPName, "",
-			func(value string, myTarget target.Target, localTempDir string) {
-				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherDCUNPName)
+			func(value string, myTarget target.Target, localTempDir string) error {
+				return setPrefetcher(value, myTarget, localTempDir, report.PrefetcherDCUNPName)
 			},
 			"DCU next page prefetcher ("+strings.Join(prefetcherOptions, ", ")+")", strings.Join(prefetcherOptions, ", "),
 			func(cmd *cobra.Command) bool {
@@ -225,8 +225,8 @@ func initializeFlags(cmd *cobra.Command) {
 				return slices.Contains(prefetcherOptions, value)
 			}),
 		newStringFlag(cmd, flagPrefetcherAMPName, "",
-			func(value string, myTarget target.Target, localTempDir string) {
-				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherAMPName)
+			func(value string, myTarget target.Target, localTempDir string) error {
+				return setPrefetcher(value, myTarget, localTempDir, report.PrefetcherAMPName)
 			},
 			"Adaptive multipath probability prefetcher ("+strings.Join(prefetcherOptions, ", ")+") [SPR,EMR,GNR]", strings.Join(prefetcherOptions, ", "),
 			func(cmd *cobra.Command) bool {
@@ -234,8 +234,8 @@ func initializeFlags(cmd *cobra.Command) {
 				return slices.Contains(prefetcherOptions, value)
 			}),
 		newStringFlag(cmd, flagPrefetcherLLCPPName, "",
-			func(value string, myTarget target.Target, localTempDir string) {
-				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherLLCPPName)
+			func(value string, myTarget target.Target, localTempDir string) error {
+				return setPrefetcher(value, myTarget, localTempDir, report.PrefetcherLLCPPName)
 			},
 			"LLC page prefetcher ("+strings.Join(prefetcherOptions, ", ")+") [GNR]", strings.Join(prefetcherOptions, ", "),
 			func(cmd *cobra.Command) bool {
@@ -243,8 +243,8 @@ func initializeFlags(cmd *cobra.Command) {
 				return slices.Contains(prefetcherOptions, value)
 			}),
 		newStringFlag(cmd, flagPrefetcherAOPName, "",
-			func(value string, myTarget target.Target, localTempDir string) {
-				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherAOPName)
+			func(value string, myTarget target.Target, localTempDir string) error {
+				return setPrefetcher(value, myTarget, localTempDir, report.PrefetcherAOPName)
 			},
 			"Array of pointers prefetcher ("+strings.Join(prefetcherOptions, ", ")+") [GNR]", strings.Join(prefetcherOptions, ", "),
 			func(cmd *cobra.Command) bool {
@@ -252,8 +252,8 @@ func initializeFlags(cmd *cobra.Command) {
 				return slices.Contains(prefetcherOptions, value)
 			}),
 		newStringFlag(cmd, flagPrefetcherHomelessName, "",
-			func(value string, myTarget target.Target, localTempDir string) {
-				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherHomelessName)
+			func(value string, myTarget target.Target, localTempDir string) error {
+				return setPrefetcher(value, myTarget, localTempDir, report.PrefetcherHomelessName)
 			},
 			"Homeless prefetcher ("+strings.Join(prefetcherOptions, ", ")+") [SPR,EMR,GNR]", strings.Join(prefetcherOptions, ", "),
 			func(cmd *cobra.Command) bool {
@@ -261,8 +261,8 @@ func initializeFlags(cmd *cobra.Command) {
 				return slices.Contains(prefetcherOptions, value)
 			}),
 		newStringFlag(cmd, flagPrefetcherLLCName, "",
-			func(value string, myTarget target.Target, localTempDir string) {
-				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherLLCName)
+			func(value string, myTarget target.Target, localTempDir string) error {
+				return setPrefetcher(value, myTarget, localTempDir, report.PrefetcherLLCName)
 			},
 			"Last level cache prefetcher ("+strings.Join(prefetcherOptions, ", ")+") [SPR,EMR,GNR]", strings.Join(prefetcherOptions, ", "),
 			func(cmd *cobra.Command) bool {

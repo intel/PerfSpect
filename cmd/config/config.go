@@ -107,22 +107,27 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			for _, flag := range group.flags {
 				if cmd.Flags().Lookup(flag.GetName()).Changed {
 					changeRequested = true
+					var err error
 					switch flag.GetType() {
 					case "int":
 						if flag.intSetFunc != nil {
 							value, _ := cmd.Flags().GetInt(flag.GetName())
-							flag.intSetFunc(value, myTarget, localTempDir)
+							err = flag.intSetFunc(value, myTarget, localTempDir)
 						}
 					case "float64":
 						if flag.floatSetFunc != nil {
 							value, _ := cmd.Flags().GetFloat64(flag.GetName())
-							flag.floatSetFunc(value, myTarget, localTempDir)
+							err = flag.floatSetFunc(value, myTarget, localTempDir)
 						}
 					case "string":
 						if flag.stringSetFunc != nil {
 							value, _ := cmd.Flags().GetString(flag.GetName())
-							flag.stringSetFunc(value, myTarget, localTempDir)
+							err = flag.stringSetFunc(value, myTarget, localTempDir)
 						}
+					}
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "Error on %s: %v\n", myTarget.GetName(), err)
+						slog.Error(err.Error(), slog.String("target", myTarget.GetName()))
 					}
 				}
 			}
@@ -186,7 +191,7 @@ func printConfig(myTargets []target.Target, localTempDir string) (err error) {
 	return
 }
 
-func setCoreCount(cores int, myTarget target.Target, localTempDir string) {
+func setCoreCount(cores int, myTarget target.Target, localTempDir string) error {
 	fmt.Printf("set core count per processor to %d on %s\n", cores, myTarget.GetName())
 	setScript := script.ScriptDefinition{
 		Name: "set core count",
@@ -278,12 +283,12 @@ done
 	}
 	_, err := runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to set core count: %v\n", err)
-		slog.Error("failed to set core count", slog.String("error", err.Error()))
+		return fmt.Errorf("failed to set core count: %w", err)
 	}
+	return nil
 }
 
-func setLlcSize(llcSize float64, myTarget target.Target, localTempDir string) {
+func setLlcSize(llcSize float64, myTarget target.Target, localTempDir string) error {
 	fmt.Printf("set LLC size to %.2f MB on %s\n", llcSize, myTarget.GetName())
 	scripts := []script.ScriptDefinition{}
 	scripts = append(scripts, script.GetScriptByName(script.LscpuScriptName))
@@ -293,42 +298,31 @@ func setLlcSize(llcSize float64, myTarget target.Target, localTempDir string) {
 
 	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		slog.Error("failed to run scripts on target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-		return
+		return fmt.Errorf("failed to run scripts on target: %w", err)
 	}
 	maximumLlcSize, _, err := report.GetL3LscpuMB(outputs)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		slog.Error("failed to get maximum LLC size", slog.String("error", err.Error()))
-		return
+		return fmt.Errorf("failed to get maximum LLC size: %w", err)
 	}
 	// microarchitecture
 	uarch := report.UarchFromOutput(outputs)
 	cacheWays := report.GetCacheWays(uarch)
 	if len(cacheWays) == 0 {
-		fmt.Fprintln(os.Stderr, "failed to get cache ways")
-		slog.Error("failed to get cache ways")
-		return
+		return fmt.Errorf("failed to get cache ways")
 	}
 	// current LLC size
 	currentLlcSize, err := report.GetL3MSRMB(outputs)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		slog.Error("failed to get LLC size", slog.String("error", err.Error()))
-		return
+		return fmt.Errorf("failed to get current LLC size: %w", err)
 	}
 	if currentLlcSize == llcSize {
-		fmt.Printf("LLC size is already set to %.2f MB\n", llcSize)
-		return
+		return fmt.Errorf("LLC size is already set to %.2f MB", llcSize)
 	}
 	// calculate the number of ways to set
 	cachePerWay := maximumLlcSize / float64(len(cacheWays))
 	waysToSet := int(math.Ceil((llcSize / cachePerWay)) - 1)
 	if waysToSet >= len(cacheWays) {
-		fmt.Fprintf(os.Stderr, "LLC size is too large, maximum is %.2f MB\n", maximumLlcSize)
-		slog.Error("LLC size is too large", slog.Float64("llc size", llcSize), slog.Float64("current llc size", currentLlcSize))
-		return
+		return fmt.Errorf("LLC size is too large, maximum is %.2f MB", maximumLlcSize)
 	}
 	// set the LLC size
 	setScript := script.ScriptDefinition{
@@ -342,36 +336,27 @@ func setLlcSize(llcSize float64, myTarget target.Target, localTempDir string) {
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to set LLC size: %v\n", err)
-		slog.Error("failed to set LLC size", slog.String("error", err.Error()))
+		return fmt.Errorf("failed to set LLC size: %w", err)
 	}
+	return nil
 }
 
-func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDir string) {
+func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDir string) error {
 	fmt.Printf("set core frequency to %.1f GHz on %s\n", coreFrequency, myTarget.GetName())
 	targetFamily, err := myTarget.GetFamily()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error getting target family: %v\n", err)
-		slog.Error("failed to get target family", slog.String("error", err.Error()))
-		return
+		return fmt.Errorf("failed to get target family: %w", err)
 	}
 	targetModel, err := myTarget.GetModel()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error getting target model: %v\n", err)
-		slog.Error("failed to get target model", slog.String("error", err.Error()))
-		return
+		return fmt.Errorf("failed to get target model: %w", err)
 	}
 	targetVendor, err := myTarget.GetVendor()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error getting target vendor: %v\n", err)
-		slog.Error("failed to get target vendor", slog.String("error", err.Error()))
-		return
+		return fmt.Errorf("failed to get target vendor: %w", err)
 	}
 	if targetVendor != "GenuineIntel" {
-		err := fmt.Errorf("core frequency setting not supported on %s due to vendor mismatch", myTarget.GetName())
-		slog.Error(err.Error())
-		fmt.Fprintf(os.Stderr, "Error: failed to set core frequency: %v\n", err)
-		return
+		return fmt.Errorf("core frequency setting not supported on %s due to vendor mismatch", myTarget.GetName())
 	}
 	var setScript script.ScriptDefinition
 	freqInt := uint64(coreFrequency * 10)
@@ -384,9 +369,7 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 		}
 		output, err := runScript(myTarget, getScript, localTempDir)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: failed to get pstate driver: %v\n", err)
-			slog.Error("failed to get pstate driver", slog.String("error", err.Error()))
-			return
+			return fmt.Errorf("failed to get pstate driver: %w", err)
 		}
 		if strings.Contains(output, "intel_pstate") {
 			var value uint64
@@ -425,11 +408,12 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to set core frequency: %v\n", err)
+		return fmt.Errorf("failed to set core frequency: %w", err)
 	}
+	return nil
 }
 
-func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float64, myTarget target.Target, localTempDir string) {
+func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float64, myTarget target.Target, localTempDir string) error {
 	var minmax, dietype string
 	if maxFreq {
 		minmax = "max"
@@ -444,21 +428,14 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 	fmt.Printf("set uncore %s %s die frequency to %.1f GHz on %s\n", minmax, dietype, uncoreFrequency, myTarget.GetName())
 	targetFamily, err := myTarget.GetFamily()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error getting target family: %v\n", err)
-		slog.Error("failed to get target family", slog.String("error", err.Error()))
-		return
+		return fmt.Errorf("failed to get target family: %w", err)
 	}
 	targetModel, err := myTarget.GetModel()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error getting target model: %v\n", err)
-		slog.Error("failed to get target model", slog.String("error", err.Error()))
-		return
+		return fmt.Errorf("failed to get target model: %w", err)
 	}
 	if targetFamily != "6" || (targetFamily == "6" && targetModel != "173" && targetModel != "175" && targetModel != "221") {
-		err := fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())
-		slog.Error(err.Error())
-		fmt.Fprintf(os.Stderr, "Error: failed to set uncore frequency: %v\n", err)
-		return
+		return fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())
 	}
 	type dieId struct {
 		instance string
@@ -470,9 +447,7 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 	scripts = append(scripts, script.GetScriptByName(script.UncoreDieTypesFromTPMIScriptName))
 	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		slog.Error("failed to run scripts on target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-		return
+		return fmt.Errorf("failed to get uncore die types: %w", err)
 	}
 	re := regexp.MustCompile(`Read bits \d+:\d+ value (\d+) from TPMI ID .* for entry (\d+) in instance (\d+)`)
 	for line := range strings.SplitSeq(outputs[script.UncoreDieTypesFromTPMIScriptName].Stdout, "\n") {
@@ -506,13 +481,13 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 		}
 		_, err = runScript(myTarget, setScript, localTempDir)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: failed to set uncore frequency: %v\n", err)
-			return
+			return fmt.Errorf("failed to set uncore frequency: %w", err)
 		}
 	}
+	return nil
 }
 
-func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.Target, localTempDir string) {
+func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.Target, localTempDir string) error {
 	var minmax string
 	if maxFreq {
 		minmax = "max"
@@ -531,34 +506,23 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 	})
 	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		slog.Error("failed to run scripts on target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-		return
+		return fmt.Errorf("failed to read uncore frequency MSR: %w", err)
 	}
 	targetFamily, err := myTarget.GetFamily()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error getting target family: %v\n", err)
-		slog.Error("failed to get target family", slog.String("error", err.Error()))
-		return
+		return fmt.Errorf("failed to get target family: %w", err)
 	}
 	targetModel, err := myTarget.GetModel()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error getting target model: %v\n", err)
-		slog.Error("failed to get target model", slog.String("error", err.Error()))
-		return
+		return fmt.Errorf("failed to get target model: %w", err)
 	}
 	if targetFamily != "6" || (targetFamily == "6" && (targetModel == "173" || targetModel == "175" || targetModel == "221")) { // not Intel || not GNR, SRF, CWF
-		err := fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())
-		slog.Error(err.Error())
-		fmt.Fprintf(os.Stderr, "Error: failed to set uncore frequency: %v\n", err)
-		return
+		return fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())
 	}
 	msrHex := strings.TrimSpace(outputs["get uncore frequency MSR"].Stdout)
 	msrInt, err := strconv.ParseInt(msrHex, 16, 0)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		slog.Error("failed to read or parse msr value", slog.String("msr", msrHex), slog.String("error", err.Error()))
-		return
+		return fmt.Errorf("failed to read uncore frequency MSR: %w", err)
 	}
 	newFreq := uint64((uncoreFrequency * 1000) / 100)
 	var newVal uint64
@@ -583,11 +547,12 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to set uncore frequency: %v\n", err)
+		return fmt.Errorf("failed to set uncore frequency: %w", err)
 	}
+	return nil
 }
 
-func setTDP(power int, myTarget target.Target, localTempDir string) {
+func setTDP(power int, myTarget target.Target, localTempDir string) error {
 	fmt.Printf("set power to %d Watts on %s\n", power, myTarget.GetName())
 	readScript := script.ScriptDefinition{
 		Name:           "get power MSR",
@@ -599,14 +564,12 @@ func setTDP(power int, myTarget target.Target, localTempDir string) {
 	}
 	readOutput, err := script.RunScript(myTarget, readScript, localTempDir)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		slog.Error("failed to run script on target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+		return fmt.Errorf("failed to read power MSR: %w", err)
 	} else {
 		msrHex := strings.TrimSpace(readOutput.Stdout)
 		msrInt, err := strconv.ParseInt(msrHex, 16, 0)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			slog.Error("failed to parse msr value", slog.String("msr", msrHex), slog.String("error", err.Error()))
+			return fmt.Errorf("failed to parse power MSR: %w", err)
 		} else {
 			// mask out lower 14 bits
 			newVal := uint64(msrInt) & 0xFFFFFFFFFFFFC000
@@ -622,25 +585,24 @@ func setTDP(power int, myTarget target.Target, localTempDir string) {
 			}
 			_, err := runScript(myTarget, setScript, localTempDir)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: failed to set power: %v\n", err)
+				return fmt.Errorf("failed to set power: %w", err)
 			}
 		}
 	}
+	return nil
 }
 
-func setEPB(epb int, myTarget target.Target, localTempDir string) {
+func setEPB(epb int, myTarget target.Target, localTempDir string) error {
 	fmt.Printf("set energy performance bias (EPB) to %d on %s\n", epb, myTarget.GetName())
 	epbSourceScript := script.GetScriptByName(script.EpbSourceScriptName)
 	epbSourceOutput, err := runScript(myTarget, epbSourceScript, localTempDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to get EPB source: %v\n", err)
-		return
+		return fmt.Errorf("failed to get EPB source: %w", err)
 	}
 	epbSource := strings.TrimSpace(epbSourceOutput)
 	source, err := strconv.ParseInt(epbSource, 16, 0)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return
+		return fmt.Errorf("failed to parse EPB source: %w", err)
 	}
 	var msr string
 	var bitOffset uint
@@ -661,13 +623,11 @@ func setEPB(epb int, myTarget target.Target, localTempDir string) {
 	}
 	readOutput, err := runScript(myTarget, readScript, localTempDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to read MSR %s: %v\n", msr, err)
-		return
+		return fmt.Errorf("failed to read EPB MSR %s: %w", msr, err)
 	}
 	msrValue, err := strconv.ParseUint(strings.TrimSpace(readOutput), 16, 64)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return
+		return fmt.Errorf("failed to parse EPB MSR %s: %w", msr, err)
 	}
 	// mask out 4 bits starting at bitOffset
 	maskedValue := msrValue &^ (0xF << bitOffset)
@@ -684,11 +644,12 @@ func setEPB(epb int, myTarget target.Target, localTempDir string) {
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to set EPB: %v\n", err)
+		return fmt.Errorf("failed to set EPB: %w", err)
 	}
+	return nil
 }
 
-func setEPP(epp int, myTarget target.Target, localTempDir string) {
+func setEPP(epp int, myTarget target.Target, localTempDir string) error {
 	fmt.Printf("set energy performance profile (EPP) to %d on %s\n", epp, myTarget.GetName())
 	// Set both the per-core EPP value and the package EPP value
 	// Reference: 15.4.4 Managing HWP in the Intel SDM
@@ -704,13 +665,11 @@ func setEPP(epp int, myTarget target.Target, localTempDir string) {
 	}
 	stdout, err := runScript(myTarget, getScript, localTempDir)
 	if err != nil {
-		return
+		return fmt.Errorf("failed to read EPP MSR %s: %w", "0x774", err)
 	}
 	msrValue, err := strconv.ParseUint(strings.TrimSpace(stdout), 16, 64)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		slog.Error("failed to parse msr value", slog.String("msr", stdout), slog.String("error", err.Error()))
-		return
+		return fmt.Errorf("failed to parse EPP MSR %s: %w", "0x774", err)
 	}
 	// mask out bits 24-31 IA32_HWP_REQUEST MSR value
 	maskedValue := msrValue & 0xFFFFFFFF00FFFFFF
@@ -727,8 +686,7 @@ func setEPP(epp int, myTarget target.Target, localTempDir string) {
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to set EPP: %v\n", err)
-		return
+		return fmt.Errorf("failed to set EPP: %w", err)
 	}
 
 	// get the current value of the IA32_HWP_REQUEST_PKG MSR that includes the current package EPP value
@@ -742,14 +700,11 @@ func setEPP(epp int, myTarget target.Target, localTempDir string) {
 	}
 	stdout, err = runScript(myTarget, getScript, localTempDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to get pkg EPP: %v\n", err)
-		return
+		return fmt.Errorf("failed to read EPP pkg MSR %s: %w", "0x772", err)
 	}
 	msrValue, err = strconv.ParseUint(strings.TrimSpace(stdout), 16, 64)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		slog.Error("failed to parse msr value", slog.String("msr", stdout), slog.String("error", err.Error()))
-		return
+		return fmt.Errorf("failed to parse EPP pkg MSR %s: %w", "0x772", err)
 	}
 	// mask out bits 24-31 IA32_HWP_REQUEST_PKG MSR value
 	maskedValue = msrValue & 0xFFFFFFFF00FFFFFF
@@ -766,11 +721,12 @@ func setEPP(epp int, myTarget target.Target, localTempDir string) {
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to set pkg EPP: %v\n", err)
+		return fmt.Errorf("failed to set EPP pkg: %w", err)
 	}
+	return nil
 }
 
-func setGovernor(governor string, myTarget target.Target, localTempDir string) {
+func setGovernor(governor string, myTarget target.Target, localTempDir string) error {
 	fmt.Printf("set governor to %s on %s\n", governor, myTarget.GetName())
 	setScript := script.ScriptDefinition{
 		Name:           "set governor",
@@ -779,11 +735,12 @@ func setGovernor(governor string, myTarget target.Target, localTempDir string) {
 	}
 	_, err := runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to set governor: %v\n", err)
+		return fmt.Errorf("failed to set governor: %w", err)
 	}
+	return nil
 }
 
-func setELC(elc string, myTarget target.Target, localTempDir string) {
+func setELC(elc string, myTarget target.Target, localTempDir string) error {
 	fmt.Printf("set efficiency latency control (ELC) mode to %s on %s\n", elc, myTarget.GetName())
 	var mode string
 	if elc == elcOptions[0] {
@@ -791,9 +748,7 @@ func setELC(elc string, myTarget target.Target, localTempDir string) {
 	} else if elc == elcOptions[1] {
 		mode = "default"
 	} else {
-		fmt.Fprintf(os.Stderr, "invalid elc mode: %s\n", elc)
-		slog.Error("invalid elc mode", slog.String("elc", elc))
-		return
+		return fmt.Errorf("invalid ELC mode: %s", elc)
 	}
 	setScript := script.ScriptDefinition{
 		Name:           "set elc",
@@ -805,17 +760,16 @@ func setELC(elc string, myTarget target.Target, localTempDir string) {
 	}
 	_, err := runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to set ELC mode: %v\n", err)
+		return fmt.Errorf("failed to set ELC mode: %w", err)
 	}
+	return nil
 }
 
-func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir string, prefetcherType string) {
+func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir string, prefetcherType string) error {
 	fmt.Printf("set %s prefetcher to %sd on %s\n", prefetcherType, enableDisable, myTarget.GetName())
 	pf, err := report.GetPrefetcherDefByName(prefetcherType)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to get prefetcher definition: %v\n", err)
-		slog.Error("failed to get prefetcher definition", slog.String("prefetcher", prefetcherType), slog.String("error", err.Error()))
-		return
+		return fmt.Errorf("failed to get prefetcher definition: %w", err)
 	}
 	// check if the prefetcher is supported on this target's architecture
 	// get the uarch
@@ -825,21 +779,15 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 	scripts = append(scripts, script.GetScriptByName(script.LspciDevicesScriptName))
 	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		slog.Error("failed to run scripts on target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-		return
+		return fmt.Errorf("failed to run target identification scripts on target: %w", err)
 	}
 	uarch := report.UarchFromOutput(outputs)
 	if uarch == "" {
-		fmt.Fprintln(os.Stderr, "failed to get microarchitecture")
-		slog.Error("failed to get microarchitecture")
-		return
+		return fmt.Errorf("failed to get microarchitecture")
 	}
 	// is the prefetcher supported on this uarch?
 	if !slices.Contains(pf.Uarchs, "all") && !slices.Contains(pf.Uarchs, uarch[:3]) {
-		fmt.Fprintf(os.Stderr, "prefetcher %s is not supported on %s\n", prefetcherType, uarch)
-		slog.Error("prefetcher not supported on target", slog.String("prefetcher", prefetcherType), slog.String("uarch", uarch))
-		return
+		return fmt.Errorf("prefetcher %s is not supported on %s", prefetcherType, uarch)
 	}
 	// get the current value of the prefetcher MSR
 	getScript := script.ScriptDefinition{
@@ -852,14 +800,11 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 	}
 	stdout, err := runScript(myTarget, getScript, localTempDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to get prefetcher MSR: %v\n", err)
-		return
+		return fmt.Errorf("failed to read prefetcher MSR: %w", err)
 	}
 	msrValue, err := strconv.ParseUint(strings.TrimSpace(stdout), 16, 64)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		slog.Error("failed to parse msr value", slog.String("msr", stdout), slog.String("error", err.Error()))
-		return
+		return fmt.Errorf("failed to parse prefetcher MSR: %w", err)
 	}
 	// set the prefetcher bit to bitValue determined by the onOff value, note: 0 is enable, 1 is disable
 	var bitVal int
@@ -868,9 +813,7 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 	} else if enableDisable == prefetcherOptions[1] {
 		bitVal = 1
 	} else {
-		fmt.Fprintf(os.Stderr, "invalid prefetcher setting: %s\n", enableDisable)
-		slog.Error("invalid prefetcher setting", slog.String("prefetcher", enableDisable))
-		return
+		return fmt.Errorf("invalid prefetcher setting: %s", enableDisable)
 	}
 	// mask out the prefetcher bit
 	maskedValue := msrValue &^ (1 << pf.Bit)
@@ -887,8 +830,9 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to set %s prefetcher: %v\n", prefetcherType, err)
+		return fmt.Errorf("failed to set %s prefetcher: %w", prefetcherType, err)
 	}
+	return nil
 }
 
 func runScript(myTarget target.Target, myScript script.ScriptDefinition, localTempDir string) (string, error) {
