@@ -100,46 +100,38 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		cmd.SilenceUsage = true
 		return err
 	}
-	// make requested changes, one target at a time
-	changeRequested := false
-	for _, myTarget := range myTargets {
-		for _, group := range flagGroups {
-			for _, flag := range group.flags {
-				if cmd.Flags().Lookup(flag.GetName()).Changed {
-					changeRequested = true
-					fmt.Printf("%s   setting %s to %s\n", myTarget.GetName(), flag.GetName(), flag.GetValueAsString())
-					var err error
-					switch flag.GetType() {
-					case "int":
-						if flag.intSetFunc != nil {
-							value, _ := cmd.Flags().GetInt(flag.GetName())
-							err = flag.intSetFunc(value, myTarget, localTempDir)
-						}
-					case "float64":
-						if flag.floatSetFunc != nil {
-							value, _ := cmd.Flags().GetFloat64(flag.GetName())
-							err = flag.floatSetFunc(value, myTarget, localTempDir)
-						}
-					case "string":
-						if flag.stringSetFunc != nil {
-							value, _ := cmd.Flags().GetString(flag.GetName())
-							err = flag.stringSetFunc(value, myTarget, localTempDir)
-						}
-					}
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "%s   Error: %v\n", myTarget.GetName(), err)
-						slog.Error(err.Error(), slog.String("target", myTarget.GetName()))
-					}
-				}
+	// if no changes were made, print a message and return
+	var changeRequested bool
+	for _, group := range flagGroups {
+		for _, flag := range group.flags {
+			if cmd.Flags().Lookup(flag.GetName()).Changed {
+				changeRequested = true
+				break
 			}
+		}
+		if changeRequested {
+			break
 		}
 	}
 	if !changeRequested {
 		fmt.Println("No changes requested.")
 		return nil
 	}
+	// make requested changes on all targets
+	channelError := make(chan error)
+	multiSpinner := progress.NewMultiSpinner()
+	multiSpinner.Start()
+	for _, myTarget := range myTargets {
+		multiSpinner.AddSpinner(myTarget.GetName())
+		go setOnTarget(cmd, myTarget, flagGroups, localTempDir, channelError, multiSpinner.Status)
+	}
+	// wait for all targets to finish
+	for range myTargets {
+		<-channelError
+	}
+	multiSpinner.Finish()
+	fmt.Println() // blank line
 	// print config after making changes
-	fmt.Println("") // blank line
 	if err := printConfig(myTargets, localTempDir); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
@@ -148,48 +140,127 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func setOnTarget(cmd *cobra.Command, myTarget target.Target, flagGroups []flagGroup, localTempDir string, channelError chan error, statusUpdate progress.MultiSpinnerUpdateFunc) {
+	for _, group := range flagGroups {
+		for _, flag := range group.flags {
+			if cmd.Flags().Lookup(flag.GetName()).Changed {
+				statusUpdate(myTarget.GetName(), fmt.Sprintf("setting %s to %s", flag.GetName(), flag.GetValueAsString()))
+				var err error
+				switch flag.GetType() {
+				case "int":
+					if flag.intSetFunc != nil {
+						value, _ := cmd.Flags().GetInt(flag.GetName())
+						err = flag.intSetFunc(value, myTarget, localTempDir)
+					}
+				case "float64":
+					if flag.floatSetFunc != nil {
+						value, _ := cmd.Flags().GetFloat64(flag.GetName())
+						err = flag.floatSetFunc(value, myTarget, localTempDir)
+					}
+				case "string":
+					if flag.stringSetFunc != nil {
+						value, _ := cmd.Flags().GetString(flag.GetName())
+						err = flag.stringSetFunc(value, myTarget, localTempDir)
+					}
+				}
+				if err != nil {
+					statusUpdate(myTarget.GetName(), fmt.Sprintf("error setting %s to %s: %v", flag.GetName(), flag.GetValueAsString(), err))
+					slog.Error(err.Error(), slog.String("target", myTarget.GetName()))
+					channelError <- err
+					return
+				}
+			}
+		}
+	}
+	statusUpdate(myTarget.GetName(), "configuration complete")
+	channelError <- nil
+}
+
 func printConfig(myTargets []target.Target, localTempDir string) (err error) {
 	scriptNames := report.GetScriptNamesForTable(report.ConfigurationTableName)
 	var scriptsToRun []script.ScriptDefinition
 	for _, scriptName := range scriptNames {
 		scriptsToRun = append(scriptsToRun, script.GetScriptByName(scriptName))
 	}
+	multiSpinner := progress.NewMultiSpinner()
+	multiSpinner.Start()
+	orderedTargetScriptOutputs := []common.TargetScriptOutputs{}
+	channelTargetScriptOutputs := make(chan common.TargetScriptOutputs)
+	channelError := make(chan error)
 	for _, myTarget := range myTargets {
-		multiSpinner := progress.NewMultiSpinner()
 		err = multiSpinner.AddSpinner(myTarget.GetName())
 		if err != nil {
 			err = fmt.Errorf("failed to add spinner: %v", err)
 			return
 		}
-		multiSpinner.Start()
-		_ = multiSpinner.Status(myTarget.GetName(), "collecting data")
-		// run the scripts
-		var scriptOutputs map[string]script.ScriptOutput
-		if scriptOutputs, err = script.RunScripts(myTarget, scriptsToRun, true, localTempDir); err != nil {
-			err = fmt.Errorf("failed to run collection scripts: %v", err)
-			_ = multiSpinner.Status(myTarget.GetName(), "error collecting data")
-			multiSpinner.Finish()
-			return
+		// run the selected scripts on the target
+		go collectOnTarget(myTarget, scriptsToRun, localTempDir, channelTargetScriptOutputs, channelError, multiSpinner.Status)
+	}
+	// wait for scripts to run on all targets
+	var allTargetScriptOutputs []common.TargetScriptOutputs
+	for range myTargets {
+		select {
+		case scriptOutputs := <-channelTargetScriptOutputs:
+			allTargetScriptOutputs = append(allTargetScriptOutputs, scriptOutputs)
+		case err := <-channelError:
+			slog.Error(err.Error())
 		}
-		_ = multiSpinner.Status(myTarget.GetName(), "collection complete")
-		multiSpinner.Finish()
+	}
+	// allTargetScriptOutputs is in the order of data collection completion
+	// reorder to match order of myTargets
+	for _, target := range myTargets {
+		for _, targetScriptOutputs := range allTargetScriptOutputs {
+			if targetScriptOutputs.TargetName == target.GetName() {
+				targetScriptOutputs.TableNames = []string{report.ConfigurationTableName}
+				orderedTargetScriptOutputs = append(orderedTargetScriptOutputs, targetScriptOutputs)
+				break
+			}
+		}
+	}
+	multiSpinner.Finish()
+	// process and print the table for each target
+	for _, targetScriptOutputs := range orderedTargetScriptOutputs {
 		// process the tables, i.e., get field values from raw script output
 		tableNames := []string{report.ConfigurationTableName}
 		var tableValues []report.TableValues
-		if tableValues, err = report.ProcessTables(tableNames, scriptOutputs); err != nil {
+		if tableValues, err = report.ProcessTables(tableNames, targetScriptOutputs.ScriptOutputs); err != nil {
 			err = fmt.Errorf("failed to process collected data: %v", err)
 			return
 		}
 		// create the report for this single table
 		var reportBytes []byte
-		if reportBytes, err = report.Create("txt", tableValues, scriptOutputs, myTarget.GetName()); err != nil {
+		if reportBytes, err = report.Create("txt", tableValues, targetScriptOutputs.ScriptOutputs, targetScriptOutputs.TargetName); err != nil {
 			err = fmt.Errorf("failed to create report: %v", err)
 			return
 		}
 		// print the report
+		if len(orderedTargetScriptOutputs) > 1 {
+			fmt.Printf("%s\n", targetScriptOutputs.TargetName)
+		}
 		fmt.Print(string(reportBytes))
 	}
 	return
+}
+
+// collectOnTarget runs the scripts on the target and sends the results to the appropriate channels
+func collectOnTarget(myTarget target.Target, scriptsToRun []script.ScriptDefinition, localTempDir string, channelTargetScriptOutputs chan common.TargetScriptOutputs, channelError chan error, statusUpdate progress.MultiSpinnerUpdateFunc) {
+	// run the scripts on the target
+	if statusUpdate != nil {
+		_ = statusUpdate(myTarget.GetName(), "collecting configuration")
+	}
+	scriptOutputs, err := script.RunScripts(myTarget, scriptsToRun, true, localTempDir)
+	if err != nil {
+		if statusUpdate != nil {
+			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("error collecting configuration: %v", err))
+		}
+		err = fmt.Errorf("error running data collection scripts on %s: %v", myTarget.GetName(), err)
+		channelError <- err
+		return
+	}
+	if statusUpdate != nil {
+		_ = statusUpdate(myTarget.GetName(), "configuration collection complete")
+	}
+	channelTargetScriptOutputs <- common.TargetScriptOutputs{TargetName: myTarget.GetName(), ScriptOutputs: scriptOutputs}
 }
 
 func setCoreCount(cores int, myTarget target.Target, localTempDir string) error {
