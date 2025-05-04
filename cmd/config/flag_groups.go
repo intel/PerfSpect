@@ -33,6 +33,7 @@ const (
 	flagGroupGeneralName         = "General Options"
 	flagGroupUncoreFrequencyName = "Uncore Frequency Options"
 	flagGroupPrefetcherName      = "Prefetcher Options"
+	flagGroupOtherName           = "Other Options"
 )
 
 // general flag names
@@ -276,7 +277,7 @@ func initializeFlags(cmd *cobra.Command) {
 			}))
 	flagGroups = append(flagGroups, group)
 	// other options
-	group = flagGroup{name: "Other Options", flags: []flagDefinition{}}
+	group = flagGroup{name: flagGroupOtherName, flags: []flagDefinition{}}
 	group.flags = append(group.flags,
 		newBoolFlag(cmd, flagNoSummaryName, false, nil, "do not print configuration summary", "", nil),
 	)
