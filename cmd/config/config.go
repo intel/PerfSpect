@@ -141,6 +141,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 }
 
 func setOnTarget(cmd *cobra.Command, myTarget target.Target, flagGroups []flagGroup, localTempDir string, channelError chan error, statusUpdate progress.MultiSpinnerUpdateFunc) {
+	var setMessages []string
 	for _, group := range flagGroups {
 		for _, flag := range group.flags {
 			if cmd.Flags().Lookup(flag.GetName()).Changed {
@@ -168,11 +169,13 @@ func setOnTarget(cmd *cobra.Command, myTarget target.Target, flagGroups []flagGr
 					slog.Error(err.Error(), slog.String("target", myTarget.GetName()))
 					channelError <- err
 					return
+				} else {
+					setMessages = append(setMessages, fmt.Sprintf("set %s to %s", flag.GetName(), flag.GetValueAsString()))
 				}
 			}
 		}
 	}
-	statusUpdate(myTarget.GetName(), "configuration complete")
+	statusUpdate(myTarget.GetName(), strings.Join(setMessages, ", "))
 	channelError <- nil
 }
 
