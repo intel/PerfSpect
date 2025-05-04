@@ -93,18 +93,21 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		cmd.SilenceUsage = true
 		return err
 	}
-	// print config prior to changes
-	if err := printConfig(myTargets, localTempDir); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		slog.Error(err.Error())
-		cmd.SilenceUsage = true
-		return err
+	// print config prior to changes, optionally
+	if !cmd.Flags().Lookup(flagNoSummaryName).Changed {
+		if err := printConfig(myTargets, localTempDir); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			cmd.SilenceUsage = true
+			return err
+		}
 	}
-	// if no changes were made, print a message and return
+	// if no changes were requested, print a message and return
 	var changeRequested bool
 	for _, group := range flagGroups {
 		for _, flag := range group.flags {
-			if cmd.Flags().Lookup(flag.GetName()).Changed {
+			hasSetFunc := flag.intSetFunc != nil || flag.floatSetFunc != nil || flag.stringSetFunc != nil || flag.boolSetFunc != nil
+			if hasSetFunc && cmd.Flags().Lookup(flag.GetName()).Changed {
 				changeRequested = true
 				break
 			}
@@ -132,10 +135,12 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	multiSpinner.Finish()
 	fmt.Println() // blank line
 	// print config after making changes
-	if err := printConfig(myTargets, localTempDir); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		slog.Error(err.Error())
-		return err
+	if !cmd.Flags().Lookup(flagNoSummaryName).Changed {
+		if err := printConfig(myTargets, localTempDir); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			return err
+		}
 	}
 	return nil
 }
@@ -144,7 +149,8 @@ func setOnTarget(cmd *cobra.Command, myTarget target.Target, flagGroups []flagGr
 	var setMessages []string
 	for _, group := range flagGroups {
 		for _, flag := range group.flags {
-			if cmd.Flags().Lookup(flag.GetName()).Changed {
+			hasSetFunc := flag.intSetFunc != nil || flag.floatSetFunc != nil || flag.stringSetFunc != nil || flag.boolSetFunc != nil
+			if hasSetFunc && cmd.Flags().Lookup(flag.GetName()).Changed {
 				statusUpdate(myTarget.GetName(), fmt.Sprintf("setting %s to %s", flag.GetName(), flag.GetValueAsString()))
 				var err error
 				switch flag.GetType() {
@@ -162,6 +168,11 @@ func setOnTarget(cmd *cobra.Command, myTarget target.Target, flagGroups []flagGr
 					if flag.stringSetFunc != nil {
 						value, _ := cmd.Flags().GetString(flag.GetName())
 						err = flag.stringSetFunc(value, myTarget, localTempDir)
+					}
+				case "bool":
+					if flag.boolSetFunc != nil {
+						value, _ := cmd.Flags().GetBool(flag.GetName())
+						err = flag.boolSetFunc(value, myTarget, localTempDir)
 					}
 				}
 				if err != nil {

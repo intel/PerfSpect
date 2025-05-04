@@ -16,6 +16,7 @@ type flagDefinition struct {
 	intSetFunc            func(int, target.Target, string) error
 	floatSetFunc          func(float64, target.Target, string) error
 	stringSetFunc         func(string, target.Target, string) error
+	boolSetFunc           func(bool, target.Target, string) error
 	validationFunc        func(cmd *cobra.Command) bool
 	validationDescription string
 }
@@ -66,6 +67,18 @@ func newStringFlag(cmd *cobra.Command, name string, defaultValue string, setFunc
 	return flagDefinition{
 		pflag:                 pFlag,
 		stringSetFunc:         setFunc,
+		validationFunc:        validationFunc,
+		validationDescription: validationDescription,
+	}
+}
+
+// newBoolFlag creates a new boolean flag and adds it to the command.
+func newBoolFlag(cmd *cobra.Command, name string, defaultValue bool, setFunc func(bool, target.Target, string) error, help string, validationDescription string, validationFunc func(cmd *cobra.Command) bool) flagDefinition {
+	cmd.Flags().Bool(name, defaultValue, help)
+	pFlag := cmd.Flags().Lookup(name)
+	return flagDefinition{
+		pflag:                 pFlag,
+		boolSetFunc:           setFunc,
 		validationFunc:        validationFunc,
 		validationDescription: validationDescription,
 	}

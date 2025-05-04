@@ -71,6 +71,11 @@ const (
 	flagPrefetcherLLCName      = "pref-llc"
 )
 
+// other flag names
+const (
+	flagNoSummaryName = "no-summary"
+)
+
 // governorOptions - list of valid governor options
 var governorOptions = []string{"performance", "powersave"}
 
@@ -269,6 +274,12 @@ func initializeFlags(cmd *cobra.Command) {
 				value, _ := cmd.Flags().GetString(flagPrefetcherLLCName)
 				return slices.Contains(prefetcherOptions, value)
 			}))
+	flagGroups = append(flagGroups, group)
+	// other options
+	group = flagGroup{name: "Other Options", flags: []flagDefinition{}}
+	group.flags = append(group.flags,
+		newBoolFlag(cmd, flagNoSummaryName, false, nil, "do not print configuration summary", "", nil),
+	)
 	flagGroups = append(flagGroups, group)
 
 	common.AddTargetFlags(Cmd)
