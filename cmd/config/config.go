@@ -93,59 +93,117 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		cmd.SilenceUsage = true
 		return err
 	}
-	// print config prior to changes
-	if err := printConfig(myTargets, localTempDir); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		slog.Error(err.Error())
-		cmd.SilenceUsage = true
-		return err
+	// print config prior to changes, optionally
+	if !cmd.Flags().Lookup(flagNoSummaryName).Changed {
+		if err := printConfig(myTargets, localTempDir); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			cmd.SilenceUsage = true
+			return err
+		}
 	}
-	// make requested changes, one target at a time
-	changeRequested := false
-	for _, myTarget := range myTargets {
-		for _, group := range flagGroups {
-			for _, flag := range group.flags {
-				if cmd.Flags().Lookup(flag.GetName()).Changed {
-					changeRequested = true
-					fmt.Printf("%s   setting %s to %s\n", myTarget.GetName(), flag.GetName(), flag.GetValueAsString())
-					var err error
-					switch flag.GetType() {
-					case "int":
-						if flag.intSetFunc != nil {
-							value, _ := cmd.Flags().GetInt(flag.GetName())
-							err = flag.intSetFunc(value, myTarget, localTempDir)
-						}
-					case "float64":
-						if flag.floatSetFunc != nil {
-							value, _ := cmd.Flags().GetFloat64(flag.GetName())
-							err = flag.floatSetFunc(value, myTarget, localTempDir)
-						}
-					case "string":
-						if flag.stringSetFunc != nil {
-							value, _ := cmd.Flags().GetString(flag.GetName())
-							err = flag.stringSetFunc(value, myTarget, localTempDir)
-						}
-					}
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "%s   Error: %v\n", myTarget.GetName(), err)
-						slog.Error(err.Error(), slog.String("target", myTarget.GetName()))
-					}
-				}
+	// if no changes were requested, print a message and return
+	var changeRequested bool
+	for _, group := range flagGroups {
+		for _, flag := range group.flags {
+			hasSetFunc := flag.intSetFunc != nil || flag.floatSetFunc != nil || flag.stringSetFunc != nil || flag.boolSetFunc != nil
+			if hasSetFunc && cmd.Flags().Lookup(flag.GetName()).Changed {
+				changeRequested = true
+				break
 			}
+		}
+		if changeRequested {
+			break
 		}
 	}
 	if !changeRequested {
 		fmt.Println("No changes requested.")
 		return nil
 	}
+	// make requested changes on all targets
+	channelError := make(chan error)
+	multiSpinner := progress.NewMultiSpinner()
+	multiSpinner.Start()
+	for _, myTarget := range myTargets {
+		err = multiSpinner.AddSpinner(myTarget.GetName())
+		if err != nil {
+			err = fmt.Errorf("failed to add spinner: %v", err)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			cmd.SilenceUsage = true
+			return err
+		}
+		go setOnTarget(cmd, myTarget, flagGroups, localTempDir, channelError, multiSpinner.Status)
+	}
+	// wait for all targets to finish
+	for range myTargets {
+		<-channelError
+	}
+	multiSpinner.Finish()
+	fmt.Println() // blank line
 	// print config after making changes
-	fmt.Println("") // blank line
-	if err := printConfig(myTargets, localTempDir); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		slog.Error(err.Error())
-		return err
+	if !cmd.Flags().Lookup(flagNoSummaryName).Changed {
+		if err := printConfig(myTargets, localTempDir); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			cmd.SilenceUsage = true
+			return err
+		}
 	}
 	return nil
+}
+
+func setOnTarget(cmd *cobra.Command, myTarget target.Target, flagGroups []flagGroup, localTempDir string, channelError chan error, statusUpdate progress.MultiSpinnerUpdateFunc) {
+	channelSetComplete := make(chan setOutput)
+	var successMessages []string
+	var errorMessages []string
+	_ = statusUpdate(myTarget.GetName(), "updating configuration")
+	for _, group := range flagGroups {
+		for _, flag := range group.flags {
+			hasSetFunc := flag.intSetFunc != nil || flag.floatSetFunc != nil || flag.stringSetFunc != nil || flag.boolSetFunc != nil
+			if hasSetFunc && cmd.Flags().Lookup(flag.GetName()).Changed {
+				successMessages = append(successMessages, fmt.Sprintf("set %s to %s", flag.GetName(), flag.GetValueAsString()))
+				errorMessages = append(errorMessages, fmt.Sprintf("failed to set %s to %s", flag.GetName(), flag.GetValueAsString()))
+				switch flag.GetType() {
+				case "int":
+					if flag.intSetFunc != nil {
+						value, _ := cmd.Flags().GetInt(flag.GetName())
+						go flag.intSetFunc(value, myTarget, localTempDir, channelSetComplete, len(successMessages)-1)
+					}
+				case "float64":
+					if flag.floatSetFunc != nil {
+						value, _ := cmd.Flags().GetFloat64(flag.GetName())
+						go flag.floatSetFunc(value, myTarget, localTempDir, channelSetComplete, len(successMessages)-1)
+					}
+				case "string":
+					if flag.stringSetFunc != nil {
+						value, _ := cmd.Flags().GetString(flag.GetName())
+						go flag.stringSetFunc(value, myTarget, localTempDir, channelSetComplete, len(successMessages)-1)
+					}
+				case "bool":
+					if flag.boolSetFunc != nil {
+						value, _ := cmd.Flags().GetBool(flag.GetName())
+						go flag.boolSetFunc(value, myTarget, localTempDir, channelSetComplete, len(successMessages)-1)
+					}
+				}
+			}
+		}
+	}
+	// wait for all set goroutines to finish
+	statusMessages := []string{}
+	for range successMessages {
+		out := <-channelSetComplete
+		if out.err != nil {
+			slog.Error(out.err.Error())
+			statusMessages = append(statusMessages, errorMessages[out.goRoutineID])
+		} else {
+			statusMessages = append(statusMessages, successMessages[out.goRoutineID])
+		}
+	}
+	statusMessage := fmt.Sprintf("configuration update complete: %s", strings.Join(statusMessages, ", "))
+	slog.Info(statusMessage, slog.String("target", myTarget.GetName()))
+	_ = statusUpdate(myTarget.GetName(), statusMessage)
+	channelError <- nil
 }
 
 func printConfig(myTargets []target.Target, localTempDir string) (err error) {
@@ -154,45 +212,88 @@ func printConfig(myTargets []target.Target, localTempDir string) (err error) {
 	for _, scriptName := range scriptNames {
 		scriptsToRun = append(scriptsToRun, script.GetScriptByName(scriptName))
 	}
+	multiSpinner := progress.NewMultiSpinner()
+	multiSpinner.Start()
+	orderedTargetScriptOutputs := []common.TargetScriptOutputs{}
+	channelTargetScriptOutputs := make(chan common.TargetScriptOutputs)
+	channelError := make(chan error)
 	for _, myTarget := range myTargets {
-		multiSpinner := progress.NewMultiSpinner()
 		err = multiSpinner.AddSpinner(myTarget.GetName())
 		if err != nil {
 			err = fmt.Errorf("failed to add spinner: %v", err)
 			return
 		}
-		multiSpinner.Start()
-		_ = multiSpinner.Status(myTarget.GetName(), "collecting data")
-		// run the scripts
-		var scriptOutputs map[string]script.ScriptOutput
-		if scriptOutputs, err = script.RunScripts(myTarget, scriptsToRun, true, localTempDir); err != nil {
-			err = fmt.Errorf("failed to run collection scripts: %v", err)
-			_ = multiSpinner.Status(myTarget.GetName(), "error collecting data")
-			multiSpinner.Finish()
-			return
+		// run the selected scripts on the target
+		go collectOnTarget(myTarget, scriptsToRun, localTempDir, channelTargetScriptOutputs, channelError, multiSpinner.Status)
+	}
+	// wait for scripts to run on all targets
+	var allTargetScriptOutputs []common.TargetScriptOutputs
+	for range myTargets {
+		select {
+		case scriptOutputs := <-channelTargetScriptOutputs:
+			allTargetScriptOutputs = append(allTargetScriptOutputs, scriptOutputs)
+		case err := <-channelError:
+			slog.Error(err.Error())
 		}
-		_ = multiSpinner.Status(myTarget.GetName(), "collection complete")
-		multiSpinner.Finish()
+	}
+	// allTargetScriptOutputs is in the order of data collection completion
+	// reorder to match order of myTargets
+	for _, target := range myTargets {
+		for _, targetScriptOutputs := range allTargetScriptOutputs {
+			if targetScriptOutputs.TargetName == target.GetName() {
+				targetScriptOutputs.TableNames = []string{report.ConfigurationTableName}
+				orderedTargetScriptOutputs = append(orderedTargetScriptOutputs, targetScriptOutputs)
+				break
+			}
+		}
+	}
+	multiSpinner.Finish()
+	// process and print the table for each target
+	for _, targetScriptOutputs := range orderedTargetScriptOutputs {
 		// process the tables, i.e., get field values from raw script output
 		tableNames := []string{report.ConfigurationTableName}
 		var tableValues []report.TableValues
-		if tableValues, err = report.ProcessTables(tableNames, scriptOutputs); err != nil {
+		if tableValues, err = report.ProcessTables(tableNames, targetScriptOutputs.ScriptOutputs); err != nil {
 			err = fmt.Errorf("failed to process collected data: %v", err)
 			return
 		}
 		// create the report for this single table
 		var reportBytes []byte
-		if reportBytes, err = report.Create("txt", tableValues, scriptOutputs, myTarget.GetName()); err != nil {
+		if reportBytes, err = report.Create("txt", tableValues, targetScriptOutputs.ScriptOutputs, targetScriptOutputs.TargetName); err != nil {
 			err = fmt.Errorf("failed to create report: %v", err)
 			return
 		}
 		// print the report
+		if len(orderedTargetScriptOutputs) > 1 {
+			fmt.Printf("%s\n", targetScriptOutputs.TargetName)
+		}
 		fmt.Print(string(reportBytes))
 	}
 	return
 }
 
-func setCoreCount(cores int, myTarget target.Target, localTempDir string) error {
+// collectOnTarget runs the scripts on the target and sends the results to the appropriate channels
+func collectOnTarget(myTarget target.Target, scriptsToRun []script.ScriptDefinition, localTempDir string, channelTargetScriptOutputs chan common.TargetScriptOutputs, channelError chan error, statusUpdate progress.MultiSpinnerUpdateFunc) {
+	// run the scripts on the target
+	if statusUpdate != nil {
+		_ = statusUpdate(myTarget.GetName(), "collecting configuration")
+	}
+	scriptOutputs, err := script.RunScripts(myTarget, scriptsToRun, true, localTempDir)
+	if err != nil {
+		if statusUpdate != nil {
+			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("error collecting configuration: %v", err))
+		}
+		err = fmt.Errorf("error running data collection scripts on %s: %v", myTarget.GetName(), err)
+		channelError <- err
+		return
+	}
+	if statusUpdate != nil {
+		_ = statusUpdate(myTarget.GetName(), "configuration collection complete")
+	}
+	channelTargetScriptOutputs <- common.TargetScriptOutputs{TargetName: myTarget.GetName(), ScriptOutputs: scriptOutputs}
+}
+
+func setCoreCount(cores int, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
 	setScript := script.ScriptDefinition{
 		Name: "set core count",
 		ScriptTemplate: fmt.Sprintf(`
@@ -283,12 +384,12 @@ done
 	}
 	_, err := runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		return fmt.Errorf("failed to set core count: %w", err)
+		err = fmt.Errorf("failed to set core count: %w", err)
 	}
-	return nil
+	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
 }
 
-func setLlcSize(llcSize float64, myTarget target.Target, localTempDir string) error {
+func setLlcSize(llcSize float64, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
 	scripts := []script.ScriptDefinition{}
 	scripts = append(scripts, script.GetScriptByName(script.LscpuScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.LspciBitsScriptName))
@@ -297,31 +398,37 @@ func setLlcSize(llcSize float64, myTarget target.Target, localTempDir string) er
 
 	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir)
 	if err != nil {
-		return fmt.Errorf("failed to run scripts on target: %w", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to run scripts on target: %w", err)}
+		return
 	}
 	maximumLlcSize, _, err := report.GetL3LscpuMB(outputs)
 	if err != nil {
-		return fmt.Errorf("failed to get maximum LLC size: %w", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get maximum LLC size: %w", err)}
+		return
 	}
 	// microarchitecture
 	uarch := report.UarchFromOutput(outputs)
 	cacheWays := report.GetCacheWays(uarch)
 	if len(cacheWays) == 0 {
-		return fmt.Errorf("failed to get cache ways")
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get cache ways")}
+		return
 	}
 	// current LLC size
 	currentLlcSize, err := report.GetL3MSRMB(outputs)
 	if err != nil {
-		return fmt.Errorf("failed to get current LLC size: %w", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get current LLC size: %w", err)}
+		return
 	}
 	if currentLlcSize == llcSize {
-		return fmt.Errorf("LLC size is already set to %.2f MB", llcSize)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("LLC size is already set to %.2f MB", llcSize)}
+		return
 	}
 	// calculate the number of ways to set
 	cachePerWay := maximumLlcSize / float64(len(cacheWays))
 	waysToSet := int(math.Ceil((llcSize / cachePerWay)) - 1)
 	if waysToSet >= len(cacheWays) {
-		return fmt.Errorf("LLC size is too large, maximum is %.2f MB", maximumLlcSize)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("LLC size is too large, maximum is %.2f MB", maximumLlcSize)}
+		return
 	}
 	// set the LLC size
 	setScript := script.ScriptDefinition{
@@ -335,26 +442,30 @@ func setLlcSize(llcSize float64, myTarget target.Target, localTempDir string) er
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		return fmt.Errorf("failed to set LLC size: %w", err)
+		err = fmt.Errorf("failed to set LLC size: %w", err)
 	}
-	return nil
+	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
 }
 
-func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDir string) error {
+func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
 	targetFamily, err := myTarget.GetFamily()
 	if err != nil {
-		return fmt.Errorf("failed to get target family: %w", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get target family: %w", err)}
+		return
 	}
 	targetModel, err := myTarget.GetModel()
 	if err != nil {
-		return fmt.Errorf("failed to get target model: %w", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get target model: %w", err)}
+		return
 	}
 	targetVendor, err := myTarget.GetVendor()
 	if err != nil {
-		return fmt.Errorf("failed to get target vendor: %w", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get target vendor: %w", err)}
+		return
 	}
 	if targetVendor != "GenuineIntel" {
-		return fmt.Errorf("core frequency setting not supported on %s due to vendor mismatch", myTarget.GetName())
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("core frequency setting not supported on %s due to vendor mismatch", myTarget.GetName())}
+		return
 	}
 	var setScript script.ScriptDefinition
 	freqInt := uint64(coreFrequency * 10)
@@ -367,7 +478,8 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 		}
 		output, err := runScript(myTarget, getScript, localTempDir)
 		if err != nil {
-			return fmt.Errorf("failed to get pstate driver: %w", err)
+			completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get pstate driver: %w", err)}
+			return
 		}
 		if strings.Contains(output, "intel_pstate") {
 			var value uint64
@@ -406,22 +518,25 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		return fmt.Errorf("failed to set core frequency: %w", err)
+		err = fmt.Errorf("failed to set core frequency: %w", err)
 	}
-	return nil
+	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
 }
 
-func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float64, myTarget target.Target, localTempDir string) error {
+func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float64, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
 	targetFamily, err := myTarget.GetFamily()
 	if err != nil {
-		return fmt.Errorf("failed to get target family: %w", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get target family: %w", err)}
+		return
 	}
 	targetModel, err := myTarget.GetModel()
 	if err != nil {
-		return fmt.Errorf("failed to get target model: %w", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get target model: %w", err)}
+		return
 	}
 	if targetFamily != "6" || (targetFamily == "6" && targetModel != "173" && targetModel != "175" && targetModel != "221") {
-		return fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())}
+		return
 	}
 	type dieId struct {
 		instance string
@@ -433,7 +548,8 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 	scripts = append(scripts, script.GetScriptByName(script.UncoreDieTypesFromTPMIScriptName))
 	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir)
 	if err != nil {
-		return fmt.Errorf("failed to get uncore die types: %w", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to run scripts on target: %w", err)}
+		return
 	}
 	re := regexp.MustCompile(`Read bits \d+:\d+ value (\d+) from TPMI ID .* for entry (\d+) in instance (\d+)`)
 	for line := range strings.SplitSeq(outputs[script.UncoreDieTypesFromTPMIScriptName].Stdout, "\n") {
@@ -467,13 +583,14 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 		}
 		_, err = runScript(myTarget, setScript, localTempDir)
 		if err != nil {
-			return fmt.Errorf("failed to set uncore frequency: %w", err)
+			err = fmt.Errorf("failed to set uncore die frequency: %w", err)
+			break
 		}
 	}
-	return nil
+	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
 }
 
-func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.Target, localTempDir string) error {
+func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
 	scripts := []script.ScriptDefinition{}
 	scripts = append(scripts, script.ScriptDefinition{
 		Name:           "get uncore frequency MSR",
@@ -485,23 +602,28 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 	})
 	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir)
 	if err != nil {
-		return fmt.Errorf("failed to read uncore frequency MSR: %w", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to run scripts on target: %w", err)}
+		return
 	}
 	targetFamily, err := myTarget.GetFamily()
 	if err != nil {
-		return fmt.Errorf("failed to get target family: %w", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get target family: %w", err)}
+		return
 	}
 	targetModel, err := myTarget.GetModel()
 	if err != nil {
-		return fmt.Errorf("failed to get target model: %w", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get target model: %w", err)}
+		return
 	}
 	if targetFamily != "6" || (targetFamily == "6" && (targetModel == "173" || targetModel == "175" || targetModel == "221")) { // not Intel || not GNR, SRF, CWF
-		return fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())}
+		return
 	}
 	msrHex := strings.TrimSpace(outputs["get uncore frequency MSR"].Stdout)
 	msrInt, err := strconv.ParseInt(msrHex, 16, 0)
 	if err != nil {
-		return fmt.Errorf("failed to read uncore frequency MSR: %w", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to parse uncore frequency MSR: %w", err)}
+		return
 	}
 	newFreq := uint64((uncoreFrequency * 1000) / 100)
 	var newVal uint64
@@ -526,12 +648,12 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		return fmt.Errorf("failed to set uncore frequency: %w", err)
+		err = fmt.Errorf("failed to set uncore frequency: %w", err)
 	}
-	return nil
+	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
 }
 
-func setTDP(power int, myTarget target.Target, localTempDir string) error {
+func setTDP(power int, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
 	readScript := script.ScriptDefinition{
 		Name:           "get power MSR",
 		ScriptTemplate: "rdmsr 0x610",
@@ -542,12 +664,14 @@ func setTDP(power int, myTarget target.Target, localTempDir string) error {
 	}
 	readOutput, err := script.RunScript(myTarget, readScript, localTempDir)
 	if err != nil {
-		return fmt.Errorf("failed to read power MSR: %w", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to read power MSR: %w", err)}
+		return
 	} else {
 		msrHex := strings.TrimSpace(readOutput.Stdout)
 		msrInt, err := strconv.ParseInt(msrHex, 16, 0)
 		if err != nil {
-			return fmt.Errorf("failed to parse power MSR: %w", err)
+			completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to parse power MSR: %w", err)}
+			return
 		} else {
 			// mask out lower 14 bits
 			newVal := uint64(msrInt) & 0xFFFFFFFFFFFFC000
@@ -563,23 +687,26 @@ func setTDP(power int, myTarget target.Target, localTempDir string) error {
 			}
 			_, err := runScript(myTarget, setScript, localTempDir)
 			if err != nil {
-				return fmt.Errorf("failed to set power: %w", err)
+				completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to set power: %w", err)}
+				return
 			}
 		}
 	}
-	return nil
+	completeChannel <- setOutput{goRoutineID: goRoutineId, err: nil}
 }
 
-func setEPB(epb int, myTarget target.Target, localTempDir string) error {
+func setEPB(epb int, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
 	epbSourceScript := script.GetScriptByName(script.EpbSourceScriptName)
 	epbSourceOutput, err := runScript(myTarget, epbSourceScript, localTempDir)
 	if err != nil {
-		return fmt.Errorf("failed to get EPB source: %w", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get EPB source: %w", err)}
+		return
 	}
 	epbSource := strings.TrimSpace(epbSourceOutput)
 	source, err := strconv.ParseInt(epbSource, 16, 0)
 	if err != nil {
-		return fmt.Errorf("failed to parse EPB source: %w", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to parse EPB source: %w", err)}
+		return
 	}
 	var msr string
 	var bitOffset uint
@@ -600,11 +727,13 @@ func setEPB(epb int, myTarget target.Target, localTempDir string) error {
 	}
 	readOutput, err := runScript(myTarget, readScript, localTempDir)
 	if err != nil {
-		return fmt.Errorf("failed to read EPB MSR %s: %w", msr, err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to read EPB MSR %s: %w", msr, err)}
+		return
 	}
 	msrValue, err := strconv.ParseUint(strings.TrimSpace(readOutput), 16, 64)
 	if err != nil {
-		return fmt.Errorf("failed to parse EPB MSR %s: %w", msr, err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to parse EPB MSR %s: %w", msr, err)}
+		return
 	}
 	// mask out 4 bits starting at bitOffset
 	maskedValue := msrValue &^ (0xF << bitOffset)
@@ -621,12 +750,12 @@ func setEPB(epb int, myTarget target.Target, localTempDir string) error {
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		return fmt.Errorf("failed to set EPB: %w", err)
+		err = fmt.Errorf("failed to set EPB: %w", err)
 	}
-	return nil
+	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
 }
 
-func setEPP(epp int, myTarget target.Target, localTempDir string) error {
+func setEPP(epp int, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
 	// Set both the per-core EPP value and the package EPP value
 	// Reference: 15.4.4 Managing HWP in the Intel SDM
 
@@ -641,11 +770,13 @@ func setEPP(epp int, myTarget target.Target, localTempDir string) error {
 	}
 	stdout, err := runScript(myTarget, getScript, localTempDir)
 	if err != nil {
-		return fmt.Errorf("failed to read EPP MSR %s: %w", "0x774", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to read EPP MSR %s: %w", "0x774", err)}
+		return
 	}
 	msrValue, err := strconv.ParseUint(strings.TrimSpace(stdout), 16, 64)
 	if err != nil {
-		return fmt.Errorf("failed to parse EPP MSR %s: %w", "0x774", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to parse EPP MSR %s: %w", "0x774", err)}
+		return
 	}
 	// mask out bits 24-31 IA32_HWP_REQUEST MSR value
 	maskedValue := msrValue & 0xFFFFFFFF00FFFFFF
@@ -662,9 +793,9 @@ func setEPP(epp int, myTarget target.Target, localTempDir string) error {
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		return fmt.Errorf("failed to set EPP: %w", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to set EPP: %w", err)}
+		return
 	}
-
 	// get the current value of the IA32_HWP_REQUEST_PKG MSR that includes the current package EPP value
 	getScript = script.ScriptDefinition{
 		Name:           "get epp pkg msr",
@@ -676,11 +807,13 @@ func setEPP(epp int, myTarget target.Target, localTempDir string) error {
 	}
 	stdout, err = runScript(myTarget, getScript, localTempDir)
 	if err != nil {
-		return fmt.Errorf("failed to read EPP pkg MSR %s: %w", "0x772", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to read EPP pkg MSR %s: %w", "0x772", err)}
+		return
 	}
 	msrValue, err = strconv.ParseUint(strings.TrimSpace(stdout), 16, 64)
 	if err != nil {
-		return fmt.Errorf("failed to parse EPP pkg MSR %s: %w", "0x772", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to parse EPP pkg MSR %s: %w", "0x772", err)}
+		return
 	}
 	// mask out bits 24-31 IA32_HWP_REQUEST_PKG MSR value
 	maskedValue = msrValue & 0xFFFFFFFF00FFFFFF
@@ -697,12 +830,12 @@ func setEPP(epp int, myTarget target.Target, localTempDir string) error {
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		return fmt.Errorf("failed to set EPP pkg: %w", err)
+		err = fmt.Errorf("failed to set EPP pkg: %w", err)
 	}
-	return nil
+	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
 }
 
-func setGovernor(governor string, myTarget target.Target, localTempDir string) error {
+func setGovernor(governor string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
 	setScript := script.ScriptDefinition{
 		Name:           "set governor",
 		ScriptTemplate: fmt.Sprintf("echo %s | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor", governor),
@@ -710,19 +843,20 @@ func setGovernor(governor string, myTarget target.Target, localTempDir string) e
 	}
 	_, err := runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		return fmt.Errorf("failed to set governor: %w", err)
+		err = fmt.Errorf("failed to set governor: %w", err)
 	}
-	return nil
+	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
 }
 
-func setELC(elc string, myTarget target.Target, localTempDir string) error {
+func setELC(elc string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
 	var mode string
 	if elc == elcOptions[0] {
 		mode = "latency-optimized-mode"
 	} else if elc == elcOptions[1] {
 		mode = "default"
 	} else {
-		return fmt.Errorf("invalid ELC mode: %s", elc)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("invalid ELC mode: %s", elc)}
+		return
 	}
 	setScript := script.ScriptDefinition{
 		Name:           "set elc",
@@ -734,15 +868,16 @@ func setELC(elc string, myTarget target.Target, localTempDir string) error {
 	}
 	_, err := runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		return fmt.Errorf("failed to set ELC mode: %w", err)
+		err = fmt.Errorf("failed to set ELC mode: %w", err)
 	}
-	return nil
+	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
 }
 
-func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir string, prefetcherType string) error {
+func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir string, prefetcherType string, completeChannel chan setOutput, goRoutineId int) {
 	pf, err := report.GetPrefetcherDefByName(prefetcherType)
 	if err != nil {
-		return fmt.Errorf("failed to get prefetcher definition: %w", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get prefetcher definition: %w", err)}
+		return
 	}
 	// check if the prefetcher is supported on this target's architecture
 	// get the uarch
@@ -752,15 +887,18 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 	scripts = append(scripts, script.GetScriptByName(script.LspciDevicesScriptName))
 	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir)
 	if err != nil {
-		return fmt.Errorf("failed to run target identification scripts on target: %w", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to run scripts on target: %w", err)}
+		return
 	}
 	uarch := report.UarchFromOutput(outputs)
 	if uarch == "" {
-		return fmt.Errorf("failed to get microarchitecture")
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get microarchitecture")}
+		return
 	}
 	// is the prefetcher supported on this uarch?
 	if !slices.Contains(pf.Uarchs, "all") && !slices.Contains(pf.Uarchs, uarch[:3]) {
-		return fmt.Errorf("prefetcher %s is not supported on %s", prefetcherType, uarch)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("prefetcher %s is not supported on %s", prefetcherType, uarch)}
+		return
 	}
 	// get the current value of the prefetcher MSR
 	getScript := script.ScriptDefinition{
@@ -773,11 +911,13 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 	}
 	stdout, err := runScript(myTarget, getScript, localTempDir)
 	if err != nil {
-		return fmt.Errorf("failed to read prefetcher MSR: %w", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to read prefetcher MSR: %w", err)}
+		return
 	}
 	msrValue, err := strconv.ParseUint(strings.TrimSpace(stdout), 16, 64)
 	if err != nil {
-		return fmt.Errorf("failed to parse prefetcher MSR: %w", err)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to parse prefetcher MSR: %w", err)}
+		return
 	}
 	// set the prefetcher bit to bitValue determined by the onOff value, note: 0 is enable, 1 is disable
 	var bitVal int
@@ -786,7 +926,8 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 	} else if enableDisable == prefetcherOptions[1] {
 		bitVal = 1
 	} else {
-		return fmt.Errorf("invalid prefetcher setting: %s", enableDisable)
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("invalid prefetcher setting: %s", enableDisable)}
+		return
 	}
 	// mask out the prefetcher bit
 	maskedValue := msrValue &^ (1 << pf.Bit)
@@ -803,9 +944,9 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		return fmt.Errorf("failed to set %s prefetcher: %w", prefetcherType, err)
+		err = fmt.Errorf("failed to set %s prefetcher: %w", prefetcherType, err)
 	}
-	return nil
+	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
 }
 
 func runScript(myTarget target.Target, myScript script.ScriptDefinition, localTempDir string) (string, error) {
