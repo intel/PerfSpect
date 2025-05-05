@@ -153,11 +153,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-type setOutput struct {
-	goRoutineID int
-	err         error
-}
-
 func setOnTarget(cmd *cobra.Command, myTarget target.Target, flagGroups []flagGroup, localTempDir string, channelError chan error, statusUpdate progress.MultiSpinnerUpdateFunc) {
 	channelSetComplete := make(chan setOutput)
 	var successMessages []string

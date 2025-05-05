@@ -10,6 +10,12 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// setOutput is a struct that holds the output of a flagDefinition set function
+type setOutput struct {
+	goRoutineID int
+	err         error
+}
+
 // flagDefinition is a struct that defines a command line flag.
 type flagDefinition struct {
 	pflag                 *pflag.Flag
