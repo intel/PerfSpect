@@ -17,7 +17,7 @@ require (
 	github.com/deckarep/golang-set/v2 v2.8.0
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.6
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.10.0
 	github.com/xuri/excelize/v2 v2.9.0
 	golang.org/x/term v0.31.0
 	golang.org/x/text v0.24.0
