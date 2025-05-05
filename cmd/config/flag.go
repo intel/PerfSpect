@@ -13,10 +13,10 @@ import (
 // flagDefinition is a struct that defines a command line flag.
 type flagDefinition struct {
 	pflag                 *pflag.Flag
-	intSetFunc            func(int, target.Target, string) error
-	floatSetFunc          func(float64, target.Target, string) error
-	stringSetFunc         func(string, target.Target, string) error
-	boolSetFunc           func(bool, target.Target, string) error
+	intSetFunc            func(int, target.Target, string, chan setOutput, int)
+	floatSetFunc          func(float64, target.Target, string, chan setOutput, int)
+	stringSetFunc         func(string, target.Target, string, chan setOutput, int)
+	boolSetFunc           func(bool, target.Target, string, chan setOutput, int)
 	validationFunc        func(cmd *cobra.Command) bool
 	validationDescription string
 }
@@ -37,7 +37,7 @@ func (f *flagDefinition) GetValueAsString() string {
 }
 
 // newIntFlag creates a new integer flag and adds it to the command.
-func newIntFlag(cmd *cobra.Command, name string, defaultValue int, setFunc func(int, target.Target, string) error, help string, validationDescription string, validationFunc func(cmd *cobra.Command) bool) flagDefinition {
+func newIntFlag(cmd *cobra.Command, name string, defaultValue int, setFunc func(int, target.Target, string, chan setOutput, int), help string, validationDescription string, validationFunc func(cmd *cobra.Command) bool) flagDefinition {
 	cmd.Flags().Int(name, defaultValue, help)
 	pFlag := cmd.Flags().Lookup(name)
 	return flagDefinition{
@@ -49,7 +49,7 @@ func newIntFlag(cmd *cobra.Command, name string, defaultValue int, setFunc func(
 }
 
 // newInt64Flag creates a new int64 flag and adds it to the command.
-func newFloat64Flag(cmd *cobra.Command, name string, defaultValue float64, setFunc func(float64, target.Target, string) error, help string, validationDescription string, validationFunc func(cmd *cobra.Command) bool) flagDefinition {
+func newFloat64Flag(cmd *cobra.Command, name string, defaultValue float64, setFunc func(float64, target.Target, string, chan setOutput, int), help string, validationDescription string, validationFunc func(cmd *cobra.Command) bool) flagDefinition {
 	cmd.Flags().Float64(name, defaultValue, help)
 	pFlag := cmd.Flags().Lookup(name)
 	return flagDefinition{
@@ -61,7 +61,7 @@ func newFloat64Flag(cmd *cobra.Command, name string, defaultValue float64, setFu
 }
 
 // newStringFlag creates a new string flag and adds it to the command.
-func newStringFlag(cmd *cobra.Command, name string, defaultValue string, setFunc func(string, target.Target, string) error, help string, validationDescription string, validationFunc func(cmd *cobra.Command) bool) flagDefinition {
+func newStringFlag(cmd *cobra.Command, name string, defaultValue string, setFunc func(string, target.Target, string, chan setOutput, int), help string, validationDescription string, validationFunc func(cmd *cobra.Command) bool) flagDefinition {
 	cmd.Flags().String(name, defaultValue, help)
 	pFlag := cmd.Flags().Lookup(name)
 	return flagDefinition{
@@ -73,7 +73,7 @@ func newStringFlag(cmd *cobra.Command, name string, defaultValue string, setFunc
 }
 
 // newBoolFlag creates a new boolean flag and adds it to the command.
-func newBoolFlag(cmd *cobra.Command, name string, defaultValue bool, setFunc func(bool, target.Target, string) error, help string, validationDescription string, validationFunc func(cmd *cobra.Command) bool) flagDefinition {
+func newBoolFlag(cmd *cobra.Command, name string, defaultValue bool, setFunc func(bool, target.Target, string, chan setOutput, int), help string, validationDescription string, validationFunc func(cmd *cobra.Command) bool) flagDefinition {
 	cmd.Flags().Bool(name, defaultValue, help)
 	pFlag := cmd.Flags().Lookup(name)
 	return flagDefinition{
