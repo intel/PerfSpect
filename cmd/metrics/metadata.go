@@ -114,6 +114,8 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 			err = fmt.Errorf("failed to get system summary: %w", err)
 			return
 		}
+	} else {
+		metadata.SystemSummaryFields = [][]string{{"", "System Info Not Available"}}
 	}
 	// Architecture
 	if metadata.Architecture, err = getArchitecture(scriptOutputs); err != nil {
