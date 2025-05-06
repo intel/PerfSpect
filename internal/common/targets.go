@@ -299,10 +299,11 @@ type targetsFile struct {
 	Targets []targetFromYAML `yaml:"targets"`
 }
 
+// sanitizeTargetName sanitizes the target name by removing any invalid characters.
 func sanitizeTargetName(targetName string) string {
 	// remove any invalid characters from the target name
 	// this is needed for the report file names
-	// we only allow alphanumeric characters, underscores, and dashes
+	// we only allow alphanumeric characters, underscores, periods, and dashes
 	// everything else is replaced with an underscore
 	sanitizedTargetName := strings.Map(func(r rune) rune {
 		if r == '-' || r == '_' || r == '.' {
