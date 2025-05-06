@@ -235,7 +235,6 @@ reset:
 	cd msr-tools && git clean -fdx && git reset --hard
 	cd spectre-meltdown-checker
 	cd sshpass && make clean
-	cd stackcollapse-perf && git clean -fdx && git reset --hard
 	cd stress-ng && git clean -fdx && git reset --hard
 	cd sysstat && git clean -fdx && git reset --hard
 	cd tsc && rm -f tsc
