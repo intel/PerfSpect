@@ -1393,8 +1393,8 @@ fi
 wait ${perf_fp_pid} ${perf_dwarf_pid}
 
 # collapse perf data
-perf script -i "$perf_dwarf_data" | stackcollapse-perf.pl > "$perf_dwarf_folded"
-perf script -i "$perf_fp_data" | stackcollapse-perf.pl > "$perf_fp_folded"
+perf script -i "$perf_dwarf_data" | stackcollapse-perf > "$perf_dwarf_folded"
+perf script -i "$perf_fp_data" | stackcollapse-perf > "$perf_fp_folded"
 
 # Display results
 if [ -f "$perf_dwarf_folded" ]; then
