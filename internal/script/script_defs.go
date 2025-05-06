@@ -1410,7 +1410,7 @@ fi
 rm -f "$perf_fp_data" "$perf_dwarf_data" "$perf_dwarf_folded" "$perf_fp_folded"
 `,
 		Superuser: true,
-		Depends:   []string{"perf", "stackcollapse-perf.pl"},
+		Depends:   []string{"perf", "stackcollapse-perf"},
 	},
 	// lock analysis scripts
 	ProfileKernelLockScriptName: {
