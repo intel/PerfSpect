@@ -320,9 +320,6 @@ func sanitizeTargetName(targetName string) string {
 		}
 		return '_'
 	}, targetName)
-	if sanitizedTargetName == "" {
-		sanitizedTargetName = "unknown"
-	}
 	return sanitizedTargetName
 }
 
@@ -346,9 +343,20 @@ func getTargetsFromFile(targetsFilePath string, localTempDir string) (targets []
 	if err != nil {
 		return
 	}
+	targetNameUsed := make(map[string]bool)
 	for _, t := range targetsFile.Targets {
 		// create a target object
-		newTarget := target.NewRemoteTarget(sanitizeTargetName(t.Name), t.Host, t.Port, t.User, t.Key)
+		// target name is not required, but if it is provided there must not be duplicate names
+		var targetName string
+		if t.Name != "" {
+			targetName = sanitizeTargetName(t.Name)
+			if targetNameUsed[targetName] {
+				err = fmt.Errorf("duplicate target name (after sanitized) found in targets file: original: %s, sanitized: %s", t.Name, targetName)
+				return
+			}
+			targetNameUsed[targetName] = true
+		}
+		newTarget := target.NewRemoteTarget(targetName, t.Host, t.Port, t.User, t.Key)
 		newTarget.SetSshPass(t.Pwd)
 		// create a sub-directory for the target in the localTempDir
 		localTargetDir := path.Join(localTempDir, newTarget.GetName())
