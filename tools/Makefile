@@ -5,9 +5,9 @@
 #
 
 default: tools
-.PHONY: default tools async-profiler avx-turbo cpuid dmidecode ethtool fio flamegraph ipmitool lshw lspci msr-tools pcm perf processwatch spectre-meltdown-checker sshpass stress-ng sysstat tsc turbostat
+.PHONY: default tools async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm perf processwatch spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc turbostat
 
-tools: async-profiler avx-turbo cpuid dmidecode ethtool fio flamegraph ipmitool lshw lspci msr-tools pcm spectre-meltdown-checker sshpass stress-ng sysstat tsc turbostat
+tools: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc turbostat
 	mkdir -p bin
 	cp -R async-profiler bin/
 	cp avx-turbo/avx-turbo bin/
@@ -15,7 +15,7 @@ tools: async-profiler avx-turbo cpuid dmidecode ethtool fio flamegraph ipmitool 
 	cp dmidecode/dmidecode bin/
 	cp ethtool/ethtool bin/
 	cp fio/fio bin/
-	cp flamegraph/stackcollapse-perf.pl bin/
+	cp stackcollapse-perf/stackcollapse-perf bin/
 	cp ipmitool/src/ipmitool.static bin/ipmitool
 	cp lshw/src/lshw-static bin/lshw
 	cp lspci/lspci bin/
@@ -96,13 +96,6 @@ ifeq ("$(wildcard fio/config.log)","")
 	cd fio && ./configure --build-static --disable-native
 endif
 	cd fio && make
-
-flamegraph:
-ifeq ("$(wildcard flamegraph)","")
-	git clone https://github.com/brendangregg/FlameGraph.git flamegraph
-	# small modification to script to include module name in output
-	cd flamegraph && sed -i '382 a \\t\t\t\t$$func = \$$func."'" "'".\$$mod;\t# add module name' stackcollapse-perf.pl
-endif
 
 ipmitool:
 ifeq ("$(wildcard ipmitool)","")
@@ -195,6 +188,9 @@ ifeq ("$(wildcard sshpass)","")
 endif
 	cd sshpass && make
 
+stackcollapse-perf:
+	cd stackcollapse-perf && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build
+
 stress-ng:
 ifeq ("$(wildcard stress-ng)","")
 	git clone https://github.com/ColinIanKing/stress-ng.git
@@ -232,7 +228,6 @@ reset:
 	cd dmidecode && git clean -fdx && git reset --hard
 	cd ethtool && git clean -fdx && git reset --hard
 	cd fio && git clean -fdx && git reset --hard
-	cd flamegraph && git clean -fdx && git reset --hard
 	cd ipmitool && git clean -fdx && git reset --hard
 	cd lshw && git clean -fdx && git reset --hard
 	cd lspci && git clean -fdx && git reset --hard
@@ -240,6 +235,7 @@ reset:
 	cd msr-tools && git clean -fdx && git reset --hard
 	cd spectre-meltdown-checker
 	cd sshpass && make clean
+	cd stackcollapse-perf && git clean -fdx && git reset --hard
 	cd stress-ng && git clean -fdx && git reset --hard
 	cd sysstat && git clean -fdx && git reset --hard
 	cd tsc && rm -f tsc
@@ -255,5 +251,5 @@ libcrypt.tar.gz:
 libs: glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
 
 oss-source: reset libs
-	tar --exclude-vcs -czf oss_source.tgz async-profiler/ cpuid/ dmidecode/ ethtool/ fio/ flamegraph/ ipmitool/ lshw/ lspci/ msr-tools/ pcm/ spectre-meltdown-checker/ sshpass/ stress-ng/ sysstat/ linux_turbostat/tools/power/x86/turbostat glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
+	tar --exclude-vcs -czf oss_source.tgz async-profiler/ cpuid/ dmidecode/ ethtool/ fio/ ipmitool/ lshw/ lspci/ msr-tools/ pcm/ spectre-meltdown-checker/ sshpass/ stress-ng/ sysstat/ linux_turbostat/tools/power/x86/turbostat glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
 	md5sum oss_source.tgz > oss_source.tgz.md5
