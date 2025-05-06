@@ -299,6 +299,32 @@ type targetsFile struct {
 	Targets []targetFromYAML `yaml:"targets"`
 }
 
+func sanitizeTargetName(targetName string) string {
+	// remove any invalid characters from the target name
+	// this is needed for the report file names
+	// we only allow alphanumeric characters, underscores, and dashes
+	// everything else is replaced with an underscore
+	sanitizedTargetName := strings.Map(func(r rune) rune {
+		if r == '-' || r == '_' || r == '.' {
+			return r
+		}
+		if r >= 'a' && r <= 'z' {
+			return r
+		}
+		if r >= 'A' && r <= 'Z' {
+			return r
+		}
+		if r >= '0' && r <= '9' {
+			return r
+		}
+		return '_'
+	}, targetName)
+	if sanitizedTargetName == "" {
+		sanitizedTargetName = "unknown"
+	}
+	return sanitizedTargetName
+}
+
 // getTargetsFromFile reads a targets file and returns a list of target objects.
 // It takes the path to the targets file and the local temporary directory as input.
 func getTargetsFromFile(targetsFilePath string, localTempDir string) (targets []target.Target, targetErrs []error, err error) {
@@ -321,7 +347,7 @@ func getTargetsFromFile(targetsFilePath string, localTempDir string) (targets []
 	}
 	for _, t := range targetsFile.Targets {
 		// create a target object
-		newTarget := target.NewRemoteTarget(t.Name, t.Host, t.Port, t.User, t.Key)
+		newTarget := target.NewRemoteTarget(sanitizeTargetName(t.Name), t.Host, t.Port, t.User, t.Key)
 		newTarget.SetSshPass(t.Pwd)
 		// create a sub-directory for the target in the localTempDir
 		localTargetDir := path.Join(localTempDir, newTarget.GetName())
