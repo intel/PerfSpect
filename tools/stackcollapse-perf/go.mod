@@ -1,3 +1,3 @@
 module intel.com/stackcollapse-perf
 
-go 1.24.1
+go 1.24
