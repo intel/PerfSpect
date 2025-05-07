@@ -142,3 +142,48 @@ invalid line format`,
 		})
 	}
 }
+func TestSanitizeTargetName(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Valid name with allowed characters",
+			input:    "valid_name-123.txt",
+			expected: "valid_name-123.txt",
+		},
+		{
+			name:     "Name with invalid characters",
+			input:    "invalid@name#123!",
+			expected: "invalid_name_123_",
+		},
+		{
+			name:     "Name with spaces",
+			input:    "name with spaces",
+			expected: "name_with_spaces",
+		},
+		{
+			name:     "Empty name",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "Name with only invalid characters",
+			input:    "@#$%^&*()",
+			expected: "_________",
+		},
+		{
+			name:     "Name with mixed valid and invalid characters",
+			input:    "valid@name#123!.txt",
+			expected: "valid_name_123_.txt",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := sanitizeTargetName(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
