@@ -214,7 +214,9 @@ func main() {
 					funcname = strings.ReplaceAll(funcname, ";", ":")
 					if matches := stripIdRegex.FindStringSubmatch(funcname); matches != nil {
 						index := stripAnonymousRegex.FindStringIndex(funcname)
-						funcname = funcname[0:index[0]]
+						if index != nil {
+							funcname = funcname[0:index[0]]
+						}
 					}
 					funcname = strings.ReplaceAll(funcname, "\"", "")
 					funcname = strings.ReplaceAll(funcname, "'", "")
