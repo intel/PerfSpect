@@ -8,8 +8,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"math/rand/v2" // nosemgrep
+	"slices"
 	"strconv"
 	"strings"
 	texttemplate "text/template" // nosemgrep
@@ -81,11 +82,6 @@ type flameGraphTemplateStruct struct {
 // Folded data conversion adapted from https://github.com/spiermar/burn
 // Copyright © 2017 Martin Spier <spiermar@gmail.com>
 // Apache License, Version 2.0
-func reverse(strings []string) {
-	for i, j := 0, len(strings)-1; i < j; i, j = i+1, j-1 {
-		strings[i], strings[j] = strings[j], strings[i]
-	}
-}
 
 type Node struct {
 	Name     string
@@ -123,24 +119,24 @@ func (n *Node) MarshalJSON() ([]byte, error) {
 	})
 }
 
-var maxStackDepth = 50
-
-func convertFoldedToJSON(folded string) (out string, err error) {
+func convertFoldedToJSON(folded string, maxStackDepth int) (out string, err error) {
 	rootNode := Node{Name: "root", Value: 0, Children: make(map[string]*Node)}
 	scanner := bufio.NewScanner(strings.NewReader(folded))
 	for scanner.Scan() {
 		line := scanner.Text()
-		sep := strings.LastIndex(line, " ")
-		s := line[:sep]
-		v := line[sep+1:]
-		stack := strings.Split(s, ";")
-		reverse(stack)
-		if len(stack) > maxStackDepth {
-			log.Printf("Trimming call stack depth from %d to %d", len(stack), maxStackDepth)
-			stack = stack[:maxStackDepth]
+		sep := strings.LastIndex(line, " ") // space separates the call stack from the count
+		callstack := line[:sep]
+		count := line[sep+1:]
+		stack := strings.Split(callstack, ";") // semicolon separates the functions in the call stack
+		slices.Reverse(stack)
+		if maxStackDepth > 0 {
+			if len(stack) > maxStackDepth {
+				slog.Info("Trimming call stack depth", slog.Int("stack length", len(stack)), slog.Int("max depth", maxStackDepth))
+				stack = stack[:maxStackDepth]
+			}
 		}
 		var i int
-		i, err = strconv.Atoi(v)
+		i, err = strconv.Atoi(count)
 		if err != nil {
 			return
 		}
@@ -152,9 +148,21 @@ func convertFoldedToJSON(folded string) (out string, err error) {
 }
 
 func renderFlameGraph(header string, tableValues TableValues, field string) (out string) {
+	maxDepthFieldIndex, err := getFieldIndex("Maximum Render Depth", tableValues)
+	if err != nil {
+		slog.Error("didn't find expected field (Maximum Render Depth) in table", slog.String("error", err.Error()))
+		return
+	}
+	maxDepth := tableValues.Fields[maxDepthFieldIndex].Values[0]
+	maxStackDepth, err := strconv.Atoi(strings.TrimSpace(maxDepth))
+	if err != nil {
+		slog.Error("failed to convert maximum stack depth", slog.String("error", err.Error()))
+		return
+	}
 	fieldIdx, err := getFieldIndex(field, tableValues)
 	if err != nil {
-		log.Panicf("didn't find expected field (%s) in table: %v", field, err)
+		slog.Error("didn't find expected field in table", slog.String("field", field), slog.String("error", err.Error()))
+		return
 	}
 	folded := tableValues.Fields[fieldIdx].Values[0]
 	if folded == "" {
@@ -166,10 +174,10 @@ func renderFlameGraph(header string, tableValues TableValues, field string) (out
 		out += msg
 		return
 	}
-	jsonStacks, err := convertFoldedToJSON(folded)
+	jsonStacks, err := convertFoldedToJSON(folded, maxStackDepth)
 	if err != nil {
-		log.Printf("failed to convert folded data: %v", err)
-		out += "Error."
+		slog.Error("failed to convert folded data", slog.String("error", err.Error()))
+		out = ""
 		return
 	}
 	fg := texttemplate.Must(texttemplate.New("flameGraphTemplate").Parse(flameGraphTemplate))
@@ -180,8 +188,8 @@ func renderFlameGraph(header string, tableValues TableValues, field string) (out
 		Header: header,
 	})
 	if err != nil {
-		log.Printf("failed to render flame graph template: %v", err)
-		out += "Error."
+		slog.Error("failed to render flame graph template", slog.String("error", err.Error()))
+		out = ""
 		return
 	}
 	out += buf.String()

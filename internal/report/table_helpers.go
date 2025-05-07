@@ -2141,3 +2141,17 @@ func systemFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
 	}
 	return folded
 }
+
+func maxRenderDepthFromOutput(outputs map[string]script.ScriptOutput) string {
+	sections := getSectionsFromOutput(outputs[script.ProfileSystemScriptName].Stdout)
+	if len(sections) == 0 {
+		slog.Warn("no sections in system profiling output")
+		return ""
+	}
+	for header, content := range sections {
+		if header == "maximum depth" {
+			return content
+		}
+	}
+	return ""
+}
