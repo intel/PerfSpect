@@ -299,6 +299,30 @@ type targetsFile struct {
 	Targets []targetFromYAML `yaml:"targets"`
 }
 
+// sanitizeTargetName sanitizes the target name by removing any invalid characters.
+func sanitizeTargetName(targetName string) string {
+	// remove any invalid characters from the target name
+	// this is needed for the report file names
+	// we only allow alphanumeric characters, underscores, periods, and dashes
+	// everything else is replaced with an underscore
+	sanitizedTargetName := strings.Map(func(r rune) rune {
+		if r == '-' || r == '_' || r == '.' {
+			return r
+		}
+		if r >= 'a' && r <= 'z' {
+			return r
+		}
+		if r >= 'A' && r <= 'Z' {
+			return r
+		}
+		if r >= '0' && r <= '9' {
+			return r
+		}
+		return '_'
+	}, targetName)
+	return sanitizedTargetName
+}
+
 // getTargetsFromFile reads a targets file and returns a list of target objects.
 // It takes the path to the targets file and the local temporary directory as input.
 func getTargetsFromFile(targetsFilePath string, localTempDir string) (targets []target.Target, targetErrs []error, err error) {
@@ -319,9 +343,20 @@ func getTargetsFromFile(targetsFilePath string, localTempDir string) (targets []
 	if err != nil {
 		return
 	}
+	targetNameUsed := make(map[string]bool)
 	for _, t := range targetsFile.Targets {
 		// create a target object
-		newTarget := target.NewRemoteTarget(t.Name, t.Host, t.Port, t.User, t.Key)
+		// target name is not required, but if it is provided there must not be duplicate names
+		var targetName string
+		if t.Name != "" {
+			targetName = sanitizeTargetName(t.Name)
+			if targetNameUsed[targetName] {
+				err = fmt.Errorf("duplicate target name (after sanitized) found in targets file: original: %s, sanitized: %s", t.Name, targetName)
+				return
+			}
+			targetNameUsed[targetName] = true
+		}
+		newTarget := target.NewRemoteTarget(targetName, t.Host, t.Port, t.User, t.Key)
 		newTarget.SetSshPass(t.Pwd)
 		// create a sub-directory for the target in the localTempDir
 		localTargetDir := path.Join(localTempDir, newTarget.GetName())
