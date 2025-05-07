@@ -42,6 +42,7 @@ var (
 	flagFrequency       int
 	flagPid             int
 	flagNoSystemSummary bool
+	flagMaxDepth        int
 )
 
 const (
@@ -49,6 +50,7 @@ const (
 	flagFrequencyName       = "frequency"
 	flagPidName             = "pid"
 	flagNoSystemSummaryName = "no-summary"
+	flagMaxDepthName        = "max-depth"
 )
 
 func init() {
@@ -58,6 +60,7 @@ func init() {
 	Cmd.Flags().IntVar(&flagFrequency, flagFrequencyName, 11, "")
 	Cmd.Flags().IntVar(&flagPid, flagPidName, 0, "")
 	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
+	Cmd.Flags().IntVar(&flagMaxDepth, flagMaxDepthName, 0, "")
 
 	common.AddTargetFlags(Cmd)
 
@@ -107,6 +110,10 @@ func getFlagGroups() []common.FlagGroup {
 		{
 			Name: common.FlagFormatName,
 			Help: fmt.Sprintf("choose output format(s) from: %s", strings.Join(append([]string{report.FormatAll}, report.FormatHtml, report.FormatTxt, report.FormatJson), ", ")),
+		},
+		{
+			Name: flagMaxDepthName,
+			Help: "maximum render depth of call stack in flamegraph (0 = no limit)",
 		},
 		{
 			Name: flagNoSystemSummaryName,
@@ -164,6 +171,11 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
 	}
+	if flagMaxDepth < 0 {
+		err := fmt.Errorf("max depth must be greater than or equal to 0")
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return err
+	}
 	// common target flags
 	if err := common.ValidateTargetFlags(cmd); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -185,6 +197,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			"Frequency": strconv.Itoa(flagFrequency),
 			"Duration":  strconv.Itoa(flagDuration),
 			"PID":       strconv.Itoa(flagPid),
+			"MaxDepth":  strconv.Itoa(flagMaxDepth),
 		},
 		TableNames: tableNames,
 	}

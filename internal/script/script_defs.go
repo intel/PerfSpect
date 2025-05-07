@@ -1244,6 +1244,7 @@ fi
 pid={{.PID}}
 duration={{.Duration}}
 frequency={{.Frequency}}
+maxdepth={{.MaxDepth}}
 
 ap_interval=0
 if [ "$frequency" -ne 0 ]; then
@@ -1295,6 +1296,9 @@ for idx in "${!java_pids[@]}"; do
 	async-profiler/profiler.sh stop -o collapsed "$pid"
 done
 
+echo "########## maximum depth ##########"
+echo "$maxdepth"
+
 `,
 		Superuser: true,
 		Depends:   []string{"async-profiler"},
@@ -1305,6 +1309,7 @@ done
 pid={{.PID}}
 duration={{.Duration}}
 frequency={{.Frequency}}
+maxdepth={{.MaxDepth}}
 
 # Function to restore original settings and clean up
 # This function will be called on exit
@@ -1405,6 +1410,9 @@ if [ -f "$perf_fp_folded" ]; then
 	echo "########## perf_fp ##########"
 	cat "$perf_fp_folded"
 fi
+
+echo "########## maximum depth ##########"
+echo "$maxdepth"
 
 # Clean up temporary files
 rm -f "$perf_fp_data" "$perf_dwarf_data" "$perf_dwarf_folded" "$perf_fp_folded"

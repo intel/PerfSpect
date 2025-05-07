@@ -2386,6 +2386,7 @@ func codePathFrequencyTableValues(outputs map[string]script.ScriptOutput) []Fiel
 	fields := []Field{
 		{Name: "System Paths", Values: []string{systemFoldedFromOutput(outputs)}},
 		{Name: "Java Paths", Values: []string{javaFoldedFromOutput(outputs)}},
+		{Name: "Maximum Render Depth", Values: []string{maxRenderDepthFromOutput(outputs)}},
 	}
 	return fields
 }
