@@ -1316,10 +1316,6 @@ maxdepth={{.MaxDepth}}
 restore_settings() {
 	echo "$PERF_EVENT_PARANOID" > /proc/sys/kernel/perf_event_paranoid
 	echo "$KPTR_RESTRICT" > /proc/sys/kernel/kptr_restrict
-    rm -f "$perf_fp_data"
-    rm -f "$perf_dwarf_data"
-    rm -f "$perf_dwarf_folded"
-    rm -f "$perf_fp_folded"
     if [ -n "$perf_fp_pid" ]; then
         kill -0 $perf_fp_pid 2>/dev/null && kill -INT $perf_fp_pid
     fi
@@ -1327,12 +1323,6 @@ restore_settings() {
         kill -0 $perf_dwarf_pid 2>/dev/null && kill -INT $perf_dwarf_pid
     fi
 }
-
-# create temporary output files
-perf_fp_data=$(mktemp)
-perf_dwarf_data=$(mktemp)
-perf_dwarf_folded=$(mktemp)
-perf_fp_folded=$(mktemp)
 
 # adjust perf_event_paranoid and kptr_restrict
 PERF_EVENT_PARANOID=$( cat /proc/sys/kernel/perf_event_paranoid )
@@ -1354,10 +1344,10 @@ fi
 # frame pointer mode
 # if pid was provided, use it
 if [ "$pid" -ne 0 ]; then
-    perf record -F "$frequency" -p "$pid" -g -o "$perf_fp_data" -m 129 &
+    perf record -F "$frequency" -p "$pid" -g -o perf_fp_data -m 129 &
 else
     # if no pid was provided, use system-wide profiling
-    perf record -F "$frequency" -a -g -o "$perf_fp_data" -m 129 &
+    perf record -F "$frequency" -a -g -o perf_fp_data -m 129 &
 fi
 perf_fp_pid=$!
 if ! kill -0 $perf_fp_pid 2>/dev/null; then
@@ -1368,10 +1358,10 @@ fi
 # dwarf mode
 # if pid was provided, use it
 if [ "$pid" -ne 0 ]; then
-    perf record -F "$frequency" -p "$pid" -g -o "$perf_dwarf_data" -m 257 --call-graph dwarf,8192 &
+    perf record -F "$frequency" -p "$pid" -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
 else
     # if no pid was provided, use system-wide profiling
-    perf record -F "$frequency" -a -g -o "$perf_dwarf_data" -m 257 --call-graph dwarf,8192 &
+    perf record -F "$frequency" -a -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
 fi
 perf_dwarf_pid=$!
 if ! kill -0 $perf_dwarf_pid 2>/dev/null; then
@@ -1398,24 +1388,23 @@ fi
 wait ${perf_fp_pid} ${perf_dwarf_pid}
 
 # collapse perf data
-perf script -i "$perf_dwarf_data" | stackcollapse-perf > "$perf_dwarf_folded"
-perf script -i "$perf_fp_data" | stackcollapse-perf > "$perf_fp_folded"
+perf script -i perf_dwarf_data > perf_dwarf_stacks
+stackcollapse-perf perf_dwarf_stacks > perf_dwarf_folded
+perf script -i perf_fp_data > perf_fp_stacks
+stackcollapse-perf perf_fp_stacks > perf_fp_folded
 
 # Display results
-if [ -f "$perf_dwarf_folded" ]; then
+if [ -f perf_dwarf_folded ]; then
 	echo "########## perf_dwarf ##########"
-	cat "$perf_dwarf_folded"
+	cat perf_dwarf_folded
 fi
-if [ -f "$perf_fp_folded" ]; then
+if [ -f perf_fp_folded ]; then
 	echo "########## perf_fp ##########"
-	cat "$perf_fp_folded"
+	cat perf_fp_folded
 fi
 
 echo "########## maximum depth ##########"
 echo "$maxdepth"
-
-# Clean up temporary files
-rm -f "$perf_fp_data" "$perf_dwarf_data" "$perf_dwarf_folded" "$perf_fp_folded"
 `,
 		Superuser: true,
 		Depends:   []string{"perf", "stackcollapse-perf"},

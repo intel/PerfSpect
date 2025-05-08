@@ -58,6 +58,7 @@ endif
 test:
 	@echo "Running unit tests..."
 	go test -v ./...
+	cd tools/stackcollapse-perf && go test -v ./...
 
 .PHONY: update-deps
 update-deps:
