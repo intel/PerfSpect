@@ -8,10 +8,14 @@
 #   $ docker build -f tools/build.Dockerfile --tag perfspect-tools:$TAG ./tools
 
 FROM ubuntu:18.04 AS builder
+# Define default values for proxy environment variables
+ARG http_proxy=""
+ARG https_proxy=""
 ENV http_proxy=${http_proxy}
 ENV https_proxy=${https_proxy}
 ENV LANG=en_US.UTF-8
 ARG DEBIAN_FRONTEND=noninteractive
+ARG GO_VERSION=1.24.3
 RUN apt-get update && apt-get install -y apt-utils locales wget curl git netcat-openbsd software-properties-common jq zip unzip
 RUN locale-gen en_US.UTF-8 &&  echo "LANG=en_US.UTF-8" > /etc/default/locale
 RUN for i in {1..5}; do \
@@ -26,7 +30,7 @@ RUN for i in {1..5}; do \
     done
 ENV JAVA_HOME=/usr/lib/jvm/java-1.11.0-openjdk-amd64
 # need golang to build go tools
-RUN rm -rf /usr/local/go && wget -qO- https://go.dev/dl/go1.24.1.linux-amd64.tar.gz | tar -C /usr/local -xz
+RUN rm -rf /usr/local/go && wget -qO- https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -C /usr/local -xz
 ENV PATH="${PATH}:/usr/local/go/bin"
 # need up-to-date zlib (used by stress-ng static build) to fix security vulnerabilities
 RUN git clone https://github.com/madler/zlib.git && cd zlib && ./configure && make install
@@ -38,6 +42,9 @@ WORKDIR /workdir
 RUN make tools && make oss-source
 
 FROM ubuntu:22.04 AS perf-builder
+# Define default values for proxy environment variables
+ARG http_proxy=""
+ARG https_proxy=""
 ENV http_proxy=${http_proxy}
 ENV https_proxy=${https_proxy}
 ENV LANG=en_US.UTF-8

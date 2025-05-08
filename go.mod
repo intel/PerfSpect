@@ -1,6 +1,6 @@
 module perfspect
 
-go 1.24.1
+go 1.24
 
 replace (
 	perfspect/internal/common => ./internal/common

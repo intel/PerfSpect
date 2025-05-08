@@ -7,7 +7,12 @@
 # build the perfspect Go components using this image
 #    $ docker run --rm -v "$PWD":/workdir -w /workdir perfspect-builder:v1 make dist
 
-FROM golang:1.24.2@sha256:1ecc479bc712a6bdb56df3e346e33edcc141f469f82840bab9f4bc2bc41bf91d
+# To update the golang version, run the following commands:
+# Pull the latest golang:1.24.3 image
+#   docker pull golang:1.24.3
+# Retrieve the updated digest
+#   docker inspect --format='{{index .RepoDigests 0}}' golang:1.24.3
+FROM golang:1.24.3@sha256:39d9e7d9c5d9c9e4baf0d8fff579f06d5032c0f4425cdec9e86732e8e4e374dc
 WORKDIR /workdir
 # pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY go.mod go.sum ./
