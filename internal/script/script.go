@@ -146,9 +146,9 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 			return nil, err
 		} else if script.Superuser && !myTarget.IsSuperUser() {
 			// run script with sudo, "-S" to read password from stdin. Note: password won't be asked for if password-less sudo is configured.
-			cmd = exec.Command(fmt.Sprintf("cd %s && sudo -S bash %s", myTarget.GetTempDirectory(), scriptPath))
+			cmd = exec.Command("sudo", "-S", "bash", scriptPath)
 		} else {
-			cmd = exec.Command(fmt.Sprintf("cd %s && bash %s", myTarget.GetTempDirectory(), scriptPath))
+			cmd = exec.Command("bash", scriptPath)
 		}
 		stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, false)
 		if err != nil {
@@ -468,11 +468,13 @@ func prepareTargetToRunScripts(myTarget target.Target, scripts []ScriptDefinitio
 		for _, dependency := range script.Depends {
 			dependenciesToCopy[path.Join(targetArchitecture, dependency)] = 1
 		}
-		// add user's path to script
-		scriptWithPath := fmt.Sprintf("export PATH=\"%s\"\n%s", userPath, script.ScriptTemplate)
+		// add cd command to the script to change to the target's local temp directory
+		targetScript := fmt.Sprintf("cd %s\n%s", targetTempDirectory, script.ScriptTemplate)
+		// add PATH (including the target temporary directory) to the script
+		targetScript = fmt.Sprintf("export PATH=\"%s\"\n%s", userPath, targetScript)
 		// write script to the target's local temp directory
 		scriptPath := path.Join(localTempDir, myTarget.GetName(), scriptNameToFilename(script.Name))
-		err = os.WriteFile(scriptPath, []byte(scriptWithPath), 0644)
+		err = os.WriteFile(scriptPath, []byte(targetScript), 0644)
 		if err != nil {
 			err = fmt.Errorf("error writing script to local file: %v", err)
 			return
