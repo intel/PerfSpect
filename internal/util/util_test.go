@@ -149,3 +149,22 @@ func TestSelectiveIntRangeToIntList(t *testing.T) {
 		}
 	}
 }
+func TestIntSliceToStringSlice(t *testing.T) {
+	tests := []struct {
+		input    []int
+		expected []string
+	}{
+		{[]int{1, 2, 3}, []string{"1", "2", "3"}},                   // Simple case
+		{[]int{-1, 0, 1}, []string{"-1", "0", "1"}},                 // Negative, zero, and positive integers
+		{[]int{}, []string{}},                                       // Empty slice
+		{[]int{123, 456, 789}, []string{"123", "456", "789"}},       // Larger numbers
+		{[]int{-123, -456, -789}, []string{"-123", "-456", "-789"}}, // Negative larger numbers
+	}
+
+	for _, test := range tests {
+		result := IntSliceToStringSlice(test.input)
+		if !slices.Equal(result, test.expected) {
+			t.Errorf("expected %v, got %v for input %v", test.expected, result, test.input)
+		}
+	}
+}

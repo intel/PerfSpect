@@ -129,7 +129,7 @@ const (
 	// config  table names
 	ConfigurationTableName = "Configuration"
 	// flamegraph table names
-	CodePathFrequencyTableName = "Code Path Frequency"
+	CallStackFrequencyTableName = "Call Stack Frequency"
 	// lock table names
 	KernelLockAnalysisTableName = "Kernel Lock Analysis"
 	// common table names
@@ -742,15 +742,14 @@ var tableDefinitions = map[string]TableDefinition{
 	//
 	// flamegraph tables
 	//
-	CodePathFrequencyTableName: {
-		Name:      CodePathFrequencyTableName,
-		MenuLabel: CodePathFrequencyTableName,
+	CallStackFrequencyTableName: {
+		Name:      CallStackFrequencyTableName,
+		MenuLabel: CallStackFrequencyTableName,
 		ScriptNames: []string{
-			script.ProfileJavaScriptName,
-			script.ProfileSystemScriptName,
+			script.CollapsedCallStacksScriptName,
 		},
-		FieldsFunc:            codePathFrequencyTableValues,
-		HTMLTableRendererFunc: codePathFrequencyTableHTMLRenderer},
+		FieldsFunc:            callStackFrequencyTableValues,
+		HTMLTableRendererFunc: callStackFrequencyTableHTMLRenderer},
 	//
 	// kernel lock analysis tables
 	//
@@ -2382,10 +2381,11 @@ func gaudiTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return fields
 }
 
-func codePathFrequencyTableValues(outputs map[string]script.ScriptOutput) []Field {
+func callStackFrequencyTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
-		{Name: "System Paths", Values: []string{systemFoldedFromOutput(outputs)}},
-		{Name: "Java Paths", Values: []string{javaFoldedFromOutput(outputs)}},
+		{Name: "Native Stacks", Values: []string{nativeFoldedFromOutput(outputs)}},
+		{Name: "Java Stacks", Values: []string{javaFoldedFromOutput(outputs)}},
+		{Name: "Maximum Render Depth", Values: []string{maxRenderDepthFromOutput(outputs)}},
 	}
 	return fields
 }
