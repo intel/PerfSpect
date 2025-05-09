@@ -100,16 +100,18 @@ func ValidateTargetFlags(cmd *cobra.Command) error {
 	}
 	// confirm that user is a valid user name
 	if flagTargetUser != "" {
-		re := regexp.MustCompile(`^([a-zA-Z0-9_-]+)$`)
+		userNameRegex := `^[a-z_][a-z0-9_.-]{0,63}$`
+		re := regexp.MustCompile(userNameRegex)
 		if !re.MatchString(flagTargetUser) {
-			return fmt.Errorf("user name %s contains invalid characters", flagTargetUser)
+			return fmt.Errorf("user name %s does not match the user name regex '%s'", flagTargetUser, userNameRegex)
 		}
 	}
 	// confirm that host is a valid host name or IP address
 	if flagTargetHost != "" {
-		re := regexp.MustCompile(`^([a-zA-Z0-9.-]+)$`)
+		hostNameRegex := `^([a-zA-Z0-9.-]+)$`
+		re := regexp.MustCompile(hostNameRegex)
 		if !re.MatchString(flagTargetHost) {
-			return fmt.Errorf("host name %s is not a valid host name or IP address", flagTargetHost)
+			return fmt.Errorf("host name %s does not match the host name regex '%s'", flagTargetHost, hostNameRegex)
 		}
 	}
 	return nil
