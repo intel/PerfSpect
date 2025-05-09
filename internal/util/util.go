@@ -521,3 +521,12 @@ func SelectiveIntRangeToIntList(input string) ([]int, error) {
 	}
 	return result, nil
 }
+
+// IntSliceToStringSlice converts a slice of integers to a slice of strings.
+func IntSliceToStringSlice(ints []int) []string {
+	strs := make([]string, len(ints))
+	for i, v := range ints {
+		strs[i] = strconv.Itoa(v)
+	}
+	return strs
+}

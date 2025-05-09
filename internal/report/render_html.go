@@ -1284,7 +1284,7 @@ func gaudiTelemetryTableHTMLRenderer(tableValues TableValues, targetName string)
 	return out
 }
 
-func codePathFrequencyTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func callStackFrequencyTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	out := `<style>
 
 /* Custom page header */
@@ -1308,8 +1308,8 @@ func codePathFrequencyTableHTMLRenderer(tableValues TableValues, targetName stri
 }
 </style>
 `
-	out += renderFlameGraph("System", tableValues, "System Paths")
-	out += renderFlameGraph("Java", tableValues, "Java Paths")
+	out += renderFlameGraph("Native", tableValues, "Native Stacks")
+	out += renderFlameGraph("Java", tableValues, "Java Stacks")
 	return out
 }
 

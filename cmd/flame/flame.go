@@ -9,6 +9,7 @@ import (
 	"os"
 	"perfspect/internal/common"
 	"perfspect/internal/report"
+	"perfspect/internal/util"
 	"slices"
 	"strconv"
 	"strings"
@@ -40,7 +41,7 @@ var Cmd = &cobra.Command{
 var (
 	flagDuration        int
 	flagFrequency       int
-	flagPid             int
+	flagPids            []int
 	flagNoSystemSummary bool
 	flagMaxDepth        int
 )
@@ -48,7 +49,7 @@ var (
 const (
 	flagDurationName        = "duration"
 	flagFrequencyName       = "frequency"
-	flagPidName             = "pid"
+	flagPidsName            = "pids"
 	flagNoSystemSummaryName = "no-summary"
 	flagMaxDepthName        = "max-depth"
 )
@@ -58,7 +59,7 @@ func init() {
 	Cmd.Flags().StringSliceVar(&common.FlagFormat, common.FlagFormatName, []string{report.FormatAll}, "")
 	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 30, "")
 	Cmd.Flags().IntVar(&flagFrequency, flagFrequencyName, 11, "")
-	Cmd.Flags().IntVar(&flagPid, flagPidName, 0, "")
+	Cmd.Flags().IntSliceVar(&flagPids, flagPidsName, nil, "")
 	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
 	Cmd.Flags().IntVar(&flagMaxDepth, flagMaxDepthName, 0, "")
 
@@ -104,8 +105,8 @@ func getFlagGroups() []common.FlagGroup {
 			Help: "number of samples taken per second",
 		},
 		{
-			Name: flagPidName,
-			Help: "pid to collect data from. If not specified, all pids will be collected",
+			Name: flagPidsName,
+			Help: "comma separated list of PIDs. If not specified, all PIDs will be collected",
 		},
 		{
 			Name: common.FlagFormatName,
@@ -166,10 +167,12 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
 	}
-	if flagPid < 0 {
-		err := fmt.Errorf("pid must be greater than or equal to 0")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+	for _, pid := range flagPids {
+		if pid < 0 {
+			err := fmt.Errorf("PID must be greater than or equal to 0")
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
 	}
 	if flagMaxDepth < 0 {
 		err := fmt.Errorf("max depth must be greater than or equal to 0")
@@ -189,14 +192,14 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	if !flagNoSystemSummary {
 		tableNames = append(tableNames, report.BriefSysSummaryTableName)
 	}
-	tableNames = append(tableNames, report.CodePathFrequencyTableName)
+	tableNames = append(tableNames, report.CallStackFrequencyTableName)
 	reportingCommand := common.ReportingCommand{
 		Cmd:            cmd,
 		ReportNamePost: "flame",
 		ScriptParams: map[string]string{
 			"Frequency": strconv.Itoa(flagFrequency),
 			"Duration":  strconv.Itoa(flagDuration),
-			"PID":       strconv.Itoa(flagPid),
+			"PIDs":      strings.Join(util.IntSliceToStringSlice(flagPids), ","),
 			"MaxDepth":  strconv.Itoa(flagMaxDepth),
 		},
 		TableNames: tableNames,

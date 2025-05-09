@@ -2080,29 +2080,28 @@ func sectionValueFromOutput(output string, sectionName string) string {
 }
 
 func javaFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
-	sections := getSectionsFromOutput(outputs[script.ProfileJavaScriptName].Stdout)
+	sections := getSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
 	if len(sections) == 0 {
-		slog.Warn("no sections in java profiling output")
+		slog.Warn("no sections in collapsed call stack output")
 		return ""
 	}
 	javaFolded := make(map[string]string)
 	re := regexp.MustCompile(`^async-profiler (\d+) (.*)$`)
 	for header, stacks := range sections {
-		if stacks == "" {
-			slog.Info("no stacks for java process", slog.String("header", header))
-			continue
-		}
-		if strings.HasPrefix(stacks, "Failed to inject profiler") {
-			slog.Warn("profiling data error", slog.String("header", header))
-			continue
-		}
 		match := re.FindStringSubmatch(header)
 		if match == nil {
-			slog.Warn("profiling data error, regex didn't match header", slog.String("header", header))
 			continue
 		}
 		pid := match[1]
 		processName := match[2]
+		if stacks == "" {
+			slog.Warn("no stacks for java process", slog.String("header", header))
+			continue
+		}
+		if strings.HasPrefix(stacks, "Failed to inject profiler") {
+			slog.Error("profiling data error", slog.String("header", header))
+			continue
+		}
 		_, ok := javaFolded[processName]
 		if processName == "" {
 			processName = "java (" + pid + ")"
@@ -2113,15 +2112,15 @@ func javaFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
 	}
 	folded, err := mergeJavaFolded(javaFolded)
 	if err != nil {
-		slog.Warn("err merging java stacks", slog.String("error", err.Error()))
+		slog.Error("failed to merge java stacks", slog.String("error", err.Error()))
 	}
 	return folded
 }
 
-func systemFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
-	sections := getSectionsFromOutput(outputs[script.ProfileSystemScriptName].Stdout)
+func nativeFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
+	sections := getSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
 	if len(sections) == 0 {
-		slog.Warn("no sections in system profiling output")
+		slog.Warn("no sections in collapsed call stack output")
 		return ""
 	}
 	var dwarfFolded, fpFolded string
@@ -2137,15 +2136,15 @@ func systemFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
 	}
 	folded, err := mergeSystemFolded(fpFolded, dwarfFolded)
 	if err != nil {
-		slog.Warn("error merging folded stacks", slog.String("error", err.Error()))
+		slog.Error("failed to merge native stacks", slog.String("error", err.Error()))
 	}
 	return folded
 }
 
 func maxRenderDepthFromOutput(outputs map[string]script.ScriptOutput) string {
-	sections := getSectionsFromOutput(outputs[script.ProfileSystemScriptName].Stdout)
+	sections := getSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
 	if len(sections) == 0 {
-		slog.Warn("no sections in system profiling output")
+		slog.Warn("no sections in collapsed call stack output")
 		return ""
 	}
 	for header, content := range sections {

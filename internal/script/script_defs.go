@@ -112,10 +112,8 @@ const (
 	TurbostatTelemetryScriptName   = "turbostat telemetry"
 	InstructionTelemetryScriptName = "instruction telemetry"
 	GaudiTelemetryScriptName       = "gaudi telemetry"
-
 	// flamegraph scripts
-	ProfileJavaScriptName   = "profile java"
-	ProfileSystemScriptName = "profile system"
+	CollapsedCallStacksScriptName = "collapsed call stacks"
 	// lock scripts
 	ProfileKernelLockScriptName = "profile kernel lock"
 )
@@ -1237,177 +1235,155 @@ fi
 		Superuser: true,
 		NeedsKill: true,
 	},
-	// profile (flamegraph) scripts
-	ProfileJavaScriptName: {
-		Name: ProfileJavaScriptName,
-		ScriptTemplate: `# JAVA app (async profiler) call stack collection
-pid={{.PID}}
+	// flamegraph scripts
+	CollapsedCallStacksScriptName: {
+		Name: CollapsedCallStacksScriptName,
+		ScriptTemplate: `# Combined (perf record and async profiler) call stack collection
+pids={{.PIDs}}
 duration={{.Duration}}
 frequency={{.Frequency}}
 maxdepth={{.MaxDepth}}
 
 ap_interval=0
 if [ "$frequency" -ne 0 ]; then
-	ap_interval=$((1000000000 / frequency))
+    ap_interval=$((1000000000 / frequency))
 fi
-
-# if pid is provided, use it
-if [ "$pid" -ne 0 ]; then
-    # check if the provided pid is running
-    if [ ! -d "/proc/$pid" ]; then
-        echo "pid $pid not running"
-        exit 1
-    fi
-    # check if pid is a java process, i.e., command line contains java
-    if ! tr '\000' ' ' < /proc/"$pid"/cmdline | grep -q java; then
-        echo "pid $pid is not a java process"
-        exit 1
-    fi
-    pids="$pid"
-else
-    # get all java pids
-    pids=$( pgrep java )
-fi
-
-# check if any java pids are found
-if [ -z "$pids" ]; then
-    echo "no java processes found"
-    exit 1
-fi
-
-# start java profiling for each java pid
-declare -a java_pids=()
-declare -a java_cmds=()
-for pid in $pids ; do
-    java_pids+=("$pid")
-    java_cmds+=("$( tr '\000' ' ' <  /proc/"$pid"/cmdline )")
-    # profile pid in background
-    async-profiler/profiler.sh start -i "$ap_interval" -o collapsed "$pid"
-done
-
-# wait for the specified duration
-sleep "$duration"
-
-# stop java profiling for each java pid
-for idx in "${!java_pids[@]}"; do
-	pid="${java_pids[$idx]}"
-	cmd="${java_cmds[$idx]}"
-	echo "########## async-profiler $pid $cmd ##########"
-	async-profiler/profiler.sh stop -o collapsed "$pid"
-done
-
-echo "########## maximum depth ##########"
-echo "$maxdepth"
-
-`,
-		Superuser: true,
-		Depends:   []string{"async-profiler"},
-	},
-	ProfileSystemScriptName: {
-		Name: ProfileSystemScriptName,
-		ScriptTemplate: `# native (perf record) call stack collection
-pid={{.PID}}
-duration={{.Duration}}
-frequency={{.Frequency}}
-maxdepth={{.MaxDepth}}
 
 # Function to restore original settings and clean up
-# This function will be called on exit
 restore_settings() {
-	echo "$PERF_EVENT_PARANOID" > /proc/sys/kernel/perf_event_paranoid
-	echo "$KPTR_RESTRICT" > /proc/sys/kernel/kptr_restrict
+    echo "$PERF_EVENT_PARANOID" > /proc/sys/kernel/perf_event_paranoid
+    echo "$KPTR_RESTRICT" > /proc/sys/kernel/kptr_restrict
     if [ -n "$perf_fp_pid" ]; then
         kill -0 $perf_fp_pid 2>/dev/null && kill -INT $perf_fp_pid
     fi
     if [ -n "$perf_dwarf_pid" ]; then
         kill -0 $perf_dwarf_pid 2>/dev/null && kill -INT $perf_dwarf_pid
     fi
+    for pid in "${java_pids[@]}"; do
+        async-profiler/profiler.sh stop -o collapsed "$pid"
+    done
 }
 
-# adjust perf_event_paranoid and kptr_restrict
-PERF_EVENT_PARANOID=$( cat /proc/sys/kernel/perf_event_paranoid )
+# Adjust perf_event_paranoid and kptr_restrict
+PERF_EVENT_PARANOID=$(cat /proc/sys/kernel/perf_event_paranoid)
 echo -1 >/proc/sys/kernel/perf_event_paranoid
-KPTR_RESTRICT=$( cat /proc/sys/kernel/kptr_restrict )
+KPTR_RESTRICT=$(cat /proc/sys/kernel/kptr_restrict)
 echo 0 >/proc/sys/kernel/kptr_restrict
 
 # Ensure settings are restored on exit
 trap restore_settings EXIT
 
-# if pid is not zero, check if the process is running
-if [ "$pid" -ne 0 ]; then
-    if ! ps -p "$pid" > /dev/null; then
-        echo "Error: Process $pid is not running."
-        exit 1
-    fi
+# Check if at least one process is running
+if [ -n "$pids" ]; then
+    IFS=',' read -r -a pid_array <<< "$pids"
+    for p in "${pid_array[@]}"; do
+        if ps -p "$p" > /dev/null; then
+            if tr '\000' ' ' < /proc/"$p"/cmdline | grep -q java; then
+                java_pids+=("$p")
+            fi
+        else
+            echo "Error: Process $p is not running." >&2
+            exit 1
+        fi
+    done
+else
+    mapfile -t java_pids < <(pgrep java)
 fi
 
-# frame pointer mode
-# if pid was provided, use it
-if [ "$pid" -ne 0 ]; then
-    perf record -F "$frequency" -p "$pid" -g -o perf_fp_data -m 129 &
+# Frame pointer mode
+if [ -n "$pids" ]; then
+    perf record -F "$frequency" -p "$pids" -g -o perf_fp_data -m 129 &
 else
-    # if no pid was provided, use system-wide profiling
     perf record -F "$frequency" -a -g -o perf_fp_data -m 129 &
 fi
 perf_fp_pid=$!
 if ! kill -0 $perf_fp_pid 2>/dev/null; then
-	echo "Failed to start perf record in frame pointer mode"
-	exit 1
+    echo "Failed to start perf record in frame pointer mode" >&2
+    exit 1
 fi
 
-# dwarf mode
-# if pid was provided, use it
-if [ "$pid" -ne 0 ]; then
-    perf record -F "$frequency" -p "$pid" -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
+# Dwarf mode
+if [ -n "$pids" ]; then
+    perf record -F "$frequency" -p "$pids" -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
 else
-    # if no pid was provided, use system-wide profiling
     perf record -F "$frequency" -a -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
 fi
 perf_dwarf_pid=$!
 if ! kill -0 $perf_dwarf_pid 2>/dev/null; then
-	echo "Failed to start perf record in dwarf mode"
-	exit 1
+    echo "Failed to start perf record in dwarf mode" >&2
+    exit 1
 fi
 
-# wait for the specified duration
+# Start Java profiling for each Java PID
+for pid in "${java_pids[@]}"; do
+    java_cmds+=("$(tr '\000' ' ' < /proc/"$pid"/cmdline)")
+    async-profiler/profiler.sh start -i "$ap_interval" -o collapsed "$pid"
+done
+
+# Wait for the specified duration
 sleep "$duration"
 
-# stop perf recording
+# Stop perf recording
 if ! kill -0 $perf_fp_pid 2>/dev/null; then
-    echo "Frame pointer mode already stopped"
+    echo "Frame pointer mode already stopped" >&2
 else
     kill -INT $perf_fp_pid
 fi
 if ! kill -0 $perf_dwarf_pid 2>/dev/null; then
-    echo "Dwarf mode already stopped"
+    echo "Dwarf mode already stopped" >&2
 else
     kill -INT $perf_dwarf_pid
 fi
 
-# wait for perf to finish
+# Stop Java profiling, write output to ap_folded_<pid> files
+for pid in "${java_pids[@]}"; do
+    async-profiler/profiler.sh stop -o collapsed -f ap_folded_"$pid" "$pid"
+done
+
+# Wait for perf to finish
 wait ${perf_fp_pid} ${perf_dwarf_pid}
 
-# collapse perf data
-perf script -i perf_dwarf_data > perf_dwarf_stacks
-stackcollapse-perf perf_dwarf_stacks > perf_dwarf_folded
-perf script -i perf_fp_data > perf_fp_stacks
-stackcollapse-perf perf_fp_stacks > perf_fp_folded
-
-# Display results
-if [ -f perf_dwarf_folded ]; then
-	echo "########## perf_dwarf ##########"
-	cat perf_dwarf_folded
+# Collapse perf data
+if [ -f perf_dwarf_data ]; then
+    perf script -i perf_dwarf_data > perf_dwarf_stacks
+    stackcollapse-perf perf_dwarf_stacks > perf_dwarf_folded
+else
+    echo "Error: perf_dwarf_data file not found" >&2
 fi
-if [ -f perf_fp_folded ]; then
-	echo "########## perf_fp ##########"
-	cat perf_fp_folded
+if [ -f perf_fp_data ]; then
+    perf script -i perf_fp_data > perf_fp_stacks
+    stackcollapse-perf perf_fp_stacks > perf_fp_folded
+else
+    echo "Error: perf_fp_data file not found" >&2
 fi
 
+# Dump results to stdout
 echo "########## maximum depth ##########"
 echo "$maxdepth"
+
+if [ -f perf_dwarf_folded ]; then
+    echo "########## perf_dwarf ##########"
+    cat perf_dwarf_folded
+fi
+if [ -f perf_fp_folded ]; then
+    echo "########## perf_fp ##########"
+    cat perf_fp_folded
+fi
+
+for idx in "${!java_pids[@]}"; do
+    pid="${java_pids[$idx]}"
+    cmd="${java_cmds[$idx]}"
+    echo "########## async-profiler $pid $cmd ##########"
+    if [ -f ap_folded_"$pid" ]; then
+        cat ap_folded_"$pid"
+    else
+        echo "Error: async-profiler output file not found for PID $pid" >&2
+    fi
+done
 `,
-		Superuser: true,
-		Depends:   []string{"perf", "stackcollapse-perf"},
+		Superuser:  true,
+		Sequential: true,
+		Depends:    []string{"async-profiler", "perf", "stackcollapse-perf"},
 	},
 	// lock analysis scripts
 	ProfileKernelLockScriptName: {

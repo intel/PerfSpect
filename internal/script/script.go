@@ -146,9 +146,9 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 			return nil, err
 		} else if script.Superuser && !myTarget.IsSuperUser() {
 			// run script with sudo, "-S" to read password from stdin. Note: password won't be asked for if password-less sudo is configured.
-			cmd = exec.Command("sudo", "-S", "bash", scriptPath)
+			cmd = exec.Command(fmt.Sprintf("cd %s && sudo -S bash %s", myTarget.GetTempDirectory(), scriptPath))
 		} else {
-			cmd = exec.Command("bash", scriptPath)
+			cmd = exec.Command(fmt.Sprintf("cd %s && bash %s", myTarget.GetTempDirectory(), scriptPath))
 		}
 		stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, false)
 		if err != nil {
