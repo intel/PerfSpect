@@ -9,6 +9,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -54,34 +55,63 @@ func (sa *StackAggregator) RememberStack(stack string, count int) {
 }
 
 func main() {
+	var config Config
+
+	flag.BoolVar(&config.AnnotateKernel, "kernel", false, "annotate kernel functions with a _[k]")
+	flag.BoolVar(&config.AnnotateJit, "jit", false, "annotate jit functions with a _[j]")
+	var annotateAll bool
+	flag.BoolVar(&annotateAll, "all", false, "all annotations (--kernel --jit)")
+	flag.BoolVar(&config.IncludePname, "pname", true, "include process names in stacks")
+	flag.BoolVar(&config.IncludePid, "pid", false, "include PID with process names")
+	flag.BoolVar(&config.IncludeTid, "tid", false, "include TID and PID with process names")
+	flag.BoolVar(&config.IncludeAddrs, "addrs", false, "include raw addresses where symbols can't be found")
+	flag.BoolVar(&config.TidyJava, "java", true, "condense Java signatures")
+	flag.BoolVar(&config.TidyGeneric, "generic", true, "clean up function names a little")
+	flag.StringVar(&config.EventFilter, "event-filter", "", "event name filter")
+	flag.BoolVar(&config.ShowInline, "inline", false, "un-inline using addr2line")
+	flag.BoolVar(&config.ShowContext, "context", false, "adds source context to --inline")
+	flag.BoolVar(&config.SrcLineInInput, "srcline", false, "parses output of 'perf script -F+srcline' and adds source context")
+
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "USAGE: %s [options] [infile] > outfile\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "\nOptions:\n")
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\n[1] perf script must emit both PID and TIDs for these to work; eg, Linux < 4.1:\n")
+		fmt.Fprintf(os.Stderr, "    perf script -f comm,pid,tid,cpu,time,event,ip,sym,dso,trace\n")
+		fmt.Fprintf(os.Stderr, "    for Linux >= 4.1:\n")
+		fmt.Fprintf(os.Stderr, "    perf script -F comm,pid,tid,cpu,time,event,ip,sym,dso,trace\n")
+		fmt.Fprintf(os.Stderr, "    If you save this output add --header on Linux >= 3.14 to include perf info.\n")
+	}
+
+	flag.Parse()
+
+	if annotateAll {
+		config.AnnotateKernel = true
+		config.AnnotateJit = true
+	}
+
+	if config.ShowInline {
+		fmt.Fprintf(os.Stderr, "--inline is not implemented\n")
+		os.Exit(1)
+	}
+	if config.SrcLineInInput {
+		fmt.Fprintf(os.Stderr, "--srcline is not implemented\n")
+		os.Exit(1)
+	}
+
 	var input *os.File
 	var err error
 
-	// Check if a file path is provided as a command-line argument
-	if len(os.Args) > 1 {
-		input, err = os.Open(os.Args[1]) // Open the file
+	args := flag.Args()
+	if len(args) > 0 {
+		input, err = os.Open(args[0])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error opening file: %s\n", err)
 			os.Exit(1)
 		}
 		defer input.Close()
 	} else {
-		input = os.Stdin // Default to standard input
-	}
-
-	var config = Config{
-		AnnotateKernel: false,
-		AnnotateJit:    false,
-		IncludePname:   true,
-		IncludePid:     false,
-		IncludeTid:     false,
-		IncludeAddrs:   false,
-		TidyJava:       true,
-		TidyGeneric:    true,
-		EventFilter:    "",
-		ShowInline:     false,
-		ShowContext:    false,
-		SrcLineInInput: false,
+		input = os.Stdin
 	}
 
 	err = ProcessStacks(input, os.Stdout, config)
@@ -93,39 +123,36 @@ func main() {
 
 // Regular expressions for parsing the perf output
 var (
-	eventLineRegex = regexp.MustCompile(`^(\S.+?)\s+(\d+)\/*(\d+)*\s+`)
-	eventTypeRegex = regexp.MustCompile(`:\s*(\d+)*\s+(\S+):\s*$`)
-	stackLineRegex = regexp.MustCompile(`^\s*(\w+)\s*(.+) \((.*)\)`)
-	// inlineRegex = regexp.MustCompile(`(perf-\d+.map|kernel\.|\[[^\]]+\])`)
-	stripSymbolsRegex   = regexp.MustCompile(`\+0x[\da-f]+$`)
-	stripIdRegex        = regexp.MustCompile(`\.\(.*\)\.`)
-	stripAnonymousRegex = regexp.MustCompile(`\([^a]*anonymous namespace[^)]*\)`)
-	jitRegex            = regexp.MustCompile(`/tmp/perf-\d+\.map`)
+	eventLineRegex         = regexp.MustCompile(`^(\S.+?)\s+(\d+)\/*(\d+)*\s+`)
+	eventTypeRegex         = regexp.MustCompile(`:\s*(\d+)*\s+(\S+):\s*$`)
+	stackLineRegex         = regexp.MustCompile(`^\s*(\w+)\s*(.+) \((.*)\)`)
+	stripSymbolOffsetRegex = regexp.MustCompile(`\+0x[\da-f]+$`)
+	goMethodRegex          = regexp.MustCompile(`\.\(.*\)\.`)
+	jitRegex               = regexp.MustCompile(`/tmp/perf-\d+\.map`)
 )
 
 // ProcessStacks processes stack traces from the input reader and writes the collapsed stacks to the output writer.
 // It uses the provided configuration to control the processing behavior.
 func ProcessStacks(input io.Reader, output io.Writer, config Config) error {
-	aggregator := NewStackAggregator()
-	scanner := bufio.NewScanner(input)
-
 	var stack []string
 	var processName string
 	var period int
+	aggregator := NewStackAggregator()
+	scanner := bufio.NewScanner(input)
 
 	// main loop, read lines from stdin
 	for scanner.Scan() {
 		line := scanner.Text()
-
+		// skip comments
 		if strings.HasPrefix(line, "#") {
 			continue
 		}
-
+		// skip empty lines that are not after a stack
 		if line == "" && processName == "" {
 			continue
 		}
-
-		if line == "" { // check for End of stack
+		// check for end of stack
+		if line == "" {
 			if config.IncludePname {
 				stack = append([]string{processName}, stack...)
 			}
@@ -136,40 +163,46 @@ func ProcessStacks(input io.Reader, output io.Writer, config Config) error {
 			processName = ""
 			continue
 		}
-		if err := handleEventRecord(line, &processName, &period, config); err != nil {
-			fmt.Fprintf(output, "Error: %s\n", err)
+		// check for event record
+		if eventLineRegex.MatchString(line) {
+			var err error
+			processName, period, err = handleEventRecord(line, config)
+			if err != nil {
+				fmt.Fprintf(output, "Error: %s\n", err)
+			}
 			continue
-		} else if err := handleStackLine(line, &stack, processName, config); err != nil {
-			fmt.Fprintf(output, "Error: %s\n", err)
+		}
+		// check for stack line
+		if stackLineRegex.MatchString(line) {
+			err := handleStackLine(line, &stack, processName, config)
+			if err != nil {
+				fmt.Fprintf(output, "Error: %s\n", err)
+			}
 			continue
 		}
 	}
-
 	// Check for errors during scanning
 	if err := scanner.Err(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error reading input: %s\n", err)
 		return err
 	}
-
 	// Output results
 	keys := make([]string, 0, len(aggregator.collapsed))
 	for k := range aggregator.collapsed {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-
 	for _, k := range keys {
 		fmt.Fprintf(output, "%s %d\n", k, aggregator.collapsed[k])
 	}
-
 	return nil
 }
 
 // handleEventRecord parses an event record line and updates the process name and period based on the configuration.
-func handleEventRecord(line string, processName *string, period *int, config Config) error {
+func handleEventRecord(line string, config Config) (processName string, period int, err error) {
 	matches := eventLineRegex.FindStringSubmatch(line)
 	if matches == nil {
-		return nil
+		return
 	}
 
 	comm, pid, tid := matches[1], matches[2], matches[3]
@@ -181,32 +214,35 @@ func handleEventRecord(line string, processName *string, period *int, config Con
 	if eventMatches := eventTypeRegex.FindStringSubmatch(line); eventMatches != nil {
 		eventPeriod := eventMatches[1]
 		if eventPeriod == "" {
-			*period = 1
+			period = 1
 		} else {
-			eventPeriodInt, err := strconv.Atoi(eventPeriod)
+			var eventPeriodInt int
+			eventPeriodInt, err = strconv.Atoi(eventPeriod)
 			if err != nil {
-				return fmt.Errorf("failed to parse event period: %s, error: %v", eventPeriod, err)
+				err = fmt.Errorf("failed to parse event period: %s, error: %v", eventPeriod, err)
+				return
 			}
-			*period = eventPeriodInt
+			period = eventPeriodInt
 		}
 		event := eventMatches[2]
 
 		if config.EventFilter == "" {
 			config.EventFilter = event
 		} else if event != config.EventFilter {
-			return fmt.Errorf("event type mismatch: %s != %s", event, config.EventFilter)
+			err = fmt.Errorf("event type mismatch: %s != %s", event, config.EventFilter)
+			return
 		}
 	}
 
 	if config.IncludeTid {
-		*processName = fmt.Sprintf("%s-%s/%s", comm, pid, tid)
+		processName = fmt.Sprintf("%s-%s/%s", comm, pid, tid)
 	} else if config.IncludePid {
-		*processName = fmt.Sprintf("%s-%s", comm, pid)
+		processName = fmt.Sprintf("%s-%s", comm, pid)
 	} else {
-		*processName = comm
+		processName = comm
 	}
-	*processName = strings.ReplaceAll(*processName, " ", "_")
-	return nil
+	processName = strings.ReplaceAll(processName, " ", "_")
+	return
 }
 
 // handleStackLine parses a stack line and appends the function name to the stack based on the configuration.
@@ -218,19 +254,7 @@ func handleStackLine(line string, stack *[]string, pname string, config Config) 
 
 	pc, rawFunc, mod := matches[1], matches[2], matches[3]
 
-	// skip for now as showInline is always false
-	// if showInline && !inlineRegex.MatchString(mod) {
-	// 	inlineRes := inline(pc, rawFunc, mod)
-	// if inlineRes != "" && inlineRes != "??" && inlineRes != "??:??:0" {
-	// 	// prepend the inline result to the stack
-	// 	stack = append([]string{inlineRes}, stack...)
-	// 	continue
-	// }
-	//}
-
-	// strip symbol offsets from rawFunc
-	// symbol offsets match this regex: \+0x[\da-f]+$
-	rawFunc = stripSymbolsRegex.ReplaceAllString(rawFunc, "")
+	rawFunc = stripSymbolOffsetRegex.ReplaceAllString(rawFunc, "")
 
 	// skip process names
 	if strings.HasPrefix(rawFunc, "(") {
@@ -244,7 +268,6 @@ func handleStackLine(line string, stack *[]string, pname string, config Config) 
 // processFunctionName processes a raw function name, module, and program counter (PC) based on the configuration.
 // It returns a slice of processed function names.
 func processFunctionName(rawFunc, mod, pc string, config Config) []string {
-	// var isUnknown bool
 	var inline []string
 	for funcname := range strings.SplitSeq(rawFunc, "->") {
 		if funcname == "[unknown]" { // use module name instead, if known
@@ -252,7 +275,6 @@ func processFunctionName(rawFunc, mod, pc string, config Config) []string {
 				funcname = filepath.Base(mod)
 			} else {
 				funcname = "unknown"
-				// isUnknown = true
 			}
 
 			if config.IncludeAddrs {
@@ -263,18 +285,14 @@ func processFunctionName(rawFunc, mod, pc string, config Config) []string {
 		}
 		if config.TidyGeneric {
 			funcname = strings.ReplaceAll(funcname, ";", ":")
-			if matches := stripIdRegex.FindStringSubmatch(funcname); matches != nil {
-				index := stripAnonymousRegex.FindStringIndex(funcname)
-				if index != nil {
-					funcname = funcname[0:index[0]]
-				}
+			if !goMethodRegex.MatchString(funcname) {
+				funcname = stripParenArgsUnlessAnonymous(funcname)
 			}
 			funcname = strings.ReplaceAll(funcname, "\"", "")
 			funcname = strings.ReplaceAll(funcname, "'", "")
 		}
 		if config.TidyJava {
 			if strings.Contains(funcname, "/") {
-				// strip the leading L
 				funcname = strings.TrimPrefix(funcname, "L")
 			}
 		}
@@ -282,21 +300,29 @@ func processFunctionName(rawFunc, mod, pc string, config Config) []string {
 		if len(inline) > 0 {
 			if !strings.Contains(funcname, "_[i]") {
 				funcname = fmt.Sprintf("%s_[i]", funcname)
-			} else if config.AnnotateKernel && (strings.HasPrefix(funcname, "[") || strings.HasSuffix(funcname, "vmlinux")) && !strings.Contains(mod, "unknown") {
-				funcname = fmt.Sprintf("%s_[k]", funcname)
-			} else if config.AnnotateJit && jitRegex.MatchString(funcname) {
-				if !strings.Contains(funcname, "_[j]") {
-					funcname = fmt.Sprintf("%s_[j]", funcname)
-				}
+			}
+		} else if config.AnnotateKernel && (strings.HasPrefix(mod, "[") || strings.HasSuffix(mod, "vmlinux")) && !strings.Contains(mod, "unknown") {
+			funcname = fmt.Sprintf("%s_[k]", funcname)
+		} else if config.AnnotateJit && jitRegex.MatchString(mod) {
+			if !strings.Contains(funcname, "_[j]") {
+				funcname = fmt.Sprintf("%s_[j]", funcname)
 			}
 		}
-
-		// source lines
-		// skip for now since srcLineInInput is always false
-		// 	if srcLineInInput && !isUnknown {
-		// }
 
 		inline = append(inline, funcname)
 	}
 	return inline
+}
+
+// stripParenArgsUnlessAnonymous removes everything after the first '(' unless it is immediately followed by 'anonymous namespace'.
+func stripParenArgsUnlessAnonymous(s string) string {
+	idx := strings.Index(s, "(")
+	if idx == -1 {
+		return s
+	}
+	// Check if what follows is 'anonymous namespace'
+	if strings.HasPrefix(s[idx:], "(anonymous namespace") {
+		return s
+	}
+	return s[:idx]
 }

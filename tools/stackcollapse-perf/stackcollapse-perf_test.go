@@ -84,7 +84,7 @@ func TestHandleEventRecord(t *testing.T) {
 		TidyGeneric:  true,
 	}
 
-	err := handleEventRecord(line, &processName, &period, config)
+	processName, period, err := handleEventRecord(line, config)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -145,11 +145,11 @@ func TestProcessFunctionName(t *testing.T) {
 			expected: []string{"com/example/MyClass"},
 		},
 		{
-			rawFunc:  "someFunction;bar\"hello'world.(anonymous namespace).foo",
+			rawFunc:  "someFunction;bar\"hello'world(remove me).foo",
 			mod:      "module.so",
 			pc:       "0x9abc",
 			config:   Config{TidyGeneric: true},
-			expected: []string{"someFunction:barhelloworld."},
+			expected: []string{"someFunction:barhelloworld"},
 		},
 	}
 
@@ -163,6 +163,30 @@ func TestProcessFunctionName(t *testing.T) {
 			if result[i] != test.expected[i] {
 				t.Errorf("expected %q, got %q", test.expected[i], result[i])
 			}
+		}
+	}
+}
+func TestStripParenArgsUnlessAnonymous(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"foo(int, float)", "foo"},
+		{"bar()", "bar"},
+		{"baz", "baz"},
+		{"qux(anonymous namespace)", "qux(anonymous namespace)"},
+		{"func(anonymous namespace::Type)", "func(anonymous namespace::Type)"},
+		{"func(anonymous namespace", "func(anonymous namespace"},
+		{"func(int) (anonymous namespace)", "func"},
+		{"func()", "func"},
+		{"func", "func"},
+		{"func(abc", "func"},
+	}
+
+	for _, test := range tests {
+		result := stripParenArgsUnlessAnonymous(test.input)
+		if result != test.expected {
+			t.Errorf("stripParenArgsUnlessAnonymous(%q) = %q; want %q", test.input, result, test.expected)
 		}
 	}
 }
