@@ -33,6 +33,7 @@ const (
 	flagGroupGeneralName         = "General Options"
 	flagGroupUncoreFrequencyName = "Uncore Frequency Options"
 	flagGroupPrefetcherName      = "Prefetcher Options"
+	flagGroupCstateName          = "C-State Options"
 	flagGroupOtherName           = "Other Options"
 )
 
@@ -72,6 +73,11 @@ const (
 	flagPrefetcherLLCName      = "pref-llc"
 )
 
+const (
+	flagC6Name         = "c6"
+	flagC1DemotionName = "c1-demotion"
+)
+
 // other flag names
 const (
 	flagNoSummaryName = "no-summary"
@@ -85,6 +91,12 @@ var elcOptions = []string{"latency-optimized", "default"}
 
 // prefetcherOptions - list of valid prefetcher options
 var prefetcherOptions = []string{"enable", "disable"}
+
+// c6Options - list of valid c-state options
+var c6Options = []string{"enable", "disable"}
+
+// c1DemotionOptions - list of valid c1 demotion options
+var c1DemotionOptions = []string{"enable", "disable"}
 
 // initializeFlags initializes the command line flags for the config command
 // the global flagGroups variable is used to store the flags
@@ -275,6 +287,29 @@ func initializeFlags(cmd *cobra.Command) {
 				value, _ := cmd.Flags().GetString(flagPrefetcherLLCName)
 				return slices.Contains(prefetcherOptions, value)
 			}))
+	flagGroups = append(flagGroups, group)
+	// c-state options
+	group = flagGroup{name: flagGroupCstateName, flags: []flagDefinition{}}
+	group.flags = append(group.flags,
+		newStringFlag(cmd, flagC6Name, "",
+			func(value string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+				setC6(value, myTarget, localTempDir, completeChannel, goRoutineId)
+			},
+			"C6 ("+strings.Join(c6Options, ", ")+")", strings.Join(c6Options, ", "),
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetString(flagC6Name)
+				return slices.Contains(c6Options, value)
+			}),
+		newStringFlag(cmd, flagC1DemotionName, "",
+			func(value string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+				setC1Demotion(value, myTarget, localTempDir, completeChannel, goRoutineId)
+			},
+			"C1 Demotion ("+strings.Join(c1DemotionOptions, ", ")+")", strings.Join(c1DemotionOptions, ", "),
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetString(flagC1DemotionName)
+				return slices.Contains(c1DemotionOptions, value)
+			}),
+	)
 	flagGroups = append(flagGroups, group)
 	// other options
 	group = flagGroup{name: flagGroupOtherName, flags: []flagDefinition{}}
