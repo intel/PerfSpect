@@ -58,6 +58,7 @@ endif
 test:
 	@echo "Running unit tests..."
 	go test -v ./...
+	cd tools/stackcollapse-perf && go test -v ./...
 
 .PHONY: update-deps
 update-deps:
@@ -103,6 +104,25 @@ check_lint:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	golangci-lint run
 
+.PHONY: check_vuln
+check_vuln:
+	@echo "Running govulncheck to check for vulnerabilities..."
+	go install golang.org/x/vuln/cmd/govulncheck@latest
+	govulncheck ./...
+
+.PHONY: check_sec
+check_sec:
+	@echo "Running gosec to check for security issues..."
+	go install github.com/securego/gosec/v2/cmd/gosec@latest
+	gosec ./...
+
+.PHONY: check_semgrep
+check_semgrep:
+	@echo "Running semgrep to check for security issues..."
+	@echo "Please install semgrep from https://semgrep.dev/docs/getting-started/installation/ if not already installed."
+	@echo "Running semgrep..."
+	semgrep scan
+
 .PHONY: check_modernize
 check_modernize:
 	@echo "Running go-modernize to check for modernization opportunities..."
@@ -114,7 +134,7 @@ modernize:
 	go run golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize@latest -fix -test ./...
 
 .PHONY: check
-check: check_format check_vet check_static check_license check_lint check_modernize
+check: check_format check_vet check_static check_license check_lint check_vuln check_modernize
 
 .PHONY: sweep
 sweep:
