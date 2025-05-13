@@ -5,7 +5,6 @@ package report
 
 import (
 	"fmt"
-	"log"
 	"log/slog"
 	"perfspect/internal/script"
 	"regexp"
@@ -67,7 +66,7 @@ func installedMemoryFromOutput(outputs map[string]script.ScriptOutput) string {
 		if match != nil {
 			size, err := strconv.Atoi(match[1])
 			if err != nil {
-				log.Printf("Don't recognize DIMM size format: %s", fields[1])
+				slog.Error("Don't recognize DIMM size format.", slog.String("field", fields[1]))
 				return ""
 			}
 			sum := count * size
