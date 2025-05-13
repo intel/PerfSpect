@@ -574,6 +574,8 @@ var tableDefinitions = map[string]TableDefinition{
 			script.ElcScriptName,
 			script.PrefetchControlName,
 			script.PrefetchersName,
+			script.CstatesScriptName,
+			script.C1DemotionScriptName,
 		},
 		FieldsFunc: configurationTableValues},
 	//
@@ -1959,6 +1961,16 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []Field {
 			}
 			fields = append(fields, Field{Name: pf.ShortName + " prefetcher", Values: []string{enabledDisabled}})
 		}
+	}
+	// add C-states
+	cstates := cstatesSummaryFromOutput(outputs)
+	if cstates != "" {
+		fields = append(fields, Field{Name: "C-states", Values: []string{cstates}})
+	}
+	// add C1 Demotion
+	c1Demotion := strings.TrimSpace(outputs[script.C1DemotionScriptName].Stdout)
+	if c1Demotion != "" {
+		fields = append(fields, Field{Name: "C1 Demotion", Values: []string{c1Demotion}})
 	}
 	return fields
 }

@@ -52,6 +52,7 @@ const (
 	ScalingDriverScriptName          = "scaling driver"
 	ScalingGovernorScriptName        = "scaling governor"
 	CstatesScriptName                = "c-states"
+	C1DemotionScriptName             = "c1 demotion"
 	SpecCoreFrequenciesScriptName    = "spec core frequencies"
 	PPINName                         = "ppin"
 	PrefetchControlName              = "prefetch control"
@@ -283,6 +284,25 @@ else
 	echo "C-state directory not found."
 fi
 `,
+	},
+	C1DemotionScriptName: {
+		Name: C1DemotionScriptName,
+		ScriptTemplate: `# if both bit 26 and bit 28 are set then C1 demotion is enabled
+bit26=$(rdmsr -f 26:26 0xe2 2>/dev/null)
+bit28=$(rdmsr -f 28:28 0xe2 2>/dev/null)
+if [[ "$bit26" == "1" && "$bit28" == "1" ]]; then
+    echo "Enabled"
+elif [[ "$bit26" == "0" && "$bit28" == "0" ]]; then
+    echo "Disabled"
+else
+    exit 1
+fi
+`,
+		Architectures: []string{x86_64},
+		Vendors:       []string{"GenuineIntel"},
+		Lkms:          []string{"msr"},
+		Depends:       []string{"rdmsr"},
+		Superuser:     true,
 	},
 	SpecCoreFrequenciesScriptName: {
 		Name: SpecCoreFrequenciesScriptName,
