@@ -35,7 +35,7 @@ tools: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci 
 	cp linux_turbostat/tools/power/x86/turbostat/turbostat bin/
 	-cd bin && strip --strip-unneeded *
 
-ASYNC_PROFILER_VERSION := "2.9"
+ASYNC_PROFILER_VERSION := "4.0"
 async-profiler:
 ifeq ("$(wildcard async-profiler)","")
 ifeq ("$(wildcard async-profiler-$(ASYNC_PROFILER_VERSION)-linux-x64.tar.gz)","")

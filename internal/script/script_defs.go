@@ -1280,7 +1280,7 @@ restore_settings() {
         kill -0 $perf_dwarf_pid 2>/dev/null && kill -INT $perf_dwarf_pid
     fi
     for pid in "${java_pids[@]}"; do
-        async-profiler/profiler.sh stop -o collapsed "$pid"
+        async-profiler/bin/asprof stop -o collapsed "$pid"
     done
 }
 
@@ -1337,7 +1337,7 @@ fi
 # Start Java profiling for each Java PID
 for pid in "${java_pids[@]}"; do
     java_cmds+=("$(tr '\000' ' ' < /proc/"$pid"/cmdline)")
-    async-profiler/profiler.sh start -i "$ap_interval" -o collapsed "$pid"
+    async-profiler/bin/asprof start -i "$ap_interval" -F probesp+vtable "$pid"
 done
 
 # Wait for the specified duration
@@ -1357,7 +1357,7 @@ fi
 
 # Stop Java profiling, write output to ap_folded_<pid> files
 for pid in "${java_pids[@]}"; do
-    async-profiler/profiler.sh stop -o collapsed -f ap_folded_"$pid" "$pid"
+    async-profiler/bin/asprof stop -o collapsed -f ap_folded_"$pid" "$pid"
 done
 
 # Wait for perf to finish
