@@ -45,7 +45,7 @@ func TestRunOneLineScript(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			localTargetDir := path.Join(localTempDir, tgt.GetName())
-			err = os.MkdirAll(localTargetDir, 0755)
+			err = os.MkdirAll(localTargetDir, 0700)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -105,7 +105,7 @@ echo "Core Count: $num_cores_per_socket"`,
 				t.Fatalf("unexpected error: %v", err)
 			}
 			localTargetDir := path.Join(localTempDir, tgt.GetName())
-			err = os.MkdirAll(localTargetDir, 0755)
+			err = os.MkdirAll(localTargetDir, 0700)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -166,7 +166,7 @@ mpstat -u -T -I SCPU -P ALL 1 $count`,
 					t.Fatalf("unexpected error: %v", err)
 				}
 				localTargetDir := path.Join(localTempDir, tgt.GetName())
-				err = os.MkdirAll(localTargetDir, 0755)
+				err = os.MkdirAll(localTargetDir, 0700)
 				if err != nil {
 					t.Fatalf("unexpected error: %v", err)
 				}

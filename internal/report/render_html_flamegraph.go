@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"math/rand/v2" // nosemgrep
+	"perfspect/internal/util"
 	"slices"
 	"strconv"
 	"strings"
@@ -183,7 +183,7 @@ func renderFlameGraph(header string, tableValues TableValues, field string) (out
 	fg := texttemplate.Must(texttemplate.New("flameGraphTemplate").Parse(flameGraphTemplate))
 	buf := new(bytes.Buffer)
 	err = fg.Execute(buf, flameGraphTemplateStruct{
-		ID:     fmt.Sprintf("%d%s", rand.IntN(10000), header),
+		ID:     fmt.Sprintf("%d%s", util.RandUint(10000), header),
 		Data:   jsonStacks,
 		Header: header,
 	})

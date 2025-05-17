@@ -135,7 +135,7 @@ func (t *LocalTarget) PushFile(srcPath string, dstPath string) (err error) {
 	}
 	if srcFileStat.IsDir() {
 		newDstDir := filepath.Join(dstPath, filepath.Base(srcPath))
-		err = util.CreateDirectoryIfNotExists(newDstDir, 0755)
+		err = util.CreateDirectoryIfNotExists(newDstDir, 0700)
 		if err != nil {
 			return
 		}
@@ -163,7 +163,7 @@ func (t *LocalTarget) PullFile(srcPath string, dstDir string) error {
 // It returns the full path of the created directory and any error encountered.
 func (t *LocalTarget) CreateDirectory(baseDir string, targetDir string) (dir string, err error) {
 	dir = filepath.Join(baseDir, targetDir)
-	err = os.Mkdir(dir, 0764)
+	err = os.Mkdir(dir, 0700)
 	return
 }
 

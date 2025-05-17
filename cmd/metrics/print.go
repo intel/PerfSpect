@@ -40,7 +40,7 @@ func printMetricsJSON(metricFrames []MetricFrame, targetName string, collectionS
 		}
 		if printToFile {
 			var file *os.File
-			file, err = os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			file, err = os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644) // #nosec G304 G302
 			if err != nil {
 				return
 			}
@@ -63,7 +63,7 @@ func printMetricsCSV(metricFrames []MetricFrame, frameCount int, targetName stri
 	var file *os.File
 	if printToFile {
 		// open file for writing/appending
-		file, err = os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		file, err = os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644) // #nosec G304 G302
 		if err != nil {
 			return
 		}
@@ -124,7 +124,7 @@ func printMetricsWide(metricFrames []MetricFrame, frameCount int, targetName str
 	var file *os.File
 	if printToFile {
 		// open file for writing/appending
-		file, err = os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		file, err = os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644) // #nosec G304 G302
 		if err != nil {
 			return
 		}
@@ -270,7 +270,7 @@ func printMetricsTxt(metricFrames []MetricFrame, targetName string, collectionSt
 	if printToFile {
 		// open file for writing/appending
 		var file *os.File
-		file, err = os.OpenFile(outputDir+"/"+targetName+"_"+"metrics.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		file, err = os.OpenFile(outputDir+"/"+targetName+"_"+"metrics.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644) // #nosec G304 G302
 		if err != nil {
 			return
 		}

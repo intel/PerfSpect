@@ -9,15 +9,16 @@ package util
 import (
 	"archive/tar"
 	"compress/gzip"
+	"crypto/rand"
 	"embed"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"log/slog"
 	"math"
 	"os"
-	"os/exec"
 	"os/user"
 	"path/filepath"
 	"regexp"
@@ -121,7 +122,7 @@ func CopyDirectory(scrDir, dest string) error {
 		}
 		if fileInfo.Mode().IsDir() {
 			// Create the subdirectory in the destination directory
-			if err := CreateDirectoryIfNotExists(destPath, 0755); err != nil {
+			if err := CreateDirectoryIfNotExists(destPath, 0700); err != nil {
 				return err
 			}
 			// Recursively copy the contents of the subdirectory
@@ -147,7 +148,7 @@ func CopyFile(srcFile, dstFile string) error {
 	if err != nil {
 		return err
 	}
-	src, err := os.Open(srcFile)
+	src, err := os.Open(srcFile) // #nosec G304 -- srcFile is not a user provided path
 	if err != nil {
 		return err
 	}
@@ -157,15 +158,18 @@ func CopyFile(srcFile, dstFile string) error {
 	if err == nil && dstFileStat.IsDir() {
 		dstFile = filepath.Join(dstFile, filepath.Base(srcFile))
 	}
-	dest, err := os.Create(dstFile)
+	dest, err := os.Create(dstFile) // #nosec G304 -- dstFile is not a user provided path
 	if err != nil {
 		return err
 	}
 	// Copy the contents of the source file to the destination file
 	_, err = io.Copy(dest, src)
-	dest.Close()
+	closeErr := dest.Close()
 	if err != nil {
 		return err
+	}
+	if closeErr != nil {
+		return closeErr
 	}
 	// Preserve the file permissions of the source file in the destination file
 	err = os.Chmod(dstFile, srcFileStat.Mode())
@@ -226,7 +230,7 @@ func ExtractResource(resources embed.FS, resourcePath string, tempDir string) (s
 		}
 		resourceName := filepath.Base(resourcePath)
 		outPath = filepath.Join(tempDir, resourceName)
-		err = os.Mkdir(outPath, 0755)
+		err = os.Mkdir(outPath, 0700)
 		if err != nil {
 			return "", err
 		}
@@ -242,7 +246,7 @@ func ExtractResource(resources embed.FS, resourcePath string, tempDir string) (s
 		resourceName := filepath.Base(resourcePath)
 		outPath = filepath.Join(tempDir, resourceName)
 		var f *os.File
-		f, err = os.OpenFile(outPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0744)
+		f, err = os.OpenFile(outPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0700) // #nosec G302,G304 -- resources are executables
 		if err != nil {
 			return "", err
 		}
@@ -321,11 +325,27 @@ func CompareVersions(v1, v2 string) (int, error) {
 	return 0, nil
 }
 
+// IsValidSemver checks if a string is a valid semantic version (semver).
+// Accepts versions like "1.2.3", "v1.2.3", "1.2.3-alpha", "1.2.3+build.1", etc.
+func IsValidSemver(version string) bool {
+	version = strings.TrimPrefix(version, "v")
+	semverRegex := `^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$`
+	matched, _ := regexp.MatchString(semverRegex, version)
+	if !matched {
+		return false
+	}
+	// Disallow double dots in prerelease or build metadata
+	if strings.Contains(version, "..") {
+		return false
+	}
+	return true
+}
+
 // ExtractTGZ extracts the contents of a tarball (.tar.gz) file to the specified destination directory.
 // If stripComponent is true, the first directory in the tarball will be skipped.
 func ExtractTGZ(tarballPath, destDir string, stripComponent bool) error {
 	// Open the tarball
-	tarball, err := os.Open(tarballPath)
+	tarball, err := os.Open(tarballPath) // #nosec G304 -- tarballPath is not a user provided path
 	if err != nil {
 		return err
 	}
@@ -338,6 +358,7 @@ func ExtractTGZ(tarballPath, destDir string, stripComponent bool) error {
 	// Create a new tar reader
 	tarReader := tar.NewReader(gzipReader)
 
+	const maxFileSize = 1024 * 1024 * 256 // 256 MiB
 	targetIdx := 0
 	firstDirectory := ""
 	for {
@@ -348,12 +369,15 @@ func ExtractTGZ(tarballPath, destDir string, stripComponent bool) error {
 		if err != nil {
 			return err
 		}
-		// Check for invalid paths, there should never be a ".." in the path
-		if strings.Contains(header.Name, "..") {
+		// Sanitize header.Name
+		cleanName := filepath.Clean(header.Name)
+		if filepath.IsAbs(cleanName) {
 			return fmt.Errorf("tarball contains invalid path: %s", header.Name)
 		}
-
-		target := filepath.Join(destDir, header.Name)
+		if slices.Contains(strings.Split(cleanName, string(os.PathSeparator)), "..") {
+			return fmt.Errorf("tarball contains invalid path: %s", header.Name)
+		}
+		target := filepath.Join(destDir, cleanName)
 
 		if stripComponent {
 			// Skip the first directory in the tarball
@@ -361,30 +385,50 @@ func ExtractTGZ(tarballPath, destDir string, stripComponent bool) error {
 				return fmt.Errorf("first entry in tarball is not a directory")
 			}
 			if targetIdx == 0 {
-				firstDirectory = header.Name
+				firstDirectory = cleanName
 				targetIdx++
 				continue
 			} else if targetIdx > 0 {
 				// remove the first directory from the target path
-				target = filepath.Join(destDir, strings.TrimPrefix(header.Name, firstDirectory))
+				target = filepath.Join(destDir, strings.TrimPrefix(cleanName, firstDirectory))
 			}
 		}
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(target, os.FileMode(header.Mode)); err != nil {
-				return err
-			}
-		case tar.TypeReg:
-			f, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(header.Mode))
+			err := os.MkdirAll(target, os.FileMode(header.Mode)) // #nosec G115
 			if err != nil {
 				return err
 			}
-			if _, err := io.Copy(f, tarReader); err != nil { // nosemgrep
-				f.Close()
+		case tar.TypeReg:
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(header.Mode)) // #nosec G115,G304
+			if err != nil {
 				return err
 			}
-			f.Close()
+			n, err := io.CopyN(f, tarReader, maxFileSize)
+			closeErr := f.Close()
+			if err != nil && err != io.EOF {
+				slog.Error("failed to copy file", slog.String("file", target), slog.String("error", err.Error()))
+				if closeErr != nil {
+					slog.Error("failed to close file", slog.String("file", target), slog.String("error", closeErr.Error()))
+				}
+				return err
+			}
+			if n == maxFileSize {
+				// Try to read one more byte to check if file is too large
+				var buf [1]byte
+				if _, extraErr := tarReader.Read(buf[:]); extraErr != io.EOF {
+					slog.Error("file in tarball exceeds maximum allowed size", slog.String("file", target), slog.String("maxFileSize", strconv.Itoa(maxFileSize)))
+					if closeErr != nil {
+						slog.Error("failed to close file", slog.String("file", target), slog.String("error", closeErr.Error()))
+					}
+					return fmt.Errorf("file %s in tarball exceeds maximum allowed size (%d bytes)", target, maxFileSize)
+				}
+			}
+			if closeErr != nil {
+				slog.Error("failed to close file", slog.String("file", target), slog.String("error", closeErr.Error()))
+				return closeErr
+			}
 		}
 		targetIdx++
 	}
@@ -397,36 +441,75 @@ func GetAppDir() string {
 	return filepath.Dir(exePath)
 }
 
-// SignalChildren sends a signal to all children of this process
-func SignalChildren(sig os.Signal) {
-	// get list of child processes
-	cmd := exec.Command("pgrep", "-P", strconv.Itoa(os.Getpid()))
-	out, err := cmd.Output()
+// SignalProcess sends a signal to the process with the given PID
+func SignalProcess(pid int, sig os.Signal) error {
+	proc, err := os.FindProcess(pid)
 	if err != nil {
-		slog.Error("failed to get child processes", slog.String("error", err.Error()))
-		return
+		return fmt.Errorf("failed to find process: %w", err)
 	}
-	// send signal to each child
-	for pid := range strings.SplitSeq(string(out), "\n") {
-		if pid == "" {
+	slog.Info("sending signal to process", slog.Int("pid", pid), slog.String("signal", sig.String()))
+	err = proc.Signal(sig)
+	if err != nil {
+		return fmt.Errorf("failed to send signal to process (pid %d): %w", pid, err)
+	}
+	return nil
+}
+
+// GetChildren returns the PIDs of all child processes of the given PID.
+func GetChildren(pid int) ([]int, error) {
+	procDir, err := os.Open("/proc")
+	if err != nil {
+		return nil, fmt.Errorf("failed to open /proc: %w", err)
+	}
+	defer procDir.Close()
+	entries, err := procDir.Readdirnames(-1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read /proc: %w", err)
+	}
+	var children []int
+	for _, entry := range entries {
+		childPid, err := strconv.Atoi(entry)
+		if err != nil {
+			continue // skip non-numeric entries
+		}
+		statPath := filepath.Join("/proc", entry, "stat")
+		statBytes, err := os.ReadFile(statPath) // #nosec G304 -- entry is a PID
+		if err != nil {
+			continue // process may have exited
+		}
+		fields := strings.Fields(string(statBytes))
+		if len(fields) < 4 {
 			continue
 		}
-		pidInt, err := strconv.Atoi(pid)
+		ppid, err := strconv.Atoi(fields[3])
 		if err != nil {
-			slog.Error("failed to convert pid to int", slog.String("pid", pid), slog.String("error", err.Error()))
 			continue
 		}
-		proc, err := os.FindProcess(pidInt)
-		if err != nil {
-			slog.Error("failed to find process", slog.Int("pid", pidInt), slog.String("error", err.Error()))
-			continue
-		}
-		slog.Info("sending signal to child process", slog.Int("pid", pidInt), slog.String("signal", sig.String()))
-		err = proc.Signal(sig)
-		if err != nil {
-			slog.Error("failed to send signal to process", slog.Int("pid", pidInt), slog.String("error", err.Error()))
+		if ppid == pid {
+			children = append(children, childPid)
 		}
 	}
+	return children, nil
+}
+
+// SignalChildren sends a signal to all children of this process
+func SignalChildren(sig os.Signal) error {
+	selfPid := os.Getpid()
+	children, err := GetChildren(selfPid)
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, pid := range children {
+		err = SignalProcess(pid, sig)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to send signal to child process (pid: %d): %w", pid, err))
+		}
+	}
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	return nil
 }
 
 // IsValidHex checks if a string is a valid hex string
@@ -529,4 +612,26 @@ func IntSliceToStringSlice(ints []int) []string {
 		strs[i] = strconv.Itoa(v)
 	}
 	return strs
+}
+
+// RandUint returns a cryptographically secure random unsigned integer in [0, max).
+func RandUint(max uint64) uint64 {
+	if max == 0 {
+		return 0
+	}
+	b := make([]byte, 8)
+	_, err := rand.Read(b)
+	if err != nil {
+		// fallback to 0 if crypto/rand fails
+		return 0
+	}
+	return binary.BigEndian.Uint64(b) % max
+}
+
+// Int64ToUint64 safely converts an int64 to uint64, returning an error if the value is negative.
+func Int64ToUint64(i int64) (uint64, error) {
+	if i < 0 {
+		return 0, fmt.Errorf("cannot convert negative int64 (%d) to uint64", i)
+	}
+	return uint64(i), nil
 }

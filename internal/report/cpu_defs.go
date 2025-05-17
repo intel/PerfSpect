@@ -132,20 +132,20 @@ func getCPUByMicroArchitecture(uarch string) (cpu CPUDefinition, err error) {
 	return
 }
 
-func getCPUCacheWays(cpu CPUDefinition) (cacheWays []int64) {
+func getCPUCacheWays(cpu CPUDefinition) (cacheWays []uint64) {
 	wayCount := cpu.CacheWayCount
 	if wayCount == 0 {
 		return
 	}
-	var cacheSize int64 = 0
+	var cacheSize uint64 = 0
 	// set wayCount bits in cacheSize
 	for range wayCount {
 		cacheSize = (cacheSize << 1) | 1
 	}
-	var mask int64 = -1 // all bits set
+	var mask uint64 = 0xffffffffffffffff // all bits set
 	for range wayCount {
 		// prepend the cache size to the list of ways
-		cacheWays = append([]int64{cacheSize}, cacheWays...)
+		cacheWays = append([]uint64{cacheSize}, cacheWays...)
 		// clear another low bit in mask
 		mask = mask << 1
 		// mask lower bits (however many bits are cleared in mask var)

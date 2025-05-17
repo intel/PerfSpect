@@ -406,8 +406,8 @@ func (md Metadata) JSON() (out []byte, err error) {
 // WriteJSONToFile writes the metadata structure (minus perf's supported events) to the filename provided
 // Note that the file will be truncated.
 func (md Metadata) WriteJSONToFile(path string) (err error) {
-	var rawFile *os.File
-	if rawFile, err = os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644); err != nil {
+	rawFile, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644) // #nosec G304 G302
+	if err != nil {
 		slog.Error("failed to open raw file for writing", slog.String("error", err.Error()))
 		return
 	}
@@ -428,7 +428,7 @@ func (md Metadata) WriteJSONToFile(path string) (err error) {
 func ReadJSONFromFile(path string) (md Metadata, err error) {
 	// read the file
 	var rawBytes []byte
-	rawBytes, err = os.ReadFile(path)
+	rawBytes, err = os.ReadFile(path) // #nosec G304
 	if err != nil {
 		slog.Error("failed to read metadata file", slog.String("error", err.Error()))
 		return

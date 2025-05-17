@@ -33,7 +33,8 @@ type MetricDefinition struct {
 func LoadMetricDefinitions(metricDefinitionOverridePath string, selectedMetrics []string, metadata Metadata) (metrics []MetricDefinition, err error) {
 	var bytes []byte
 	if metricDefinitionOverridePath != "" {
-		if bytes, err = os.ReadFile(metricDefinitionOverridePath); err != nil {
+		bytes, err = os.ReadFile(metricDefinitionOverridePath) // #nosec G304
+		if err != nil {
 			return
 		}
 	} else {

@@ -702,7 +702,7 @@ func GetL3LscpuMB(outputs map[string]script.ScriptOutput) (instanceSizeMB float6
 	return getL3LscpuMB(outputs)
 }
 
-func getCacheWays(uArch string) (cacheWays []int64) {
+func getCacheWays(uArch string) (cacheWays []uint64) {
 	cpu, err := getCPUByMicroArchitecture(uArch)
 	if err != nil {
 		return
@@ -711,7 +711,7 @@ func getCacheWays(uArch string) (cacheWays []int64) {
 }
 
 // GetCacheWays exports the getCacheWays function
-func GetCacheWays(uArch string) (cacheWays []int64) {
+func GetCacheWays(uArch string) (cacheWays []uint64) {
 	return getCacheWays(uArch)
 }
 
@@ -727,7 +727,7 @@ func getL3MSRMB(outputs map[string]script.ScriptOutput) (val float64, err error)
 		return
 	}
 	l3MSRHex := strings.TrimSpace(outputs[script.L3WaySizeName].Stdout)
-	l3MSR, err := strconv.ParseInt(l3MSRHex, 16, 64)
+	l3MSR, err := strconv.ParseUint(l3MSRHex, 16, 64)
 	if err != nil {
 		err = fmt.Errorf("failed to parse MSR output: %s", l3MSRHex)
 		return
