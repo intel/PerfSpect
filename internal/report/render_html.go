@@ -10,7 +10,7 @@ import (
 	htmltemplate "html/template"
 	"log/slog"
 	"math"
-	"math/rand/v2" // nosemgrep
+	"perfspect/internal/util"
 	"slices"
 	"sort"
 	"strconv"
@@ -760,7 +760,7 @@ func coreTurboFrequencyTableHTMLRenderer(tableValues TableValues) string {
 		}
 	}
 	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("turboFrequency%d", rand.IntN(10000)),
+		ID:            fmt.Sprintf("turboFrequency%d", util.RandUint(10000)),
 		XaxisText:     "Core Count",
 		YaxisText:     "Frequency (GHz)",
 		TitleText:     "",
@@ -806,7 +806,7 @@ func memoryBenchmarkTableMultiTargetHtmlRenderer(allTableValues []TableValues, t
 		datasetNames = append(datasetNames, targetNames[targetIdx])
 	}
 	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("latencyBandwidth%d", rand.IntN(10000)),
+		ID:            fmt.Sprintf("latencyBandwidth%d", util.RandUint(10000)),
 		XaxisText:     "Bandwidth (MB/s)",
 		YaxisText:     "Latency (ns)",
 		TitleText:     "",
@@ -873,7 +873,7 @@ func cpuUtilizationTelemetryTableHTMLRenderer(tableValues TableValues, targetNam
 		}
 	}
 	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.IntN(10000)),
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
 		XaxisText:     "Time",
 		YaxisText:     "% Utilization",
 		TitleText:     "",
@@ -908,7 +908,7 @@ func utilizationCategoriesTelemetryTableHTMLRenderer(tableValues TableValues, ta
 		}
 	}
 	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.IntN(10000)),
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
 		XaxisText:     "Time",
 		YaxisText:     "% Utilization",
 		TitleText:     "",
@@ -948,7 +948,7 @@ func irqRateTelemetryTableHTMLRenderer(tableValues TableValues, targetName strin
 		data = append(data, points)
 	}
 	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.IntN(10000)),
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
 		XaxisText:     "Time",
 		YaxisText:     "IRQ/s",
 		TitleText:     "",
@@ -1004,7 +1004,7 @@ func driveTelemetryTableHTMLRenderer(tableValues TableValues, targetName string)
 			}
 		}
 		chartConfig := chartTemplateStruct{
-			ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.IntN(10000)),
+			ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
 			XaxisText:     "Time",
 			YaxisText:     "",
 			TitleText:     drive,
@@ -1062,7 +1062,7 @@ func networkTelemetryTableHTMLRenderer(tableValues TableValues, targetName strin
 			}
 		}
 		chartConfig := chartTemplateStruct{
-			ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.IntN(10000)),
+			ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
 			XaxisText:     "Time",
 			YaxisText:     "",
 			TitleText:     nic,
@@ -1099,7 +1099,7 @@ func memoryTelemetryTableHTMLRenderer(tableValues TableValues, targetName string
 		}
 	}
 	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.IntN(10000)),
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
 		XaxisText:     "Time",
 		YaxisText:     "kilobytes",
 		TitleText:     "",
@@ -1134,7 +1134,7 @@ func averageFrequencyTelemetryTableHTMLRenderer(tableValues TableValues, targetN
 		}
 	}
 	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.IntN(10000)),
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
 		XaxisText:     "Time",
 		YaxisText:     "MHz",
 		TitleText:     "",
@@ -1169,7 +1169,7 @@ func powerTelemetryTableHTMLRenderer(tableValues TableValues, targetName string)
 		}
 	}
 	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.IntN(10000)),
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
 		XaxisText:     "Time",
 		YaxisText:     "Watts",
 		TitleText:     "",
@@ -1204,7 +1204,7 @@ func instructionTelemetryTableHTMLRenderer(tableValues TableValues, targetname s
 		}
 	}
 	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.IntN(10000)),
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
 		XaxisText:     "Time",
 		YaxisText:     "% Samples",
 		TitleText:     "",
@@ -1261,7 +1261,7 @@ func renderGaudiStatsChart(tableValues TableValues, chartStatFieldName string, t
 		}
 	}
 	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, rand.IntN(10000)),
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
 		XaxisText:     "Time",
 		YaxisText:     yAxisText,
 		TitleText:     titleText,

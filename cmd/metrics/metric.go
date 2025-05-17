@@ -236,8 +236,8 @@ func evaluateExpression(metric MetricDefinition, variables map[string]any) (resu
 
 // write json formatted events to raw file
 func writeEventsToFile(path string, events [][]byte) (err error) {
-	var rawFile *os.File
-	if rawFile, err = os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err != nil {
+	rawFile, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644) // #nosec G304 G302
+	if err != nil {
 		slog.Error("failed to open raw file for writing", slog.String("error", err.Error()))
 		return
 	}

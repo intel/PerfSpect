@@ -484,6 +484,45 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
 	}
+	// event file path
+	if flagEventFilePath != "" {
+		if _, err := os.Stat(flagEventFilePath); err != nil {
+			if os.IsNotExist(err) {
+				err = fmt.Errorf("event file path does not exist: %s", flagEventFilePath)
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				return err
+			}
+			err = fmt.Errorf("failed to access event file path: %s, error: %v", flagEventFilePath, err)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
+	}
+	// metric file path
+	if flagMetricFilePath != "" {
+		if _, err := os.Stat(flagMetricFilePath); err != nil {
+			if os.IsNotExist(err) {
+				err = fmt.Errorf("metric file path does not exist: %s", flagMetricFilePath)
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				return err
+			}
+			err = fmt.Errorf("failed to access metric file path: %s, error: %v", flagMetricFilePath, err)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
+	}
+	// input file path
+	if flagInput != "" {
+		if _, err := os.Stat(flagInput); err != nil {
+			if os.IsNotExist(err) {
+				err = fmt.Errorf("input file path does not exist: %s", flagInput)
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				return err
+			}
+			err = fmt.Errorf("failed to access input file path: %s, error: %v", flagInput, err)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
+	}
 	// common target flags
 	if err := common.ValidateTargetFlags(cmd); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -552,7 +591,7 @@ func readRawData(directory string) (metadata Metadata, eventFile *os.File, err e
 		err = fmt.Errorf("failed to read metadata from file: %v", err)
 		return
 	}
-	eventFile, err = os.Open(eventPath)
+	eventFile, err = os.Open(eventPath) // #nosec G304
 	if err != nil {
 		err = fmt.Errorf("failed to open events file: %v", err)
 		return
@@ -683,7 +722,10 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		setSignalReceived()
 		slog.Info("received signal", slog.String("signal", sig.String()))
 		// send kill signal to children
-		util.SignalChildren(syscall.SIGKILL)
+		err := util.SignalChildren(syscall.SIGKILL)
+		if err != nil {
+			slog.Error("failed to send kill signal to children", slog.String("error", err.Error()))
+		}
 	}()
 	if flagInput != "" {
 		// create output directory
@@ -984,7 +1026,8 @@ func summarizeMetrics(localOutputDir string, targetName string, metadata Metadat
 		return filesCreated, err
 	}
 	csvSummaryFile := localOutputDir + "/" + targetName + "_" + "metrics_summary.csv"
-	if err = os.WriteFile(csvSummaryFile, []byte(out), 0644); err != nil {
+	err = os.WriteFile(csvSummaryFile, []byte(out), 0644) // #nosec G306
+	if err != nil {
 		err = fmt.Errorf("failed to write summary to file: %w", err)
 		return filesCreated, err
 	}
@@ -998,7 +1041,8 @@ func summarizeMetrics(localOutputDir string, targetName string, metadata Metadat
 			return filesCreated, err
 		}
 		htmlSummaryFile := localOutputDir + "/" + targetName + "_" + "metrics_summary.html"
-		if err = os.WriteFile(htmlSummaryFile, []byte(out), 0644); err != nil {
+		err = os.WriteFile(htmlSummaryFile, []byte(out), 0644) // #nosec G306
+		if err != nil {
 			err = fmt.Errorf("failed to write HTML summary to file: %w", err)
 			return filesCreated, err
 		}
@@ -1374,7 +1418,7 @@ func getPerfCommand(myTarget target.Target, perfPath string, eventGroups []Group
 			err = fmt.Errorf("failed to assemble perf args: %v", err)
 			return
 		}
-		perfCommand = exec.Command(perfPath, args...) // nosemgrep
+		perfCommand = exec.Command(perfPath, args...) // #nosec G204 // nosemgrep
 	} else if flagScope == scopeProcess {
 		if len(flagPidList) > 0 {
 			if processes, err = GetProcesses(myTarget, flagPidList); err != nil {
@@ -1413,7 +1457,7 @@ func getPerfCommand(myTarget target.Target, perfPath string, eventGroups []Group
 			err = fmt.Errorf("failed to assemble perf args: %v", err)
 			return
 		}
-		perfCommand = exec.Command(perfPath, args...) // nosemgrep
+		perfCommand = exec.Command(perfPath, args...) // #nosec G204 // nosemgrep
 	} else if flagScope == scopeCgroup {
 		var cgroups []string
 		if len(flagCidList) > 0 {
@@ -1434,7 +1478,7 @@ func getPerfCommand(myTarget target.Target, perfPath string, eventGroups []Group
 			err = fmt.Errorf("failed to assemble perf args: %v", err)
 			return
 		}
-		perfCommand = exec.Command(perfPath, args...) // nosemgrep
+		perfCommand = exec.Command(perfPath, args...) // #nosec G204 // nosemgrep
 	}
 	return
 }
