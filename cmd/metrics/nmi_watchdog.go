@@ -47,7 +47,7 @@ func getNMIWatchdog(myTarget target.Target) (setting string, err error) {
 	if sysctl, err = findSysctl(myTarget); err != nil {
 		return
 	}
-	cmd := exec.Command(sysctl, "kernel.nmi_watchdog") // nosemgrep
+	cmd := exec.Command(sysctl, "kernel.nmi_watchdog") // #nosec G204 // nosemgrep
 	stdout, _, _, err := myTarget.RunCommand(cmd, 0, true)
 	if err != nil {
 		return

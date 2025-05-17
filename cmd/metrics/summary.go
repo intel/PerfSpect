@@ -111,8 +111,8 @@ type metricsFromCSV struct {
 // newMetricsFromCSV - loads data from CSV. Returns a list of metrics, one per
 // scope unit or granularity unit, e.g., one per socket, or one per PID
 func newMetricsFromCSV(csvPath string) (metrics []metricsFromCSV, err error) {
-	var file *os.File
-	if file, err = os.Open(csvPath); err != nil {
+	file, err := os.Open(csvPath) // #nosec G304
+	if err != nil {
 		return
 	}
 	reader := csv.NewReader(file)

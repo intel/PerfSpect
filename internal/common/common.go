@@ -113,7 +113,10 @@ func (rc *ReportingCommand) Run() error {
 		// when perfspect receives ctrl-c while in the shell, the shell makes sure to propogate the
 		// signal to all our children. But when perfspect is run in the background or disowned and
 		// then receives SIGINT, e.g., from a script, we need to send the signal to our children
-		util.SignalChildren(syscall.SIGINT)
+		err := util.SignalChildren(syscall.SIGINT)
+		if err != nil {
+			slog.Error("error sending signal to children", slog.String("error", err.Error()))
+		}
 	}()
 
 	var orderedTargetScriptOutputs []TargetScriptOutputs
@@ -264,7 +267,8 @@ func (rc *ReportingCommand) Run() error {
 
 // CreateOutputDir creates the output directory if it does not exist
 func CreateOutputDir(outputDir string) error {
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	err := os.MkdirAll(outputDir, 0755) // #nosec G301
+	if err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 	return nil
@@ -316,7 +320,7 @@ func (rc *ReportingCommand) createRawReports(appContext AppContext, orderedTarge
 
 // writeReport writes the report bytes to the specified path.
 func writeReport(reportBytes []byte, reportPath string) error {
-	err := os.WriteFile(reportPath, reportBytes, 0644)
+	err := os.WriteFile(reportPath, reportBytes, 0644) // #nosec G306
 	if err != nil {
 		err = fmt.Errorf("failed to write report file: %v", err)
 		fmt.Fprintln(os.Stderr, err)

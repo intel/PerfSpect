@@ -127,7 +127,7 @@ func (t *RemoteTarget) CreateTempDirectory(rootDir string) (tempDir string, err 
 	if rootDir != "" {
 		root = fmt.Sprintf("--tmpdir=%s", rootDir)
 	}
-	cmd := exec.Command("mktemp", "-d", "-t", root, "perfspect.tmp.XXXXXXXXXX", "|", "xargs", "realpath")
+	cmd := exec.Command("mktemp", "-d", "-t", root, "perfspect.tmp.XXXXXXXXXX", "|", "xargs", "realpath") // #nosec G204
 	tempDir, _, _, err = t.RunCommand(cmd, 0, true)
 	if err != nil {
 		return
@@ -377,7 +377,7 @@ func (t *RemoteTarget) prepareLocalCommand(cmd *exec.Cmd, useControlMaster bool)
 		name = sshCommand[0]
 		args = sshCommand[1:]
 	}
-	localCommand := exec.Command(name, args...) // nosemgrep
+	localCommand := exec.Command(name, args...) // #nosec G204 // nosemgrep
 	if usePass {
 		localCommand.Env = append(localCommand.Env, "SSHPASS="+t.sshPass)
 	}
@@ -397,7 +397,7 @@ func (t *RemoteTarget) prepareAndRunSCPCommand(srcPath string, dstDir string, is
 		name = scpCommand[0]
 		args = scpCommand[1:]
 	}
-	localCommand := exec.Command(name, args...) // nosemgrep
+	localCommand := exec.Command(name, args...) // #nosec G204 // nosemgrep
 	if usePass {
 		localCommand.Env = append(localCommand.Env, "SSHPASS="+t.sshPass)
 	}

@@ -4,8 +4,10 @@ package util
 // SPDX-License-Identifier: BSD-3-Clause
 
 import (
+	"os"
 	"slices"
 	"testing"
+	"time"
 )
 
 func TestCompareVersions(t *testing.T) {
@@ -166,5 +168,145 @@ func TestIntSliceToStringSlice(t *testing.T) {
 		if !slices.Equal(result, test.expected) {
 			t.Errorf("expected %v, got %v for input %v", test.expected, result, test.input)
 		}
+	}
+}
+func TestIsValidSemver(t *testing.T) {
+	tests := []struct {
+		version string
+		valid   bool
+	}{
+		{"1.0.0", true},
+		{"v1.0.0", true},
+		{"1.2.3", true},
+		{"0.1.0", true},
+		{"1.2.3-alpha", true},
+		{"1.2.3+build.1", true},
+		{"1.2.3-alpha+build.1", true},
+		{"1.2.3-alpha.1", true},
+		{"1.2.3-0.3.7", true},
+		{"1.2.3-x.7.z.92", true},
+		{"1.2.3-rc.1+build.1", true},
+		{"v1.2.3-rc.1+build.1", true},
+		{"1.2", false},
+		{"1.2.3.4", false},
+		{"1.2.3-", false},
+		{"1.2.3+", false},
+		{"1.2.3-01", true},    // leading zero allowed in prerelease
+		{"1.2.3-rc.01", true}, // leading zero allowed in prerelease
+		{"1.2.3-rc..1", false},
+		{"1.2.3-rc_1", false}, // underscore not allowed
+		{"1.2.3-rc@1", false}, // @ not allowed
+		{"v", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		if got := IsValidSemver(tt.version); got != tt.valid {
+			t.Errorf("IsValidSemver(%q) = %v, want %v", tt.version, got, tt.valid)
+		}
+	}
+}
+func TestRandUint(t *testing.T) {
+	const max uint64 = 100
+	const iterations = 1000
+
+	// Test that returned value is always in [0, max)
+	for range iterations {
+		val := RandUint(max)
+		if val >= max {
+			t.Errorf("RandInt(%d) returned %d, want in [0, %d)", max, val, max)
+		}
+	}
+
+	// Test that values are distributed (not always the same)
+	seen := make(map[uint64]bool)
+	for range iterations {
+		val := RandUint(max)
+		seen[val] = true
+	}
+	if len(seen) < int(max/2) {
+		t.Errorf("RandInt(%d) seems not random enough, got only %d unique values", max, len(seen))
+	}
+
+	// Test with max = 1 (should always return 0)
+	for range 10 {
+		val := RandUint(1)
+		if val != 0 {
+			t.Errorf("RandInt(1) returned %d, want 0", val)
+		}
+	}
+
+	// Test with max = 0 (should always return 0, but avoid panic)
+	for range 10 {
+		val := RandUint(0)
+		if val != 0 {
+			t.Errorf("RandInt(0) returned %d, want 0", val)
+		}
+	}
+}
+func TestGetChildren(t *testing.T) {
+	// This test assumes that the current process has no child processes at the start.
+	selfPid := os.Getpid()
+	children, err := GetChildren(selfPid)
+	if err != nil {
+		t.Fatalf("GetChildren returned error: %v", err)
+	}
+	if len(children) != 0 {
+		t.Errorf("expected no children, got %v", children)
+	}
+
+	// Now fork a child process (using os/exec) and check that it appears in the list.
+	// We'll use a short-lived sleep process.
+	proc, err := os.StartProcess("/bin/sleep", []string{"sleep", "1"}, &os.ProcAttr{
+		Files: []*os.File{os.Stdin, os.Stdout, os.Stderr},
+	})
+	if err != nil {
+		t.Fatalf("failed to start child process: %v", err)
+	}
+	defer func() {
+		_, _ = proc.Wait()
+	}()
+
+	// Give the child process a moment to start and appear in /proc
+	found := false
+	for range 10 {
+		children, err = GetChildren(selfPid)
+		if err != nil {
+			t.Fatalf("GetChildren returned error: %v", err)
+		}
+		if slices.Contains(children, proc.Pid) {
+			found = true
+		}
+		if found {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if !found {
+		t.Errorf("child process PID %d not found in GetChildren(%d): got %v", proc.Pid, selfPid, children)
+	}
+}
+func TestInt64ToUint64(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   int64
+		want    uint64
+		wantErr bool
+	}{
+		{"positive value", 12345, 12345, false},
+		{"zero", 0, 0, false},
+		{"max int64", int64(^uint64(0) >> 1), uint64(^uint64(0) >> 1), false},
+		{"negative value", -1, 0, true},
+		{"min int64", int64(-1 << 63), 0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Int64ToUint64(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Int64ToUint64(%d) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+			}
+			if !tt.wantErr && got != tt.want {
+				t.Errorf("Int64ToUint64(%d) = %d, want %d", tt.input, got, tt.want)
+			}
+		})
 	}
 }

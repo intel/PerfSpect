@@ -89,7 +89,7 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 		masterScript, needsElevatedPrivileges := formMasterScript(myTarget.GetTempDirectory(), parallelScripts)
 		// write master script to local file
 		masterScriptPath := path.Join(localTempDir, myTarget.GetName(), masterScriptName)
-		err = os.WriteFile(masterScriptPath, []byte(masterScript), 0644)
+		err = os.WriteFile(masterScriptPath, []byte(masterScript), 0600)
 		if err != nil {
 			err = fmt.Errorf("error writing master script to local file: %v", err)
 			return nil, err
@@ -112,9 +112,9 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 			return nil, err
 		} else if needsElevatedPrivileges && !myTarget.IsSuperUser() {
 			// run master script with sudo, "-S" to read password from stdin. Note: password won't be asked for if password-less sudo is configured.
-			cmd = exec.Command("sudo", "-S", "bash", path.Join(myTarget.GetTempDirectory(), masterScriptName))
+			cmd = exec.Command("sudo", "-S", "bash", path.Join(myTarget.GetTempDirectory(), masterScriptName)) // #nosec G204
 		} else {
-			cmd = exec.Command("bash", path.Join(myTarget.GetTempDirectory(), masterScriptName))
+			cmd = exec.Command("bash", path.Join(myTarget.GetTempDirectory(), masterScriptName)) // #nosec G204
 		}
 		stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, false) // don't reuse ssh connection on long-running commands, makes it difficult to kill the command
 		if err != nil {
@@ -146,9 +146,9 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 			return nil, err
 		} else if script.Superuser && !myTarget.IsSuperUser() {
 			// run script with sudo, "-S" to read password from stdin. Note: password won't be asked for if password-less sudo is configured.
-			cmd = exec.Command("sudo", "-S", "bash", scriptPath)
+			cmd = exec.Command("sudo", "-S", "bash", scriptPath) // #nosec G204
 		} else {
-			cmd = exec.Command("bash", scriptPath)
+			cmd = exec.Command("bash", scriptPath) // #nosec G204
 		}
 		stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, false)
 		if err != nil {
@@ -244,9 +244,9 @@ func scriptForTarget(script ScriptDefinition, myTarget target.Target) bool {
 func prepareCommand(script ScriptDefinition, targetTempDirectory string) (cmd *exec.Cmd) {
 	scriptPath := path.Join(targetTempDirectory, scriptNameToFilename(script.Name))
 	if script.Superuser {
-		cmd = exec.Command("sudo", "bash", scriptPath)
+		cmd = exec.Command("sudo", "bash", scriptPath) // #nosec G204
 	} else {
-		cmd = exec.Command("bash", scriptPath)
+		cmd = exec.Command("bash", scriptPath) // #nosec G204
 	}
 	return
 }
@@ -474,7 +474,7 @@ func prepareTargetToRunScripts(myTarget target.Target, scripts []ScriptDefinitio
 		targetScript = fmt.Sprintf("export PATH=\"%s\"\n%s", userPath, targetScript)
 		// write script to the target's local temp directory
 		scriptPath := path.Join(localTempDir, myTarget.GetName(), scriptNameToFilename(script.Name))
-		err = os.WriteFile(scriptPath, []byte(targetScript), 0644)
+		err = os.WriteFile(scriptPath, []byte(targetScript), 0600)
 		if err != nil {
 			err = fmt.Errorf("error writing script to local file: %v", err)
 			return

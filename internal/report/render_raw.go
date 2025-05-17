@@ -72,7 +72,7 @@ func ReadRawReports(path string) (reports []RawReport, err error) {
 }
 
 func readRawReport(rawReportPath string) (report RawReport, err error) {
-	reportBytes, err := os.ReadFile(rawReportPath)
+	reportBytes, err := os.ReadFile(rawReportPath) // #nosec G304
 	if err != nil {
 		err = fmt.Errorf("failed to read raw report file: %v", err)
 		return

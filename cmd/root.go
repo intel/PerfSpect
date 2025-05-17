@@ -193,7 +193,7 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 		slog.SetDefault(slog.New(handler))
 	} else { // log to file
 		// open log file in current directory
-		gLogFile, err = os.OpenFile(common.AppName+".log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		gLogFile, err = os.OpenFile(common.AppName+".log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644) // #nosec G302
 		if err != nil {
 			fmt.Printf("Error: failed to open log file: %v\n", err)
 			os.Exit(1)
@@ -270,7 +270,11 @@ func terminateApplication(cmd *cobra.Command, args []string) error {
 				}
 				slog.Info("Shutting down", slog.String("app", common.AppName), slog.String("version", gVersion), slog.Int("PID", os.Getpid()), slog.String("arguments", strings.Join(os.Args, " ")))
 				if gLogFile != nil {
-					gLogFile.Close()
+					err := gLogFile.Close()
+					if err != nil {
+						slog.Error("error closing log file", slog.String("logFile", gLogFile.Name()), slog.String("error", err.Error()))
+						return err
+					}
 				}
 			}
 		}
@@ -340,6 +344,10 @@ func updateApp(latestManifest manifest, localTempDir string) error {
 
 	// download the latest release
 	// try both versioned and unversioned filenames, until we settle on a naming convention
+	// confirm that manifest's version is a valid semver
+	if !util.IsValidSemver(latestManifest.Version) {
+		return fmt.Errorf("invalid version format in manifest: %s", latestManifest.Version)
+	}
 	versionedFileName := "perfspect" + "_" + latestManifest.Version + ".tgz"
 	unVersionedfileName := "perfspect.tgz"
 	fileNames := []string{unVersionedfileName, versionedFileName}
@@ -347,7 +355,7 @@ func updateApp(latestManifest manifest, localTempDir string) error {
 	var resp *http.Response
 	for _, fileName := range fileNames {
 		url := artifactoryUrl + fileName
-		resp, err = http.Get(url)
+		resp, err = http.Get(url) // #nosec G107
 		if err == nil && resp.StatusCode == http.StatusOK {
 			slog.Info("Downloaded latest release", slog.String("url", url))
 			break
@@ -366,19 +374,24 @@ func updateApp(latestManifest manifest, localTempDir string) error {
 	if err != nil {
 		return err
 	}
-	defer tarballFile.Close()
 	slog.Debug("Writing tarball to temp file", slog.String("tempFile", tarballFile.Name()))
 	_, err = io.Copy(tarballFile, resp.Body)
+	closeErr := tarballFile.Close()
 	if err != nil {
+		slog.Error("Error writing tarball to temp file", slog.String("tempFile", tarballFile.Name()), slog.String("error", err.Error()))
 		return err
 	}
-	tarballFile.Close()
+	if closeErr != nil {
+		slog.Error("Error closing tarball file", slog.String("tempFile", tarballFile.Name()), slog.String("error", closeErr.Error()))
+		return closeErr
+	}
 	// rename the running app to "_<version>"
 	oldAppFile := runningAppFile + "_" + gVersion
 	oldAppPath := filepath.Join(runningAppDir, oldAppFile)
 	slog.Info("Renaming running app", slog.String("from", runningAppFile), slog.String("to", oldAppFile))
 	err = os.Rename(runningAppPath, oldAppPath)
 	if err != nil {
+		slog.Error("Error renaming running app", slog.String("from", runningAppFile), slog.String("to", oldAppFile), slog.String("error", err.Error()))
 		return err
 	}
 	// rename the targets.yaml file to ".sav" if it exists
@@ -387,6 +400,7 @@ func updateApp(latestManifest manifest, localTempDir string) error {
 		slog.Info("Renaming targets file", slog.String("from", "targets.yaml"), slog.String("to", "targets.yaml.sav"))
 		err = os.Rename(targetsFile, targetsFile+".sav")
 		if err != nil {
+			slog.Error("Error renaming targets file", slog.String("from", "targets.yaml"), slog.String("to", "targets.yaml.sav"), slog.String("error", err.Error()))
 			return err
 		}
 	}
@@ -417,6 +431,7 @@ func updateApp(latestManifest manifest, localTempDir string) error {
 	slog.Debug("Removing tarball")
 	err = os.Remove(tarballFile.Name())
 	if err != nil {
+		slog.Error("Error removing tarball", slog.String("tempFile", tarballFile.Name()), slog.String("error", err.Error()))
 		return err
 	}
 	// replace the new targets.yaml with the saved one
@@ -424,6 +439,7 @@ func updateApp(latestManifest manifest, localTempDir string) error {
 		slog.Info("Restoring targets file", slog.String("from", "targets.yaml.sav"), slog.String("to", "targets.yaml"))
 		err = os.Rename(targetsFile+".sav", targetsFile)
 		if err != nil {
+			slog.Error("Error restoring targets file", slog.String("from", "targets.yaml.sav"), slog.String("to", "targets.yaml"), slog.String("error", err.Error()))
 			return err
 		}
 	}

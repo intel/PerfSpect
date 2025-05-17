@@ -32,7 +32,7 @@ func installLkms(t Target, lkms []string) (installedLkms []string, err error) {
 	}
 	for _, lkm := range lkms {
 		slog.Debug("attempting to install kernel module", slog.String("lkm", lkm))
-		_, _, _, err := t.RunCommand(exec.Command("modprobe", "--first-time", lkm), 10, true)
+		_, _, _, err := t.RunCommand(exec.Command("modprobe", "--first-time", lkm), 10, true) // #nosec G204
 		if err != nil {
 			slog.Debug("kernel module already installed or problem installing", slog.String("lkm", lkm), slog.String("error", err.Error()))
 			continue
@@ -60,7 +60,7 @@ func uninstallLkms(t Target, lkms []string) (err error) {
 	}
 	for _, lkm := range lkms {
 		slog.Debug("attempting to uninstall kernel module", slog.String("lkm", lkm))
-		_, _, _, err := t.RunCommand(exec.Command("modprobe", "-r", lkm), 10, true)
+		_, _, _, err := t.RunCommand(exec.Command("modprobe", "-r", lkm), 10, true) // #nosec G204
 		if err != nil {
 			slog.Error("error uninstalling kernel module", slog.String("lkm", lkm), slog.String("error", err.Error()))
 			continue
@@ -93,7 +93,7 @@ func runLocalCommandWithInputWithTimeout(cmd *exec.Cmd, input string, timeout in
 		var cancel context.CancelFunc
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 		defer cancel()
-		commandWithContext := exec.CommandContext(ctx, cmd.Path, cmd.Args[1:]...) // nosemgrep
+		commandWithContext := exec.CommandContext(ctx, cmd.Path, cmd.Args[1:]...) // #nosec G204 // nosemgrep
 		commandWithContext.Env = cmd.Env
 		cmd = commandWithContext
 	}
@@ -138,7 +138,7 @@ func runLocalCommandWithInputWithTimeoutAsync(cmd *exec.Cmd, stdoutChannel chan 
 		var cancel context.CancelFunc
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 		defer cancel()
-		commandWithContext := exec.CommandContext(ctx, cmd.Path, cmd.Args[1:]...) // nosemgrep
+		commandWithContext := exec.CommandContext(ctx, cmd.Path, cmd.Args[1:]...) // #nosec G204 // nosemgrep
 		commandWithContext.Env = cmd.Env
 		cmd = commandWithContext
 	}

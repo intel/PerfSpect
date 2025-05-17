@@ -34,7 +34,8 @@ type GroupDefinition []EventDefinition
 func LoadEventGroups(eventDefinitionOverridePath string, metadata Metadata) (groups []GroupDefinition, uncollectableEvents []string, err error) {
 	var file fs.File
 	if eventDefinitionOverridePath != "" {
-		if file, err = os.Open(eventDefinitionOverridePath); err != nil {
+		file, err = os.Open(eventDefinitionOverridePath) // #nosec G304
+		if err != nil {
 			return
 		}
 	} else {

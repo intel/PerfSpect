@@ -13,7 +13,7 @@ func GetTSCFreqMHz() (freqMHz int) {
 	start := GetTSCStart()
 	time.Sleep(time.Millisecond * 1000)
 	end := GetTSCEnd()
-	freqMHz = int(end-start) / 1000000
+	freqMHz = int((end - start) / 1000000) // #nosec G115
 	return
 }
 

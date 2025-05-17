@@ -104,8 +104,8 @@ func initializeFlags(cmd *cobra.Command) {
 	// general options
 	group := flagGroup{name: flagGroupGeneralName, flags: []flagDefinition{}}
 	group.flags = append(group.flags,
-		newIntFlag(cmd, flagCoreCountName, 0, setCoreCount, "number of physical cores per processor", "greater than 0",
-			func(cmd *cobra.Command) bool { value, _ := cmd.Flags().GetInt(flagCoreCountName); return value > 0 }),
+		newUintFlag(cmd, flagCoreCountName, 0, setCoreCount, "number of physical cores per processor", "greater than 0",
+			func(cmd *cobra.Command) bool { value, _ := cmd.Flags().GetUint(flagCoreCountName); return value > 0 }),
 		newFloat64Flag(cmd, flagLLCSizeName, 0, setLlcSize, "LLC size in MB", "greater than 0",
 			func(cmd *cobra.Command) bool { value, _ := cmd.Flags().GetFloat64(flagLLCSizeName); return value > 0 }),
 		newFloat64Flag(cmd, flagAllCoreMaxFrequencyName, 0, setCoreFrequency, "all-core max frequency in GHz", "greater than 0.1",
@@ -113,18 +113,12 @@ func initializeFlags(cmd *cobra.Command) {
 				value, _ := cmd.Flags().GetFloat64(flagAllCoreMaxFrequencyName)
 				return value > 0.1
 			}),
-		newIntFlag(cmd, flagTDPName, 0, setTDP, "maximum power per processor in Watts", "greater than 0",
-			func(cmd *cobra.Command) bool { value, _ := cmd.Flags().GetInt(flagTDPName); return value > 0 }),
-		newIntFlag(cmd, flagEPBName, 0, setEPB, "energy perf bias from best performance (0) to most power savings (15)", "0-15",
-			func(cmd *cobra.Command) bool {
-				value, _ := cmd.Flags().GetInt(flagEPBName)
-				return value >= 0 && value <= 15
-			}),
-		newIntFlag(cmd, flagEPPName, 0, setEPP, "energy perf profile from best performance (0) to most power savings (255)", "0-255",
-			func(cmd *cobra.Command) bool {
-				value, _ := cmd.Flags().GetInt(flagEPPName)
-				return value >= 0 && value <= 255
-			}),
+		newUintFlag(cmd, flagTDPName, 0, setTDP, "maximum power per processor in Watts", "greater than 0",
+			func(cmd *cobra.Command) bool { value, _ := cmd.Flags().GetUint(flagTDPName); return value > 0 }),
+		newUintFlag(cmd, flagEPBName, 0, setEPB, "energy perf bias from best performance (0) to most power savings (15)", "0-15",
+			func(cmd *cobra.Command) bool { value, _ := cmd.Flags().GetUint(flagEPBName); return value <= 15 }),
+		newUintFlag(cmd, flagEPPName, 0, setEPP, "energy perf profile from best performance (0) to most power savings (255)", "0-255",
+			func(cmd *cobra.Command) bool { value, _ := cmd.Flags().GetUint(flagEPPName); return value <= 255 }),
 		newStringFlag(cmd, flagGovernorName, "", setGovernor, "CPU scaling governor ("+strings.Join(governorOptions, ", ")+")", strings.Join(governorOptions, ", "),
 			func(cmd *cobra.Command) bool {
 				value, _ := cmd.Flags().GetString(flagGovernorName)

@@ -103,8 +103,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	var changeRequested bool
 	for _, group := range flagGroups {
 		for _, flag := range group.flags {
-			hasSetFunc := flag.intSetFunc != nil || flag.floatSetFunc != nil || flag.stringSetFunc != nil || flag.boolSetFunc != nil
-			if hasSetFunc && cmd.Flags().Lookup(flag.GetName()).Changed {
+			if flag.HasSetFunc() && cmd.Flags().Lookup(flag.GetName()).Changed {
 				changeRequested = true
 				break
 			}
@@ -157,11 +156,15 @@ func setOnTarget(cmd *cobra.Command, myTarget target.Target, flagGroups []flagGr
 	_ = statusUpdate(myTarget.GetName(), "updating configuration")
 	for _, group := range flagGroups {
 		for _, flag := range group.flags {
-			hasSetFunc := flag.intSetFunc != nil || flag.floatSetFunc != nil || flag.stringSetFunc != nil || flag.boolSetFunc != nil
-			if hasSetFunc && cmd.Flags().Lookup(flag.GetName()).Changed {
+			if flag.HasSetFunc() && cmd.Flags().Lookup(flag.GetName()).Changed {
 				successMessages = append(successMessages, fmt.Sprintf("set %s to %s", flag.GetName(), flag.GetValueAsString()))
 				errorMessages = append(errorMessages, fmt.Sprintf("failed to set %s to %s", flag.GetName(), flag.GetValueAsString()))
 				switch flag.GetType() {
+				case "uint":
+					if flag.uintSetFunc != nil {
+						value, _ := cmd.Flags().GetUint(flag.GetName())
+						go flag.uintSetFunc(value, myTarget, localTempDir, channelSetComplete, len(successMessages)-1)
+					}
 				case "int":
 					if flag.intSetFunc != nil {
 						value, _ := cmd.Flags().GetInt(flag.GetName())

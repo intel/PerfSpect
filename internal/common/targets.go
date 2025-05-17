@@ -186,7 +186,7 @@ func getLocalTarget(needsElevatedPrivileges bool, failIfCantElevate bool, localT
 	myTarget := target.NewLocalTarget()
 	// create a sub-directory for the target in the localTempDir
 	localTargetDir := path.Join(localTempDir, myTarget.GetName())
-	err := os.MkdirAll(localTargetDir, 0755)
+	err := os.MkdirAll(localTargetDir, 0700)
 	if err != nil {
 		return myTarget, nil, err
 	}
@@ -239,7 +239,7 @@ func getRemoteTarget(targetHost string, targetPort string, targetUser string, ta
 	myTarget := target.NewRemoteTarget(targetHost, targetHost, targetPort, targetUser, targetKey)
 	// create a sub-directory for the target in the localTempDir
 	localTargetDir := path.Join(localTempDir, myTarget.GetName())
-	err := os.MkdirAll(localTargetDir, 0755)
+	err := os.MkdirAll(localTargetDir, 0700)
 	if err != nil {
 		return myTarget, nil, err
 	}
@@ -330,7 +330,7 @@ func sanitizeTargetName(targetName string) string {
 func getTargetsFromFile(targetsFilePath string, localTempDir string) (targets []target.Target, targetErrs []error, err error) {
 	var targetsFile targetsFile
 	// read the file into a byte array
-	yamlFile, err := os.ReadFile(targetsFilePath)
+	yamlFile, err := os.ReadFile(targetsFilePath) // #nosec G304
 	if err != nil {
 		return
 	}
@@ -362,7 +362,7 @@ func getTargetsFromFile(targetsFilePath string, localTempDir string) (targets []
 		newTarget.SetSshPass(t.Pwd)
 		// create a sub-directory for the target in the localTempDir
 		localTargetDir := path.Join(localTempDir, newTarget.GetName())
-		err = os.MkdirAll(localTargetDir, 0755)
+		err = os.MkdirAll(localTargetDir, 0700)
 		if err != nil {
 			return
 		}

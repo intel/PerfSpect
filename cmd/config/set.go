@@ -16,7 +16,7 @@ import (
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
-func setCoreCount(cores int, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+func setCoreCount(cores uint, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
 	setScript := script.ScriptDefinition{
 		Name: "set core count",
 		ScriptTemplate: fmt.Sprintf(`
@@ -206,8 +206,9 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 		}
 		if strings.Contains(output, "intel_pstate") {
 			var value uint64
-			for i := range 2 {
-				value = value | freqInt<<uint(i*8)
+			var i uint
+			for i = range 2 {
+				value = value | freqInt<<i*8
 			}
 			setScript = script.ScriptDefinition{
 				Name:           "set frequency bins",
@@ -228,8 +229,9 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 		}
 	} else {
 		var value uint64
-		for i := range 8 {
-			value = value | freqInt<<uint(i*8)
+		var i uint
+		for i = range 8 {
+			value = value | freqInt<<i*8
 		}
 		setScript = script.ScriptDefinition{
 			Name:           "set frequency bins",
@@ -342,8 +344,7 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())}
 		return
 	}
-	msrHex := strings.TrimSpace(outputs["get uncore frequency MSR"].Stdout)
-	msrInt, err := strconv.ParseInt(msrHex, 16, 0)
+	msrUint, err := strconv.ParseUint(strings.TrimSpace(outputs["get uncore frequency MSR"].Stdout), 16, 0)
 	if err != nil {
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to parse uncore frequency MSR: %w", err)}
 		return
@@ -352,12 +353,12 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 	var newVal uint64
 	if maxFreq {
 		// mask out lower 6 bits to write the max frequency
-		newVal = uint64(msrInt) & 0xFFFFFFFFFFFFFFC0
+		newVal = msrUint & 0xFFFFFFFFFFFFFFC0
 		// add in the new frequency value
 		newVal = newVal | newFreq
 	} else {
 		// mask bits 8:14 to write the min frequency
-		newVal = uint64(msrInt) & 0xFFFFFFFFFFFF80FF
+		newVal = msrUint & 0xFFFFFFFFFFFF80FF
 		// add in the new frequency value
 		newVal = newVal | newFreq<<8
 	}
@@ -376,7 +377,7 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
 }
 
-func setTDP(power int, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+func setTDP(power uint, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
 	readScript := script.ScriptDefinition{
 		Name:           "get power MSR",
 		ScriptTemplate: "rdmsr 0x610",
@@ -391,15 +392,15 @@ func setTDP(power int, myTarget target.Target, localTempDir string, completeChan
 		return
 	} else {
 		msrHex := strings.TrimSpace(readOutput.Stdout)
-		msrInt, err := strconv.ParseInt(msrHex, 16, 0)
+		msrUint, err := strconv.ParseUint(msrHex, 16, 0)
 		if err != nil {
 			completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to parse power MSR: %w", err)}
 			return
 		} else {
 			// mask out lower 14 bits
-			newVal := uint64(msrInt) & 0xFFFFFFFFFFFFC000
+			newVal := uint64(msrUint) & 0xFFFFFFFFFFFFC000
 			// add in the new power value
-			newVal = newVal | uint64(power*8)
+			newVal = newVal | uint64(power*8) // #nosec G115
 			setScript := script.ScriptDefinition{
 				Name:           "set tdp",
 				ScriptTemplate: fmt.Sprintf("wrmsr -a 0x610 %d", newVal),
@@ -418,7 +419,7 @@ func setTDP(power int, myTarget target.Target, localTempDir string, completeChan
 	completeChannel <- setOutput{goRoutineID: goRoutineId, err: nil}
 }
 
-func setEPB(epb int, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+func setEPB(epb uint, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
 	epbSourceScript := script.GetScriptByName(script.EpbSourceScriptName)
 	epbSourceOutput, err := runScript(myTarget, epbSourceScript, localTempDir)
 	if err != nil {
@@ -478,7 +479,7 @@ func setEPB(epb int, myTarget target.Target, localTempDir string, completeChanne
 	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
 }
 
-func setEPP(epp int, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+func setEPP(epp uint, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
 	// Set both the per-core EPP value and the package EPP value
 	// Reference: 15.4.4 Managing HWP in the Intel SDM
 
@@ -643,7 +644,7 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 		return
 	}
 	// set the prefetcher bit to bitValue determined by the onOff value, note: 0 is enable, 1 is disable
-	var bitVal int
+	var bitVal uint64
 	if enableDisable == prefetcherOptions[0] {
 		bitVal = 0
 	} else if enableDisable == prefetcherOptions[1] {
@@ -746,7 +747,7 @@ func setC1Demotion(enableDisable string, myTarget target.Target, localTempDir st
 		return
 	}
 	// set the c1 demotion bits to bitValue, note: 1 is enable, 0 is disable
-	var bitVal int
+	var bitVal uint64
 	if enableDisable == c1DemotionOptions[0] { // enable
 		bitVal = 1
 	} else if enableDisable == c1DemotionOptions[1] { // disable
