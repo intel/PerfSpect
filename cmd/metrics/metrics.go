@@ -1296,8 +1296,8 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 	// The timer will expire when no lines (events) have been received from perf for more than 100ms. This
 	// works because perf writes the events to stderr in a burst every collection interval, e.g., 5 seconds.
 	// When the timer expires, this code assumes that perf is done writing events to stderr.
-	perfEventWaitTime := time.Duration(100 * time.Millisecond) // 100ms is somewhat arbitrary, but is long enough for perf to print a frame of events
-	perfOutputTimer := time.NewTimer(time.Duration(2 * flagPerfPrintInterval * 1000))
+	perfEventWaitTime := time.Duration(100 * time.Millisecond)                        // 100ms is somewhat arbitrary, but is long enough for perf to print a frame of events
+	perfOutputTimer := time.NewTimer(time.Duration(2 * flagPerfPrintInterval * 1000)) // #nosec G115
 	perfProcessingContext, cancelPerfProcessing := context.WithCancel(context.Background())
 	outputLines := make([][]byte, 0)
 	donePerfProcessingChannel := make(chan struct{}) // channel to wait for processPerfOutput to finish

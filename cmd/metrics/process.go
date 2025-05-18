@@ -61,6 +61,10 @@ func GetCgroups(myTarget target.Target, cids []string, localTempDir string) (cgr
 // GetHotProcesses - get maxProcesses processes with highest CPU utilization, matching
 // filter if provided
 func GetHotProcesses(myTarget target.Target, maxProcesses uint, filter string) (processes []Process, err error) {
+	if maxProcesses == 0 {
+		err = fmt.Errorf("maxProcesses must be greater than 0")
+		return
+	}
 	// run ps to get list of processes sorted by cpu utilization (descending)
 	cmd := exec.Command("ps", "-a", "-x", "-h", "-o", "pid,ppid,comm,cmd", "--sort=-%cpu")
 	stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, true)
@@ -105,7 +109,7 @@ func GetHotProcesses(myTarget target.Target, maxProcesses uint, filter string) (
 			continue
 		}
 		processes = append(processes, Process{pid: pid, ppid: ppid, comm: comm, cmd: cmd})
-		if len(processes) == int(maxProcesses) {
+		if len(processes) == int(maxProcesses) { // #nosec G115
 			break
 		}
 	}
