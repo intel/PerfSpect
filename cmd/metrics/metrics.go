@@ -1218,7 +1218,7 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 	targetContext.metadata.CollectionStartTime = time.Now() // save the start time in the metadata for use when using the --input option to process raw data
 	go printMetricsAsync(targetContext, localOutputDir, frameChannel, printCompleteChannel)
 	var err error
-	for {
+	for !getSignalReceived() {
 		var perfCommand *exec.Cmd
 		var processes []Process
 		var tempErr error
