@@ -1002,23 +1002,31 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 	// wait for all targets to finish
 	for range targetContexts {
-		targetError := <-channelTargetError
-		if targetError.err != nil {
-			slog.Error("failed to collect on target", slog.String("target", targetError.target.GetName()), slog.String("error", targetError.err.Error()))
-		}
+		<-channelTargetError // this error is also captured in the targetContext, so we can ignore it here
 	}
-	// finalize the spinner
+	// finalize the spinner status, capture any errors, and create output files
 	var exitErrs []error
-	for _, targetContext := range targetContexts {
+	allPrintedFileNames := make([][]string, 0)
+	for i, targetContext := range targetContexts {
 		if targetContext.err == nil {
-			_ = multiSpinner.Status(targetContext.target.GetName(), "collection complete")
+			if !flagLive {
+				_ = multiSpinner.Status(targetContext.target.GetName(), "collection complete")
+				summaryFiles, err := summarizeMetrics(localOutputDir, targetContext.target.GetName(), targetContext.metadata)
+				if err != nil {
+					err = fmt.Errorf("failed to summarize metrics: %w", err)
+					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+					slog.Error(err.Error())
+					exitErrs = append(exitErrs, err)
+				}
+				targetContexts[i].printedFiles = append(targetContexts[i].printedFiles, summaryFiles...)
+			}
 		} else {
-			exitErrs = append(exitErrs, targetContext.err)
+			err := fmt.Errorf("failed to collect on target %s: %w", targetContext.target.GetName(), targetContext.err)
+			exitErrs = append(exitErrs, err)
 		}
-	}
-	// write metadata to file
-	if flagWriteEventsToFile {
-		for _, targetContext := range targetContexts {
+		allPrintedFileNames = append(allPrintedFileNames, targetContexts[i].printedFiles)
+		// write metadata to file
+		if flagWriteEventsToFile {
 			if err = targetContext.metadata.WriteJSONToFile(localOutputDir + "/" + targetContext.target.GetName() + "_" + "metadata.json"); err != nil {
 				err = fmt.Errorf("failed to write metadata to file: %w", err)
 				fmt.Fprintf(os.Stderr, "Error: %+v\n", err)
@@ -1026,32 +1034,15 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}
-	// summarize outputs
 	if !flagLive {
 		multiSpinner.Finish()
-		for i, ctx := range targetContexts {
-			if targetContexts[i].err != nil {
-				continue
-			}
-			myTarget := targetContexts[i].target
-			summaryFiles, err := summarizeMetrics(localOutputDir, myTarget.GetName(), ctx.metadata)
-			if err != nil {
-				err = fmt.Errorf("failed to summarize metrics: %w", err)
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				slog.Error(err.Error())
-				exitErrs = append(exitErrs, err)
-			}
-			targetContexts[i].printedFiles = append(targetContexts[i].printedFiles, summaryFiles...)
-		}
-		// print the names of the files that were created
-		allFileNames := make([][]string, len(targetContexts))
-		for i, ctx := range targetContexts {
-			allFileNames[i] = ctx.printedFiles
-		}
-		printOutputFileNames(allFileNames)
+		printOutputFileNames(allPrintedFileNames)
 	}
+	// join the errors and print them
 	err = errors.Join(exitErrs...)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		slog.Error(err.Error())
 		cmd.SilenceUsage = true
 	}
 	return err

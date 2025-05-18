@@ -50,6 +50,16 @@ func printMetrics(metricFrames []MetricFrame, frameCount int, targetName string,
 }
 
 func printOutputFileNames(allFileNames [][]string) {
+	if len(allFileNames) == 0 {
+		return
+	}
+	totalCount := 0
+	for _, fileNames := range allFileNames {
+		totalCount += len(fileNames)
+	}
+	if totalCount == 0 {
+		return
+	}
 	fmt.Println()
 	fmt.Println("Metric files:")
 	for _, fileNames := range allFileNames {
