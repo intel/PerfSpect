@@ -48,11 +48,11 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 	var parallelScripts []ScriptDefinition
 	for _, script := range scripts {
 		if !scriptForTarget(script, myTarget) {
-			slog.Info("skipping script because it is not intended to run on the target processor", slog.String("target", myTarget.GetName()), slog.String("script", script.Name))
+			slog.Debug("skipping script because it is not intended to run on the target processor", slog.String("target", myTarget.GetName()), slog.String("script", script.Name))
 			continue
 		}
 		if script.Superuser && !canElevate {
-			slog.Info("skipping script because it requires superuser privileges and the user cannot elevate privileges on target", slog.String("script", script.Name))
+			slog.Debug("skipping script because it requires superuser privileges and the user cannot elevate privileges on target", slog.String("script", script.Name))
 			continue
 		}
 		if script.Sequential {
