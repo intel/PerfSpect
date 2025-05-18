@@ -898,7 +898,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 	// prepare the metrics for each target
 	for i := range targetContexts {
-		go prepareMetrics(cmd, &targetContexts[i], localTempDir, channelTargetError, multiSpinner.Status)
+		go prepareMetrics(&targetContexts[i], localTempDir, channelTargetError, multiSpinner.Status)
 	}
 	// wait for all metrics to be prepared
 	numTargetsWithPreparedMetrics := 0
@@ -1052,13 +1052,6 @@ func prepareTarget(targetContext *targetContext, localTempDir string, localPerfP
 			targetContext.nmiDisabled = true
 		}
 	}
-	// update default mux interval to 16ms for AMD architecture
-	if !flagNoRoot && useDefaultMuxInterval {
-		vendor, err := myTarget.GetVendor()
-		if err == nil && vendor == "AuthenticAMD" {
-			flagPerfMuxInterval = 16
-		}
-	}
 	// set perf mux interval to desired value
 	if !flagNoRoot {
 		if targetContext.perfMuxIntervals, err = GetMuxIntervals(myTarget, localTempDir); err != nil {
@@ -1068,7 +1061,15 @@ func prepareTarget(targetContext *targetContext, localTempDir string, localPerfP
 			channelError <- targetError{target: myTarget, err: err}
 			return
 		}
-		if err = SetAllMuxIntervals(myTarget, flagPerfMuxInterval, localTempDir); err != nil {
+		perfMuxInterval := flagPerfMuxInterval
+		if useDefaultMuxInterval {
+			// set the default mux interval to 16ms for AMD architecture
+			vendor, err := myTarget.GetVendor()
+			if err == nil && vendor == "AuthenticAMD" {
+				perfMuxInterval = 16
+			}
+		}
+		if err = SetAllMuxIntervals(myTarget, perfMuxInterval, localTempDir); err != nil {
 			err = fmt.Errorf("failed to set all perf mux intervals: %w", err)
 			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 			targetContext.err = err
@@ -1089,7 +1090,7 @@ func prepareTarget(targetContext *targetContext, localTempDir string, localPerfP
 	channelError <- targetError{target: myTarget, err: nil}
 }
 
-func prepareMetrics(cmd *cobra.Command, targetContext *targetContext, localTempDir string, channelError chan targetError, statusUpdate progress.MultiSpinnerUpdateFunc) {
+func prepareMetrics(targetContext *targetContext, localTempDir string, channelError chan targetError, statusUpdate progress.MultiSpinnerUpdateFunc) {
 	myTarget := targetContext.target
 	if targetContext.err != nil {
 		channelError <- targetError{target: myTarget, err: nil}
@@ -1098,7 +1099,7 @@ func prepareMetrics(cmd *cobra.Command, targetContext *targetContext, localTempD
 	// load metadata
 	_ = statusUpdate(myTarget.GetName(), "collecting metadata")
 	var err error
-	if targetContext.metadata, err = LoadMetadata(myTarget, flagNoRoot, flagNoSystemSummary, targetContext.perfPath, localTempDir, cmd); err != nil {
+	if targetContext.metadata, err = LoadMetadata(myTarget, flagNoRoot, flagNoSystemSummary, targetContext.perfPath, localTempDir); err != nil {
 		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
