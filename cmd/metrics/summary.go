@@ -23,14 +23,14 @@ import (
 
 func summarizeMetrics(localOutputDir string, targetName string, metadata Metadata) ([]string, error) {
 	filesCreated := []string{}
-	csvMetricsFile := localOutputDir + "/" + targetName + "_" + "metrics.csv"
+	csvMetricsFile := filepath.Join(localOutputDir, targetName+"_metrics.csv")
 	// csv summary
 	out, err := summarize(csvMetricsFile, false, metadata)
 	if err != nil {
 		err = fmt.Errorf("failed to summarize output: %w", err)
 		return filesCreated, err
 	}
-	csvSummaryFile := localOutputDir + "/" + targetName + "_" + "metrics_summary.csv"
+	csvSummaryFile := filepath.Join(localOutputDir, targetName+"_metrics_summary.csv")
 	err = os.WriteFile(csvSummaryFile, []byte(out), 0644) // #nosec G306
 	if err != nil {
 		err = fmt.Errorf("failed to write summary to file: %w", err)
