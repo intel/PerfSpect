@@ -6,12 +6,74 @@ package metrics
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"math"
 	"os"
+	"perfspect/internal/util"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 )
+
+func printMetrics(metricFrames []MetricFrame, frameCount int, targetName string, collectionStartTime time.Time, outputDir string) (printedFiles []string) {
+	fileName, err := printMetricsTxt(metricFrames, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatTxt, !flagLive && slices.Contains(flagOutputFormat, formatTxt), outputDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		slog.Error(err.Error())
+	} else if fileName != "" {
+		printedFiles = util.UniqueAppend(printedFiles, fileName)
+	}
+	fileName, err = printMetricsJSON(metricFrames, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatJSON, !flagLive && slices.Contains(flagOutputFormat, formatJSON), outputDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		slog.Error(err.Error())
+	} else if fileName != "" {
+		printedFiles = util.UniqueAppend(printedFiles, fileName)
+	}
+	// csv is always written to file unless no files are requested -- we need it to create the summary reports
+	fileName, err = printMetricsCSV(metricFrames, frameCount, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatCSV, !flagLive, outputDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		slog.Error(err.Error())
+	} else if fileName != "" {
+		printedFiles = util.UniqueAppend(printedFiles, fileName)
+	}
+	fileName, err = printMetricsWide(metricFrames, frameCount, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatWide, !flagLive && slices.Contains(flagOutputFormat, formatWide), outputDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		slog.Error(err.Error())
+	} else if fileName != "" {
+		printedFiles = util.UniqueAppend(printedFiles, fileName)
+	}
+	return printedFiles
+}
+
+func printOutputFileNames(allFileNames [][]string) {
+	fmt.Println()
+	fmt.Println("Metric files:")
+	for _, fileNames := range allFileNames {
+		for _, fileName := range fileNames {
+			fmt.Printf("  %s\n", fileName)
+		}
+	}
+}
+
+// printMetricsAsync receives metric frames over the provided channel and prints them to file and stdout in the requested format.
+// It exits when the channel is closed.
+func printMetricsAsync(targetContext *targetContext, outputDir string, frameChannel chan []MetricFrame, doneChannel chan []string) {
+	var allPrintedFiles []string
+	frameCount := 1
+	// block until next set of metric frames arrives, will exit loop when frameChannel is closed
+	for metricFrames := range frameChannel {
+		printedFiles := printMetrics(metricFrames, frameCount, targetContext.target.GetName(), targetContext.perfStartTime, outputDir)
+		for _, file := range printedFiles {
+			allPrintedFiles = util.UniqueAppend(allPrintedFiles, file)
+		}
+		frameCount += len(metricFrames)
+	}
+	doneChannel <- allPrintedFiles
+}
 
 func printMetricsJSON(metricFrames []MetricFrame, targetName string, collectionStartTime time.Time, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
 	if !printToStdout && !printToFile {

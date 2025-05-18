@@ -163,9 +163,8 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 	return scriptOutputs, nil
 }
 
-// RunScriptAsync runs a script on the specified target and returns the output. It is meant to be called
-// in a go routine.
-func RunScriptAsync(myTarget target.Target, script ScriptDefinition, localTempDir string, stdoutChannel chan string, stderrChannel chan string, exitcodeChannel chan int, errorChannel chan error, cmdChannel chan *exec.Cmd) {
+// RunScriptStream runs a script on the specified target and streams the output to the specified channels.
+func RunScriptStream(myTarget target.Target, script ScriptDefinition, localTempDir string, stdoutChannel chan string, stderrChannel chan string, exitcodeChannel chan int, errorChannel chan error, cmdChannel chan *exec.Cmd) {
 	targetArchitecture, err := myTarget.GetArchitecture()
 	if err != nil {
 		err = fmt.Errorf("error getting target architecture: %v", err)
@@ -192,7 +191,7 @@ func RunScriptAsync(myTarget target.Target, script ScriptDefinition, localTempDi
 		}()
 	}
 	cmd := prepareCommand(script, myTarget.GetTempDirectory())
-	err = myTarget.RunCommandAsync(cmd, 0, false, stdoutChannel, stderrChannel, exitcodeChannel, cmdChannel)
+	err = myTarget.RunCommandStream(cmd, 0, false, stdoutChannel, stderrChannel, exitcodeChannel, cmdChannel)
 	errorChannel <- err
 }
 

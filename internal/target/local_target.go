@@ -30,13 +30,13 @@ func (t *LocalTarget) RunCommand(cmd *exec.Cmd, timeout int, argNotUsed bool) (s
 	return runLocalCommandWithInputWithTimeout(cmd, input, timeout)
 }
 
-// RunCommandAsync runs the given command asynchronously on the target.
+// RunCommandStream runs the given command asynchronously on the target.
 // It sends the command to the cmdChannel and executes it with a timeout.
 // The output from the command is sent to the stdoutChannel and stderrChannel,
 // and the exit code is sent to the exitcodeChannel.
 // The timeout parameter specifies the maximum time allowed for the command to run.
 // Returns an error if there was a problem running the command.
-func (t *LocalTarget) RunCommandAsync(cmd *exec.Cmd, timeout int, argNotUsed bool, stdoutChannel chan string, stderrChannel chan string, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) (err error) {
+func (t *LocalTarget) RunCommandStream(cmd *exec.Cmd, timeout int, argNotUsed bool, stdoutChannel chan string, stderrChannel chan string, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) (err error) {
 	localCommand := cmd
 	cmdChannel <- localCommand
 	err = runLocalCommandWithInputWithTimeoutAsync(localCommand, stdoutChannel, stderrChannel, exitcodeChannel, "", timeout)
