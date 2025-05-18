@@ -1386,24 +1386,25 @@ func processPerfOutput(
 			// process the events
 			var metricFrames []MetricFrame
 			var err error
-			if metricFrames, frameTimestamp, err = ProcessEvents(*outputLines, eventGroupDefinitions, metricDefinitions, processes, frameTimestamp, metadata); err != nil {
+			metricFrames, frameTimestamp, err = ProcessEvents(*outputLines, eventGroupDefinitions, metricDefinitions, processes, frameTimestamp, metadata)
+			if err != nil {
 				slog.Warn(err.Error())
 				*outputLines = [][]byte{} // empty it
-				continue
+			} else {
+				// send the metrics frames out to be printed
+				frameChannel <- metricFrames
+				// empty the outputLines
+				*outputLines = [][]byte{}
 			}
-			// send the metrics frames out to be printed
-			frameChannel <- metricFrames
-			// empty the outputLines
-			*outputLines = [][]byte{}
 		}
 		// for cgroup scope, terminate perf if we're done or timeout is reached
 		if flagScope == scopeCgroup {
 			if done || uint(time.Since(startPerfTimestamp).Seconds()) >= cgroupTimeout {
 				err := localCommand.Process.Signal(os.Interrupt)
-				if err != nil {
+				// log the error unless the app received a signal that already terminated perf
+				if err != nil && !getSignalReceived() {
 					err = fmt.Errorf("failed to terminate perf: %v", err)
 					slog.Warn(err.Error())
-					// TOOD: should we send this error to the error channel?
 				}
 				done = true
 			}
