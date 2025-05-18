@@ -60,7 +60,7 @@ func GetCgroups(myTarget target.Target, cids []string, localTempDir string) (cgr
 
 // GetHotProcesses - get maxProcesses processes with highest CPU utilization, matching
 // filter if provided
-func GetHotProcesses(myTarget target.Target, maxProcesses int, filter string) (processes []Process, err error) {
+func GetHotProcesses(myTarget target.Target, maxProcesses uint, filter string) (processes []Process, err error) {
 	// run ps to get list of processes sorted by cpu utilization (descending)
 	cmd := exec.Command("ps", "-a", "-x", "-h", "-o", "pid,ppid,comm,cmd", "--sort=-%cpu")
 	stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, true)
@@ -105,7 +105,7 @@ func GetHotProcesses(myTarget target.Target, maxProcesses int, filter string) (p
 			continue
 		}
 		processes = append(processes, Process{pid: pid, ppid: ppid, comm: comm, cmd: cmd})
-		if len(processes) == maxProcesses {
+		if len(processes) == int(maxProcesses) {
 			break
 		}
 	}
@@ -119,7 +119,7 @@ func GetHotProcesses(myTarget target.Target, maxProcesses int, filter string) (p
 
 // GetHotCgroups - get maxCgroups cgroup names whose associated processes have the
 // highest CPU utilization, matching filter if provided
-func GetHotCgroups(myTarget target.Target, maxCgroups int, filter string, localTempDir string) (cgroups []string, err error) {
+func GetHotCgroups(myTarget target.Target, maxCgroups uint, filter string, localTempDir string) (cgroups []string, err error) {
 	hotCgroupsScript := script.ScriptDefinition{
 		Name: "hot_cgroups",
 		ScriptTemplate: fmt.Sprintf(`

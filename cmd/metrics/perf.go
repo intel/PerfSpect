@@ -94,7 +94,7 @@ func getPerfPath(myTarget target.Target, localPerfPath string) (string, error) {
 // Returns:
 // - args: The command arguments for the 'perf stat' command.
 // - err: An error, if any.
-func getPerfCommandArgs(pids string, cgroups []string, timeout int, eventGroups []GroupDefinition) (args []string, err error) {
+func getPerfCommandArgs(pids string, cgroups []string, timeout uint, eventGroups []GroupDefinition) (args []string, err error) {
 	// -I: print interval in ms
 	// -j: json formatted event output
 	args = append(args, "stat", "-I", fmt.Sprintf("%d", flagPerfPrintInterval*1000), "-j")
@@ -163,7 +163,7 @@ func getPerfCommand(myTarget target.Target, perfPath string, eventGroups []Group
 				}
 			}
 		}
-		var timeout int
+		var timeout uint
 		if flagDuration > 0 {
 			timeout = flagDuration
 		} else if len(flagPidList) == 0 { // don't refresh if PIDs are specified
@@ -195,7 +195,7 @@ func getPerfCommand(myTarget target.Target, perfPath string, eventGroups []Group
 			return
 		}
 		var args []string
-		if args, err = getPerfCommandArgs("", cgroups, -1, eventGroups); err != nil {
+		if args, err = getPerfCommandArgs("", cgroups, 0, eventGroups); err != nil {
 			err = fmt.Errorf("failed to assemble perf args: %v", err)
 			return
 		}

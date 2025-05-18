@@ -7,6 +7,7 @@ package metrics
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -87,13 +88,13 @@ func getSignalReceived() bool {
 
 var (
 	// collection options
-	flagDuration int
+	flagDuration uint
 	flagScope    string
 	flagPidList  []string
 	flagCidList  []string
 	flagFilter   string
-	flagCount    int
-	flagRefresh  int
+	flagCount    uint
+	flagRefresh  uint
 	// output format options
 	flagGranularity     string
 	flagOutputFormat    []string
@@ -104,8 +105,8 @@ var (
 	flagMetricsList       []string
 	flagEventFilePath     string
 	flagMetricFilePath    string
-	flagPerfPrintInterval int
-	flagPerfMuxInterval   int
+	flagPerfPrintInterval uint
+	flagPerfMuxInterval   uint
 	flagNoRoot            bool
 	flagWriteEventsToFile bool
 	flagInput             string
@@ -167,13 +168,13 @@ const (
 var formatOptions = []string{formatTxt, formatCSV, formatJSON, formatWide}
 
 func init() {
-	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 0, "")
+	Cmd.Flags().UintVar(&flagDuration, flagDurationName, 0, "")
 	Cmd.Flags().StringVar(&flagScope, flagScopeName, scopeSystem, "")
 	Cmd.Flags().StringSliceVar(&flagPidList, flagPidListName, []string{}, "")
 	Cmd.Flags().StringSliceVar(&flagCidList, flagCidListName, []string{}, "")
 	Cmd.Flags().StringVar(&flagFilter, flagFilterName, "", "")
-	Cmd.Flags().IntVar(&flagCount, flagCountName, 5, "")
-	Cmd.Flags().IntVar(&flagRefresh, flagRefreshName, 30, "")
+	Cmd.Flags().UintVar(&flagCount, flagCountName, 5, "")
+	Cmd.Flags().UintVar(&flagRefresh, flagRefreshName, 30, "")
 
 	Cmd.Flags().StringVar(&flagGranularity, flagGranularityName, granularitySystem, "")
 	Cmd.Flags().StringSliceVar(&flagOutputFormat, flagOutputFormatName, []string{formatCSV}, "")
@@ -184,8 +185,8 @@ func init() {
 	Cmd.Flags().StringSliceVar(&flagMetricsList, flagMetricsListName, []string{}, "")
 	Cmd.Flags().StringVar(&flagEventFilePath, flagEventFilePathName, "", "")
 	Cmd.Flags().StringVar(&flagMetricFilePath, flagMetricFilePathName, "", "")
-	Cmd.Flags().IntVar(&flagPerfPrintInterval, flagPerfPrintIntervalName, 5, "")
-	Cmd.Flags().IntVar(&flagPerfMuxInterval, flagPerfMuxIntervalName, 125, "")
+	Cmd.Flags().UintVar(&flagPerfPrintInterval, flagPerfPrintIntervalName, 5, "")
+	Cmd.Flags().UintVar(&flagPerfMuxInterval, flagPerfMuxIntervalName, 125, "")
 	Cmd.Flags().BoolVar(&flagNoRoot, flagNoRootName, false, "")
 	Cmd.Flags().BoolVar(&flagWriteEventsToFile, flagWriteEventsToFileName, false, "")
 	Cmd.Flags().StringVar(&flagInput, flagInputName, "", "")
@@ -353,13 +354,18 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			return err
 		}
+		if cmd.Flags().Lookup(flagRefreshName).Changed {
+			err := fmt.Errorf("refresh is not supported with an application argument")
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
+		if cmd.Flags().Lookup(flagCountName).Changed {
+			err := fmt.Errorf("count is not supported with an application argument")
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
 	}
 	// confirm valid duration
-	if cmd.Flags().Lookup(flagDurationName).Changed && flagDuration < 0 {
-		err := fmt.Errorf("duration must be a positive integer")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
 	if cmd.Flags().Lookup(flagDurationName).Changed && flagDuration != 0 && flagDuration < flagPerfPrintInterval {
 		err := fmt.Errorf("duration must be greater than or equal to the event collection interval (%ds)", flagPerfPrintInterval)
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -377,7 +383,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return err
 	}
-	// pids only when scope is process
+	// pid list changed
 	if len(flagPidList) > 0 {
 		// if scope was set and it wasn't set to process, error
 		if cmd.Flags().Changed(flagScopeName) && flagScope != scopeProcess {
@@ -396,7 +402,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}
-	// cids only when scope is cgroup
+	// cid list changed
 	if len(flagCidList) > 0 {
 		// if scope was set and it wasn't set to cgroup, error
 		if cmd.Flags().Changed(flagScopeName) && flagScope != scopeCgroup {
@@ -407,35 +413,74 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		// if scope wasn't set, set it to cgroup
 		flagScope = scopeCgroup
 	}
-	// filter only no cids or pids
-	if flagFilter != "" && (len(flagPidList) > 0 || len(flagCidList) > 0) {
-		err := fmt.Errorf("cannot specify filter when pids or cids are specified")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+	// filter changed
+	if flagFilter != "" {
+		// if scope isn't process or cgroup, error
+		if flagScope != scopeProcess && flagScope != scopeCgroup {
+			err := fmt.Errorf("cannot specify filter when scope is not %s or %s", scopeProcess, scopeCgroup)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
+		// if pids or cids are specified, error
+		if len(flagPidList) > 0 || len(flagCidList) > 0 {
+			err := fmt.Errorf("cannot specify filter when pids or cids are specified")
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
 	}
-	// filter only when scope is process or cgroup
-	if flagFilter != "" && (flagScope != scopeProcess && flagScope != scopeCgroup) {
-		err := fmt.Errorf("cannot specify filter when scope is not %s or %s", scopeProcess, scopeCgroup)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+	// count changed
+	if cmd.Flags().Lookup(flagCountName).Changed {
+		// if scope isn't process or cgroup, error
+		if flagScope != scopeProcess && flagScope != scopeCgroup {
+			err := fmt.Errorf("cannot specify count when scope is not %s or %s", scopeProcess, scopeCgroup)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
+		// if count is less than 1, error
+		if flagCount < 1 {
+			err := fmt.Errorf("count must be greater than 0")
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
+		// if pids or cids are specified, error
+		if len(flagPidList) > 0 || len(flagCidList) > 0 {
+			err := fmt.Errorf("cannot specify count when pids or cids are specified")
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
 	}
-	// count must be positive
-	if flagCount < 1 {
-		err := fmt.Errorf("count must be a positive integer")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	// count only when scope is process or cgroup
-	if cmd.Flags().Lookup(flagCountName).Changed && flagCount != 5 && (flagScope != scopeProcess && flagScope != scopeCgroup) {
-		err := fmt.Errorf("cannot specify count when scope is not %s or %s", scopeProcess, scopeCgroup)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	// refresh must be greater than perf print interval
-	if flagRefresh < flagPerfPrintInterval {
-		err := fmt.Errorf("refresh must be greater than or equal to the event collection interval (%ds)", flagPerfPrintInterval)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+	// refresh changed
+	if cmd.Flags().Lookup(flagRefreshName).Changed {
+		// if scope isn't process or cgroup, error
+		if flagScope != scopeProcess && flagScope != scopeCgroup {
+			err := fmt.Errorf("cannot specify refresh when scope is not %s or %s", scopeProcess, scopeCgroup)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
+		// if pidlist or cidlist is set, error
+		if len(flagPidList) > 0 || len(flagCidList) > 0 {
+			err := fmt.Errorf("cannot specify refresh when pids or cids are set")
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
+		// if duration is set, error
+		if flagDuration > 0 {
+			err := fmt.Errorf("cannot specify refresh when duration is set")
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
+		// if refresh is less than 1, error
+		if flagRefresh < 1 {
+			err := fmt.Errorf("refresh must be greater than 0")
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
+		// if refresh is less than perf print interval, error
+		if flagRefresh < flagPerfPrintInterval {
+			err := fmt.Errorf("refresh must be greater than or equal to the event collection interval (%ds)", flagPerfPrintInterval)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
 	}
 
 	// output options
@@ -955,16 +1000,20 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	if flagLive {
 		multiSpinner.Finish()
 	}
+	// wait for all targets to finish
 	for range targetContexts {
 		targetError := <-channelTargetError
 		if targetError.err != nil {
 			slog.Error("failed to collect on target", slog.String("target", targetError.target.GetName()), slog.String("error", targetError.err.Error()))
 		}
 	}
-	// finalize and stop the spinner
+	// finalize the spinner
+	var exitErrs []error
 	for _, targetContext := range targetContexts {
 		if targetContext.err == nil {
 			_ = multiSpinner.Status(targetContext.target.GetName(), "collection complete")
+		} else {
+			exitErrs = append(exitErrs, targetContext.err)
 		}
 	}
 	// write metadata to file
@@ -973,8 +1022,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			if err = targetContext.metadata.WriteJSONToFile(localOutputDir + "/" + targetContext.target.GetName() + "_" + "metadata.json"); err != nil {
 				err = fmt.Errorf("failed to write metadata to file: %w", err)
 				fmt.Fprintf(os.Stderr, "Error: %+v\n", err)
-				cmd.SilenceUsage = true
-				return err
+				exitErrs = append(exitErrs, err)
 			}
 		}
 	}
@@ -991,8 +1039,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 				err = fmt.Errorf("failed to summarize metrics: %w", err)
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				slog.Error(err.Error())
-				cmd.SilenceUsage = true
-				return err
+				exitErrs = append(exitErrs, err)
 			}
 			targetContexts[i].printedFiles = append(targetContexts[i].printedFiles, summaryFiles...)
 		}
@@ -1003,7 +1050,11 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		}
 		printOutputFileNames(allFileNames)
 	}
-	return nil
+	err = errors.Join(exitErrs...)
+	if err != nil {
+		cmd.SilenceUsage = true
+	}
+	return err
 }
 
 func prepareTarget(targetContext *targetContext, localTempDir string, localPerfPath string, channelError chan targetError, statusUpdate progress.MultiSpinnerUpdateFunc, useDefaultMuxInterval bool) {
@@ -1147,13 +1198,22 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 		channelError <- targetError{target: myTarget, err: nil}
 		return
 	}
-	// refresh if collecting per-process/cgroup and list of PIDs/CIDs not specified
-	refresh := (flagScope == scopeProcess && len(flagPidList) == 0) ||
-		(flagScope == scopeCgroup && len(flagCidList) == 0)
+	// only refresh if duration is 0, i.e., no timeout and pids/cids are not specified
+	var needsRefresh bool
+	if flagDuration == 0 {
+		if flagScope == scopeProcess {
+			if len(flagPidList) == 0 {
+				needsRefresh = true
+			}
+		} else if flagScope == scopeCgroup {
+			if len(flagCidList) == 0 {
+				needsRefresh = true
+			}
+		}
+	}
 	errorChannel := make(chan error)
 	frameChannel := make(chan []MetricFrame)
 	printCompleteChannel := make(chan []string)
-	totalPerfRuntimeSeconds := 0 // only relevant in process scope
 	// get current time for use in setting timestamps on output
 	targetContext.metadata.CollectionStartTime = time.Now() // save the start time in the metadata for use when using the --input option to process raw data
 	go printMetricsAsync(targetContext, localOutputDir, frameChannel, printCompleteChannel)
@@ -1184,11 +1244,9 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 			slog.Debug("perf error", slog.String("error", perfErr.Error()))
 			break
 		}
-		// no perf errors, continue
-		perfEndTime := time.Now()
-		totalPerfRuntimeSeconds += int(perfEndTime.Sub(targetContext.perfStartTime).Seconds())
-		if !refresh || (flagDuration != 0 && totalPerfRuntimeSeconds >= flagDuration) {
-			slog.Debug("not refreshing or exceeded duration")
+		// perf exited with no errors
+		if !needsRefresh {
+			slog.Debug("we're done, no refresh needed")
 			break
 		}
 	}
@@ -1196,12 +1254,10 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 	// wait for printing to complete
 	targetContext.printedFiles = <-printCompleteChannel
 	close(printCompleteChannel)
-	if err != nil {
-		targetContext.err = err
-		channelError <- targetError{target: myTarget, err: err}
-		return
-	}
-	channelError <- targetError{target: myTarget, err: nil}
+	// keep track of the error
+	targetContext.err = err
+	// signal that we're done
+	channelError <- targetError{target: myTarget, err: err}
 }
 
 // runPerf starts Linux perf using the provided command, then reads perf's output
@@ -1236,9 +1292,9 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 	}
 	// must manually terminate perf in cgroup scope when a timeout is specified and/or need to refresh cgroups
 	startPerfTimestamp := time.Now()
-	var cgroupTimeout int
-	if flagScope == scopeCgroup && (flagDuration != 0 || len(flagCidList) == 0) {
-		if flagDuration > 0 && flagDuration < flagRefresh {
+	var cgroupTimeout uint
+	if flagScope == scopeCgroup {
+		if flagDuration != 0 {
 			cgroupTimeout = flagDuration
 		} else {
 			cgroupTimeout = flagRefresh
@@ -1275,20 +1331,20 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 	done := false
 	for !done {
 		select {
-		case err := <-scriptErrorChannel: // if there is an error running perf, it comes here
-			if err != nil {
-				slog.Error("error from perf", slog.String("error", err.Error()))
-			}
-			done = true // exit the loop
-		case exitCode := <-exitcodeChannel: // when perf exits, the exit code comes to this channel
-			slog.Debug("perf exited", slog.Int("exit code", exitCode))
-			time.Sleep(perfEventWaitTime) // wait for timer to expire so that last events can be processed
-			done = true                   // exit the loop
 		case line := <-stderrChannel: // perf output comes in on this channel, one line at a time
 			perfOutputTimer.Stop()
 			perfOutputTimer.Reset(perfEventWaitTime)
 			// accumulate the lines, they will be processed in the goroutine when the timer expires
 			outputLines = append(outputLines, []byte(line))
+		case exitCode := <-exitcodeChannel: // when perf exits, the exit code comes to this channel
+			slog.Debug("perf exited", slog.Int("exit code", exitCode))
+			time.Sleep(perfEventWaitTime) // wait for timer to expire so that last events can be processed
+			done = true                   // exit the loop
+		case err := <-scriptErrorChannel: // if there is an error running perf, it comes here
+			if err != nil {
+				slog.Error("error from perf", slog.String("error", err.Error()))
+			}
+			done = true // exit the loop
 		}
 	}
 	perfOutputTimer.Stop()
@@ -1308,7 +1364,7 @@ func processPerfOutput(
 	metricDefinitions []MetricDefinition,
 	outputDir string,
 	processes []Process,
-	cgroupTimeout int,
+	cgroupTimeout uint,
 	startPerfTimestamp time.Time,
 	perfOutputTimer *time.Timer,
 	localCommand *exec.Cmd,
@@ -1349,14 +1405,16 @@ func processPerfOutput(
 			// empty the outputLines
 			*outputLines = [][]byte{}
 		}
-		// for cgroup scope, terminate perf if timeout is reached or we're done
+		// for cgroup scope, terminate perf if we're done or timeout is reached
 		if flagScope == scopeCgroup {
-			if done || (cgroupTimeout != 0 && int(time.Since(startPerfTimestamp).Seconds()) > cgroupTimeout) {
+			if done || uint(time.Since(startPerfTimestamp).Seconds()) >= cgroupTimeout {
 				err := localCommand.Process.Signal(os.Interrupt)
 				if err != nil {
 					err = fmt.Errorf("failed to terminate perf: %v", err)
 					slog.Warn(err.Error())
+					// TOOD: should we send this error to the error channel?
 				}
+				done = true
 			}
 		}
 	}
