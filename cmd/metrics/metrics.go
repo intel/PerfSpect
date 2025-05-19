@@ -425,7 +425,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		}
 		// if pidlist or cidlist is set, error
 		if len(flagPidList) > 0 || len(flagCidList) > 0 {
-			return common.FlagValidationError(cmd, "cannot specify refresh when pids or cids are set")
+			return common.FlagValidationError(cmd, "cannot specify refresh when pids or cids are specified")
 		}
 		// if duration is set, error
 		if flagDuration > 0 {
