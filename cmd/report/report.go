@@ -295,18 +295,14 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	for _, format := range common.FlagFormat {
 		formatOptions := append([]string{report.FormatAll}, report.FormatOptions...)
 		if !slices.Contains(formatOptions, format) {
-			err := fmt.Errorf("format options are: %s", strings.Join(formatOptions, ", "))
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("format options are: %s", strings.Join(formatOptions, ", ")))
 		}
 	}
 	// validate benchmark options
 	for _, benchmark := range flagBenchmark {
 		options := append([]string{benchmarkAll}, benchmarkOptions...)
 		if !slices.Contains(options, benchmark) {
-			err := fmt.Errorf("benchmark options are: %s", strings.Join(options, ", "))
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("benchmark options are: %s", strings.Join(options, ", ")))
 		}
 	}
 	// if benchmark all is selected, replace it with all benchmark options
@@ -317,23 +313,18 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	// validate storage dir
 	if flagStorageDir != "" {
 		if !util.IsValidDirectoryName(flagStorageDir) {
-			err := fmt.Errorf("invalid storage directory name: %s", flagStorageDir)
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("invalid storage directory name: %s", flagStorageDir))
 		}
 		// if no target is specified, i.e., we have a local target only, check if the directory exists
 		if !cmd.Flags().Lookup("targets").Changed && !cmd.Flags().Lookup("target").Changed {
 			if _, err := os.Stat(flagStorageDir); os.IsNotExist(err) {
-				err := fmt.Errorf("storage dir does not exist: %s", flagStorageDir)
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				return err
+				return common.FlagValidationError(cmd, fmt.Sprintf("storage dir does not exist: %s", flagStorageDir))
 			}
 		}
 	}
 	// common target flags
 	if err := common.ValidateTargetFlags(cmd); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, err.Error())
 	}
 	return nil
 }

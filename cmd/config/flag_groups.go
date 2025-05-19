@@ -5,7 +5,6 @@ package config
 
 import (
 	"fmt"
-	"os"
 	"perfspect/internal/common"
 	"perfspect/internal/report"
 	"perfspect/internal/target"
@@ -352,18 +351,14 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		for _, flag := range group.flags {
 			if cmd.Flags().Lookup(flag.GetName()).Changed && flag.validationFunc != nil {
 				if !flag.validationFunc(cmd) {
-					err := fmt.Errorf("invalid flag value, --%s %s, valid values are %s", flag.GetName(), flag.GetValueAsString(), flag.validationDescription)
-					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-					cmd.SilenceUsage = true
-					return err
+					return common.FlagValidationError(cmd, fmt.Sprintf("invalid flag value, --%s %s, valid values are %s", flag.GetName(), flag.GetValueAsString(), flag.validationDescription))
 				}
 			}
 		}
 	}
 	// common target flags
 	if err := common.ValidateTargetFlags(cmd); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, err.Error())
 	}
 	return nil
 }

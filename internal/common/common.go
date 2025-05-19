@@ -6,6 +6,7 @@ package common
 // SPDX-License-Identifier: BSD-3-Clause
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -294,6 +295,15 @@ func DefaultInsightsFunc(allTableValues []report.TableValues, scriptOutputs map[
 		}
 	}
 	return insightsTableValues
+}
+
+// FlagValidationError is used to report an error with a flag
+func FlagValidationError(cmd *cobra.Command, msg string) error {
+	err := errors.New(msg)
+	fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+	fmt.Fprintf(os.Stderr, "See '%s --help' for usage details.\n", cmd.CommandPath())
+	cmd.SilenceUsage = true
+	return err
 }
 
 // createRawReports creates the raw report(s) from the collected data

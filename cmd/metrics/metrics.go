@@ -340,65 +340,45 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		argsApplication = args
 		if flagDuration > 0 {
-			err := fmt.Errorf("duration is not supported with an application argument")
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, "duration is not supported with an application argument")
 		}
 		if len(flagPidList) > 0 || len(flagCidList) > 0 {
-			err := fmt.Errorf("pids and cids are not supported with an application argument")
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, "pids and cids are not supported with an application argument")
 		}
 		if flagFilter != "" {
-			err := fmt.Errorf("filter is not supported with an application argument")
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, "filter is not supported with an application argument")
 		}
 		if cmd.Flags().Lookup(flagRefreshName).Changed {
-			err := fmt.Errorf("refresh is not supported with an application argument")
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, "refresh is not supported with an application argument")
 		}
 		if cmd.Flags().Lookup(flagCountName).Changed {
-			err := fmt.Errorf("count is not supported with an application argument")
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, "count is not supported with an application argument")
 		}
 	}
 	// confirm valid duration
 	if cmd.Flags().Lookup(flagDurationName).Changed && flagDuration != 0 && flagDuration < flagPerfPrintInterval {
-		err := fmt.Errorf("duration must be greater than or equal to the event collection interval (%ds)", flagPerfPrintInterval)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, fmt.Sprintf("duration must be greater than or equal to the event collection interval (%d)", flagPerfPrintInterval))
 	}
 	// confirm valid scope
 	if cmd.Flags().Lookup(flagScopeName).Changed && !slices.Contains(scopeOptions, flagScope) {
-		err := fmt.Errorf("invalid scope: %s, valid options are: %s", flagScope, strings.Join(scopeOptions, ", "))
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, fmt.Sprintf("invalid scope: %s, valid options are: %s", flagScope, strings.Join(scopeOptions, ", ")))
 	}
 	// pids and cids are mutually exclusive
 	if len(flagPidList) > 0 && len(flagCidList) > 0 {
-		err := fmt.Errorf("cannot specify both pids and cids")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, "cannot specify both pids and cids")
 	}
 	// pid list changed
 	if len(flagPidList) > 0 {
 		// if scope was set and it wasn't set to process, error
 		if cmd.Flags().Changed(flagScopeName) && flagScope != scopeProcess {
-			err := fmt.Errorf("cannot specify pids when scope is not %s", scopeProcess)
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("cannot specify pids when scope is not %s", scopeProcess))
 		}
 		// if scope wasn't set, set it to process
 		flagScope = scopeProcess
 		// verify PIDs are integers
 		for _, pid := range flagPidList {
 			if _, err := strconv.Atoi(pid); err != nil {
-				err := fmt.Errorf("pids must be integers")
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				return err
+				return common.FlagValidationError(cmd, "pids must be integers")
 			}
 		}
 	}
@@ -406,9 +386,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	if len(flagCidList) > 0 {
 		// if scope was set and it wasn't set to cgroup, error
 		if cmd.Flags().Changed(flagScopeName) && flagScope != scopeCgroup {
-			err := fmt.Errorf("cannot specify cids when scope is not %s", scopeCgroup)
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("cannot specify cids when scope is not %s", scopeCgroup))
 		}
 		// if scope wasn't set, set it to cgroup
 		flagScope = scopeCgroup
@@ -417,161 +395,114 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	if flagFilter != "" {
 		// if scope isn't process or cgroup, error
 		if flagScope != scopeProcess && flagScope != scopeCgroup {
-			err := fmt.Errorf("cannot specify filter when scope is not %s or %s", scopeProcess, scopeCgroup)
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("cannot specify filter when scope is not %s or %s", scopeProcess, scopeCgroup))
 		}
 		// if pids or cids are specified, error
 		if len(flagPidList) > 0 || len(flagCidList) > 0 {
-			err := fmt.Errorf("cannot specify filter when pids or cids are specified")
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, "cannot specify filter when pids or cids are specified")
 		}
 	}
 	// count changed
 	if cmd.Flags().Lookup(flagCountName).Changed {
 		// if scope isn't process or cgroup, error
 		if flagScope != scopeProcess && flagScope != scopeCgroup {
-			err := fmt.Errorf("cannot specify count when scope is not %s or %s", scopeProcess, scopeCgroup)
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("cannot specify count when scope is not %s or %s", scopeProcess, scopeCgroup))
 		}
 		// if count is less than 1, error
 		if flagCount < 1 {
-			err := fmt.Errorf("count must be greater than 0")
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, "count must be greater than 0")
 		}
 		// if pids or cids are specified, error
 		if len(flagPidList) > 0 || len(flagCidList) > 0 {
-			err := fmt.Errorf("cannot specify count when pids or cids are specified")
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, "cannot specify count when pids or cids are specified")
 		}
 	}
 	// refresh changed
 	if cmd.Flags().Lookup(flagRefreshName).Changed {
 		// if scope isn't process or cgroup, error
 		if flagScope != scopeProcess && flagScope != scopeCgroup {
-			err := fmt.Errorf("cannot specify refresh when scope is not %s or %s", scopeProcess, scopeCgroup)
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("cannot specify refresh when scope is not %s or %s", scopeProcess, scopeCgroup))
 		}
 		// if pidlist or cidlist is set, error
 		if len(flagPidList) > 0 || len(flagCidList) > 0 {
-			err := fmt.Errorf("cannot specify refresh when pids or cids are set")
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, "cannot specify refresh when pids or cids are set")
 		}
 		// if duration is set, error
 		if flagDuration > 0 {
-			err := fmt.Errorf("cannot specify refresh when duration is set")
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, "cannot specify refresh when duration is set")
 		}
 		// if refresh is less than 1, error
 		if flagRefresh < 1 {
-			err := fmt.Errorf("refresh must be greater than 0")
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, "refresh must be greater than 0")
 		}
 		// if refresh is less than perf print interval, error
 		if flagRefresh < flagPerfPrintInterval {
-			err := fmt.Errorf("refresh must be greater than or equal to the event collection interval (%ds)", flagPerfPrintInterval)
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("refresh must be greater than or equal to the event collection interval (%d)", flagPerfPrintInterval))
 		}
 	}
 
 	// output options
 	// confirm valid granularity
 	if cmd.Flags().Lookup(flagGranularityName).Changed && !slices.Contains(granularityOptions, flagGranularity) {
-		err := fmt.Errorf("invalid granularity: %s, valid options are: %s", flagGranularity, strings.Join(granularityOptions, ", "))
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, fmt.Sprintf("invalid granularity: %s, valid options are: %s", flagGranularity, strings.Join(granularityOptions, ", ")))
 	}
 	// if scope is not system, granularity must be system
 	if flagGranularity != granularitySystem && flagScope != scopeSystem {
-		err := fmt.Errorf("granularity option must be %s when collecting at a scope other than %s", granularitySystem, scopeSystem)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, fmt.Sprintf("granularity option must be %s when collecting at a scope other than %s", granularitySystem, scopeSystem))
 	}
 	// confirm valid output format
 	for _, format := range flagOutputFormat {
 		if !slices.Contains(formatOptions, format) {
-			err := fmt.Errorf("invalid output format: %s, valid options are: %s", format, strings.Join(formatOptions, ", "))
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("invalid output format: %s, valid options are: %s", format, strings.Join(formatOptions, ", ")))
 		}
 	}
 	// advanced options
 	// confirm valid perf print interval
 	if cmd.Flags().Lookup(flagPerfPrintIntervalName).Changed && flagPerfPrintInterval < 1 {
-		err := fmt.Errorf("event collection interval must be at least 1 second")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, "event collection interval must be at least 1 second")
 	}
 	// confirm valid perf mux interval
 	if cmd.Flags().Lookup(flagPerfMuxIntervalName).Changed && flagPerfMuxInterval < 10 {
-		err := fmt.Errorf("mux interval must be at least 10 milliseconds")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, "mux interval must be at least 10 milliseconds")
 	}
 	// print events to file
 	if flagWriteEventsToFile && flagLive {
-		err := fmt.Errorf("cannot write raw perf events to file when --%s is set", flagLiveName)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, fmt.Sprintf("cannot write raw perf events to file when --%s is set", flagLiveName))
 	}
 	// only one output format if live
 	if flagLive && len(flagOutputFormat) > 1 {
-		err := fmt.Errorf("specify one output format with --%s <format> when --%s is set", flagOutputFormatName, flagLiveName)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, fmt.Sprintf("specify one output format with --%s <format> when --%s is set", flagOutputFormatName, flagLiveName))
 	}
 	// event file path
 	if flagEventFilePath != "" {
 		if _, err := os.Stat(flagEventFilePath); err != nil {
 			if os.IsNotExist(err) {
-				err = fmt.Errorf("event file path does not exist: %s", flagEventFilePath)
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				return err
+				return common.FlagValidationError(cmd, fmt.Sprintf("event file path does not exist: %s", flagEventFilePath))
 			}
-			err = fmt.Errorf("failed to access event file path: %s, error: %v", flagEventFilePath, err)
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("failed to access event file path: %s, error: %v", flagEventFilePath, err))
 		}
 	}
 	// metric file path
 	if flagMetricFilePath != "" {
 		if _, err := os.Stat(flagMetricFilePath); err != nil {
 			if os.IsNotExist(err) {
-				err = fmt.Errorf("metric file path does not exist: %s", flagMetricFilePath)
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				return err
+				return common.FlagValidationError(cmd, fmt.Sprintf("metric file path does not exist: %s", flagMetricFilePath))
 			}
-			err = fmt.Errorf("failed to access metric file path: %s, error: %v", flagMetricFilePath, err)
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("failed to access metric file path: %s, error: %v", flagMetricFilePath, err))
 		}
 	}
 	// input file path
 	if flagInput != "" {
 		if _, err := os.Stat(flagInput); err != nil {
 			if os.IsNotExist(err) {
-				err = fmt.Errorf("input file path does not exist: %s", flagInput)
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				return err
+				return common.FlagValidationError(cmd, fmt.Sprintf("input file path does not exist: %s", flagInput))
 			}
-			err = fmt.Errorf("failed to access input file path: %s, error: %v", flagInput, err)
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("failed to access input file path: %s, error: %v", flagInput, err))
 		}
 	}
 	// common target flags
 	if err := common.ValidateTargetFlags(cmd); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, err.Error())
 	}
 	return nil
 }
