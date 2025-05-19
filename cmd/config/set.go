@@ -16,7 +16,7 @@ import (
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
-func setCoreCount(cores uint, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+func setCoreCount(cores int, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
 	setScript := script.ScriptDefinition{
 		Name: "set core count",
 		ScriptTemplate: fmt.Sprintf(`
@@ -377,7 +377,7 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
 }
 
-func setTDP(power uint, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+func setTDP(power int, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
 	readScript := script.ScriptDefinition{
 		Name:           "get power MSR",
 		ScriptTemplate: "rdmsr 0x610",
@@ -419,7 +419,7 @@ func setTDP(power uint, myTarget target.Target, localTempDir string, completeCha
 	completeChannel <- setOutput{goRoutineID: goRoutineId, err: nil}
 }
 
-func setEPB(epb uint, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+func setEPB(epb int, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
 	epbSourceScript := script.GetScriptByName(script.EpbSourceScriptName)
 	epbSourceOutput, err := runScript(myTarget, epbSourceScript, localTempDir)
 	if err != nil {
@@ -479,7 +479,7 @@ func setEPB(epb uint, myTarget target.Target, localTempDir string, completeChann
 	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
 }
 
-func setEPP(epp uint, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+func setEPP(epp int, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
 	// Set both the per-core EPP value and the package EPP value
 	// Reference: 15.4.4 Managing HWP in the Intel SDM
 

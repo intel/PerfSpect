@@ -88,13 +88,13 @@ func getSignalReceived() bool {
 
 var (
 	// collection options
-	flagDuration uint
+	flagDuration int
 	flagScope    string
 	flagPidList  []string
 	flagCidList  []string
 	flagFilter   string
-	flagCount    uint
-	flagRefresh  uint
+	flagCount    int
+	flagRefresh  int
 	// output format options
 	flagGranularity     string
 	flagOutputFormat    []string
@@ -105,8 +105,8 @@ var (
 	flagMetricsList       []string
 	flagEventFilePath     string
 	flagMetricFilePath    string
-	flagPerfPrintInterval uint
-	flagPerfMuxInterval   uint
+	flagPerfPrintInterval int
+	flagPerfMuxInterval   int
 	flagNoRoot            bool
 	flagWriteEventsToFile bool
 	flagInput             string
@@ -168,13 +168,13 @@ const (
 var formatOptions = []string{formatTxt, formatCSV, formatJSON, formatWide}
 
 func init() {
-	Cmd.Flags().UintVar(&flagDuration, flagDurationName, 0, "")
+	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 0, "")
 	Cmd.Flags().StringVar(&flagScope, flagScopeName, scopeSystem, "")
 	Cmd.Flags().StringSliceVar(&flagPidList, flagPidListName, []string{}, "")
 	Cmd.Flags().StringSliceVar(&flagCidList, flagCidListName, []string{}, "")
 	Cmd.Flags().StringVar(&flagFilter, flagFilterName, "", "")
-	Cmd.Flags().UintVar(&flagCount, flagCountName, 5, "")
-	Cmd.Flags().UintVar(&flagRefresh, flagRefreshName, 30, "")
+	Cmd.Flags().IntVar(&flagCount, flagCountName, 5, "")
+	Cmd.Flags().IntVar(&flagRefresh, flagRefreshName, 30, "")
 
 	Cmd.Flags().StringVar(&flagGranularity, flagGranularityName, granularitySystem, "")
 	Cmd.Flags().StringSliceVar(&flagOutputFormat, flagOutputFormatName, []string{formatCSV}, "")
@@ -185,8 +185,8 @@ func init() {
 	Cmd.Flags().StringSliceVar(&flagMetricsList, flagMetricsListName, []string{}, "")
 	Cmd.Flags().StringVar(&flagEventFilePath, flagEventFilePathName, "", "")
 	Cmd.Flags().StringVar(&flagMetricFilePath, flagMetricFilePathName, "", "")
-	Cmd.Flags().UintVar(&flagPerfPrintInterval, flagPerfPrintIntervalName, 5, "")
-	Cmd.Flags().UintVar(&flagPerfMuxInterval, flagPerfMuxIntervalName, 125, "")
+	Cmd.Flags().IntVar(&flagPerfPrintInterval, flagPerfPrintIntervalName, 5, "")
+	Cmd.Flags().IntVar(&flagPerfMuxInterval, flagPerfMuxIntervalName, 125, "")
 	Cmd.Flags().BoolVar(&flagNoRoot, flagNoRootName, false, "")
 	Cmd.Flags().BoolVar(&flagWriteEventsToFile, flagWriteEventsToFileName, false, "")
 	Cmd.Flags().StringVar(&flagInput, flagInputName, "", "")
@@ -339,13 +339,16 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	// some flags will not be valid if an application argument is provided
 	if len(args) > 0 {
 		argsApplication = args
-		if flagDuration > 0 {
+		if cmd.Flags().Lookup(flagDurationName).Changed {
 			return common.FlagValidationError(cmd, "duration is not supported with an application argument")
 		}
-		if len(flagPidList) > 0 || len(flagCidList) > 0 {
-			return common.FlagValidationError(cmd, "pids and cids are not supported with an application argument")
+		if cmd.Flags().Lookup(flagPidListName).Changed {
+			return common.FlagValidationError(cmd, "pids are not supported with an application argument")
 		}
-		if flagFilter != "" {
+		if cmd.Flags().Lookup(flagCidListName).Changed {
+			return common.FlagValidationError(cmd, "cids are not supported with an application argument")
+		}
+		if cmd.Flags().Lookup(flagFilterName).Changed {
 			return common.FlagValidationError(cmd, "filter is not supported with an application argument")
 		}
 		if cmd.Flags().Lookup(flagRefreshName).Changed {
@@ -1114,7 +1117,7 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 	channelError <- targetError{target: myTarget, err: nil}
 }
 
-func getProcessesForPerf(myTarget target.Target, pidList []string, count uint, filter string) ([]Process, error) {
+func getProcessesForPerf(myTarget target.Target, pidList []string, count int, filter string) ([]Process, error) {
 	var processes []Process
 	if len(pidList) > 0 {
 		var err error
@@ -1135,7 +1138,7 @@ func getProcessesForPerf(myTarget target.Target, pidList []string, count uint, f
 	return processes, nil
 }
 
-func getCidsForPerf(myTarget target.Target, cidList []string, count uint, filter string, localTempDir string) ([]string, error) {
+func getCidsForPerf(myTarget target.Target, cidList []string, count int, filter string, localTempDir string) ([]string, error) {
 	var cids []string
 	if len(cidList) > 0 {
 		var err error
@@ -1203,6 +1206,7 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 			cids, err = getCidsForPerf(myTarget, flagCidList, flagCount, flagFilter, localTempDir)
 			if err != nil {
 				if len(flagCidList) == 0 && strings.Contains(err.Error(), "no cgroups found") {
+					err = nil // ignore this error, we'll try again
 					slog.Debug("no cgroups found, will try again in 5 seconds")
 					time.Sleep(5 * time.Second) // wait for 5 seconds before trying again
 					continue
@@ -1280,7 +1284,7 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 	}
 	// must manually terminate perf in cgroup scope when a timeout is specified and/or need to refresh cgroups
 	startPerfTimestamp := time.Now()
-	var cgroupTimeout uint
+	var cgroupTimeout int
 	if flagScope == scopeCgroup {
 		if flagDuration != 0 {
 			cgroupTimeout = flagDuration
@@ -1356,7 +1360,7 @@ func processPerfOutput(
 	metricDefinitions []MetricDefinition,
 	outputDir string,
 	processes []Process,
-	cgroupRefreshTimeout uint,
+	cgroupRefreshTimeout int,
 	startPerfTimestamp time.Time,
 	perfOutputTimer *time.Timer,
 	localCommand *exec.Cmd,
@@ -1412,7 +1416,7 @@ func processPerfOutput(
 		}
 		// for cgroup scope, terminate perf if refresh timeout is reached
 		if flagScope == scopeCgroup {
-			if uint(time.Since(startPerfTimestamp).Seconds()) >= cgroupRefreshTimeout {
+			if int(time.Since(startPerfTimestamp).Seconds()) >= cgroupRefreshTimeout {
 				slog.Debug("cgroup refresh timeout reached, killing perf")
 				// killing perf will trigger the context cancellation
 				err := terminateCommand(localCommand)

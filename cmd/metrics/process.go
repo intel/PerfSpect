@@ -60,7 +60,7 @@ func GetCgroups(myTarget target.Target, cids []string, localTempDir string) (cgr
 
 // GetHotProcesses - get maxProcesses processes with highest CPU utilization, matching
 // filter if provided
-func GetHotProcesses(myTarget target.Target, maxProcesses uint, filter string) (processes []Process, err error) {
+func GetHotProcesses(myTarget target.Target, maxProcesses int, filter string) (processes []Process, err error) {
 	if maxProcesses == 0 {
 		err = fmt.Errorf("maxProcesses must be greater than 0")
 		return
@@ -123,7 +123,7 @@ func GetHotProcesses(myTarget target.Target, maxProcesses uint, filter string) (
 
 // GetHotCgroups - get maxCgroups cgroup names whose associated processes have the
 // highest CPU utilization, matching filter if provided
-func GetHotCgroups(myTarget target.Target, maxCgroups uint, filter string, localTempDir string) (cgroups []string, err error) {
+func GetHotCgroups(myTarget target.Target, maxCgroups int, filter string, localTempDir string) (cgroups []string, err error) {
 	hotCgroupsScript := script.ScriptDefinition{
 		Name: "hot_cgroups",
 		ScriptTemplate: fmt.Sprintf(`
