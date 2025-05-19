@@ -94,7 +94,7 @@ func getPerfPath(myTarget target.Target, localPerfPath string) (string, error) {
 // Returns:
 // - args: The command arguments for the 'perf stat' command.
 // - err: An error, if any.
-func getPerfCommandArgs(pids string, cgroups []string, timeout uint, eventGroups []GroupDefinition) (args []string, err error) {
+func getPerfCommandArgs(pids []string, cgroups []string, timeout uint, eventGroups []GroupDefinition) (args []string, err error) {
 	// -I: print interval in ms
 	// -j: json formatted event output
 	args = append(args, "stat", "-I", fmt.Sprintf("%d", flagPerfPrintInterval*1000), "-j")
@@ -104,7 +104,7 @@ func getPerfCommandArgs(pids string, cgroups []string, timeout uint, eventGroups
 			args = append(args, "-A") // no aggregation
 		}
 	} else if flagScope == scopeProcess {
-		args = append(args, "-p", pids) // collect only for these processes
+		args = append(args, "-p", strings.Join(pids, ",")) // collect only for these processes
 	} else if flagScope == scopeCgroup {
 		args = append(args, "--for-each-cgroup", strings.Join(cgroups, ",")) // collect only for these cgroups
 	}
@@ -132,74 +132,25 @@ func getPerfCommandArgs(pids string, cgroups []string, timeout uint, eventGroups
 
 // getPerfCommand is responsible for assembling the command that will be
 // executed to collect event data
-func getPerfCommand(myTarget target.Target, perfPath string, eventGroups []GroupDefinition, localTempDir string) (processes []Process, perfCommand *exec.Cmd, err error) {
+func getPerfCommand(perfPath string, eventGroups []GroupDefinition, pids []string, cids []string) (*exec.Cmd, error) {
+	var duration uint
 	if flagScope == scopeSystem {
-		var args []string
-		if args, err = getPerfCommandArgs("", []string{}, flagDuration, eventGroups); err != nil {
-			err = fmt.Errorf("failed to assemble perf args: %v", err)
-			return
-		}
-		perfCommand = exec.Command(perfPath, args...) // #nosec G204 // nosemgrep
+		duration = flagDuration
 	} else if flagScope == scopeProcess {
-		if len(flagPidList) > 0 {
-			if processes, err = GetProcesses(myTarget, flagPidList); err != nil {
-				return
-			}
-			if len(processes) == 0 {
-				err = fmt.Errorf("failed to find processes associated with designated PIDs: %v", flagPidList)
-				return
-			}
-		} else {
-			if processes, err = GetHotProcesses(myTarget, flagCount, flagFilter); err != nil {
-				return
-			}
-			if len(processes) == 0 {
-				if flagFilter == "" {
-					err = fmt.Errorf("failed to find \"hot\" processes")
-					return
-				} else {
-					err = fmt.Errorf("failed to find processes matching filter: %s", flagFilter)
-					return
-				}
-			}
-		}
-		var timeout uint
 		if flagDuration > 0 {
-			timeout = flagDuration
+			duration = flagDuration
 		} else if len(flagPidList) == 0 { // don't refresh if PIDs are specified
-			timeout = flagRefresh // refresh hot processes every flagRefresh seconds
+			duration = flagRefresh // refresh hot processes every flagRefresh seconds
 		}
-		pidList := make([]string, 0, len(processes))
-		for _, process := range processes {
-			pidList = append(pidList, process.pid)
-		}
-		var args []string
-		if args, err = getPerfCommandArgs(strings.Join(pidList, ","), []string{}, timeout, eventGroups); err != nil {
-			err = fmt.Errorf("failed to assemble perf args: %v", err)
-			return
-		}
-		perfCommand = exec.Command(perfPath, args...) // #nosec G204 // nosemgrep
 	} else if flagScope == scopeCgroup {
-		var cgroups []string
-		if len(flagCidList) > 0 {
-			if cgroups, err = GetCgroups(myTarget, flagCidList, localTempDir); err != nil {
-				return
-			}
-		} else {
-			if cgroups, err = GetHotCgroups(myTarget, flagCount, flagFilter, localTempDir); err != nil {
-				return
-			}
-		}
-		if len(cgroups) == 0 {
-			err = fmt.Errorf("no CIDs selected")
-			return
-		}
-		var args []string
-		if args, err = getPerfCommandArgs("", cgroups, 0, eventGroups); err != nil {
-			err = fmt.Errorf("failed to assemble perf args: %v", err)
-			return
-		}
-		perfCommand = exec.Command(perfPath, args...) // #nosec G204 // nosemgrep
+		duration = 0
 	}
-	return
+
+	args, err := getPerfCommandArgs(pids, cids, duration, eventGroups)
+	if err != nil {
+		err = fmt.Errorf("failed to assemble perf args: %v", err)
+		return nil, err
+	}
+	perfCommand := exec.Command(perfPath, args...) // #nosec G204 // nosemgrep
+	return perfCommand, nil
 }

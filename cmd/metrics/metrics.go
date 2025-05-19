@@ -1114,6 +1114,48 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 	channelError <- targetError{target: myTarget, err: nil}
 }
 
+func getProcessesForPerf(myTarget target.Target, pidList []string, count uint, filter string) ([]Process, error) {
+	var processes []Process
+	if len(pidList) > 0 {
+		var err error
+		processes, err = GetProcesses(myTarget, pidList)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get processes: %w", err)
+		}
+	} else {
+		var err error
+		processes, err = GetHotProcesses(myTarget, count, filter)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get hot processes: %w", err)
+		}
+		if len(processes) == 0 {
+			return nil, fmt.Errorf("no processes found")
+		}
+	}
+	return processes, nil
+}
+
+func getCidsForPerf(myTarget target.Target, cidList []string, count uint, filter string, localTempDir string) ([]string, error) {
+	var cids []string
+	if len(cidList) > 0 {
+		var err error
+		cids, err = GetCgroups(myTarget, cidList, localTempDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get cgroups: %w", err)
+		}
+	} else {
+		var err error
+		cids, err = GetHotCgroups(myTarget, count, filter, localTempDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get hot cgroups: %w", err)
+		}
+		if len(cids) == 0 {
+			return nil, fmt.Errorf("no cgroups found")
+		}
+	}
+	return cids, nil
+}
+
 func collectOnTarget(targetContext *targetContext, localTempDir string, localOutputDir string, channelError chan targetError, statusUpdate progress.MultiSpinnerUpdateFunc) {
 	myTarget := targetContext.target
 	if targetContext.err != nil {
@@ -1141,16 +1183,40 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 	go printMetricsAsync(targetContext, localOutputDir, frameChannel, printCompleteChannel)
 	var err error
 	for !getSignalReceived() {
-		var perfCommand *exec.Cmd
 		var processes []Process
-		var tempErr error
-		// get the perf command
-		if processes, perfCommand, tempErr = getPerfCommand(myTarget, targetContext.perfPath, targetContext.groupDefinitions, localTempDir); tempErr != nil {
-			if !getSignalReceived() {
-				err = fmt.Errorf("failed to get perf command: %w", tempErr)
+		var pids []string
+		var cids []string
+		if flagScope == scopeProcess {
+			// get the list of pids to collect
+			processes, err = getProcessesForPerf(myTarget, flagPidList, flagCount, flagFilter)
+			if err != nil {
+				err = fmt.Errorf("failed to get processes: %w", err)
 				_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
+				break
 			}
-			slog.Debug("perf command error", slog.String("error", tempErr.Error()))
+			// get pids from processes
+			for _, process := range processes {
+				pids = append(pids, process.pid)
+			}
+		} else if flagScope == scopeCgroup {
+			// get the list of cids to collect
+			cids, err = getCidsForPerf(myTarget, flagCidList, flagCount, flagFilter, localTempDir)
+			if err != nil {
+				if len(flagCidList) == 0 && strings.Contains(err.Error(), "no cgroups found") {
+					slog.Debug("no cgroups found, will try again in 5 seconds")
+					time.Sleep(5 * time.Second) // wait for 5 seconds before trying again
+					continue
+				}
+				err = fmt.Errorf("failed to get cgroups: %w", err)
+				_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
+				break
+			}
+		}
+		var perfCommand *exec.Cmd
+		perfCommand, err = getPerfCommand(targetContext.perfPath, targetContext.groupDefinitions, pids, cids)
+		if err != nil {
+			err = fmt.Errorf("failed to get perf command: %w", err)
+			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 			break
 		}
 		// this timestamp is used to determine if we need to exit the loop, i.e., we've run long enough
@@ -1246,7 +1312,6 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 		localCommand,
 		&outputLines,
 		frameChannel,
-		errorChannel,
 		donePerfProcessingChannel,
 	)
 	// receive perf output
@@ -1278,6 +1343,11 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 }
 
 // processPerfOutput processes perf output in a goroutine and supports cancellation via context.
+// This function must not return until the context is cancelled.
+// When context is cancelled, this function will close the done channel to signal that processing is complete.
+// there are two scenarios where this function will trigger a context cancellation by signalling the localCommand to terminate:
+//  1. when the number of consecutive errors processing events exceeds the maximum (2)
+//  2. when the cgroup refresh timeout is reached (in scope==cgroup mode)
 func processPerfOutput(
 	ctx context.Context,
 	myTarget target.Target,
@@ -1286,32 +1356,33 @@ func processPerfOutput(
 	metricDefinitions []MetricDefinition,
 	outputDir string,
 	processes []Process,
-	cgroupTimeout uint,
+	cgroupRefreshTimeout uint,
 	startPerfTimestamp time.Time,
 	perfOutputTimer *time.Timer,
 	localCommand *exec.Cmd,
 	outputLines *[][]byte,
 	frameChannel chan []MetricFrame,
-	errorChannel chan error,
 	doneChannel chan struct{},
 ) {
 	defer close(doneChannel) // close the done channel when the function returns to signal completion
 	var frameTimestamp float64
-	done := false
-	for !done {
+	contextCancelled := false
+	var numConsecutiveProcessEventErrors int
+	const maxConsecutiveProcessEventErrors = 2
+	for !contextCancelled {
 		select {
 		case <-perfOutputTimer.C: // waits for timer to expire the process the events in outputLines
 		case <-ctx.Done(): // context cancellation
-			done = true // exit the loop after one more pass
+			contextCancelled = true // exit the loop after one more pass
 		}
-		if !done && len(*outputLines) != 0 {
+		if contextCancelled {
+			break
+		}
+		if len(*outputLines) != 0 {
 			// write the events to a file
 			if flagWriteEventsToFile {
 				if err := writeEventsToFile(outputDir+"/"+myTarget.GetName()+"_"+"events.json", *outputLines); err != nil {
-					err = fmt.Errorf("failed to write events to file: %v", err)
-					slog.Error(err.Error())
-					errorChannel <- err
-					return
+					slog.Error("failed to write events to file", slog.String("error", err.Error()))
 				}
 			}
 			// process the events
@@ -1319,26 +1390,49 @@ func processPerfOutput(
 			var err error
 			metricFrames, frameTimestamp, err = ProcessEvents(*outputLines, eventGroupDefinitions, metricDefinitions, processes, frameTimestamp, metadata)
 			if err != nil {
-				slog.Warn(err.Error())
+				slog.Error(err.Error())
+				numConsecutiveProcessEventErrors++
+				if numConsecutiveProcessEventErrors > maxConsecutiveProcessEventErrors {
+					slog.Error("too many consecutive errors processing events, killing perf", slog.Int("max errors", maxConsecutiveProcessEventErrors))
+					// killing perf will trigger the context cancellation
+					err := terminateCommand(localCommand)
+					if err != nil {
+						slog.Error("failed to kill perf", slog.String("error", err.Error()))
+					}
+				}
 				*outputLines = [][]byte{} // empty it
 			} else {
 				// send the metrics frames out to be printed
 				frameChannel <- metricFrames
 				// empty the outputLines
 				*outputLines = [][]byte{}
+				// reset the error count
+				numConsecutiveProcessEventErrors = 0
 			}
 		}
-		// for cgroup scope, terminate perf if we're done or timeout is reached
+		// for cgroup scope, terminate perf if refresh timeout is reached
 		if flagScope == scopeCgroup {
-			if done || uint(time.Since(startPerfTimestamp).Seconds()) >= cgroupTimeout {
-				err := localCommand.Process.Signal(os.Interrupt)
+			if uint(time.Since(startPerfTimestamp).Seconds()) >= cgroupRefreshTimeout {
+				slog.Debug("cgroup refresh timeout reached, killing perf")
+				// killing perf will trigger the context cancellation
+				err := terminateCommand(localCommand)
 				// log the error unless the app received a signal that already terminated perf
 				if err != nil && !getSignalReceived() {
-					err = fmt.Errorf("failed to terminate perf: %v", err)
-					slog.Warn(err.Error())
+					slog.Error("failed to kill perf", slog.String("error", err.Error()))
 				}
-				done = true
 			}
 		}
 	}
+}
+
+// terminateCommand sends an interrupt signal to the command's process.
+func terminateCommand(cmd *exec.Cmd) error {
+	if cmd == nil {
+		return nil
+	}
+	err := cmd.Process.Signal(os.Interrupt)
+	if err != nil {
+		return fmt.Errorf("failed to terminate command: %v", err)
+	}
+	return nil
 }
