@@ -1209,7 +1209,11 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 			// get the list of cids to collect
 			cids, err = getCidsForPerf(myTarget, flagCidList, flagCount, flagFilter, localTempDir)
 			if err != nil {
-				if len(flagCidList) == 0 && strings.Contains(err.Error(), "no cgroups found") {
+				if targetContext.perfStartTime == (time.Time{}) {
+					targetContext.perfStartTime = time.Now()
+				}
+				exceededDuration := flagDuration != 0 && time.Since(targetContext.perfStartTime) > time.Duration(flagDuration)*time.Second
+				if !exceededDuration && len(flagCidList) == 0 && strings.Contains(err.Error(), "no cgroups found") {
 					err = nil // ignore this error, we'll try again
 					slog.Debug("no cgroups found, will try again in 5 seconds")
 					time.Sleep(5 * time.Second) // wait for 5 seconds before trying again
