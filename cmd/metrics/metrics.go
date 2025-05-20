@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -945,14 +946,18 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		if targetContext.err == nil {
 			if !flagLive {
 				_ = multiSpinner.Status(targetContext.target.GetName(), "collection complete")
-				summaryFiles, err := summarizeMetrics(localOutputDir, targetContext.target.GetName(), targetContext.metadata)
-				if err != nil {
-					err = fmt.Errorf("failed to summarize metrics: %w", err)
-					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-					slog.Error(err.Error())
-					exitErrs = append(exitErrs, err)
+				csvMetricsFile := filepath.Join(localOutputDir, targetContext.target.GetName()+"_metrics.csv")
+				exists, _ := util.FileExists(csvMetricsFile)
+				if !exists {
+					_ = multiSpinner.Status(targetContext.target.GetName(), "no metrics collected")
+				} else {
+					summaryFiles, err := summarizeMetrics(localOutputDir, targetContext.target.GetName(), targetContext.metadata)
+					if err != nil {
+						err = fmt.Errorf("failed to summarize metrics: %w", err)
+						exitErrs = append(exitErrs, err)
+					}
+					targetContexts[i].printedFiles = append(targetContexts[i].printedFiles, summaryFiles...)
 				}
-				targetContexts[i].printedFiles = append(targetContexts[i].printedFiles, summaryFiles...)
 			}
 		} else {
 			err := fmt.Errorf("failed to collect on target %s: %w", targetContext.target.GetName(), targetContext.err)
@@ -963,7 +968,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		if flagWriteEventsToFile {
 			if err = targetContext.metadata.WriteJSONToFile(localOutputDir + "/" + targetContext.target.GetName() + "_" + "metadata.json"); err != nil {
 				err = fmt.Errorf("failed to write metadata to file: %w", err)
-				fmt.Fprintf(os.Stderr, "Error: %+v\n", err)
 				exitErrs = append(exitErrs, err)
 			}
 		}
