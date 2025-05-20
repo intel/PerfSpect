@@ -1079,7 +1079,11 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 	// load metadata
 	_ = statusUpdate(myTarget.GetName(), "collecting metadata")
 	var err error
-	if targetContext.metadata, err = LoadMetadata(myTarget, flagNoRoot, flagNoSystemSummary, targetContext.perfPath, localTempDir); err != nil {
+	skipSystemSummary := flagNoSystemSummary
+	if flagLive {
+		skipSystemSummary = true // no system summary when live, it doesn't get used/printed
+	}
+	if targetContext.metadata, err = LoadMetadata(myTarget, flagNoRoot, skipSystemSummary, targetContext.perfPath, localTempDir); err != nil {
 		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
