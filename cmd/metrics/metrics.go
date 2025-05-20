@@ -882,17 +882,17 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 	// wait for all metrics to be prepared
 	numTargetsWithPreparedMetrics := 0
-	for _, ctx := range targetContexts {
+	for range targetContexts {
 		targetError := <-channelTargetError
 		if targetError.err != nil {
 			slog.Error("failed to prepare metrics", slog.String("target", targetError.target.GetName()), slog.String("error", targetError.err.Error()))
-			_ = multiSpinner.Status(ctx.target.GetName(), fmt.Sprintf("Error: %v", targetError.err))
+			_ = multiSpinner.Status(targetError.target.GetName(), fmt.Sprintf("Error: %v", targetError.err))
 		} else {
 			numTargetsWithPreparedMetrics++
 		}
 	}
 	if numTargetsWithPreparedMetrics == 0 {
-		err := fmt.Errorf("no targets had metrics prepared")
+		err := fmt.Errorf("no targets had metrics successfully prepared")
 		slog.Error(err.Error())
 		cmd.SilenceUsage = true
 		return err
@@ -919,7 +919,8 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-	// start the metric collection
+	// start the metric production for each target
+	collectOnTargetWG := sync.WaitGroup{}
 	for i := range targetContexts {
 		if targetContexts[i].err == nil {
 			finalMessage := "collecting metrics"
@@ -930,15 +931,14 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			}
 			_ = multiSpinner.Status(targetContexts[i].target.GetName(), finalMessage)
 		}
-		go collectOnTarget(&targetContexts[i], localTempDir, localOutputDir, channelTargetError, multiSpinner.Status)
+		collectOnTargetWG.Add(1)
+		go collectOnTarget(&targetContexts[i], localTempDir, localOutputDir, &collectOnTargetWG, multiSpinner.Status)
 	}
 	if flagLive {
 		multiSpinner.Finish()
 	}
-	// wait for all targets to finish
-	for range targetContexts {
-		<-channelTargetError // this error is also captured in the targetContext, so we can ignore it here
-	}
+	// wait for all collectOnTarget goroutines to finish
+	collectOnTargetWG.Wait()
 	// finalize the spinner status, capture any errors, and create output files
 	var exitErrs []error
 	allPrintedFileNames := make([][]string, 0)
@@ -1163,10 +1163,10 @@ func getCidsForPerf(myTarget target.Target, cidList []string, count int, filter 
 	return cids, nil
 }
 
-func collectOnTarget(targetContext *targetContext, localTempDir string, localOutputDir string, channelError chan targetError, statusUpdate progress.MultiSpinnerUpdateFunc) {
+func collectOnTarget(targetContext *targetContext, localTempDir string, localOutputDir string, wg *sync.WaitGroup, statusUpdate progress.MultiSpinnerUpdateFunc) {
+	defer wg.Done()
 	myTarget := targetContext.target
 	if targetContext.err != nil {
-		channelError <- targetError{target: myTarget, err: nil}
 		return
 	}
 	// only refresh if duration is 0, i.e., no timeout and pids/cids are not specified
@@ -1198,6 +1198,7 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 			processes, err = getProcessesForPerf(myTarget, flagPidList, flagCount, flagFilter)
 			if err != nil {
 				err = fmt.Errorf("failed to get processes: %w", err)
+				slog.Error("failed to get processes", slog.String("error", err.Error()))
 				_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 				break
 			}
@@ -1256,8 +1257,6 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 	close(printCompleteChannel)
 	// keep track of the error
 	targetContext.err = err
-	// signal that we're done
-	channelError <- targetError{target: myTarget, err: err}
 }
 
 // runPerf starts Linux perf using the provided command, then reads perf's output
@@ -1305,7 +1304,7 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 	// The timer will expire when no lines (events) have been received from perf for more than 100ms. This
 	// works because perf writes the events to stderr in a burst every collection interval, e.g., 5 seconds.
 	// When the timer expires, this code assumes that perf is done writing events to stderr.
-	perfEventWaitTime := time.Duration(100 * time.Millisecond)                        // 100ms is somewhat arbitrary, but is long enough for perf to print a frame of events
+	const perfEventWaitTime = time.Duration(100 * time.Millisecond)                   // 100ms is somewhat arbitrary, but is long enough for perf to print a frame of events
 	perfOutputTimer := time.NewTimer(time.Duration(2 * flagPerfPrintInterval * 1000)) // #nosec G115
 	perfProcessingContext, cancelPerfProcessing := context.WithCancel(context.Background())
 	outputLines := make([][]byte, 0)
@@ -1440,7 +1439,7 @@ func processPerfOutput(
 // terminateCommand sends an interrupt signal to the command's process.
 func terminateCommand(cmd *exec.Cmd) error {
 	if cmd == nil {
-		return nil
+		return fmt.Errorf("command is nil")
 	}
 	err := cmd.Process.Signal(os.Interrupt)
 	if err != nil {
