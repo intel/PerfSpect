@@ -46,7 +46,7 @@ func summarizeMetrics(localOutputDir string, targetName string, metadata Metadat
 			err = fmt.Errorf("failed to summarize output as HTML: %w", err)
 			return filesCreated, err
 		}
-		htmlSummaryFile := localOutputDir + "/" + targetName + "_" + "metrics_summary.html"
+		htmlSummaryFile := filepath.Join(localOutputDir, targetName+"_metrics_summary.html")
 		err = os.WriteFile(htmlSummaryFile, []byte(out), 0644) // #nosec G306
 		if err != nil {
 			err = fmt.Errorf("failed to write HTML summary to file: %w", err)
