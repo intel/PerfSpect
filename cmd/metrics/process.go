@@ -109,7 +109,7 @@ func GetHotProcesses(myTarget target.Target, maxProcesses int, filter string) (p
 			continue
 		}
 		processes = append(processes, Process{pid: pid, ppid: ppid, comm: comm, cmd: cmd})
-		if len(processes) == int(maxProcesses) { // #nosec G115
+		if len(processes) == maxProcesses { // #nosec G115
 			break
 		}
 	}
