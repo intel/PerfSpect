@@ -121,7 +121,7 @@ func getCPUExtended(family, model, stepping, capid4, devices string) (cpu CPUDef
 	return
 }
 
-func getCPUByMicroArchitecture(uarch string) (cpu CPUDefinition, err error) {
+func GetCPUByMicroArchitecture(uarch string) (cpu CPUDefinition, err error) {
 	for _, info := range cpuDefinitions {
 		if strings.EqualFold(info.MicroArchitecture, uarch) {
 			cpu = info
@@ -129,28 +129,6 @@ func getCPUByMicroArchitecture(uarch string) (cpu CPUDefinition, err error) {
 		}
 	}
 	err = fmt.Errorf("CPU match not found for uarch %s", uarch)
-	return
-}
-
-func getCPUCacheWays(cpu CPUDefinition) (cacheWays []uint64) {
-	wayCount := cpu.CacheWayCount
-	if wayCount == 0 {
-		return
-	}
-	var cacheSize uint64 = 0
-	// set wayCount bits in cacheSize
-	for range wayCount {
-		cacheSize = (cacheSize << 1) | 1
-	}
-	var mask uint64 = 0xffffffffffffffff // all bits set
-	for range wayCount {
-		// prepend the cache size to the list of ways
-		cacheWays = append([]uint64{cacheSize}, cacheWays...)
-		// clear another low bit in mask
-		mask = mask << 1
-		// mask lower bits (however many bits are cleared in mask var)
-		cacheSize = cacheSize & mask
-	}
 	return
 }
 

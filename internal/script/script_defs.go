@@ -57,7 +57,7 @@ const (
 	PPINName                         = "ppin"
 	PrefetchControlName              = "prefetch control"
 	PrefetchersName                  = "prefetchers"
-	L3WaySizeName                    = "l3 way size"
+	L3CacheWayEnabled                = "l3 way enabled"
 	PackagePowerLimitName            = "package power limit"
 	EpbScriptName                    = "energy performance bias"
 	EpbSourceScriptName              = "energy performance bias source"
@@ -379,8 +379,8 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
 	},
-	L3WaySizeName: {
-		Name:           L3WaySizeName,
+	L3CacheWayEnabled: {
+		Name:           L3CacheWayEnabled,
 		ScriptTemplate: "rdmsr 0xc90", // TODO: get name, used to read l3 size
 		Architectures:  []string{x86_64},
 		Vendors:        []string{"GenuineIntel"},
