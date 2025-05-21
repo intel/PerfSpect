@@ -235,7 +235,7 @@ func getRemoteTarget(targetHost string, targetPort string, targetUser string, ta
 	if targetPort == "" {
 		targetPort = "22"
 	}
-	slog.Info("Creating remote target", slog.String("targetHost", targetHost), slog.String("targetPort", targetPort), slog.String("targetUser", targetUser))
+	slog.Debug("Creating remote target", slog.String("targetHost", targetHost), slog.String("targetPort", targetPort), slog.String("targetUser", targetUser))
 	myTarget := target.NewRemoteTarget(targetHost, targetHost, targetPort, targetUser, targetKey)
 	// create a sub-directory for the target in the localTempDir
 	localTargetDir := path.Join(localTempDir, myTarget.GetName())

@@ -144,45 +144,32 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	for _, format := range common.FlagFormat {
 		formatOptions := append([]string{report.FormatAll}, report.FormatHtml, report.FormatTxt, report.FormatJson)
 		if !slices.Contains(formatOptions, format) {
-			err := fmt.Errorf("format options are: %s", strings.Join(formatOptions, ", "))
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("format options are: %s", strings.Join(formatOptions, ", ")))
 		}
 	}
 	// validate input file
 	if common.FlagInput != "" {
 		if _, err := os.Stat(common.FlagInput); os.IsNotExist(err) {
-			err := fmt.Errorf("input file %s does not exist", common.FlagInput)
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("input file %s does not exist", common.FlagInput))
 		}
 	}
 	if flagDuration <= 0 {
-		err := fmt.Errorf("duration must be greater than 0")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, "duration must be greater than 0")
 	}
 	if flagFrequency <= 0 {
-		err := fmt.Errorf("frequency must be greater than 0")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, "frequency must be greater than 0")
 	}
 	for _, pid := range flagPids {
 		if pid < 0 {
-			err := fmt.Errorf("PID must be greater than or equal to 0")
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, "PID must be greater than or equal to 0")
 		}
 	}
 	if flagMaxDepth < 0 {
-		err := fmt.Errorf("max depth must be greater than or equal to 0")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, "max depth must be greater than or equal to 0")
 	}
 	// common target flags
 	if err := common.ValidateTargetFlags(cmd); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, err.Error())
 	}
 	return nil
 }

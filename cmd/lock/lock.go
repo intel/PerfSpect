@@ -6,7 +6,6 @@ package lock
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"perfspect/internal/common"
 	"perfspect/internal/progress"
@@ -132,25 +131,18 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	formatOptions := append([]string{report.FormatAll}, report.FormatHtml, report.FormatTxt)
 	for _, format := range flagFormat {
 		if !slices.Contains(formatOptions, format) {
-			err := fmt.Errorf("format options are: %s", strings.Join(formatOptions, ", "))
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("format options are: %s", strings.Join(formatOptions, ", ")))
 		}
 	}
 	if flagDuration <= 0 {
-		err := fmt.Errorf("duration must be greater than 0")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, "duration must be greater than 0")
 	}
 	if flagFrequency <= 0 {
-		err := fmt.Errorf("frequency must be greater than 0")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, "frequency must be greater than 0")
 	}
 	// common target flags
 	if err := common.ValidateTargetFlags(cmd); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, err.Error())
 	}
 	return nil
 }

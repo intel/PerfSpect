@@ -64,7 +64,7 @@ type Target interface {
 	// It returns the standard output, standard error, exit code, and any error that occurred.
 	RunCommand(cmd *exec.Cmd, timeout int, reuseSSHConnection bool) (stdout string, stderr string, exitCode int, err error)
 
-	// RunCommandAsync runs the specified command on the target in an asynchronous manner.
+	// RunCommandStream runs the specified command on the target and streams the output to the provided channels.
 	// Arguments:
 	// - cmd: the command to run
 	// - timeout: the maximum time allowed for the command to run (zero means no timeout)
@@ -74,7 +74,7 @@ type Target interface {
 	// - exitcodeChannel: a channel to send the exit code of the command
 	// - cmdChannel: a channel to send the command that was run
 	// It returns any error that occurred.
-	RunCommandAsync(cmd *exec.Cmd, timeout int, reuseSSHConnection bool, stdoutChannel chan string, stderrChannel chan string, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) error
+	RunCommandStream(cmd *exec.Cmd, timeout int, reuseSSHConnection bool, stdoutChannel chan string, stderrChannel chan string, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) error
 
 	// PushFile transfers a file from the local system to the target.
 	// It returns any error that occurred.

@@ -20,8 +20,6 @@ import (
 	"perfspect/internal/report"
 	"perfspect/internal/script"
 	"perfspect/internal/target"
-
-	"github.com/spf13/cobra"
 )
 
 // Metadata is the representation of the platform's state and capabilities
@@ -55,7 +53,7 @@ type Metadata struct {
 
 // LoadMetadata - populates and returns a Metadata structure containing state of the
 // system.
-func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, perfPath string, localTempDir string, cmd *cobra.Command) (metadata Metadata, err error) {
+func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, perfPath string, localTempDir string) (metadata Metadata, err error) {
 	// Hostname
 	metadata.Hostname = myTarget.GetName()
 	// CPU Info (from /proc/cpuinfo)

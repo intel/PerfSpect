@@ -7,7 +7,6 @@ package telemetry
 import (
 	"fmt"
 	"log/slog"
-	"os"
 	"regexp"
 	"slices"
 	"strconv"
@@ -222,20 +221,14 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		formatOptions := []string{report.FormatAll}
 		formatOptions = append(formatOptions, report.FormatOptions...)
 		if !slices.Contains(formatOptions, format) {
-			err := fmt.Errorf("format options are: %s", strings.Join(formatOptions, ", "))
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("format options are: %s", strings.Join(formatOptions, ", ")))
 		}
 	}
 	if flagInterval < 1 {
-		err := fmt.Errorf("interval must be 1 or greater")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, "interval must be 1 or greater")
 	}
 	if flagDuration < 0 {
-		err := fmt.Errorf("duration must be 0 or greater")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, "duration must be 0 or greater")
 	}
 	target, err := cmd.Flags().GetString("target")
 	if err != nil {
@@ -246,24 +239,19 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		panic("failed to get targets flag")
 	}
 	if flagDuration == 0 && (target != "" || targets != "") {
-		err := fmt.Errorf("duration must be greater than 0 when collecting from a remote target")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, "duration must be greater than 0 when collecting from a remote target")
 	}
 	if cmd.Flags().Lookup(flagInstrMixFilterName).Changed {
 		re := regexp.MustCompile("^[A-Z0-9_]+$")
 		for _, filter := range flagInstrMixFilter {
 			if !re.MatchString(filter) {
-				err := fmt.Errorf("invalid filter: %s, must be uppercase letters, numbers, and underscores", filter)
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				return err
+				return common.FlagValidationError(cmd, fmt.Sprintf("invalid filter: %s, must be uppercase letters, numbers, and underscores", filter))
 			}
 		}
 	}
 	// common target flags
 	if err := common.ValidateTargetFlags(cmd); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, err.Error())
 	}
 	return nil
 }

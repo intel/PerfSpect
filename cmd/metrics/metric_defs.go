@@ -110,7 +110,7 @@ func ConfigureMetrics(loadedMetrics []MetricDefinition, uncollectableEvents []st
 		}
 		for _, uncollectableEvent := range uncollectableEvents {
 			if strings.Contains(tmpMetric.Expression, uncollectableEvent) {
-				slog.Warn("removing metric that uses uncollectable event", slog.String("metric", tmpMetric.Name), slog.String("event", uncollectableEvent))
+				slog.Debug("removing metric that uses uncollectable event", slog.String("metric", tmpMetric.Name), slog.String("event", uncollectableEvent))
 				foundUncollectable = true
 				break
 			}

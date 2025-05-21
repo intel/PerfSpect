@@ -447,7 +447,7 @@ func SignalProcess(pid int, sig os.Signal) error {
 	if err != nil {
 		return fmt.Errorf("failed to find process: %w", err)
 	}
-	slog.Info("sending signal to process", slog.Int("pid", pid), slog.String("signal", sig.String()))
+	slog.Debug("sending signal to process", slog.Int("pid", pid), slog.String("signal", sig.String()))
 	err = proc.Signal(sig)
 	if err != nil {
 		return fmt.Errorf("failed to send signal to process (pid %d): %w", pid, err)
@@ -508,6 +508,16 @@ func SignalChildren(sig os.Signal) error {
 	}
 	if len(errs) > 0 {
 		return errors.Join(errs...)
+	}
+	return nil
+}
+
+// SignalSelf sends a signal to this process
+func SignalSelf(sig os.Signal) error {
+	selfPid := os.Getpid()
+	err := SignalProcess(selfPid, sig)
+	if err != nil {
+		return fmt.Errorf("failed to send signal to self (pid: %d): %w", selfPid, err)
 	}
 	return nil
 }

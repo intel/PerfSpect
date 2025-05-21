@@ -41,7 +41,7 @@ func (t *RemoteTarget) RunCommand(cmd *exec.Cmd, timeout int, reuseSSHConnection
 	return runLocalCommandWithInputWithTimeout(localCommand, "", timeout)
 }
 
-// RunCommandAsync executes a command asynchronously on a remote target.
+// RunCommandStream executes a command asynchronously on a remote target.
 // It prepares the local command based on the provided parameters and runs it
 // with a specified timeout. The function communicates the command's output,
 // error, and exit code through the provided channels.
@@ -57,7 +57,7 @@ func (t *RemoteTarget) RunCommand(cmd *exec.Cmd, timeout int, reuseSSHConnection
 //
 // Returns:
 //   - err: An error object if the command fails to execute or times out.
-func (t *RemoteTarget) RunCommandAsync(cmd *exec.Cmd, timeout int, reuseSSHConnection bool, stdoutChannel chan string, stderrChannel chan string, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) (err error) {
+func (t *RemoteTarget) RunCommandStream(cmd *exec.Cmd, timeout int, reuseSSHConnection bool, stdoutChannel chan string, stderrChannel chan string, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) (err error) {
 	localCommand := t.prepareLocalCommand(cmd, reuseSSHConnection)
 	cmdChannel <- localCommand
 	err = runLocalCommandWithInputWithTimeoutAsync(localCommand, stdoutChannel, stderrChannel, exitcodeChannel, "", timeout)

@@ -160,11 +160,6 @@ func setOnTarget(cmd *cobra.Command, myTarget target.Target, flagGroups []flagGr
 				successMessages = append(successMessages, fmt.Sprintf("set %s to %s", flag.GetName(), flag.GetValueAsString()))
 				errorMessages = append(errorMessages, fmt.Sprintf("failed to set %s to %s", flag.GetName(), flag.GetValueAsString()))
 				switch flag.GetType() {
-				case "uint":
-					if flag.uintSetFunc != nil {
-						value, _ := cmd.Flags().GetUint(flag.GetName())
-						go flag.uintSetFunc(value, myTarget, localTempDir, channelSetComplete, len(successMessages)-1)
-					}
 				case "int":
 					if flag.intSetFunc != nil {
 						value, _ := cmd.Flags().GetInt(flag.GetName())

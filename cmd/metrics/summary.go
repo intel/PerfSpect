@@ -14,6 +14,7 @@ import (
 	"log/slog"
 	"math"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -21,9 +22,44 @@ import (
 	"time"
 )
 
-// Summarize - generates formatted output from a CSV file containing metric values.
+func summarizeMetrics(localOutputDir string, targetName string, metadata Metadata) ([]string, error) {
+	filesCreated := []string{}
+	csvMetricsFile := filepath.Join(localOutputDir, targetName+"_metrics.csv")
+	// csv summary
+	out, err := summarize(csvMetricsFile, false, metadata)
+	if err != nil {
+		err = fmt.Errorf("failed to summarize output: %w", err)
+		return filesCreated, err
+	}
+	csvSummaryFile := filepath.Join(localOutputDir, targetName+"_metrics_summary.csv")
+	err = os.WriteFile(csvSummaryFile, []byte(out), 0644) // #nosec G306
+	if err != nil {
+		err = fmt.Errorf("failed to write summary to file: %w", err)
+		return filesCreated, err
+	}
+	filesCreated = append(filesCreated, csvSummaryFile)
+	// html summary
+	htmlSummary := (flagScope == scopeSystem || flagScope == scopeProcess) && flagGranularity == granularitySystem
+	if htmlSummary {
+		out, err = summarize(csvMetricsFile, true, metadata)
+		if err != nil {
+			err = fmt.Errorf("failed to summarize output as HTML: %w", err)
+			return filesCreated, err
+		}
+		htmlSummaryFile := filepath.Join(localOutputDir, targetName+"_metrics_summary.html")
+		err = os.WriteFile(htmlSummaryFile, []byte(out), 0644) // #nosec G306
+		if err != nil {
+			err = fmt.Errorf("failed to write HTML summary to file: %w", err)
+			return filesCreated, err
+		}
+		filesCreated = append(filesCreated, htmlSummaryFile)
+	}
+	return filesCreated, nil
+}
+
+// summarize - generates formatted output from a CSV file containing metric values.
 // The output can be in CSV or HTML format. Set html to true to generate HTML output otherwise CSV is generated.
-func Summarize(csvInputPath string, html bool, metadata Metadata) (out string, err error) {
+func summarize(csvInputPath string, html bool, metadata Metadata) (out string, err error) {
 	var metrics []metricsFromCSV
 	if metrics, err = newMetricsFromCSV(csvInputPath); err != nil {
 		return

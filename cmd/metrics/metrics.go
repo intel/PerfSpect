@@ -5,14 +5,16 @@ package metrics
 // SPDX-License-Identifier: BSD-3-Clause
 
 import (
+	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"os/exec"
 	"os/signal"
-	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -338,195 +340,173 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	// some flags will not be valid if an application argument is provided
 	if len(args) > 0 {
 		argsApplication = args
-		if flagDuration > 0 {
-			err := fmt.Errorf("duration is not supported with an application argument")
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+		if cmd.Flags().Lookup(flagDurationName).Changed {
+			return common.FlagValidationError(cmd, "duration is not supported with an application argument")
 		}
-		if len(flagPidList) > 0 || len(flagCidList) > 0 {
-			err := fmt.Errorf("pids and cids are not supported with an application argument")
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+		if cmd.Flags().Lookup(flagPidListName).Changed {
+			return common.FlagValidationError(cmd, "pids are not supported with an application argument")
 		}
-		if flagFilter != "" {
-			err := fmt.Errorf("filter is not supported with an application argument")
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+		if cmd.Flags().Lookup(flagCidListName).Changed {
+			return common.FlagValidationError(cmd, "cids are not supported with an application argument")
+		}
+		if cmd.Flags().Lookup(flagFilterName).Changed {
+			return common.FlagValidationError(cmd, "filter is not supported with an application argument")
+		}
+		if cmd.Flags().Lookup(flagRefreshName).Changed {
+			return common.FlagValidationError(cmd, "refresh is not supported with an application argument")
+		}
+		if cmd.Flags().Lookup(flagCountName).Changed {
+			return common.FlagValidationError(cmd, "count is not supported with an application argument")
 		}
 	}
 	// confirm valid duration
-	if cmd.Flags().Lookup(flagDurationName).Changed && flagDuration < 0 {
-		err := fmt.Errorf("duration must be a positive integer")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
 	if cmd.Flags().Lookup(flagDurationName).Changed && flagDuration != 0 && flagDuration < flagPerfPrintInterval {
-		err := fmt.Errorf("duration must be greater than or equal to the event collection interval (%ds)", flagPerfPrintInterval)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, fmt.Sprintf("duration must be greater than or equal to the event collection interval (%d)", flagPerfPrintInterval))
 	}
 	// confirm valid scope
 	if cmd.Flags().Lookup(flagScopeName).Changed && !slices.Contains(scopeOptions, flagScope) {
-		err := fmt.Errorf("invalid scope: %s, valid options are: %s", flagScope, strings.Join(scopeOptions, ", "))
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, fmt.Sprintf("invalid scope: %s, valid options are: %s", flagScope, strings.Join(scopeOptions, ", ")))
 	}
 	// pids and cids are mutually exclusive
 	if len(flagPidList) > 0 && len(flagCidList) > 0 {
-		err := fmt.Errorf("cannot specify both pids and cids")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, "cannot specify both pids and cids")
 	}
-	// pids only when scope is process
+	// pid list changed
 	if len(flagPidList) > 0 {
 		// if scope was set and it wasn't set to process, error
 		if cmd.Flags().Changed(flagScopeName) && flagScope != scopeProcess {
-			err := fmt.Errorf("cannot specify pids when scope is not %s", scopeProcess)
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("cannot specify pids when scope is not %s", scopeProcess))
 		}
 		// if scope wasn't set, set it to process
 		flagScope = scopeProcess
 		// verify PIDs are integers
 		for _, pid := range flagPidList {
 			if _, err := strconv.Atoi(pid); err != nil {
-				err := fmt.Errorf("pids must be integers")
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				return err
+				return common.FlagValidationError(cmd, "pids must be integers")
 			}
 		}
 	}
-	// cids only when scope is cgroup
+	// cid list changed
 	if len(flagCidList) > 0 {
 		// if scope was set and it wasn't set to cgroup, error
 		if cmd.Flags().Changed(flagScopeName) && flagScope != scopeCgroup {
-			err := fmt.Errorf("cannot specify cids when scope is not %s", scopeCgroup)
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("cannot specify cids when scope is not %s", scopeCgroup))
 		}
 		// if scope wasn't set, set it to cgroup
 		flagScope = scopeCgroup
 	}
-	// filter only no cids or pids
-	if flagFilter != "" && (len(flagPidList) > 0 || len(flagCidList) > 0) {
-		err := fmt.Errorf("cannot specify filter when pids or cids are specified")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+	// filter changed
+	if flagFilter != "" {
+		// if scope isn't process or cgroup, error
+		if flagScope != scopeProcess && flagScope != scopeCgroup {
+			return common.FlagValidationError(cmd, fmt.Sprintf("cannot specify filter when scope is not %s or %s", scopeProcess, scopeCgroup))
+		}
+		// if pids or cids are specified, error
+		if len(flagPidList) > 0 || len(flagCidList) > 0 {
+			return common.FlagValidationError(cmd, "cannot specify filter when pids or cids are specified")
+		}
 	}
-	// filter only when scope is process or cgroup
-	if flagFilter != "" && (flagScope != scopeProcess && flagScope != scopeCgroup) {
-		err := fmt.Errorf("cannot specify filter when scope is not %s or %s", scopeProcess, scopeCgroup)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+	// count changed
+	if cmd.Flags().Lookup(flagCountName).Changed {
+		// if scope isn't process or cgroup, error
+		if flagScope != scopeProcess && flagScope != scopeCgroup {
+			return common.FlagValidationError(cmd, fmt.Sprintf("cannot specify count when scope is not %s or %s", scopeProcess, scopeCgroup))
+		}
+		// if count is less than 1, error
+		if flagCount < 1 {
+			return common.FlagValidationError(cmd, "count must be greater than 0")
+		}
+		// if pids or cids are specified, error
+		if len(flagPidList) > 0 || len(flagCidList) > 0 {
+			return common.FlagValidationError(cmd, "cannot specify count when pids or cids are specified")
+		}
 	}
-	// count must be positive
-	if flagCount < 1 {
-		err := fmt.Errorf("count must be a positive integer")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	// count only when scope is process or cgroup
-	if cmd.Flags().Lookup(flagCountName).Changed && flagCount != 5 && (flagScope != scopeProcess && flagScope != scopeCgroup) {
-		err := fmt.Errorf("cannot specify count when scope is not %s or %s", scopeProcess, scopeCgroup)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
-	}
-	// refresh must be greater than perf print interval
-	if flagRefresh < flagPerfPrintInterval {
-		err := fmt.Errorf("refresh must be greater than or equal to the event collection interval (%ds)", flagPerfPrintInterval)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+	// refresh changed
+	if cmd.Flags().Lookup(flagRefreshName).Changed {
+		// if scope isn't process or cgroup, error
+		if flagScope != scopeProcess && flagScope != scopeCgroup {
+			return common.FlagValidationError(cmd, fmt.Sprintf("cannot specify refresh when scope is not %s or %s", scopeProcess, scopeCgroup))
+		}
+		// if pidlist or cidlist is set, error
+		if len(flagPidList) > 0 || len(flagCidList) > 0 {
+			return common.FlagValidationError(cmd, "cannot specify refresh when pids or cids are specified")
+		}
+		// if duration is set, error
+		if flagDuration > 0 {
+			return common.FlagValidationError(cmd, "cannot specify refresh when duration is set")
+		}
+		// if refresh is less than 1, error
+		if flagRefresh < 1 {
+			return common.FlagValidationError(cmd, "refresh must be greater than 0")
+		}
+		// if refresh is less than perf print interval, error
+		if flagRefresh < flagPerfPrintInterval {
+			return common.FlagValidationError(cmd, fmt.Sprintf("refresh must be greater than or equal to the event collection interval (%d)", flagPerfPrintInterval))
+		}
 	}
 
 	// output options
 	// confirm valid granularity
 	if cmd.Flags().Lookup(flagGranularityName).Changed && !slices.Contains(granularityOptions, flagGranularity) {
-		err := fmt.Errorf("invalid granularity: %s, valid options are: %s", flagGranularity, strings.Join(granularityOptions, ", "))
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, fmt.Sprintf("invalid granularity: %s, valid options are: %s", flagGranularity, strings.Join(granularityOptions, ", ")))
 	}
 	// if scope is not system, granularity must be system
 	if flagGranularity != granularitySystem && flagScope != scopeSystem {
-		err := fmt.Errorf("granularity option must be %s when collecting at a scope other than %s", granularitySystem, scopeSystem)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, fmt.Sprintf("granularity option must be %s when collecting at a scope other than %s", granularitySystem, scopeSystem))
 	}
 	// confirm valid output format
 	for _, format := range flagOutputFormat {
 		if !slices.Contains(formatOptions, format) {
-			err := fmt.Errorf("invalid output format: %s, valid options are: %s", format, strings.Join(formatOptions, ", "))
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("invalid output format: %s, valid options are: %s", format, strings.Join(formatOptions, ", ")))
 		}
 	}
 	// advanced options
 	// confirm valid perf print interval
 	if cmd.Flags().Lookup(flagPerfPrintIntervalName).Changed && flagPerfPrintInterval < 1 {
-		err := fmt.Errorf("event collection interval must be at least 1 second")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, "event collection interval must be at least 1 second")
 	}
 	// confirm valid perf mux interval
 	if cmd.Flags().Lookup(flagPerfMuxIntervalName).Changed && flagPerfMuxInterval < 10 {
-		err := fmt.Errorf("mux interval must be at least 10 milliseconds")
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, "mux interval must be at least 10 milliseconds")
 	}
 	// print events to file
 	if flagWriteEventsToFile && flagLive {
-		err := fmt.Errorf("cannot write raw perf events to file when --%s is set", flagLiveName)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, fmt.Sprintf("cannot write raw perf events to file when --%s is set", flagLiveName))
 	}
 	// only one output format if live
 	if flagLive && len(flagOutputFormat) > 1 {
-		err := fmt.Errorf("specify one output format with --%s <format> when --%s is set", flagOutputFormatName, flagLiveName)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, fmt.Sprintf("specify one output format with --%s <format> when --%s is set", flagOutputFormatName, flagLiveName))
 	}
 	// event file path
 	if flagEventFilePath != "" {
 		if _, err := os.Stat(flagEventFilePath); err != nil {
 			if os.IsNotExist(err) {
-				err = fmt.Errorf("event file path does not exist: %s", flagEventFilePath)
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				return err
+				return common.FlagValidationError(cmd, fmt.Sprintf("event file path does not exist: %s", flagEventFilePath))
 			}
-			err = fmt.Errorf("failed to access event file path: %s, error: %v", flagEventFilePath, err)
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("failed to access event file path: %s, error: %v", flagEventFilePath, err))
 		}
 	}
 	// metric file path
 	if flagMetricFilePath != "" {
 		if _, err := os.Stat(flagMetricFilePath); err != nil {
 			if os.IsNotExist(err) {
-				err = fmt.Errorf("metric file path does not exist: %s", flagMetricFilePath)
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				return err
+				return common.FlagValidationError(cmd, fmt.Sprintf("metric file path does not exist: %s", flagMetricFilePath))
 			}
-			err = fmt.Errorf("failed to access metric file path: %s, error: %v", flagMetricFilePath, err)
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("failed to access metric file path: %s, error: %v", flagMetricFilePath, err))
 		}
 	}
 	// input file path
 	if flagInput != "" {
 		if _, err := os.Stat(flagInput); err != nil {
 			if os.IsNotExist(err) {
-				err = fmt.Errorf("input file path does not exist: %s", flagInput)
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				return err
+				return common.FlagValidationError(cmd, fmt.Sprintf("input file path does not exist: %s", flagInput))
 			}
-			err = fmt.Errorf("failed to access input file path: %s, error: %v", flagInput, err)
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			return common.FlagValidationError(cmd, fmt.Sprintf("failed to access input file path: %s, error: %v", flagInput, err))
 		}
 	}
 	// common target flags
 	if err := common.ValidateTargetFlags(cmd); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, err.Error())
 	}
 	return nil
 }
@@ -713,18 +693,19 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	localTempDir := appContext.LocalTempDir
 	localOutputDir := appContext.OutputDir
 	// handle signals
-	// child processes will exit when the signals are received which will
-	// allow this app to exit normally
 	sigChannel := make(chan os.Signal, 1)
-	signal.Notify(sigChannel, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigChannel, syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1)
 	go func() {
-		sig := <-sigChannel
-		setSignalReceived()
-		slog.Info("received signal", slog.String("signal", sig.String()))
-		// send kill signal to children
-		err := util.SignalChildren(syscall.SIGKILL)
-		if err != nil {
-			slog.Error("failed to send kill signal to children", slog.String("error", err.Error()))
+		for sig := range sigChannel {
+			slog.Debug("received signal", slog.String("signal", sig.String()))
+			if sig == syscall.SIGINT || sig == syscall.SIGTERM {
+				setSignalReceived()
+			}
+			// send kill signal to children
+			err := util.SignalChildren(syscall.SIGKILL)
+			if err != nil {
+				slog.Error("failed to send kill signal to children", slog.String("error", err.Error()))
+			}
 		}
 	}()
 	if flagInput != "" {
@@ -898,21 +879,21 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 	// prepare the metrics for each target
 	for i := range targetContexts {
-		go prepareMetrics(cmd, &targetContexts[i], localTempDir, channelTargetError, multiSpinner.Status)
+		go prepareMetrics(&targetContexts[i], localTempDir, channelTargetError, multiSpinner.Status)
 	}
 	// wait for all metrics to be prepared
 	numTargetsWithPreparedMetrics := 0
-	for _, ctx := range targetContexts {
+	for range targetContexts {
 		targetError := <-channelTargetError
 		if targetError.err != nil {
 			slog.Error("failed to prepare metrics", slog.String("target", targetError.target.GetName()), slog.String("error", targetError.err.Error()))
-			_ = multiSpinner.Status(ctx.target.GetName(), fmt.Sprintf("Error: %v", targetError.err))
+			_ = multiSpinner.Status(targetError.target.GetName(), fmt.Sprintf("Error: %v", targetError.err))
 		} else {
 			numTargetsWithPreparedMetrics++
 		}
 	}
 	if numTargetsWithPreparedMetrics == 0 {
-		err := fmt.Errorf("no targets had metrics prepared")
+		err := fmt.Errorf("no targets had metrics successfully prepared")
 		slog.Error(err.Error())
 		cmd.SilenceUsage = true
 		return err
@@ -939,7 +920,8 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-	// start the metric collection
+	// start the metric production for each target
+	collectOnTargetWG := sync.WaitGroup{}
 	for i := range targetContexts {
 		if targetContexts[i].err == nil {
 			finalMessage := "collecting metrics"
@@ -950,105 +932,59 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			}
 			_ = multiSpinner.Status(targetContexts[i].target.GetName(), finalMessage)
 		}
-		go collectOnTarget(&targetContexts[i], localTempDir, localOutputDir, channelTargetError, multiSpinner.Status)
+		collectOnTargetWG.Add(1)
+		go collectOnTarget(&targetContexts[i], localTempDir, localOutputDir, &collectOnTargetWG, multiSpinner.Status)
 	}
 	if flagLive {
 		multiSpinner.Finish()
 	}
-	for range targetContexts {
-		targetError := <-channelTargetError
-		if targetError.err != nil {
-			slog.Error("failed to collect on target", slog.String("target", targetError.target.GetName()), slog.String("error", targetError.err.Error()))
-		}
-	}
-	// finalize and stop the spinner
-	for _, targetContext := range targetContexts {
+	// wait for all collectOnTarget goroutines to finish
+	collectOnTargetWG.Wait()
+	// finalize the spinner status, capture any errors, and create output files
+	var exitErrs []error
+	allPrintedFileNames := make([][]string, 0)
+	for i, targetContext := range targetContexts {
 		if targetContext.err == nil {
-			_ = multiSpinner.Status(targetContext.target.GetName(), "collection complete")
+			if !flagLive {
+				_ = multiSpinner.Status(targetContext.target.GetName(), "collection complete")
+				csvMetricsFile := filepath.Join(localOutputDir, targetContext.target.GetName()+"_metrics.csv")
+				exists, _ := util.FileExists(csvMetricsFile)
+				if !exists {
+					_ = multiSpinner.Status(targetContext.target.GetName(), "no metrics collected")
+				} else {
+					summaryFiles, err := summarizeMetrics(localOutputDir, targetContext.target.GetName(), targetContext.metadata)
+					if err != nil {
+						err = fmt.Errorf("failed to summarize metrics: %w", err)
+						exitErrs = append(exitErrs, err)
+					}
+					targetContexts[i].printedFiles = append(targetContexts[i].printedFiles, summaryFiles...)
+				}
+			}
+		} else {
+			err := fmt.Errorf("failed to collect on target %s: %w", targetContext.target.GetName(), targetContext.err)
+			exitErrs = append(exitErrs, err)
 		}
-	}
-	// write metadata to file
-	if flagWriteEventsToFile {
-		for _, targetContext := range targetContexts {
+		allPrintedFileNames = append(allPrintedFileNames, targetContexts[i].printedFiles)
+		// write metadata to file
+		if flagWriteEventsToFile {
 			if err = targetContext.metadata.WriteJSONToFile(localOutputDir + "/" + targetContext.target.GetName() + "_" + "metadata.json"); err != nil {
 				err = fmt.Errorf("failed to write metadata to file: %w", err)
-				fmt.Fprintf(os.Stderr, "Error: %+v\n", err)
-				cmd.SilenceUsage = true
-				return err
+				exitErrs = append(exitErrs, err)
 			}
 		}
 	}
-	// summarize outputs
 	if !flagLive {
 		multiSpinner.Finish()
-		for i, ctx := range targetContexts {
-			if targetContexts[i].err != nil {
-				continue
-			}
-			myTarget := targetContexts[i].target
-			summaryFiles, err := summarizeMetrics(localOutputDir, myTarget.GetName(), ctx.metadata)
-			if err != nil {
-				err = fmt.Errorf("failed to summarize metrics: %w", err)
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				slog.Error(err.Error())
-				cmd.SilenceUsage = true
-				return err
-			}
-			targetContexts[i].printedFiles = append(targetContexts[i].printedFiles, summaryFiles...)
-		}
-		// print the names of the files that were created
-		allFileNames := make([][]string, len(targetContexts))
-		for i, ctx := range targetContexts {
-			allFileNames[i] = ctx.printedFiles
-		}
-		printOutputFileNames(allFileNames)
+		printOutputFileNames(allPrintedFileNames)
 	}
-	return nil
-}
-
-func printOutputFileNames(allFileNames [][]string) {
-	fmt.Println()
-	fmt.Println("Metric files:")
-	for _, fileNames := range allFileNames {
-		for _, fileName := range fileNames {
-			fmt.Printf("  %s\n", fileName)
-		}
-	}
-}
-
-func summarizeMetrics(localOutputDir string, targetName string, metadata Metadata) ([]string, error) {
-	filesCreated := []string{}
-	csvMetricsFile := localOutputDir + "/" + targetName + "_" + "metrics.csv"
-	// csv summary
-	out, err := Summarize(csvMetricsFile, false, metadata)
+	// join the errors and print them
+	err = errors.Join(exitErrs...)
 	if err != nil {
-		err = fmt.Errorf("failed to summarize output: %w", err)
-		return filesCreated, err
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		slog.Error(err.Error())
+		cmd.SilenceUsage = true
 	}
-	csvSummaryFile := localOutputDir + "/" + targetName + "_" + "metrics_summary.csv"
-	err = os.WriteFile(csvSummaryFile, []byte(out), 0644) // #nosec G306
-	if err != nil {
-		err = fmt.Errorf("failed to write summary to file: %w", err)
-		return filesCreated, err
-	}
-	filesCreated = append(filesCreated, csvSummaryFile)
-	// html summary
-	htmlSummary := (flagScope == scopeSystem || flagScope == scopeProcess) && flagGranularity == granularitySystem
-	if htmlSummary {
-		out, err = Summarize(csvMetricsFile, true, metadata)
-		if err != nil {
-			err = fmt.Errorf("failed to summarize output as HTML: %w", err)
-			return filesCreated, err
-		}
-		htmlSummaryFile := localOutputDir + "/" + targetName + "_" + "metrics_summary.html"
-		err = os.WriteFile(htmlSummaryFile, []byte(out), 0644) // #nosec G306
-		if err != nil {
-			err = fmt.Errorf("failed to write HTML summary to file: %w", err)
-			return filesCreated, err
-		}
-		filesCreated = append(filesCreated, htmlSummaryFile)
-	}
-	return filesCreated, nil
+	return err
 }
 
 func prepareTarget(targetContext *targetContext, localTempDir string, localPerfPath string, channelError chan targetError, statusUpdate progress.MultiSpinnerUpdateFunc, useDefaultMuxInterval bool) {
@@ -1097,13 +1033,6 @@ func prepareTarget(targetContext *targetContext, localTempDir string, localPerfP
 			targetContext.nmiDisabled = true
 		}
 	}
-	// update default mux interval to 16ms for AMD architecture
-	if !flagNoRoot && useDefaultMuxInterval {
-		vendor, err := myTarget.GetVendor()
-		if err == nil && vendor == "AuthenticAMD" {
-			flagPerfMuxInterval = 16
-		}
-	}
 	// set perf mux interval to desired value
 	if !flagNoRoot {
 		if targetContext.perfMuxIntervals, err = GetMuxIntervals(myTarget, localTempDir); err != nil {
@@ -1113,7 +1042,15 @@ func prepareTarget(targetContext *targetContext, localTempDir string, localPerfP
 			channelError <- targetError{target: myTarget, err: err}
 			return
 		}
-		if err = SetAllMuxIntervals(myTarget, flagPerfMuxInterval, localTempDir); err != nil {
+		perfMuxInterval := flagPerfMuxInterval
+		if useDefaultMuxInterval {
+			// set the default mux interval to 16ms for AMD architecture
+			vendor, err := myTarget.GetVendor()
+			if err == nil && vendor == "AuthenticAMD" {
+				perfMuxInterval = 16
+			}
+		}
+		if err = SetAllMuxIntervals(myTarget, perfMuxInterval, localTempDir); err != nil {
 			err = fmt.Errorf("failed to set all perf mux intervals: %w", err)
 			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 			targetContext.err = err
@@ -1130,11 +1067,11 @@ func prepareTarget(targetContext *targetContext, localTempDir string, localPerfP
 		channelError <- targetError{target: myTarget, err: err}
 		return
 	}
-	slog.Info("Using Linux perf", slog.String("target", targetContext.target.GetName()), slog.String("path", targetContext.perfPath))
+	slog.Debug("Using Linux perf", slog.String("target", targetContext.target.GetName()), slog.String("path", targetContext.perfPath))
 	channelError <- targetError{target: myTarget, err: nil}
 }
 
-func prepareMetrics(cmd *cobra.Command, targetContext *targetContext, localTempDir string, channelError chan targetError, statusUpdate progress.MultiSpinnerUpdateFunc) {
+func prepareMetrics(targetContext *targetContext, localTempDir string, channelError chan targetError, statusUpdate progress.MultiSpinnerUpdateFunc) {
 	myTarget := targetContext.target
 	if targetContext.err != nil {
 		channelError <- targetError{target: myTarget, err: nil}
@@ -1143,19 +1080,23 @@ func prepareMetrics(cmd *cobra.Command, targetContext *targetContext, localTempD
 	// load metadata
 	_ = statusUpdate(myTarget.GetName(), "collecting metadata")
 	var err error
-	if targetContext.metadata, err = LoadMetadata(myTarget, flagNoRoot, flagNoSystemSummary, targetContext.perfPath, localTempDir, cmd); err != nil {
+	skipSystemSummary := flagNoSystemSummary
+	if flagLive {
+		skipSystemSummary = true // no system summary when live, it doesn't get used/printed
+	}
+	if targetContext.metadata, err = LoadMetadata(myTarget, flagNoRoot, skipSystemSummary, targetContext.perfPath, localTempDir); err != nil {
 		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
 		return
 	}
+	slog.Debug("metadata: " + targetContext.metadata.String())
 	if !targetContext.metadata.SupportsInstructions {
-		slog.Info("Target does not support instructions event collection", slog.String("target", myTarget.GetName()))
+		slog.Error("Target does not support instructions event collection", slog.String("target", myTarget.GetName()))
 		targetContext.err = fmt.Errorf("target not supported, does not support instructions event collection")
 		channelError <- targetError{target: myTarget, err: targetContext.err}
 		return
 	}
-	slog.Info(targetContext.metadata.String())
 	// load event definitions
 	var uncollectableEvents []string
 	if targetContext.groupDefinitions, uncollectableEvents, err = LoadEventGroups(flagEventFilePath, targetContext.metadata); err != nil {
@@ -1185,33 +1126,115 @@ func prepareMetrics(cmd *cobra.Command, targetContext *targetContext, localTempD
 	channelError <- targetError{target: myTarget, err: nil}
 }
 
-func collectOnTarget(targetContext *targetContext, localTempDir string, localOutputDir string, channelError chan targetError, statusUpdate progress.MultiSpinnerUpdateFunc) {
+func getProcessesForPerf(myTarget target.Target, pidList []string, count int, filter string) ([]Process, error) {
+	var processes []Process
+	if len(pidList) > 0 {
+		var err error
+		processes, err = GetProcesses(myTarget, pidList)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get processes: %w", err)
+		}
+	} else {
+		var err error
+		processes, err = GetHotProcesses(myTarget, count, filter)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get hot processes: %w", err)
+		}
+		if len(processes) == 0 {
+			return nil, fmt.Errorf("no processes found")
+		}
+	}
+	return processes, nil
+}
+
+func getCidsForPerf(myTarget target.Target, cidList []string, count int, filter string, localTempDir string) ([]string, error) {
+	var cids []string
+	if len(cidList) > 0 {
+		var err error
+		cids, err = GetCgroups(myTarget, cidList, localTempDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get cgroups: %w", err)
+		}
+	} else {
+		var err error
+		cids, err = GetHotCgroups(myTarget, count, filter, localTempDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get hot cgroups: %w", err)
+		}
+		if len(cids) == 0 {
+			return nil, fmt.Errorf("no cgroups found")
+		}
+	}
+	return cids, nil
+}
+
+func collectOnTarget(targetContext *targetContext, localTempDir string, localOutputDir string, wg *sync.WaitGroup, statusUpdate progress.MultiSpinnerUpdateFunc) {
+	defer wg.Done()
 	myTarget := targetContext.target
 	if targetContext.err != nil {
-		channelError <- targetError{target: myTarget, err: nil}
 		return
 	}
-	// refresh if collecting per-process/cgroup and list of PIDs/CIDs not specified
-	refresh := (flagScope == scopeProcess && len(flagPidList) == 0) ||
-		(flagScope == scopeCgroup && len(flagCidList) == 0)
+	// only refresh if duration is 0, i.e., no timeout and pids/cids are not specified
+	var needsRefresh bool
+	if flagDuration == 0 {
+		if flagScope == scopeProcess {
+			if len(flagPidList) == 0 {
+				needsRefresh = true
+			}
+		} else if flagScope == scopeCgroup {
+			if len(flagCidList) == 0 {
+				needsRefresh = true
+			}
+		}
+	}
 	errorChannel := make(chan error)
 	frameChannel := make(chan []MetricFrame)
 	printCompleteChannel := make(chan []string)
-	totalPerfRuntimeSeconds := 0 // only relevant in process scope
 	// get current time for use in setting timestamps on output
 	targetContext.metadata.CollectionStartTime = time.Now() // save the start time in the metadata for use when using the --input option to process raw data
 	go printMetricsAsync(targetContext, localOutputDir, frameChannel, printCompleteChannel)
 	var err error
-	for {
-		var perfCommand *exec.Cmd
+	for !getSignalReceived() {
 		var processes []Process
-		var tempErr error
-		// get the perf command
-		if processes, perfCommand, tempErr = getPerfCommand(myTarget, targetContext.perfPath, targetContext.groupDefinitions, localTempDir); tempErr != nil {
-			if !getSignalReceived() {
-				err = fmt.Errorf("failed to get perf command: %w", tempErr)
+		var pids []string
+		var cids []string
+		if flagScope == scopeProcess {
+			// get the list of pids to collect
+			processes, err = getProcessesForPerf(myTarget, flagPidList, flagCount, flagFilter)
+			if err != nil {
+				err = fmt.Errorf("failed to get processes: %w", err)
+				slog.Error("failed to get processes", slog.String("error", err.Error()))
 				_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
+				break
 			}
+			// get pids from processes
+			for _, process := range processes {
+				pids = append(pids, process.pid)
+			}
+		} else if flagScope == scopeCgroup {
+			// get the list of cids to collect
+			cids, err = getCidsForPerf(myTarget, flagCidList, flagCount, flagFilter, localTempDir)
+			if err != nil {
+				if targetContext.perfStartTime == (time.Time{}) {
+					targetContext.perfStartTime = time.Now()
+				}
+				exceededDuration := flagDuration != 0 && time.Since(targetContext.perfStartTime) > time.Duration(flagDuration)*time.Second
+				if !exceededDuration && len(flagCidList) == 0 && strings.Contains(err.Error(), "no cgroups found") {
+					err = nil // ignore this error, we'll try again
+					slog.Debug("no cgroups found, will try again in 5 seconds")
+					time.Sleep(5 * time.Second) // wait for 5 seconds before trying again
+					continue
+				}
+				err = fmt.Errorf("failed to get cgroups: %w", err)
+				_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
+				break
+			}
+		}
+		var perfCommand *exec.Cmd
+		perfCommand, err = getPerfCommand(targetContext.perfPath, targetContext.groupDefinitions, pids, cids)
+		if err != nil {
+			err = fmt.Errorf("failed to get perf command: %w", err)
+			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 			break
 		}
 		// this timestamp is used to determine if we need to exit the loop, i.e., we've run long enough
@@ -1224,12 +1247,12 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 				err = perfErr
 				_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 			}
+			slog.Debug("perf error", slog.String("error", perfErr.Error()))
 			break
 		}
-		// no perf errors, continue
-		perfEndTime := time.Now()
-		totalPerfRuntimeSeconds += int(perfEndTime.Sub(targetContext.perfStartTime).Seconds())
-		if !refresh || (flagDuration != 0 && totalPerfRuntimeSeconds >= flagDuration) {
+		// perf exited with no errors
+		if !needsRefresh {
+			slog.Debug("we're done, no refresh needed")
 			break
 		}
 	}
@@ -1237,250 +1260,8 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 	// wait for printing to complete
 	targetContext.printedFiles = <-printCompleteChannel
 	close(printCompleteChannel)
-	if err != nil {
-		targetContext.err = err
-		channelError <- targetError{target: myTarget, err: err}
-		return
-	}
-	channelError <- targetError{target: myTarget, err: nil}
-}
-
-func printMetrics(metricFrames []MetricFrame, frameCount int, targetName string, collectionStartTime time.Time, outputDir string) (printedFiles []string) {
-	fileName, err := printMetricsTxt(metricFrames, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatTxt, !flagLive && slices.Contains(flagOutputFormat, formatTxt), outputDir)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		slog.Error(err.Error())
-	} else if fileName != "" {
-		printedFiles = util.UniqueAppend(printedFiles, fileName)
-	}
-	fileName, err = printMetricsJSON(metricFrames, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatJSON, !flagLive && slices.Contains(flagOutputFormat, formatJSON), outputDir)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		slog.Error(err.Error())
-	} else if fileName != "" {
-		printedFiles = util.UniqueAppend(printedFiles, fileName)
-	}
-	// csv is always written to file unless no files are requested -- we need it to create the summary reports
-	fileName, err = printMetricsCSV(metricFrames, frameCount, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatCSV, !flagLive, outputDir)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		slog.Error(err.Error())
-	} else if fileName != "" {
-		printedFiles = util.UniqueAppend(printedFiles, fileName)
-	}
-	fileName, err = printMetricsWide(metricFrames, frameCount, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatWide, !flagLive && slices.Contains(flagOutputFormat, formatWide), outputDir)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		slog.Error(err.Error())
-	} else if fileName != "" {
-		printedFiles = util.UniqueAppend(printedFiles, fileName)
-	}
-	return printedFiles
-}
-
-// printMetricsAsync receives metric frames over the provided channel and prints them to file and stdout in the requested format.
-// It exits when the channel is closed.
-func printMetricsAsync(targetContext *targetContext, outputDir string, frameChannel chan []MetricFrame, doneChannel chan []string) {
-	var allPrintedFiles []string
-	frameCount := 1
-	// block until next set of metric frames arrives, will exit loop when channel is closed
-	for metricFrames := range frameChannel {
-		printedFiles := printMetrics(metricFrames, frameCount, targetContext.target.GetName(), targetContext.perfStartTime, outputDir)
-		for _, file := range printedFiles {
-			allPrintedFiles = util.UniqueAppend(allPrintedFiles, file)
-		}
-		frameCount += len(metricFrames)
-	}
-	doneChannel <- allPrintedFiles
-}
-
-// extractPerf extracts the perf binary from the resources to the local temporary directory.
-func extractPerf(myTarget target.Target, localTempDir string) (string, error) {
-	// get the target architecture
-	arch, err := myTarget.GetArchitecture()
-	if err != nil {
-		return "", fmt.Errorf("failed to get target architecture: %w", err)
-	}
-	// extract the perf binary
-	return util.ExtractResource(script.Resources, path.Join("resources", arch, "perf"), localTempDir)
-}
-
-// getPerfPath determines the path to the `perf` binary for the given target.
-// If the target is a local target, it uses the provided localPerfPath.
-// If the target is remote, it checks if `perf` version 6.1 or later is available on the target.
-// If available, it uses the `perf` binary on the target.
-// If not available, it pushes the local `perf` binary to the target's temporary directory and uses that.
-//
-// Parameters:
-// - myTarget: The target system where the `perf` binary is needed.
-// - localPerfPath: The local path to the `perf` binary.
-//
-// Returns:
-// - perfPath: The path to the `perf` binary on the target.
-// - err: An error if any occurred during the process.
-func getPerfPath(myTarget target.Target, localPerfPath string) (string, error) {
-	var perfPath string
-	if _, ok := myTarget.(*target.LocalTarget); ok {
-		perfPath = localPerfPath
-	} else {
-		hasPerf := false
-		cmd := exec.Command("perf", "--version")
-		output, _, _, err := myTarget.RunCommand(cmd, 0, true)
-		if err == nil && strings.Contains(output, "perf version") {
-			// get the version number
-			version := strings.Split(strings.TrimSpace(output), " ")[2]
-			// split version into major and minor and build numbers
-			versionParts := strings.Split(version, ".")
-			if len(versionParts) >= 2 {
-				major, _ := strconv.Atoi(versionParts[0])
-				minor, _ := strconv.Atoi(versionParts[1])
-				if major > 6 || (major == 6 && minor >= 1) {
-					hasPerf = true
-				}
-			}
-		}
-		if hasPerf {
-			perfPath = "perf"
-		} else {
-			targetTempDir := myTarget.GetTempDirectory()
-			if targetTempDir == "" {
-				panic("targetTempDir is empty")
-			}
-			if err = myTarget.PushFile(localPerfPath, targetTempDir); err != nil {
-				slog.Error("failed to push perf binary to remote directory", slog.String("error", err.Error()))
-				return "", err
-			}
-			perfPath = path.Join(targetTempDir, "perf")
-		}
-	}
-	return perfPath, nil
-}
-
-// getPerfCommandArgs returns the command arguments for the 'perf stat' command
-// based on the provided parameters.
-//
-// Parameters:
-//   - pids: The process IDs for which to collect performance data. If flagScope is
-//     set to "process", the data will be collected only for these processes.
-//   - cgroups: The list of cgroups for which to collect performance data. If
-//     flagScope is set to "cgroup", the data will be collected only for these cgroups.
-//   - timeout: The timeout value in seconds. If flagScope is not set to "cgroup"
-//     and timeout is not 0, the 'sleep' command will be added to the arguments
-//     with the specified timeout value.
-//   - eventGroups: The list of event groups to collect. Each event group is a
-//     collection of events to be monitored.
-//
-// Returns:
-// - args: The command arguments for the 'perf stat' command.
-// - err: An error, if any.
-func getPerfCommandArgs(pids string, cgroups []string, timeout int, eventGroups []GroupDefinition) (args []string, err error) {
-	// -I: print interval in ms
-	// -j: json formatted event output
-	args = append(args, "stat", "-I", fmt.Sprintf("%d", flagPerfPrintInterval*1000), "-j")
-	if flagScope == scopeSystem {
-		args = append(args, "-a") // system-wide collection
-		if flagGranularity == granularityCPU || flagGranularity == granularitySocket {
-			args = append(args, "-A") // no aggregation
-		}
-	} else if flagScope == scopeProcess {
-		args = append(args, "-p", pids) // collect only for these processes
-	} else if flagScope == scopeCgroup {
-		args = append(args, "--for-each-cgroup", strings.Join(cgroups, ",")) // collect only for these cgroups
-	}
-	// -e: event groups to collect
-	args = append(args, "-e")
-	var groups []string
-	for _, group := range eventGroups {
-		var events []string
-		for _, event := range group {
-			events = append(events, event.Raw)
-		}
-		groups = append(groups, fmt.Sprintf("{%s}", strings.Join(events, ",")))
-	}
-	args = append(args, fmt.Sprintf("'%s'", strings.Join(groups, ",")))
-	if len(argsApplication) > 0 {
-		// add application args
-		args = append(args, "--")
-		args = append(args, argsApplication...)
-	} else if flagScope != scopeCgroup && timeout != 0 {
-		// add timeout
-		args = append(args, "sleep", fmt.Sprintf("%d", timeout))
-	}
-	return
-}
-
-// getPerfCommand is responsible for assembling the command that will be
-// executed to collect event data
-func getPerfCommand(myTarget target.Target, perfPath string, eventGroups []GroupDefinition, localTempDir string) (processes []Process, perfCommand *exec.Cmd, err error) {
-	if flagScope == scopeSystem {
-		var args []string
-		if args, err = getPerfCommandArgs("", []string{}, flagDuration, eventGroups); err != nil {
-			err = fmt.Errorf("failed to assemble perf args: %v", err)
-			return
-		}
-		perfCommand = exec.Command(perfPath, args...) // #nosec G204 // nosemgrep
-	} else if flagScope == scopeProcess {
-		if len(flagPidList) > 0 {
-			if processes, err = GetProcesses(myTarget, flagPidList); err != nil {
-				return
-			}
-			if len(processes) == 0 {
-				err = fmt.Errorf("failed to find processes associated with designated PIDs: %v", flagPidList)
-				return
-			}
-		} else {
-			if processes, err = GetHotProcesses(myTarget, flagCount, flagFilter); err != nil {
-				return
-			}
-			if len(processes) == 0 {
-				if flagFilter == "" {
-					err = fmt.Errorf("failed to find \"hot\" processes")
-					return
-				} else {
-					err = fmt.Errorf("failed to find processes matching filter: %s", flagFilter)
-					return
-				}
-			}
-		}
-		var timeout int
-		if flagDuration > 0 {
-			timeout = flagDuration
-		} else if len(flagPidList) == 0 { // don't refresh if PIDs are specified
-			timeout = flagRefresh // refresh hot processes every flagRefresh seconds
-		}
-		pidList := make([]string, 0, len(processes))
-		for _, process := range processes {
-			pidList = append(pidList, process.pid)
-		}
-		var args []string
-		if args, err = getPerfCommandArgs(strings.Join(pidList, ","), []string{}, timeout, eventGroups); err != nil {
-			err = fmt.Errorf("failed to assemble perf args: %v", err)
-			return
-		}
-		perfCommand = exec.Command(perfPath, args...) // #nosec G204 // nosemgrep
-	} else if flagScope == scopeCgroup {
-		var cgroups []string
-		if len(flagCidList) > 0 {
-			if cgroups, err = GetCgroups(myTarget, flagCidList, localTempDir); err != nil {
-				return
-			}
-		} else {
-			if cgroups, err = GetHotCgroups(myTarget, flagCount, flagFilter, localTempDir); err != nil {
-				return
-			}
-		}
-		if len(cgroups) == 0 {
-			err = fmt.Errorf("no CIDs selected")
-			return
-		}
-		var args []string
-		if args, err = getPerfCommandArgs("", cgroups, -1, eventGroups); err != nil {
-			err = fmt.Errorf("failed to assemble perf args: %v", err)
-			return
-		}
-		perfCommand = exec.Command(perfPath, args...) // #nosec G204 // nosemgrep
-	}
-	return
+	// keep track of the error
+	targetContext.err = err
 }
 
 // runPerf starts Linux perf using the provided command, then reads perf's output
@@ -1488,10 +1269,6 @@ func getPerfCommand(myTarget target.Target, perfPath string, eventGroups []Group
 // run duration exceeds the collection time or the time when the cgroup list needs
 // to be refreshed.
 func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec.Cmd, eventGroupDefinitions []GroupDefinition, metricDefinitions []MetricDefinition, metadata Metadata, localTempDir string, outputDir string, frameChannel chan []MetricFrame, errorChannel chan error) {
-	var err error
-	defer func() { errorChannel <- err }()
-	cpuCount := metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore
-	outputLines := make([][]byte, 0, cpuCount*150) // a rough approximation of expected number of events
 	// start perf
 	perfCommand := strings.Join(cmd.Args, " ")
 	stdoutChannel := make(chan string)
@@ -1500,24 +1277,35 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 	scriptErrorChannel := make(chan error)
 	cmdChannel := make(chan *exec.Cmd)
 	slog.Debug("running perf stat", slog.String("command", perfCommand))
-	go script.RunScriptAsync(myTarget, script.ScriptDefinition{Name: "perf stat", ScriptTemplate: perfCommand, Superuser: !noRoot}, localTempDir, stdoutChannel, stderrChannel, exitcodeChannel, scriptErrorChannel, cmdChannel)
-	var localCommand *exec.Cmd
+	perfStatScript := script.ScriptDefinition{
+		Name:           "perf stat",
+		ScriptTemplate: perfCommand,
+		Superuser:      !noRoot,
+	}
+	// start goroutine to run perf, output will be streamed back in provided channels
+	go script.RunScriptStream(myTarget, perfStatScript, localTempDir, stdoutChannel, stderrChannel, exitcodeChannel, scriptErrorChannel, cmdChannel)
 	select {
-	case cmd := <-cmdChannel:
-		localCommand = cmd
+	case <-cmdChannel:
 	case err := <-scriptErrorChannel:
 		if err != nil {
+			errorChannel <- err // error running the script
 			return
 		}
 	}
 	// must manually terminate perf in cgroup scope when a timeout is specified and/or need to refresh cgroups
 	startPerfTimestamp := time.Now()
-	var cgroupTimeout int
-	if flagScope == scopeCgroup && (flagDuration != 0 || len(flagCidList) == 0) {
-		if flagDuration > 0 && flagDuration < flagRefresh {
+	cgroupTimeout := 0 // default to 0, which means no timeout
+	if flagScope == scopeCgroup {
+		// if cids are specified, we don't need to refresh, but we do need to set a timeout
+		if len(flagCidList) > 0 {
 			cgroupTimeout = flagDuration
-		} else {
-			cgroupTimeout = flagRefresh
+		} else { // no cids are specified
+			// if duration is specified, use that as the timeout
+			if flagDuration != 0 {
+				cgroupTimeout = flagDuration
+			} else {
+				cgroupTimeout = flagRefresh
+			}
 		}
 	}
 	// Start a goroutine to wait for and then process perf output
@@ -1525,80 +1313,131 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 	// The timer will expire when no lines (events) have been received from perf for more than 100ms. This
 	// works because perf writes the events to stderr in a burst every collection interval, e.g., 5 seconds.
 	// When the timer expires, this code assumes that perf is done writing events to stderr.
-	perfEventWaitTime := time.Duration(100 * time.Millisecond) // 100ms is somewhat arbitrary, but is long enough for perf to print a frame of events
-	// The first duration needs to be longer than the time it takes for perf to print its first line of output.
-	t1 := time.NewTimer(time.Duration(2 * flagPerfPrintInterval * 1000))
-	var frameTimestamp float64
-	stopAnonymousFuncChannel := make(chan bool)
-	go func() {
-		stop := false
-		for {
-			select {
-			case <-t1.C: // waits for timer to expire
-			case <-stopAnonymousFuncChannel: // wait for signal to exit the goroutine
-				stop = true // exit the loop
-			}
-			if !stop && len(outputLines) != 0 {
-				// process the events
-				var metricFrames []MetricFrame
-				if metricFrames, frameTimestamp, err = ProcessEvents(outputLines, eventGroupDefinitions, metricDefinitions, processes, frameTimestamp, metadata); err != nil {
-					slog.Warn(err.Error())
-					outputLines = [][]byte{} // empty it
-					continue
-				}
-				// send the metrics frames out to be printed
-				frameChannel <- metricFrames
-				// write the events to a file
-				if flagWriteEventsToFile {
-					if err = writeEventsToFile(outputDir+"/"+myTarget.GetName()+"_"+"events.json", outputLines); err != nil {
-						err = fmt.Errorf("failed to write events to raw file: %v", err)
-						slog.Error(err.Error())
-						return
-					}
-				}
-				// empty the outputLines
-				outputLines = [][]byte{}
-			}
-			// for cgroup scope, terminate perf if timeout is reached
-			if flagScope == scopeCgroup {
-				if stop || (cgroupTimeout != 0 && int(time.Since(startPerfTimestamp).Seconds()) > cgroupTimeout) {
-					err = localCommand.Process.Signal(os.Interrupt)
-					if err != nil {
-						err = fmt.Errorf("failed to terminate perf: %v", err)
-						slog.Error(err.Error())
-					}
-				}
-			}
-			if stop {
-				break
-			}
-		}
-		// signal that the goroutine is done
-		stopAnonymousFuncChannel <- true
-	}()
+	const perfEventWaitTime = time.Duration(100 * time.Millisecond)                   // 100ms is somewhat arbitrary, but is long enough for perf to print a frame of events
+	perfOutputTimer := time.NewTimer(time.Duration(2 * flagPerfPrintInterval * 1000)) // #nosec G115
+	perfProcessingContext, cancelPerfProcessing := context.WithCancel(context.Background())
+	outputLines := make([][]byte, 0)
+	donePerfProcessingChannel := make(chan struct{}) // channel to wait for processPerfOutput to finish
+	go processPerfOutput(
+		perfProcessingContext,
+		myTarget,
+		metadata,
+		eventGroupDefinitions,
+		metricDefinitions,
+		outputDir,
+		processes,
+		cgroupTimeout,
+		startPerfTimestamp,
+		perfOutputTimer,
+		&outputLines,
+		frameChannel,
+		donePerfProcessingChannel,
+	)
 	// receive perf output
 	done := false
 	for !done {
 		select {
+		case line := <-stderrChannel: // perf output comes in on this channel, one line at a time
+			perfOutputTimer.Stop()
+			perfOutputTimer.Reset(perfEventWaitTime)
+			// accumulate the lines, they will be processed in the goroutine when the timer expires
+			outputLines = append(outputLines, []byte(line))
+		case exitCode := <-exitcodeChannel: // when perf exits, the exit code comes to this channel
+			slog.Debug("perf exited", slog.Int("exit code", exitCode))
+			time.Sleep(perfEventWaitTime) // wait for timer to expire so that last events can be processed
+			done = true                   // exit the loop
 		case err := <-scriptErrorChannel: // if there is an error running perf, it comes here
 			if err != nil {
 				slog.Error("error from perf", slog.String("error", err.Error()))
 			}
 			done = true // exit the loop
-		case exitCode := <-exitcodeChannel: // when perf exits, the exit code comes to this channel
-			slog.Debug("perf exited", slog.Int("exit code", exitCode))
-			time.Sleep(perfEventWaitTime) // wait for timer to expire so that last events can be processed
-			done = true                   // exit the loop
-		case line := <-stderrChannel: // perf output comes in on this channel, one line at a time
-			t1.Stop()
-			t1.Reset(perfEventWaitTime)
-			// accumulate the lines, they will be processed in the goroutine when the timer expires
-			outputLines = append(outputLines, []byte(line))
 		}
 	}
-	t1.Stop()
-	// send signal to exit the goroutine
-	stopAnonymousFuncChannel <- true
-	// wait for the goroutine to exit
-	<-stopAnonymousFuncChannel
+	perfOutputTimer.Stop()
+	// cancel the context to stop processPerfOutput
+	cancelPerfProcessing()
+	// wait for processPerfOutput to finish
+	<-donePerfProcessingChannel
+	errorChannel <- nil
+}
+
+// processPerfOutput processes perf output in a goroutine and supports cancellation via context.
+// This function must not return until the context is cancelled.
+// When context is cancelled, this function will close the done channel to signal that processing is complete.
+// there are two scenarios where this function will trigger a context cancellation by signalling the localCommand to terminate:
+//  1. when the number of consecutive errors processing events exceeds the maximum (2)
+//  2. when the cgroup refresh timeout is reached (in scope==cgroup mode)
+func processPerfOutput(
+	ctx context.Context,
+	myTarget target.Target,
+	metadata Metadata,
+	eventGroupDefinitions []GroupDefinition,
+	metricDefinitions []MetricDefinition,
+	outputDir string,
+	processes []Process,
+	cgroupTimeout int,
+	startPerfTimestamp time.Time,
+	perfOutputTimer *time.Timer,
+	outputLines *[][]byte,
+	frameChannel chan []MetricFrame,
+	doneChannel chan struct{},
+) {
+	defer close(doneChannel) // close the done channel when the function returns to signal completion
+	var frameTimestamp float64
+	contextCancelled := false
+	var numConsecutiveProcessEventErrors int
+	const maxConsecutiveProcessEventErrors = 2
+	for !contextCancelled {
+		select {
+		case <-perfOutputTimer.C: // waits for timer to expire the process the events in outputLines
+		case <-ctx.Done(): // context cancellation
+			contextCancelled = true // exit the loop after one more pass
+		}
+		if contextCancelled {
+			break
+		}
+		if len(*outputLines) != 0 {
+			// write the events to a file
+			if flagWriteEventsToFile {
+				if err := writeEventsToFile(outputDir+"/"+myTarget.GetName()+"_"+"events.json", *outputLines); err != nil {
+					slog.Error("failed to write events to file", slog.String("error", err.Error()))
+				}
+			}
+			// process the events
+			var metricFrames []MetricFrame
+			var err error
+			metricFrames, frameTimestamp, err = ProcessEvents(*outputLines, eventGroupDefinitions, metricDefinitions, processes, frameTimestamp, metadata)
+			if err != nil {
+				slog.Error(err.Error())
+				numConsecutiveProcessEventErrors++
+				if numConsecutiveProcessEventErrors > maxConsecutiveProcessEventErrors {
+					slog.Error("too many consecutive errors processing events, killing perf", slog.Int("max errors", maxConsecutiveProcessEventErrors))
+					// signaling self with SIGUSR1 will signal child processes to exit, which will cancel the context and let this function exit
+					err := util.SignalSelf(syscall.SIGUSR1)
+					if err != nil {
+						slog.Error("failed to signal self", slog.String("error", err.Error()))
+					}
+				}
+				*outputLines = [][]byte{} // empty it
+			} else {
+				// send the metrics frames out to be printed
+				frameChannel <- metricFrames
+				// empty the outputLines
+				*outputLines = [][]byte{}
+				// reset the error count
+				numConsecutiveProcessEventErrors = 0
+			}
+		}
+		// for cgroup scope, terminate perf if refresh timeout is reached
+		if flagScope == scopeCgroup && cgroupTimeout != 0 {
+			if int(time.Since(startPerfTimestamp).Seconds()) >= cgroupTimeout {
+				slog.Debug("cgroup refresh timeout reached")
+				// signaling self with SIGUSR1 will signal child processes to exit, which will cancel the context and let this function exit
+				err := util.SignalSelf(syscall.SIGUSR1)
+				if err != nil {
+					slog.Error("failed to signal self", slog.String("error", err.Error()))
+				}
+			}
+		}
+	}
 }

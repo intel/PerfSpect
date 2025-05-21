@@ -5,7 +5,6 @@ package config
 
 import (
 	"fmt"
-	"os"
 	"perfspect/internal/common"
 	"perfspect/internal/report"
 	"perfspect/internal/target"
@@ -104,7 +103,7 @@ func initializeFlags(cmd *cobra.Command) {
 	// general options
 	group := flagGroup{name: flagGroupGeneralName, flags: []flagDefinition{}}
 	group.flags = append(group.flags,
-		newUintFlag(cmd, flagCoreCountName, 0, setCoreCount, "number of physical cores per processor", "greater than 0",
+		newIntFlag(cmd, flagCoreCountName, 0, setCoreCount, "number of physical cores per processor", "greater than 0",
 			func(cmd *cobra.Command) bool { value, _ := cmd.Flags().GetUint(flagCoreCountName); return value > 0 }),
 		newFloat64Flag(cmd, flagLLCSizeName, 0, setLlcSize, "LLC size in MB", "greater than 0",
 			func(cmd *cobra.Command) bool { value, _ := cmd.Flags().GetFloat64(flagLLCSizeName); return value > 0 }),
@@ -113,12 +112,18 @@ func initializeFlags(cmd *cobra.Command) {
 				value, _ := cmd.Flags().GetFloat64(flagAllCoreMaxFrequencyName)
 				return value > 0.1
 			}),
-		newUintFlag(cmd, flagTDPName, 0, setTDP, "maximum power per processor in Watts", "greater than 0",
+		newIntFlag(cmd, flagTDPName, 0, setTDP, "maximum power per processor in Watts", "greater than 0",
 			func(cmd *cobra.Command) bool { value, _ := cmd.Flags().GetUint(flagTDPName); return value > 0 }),
-		newUintFlag(cmd, flagEPBName, 0, setEPB, "energy perf bias from best performance (0) to most power savings (15)", "0-15",
-			func(cmd *cobra.Command) bool { value, _ := cmd.Flags().GetUint(flagEPBName); return value <= 15 }),
-		newUintFlag(cmd, flagEPPName, 0, setEPP, "energy perf profile from best performance (0) to most power savings (255)", "0-255",
-			func(cmd *cobra.Command) bool { value, _ := cmd.Flags().GetUint(flagEPPName); return value <= 255 }),
+		newIntFlag(cmd, flagEPBName, 0, setEPB, "energy perf bias from best performance (0) to most power savings (15)", "0-15",
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetInt(flagEPBName)
+				return value >= 0 && value <= 15
+			}),
+		newIntFlag(cmd, flagEPPName, 0, setEPP, "energy perf profile from best performance (0) to most power savings (255)", "0-255",
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetInt(flagEPPName)
+				return value >= 0 && value <= 255
+			}),
 		newStringFlag(cmd, flagGovernorName, "", setGovernor, "CPU scaling governor ("+strings.Join(governorOptions, ", ")+")", strings.Join(governorOptions, ", "),
 			func(cmd *cobra.Command) bool {
 				value, _ := cmd.Flags().GetString(flagGovernorName)
@@ -352,18 +357,14 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		for _, flag := range group.flags {
 			if cmd.Flags().Lookup(flag.GetName()).Changed && flag.validationFunc != nil {
 				if !flag.validationFunc(cmd) {
-					err := fmt.Errorf("invalid flag value, --%s %s, valid values are %s", flag.GetName(), flag.GetValueAsString(), flag.validationDescription)
-					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-					cmd.SilenceUsage = true
-					return err
+					return common.FlagValidationError(cmd, fmt.Sprintf("invalid flag value, --%s %s, valid values are %s", flag.GetName(), flag.GetValueAsString(), flag.validationDescription))
 				}
 			}
 		}
 	}
 	// common target flags
 	if err := common.ValidateTargetFlags(cmd); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return err
+		return common.FlagValidationError(cmd, err.Error())
 	}
 	return nil
 }
