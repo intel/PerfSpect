@@ -124,6 +124,7 @@ func parseEvents(rawEvents [][]byte, eventGroupDefinitions []GroupDefinition) (e
 			} else {
 				slog.Debug(err.Error(), slog.String("event", string(rawEvent)))
 				event.Value = math.NaN()
+				err = nil
 			}
 		}
 		if event.Event != previousEvent {
