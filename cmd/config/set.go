@@ -119,7 +119,7 @@ func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir str
 	scripts = append(scripts, script.GetScriptByName(script.LscpuScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.LspciBitsScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.LspciDevicesScriptName))
-	scripts = append(scripts, script.GetScriptByName(script.L3CacheWayEnabled))
+	scripts = append(scripts, script.GetScriptByName(script.L3CacheWayEnabledName))
 	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir)
 	if err != nil {
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to run scripts on target: %w", err)}

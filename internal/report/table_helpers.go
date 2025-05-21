@@ -709,7 +709,7 @@ func GetL3MSRMB(outputs map[string]script.ScriptOutput) (float64, error) {
 		return 0, err
 	}
 	// for every bit set in l3WayEnabled, a way is enabled
-	l3WayEnabledMSRVal := strings.TrimSpace(outputs[script.L3CacheWayEnabled].Stdout)
+	l3WayEnabledMSRVal := strings.TrimSpace(outputs[script.L3CacheWayEnabledName].Stdout)
 	if l3WayEnabledMSRVal == "" {
 		err = fmt.Errorf("L3 cache way enabled MSR value is empty")
 		return 0, err
