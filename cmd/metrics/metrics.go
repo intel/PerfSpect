@@ -1283,10 +1283,8 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 	}
 	// start goroutine to run perf, output will be streamed back in provided channels
 	go script.RunScriptStream(myTarget, perfStatScript, localTempDir, stdoutChannel, stderrChannel, exitcodeChannel, scriptErrorChannel, cmdChannel)
-	var localCommand *exec.Cmd
 	select {
-	case cmd := <-cmdChannel:
-		localCommand = cmd // capture the command so that we can terminate it later
+	case <-cmdChannel:
 	case err := <-scriptErrorChannel:
 		if err != nil {
 			errorChannel <- err // error running the script
@@ -1324,7 +1322,6 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 		cgroupTimeout,
 		startPerfTimestamp,
 		perfOutputTimer,
-		localCommand,
 		&outputLines,
 		frameChannel,
 		donePerfProcessingChannel,
@@ -1374,7 +1371,6 @@ func processPerfOutput(
 	cgroupRefreshTimeout int,
 	startPerfTimestamp time.Time,
 	perfOutputTimer *time.Timer,
-	localCommand *exec.Cmd,
 	outputLines *[][]byte,
 	frameChannel chan []MetricFrame,
 	doneChannel chan struct{},
@@ -1409,10 +1405,10 @@ func processPerfOutput(
 				numConsecutiveProcessEventErrors++
 				if numConsecutiveProcessEventErrors > maxConsecutiveProcessEventErrors {
 					slog.Error("too many consecutive errors processing events, killing perf", slog.Int("max errors", maxConsecutiveProcessEventErrors))
-					// killing perf will trigger the context cancellation
-					err := terminateCommand(localCommand)
+					// signaling self will signal child processes to exit, which will cancel the context and let this function exit
+					err := util.SignalSelf(syscall.SIGINT)
 					if err != nil {
-						slog.Error("failed to kill perf", slog.String("error", err.Error()))
+						slog.Error("failed to signal self", slog.String("error", err.Error()))
 					}
 				}
 				*outputLines = [][]byte{} // empty it
@@ -1428,12 +1424,11 @@ func processPerfOutput(
 		// for cgroup scope, terminate perf if refresh timeout is reached
 		if flagScope == scopeCgroup {
 			if int(time.Since(startPerfTimestamp).Seconds()) >= cgroupRefreshTimeout {
-				slog.Debug("cgroup refresh timeout reached, killing perf")
-				// killing perf will trigger the context cancellation
-				err := terminateCommand(localCommand)
-				// log the error unless the app received a signal that already terminated perf
-				if err != nil && !getSignalReceived() {
-					slog.Error("failed to kill perf", slog.String("error", err.Error()))
+				slog.Debug("cgroup refresh timeout reached")
+				// signaling self will signal child processes to exit, which will cancel the context and let this function exit
+				err := util.SignalSelf(syscall.SIGINT)
+				if err != nil {
+					slog.Error("failed to signal self", slog.String("error", err.Error()))
 				}
 			}
 		}

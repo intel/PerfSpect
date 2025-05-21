@@ -512,6 +512,16 @@ func SignalChildren(sig os.Signal) error {
 	return nil
 }
 
+// SignalSelf sends a signal to this process
+func SignalSelf(sig os.Signal) error {
+	selfPid := os.Getpid()
+	err := SignalProcess(selfPid, sig)
+	if err != nil {
+		return fmt.Errorf("failed to send signal to self (pid: %d): %w", selfPid, err)
+	}
+	return nil
+}
+
 // IsValidHex checks if a string is a valid hex string
 // Valid hex strings are non-empty, optionally prefixed with "0x" or "0X",
 // and contain only valid hex characters (0-9, a-f, A-F).
