@@ -447,7 +447,7 @@ func SignalProcess(pid int, sig os.Signal) error {
 	if err != nil {
 		return fmt.Errorf("failed to find process: %w", err)
 	}
-	slog.Info("sending signal to process", slog.Int("pid", pid), slog.String("signal", sig.String()))
+	slog.Debug("sending signal to process", slog.Int("pid", pid), slog.String("signal", sig.String()))
 	err = proc.Signal(sig)
 	if err != nil {
 		return fmt.Errorf("failed to send signal to process (pid %d): %w", pid, err)
