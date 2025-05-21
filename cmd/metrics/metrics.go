@@ -1067,7 +1067,7 @@ func prepareTarget(targetContext *targetContext, localTempDir string, localPerfP
 		channelError <- targetError{target: myTarget, err: err}
 		return
 	}
-	slog.Info("Using Linux perf", slog.String("target", targetContext.target.GetName()), slog.String("path", targetContext.perfPath))
+	slog.Debug("Using Linux perf", slog.String("target", targetContext.target.GetName()), slog.String("path", targetContext.perfPath))
 	channelError <- targetError{target: myTarget, err: nil}
 }
 
@@ -1090,13 +1090,13 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 		channelError <- targetError{target: myTarget, err: err}
 		return
 	}
+	slog.Debug("metadata: " + targetContext.metadata.String())
 	if !targetContext.metadata.SupportsInstructions {
-		slog.Info("Target does not support instructions event collection", slog.String("target", myTarget.GetName()))
+		slog.Error("Target does not support instructions event collection", slog.String("target", myTarget.GetName()))
 		targetContext.err = fmt.Errorf("target not supported, does not support instructions event collection")
 		channelError <- targetError{target: myTarget, err: targetContext.err}
 		return
 	}
-	slog.Info(targetContext.metadata.String())
 	// load event definitions
 	var uncollectableEvents []string
 	if targetContext.groupDefinitions, uncollectableEvents, err = LoadEventGroups(flagEventFilePath, targetContext.metadata); err != nil {
