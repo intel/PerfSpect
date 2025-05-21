@@ -1294,12 +1294,18 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 	}
 	// must manually terminate perf in cgroup scope when a timeout is specified and/or need to refresh cgroups
 	startPerfTimestamp := time.Now()
-	var cgroupTimeout int
+	cgroupTimeout := 0 // default to 0, which means no timeout
 	if flagScope == scopeCgroup {
-		if flagDuration != 0 {
+		// if cids are specified, we don't need to refresh, but we do need to set a timeout
+		if len(flagCidList) > 0 {
 			cgroupTimeout = flagDuration
-		} else {
-			cgroupTimeout = flagRefresh
+		} else { // no cids are specified
+			// if duration is specified, use that as the timeout
+			if flagDuration != 0 {
+				cgroupTimeout = flagDuration
+			} else {
+				cgroupTimeout = flagRefresh
+			}
 		}
 	}
 	// Start a goroutine to wait for and then process perf output
@@ -1369,7 +1375,7 @@ func processPerfOutput(
 	metricDefinitions []MetricDefinition,
 	outputDir string,
 	processes []Process,
-	cgroupRefreshTimeout int,
+	cgroupTimeout int,
 	startPerfTimestamp time.Time,
 	perfOutputTimer *time.Timer,
 	outputLines *[][]byte,
@@ -1423,8 +1429,8 @@ func processPerfOutput(
 			}
 		}
 		// for cgroup scope, terminate perf if refresh timeout is reached
-		if flagScope == scopeCgroup {
-			if int(time.Since(startPerfTimestamp).Seconds()) >= cgroupRefreshTimeout {
+		if flagScope == scopeCgroup && cgroupTimeout != 0 {
+			if int(time.Since(startPerfTimestamp).Seconds()) >= cgroupTimeout {
 				slog.Debug("cgroup refresh timeout reached")
 				// signaling self with SIGUSR1 will signal child processes to exit, which will cancel the context and let this function exit
 				err := util.SignalSelf(syscall.SIGUSR1)
