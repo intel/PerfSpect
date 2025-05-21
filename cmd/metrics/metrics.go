@@ -693,18 +693,19 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	localTempDir := appContext.LocalTempDir
 	localOutputDir := appContext.OutputDir
 	// handle signals
-	// child processes will exit when the signals are received which will
-	// allow this app to exit normally
 	sigChannel := make(chan os.Signal, 1)
-	signal.Notify(sigChannel, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigChannel, syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1)
 	go func() {
-		sig := <-sigChannel
-		setSignalReceived()
-		slog.Info("received signal", slog.String("signal", sig.String()))
-		// send kill signal to children
-		err := util.SignalChildren(syscall.SIGKILL)
-		if err != nil {
-			slog.Error("failed to send kill signal to children", slog.String("error", err.Error()))
+		for sig := range sigChannel {
+			slog.Debug("received signal", slog.String("signal", sig.String()))
+			if sig == syscall.SIGINT || sig == syscall.SIGTERM {
+				setSignalReceived()
+			}
+			// send kill signal to children
+			err := util.SignalChildren(syscall.SIGKILL)
+			if err != nil {
+				slog.Error("failed to send kill signal to children", slog.String("error", err.Error()))
+			}
 		}
 	}()
 	if flagInput != "" {
@@ -1405,8 +1406,8 @@ func processPerfOutput(
 				numConsecutiveProcessEventErrors++
 				if numConsecutiveProcessEventErrors > maxConsecutiveProcessEventErrors {
 					slog.Error("too many consecutive errors processing events, killing perf", slog.Int("max errors", maxConsecutiveProcessEventErrors))
-					// signaling self will signal child processes to exit, which will cancel the context and let this function exit
-					err := util.SignalSelf(syscall.SIGINT)
+					// signaling self with SIGUSR1 will signal child processes to exit, which will cancel the context and let this function exit
+					err := util.SignalSelf(syscall.SIGUSR1)
 					if err != nil {
 						slog.Error("failed to signal self", slog.String("error", err.Error()))
 					}
@@ -1425,8 +1426,8 @@ func processPerfOutput(
 		if flagScope == scopeCgroup {
 			if int(time.Since(startPerfTimestamp).Seconds()) >= cgroupRefreshTimeout {
 				slog.Debug("cgroup refresh timeout reached")
-				// signaling self will signal child processes to exit, which will cancel the context and let this function exit
-				err := util.SignalSelf(syscall.SIGINT)
+				// signaling self with SIGUSR1 will signal child processes to exit, which will cancel the context and let this function exit
+				err := util.SignalSelf(syscall.SIGUSR1)
 				if err != nil {
 					slog.Error("failed to signal self", slog.String("error", err.Error()))
 				}
