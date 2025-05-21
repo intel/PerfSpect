@@ -1434,15 +1434,3 @@ func processPerfOutput(
 		}
 	}
 }
-
-// terminateCommand sends an interrupt signal to the command's process.
-func terminateCommand(cmd *exec.Cmd) error {
-	if cmd == nil {
-		return fmt.Errorf("command is nil")
-	}
-	err := cmd.Process.Signal(os.Interrupt)
-	if err != nil {
-		return fmt.Errorf("failed to terminate command: %v", err)
-	}
-	return nil
-}
