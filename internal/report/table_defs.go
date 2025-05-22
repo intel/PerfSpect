@@ -222,7 +222,7 @@ var tableDefinitions = map[string]TableDefinition{
 			script.MaximumFrequencyScriptName,
 			script.SpecCoreFrequenciesScriptName,
 			script.PPINName,
-			script.L3WaySizeName},
+			script.L3CacheWayEnabledName},
 		FieldsFunc:   cpuTableValues,
 		InsightsFunc: cpuTableInsights},
 	PrefetcherTableName: {
@@ -495,7 +495,7 @@ var tableDefinitions = map[string]TableDefinition{
 			script.LscpuScriptName,
 			script.LspciBitsScriptName,
 			script.LspciDevicesScriptName,
-			script.L3WaySizeName,
+			script.L3CacheWayEnabledName,
 			script.CpuidScriptName,
 			script.BaseFrequencyScriptName,
 			script.SpecCoreFrequenciesScriptName,
@@ -557,7 +557,7 @@ var tableDefinitions = map[string]TableDefinition{
 			script.LscpuScriptName,
 			script.LspciBitsScriptName,
 			script.LspciDevicesScriptName,
-			script.L3WaySizeName,
+			script.L3CacheWayEnabledName,
 			script.PackagePowerLimitName,
 			script.EpbScriptName,
 			script.EppScriptName,
@@ -920,7 +920,7 @@ func cpuTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return []Field{
 		{Name: "CPU Model", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^[Mm]odel name:\s*(.+)$`)}},
 		{Name: "Architecture", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Architecture:\s*(.+)$`)}},
-		{Name: "Microarchitecture", Values: []string{uarchFromOutput(outputs)}},
+		{Name: "Microarchitecture", Values: []string{UarchFromOutput(outputs)}},
 		{Name: "Family", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU family:\s*(.+)$`)}},
 		{Name: "Model", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Model:\s*(.+)$`)}},
 		{Name: "Stepping", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Stepping:\s*(.+)$`)}},
@@ -1137,7 +1137,7 @@ func cstateTableValues(outputs map[string]script.ScriptOutput) []Field {
 }
 
 func uncoreTableValues(outputs map[string]script.ScriptOutput) []Field {
-	uarch := uarchFromOutput(outputs)
+	uarch := UarchFromOutput(outputs)
 	if uarch == "" {
 		slog.Error("failed to get uarch from script outputs")
 		return []Field{}
@@ -1340,9 +1340,9 @@ func memoryTableInsights(outputs map[string]script.ScriptOutput, tableValues Tab
 	} else {
 		populatedChannels := tableValues.Fields[populatedChannelsIndex].Values[0]
 		if populatedChannels != "" {
-			uarch := uarchFromOutput(outputs)
+			uarch := UarchFromOutput(outputs)
 			if uarch != "" {
-				cpu, err := getCPUByMicroArchitecture(uarch)
+				cpu, err := GetCPUByMicroArchitecture(uarch)
 				if err != nil {
 					slog.Warn(err.Error())
 				} else {
@@ -1838,7 +1838,7 @@ func systemSummaryTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Chassis", Values: []string{valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Manufacturer:\s*(.+?)$`) + " " + valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Type:\s*(.+?)$`)}},
 		{Name: "CPU Model", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^[Mm]odel name:\s*(.+)$`)}},
 		{Name: "Architecture", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Architecture:\s*(.+)$`)}},
-		{Name: "Microarchitecture", Values: []string{uarchFromOutput(outputs)}},
+		{Name: "Microarchitecture", Values: []string{UarchFromOutput(outputs)}},
 		{Name: "L3 Cache", Values: []string{l3FromOutput(outputs)}},
 		{Name: "Cores per Socket", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)}},
 		{Name: "Sockets", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)}},
@@ -1878,7 +1878,7 @@ func briefSummaryTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Host Name", Values: []string{strings.TrimSpace(outputs[script.HostnameScriptName].Stdout)}},                                          // Hostname
 		{Name: "Time", Values: []string{strings.TrimSpace(outputs[script.DateScriptName].Stdout)}},                                                   // Date
 		{Name: "CPU Model", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^[Mm]odel name:\s*(.+)$`)}},               // Lscpu
-		{Name: "Microarchitecture", Values: []string{uarchFromOutput(outputs)}},                                                                      // Lscpu, LspciBits, LspciDevices
+		{Name: "Microarchitecture", Values: []string{UarchFromOutput(outputs)}},                                                                      // Lscpu, LspciBits, LspciDevices
 		{Name: "TDP", Values: []string{tdpFromOutput(outputs)}},                                                                                      // PackagePowerLimit
 		{Name: "Sockets", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)}},                   // Lscpu
 		{Name: "Cores per Socket", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)}}, // Lscpu
@@ -1901,7 +1901,7 @@ func briefSummaryTableValues(outputs map[string]script.ScriptOutput) []Field {
 }
 
 func configurationTableValues(outputs map[string]script.ScriptOutput) []Field {
-	uarch := uarchFromOutput(outputs)
+	uarch := UarchFromOutput(outputs)
 	if uarch == "" {
 		slog.Error("failed to get uarch from script outputs")
 		return []Field{}

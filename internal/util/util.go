@@ -645,3 +645,32 @@ func Int64ToUint64(i int64) (uint64, error) {
 	}
 	return uint64(i), nil
 }
+
+// NumUint64Bits returns the number of bits that are set in a uint64 value.
+func NumUint64Bits(x uint64) int {
+	count := 0
+	for x != 0 {
+		count++
+		x &= x - 1 // clear the least significant bit set
+	}
+	return count
+}
+
+// Uint64FromNumLowerBits returns a uint64 value with the specified number of lower bits set to 1.
+func Uint64FromNumLowerBits(numBits int) (uint64, error) {
+	if numBits < 0 || numBits > 64 {
+		return 0, fmt.Errorf("numBits must be between 0 and 64, got %d", numBits)
+	}
+	if numBits == 0 {
+		return 0, nil
+	}
+	return (1 << numBits) - 1, nil
+}
+
+// IsUint64BitSet checks if the specified bit in a uint64 value is set to 1.
+func IsUint64BitSet(x uint64, bit int) (bool, error) {
+	if bit < 0 || bit > 63 {
+		return false, fmt.Errorf("bit must be between 0 and 63, got %d", bit)
+	}
+	return (x & (1 << bit)) != 0, nil
+}

@@ -7,6 +7,7 @@ import (
 	"perfspect/internal/report"
 	"perfspect/internal/script"
 	"perfspect/internal/target"
+	"perfspect/internal/util"
 	"regexp"
 	"slices"
 	"strconv"
@@ -112,16 +113,27 @@ done
 	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
 }
 
-func setLlcSize(llcSize float64, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+	// get the data we need to set the LLC size
 	scripts := []script.ScriptDefinition{}
 	scripts = append(scripts, script.GetScriptByName(script.LscpuScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.LspciBitsScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.LspciDevicesScriptName))
-	scripts = append(scripts, script.GetScriptByName(script.L3WaySizeName))
-
+	scripts = append(scripts, script.GetScriptByName(script.L3CacheWayEnabledName))
 	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir)
 	if err != nil {
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to run scripts on target: %w", err)}
+		return
+	}
+
+	uarch := report.UarchFromOutput(outputs)
+	cpu, err := report.GetCPUByMicroArchitecture(uarch)
+	if err != nil {
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get CPU by microarchitecture: %w", err)}
+		return
+	}
+	if cpu.CacheWayCount == 0 {
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("cache way count is zero")}
 		return
 	}
 	maximumLlcSize, _, err := report.GetL3LscpuMB(outputs)
@@ -129,37 +141,37 @@ func setLlcSize(llcSize float64, myTarget target.Target, localTempDir string, co
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get maximum LLC size: %w", err)}
 		return
 	}
-	// microarchitecture
-	uarch := report.UarchFromOutput(outputs)
-	cacheWays := report.GetCacheWays(uarch)
-	if len(cacheWays) == 0 {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get cache ways")}
-		return
-	}
-	// current LLC size
 	currentLlcSize, err := report.GetL3MSRMB(outputs)
 	if err != nil {
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get current LLC size: %w", err)}
 		return
 	}
-	if currentLlcSize == llcSize {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("LLC size is already set to %.2f MB", llcSize)}
+	if currentLlcSize == desiredLlcSize {
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("LLC size is already set to %.2f MB", desiredLlcSize)}
+		return
+	}
+	if desiredLlcSize > maximumLlcSize {
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("LLC size is too large, maximum is %.2f MB", maximumLlcSize)}
 		return
 	}
 	// calculate the number of ways to set
-	cachePerWay := maximumLlcSize / float64(len(cacheWays))
-	waysToSet := int(math.Ceil((llcSize / cachePerWay)) - 1)
-	if waysToSet >= len(cacheWays) {
+	cachePerWay := maximumLlcSize / float64(cpu.CacheWayCount)
+	waysToSet := int(math.Ceil(desiredLlcSize / cachePerWay))
+	if waysToSet > cpu.CacheWayCount {
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("LLC size is too large, maximum is %.2f MB", maximumLlcSize)}
 		return
 	}
 	// set the LLC size
+	msrVal, err := util.Uint64FromNumLowerBits(waysToSet)
+	if err != nil {
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to convert waysToSet to uint64: %w", err)}
+		return
+	}
 	setScript := script.ScriptDefinition{
 		Name:           "set LLC size",
-		ScriptTemplate: fmt.Sprintf("wrmsr -a 0xC90 %d", cacheWays[waysToSet]),
+		ScriptTemplate: fmt.Sprintf("wrmsr -a 0xC90 %d", msrVal),
 		Superuser:      true,
-		Families:       []string{"6"},                                                // Intel only
-		Models:         []string{"63", "79", "86", "85", "106", "108", "143", "207"}, // not SRF, GNR
+		Vendors:        []string{"GenuineIntel"},
 		Depends:        []string{"wrmsr"},
 		Lkms:           []string{"msr"},
 	}

@@ -310,3 +310,96 @@ func TestInt64ToUint64(t *testing.T) {
 		})
 	}
 }
+func TestNumUint64Bits(t *testing.T) {
+	tests := []struct {
+		input    uint64
+		expected int
+	}{
+		{0, 0},
+		{1, 1},
+		{2, 1},
+		{3, 2},
+		{4, 1},
+		{7, 3},
+		{8, 1},
+		{15, 4},
+		{16, 1},
+		{255, 8},
+		{256, 1},
+		{1023, 10},
+		{1024, 1},
+		{0xfff, 12},
+		{0xffff, 16},
+		{uint64(^uint64(0)), 64}, // all bits set
+	}
+
+	for _, tt := range tests {
+		got := NumUint64Bits(tt.input)
+		if got != tt.expected {
+			t.Errorf("NumUint64Bits(%d) = %d, want %d", tt.input, got, tt.expected)
+		}
+	}
+}
+func TestUint64FromNumLowerBits(t *testing.T) {
+	tests := []struct {
+		numBits  int
+		expected uint64
+		wantErr  bool
+	}{
+		{0, 0, false},
+		{1, 1, false},
+		{2, 3, false},
+		{3, 7, false},
+		{4, 15, false},
+		{8, 255, false},
+		{16, 65535, false},
+		{32, 4294967295, false},
+		{63, 0x7FFFFFFFFFFFFFFF, false},
+		{64, 0xFFFFFFFFFFFFFFFF, false},
+		{-1, 0, true},
+		{65, 0, true},
+		{100, 0, true},
+	}
+	for _, tt := range tests {
+		got, err := Uint64FromNumLowerBits(tt.numBits)
+		if (err != nil) != tt.wantErr {
+			t.Errorf("Uint64FromNumLowerBits(%d) error = %v, wantErr %v", tt.numBits, err, tt.wantErr)
+		}
+		if !tt.wantErr && got != tt.expected {
+			t.Errorf("Uint64FromNumLowerBits(%d) = %d, want %d", tt.numBits, got, tt.expected)
+		}
+	}
+}
+func TestIsUint64BitSet(t *testing.T) {
+	tests := []struct {
+		name    string
+		x       uint64
+		bit     int
+		want    bool
+		wantErr bool
+	}{
+		{"bit 0 set", 1, 0, true, false},
+		{"bit 1 set", 2, 1, true, false},
+		{"bit 2 not set", 2, 2, false, false},
+		{"bit 63 set", 1 << 63, 63, true, false},
+		{"bit 63 not set", 1, 63, false, false},
+		{"all bits set", ^uint64(0), 0, true, false},
+		{"all bits set, bit 63", ^uint64(0), 63, true, false},
+		{"bit out of range negative", 1, -1, false, true},
+		{"bit out of range high", 1, 64, false, true},
+		{"zero value, bit 0", 0, 0, false, false},
+		{"zero value, bit 63", 0, 63, false, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := IsUint64BitSet(tt.x, tt.bit)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("IsUint64BitSet(%d, %d) error = %v, wantErr %v", tt.x, tt.bit, err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("IsUint64BitSet(%d, %d) = %v, want %v", tt.x, tt.bit, got, tt.want)
+			}
+		})
+	}
+}
