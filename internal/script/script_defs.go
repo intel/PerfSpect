@@ -57,6 +57,7 @@ const (
 	PPINName                         = "ppin"
 	PrefetchControlName              = "prefetch control"
 	PrefetchersName                  = "prefetchers"
+	PrefetchersAtomName              = "prefetchers atom"
 	L3CacheWayEnabledName            = "l3 way enabled"
 	PackagePowerLimitName            = "package power limit"
 	EpbScriptName                    = "energy performance bias"
@@ -375,6 +376,16 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		ScriptTemplate: "rdmsr 0x6d", // TODO: get name, used to read prefetchers
 		Architectures:  []string{x86_64},
 		Vendors:        []string{"GenuineIntel"},
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
+		Superuser:      true,
+	},
+	PrefetchersAtomName: {
+		Name:           PrefetchersAtomName,
+		ScriptTemplate: "rdmsr 0x1320", // Atom Pref_tuning1
+		Architectures:  []string{x86_64},
+		Vendors:        []string{"GenuineIntel"},
+		Models:         []string{"175"}, // SRF
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
