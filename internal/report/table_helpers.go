@@ -575,6 +575,8 @@ func prefetchersFromOutput(outputs map[string]script.ScriptOutput) [][]string {
 				scriptName = script.PrefetchControlName
 			} else if pf.Msr == MsrPrefetchers {
 				scriptName = script.PrefetchersName
+			} else if pf.Msr == MsrAtomPrefTuning1 {
+				scriptName = script.PrefetchersAtomName
 			} else {
 				slog.Error("unknown msr for prefetcher", slog.String("msr", fmt.Sprintf("0x%x", pf.Msr)))
 				continue
@@ -614,6 +616,8 @@ func prefetchersSummaryFromOutput(outputs map[string]script.ScriptOutput) string
 				scriptName = script.PrefetchControlName
 			} else if pf.Msr == MsrPrefetchers {
 				scriptName = script.PrefetchersName
+			} else if pf.Msr == MsrAtomPrefTuning1 {
+				scriptName = script.PrefetchersAtomName
 			} else {
 				slog.Error("unknown msr for prefetcher", slog.String("msr", fmt.Sprintf("0x%x", pf.Msr)))
 				continue

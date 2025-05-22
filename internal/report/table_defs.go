@@ -235,6 +235,7 @@ var tableDefinitions = map[string]TableDefinition{
 			script.LspciDevicesScriptName,
 			script.PrefetchControlName,
 			script.PrefetchersName,
+			script.PrefetchersAtomName,
 		},
 		FieldsFunc: prefetcherTableValues},
 	ISATableName: {
@@ -501,6 +502,7 @@ var tableDefinitions = map[string]TableDefinition{
 			script.SpecCoreFrequenciesScriptName,
 			script.PrefetchControlName,
 			script.PrefetchersName,
+			script.PrefetchersAtomName,
 			script.PPINName,
 			script.LshwScriptName,
 			script.MeminfoScriptName,
@@ -574,6 +576,7 @@ var tableDefinitions = map[string]TableDefinition{
 			script.ElcScriptName,
 			script.PrefetchControlName,
 			script.PrefetchersName,
+			script.PrefetchersAtomName,
 			script.CstatesScriptName,
 			script.C1DemotionScriptName,
 		},
@@ -1943,6 +1946,8 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []Field {
 				scriptName = script.PrefetchControlName
 			} else if pf.Msr == MsrPrefetchers {
 				scriptName = script.PrefetchersName
+			} else if pf.Msr == MsrAtomPrefTuning1 {
+				scriptName = script.PrefetchersAtomName
 			} else {
 				slog.Error("unknown msr for prefetcher", slog.String("msr", fmt.Sprintf("0x%x", pf.Msr)))
 				continue
