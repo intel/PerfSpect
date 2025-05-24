@@ -110,22 +110,27 @@ func GetEventFrames(rawEvents [][]byte, eventGroupDefinitions []GroupDefinition,
 }
 
 // parseEvents parses the raw event data into a list of Event
-func parseEvents(rawEvents [][]byte, eventGroupDefinitions []GroupDefinition) (events []Event, err error) {
-	events = make([]Event, 0, len(rawEvents))
+func parseEvents(rawEvents [][]byte, eventGroupDefinitions []GroupDefinition) ([]Event, error) {
+	events := make([]Event, 0, len(rawEvents))
 	groupIdx := 0
 	eventIdx := -1
 	previousEvent := ""
+	var eventsNotCounted []string
+	var eventsNotSupported []string
 	for _, rawEvent := range rawEvents {
-		var event Event
-		if event, err = parseEventJSON(rawEvent); err != nil { // nosemgrep
-			if strings.Contains(err.Error(), "unrecognized event format") {
-				slog.Error(err.Error(), slog.String("event", string(rawEvent)))
-				return
-			} else {
-				slog.Debug(err.Error(), slog.String("event", string(rawEvent)))
-				event.Value = math.NaN()
-				err = nil
-			}
+		event, err := parseEventJSON(rawEvent) // nosemgrep
+		if err != nil {
+			slog.Error(err.Error(), slog.String("event", string(rawEvent)))
+			return nil, err
+		}
+		if event.CounterValue == "<not counted>" {
+			slog.Debug("event not counted", slog.String("event", string(rawEvent)))
+			eventsNotCounted = append(eventsNotCounted, event.Event)
+			event.Value = math.NaN()
+		} else if event.CounterValue == "<not supported>" {
+			slog.Debug("event not supported", slog.String("event", string(rawEvent)))
+			eventsNotSupported = append(eventsNotSupported, event.Event)
+			event.Value = math.NaN()
 		}
 		if event.Event != previousEvent {
 			eventIdx++
@@ -134,11 +139,11 @@ func parseEvents(rawEvents [][]byte, eventGroupDefinitions []GroupDefinition) (e
 		if eventIdx == len(eventGroupDefinitions[groupIdx]) { // last event in group
 			groupIdx++
 			if groupIdx == len(eventGroupDefinitions) {
+				// if in cgroup scope, we receive one set of events for each cgroup
 				if flagScope == scopeCgroup {
 					groupIdx = 0
 				} else {
-					err = fmt.Errorf("event group definitions not aligning with raw events")
-					return
+					return nil, fmt.Errorf("event group definitions not aligning with raw events")
 				}
 			}
 			eventIdx = 0
@@ -146,7 +151,13 @@ func parseEvents(rawEvents [][]byte, eventGroupDefinitions []GroupDefinition) (e
 		event.Group = groupIdx
 		events = append(events, event)
 	}
-	return
+	if len(eventsNotCounted) > 0 {
+		slog.Warn("events not counted", slog.String("events", strings.Join(eventsNotCounted, ",")))
+	}
+	if len(eventsNotSupported) > 0 {
+		slog.Warn("events not supported", slog.String("events", strings.Join(eventsNotSupported, ",")))
+	}
+	return events, nil
 }
 
 // coalesceEvents separates the events into a number of event lists by granularity and scope
@@ -354,22 +365,18 @@ func collapseUncoreGroups(inGroups []EventGroup, firstIdx int, count int) (outGr
 
 // parseEventJSON parses JSON formatted event into struct
 // example: {"interval" : 5.005113019, "cpu": "0", "counter-value" : "22901873.000000", "unit" : "", "cgroup" : "...1cb2de.scope", "event" : "L1D.REPLACEMENT", "event-runtime" : 80081151765, "pcnt-running" : 6.00, "metric-value" : 0.000000, "metric-unit" : "(null)"}
-func parseEventJSON(rawEvent []byte) (event Event, err error) {
-	if err = json.Unmarshal(rawEvent, &event); err != nil {
+func parseEventJSON(rawEvent []byte) (Event, error) {
+	var event Event
+	if err := json.Unmarshal(rawEvent, &event); err != nil {
 		err = fmt.Errorf("unrecognized event format: \"%s\"", rawEvent)
-		return
+		return event, err
 	}
-	if event.CounterValue == "<not supported>" {
-		err = fmt.Errorf("event not supported: \"%s\"", rawEvent)
-		return
+	if !strings.Contains(event.CounterValue, "not counted") && !strings.Contains(event.CounterValue, "not supported") {
+		var err error
+		if event.Value, err = strconv.ParseFloat(event.CounterValue, 64); err != nil {
+			slog.Error("failed to parse event value", slog.String("event", event.Event), slog.String("value", event.CounterValue))
+			event.Value = math.NaN()
+		}
 	}
-	if event.CounterValue == "<not counted>" {
-		err = fmt.Errorf("event not counted: \"%s\"", rawEvent)
-		return
-	}
-	if event.Value, err = strconv.ParseFloat(event.CounterValue, 64); err != nil {
-		err = fmt.Errorf("failed to parse event value as float: \"%s\"", rawEvent)
-		return
-	}
-	return
+	return event, nil
 }
