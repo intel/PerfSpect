@@ -19,19 +19,21 @@ type PrefetcherDefinition struct {
 const (
 	MsrPrefetchControl = 0x1a4
 	MsrPrefetchers     = 0x6d
+	MsrAtomPrefTuning1 = 0x1320
 )
 
 const (
-	PrefetcherL2HWName     = "L2 HW"
-	PrefetcherL2AdjName    = "L2 Adj"
-	PrefetcherDCUHWName    = "DCU HW"
-	PrefetcherDCUIPName    = "DCU IP"
-	PrefetcherDCUNPName    = "DCU NP"
-	PrefetcherAMPName      = "AMP"
-	PrefetcherLLCPPName    = "LLCPP"
-	PrefetcherAOPName      = "AOP"
-	PrefetcherHomelessName = "Homeless"
-	PrefetcherLLCName      = "LLC"
+	PrefetcherL2HWName      = "L2 HW"
+	PrefetcherL2AdjName     = "L2 Adj"
+	PrefetcherDCUHWName     = "DCU HW"
+	PrefetcherDCUIPName     = "DCU IP"
+	PrefetcherDCUNPName     = "DCU NP"
+	PrefetcherAMPName       = "AMP"
+	PrefetcherLLCPPName     = "LLCPP"
+	PrefetcherAOPName       = "AOP"
+	PrefetcherHomelessName  = "Homeless"
+	PrefetcherLLCName       = "LLC"
+	PrefetcherLLCStreamName = "LLC Stream"
 )
 
 var prefetcherDefinitions = []PrefetcherDefinition{
@@ -105,6 +107,13 @@ var prefetcherDefinitions = []PrefetcherDefinition{
 		Bit:         42,
 		Uarchs:      []string{"SPR", "EMR", "GNR"},
 	},
+	{
+		ShortName:   PrefetcherLLCStreamName,
+		Description: "Last level cache stream prefetcher.",
+		Msr:         MsrAtomPrefTuning1,
+		Bit:         43,
+		Uarchs:      []string{"SRF"},
+	},
 }
 
 // GetPrefetcherDefByName returns the Prefetcher definition by its short name.
@@ -116,4 +125,9 @@ func GetPrefetcherDefByName(name string) (PrefetcherDefinition, error) {
 		}
 	}
 	return PrefetcherDefinition{}, fmt.Errorf("prefetcher %s not found", name)
+}
+
+// GetPrefetcherDefinitions returns all Prefetcher definitions.
+func GetPrefetcherDefinitions() []PrefetcherDefinition {
+	return prefetcherDefinitions
 }
