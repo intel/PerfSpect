@@ -255,7 +255,7 @@ func getFlagGroups() []common.FlagGroup {
 		},
 		{
 			Name: flagRefreshName,
-			Help: "number of seconds to run before refreshing the \"hot\" or \"filtered\" process or cgroup list",
+			Help: "number of seconds to run before refreshing the \"hot\" or \"filtered\" process or cgroup list. If 0, the list will not be refreshed.",
 		},
 	}
 	groups = append(groups, common.FlagGroup{
@@ -436,15 +436,14 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 			return common.FlagValidationError(cmd, "cannot specify refresh when duration is set")
 		}
 		// if refresh is less than 1, error
-		if flagRefresh < 1 {
-			return common.FlagValidationError(cmd, "refresh must be greater than 0")
+		if flagRefresh < 0 {
+			return common.FlagValidationError(cmd, "refresh must be greater than or equal to 0")
 		}
 		// if refresh is less than perf print interval, error
 		if flagRefresh < flagPerfPrintInterval {
 			return common.FlagValidationError(cmd, fmt.Sprintf("refresh must be greater than or equal to the event collection interval (%d)", flagPerfPrintInterval))
 		}
 	}
-
 	// output options
 	// confirm valid granularity
 	if cmd.Flags().Lookup(flagGranularityName).Changed && !slices.Contains(granularityOptions, flagGranularity) {
@@ -462,8 +461,19 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	}
 	// advanced options
 	// confirm valid perf print interval
-	if cmd.Flags().Lookup(flagPerfPrintIntervalName).Changed && flagPerfPrintInterval < 1 {
-		return common.FlagValidationError(cmd, "event collection interval must be at least 1 second")
+	if cmd.Flags().Lookup(flagPerfPrintIntervalName).Changed {
+		if flagPerfPrintInterval < 1 {
+			return common.FlagValidationError(cmd, "event collection interval must be at least 1 second")
+		}
+		// if perf print interval is greater than duration, error
+		if flagDuration > 0 && flagPerfPrintInterval > flagDuration {
+			return common.FlagValidationError(cmd, fmt.Sprintf("event collection interval must be less than or equal to the duration (%d)", flagDuration))
+		}
+		// if refresh is relevant, perf print interval must be less than refresh
+		relevant := flagRefresh > 0 && flagScope != scopeSystem && len(flagPidList) == 0 && len(flagCidList) == 0
+		if relevant && flagPerfPrintInterval > flagRefresh {
+			return common.FlagValidationError(cmd, fmt.Sprintf("event collection interval must be less than or equal to the refresh interval (%d)", flagRefresh))
+		}
 	}
 	// confirm valid perf mux interval
 	if cmd.Flags().Lookup(flagPerfMuxIntervalName).Changed && flagPerfMuxInterval < 10 {
