@@ -58,21 +58,6 @@ const (
 	flagUncoreMinIOFrequencyName      = "uncore-min-io"
 )
 
-// prefetcher flag names
-const (
-	flagPrefetcherL2HWName      = "pref-l2hw"
-	flagPrefetcherL2AdjName     = "pref-l2adj"
-	flagPrefetcherDCUHWName     = "pref-dcuhw"
-	flagPrefetcherDCUIPName     = "pref-dcuip"
-	flagPrefetcherDCUNPName     = "pref-dcunp"
-	flagPrefetcherAMPName       = "pref-amp"
-	flagPrefetcherLLCPPName     = "pref-llcpp"
-	flagPrefetcherAOPName       = "pref-aop"
-	flagPrefetcherHomelessName  = "pref-homeless"
-	flagPrefetcherLLCName       = "pref-llc"
-	flagPrefetcherLLCStreamName = "pref-llcstream"
-)
-
 const (
 	flagC6Name         = "c6"
 	flagC1DemotionName = "c1-demotion"
@@ -196,151 +181,33 @@ func initializeFlags(cmd *cobra.Command) {
 	flagGroups = append(flagGroups, group)
 	// prefetcher options
 	group = flagGroup{name: flagGroupPrefetcherName, flags: []flagDefinition{}}
-	group.flags = append(group.flags,
-		newStringFlag(cmd, flagPrefetcherL2HWName, "",
-			func(value string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
-				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherL2HWName, completeChannel, goRoutineId)
-			},
-			func() string {
-				pref, _ := report.GetPrefetcherDefByName(report.PrefetcherL2HWName)
-				return pref.ShortName + " [" + strings.Join(pref.Uarchs, ",") + "]" + " (" + strings.Join(prefetcherOptions, ", ") + ")"
-			}(),
-			strings.Join(prefetcherOptions, ", "),
-			func(cmd *cobra.Command) bool {
-				value, _ := cmd.Flags().GetString(flagPrefetcherL2HWName)
-				return slices.Contains(prefetcherOptions, value)
-			}),
-		newStringFlag(cmd, flagPrefetcherL2AdjName, "",
-			func(value string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
-				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherL2AdjName, completeChannel, goRoutineId)
-			},
-			func() string {
-				pref, _ := report.GetPrefetcherDefByName(report.PrefetcherL2AdjName)
-				return pref.ShortName + " [" + strings.Join(pref.Uarchs, ",") + "]" + " (" + strings.Join(prefetcherOptions, ", ") + ")"
-			}(),
-			strings.Join(prefetcherOptions, ", "),
-			func(cmd *cobra.Command) bool {
-				value, _ := cmd.Flags().GetString(flagPrefetcherL2AdjName)
-				return slices.Contains(prefetcherOptions, value)
-			}),
-		newStringFlag(cmd, flagPrefetcherDCUHWName, "",
-			func(value string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
-				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherDCUHWName, completeChannel, goRoutineId)
-			},
-			func() string {
-				pref, _ := report.GetPrefetcherDefByName(report.PrefetcherDCUHWName)
-				return pref.ShortName + " [" + strings.Join(pref.Uarchs, ",") + "]" + " (" + strings.Join(prefetcherOptions, ", ") + ")"
-			}(),
-			strings.Join(prefetcherOptions, ", "),
-			func(cmd *cobra.Command) bool {
-				value, _ := cmd.Flags().GetString(flagPrefetcherDCUHWName)
-				return slices.Contains(prefetcherOptions, value)
-			}),
-		newStringFlag(cmd, flagPrefetcherDCUIPName, "",
-			func(value string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
-				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherDCUIPName, completeChannel, goRoutineId)
-			},
-			func() string {
-				pref, _ := report.GetPrefetcherDefByName(report.PrefetcherDCUIPName)
-				return pref.ShortName + " [" + strings.Join(pref.Uarchs, ",") + "]" + " (" + strings.Join(prefetcherOptions, ", ") + ")"
-			}(),
-			strings.Join(prefetcherOptions, ", "),
-			func(cmd *cobra.Command) bool {
-				value, _ := cmd.Flags().GetString(flagPrefetcherDCUIPName)
-				return slices.Contains(prefetcherOptions, value)
-			}),
-		newStringFlag(cmd, flagPrefetcherDCUNPName, "",
-			func(value string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
-				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherDCUNPName, completeChannel, goRoutineId)
-			},
-			func() string {
-				pref, _ := report.GetPrefetcherDefByName(report.PrefetcherDCUNPName)
-				return pref.ShortName + " [" + strings.Join(pref.Uarchs, ",") + "]" + " (" + strings.Join(prefetcherOptions, ", ") + ")"
-			}(),
-			strings.Join(prefetcherOptions, ", "),
-			func(cmd *cobra.Command) bool {
-				value, _ := cmd.Flags().GetString(flagPrefetcherDCUNPName)
-				return slices.Contains(prefetcherOptions, value)
-			}),
-		newStringFlag(cmd, flagPrefetcherAMPName, "",
-			func(value string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
-				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherAMPName, completeChannel, goRoutineId)
-			},
-			func() string {
-				pref, _ := report.GetPrefetcherDefByName(report.PrefetcherAMPName)
-				return pref.ShortName + " [" + strings.Join(pref.Uarchs, ",") + "]" + " (" + strings.Join(prefetcherOptions, ", ") + ")"
-			}(),
-			strings.Join(prefetcherOptions, ", "),
-			func(cmd *cobra.Command) bool {
-				value, _ := cmd.Flags().GetString(flagPrefetcherAMPName)
-				return slices.Contains(prefetcherOptions, value)
-			}),
-		newStringFlag(cmd, flagPrefetcherLLCPPName, "",
-			func(value string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
-				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherLLCPPName, completeChannel, goRoutineId)
-			},
-			func() string {
-				pref, _ := report.GetPrefetcherDefByName(report.PrefetcherLLCPPName)
-				return pref.ShortName + " [" + strings.Join(pref.Uarchs, ",") + "]" + " (" + strings.Join(prefetcherOptions, ", ") + ")"
-			}(),
-			strings.Join(prefetcherOptions, ", "),
-			func(cmd *cobra.Command) bool {
-				value, _ := cmd.Flags().GetString(flagPrefetcherLLCPPName)
-				return slices.Contains(prefetcherOptions, value)
-			}),
-		newStringFlag(cmd, flagPrefetcherAOPName, "",
-			func(value string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
-				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherAOPName, completeChannel, goRoutineId)
-			},
-			func() string {
-				pref, _ := report.GetPrefetcherDefByName(report.PrefetcherAOPName)
-				return pref.ShortName + " [" + strings.Join(pref.Uarchs, ",") + "]" + " (" + strings.Join(prefetcherOptions, ", ") + ")"
-			}(),
-			strings.Join(prefetcherOptions, ", "),
-			func(cmd *cobra.Command) bool {
-				value, _ := cmd.Flags().GetString(flagPrefetcherAOPName)
-				return slices.Contains(prefetcherOptions, value)
-			}),
-		newStringFlag(cmd, flagPrefetcherHomelessName, "",
-			func(value string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
-				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherHomelessName, completeChannel, goRoutineId)
-			},
-			func() string {
-				pref, _ := report.GetPrefetcherDefByName(report.PrefetcherHomelessName)
-				return pref.ShortName + " [" + strings.Join(pref.Uarchs, ",") + "]" + " (" + strings.Join(prefetcherOptions, ", ") + ")"
-			}(),
-			strings.Join(prefetcherOptions, ", "),
-			func(cmd *cobra.Command) bool {
-				value, _ := cmd.Flags().GetString(flagPrefetcherHomelessName)
-				return slices.Contains(prefetcherOptions, value)
-			}),
-		newStringFlag(cmd, flagPrefetcherLLCName, "",
-			func(value string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
-				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherLLCName, completeChannel, goRoutineId)
-			},
-			func() string {
-				pref, _ := report.GetPrefetcherDefByName(report.PrefetcherLLCName)
-				return pref.ShortName + " [" + strings.Join(pref.Uarchs, ",") + "]" + " (" + strings.Join(prefetcherOptions, ", ") + ")"
-			}(),
-			strings.Join(prefetcherOptions, ", "),
-			func(cmd *cobra.Command) bool {
-				value, _ := cmd.Flags().GetString(flagPrefetcherLLCName)
-				return slices.Contains(prefetcherOptions, value)
-			}),
-		newStringFlag(cmd, flagPrefetcherLLCStreamName, "",
-			func(value string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
-				setPrefetcher(value, myTarget, localTempDir, report.PrefetcherLLCStreamName, completeChannel, goRoutineId)
-			},
-			func() string {
-				pref, _ := report.GetPrefetcherDefByName(report.PrefetcherLLCStreamName)
-				return pref.ShortName + " [" + strings.Join(pref.Uarchs, ",") + "]" + " (" + strings.Join(prefetcherOptions, ", ") + ")"
-			}(),
-			strings.Join(prefetcherOptions, ", "),
-			func(cmd *cobra.Command) bool {
-				value, _ := cmd.Flags().GetString(flagPrefetcherLLCStreamName)
-				return slices.Contains(prefetcherOptions, value)
-			}),
-	)
+	for _, pref := range report.GetPrefetcherDefinitions() {
+		group.flags = append(group.flags,
+			newStringFlag(cmd,
+				// flag name
+				func() string {
+					return "pref-" + strings.ReplaceAll(strings.ToLower(pref.ShortName), " ", "")
+				}(),
+				// flag default value
+				"",
+				// flag value setter function
+				func(value string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+					setPrefetcher(value, myTarget, localTempDir, pref.ShortName, completeChannel, goRoutineId)
+				},
+				// flag help
+				func() string {
+					return pref.ShortName + " [" + strings.Join(pref.Uarchs, ",") + "]" + " (" + strings.Join(prefetcherOptions, ", ") + ")"
+				}(),
+				// flag validation description
+				strings.Join(prefetcherOptions, ", "),
+				// flag validation function
+				func(cmd *cobra.Command) bool {
+					value, _ := cmd.Flags().GetString("pref-" + strings.ReplaceAll(strings.ToLower(pref.ShortName), " ", ""))
+					return slices.Contains(prefetcherOptions, value)
+				},
+			),
+		)
+	}
 	flagGroups = append(flagGroups, group)
 	// c-state options
 	group = flagGroup{name: flagGroupCstateName, flags: []flagDefinition{}}

@@ -126,3 +126,8 @@ func GetPrefetcherDefByName(name string) (PrefetcherDefinition, error) {
 	}
 	return PrefetcherDefinition{}, fmt.Errorf("prefetcher %s not found", name)
 }
+
+// GetPrefetcherDefinitions returns all Prefetcher definitions.
+func GetPrefetcherDefinitions() []PrefetcherDefinition {
+	return prefetcherDefinitions
+}

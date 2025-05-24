@@ -671,7 +671,7 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 	newVal := maskedValue | uint64(bitVal<<pf.Bit)
 	// write the new value to the MSR
 	setScript := script.ScriptDefinition{
-		Name:           "set prefetcher",
+		Name:           "set prefetcher" + prefetcherType,
 		ScriptTemplate: fmt.Sprintf("wrmsr -a %d %d", pf.Msr, newVal),
 		Vendors:        []string{"GenuineIntel"},
 		Lkms:           []string{"msr"},
