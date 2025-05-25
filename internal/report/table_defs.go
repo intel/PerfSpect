@@ -118,7 +118,7 @@ const (
 	// telemetry table names
 	CPUUtilizationTelemetryTableName        = "CPU Utilization Telemetry"
 	UtilizationCategoriesTelemetryTableName = "Utilization Categories Telemetry"
-	AverageFrequencyTelemetryTableName      = "Average Frequency Telemetry"
+	FrequencyTelemetryTableName             = "Frequency Telemetry"
 	IRQRateTelemetryTableName               = "IRQ Rate Telemetry"
 	InstructionTelemetryTableName           = "Instruction Telemetry"
 	DriveTelemetryTableName                 = "Drive Telemetry"
@@ -142,7 +142,7 @@ const (
 	// telemetry table menu labels
 	CPUUtilizationTelemetryMenuLabel        = "CPU Utilization"
 	UtilizationCategoriesTelemetryMenuLabel = "Utilization Categories"
-	AverageFrequencyTelemetryMenuLabel      = "Average Frequency"
+	FrequencyTelemetryMenuLabel             = "Frequency"
 	IRQRateTelemetryMenuLabel               = "IRQ Rate"
 	InstructionTelemetryMenuLabel           = "Instruction"
 	DriveTelemetryMenuLabel                 = "Drive"
@@ -673,14 +673,14 @@ var tableDefinitions = map[string]TableDefinition{
 		},
 		FieldsFunc:            utilizationCategoriesTelemetryTableValues,
 		HTMLTableRendererFunc: utilizationCategoriesTelemetryTableHTMLRenderer},
-	AverageFrequencyTelemetryTableName: {
-		Name:      AverageFrequencyTelemetryTableName,
-		MenuLabel: AverageFrequencyTelemetryMenuLabel,
+	FrequencyTelemetryTableName: {
+		Name:      FrequencyTelemetryTableName,
+		MenuLabel: FrequencyTelemetryMenuLabel,
 		HasRows:   true,
 		ScriptNames: []string{
 			script.TurbostatTelemetryScriptName,
 		},
-		FieldsFunc:            averageFrequencyTelemetryTableValues,
+		FieldsFunc:            frequencyTelemetryTableValues,
 		HTMLTableRendererFunc: averageFrequencyTelemetryTableHTMLRenderer},
 	IRQRateTelemetryTableName: {
 		Name:      IRQRateTelemetryTableName,
@@ -2399,10 +2399,10 @@ func temperatureTelemetryTableValues(outputs map[string]script.ScriptOutput) []F
 	return fields
 }
 
-func averageFrequencyTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
+func frequencyTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
 		{Name: "Time"},
-		{Name: "Frequency"},
+		{Name: "Core (Avg.)"},
 	}
 	tsRowValues, err := turbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"Bzy_MHz"})
 	if err != nil {

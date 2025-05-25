@@ -50,13 +50,16 @@ var (
 
 	flagAll bool
 
-	flagCpu      bool
-	flagMemory   bool
-	flagNetwork  bool
-	flagStorage  bool
-	flagPower    bool
-	flagInstrMix bool
-	flagGaudi    bool
+	flagCpu         bool
+	flagFrequency   bool
+	flagIRQRate     bool
+	flagMemory      bool
+	flagNetwork     bool
+	flagStorage     bool
+	flagPower       bool
+	flagTemperature bool
+	flagInstrMix    bool
+	flagGaudi       bool
 
 	flagNoSystemSummary bool
 
@@ -70,13 +73,16 @@ const (
 
 	flagAllName = "all"
 
-	flagCpuName      = "cpu"
-	flagMemoryName   = "memory"
-	flagNetworkName  = "network"
-	flagStorageName  = "storage"
-	flagPowerName    = "power"
-	flagInstrMixName = "instrmix"
-	flagGaudiName    = "gaudi"
+	flagCpuName         = "cpu"
+	flagFrequencyName   = "frequency"
+	flagIRQRateName     = "irqrate"
+	flagMemoryName      = "memory"
+	flagNetworkName     = "network"
+	flagStorageName     = "storage"
+	flagPowerName       = "power"
+	flagTemperatureName = "temperature"
+	flagInstrMixName    = "instrmix"
+	flagGaudiName       = "gaudi"
 
 	flagNoSystemSummaryName = "no-summary"
 
@@ -87,11 +93,14 @@ const (
 var telemetrySummaryTableName = "Telemetry Summary"
 
 var categories = []common.Category{
-	{FlagName: flagCpuName, FlagVar: &flagCpu, DefaultValue: false, Help: "monitor cpu", TableNames: []string{report.CPUUtilizationTelemetryTableName, report.UtilizationCategoriesTelemetryTableName, report.AverageFrequencyTelemetryTableName, report.IRQRateTelemetryTableName}},
+	{FlagName: flagCpuName, FlagVar: &flagCpu, DefaultValue: false, Help: "monitor cpu utilization", TableNames: []string{report.CPUUtilizationTelemetryTableName, report.UtilizationCategoriesTelemetryTableName}},
+	{FlagName: flagFrequencyName, FlagVar: &flagFrequency, DefaultValue: false, Help: "monitor cpu frequency", TableNames: []string{report.FrequencyTelemetryTableName}},
+	{FlagName: flagPowerName, FlagVar: &flagPower, DefaultValue: false, Help: "monitor power", TableNames: []string{report.PowerTelemetryTableName}},
+	{FlagName: flagTemperatureName, FlagVar: &flagTemperature, DefaultValue: false, Help: "monitor temperature", TableNames: []string{report.TemperatureTelemetryTableName}},
 	{FlagName: flagMemoryName, FlagVar: &flagMemory, DefaultValue: false, Help: "monitor memory", TableNames: []string{report.MemoryTelemetryTableName}},
 	{FlagName: flagNetworkName, FlagVar: &flagNetwork, DefaultValue: false, Help: "monitor network", TableNames: []string{report.NetworkTelemetryTableName}},
 	{FlagName: flagStorageName, FlagVar: &flagStorage, DefaultValue: false, Help: "monitor storage", TableNames: []string{report.DriveTelemetryTableName}},
-	{FlagName: flagPowerName, FlagVar: &flagPower, DefaultValue: false, Help: "monitor power", TableNames: []string{report.PowerTelemetryTableName, report.TemperatureTelemetryTableName}},
+	{FlagName: flagIRQRateName, FlagVar: &flagIRQRate, DefaultValue: false, Help: "monitor IRQ rate", TableNames: []string{report.IRQRateTelemetryTableName}},
 	{FlagName: flagInstrMixName, FlagVar: &flagInstrMix, DefaultValue: false, Help: "monitor instruction mix", TableNames: []string{report.InstructionTelemetryTableName}},
 	{FlagName: flagGaudiName, FlagVar: &flagGaudi, DefaultValue: false, Help: "monitor gaudi", TableNames: []string{report.GaudiTelemetryTableName}},
 }
@@ -304,8 +313,11 @@ func getTableValues(allTableValues []report.TableValues, tableName string) repor
 
 func summaryFromTableValues(allTableValues []report.TableValues, _ map[string]script.ScriptOutput) report.TableValues {
 	cpuUtil := getCPUAveragePercentage(getTableValues(allTableValues, report.UtilizationCategoriesTelemetryTableName), "%idle", true)
-	cpuFreq := getMetricAverage(getTableValues(allTableValues, report.AverageFrequencyTelemetryTableName), []string{"Frequency"}, "Time")
-	pkgPower := getMetricAverage(getTableValues(allTableValues, report.PowerTelemetryTableName), []string{"Package"}, "")
+	avgCoreFreq := getMetricAverage(getTableValues(allTableValues, report.FrequencyTelemetryTableName), []string{"Core (Avg.)"}, "Time")
+	pkgPower := getPkgAveragePower(allTableValues)
+	dramPower := getDramAveragePower(allTableValues)
+	pkgTemperature := getPkgAverageTemperature(allTableValues)
+	coreTemperature := getMetricAverage(getTableValues(allTableValues, report.TemperatureTelemetryTableName), []string{"Core (Avg.)"}, "")
 	driveReads := getMetricAverage(getTableValues(allTableValues, report.DriveTelemetryTableName), []string{"kB_read/s"}, "Device")
 	driveWrites := getMetricAverage(getTableValues(allTableValues, report.DriveTelemetryTableName), []string{"kB_wrtn/s"}, "Device")
 	networkReads := getMetricAverage(getTableValues(allTableValues, report.NetworkTelemetryTableName), []string{"rxkB/s"}, "Time")
@@ -319,13 +331,16 @@ func summaryFromTableValues(allTableValues []report.TableValues, _ map[string]sc
 		},
 		Fields: []report.Field{
 			{Name: "CPU Utilization (%)", Values: []string{cpuUtil}},
-			{Name: "CPU Frequency (MHz)", Values: []string{cpuFreq}},
+			{Name: "Core Frequency (MHz)", Values: []string{avgCoreFreq}},
 			{Name: "Package Power (Watts)", Values: []string{pkgPower}},
+			{Name: "DRAM Power (Watts)", Values: []string{dramPower}},
+			{Name: "Package Temperature (C)", Values: []string{pkgTemperature}},
+			{Name: "Core Temperature (C)", Values: []string{coreTemperature}},
+			{Name: "Memory Available (kB)", Values: []string{memAvail}},
 			{Name: "Drive Reads (kB/s)", Values: []string{driveReads}},
 			{Name: "Drive Writes (kB/s)", Values: []string{driveWrites}},
 			{Name: "Network RX (kB/s)", Values: []string{networkReads}},
 			{Name: "Network TX (kB/s)", Values: []string{networkWrites}},
-			{Name: "Memory Available (kB)", Values: []string{memAvail}},
 		},
 	}
 }
@@ -415,6 +430,105 @@ func getCPUAveragePercentage(tableValues report.TableValues, fieldName string, i
 		if inverse {
 			averageFloat = 100.0 - averageFloat
 		}
+		return fmt.Sprintf("%0.2f", averageFloat)
+	}
+	return ""
+}
+
+func getPkgAverageTemperature(allTableValues []report.TableValues) string {
+	tableValues := getTableValues(allTableValues, report.TemperatureTelemetryTableName)
+	// number of packages can vary, so we need to find the average temperature across all packages
+	if len(tableValues.Fields) == 0 {
+		return ""
+	}
+	pkgTempFieldIndices := make([]int, 0)
+	for i, field := range tableValues.Fields {
+		if strings.HasPrefix(field.Name, "Package") {
+			pkgTempFieldIndices = append(pkgTempFieldIndices, i)
+		}
+	}
+	if len(pkgTempFieldIndices) == 0 {
+		return ""
+	}
+	sum := 0.0
+	for _, fieldIndex := range pkgTempFieldIndices {
+		for _, value := range tableValues.Fields[fieldIndex].Values {
+			valueFloat, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				slog.Warn("failed to parse float value", slog.String("value", value), slog.String("error", err.Error()))
+				return ""
+			}
+			sum += valueFloat
+		}
+	}
+	if sum != 0 {
+		averageFloat := sum / float64(len(pkgTempFieldIndices)) / float64(len(tableValues.Fields[pkgTempFieldIndices[0]].Values))
+		return fmt.Sprintf("%0.2f", averageFloat)
+	}
+	return ""
+}
+
+func getPkgAveragePower(allTableValues []report.TableValues) string {
+	tableValues := getTableValues(allTableValues, report.PowerTelemetryTableName)
+	// number of packages can vary, so we need to find the average power across all packages
+	if len(tableValues.Fields) == 0 {
+		return ""
+	}
+	pkgPowerFieldIndices := make([]int, 0)
+	for i, field := range tableValues.Fields {
+		if strings.HasPrefix(field.Name, "Package") {
+			pkgPowerFieldIndices = append(pkgPowerFieldIndices, i)
+		}
+	}
+	if len(pkgPowerFieldIndices) == 0 {
+		return ""
+	}
+	sum := 0.0
+	for _, fieldIndex := range pkgPowerFieldIndices {
+		for _, value := range tableValues.Fields[fieldIndex].Values {
+			valueFloat, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				slog.Warn("failed to parse float value", slog.String("value", value), slog.String("error", err.Error()))
+				return ""
+			}
+			sum += valueFloat
+		}
+	}
+	if sum != 0 {
+		averageFloat := sum / float64(len(pkgPowerFieldIndices)) / float64(len(tableValues.Fields[pkgPowerFieldIndices[0]].Values))
+		return fmt.Sprintf("%0.2f", averageFloat)
+	}
+	return ""
+}
+
+func getDramAveragePower(allTableValues []report.TableValues) string {
+	tableValues := getTableValues(allTableValues, report.PowerTelemetryTableName)
+	// number of DRAMs can vary, so we need to find the average power across all DRAMs
+	if len(tableValues.Fields) == 0 {
+		return ""
+	}
+	dramPowerFieldIndices := make([]int, 0)
+	for i, field := range tableValues.Fields {
+		if strings.HasPrefix(field.Name, "DRAM") {
+			dramPowerFieldIndices = append(dramPowerFieldIndices, i)
+		}
+	}
+	if len(dramPowerFieldIndices) == 0 {
+		return ""
+	}
+	sum := 0.0
+	for _, fieldIndex := range dramPowerFieldIndices {
+		for _, value := range tableValues.Fields[fieldIndex].Values {
+			valueFloat, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				slog.Warn("failed to parse float value", slog.String("value", value), slog.String("error", err.Error()))
+				return ""
+			}
+			sum += valueFloat
+		}
+	}
+	if sum != 0 {
+		averageFloat := sum / float64(len(dramPowerFieldIndices)) / float64(len(tableValues.Fields[dramPowerFieldIndices[0]].Values))
 		return fmt.Sprintf("%0.2f", averageFloat)
 	}
 	return ""
