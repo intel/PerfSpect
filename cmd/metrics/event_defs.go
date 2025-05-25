@@ -77,7 +77,7 @@ func LoadEventGroups(eventDefinitionOverridePath string, metadata Metadata) (gro
 			if len(group) > 0 {
 				groups = append(groups, group)
 			} else {
-				slog.Warn("No collectable events in group", slog.String("ending", line))
+				slog.Debug("No collectable events in group", slog.String("ending", line))
 			}
 			group = GroupDefinition{} // clear the list
 		}
@@ -90,7 +90,7 @@ func LoadEventGroups(eventDefinitionOverridePath string, metadata Metadata) (gro
 	groups, err = expandUncoreGroups(groups, metadata)
 
 	if uncollectable.Cardinality() != 0 {
-		slog.Warn("Events not collectable on target", slog.String("events", uncollectable.String()))
+		slog.Debug("Events not collectable on target", slog.String("events", uncollectable.String()))
 	}
 	return
 }
