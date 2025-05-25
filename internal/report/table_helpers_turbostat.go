@@ -20,7 +20,7 @@ func parseTurbostatOutput(output string) ([]map[string]string, error) {
 		headers    []string
 		rows       []map[string]string
 		interval   float64
-		startTime  time.Time
+		timestamp  time.Time
 		timeParsed bool
 		rowCount   int
 	)
@@ -41,25 +41,26 @@ func parseTurbostatOutput(output string) ([]map[string]string, error) {
 		if strings.HasPrefix(line, "TIME:") {
 			val := strings.TrimSpace(strings.TrimPrefix(line, "TIME:"))
 			// Try to parse as HH:MM:SS
-			t, err := time.Parse("15:04:05", val)
-			if err == nil {
-				startTime = t
-				timeParsed = true
-			} else {
-				// fallback: try as seconds since epoch
-				sec, err := strconv.ParseFloat(val, 64)
-				if err == nil {
-					startTime = time.Unix(int64(sec), 0)
-					timeParsed = true
-				}
+			var err error
+			timestamp, err = time.Parse("15:04:05", val)
+			if err != nil {
+				slog.Error("unable to parse time", slog.String("value", val), slog.String("error", err.Error()))
+				return nil, fmt.Errorf("unable to parse time: %s", val)
 			}
+			timeParsed = true
 			continue
 		}
-		// Only set headers once, even if repeated
+		// parse the fields in the line
 		fields := strings.Fields(line)
+		// if this is a header line
 		if len(fields) > 1 && (fields[0] == "CPU" || fields[0] == "Package" || fields[0] == "Core") {
 			if len(headers) == 0 {
 				headers = fields
+			} else {
+				// bump the timestamp to the next interval
+				if timeParsed && interval > 0 {
+					timestamp = timestamp.Add(time.Duration(interval) * time.Second)
+				}
 			}
 			continue
 		}
@@ -68,16 +69,15 @@ func parseTurbostatOutput(output string) ([]map[string]string, error) {
 		}
 		values := strings.Fields(line)
 		if len(values) != len(headers) {
-			continue // skip malformed lines
+			continue // skip core lines
 		}
 		row := make(map[string]string)
 		for i, h := range headers {
 			row[h] = values[i]
 		}
-		// Add timestamp
+		// Add timestamp to row
 		if timeParsed && interval > 0 {
-			ts := startTime.Add(time.Duration(float64(rowCount)*interval) * time.Second)
-			row["timestamp"] = ts.Format("15:04:05")
+			row["timestamp"] = timestamp.Format("15:04:05")
 		}
 		rows = append(rows, row)
 		rowCount++
@@ -85,9 +85,9 @@ func parseTurbostatOutput(output string) ([]map[string]string, error) {
 	return rows, nil
 }
 
-// turbostatSummaryRows parses the output of the turbostat script and returns a slice of rows with the specified field names.
+// turbostatPlatformRows parses the output of the turbostat script and returns a slice of rows with the specified field names.
 // The first column is the sample time, and the rest are the values for the specified fields.
-func turbostatSummaryRows(turboStatScriptOutput string, fieldNames []string) ([][]string, error) {
+func turbostatPlatformRows(turboStatScriptOutput string, fieldNames []string) ([][]string, error) {
 	if len(fieldNames) == 0 {
 		err := fmt.Errorf("no field names provided")
 		slog.Error(err.Error())
@@ -129,6 +129,66 @@ func turbostatSummaryRows(turboStatScriptOutput string, fieldNames []string) ([]
 		return nil, err
 	}
 	return fieldValues, nil
+}
+
+// turbostatPackageRows
+// packages -> rows
+func turbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([][][]string, error) {
+	if len(fieldNames) == 0 {
+		err := fmt.Errorf("no field names provided")
+		slog.Error(err.Error())
+		return nil, err
+	}
+	rows, err := parseTurbostatOutput(turboStatScriptOutput)
+	if err != nil {
+		slog.Error("unable to parse turbostat output", slog.String("output", turboStatScriptOutput), slog.Any("fieldNames", fieldNames), slog.String("error", err.Error()))
+		return nil, err
+	}
+	if len(rows) == 0 {
+		err := fmt.Errorf("turbostat output is empty")
+		slog.Error("turbostat output is empty", slog.String("output", turboStatScriptOutput), slog.Any("fieldNames", fieldNames), slog.String("error", err.Error()))
+		return nil, err
+	}
+	var packageRows [][][]string
+	prevPackage := ""
+	for _, row := range rows {
+		// the first row with a new package number is the package row
+		if row["Package"] == "" || row["Package"] == "-" {
+			continue // skip rows that are not package rows
+		}
+		if row["Package"] == prevPackage {
+			continue // skip rows that are not the first row for this package
+		}
+		prevPackage = row["Package"]
+		// this is a package row, extract the values for the specified fields
+		rowValues := make([]string, len(fieldNames)+1) // +1 for the sample time
+		rowValues[0] = row["timestamp"]                // first column is the sample time
+		for i, fieldName := range fieldNames {
+			if value, ok := row[fieldName]; ok {
+				rowValues[i+1] = value // +1 for the sample time
+			} else {
+				slog.Error("field not found in turbostat output", slog.String("fieldName", fieldName))
+				return nil, fmt.Errorf("field %s not found in turbostat output", fieldName)
+			}
+		}
+		packageNum, err := strconv.Atoi(row["Package"])
+		if err != nil {
+			slog.Error("unable to parse package number", slog.String("package", row["Package"]), slog.String("error", err.Error()))
+			return nil, fmt.Errorf("unable to parse package number: %s", row["Package"])
+		}
+		// if we have a new package, start a new package row
+		if len(packageRows) < packageNum+1 {
+			packageRows = append(packageRows, [][]string{rowValues})
+		} else {
+			// append to the associated package row
+			packageRows[packageNum] = append(packageRows[packageNum], rowValues)
+		}
+	}
+	if len(packageRows) == 0 {
+		err := fmt.Errorf("no data found in turbostat output for fields: %s", fieldNames)
+		return nil, err
+	}
+	return packageRows, nil
 }
 
 // maxTotalPackagePowerFromOutput calculates the maximum total package power from the turbostat output.

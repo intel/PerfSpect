@@ -833,7 +833,7 @@ func validateTableValues(tableValues TableValues) {
 	numEntries := len(tableValues.Fields[0].Values)
 	for i, field := range tableValues.Fields {
 		if len(field.Values) != numEntries {
-			panic(fmt.Sprintf("table %s, field %d, %s, number of entries must be the same for all fields", tableValues.Name, i, field.Name))
+			panic(fmt.Sprintf("table %s, field %d, %s, number of entries must be the same for all fields, expected %d, got %d", tableValues.Name, i, field.Name, numEntries, len(field.Values)))
 		}
 	}
 }
@@ -2320,18 +2320,28 @@ func memoryTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field 
 func powerTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
 		{Name: "Time"},
-		{Name: "Package"},
-		{Name: "DRAM"},
 	}
-	tsRowValues, err := turbostatSummaryRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"PkgWatt", "RAMWatt"})
+	packageRows, err := turbostatPackageRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"PkgWatt", "RAMWatt"})
 	if err != nil {
 		slog.Error(err.Error())
 		return []Field{}
 	}
-	for _, tsRow := range tsRowValues {
-		fields[0].Values = append(fields[0].Values, tsRow[0])
-		fields[1].Values = append(fields[1].Values, tsRow[1])
-		fields[2].Values = append(fields[2].Values, tsRow[2])
+	for i := range packageRows {
+		fields = append(fields, Field{Name: fmt.Sprintf("Package %d", i)})
+		fields = append(fields, Field{Name: fmt.Sprintf("DRAM %d", i)})
+	}
+	// for each package
+	numPackages := len(packageRows)
+	for i := range packageRows {
+		// traverse the rows
+		for _, row := range packageRows[i] {
+			if i == 0 {
+				fields[0].Values = append(fields[0].Values, row[0]) // Timestamp
+			}
+			// append the package power and DRAM power to the fields
+			fields[i*numPackages+1].Values = append(fields[i*numPackages+1].Values, row[1]) // Package power
+			fields[i*numPackages+2].Values = append(fields[i*numPackages+2].Values, row[2]) // DRAM power
+		}
 	}
 	return fields
 }
@@ -2341,7 +2351,7 @@ func averageFrequencyTelemetryTableValues(outputs map[string]script.ScriptOutput
 		{Name: "Time"},
 		{Name: "Frequency"},
 	}
-	tsRowValues, err := turbostatSummaryRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"Bzy_MHz"})
+	tsRowValues, err := turbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"Bzy_MHz"})
 	if err != nil {
 		slog.Error(err.Error())
 		return []Field{}

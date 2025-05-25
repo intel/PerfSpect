@@ -13,21 +13,21 @@ const turbostatOutput = `TIME: 15:04:05
 INTERVAL: 2
 Package Core    CPU     Avg_MHz Busy%   Bzy_MHz TSC_MHz IPC     IRQ     SMI     POLL    C1      C1E     C6      POLL%   C1%     C1E%    C6%     CPU%c1  CPU%c6  CoreTmp CoreThr PkgTmp  Pkg%pc2 Pkg%pc6 PkgWatt RAMWatt PKG_%   RAM_%   UncMHz
 -       -       -       363     9.41    3863    1997    2.15    132732  0       77      68      2530    9318    0.00    0.00    0.15    90.29   0.28    80.88   57      0       57      0.00    0.00    431.32  24.17   0.00    0.00    2400
-0       0       0       2244    58.05   3866    2000    2.12    5298    0       0       3       906     1451    0.00    0.00    14.06   27.97   14.07   27.66   45      0       57      0.00    0.00    223.53  7.38    0.00    0.00    2400
+0       0       0       2244    58.05   3866    2000    2.12    5298    0       0       3       906     1451    0.00    0.00    14.06   27.97   14.07   27.66   45      0       57      0.00    0.00    223.53  7.38    0.00    0.00    2350
 0       0       128     0       0.01    3842    2000    0.57    16      0       0       0       4       13      0.00    0.00    0.07    99.92   14.07
 0       1       1       951     24.63   3860    2000    2.06    3721    0       0       0       1107    2067    0.00    0.00    20.19   55.29   20.16   54.97   50      0
 0       1       129     0       0.01    3875    2000    0.47    19      0       0       0       4       18      0.00    0.00    0.08    99.92   20.16
-1       0       64      2       0.05    3789    2000    0.39    433     0       0       0       408     30      0.00    0.00    3.75    96.20   0.99    18.81   46      0       53      0.00    0.00    208.40  16.83   0.00    0.00    2400
+1       0       64      2       0.05    3789    2000    0.39    433     0       0       0       408     30      0.00    0.00    3.75    96.20   0.99    18.81   46      0       53      0.00    0.00    208.40  16.83   0.00    0.00    2300
 1       0       192     3096    80.09   3866    2000    2.15    4205    0       0       0       0       162     0.00    0.00    0.00    19.92   0.99
 1       1       65      80      2.06    3862    2000    3.12    130     0       0       0       2       26      0.00    0.00    0.02    97.92   0.02    97.90   46      0
 1       1       193     1       0.02    3885    2000    0.30    26      0       0       0       0       27      0.00    0.00    0.00    99.99   0.02
 Package Core    CPU     Avg_MHz Busy%   Bzy_MHz TSC_MHz IPC     IRQ     SMI     POLL    C1      C1E     C6      POLL%   C1%     C1E%    C6%     CPU%c1  CPU%c6  CoreTmp CoreThr PkgTmp  Pkg%pc2 Pkg%pc6 PkgWatt RAMWatt PKG_%   RAM_%   UncMHz
 -       -       -       363     9.41    3863    1997    2.15    132732  0       77      68      2530    9318    0.00    0.00    0.15    90.29   0.28    80.88   57      0       22      0.00    0.00    223.32  24.17   0.00    0.00    2400
-0       0       0       2244    58.05   3866    2000    2.12    5298    0       0       3       906     1451    0.00    0.00    14.06   27.97   14.07   27.66   45      0       57      0.00    0.00    223.53  7.38    0.00    0.00    2400
+0       0       0       2244    58.05   3866    2000    2.12    5298    0       0       3       906     1451    0.00    0.00    14.06   27.97   14.07   27.66   45      0       59      0.00    0.00    229.53  7.38    0.00    0.00    2400
 0       0       128     0       0.01    3842    2000    0.57    16      0       0       0       4       13      0.00    0.00    0.07    99.92   14.07
 0       1       1       951     24.63   3860    2000    2.06    3721    0       0       0       1107    2067    0.00    0.00    20.19   55.29   20.16   54.97   50      0
 0       1       129     0       0.01    3875    2000    0.47    19      0       0       0       4       18      0.00    0.00    0.08    99.92   20.16
-1       0       64      2       0.05    3789    2000    0.39    433     0       0       0       408     30      0.00    0.00    3.75    96.20   0.99    18.81   46      0       53      0.00    0.00    208.40  16.83   0.00    0.00    2400
+1       0       64      2       0.05    3789    2000    0.39    433     0       0       0       408     30      0.00    0.00    3.75    96.20   0.99    18.81   46      0       55      0.00    0.00    218.40  16.83   0.00    0.00    2400
 1       0       192     3096    80.09   3866    2000    2.15    4205    0       0       0       0       162     0.00    0.00    0.00    19.92   0.99
 1       1       65      80      2.06    3862    2000    3.12    130     0       0       0       2       26      0.00    0.00    0.02    97.92   0.02    97.90   46      0
 1       1       193     1       0.02    3885    2000    0.30    26      0       0       0       0       27      0.00    0.00    0.00    99.99   0.02
@@ -43,7 +43,7 @@ Package Core    CPU     Avg_MHz Busy%   Bzy_MHz TSC_MHz IPC     IRQ     SMI     
 1       1       193     1       0.02    3885    2000    0.30    26      0       0       0       0       27      0.00    0.00    0.00    99.99   0.02
 `
 
-func TestTurbostatSummaryRows(t *testing.T) {
+func TestTurbostatPlatformRows(t *testing.T) {
 	tests := []struct {
 		name            string
 		turbostatOutput string
@@ -120,7 +120,7 @@ func TestTurbostatSummaryRows(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := turbostatSummaryRows(tt.turbostatOutput, tt.fieldNames)
+			got, err := turbostatPlatformRows(tt.turbostatOutput, tt.fieldNames)
 			if (err != nil) != tt.expectErr {
 				t.Errorf("turbostatSummaryRows() error = %v, expectErr %v", err, tt.expectErr)
 				return
@@ -429,6 +429,148 @@ Package Core    CPU     PkgTmp
 			got := maxPackageTemperatureFromOutput(tt.turbostatOutput)
 			if got != tt.want {
 				t.Errorf("maxPackageTemperatureFromOutput() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+func TestTurbostatPackageRows(t *testing.T) {
+	tests := []struct {
+		name            string
+		turbostatOutput string
+		fieldNames      []string
+		want            [][][]string
+		wantErr         bool
+	}{
+		{
+			name:            "package rows with UncoreMHz, PKGTmp, PkgWatt",
+			turbostatOutput: turbostatOutput,
+			fieldNames:      []string{"UncMHz", "PkgTmp", "PkgWatt"},
+			want: [][][]string{
+				{{"15:04:05", "2350", "57", "223.53"}, {"15:04:07", "2400", "59", "229.53"}, {"15:04:09", "2400", "57", "223.53"}},
+				{{"15:04:05", "2300", "53", "208.40"}, {"15:04:07", "2400", "55", "218.40"}, {"15:04:09", "2400", "53", "208.40"}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Typical output, two packages, one field",
+			turbostatOutput: `
+TIME: 12:00:00
+INTERVAL: 1
+Package Core    CPU     Avg_MHz Busy%
+-       -       -       1000    10
+0       0       0       1000    10
+0       1       1       1100    11
+1       0       2       2000    20
+1       1       3       2100    21
+`,
+			fieldNames: []string{"Avg_MHz"},
+			want: [][][]string{
+				{{"12:00:00", "1000"}},
+				{{"12:00:00", "2000"}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Typical output, two packages, two fields",
+			turbostatOutput: `
+TIME: 12:00:00
+INTERVAL: 1
+Package Core    CPU     Avg_MHz Busy%
+-       -       -       1000    10
+0       0       0       1000    10
+0       1       1       1100    11
+1       0       2       2000    20
+1       1       3       2100    21
+`,
+			fieldNames: []string{"Avg_MHz", "Busy%"},
+			want: [][][]string{
+				{{"12:00:00", "1000", "10"}},
+				{{"12:00:00", "2000", "20"}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Missing field in header",
+			turbostatOutput: `
+TIME: 12:00:00
+INTERVAL: 1
+Package Core    CPU     Avg_MHz Busy%
+-       -       -       1000    10
+0       0       0       1000    10
+1       0       2       2000    20
+`,
+			fieldNames: []string{"NotAField"},
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name: "Empty fieldNames",
+			turbostatOutput: `
+TIME: 12:00:00
+INTERVAL: 1
+Package Core    CPU     Avg_MHz Busy%
+-       -       -       1000    10
+0       0       0       1000    10
+1       0       2       2000    20
+`,
+			fieldNames: []string{},
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name: "No package rows",
+			turbostatOutput: `
+TIME: 12:00:00
+INTERVAL: 1
+Package Core    CPU     Avg_MHz Busy%
+-       -       -       999     99
+-       -       -       888     88
+`,
+			fieldNames: []string{"Avg_MHz"},
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name: "Malformed package number",
+			turbostatOutput: `
+TIME: 12:00:00
+INTERVAL: 1
+Package Core    CPU     Avg_MHz Busy%
+X       0       0       1000    10
+`,
+			fieldNames: []string{"Avg_MHz"},
+			want:       nil,
+			wantErr:    true,
+		},
+		{
+			name:            "Empty output",
+			turbostatOutput: "",
+			fieldNames:      []string{"Avg_MHz"},
+			want:            nil,
+			wantErr:         true,
+		},
+		{
+			name: "Only headers, no data",
+			turbostatOutput: `
+TIME: 12:00:00
+INTERVAL: 1
+Package Core    CPU     Avg_MHz Busy%
+`,
+			fieldNames: []string{"Avg_MHz"},
+			want:       nil,
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := turbostatPackageRows(tt.turbostatOutput, tt.fieldNames)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("turbostatPackageRows() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("turbostatPackageRows() = %v, want %v", got, tt.want)
 			}
 		})
 	}
