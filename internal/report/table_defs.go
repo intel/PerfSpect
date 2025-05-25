@@ -2396,8 +2396,6 @@ func temperatureTelemetryTableValues(outputs map[string]script.ScriptOutput) []F
 			fields[i+2].Values = append(fields[i+2].Values, row[1]) // Package temperature
 		}
 	}
-	fmt.Printf("packageRows: %+v\n", packageRows)
-	fmt.Printf("fields: %+v\n", fields)
 	return fields
 }
 
