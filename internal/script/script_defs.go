@@ -1070,7 +1070,7 @@ avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd
 	},
 	PowerBenchmarkScriptName: {
 		Name:           PowerBenchmarkScriptName,
-		ScriptTemplate: `((turbostat --show PkgTmp,PkgWatt -i 2 2>/dev/null &) ; stress-ng --cpu 0 --bsearch 0 -t 60s >/dev/null 2>&1 ; pkill -9 -f turbostat) | awk '$1=="PkgTmp" {if(f!=1) print $0;f=1} $1!="PkgTmp" {print $0}'`,
+		ScriptTemplate: `((turbostat -i 2 2>/dev/null &) ; stress-ng --cpu 0 --bsearch 0 -t 60s >/dev/null 2>&1 ; pkill -9 -f turbostat)`,
 		Superuser:      true,
 		Lkms:           []string{"msr"},
 		Depends:        []string{"turbostat", "stress-ng"},
@@ -1078,7 +1078,7 @@ avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd
 	},
 	IdlePowerBenchmarkScriptName: {
 		Name:           IdlePowerBenchmarkScriptName,
-		ScriptTemplate: `turbostat --show PkgWatt -i 2 -n 2 2>/dev/null | sed -n '$p'`,
+		ScriptTemplate: `turbostat -i 2 -n 2 2>/dev/null`,
 		Superuser:      true,
 		Lkms:           []string{"msr"},
 		Depends:        []string{"turbostat"},

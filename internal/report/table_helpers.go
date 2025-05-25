@@ -13,7 +13,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"perfspect/internal/script"
 	"perfspect/internal/util"
@@ -1764,69 +1763,6 @@ func cveInfoFromOutput(outputs map[string]script.ScriptOutput) [][]string {
 		cves = append(cves, []string{id, vulns[id]})
 	}
 	return cves
-}
-
-func turbostatSummaryRows(turboStatScriptOutput script.ScriptOutput, fieldNames []string) ([][]string, error) {
-	var fieldValues [][]string
-	// initialize indices with -1
-	fieldIndices := make([]int, len(fieldNames))
-	for i := range fieldIndices {
-		fieldIndices[i] = -1
-	}
-	var startTime time.Time
-	var interval int
-	var sampleTime time.Time
-	sampleCount := 0
-	// parse the turbostat output
-	for i, line := range strings.Split(turboStatScriptOutput.Stdout, "\n") {
-		if i == 0 { // first line is the time stamp, e.g., TIME: 15:04:05
-			var err error
-			startTime, err = time.Parse("15:04:05", strings.TrimPrefix(line, "TIME: "))
-			if err != nil {
-				err := fmt.Errorf("unable to parse power stats start time: %s", line)
-				return nil, err
-			}
-			continue
-		} else if i == 1 { // second line is the collection interval, e.g., INTERVAL: 2
-			var err error
-			interval, err = strconv.Atoi(strings.TrimPrefix(line, "INTERVAL: "))
-			if err != nil {
-				err := fmt.Errorf("unable to parse power stats interval: %s", line)
-				return nil, err
-			}
-			continue
-		} else if i == 2 { // third line is the header, e.g., Package	Die	Node	Core	CPU	Avg_MHz	Busy%	Bzy_MHz	TSC_MHz	IPC
-			// parse the field names from the header line
-			tsFields := strings.Fields(line)
-			// find the index of the fields we are interested in
-			for j, tsFieldName := range tsFields {
-				for k, fieldName := range fieldNames {
-					if tsFieldName == fieldName {
-						fieldIndices[k] = j
-					}
-				}
-			}
-			// check that we found all the fields
-			if slices.Contains(fieldIndices, -1) {
-				err := fmt.Errorf("turbostat output is missing field: %s", fieldNames)
-				return nil, err
-			}
-			continue
-		}
-		// alright...we should be at the data now
-		tsRowValues := strings.Fields(line)
-		if len(tsRowValues) == 0 || tsRowValues[0] != "-" { // summary rows have a "-" in the first colum
-			continue
-		}
-		sampleTime = startTime.Add(time.Duration(sampleCount*interval) * time.Second)
-		sampleCount++
-		rowValues := []string{sampleTime.Format("15:04:05")}
-		for _, fieldIndex := range fieldIndices {
-			rowValues = append(rowValues, tsRowValues[fieldIndex])
-		}
-		fieldValues = append(fieldValues, rowValues)
-	}
-	return fieldValues, nil
 }
 
 func nicIRQMappingsFromOutput(outputs map[string]script.ScriptOutput) [][]string {

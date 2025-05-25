@@ -1990,14 +1990,14 @@ func speedBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
 
 func powerBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return []Field{
-		{Name: "Maximum Power", Values: []string{maxPowerFromOutput(outputs)}},
-		{Name: "Minimum Power", Values: []string{minPowerFromOutput(outputs)}},
+		{Name: "Maximum Power", Values: []string{maxTotalPackagePowerFromOutput(outputs[script.PowerBenchmarkScriptName].Stdout)}},
+		{Name: "Minimum Power", Values: []string{minTotalPackagePowerFromOutput(outputs[script.IdlePowerBenchmarkScriptName].Stdout)}},
 	}
 }
 
 func temperatureBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return []Field{
-		{Name: "Maximum Temperature", Values: []string{maxTemperatureFromOutput(outputs)}},
+		{Name: "Maximum Temperature", Values: []string{maxPackageTemperatureFromOutput(outputs[script.PowerBenchmarkScriptName].Stdout)}},
 	}
 }
 
@@ -2323,7 +2323,7 @@ func powerTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Package"},
 		{Name: "DRAM"},
 	}
-	tsRowValues, err := turbostatSummaryRows(outputs[script.TurbostatTelemetryScriptName], []string{"PkgWatt", "RAMWatt"})
+	tsRowValues, err := turbostatSummaryRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"PkgWatt", "RAMWatt"})
 	if err != nil {
 		slog.Error(err.Error())
 		return []Field{}
@@ -2341,7 +2341,7 @@ func averageFrequencyTelemetryTableValues(outputs map[string]script.ScriptOutput
 		{Name: "Time"},
 		{Name: "Frequency"},
 	}
-	tsRowValues, err := turbostatSummaryRows(outputs[script.TurbostatTelemetryScriptName], []string{"Bzy_MHz"})
+	tsRowValues, err := turbostatSummaryRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"Bzy_MHz"})
 	if err != nil {
 		slog.Error(err.Error())
 		return []Field{}
