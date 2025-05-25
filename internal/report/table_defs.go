@@ -125,6 +125,7 @@ const (
 	NetworkTelemetryTableName               = "Network Telemetry"
 	MemoryTelemetryTableName                = "Memory Telemetry"
 	PowerTelemetryTableName                 = "Power Telemetry"
+	TemperatureTelemetryTableName           = "Temperature Telemetry"
 	GaudiTelemetryTableName                 = "Gaudi Telemetry"
 	// config  table names
 	ConfigurationTableName = "Configuration"
@@ -148,6 +149,7 @@ const (
 	NetworkTelemetryMenuLabel               = "Network"
 	MemoryTelemetryMenuLabel                = "Memory"
 	PowerTelemetryMenuLabel                 = "Power"
+	TemperatureTelemetryMenuLabel           = "Temperature"
 	GaudiTelemetryMenuLabel                 = "Gaudi"
 )
 
@@ -725,6 +727,15 @@ var tableDefinitions = map[string]TableDefinition{
 		},
 		FieldsFunc:            powerTelemetryTableValues,
 		HTMLTableRendererFunc: powerTelemetryTableHTMLRenderer},
+	TemperatureTelemetryTableName: {
+		Name:      TemperatureTelemetryTableName,
+		MenuLabel: TemperatureTelemetryMenuLabel,
+		HasRows:   true,
+		ScriptNames: []string{
+			script.TurbostatTelemetryScriptName,
+		},
+		FieldsFunc:            temperatureTelemetryTableValues,
+		HTMLTableRendererFunc: temperatureTelemetryTableHTMLRenderer},
 	InstructionTelemetryTableName: {
 		Name:      InstructionTelemetryTableName,
 		MenuLabel: InstructionTelemetryMenuLabel,
@@ -2343,6 +2354,50 @@ func powerTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
 			fields[i*numPackages+2].Values = append(fields[i*numPackages+2].Values, row[2]) // DRAM power
 		}
 	}
+	return fields
+}
+
+func temperatureTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
+	fields := []Field{
+		{Name: "Time"},
+		{Name: "Core (Avg.)"},
+	}
+	platformRows, err := turbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"CoreTmp"})
+	if err != nil {
+		slog.Error(err.Error())
+		return []Field{}
+	}
+	packageRows, err := turbostatPackageRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"PkgTmp"})
+	if err != nil {
+		slog.Error(err.Error())
+		return []Field{}
+	}
+	if len(platformRows) == 0 || len(packageRows) == 0 {
+		slog.Warn("no platform or package rows found in turbostat telemetry output")
+		return []Field{}
+	}
+	// add the package rows to the fields
+	for i := range packageRows {
+		fields = append(fields, Field{Name: fmt.Sprintf("Package %d", i)})
+	}
+	// for each platform row
+	for i := range platformRows {
+		// append the timestamp to the fields
+		fields[0].Values = append(fields[0].Values, platformRows[i][0]) // Timestamp
+		// append the core temperature values to the fields
+		fields[1].Values = append(fields[1].Values, platformRows[i][1]) // Core temperature
+	}
+	// for each package
+	//numPackages := len(packageRows)
+	for i := range packageRows {
+		// traverse the rows
+		for _, row := range packageRows[i] {
+			// append the package temperature to the fields
+			fields[i+2].Values = append(fields[i+2].Values, row[1]) // Package temperature
+		}
+	}
+	fmt.Printf("packageRows: %+v\n", packageRows)
+	fmt.Printf("fields: %+v\n", fields)
 	return fields
 }
 
