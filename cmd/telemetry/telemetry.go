@@ -50,8 +50,10 @@ var (
 
 	flagAll bool
 
-	flagCpu         bool
+	flagCPU         bool
 	flagFrequency   bool
+	flagIPC         bool
+	flagC6          bool
 	flagIRQRate     bool
 	flagMemory      bool
 	flagNetwork     bool
@@ -73,8 +75,10 @@ const (
 
 	flagAllName = "all"
 
-	flagCpuName         = "cpu"
+	flagCPUName         = "cpu"
 	flagFrequencyName   = "frequency"
+	flagIPCName         = "ipc"
+	flagC6Name          = "c6"
 	flagIRQRateName     = "irqrate"
 	flagMemoryName      = "memory"
 	flagNetworkName     = "network"
@@ -93,7 +97,9 @@ const (
 var telemetrySummaryTableName = "Telemetry Summary"
 
 var categories = []common.Category{
-	{FlagName: flagCpuName, FlagVar: &flagCpu, DefaultValue: false, Help: "monitor cpu utilization", TableNames: []string{report.CPUUtilizationTelemetryTableName, report.UtilizationCategoriesTelemetryTableName}},
+	{FlagName: flagCPUName, FlagVar: &flagCPU, DefaultValue: false, Help: "monitor cpu utilization", TableNames: []string{report.CPUUtilizationTelemetryTableName, report.UtilizationCategoriesTelemetryTableName}},
+	{FlagName: flagIPCName, FlagVar: &flagIPC, DefaultValue: false, Help: "monitor IPC", TableNames: []string{report.IPCTelemetryTableName}},
+	{FlagName: flagC6Name, FlagVar: &flagC6, DefaultValue: false, Help: "monitor C6 residency", TableNames: []string{report.C6TelemetryTableName}},
 	{FlagName: flagFrequencyName, FlagVar: &flagFrequency, DefaultValue: false, Help: "monitor cpu frequency", TableNames: []string{report.FrequencyTelemetryTableName}},
 	{FlagName: flagPowerName, FlagVar: &flagPower, DefaultValue: false, Help: "monitor power", TableNames: []string{report.PowerTelemetryTableName}},
 	{FlagName: flagTemperatureName, FlagVar: &flagTemperature, DefaultValue: false, Help: "monitor temperature", TableNames: []string{report.TemperatureTelemetryTableName}},
@@ -313,6 +319,8 @@ func getTableValues(allTableValues []report.TableValues, tableName string) repor
 
 func summaryFromTableValues(allTableValues []report.TableValues, _ map[string]script.ScriptOutput) report.TableValues {
 	cpuUtil := getCPUAveragePercentage(getTableValues(allTableValues, report.UtilizationCategoriesTelemetryTableName), "%idle", true)
+	ipc := getCPUAveragePercentage(getTableValues(allTableValues, report.IPCTelemetryTableName), "Core (Avg.)", false)
+	c6 := getCPUAveragePercentage(getTableValues(allTableValues, report.C6TelemetryTableName), "Core (Avg.)", false)
 	avgCoreFreq := getMetricAverage(getTableValues(allTableValues, report.FrequencyTelemetryTableName), []string{"Core (Avg.)"}, "Time")
 	pkgPower := getPkgAveragePower(allTableValues)
 	dramPower := getDramAveragePower(allTableValues)
@@ -331,6 +339,8 @@ func summaryFromTableValues(allTableValues []report.TableValues, _ map[string]sc
 		},
 		Fields: []report.Field{
 			{Name: "CPU Utilization (%)", Values: []string{cpuUtil}},
+			{Name: "IPC", Values: []string{ipc}},
+			{Name: "C6 Core Residency (%)", Values: []string{c6}},
 			{Name: "Core Frequency (MHz)", Values: []string{avgCoreFreq}},
 			{Name: "Package Power (Watts)", Values: []string{pkgPower}},
 			{Name: "DRAM Power (Watts)", Values: []string{dramPower}},
