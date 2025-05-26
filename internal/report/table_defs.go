@@ -2388,7 +2388,6 @@ func temperatureTelemetryTableValues(outputs map[string]script.ScriptOutput) []F
 		fields[1].Values = append(fields[1].Values, platformRows[i][1]) // Core temperature
 	}
 	// for each package
-	//numPackages := len(packageRows)
 	for i := range packageRows {
 		// traverse the rows
 		for _, row := range packageRows[i] {
@@ -2404,14 +2403,38 @@ func frequencyTelemetryTableValues(outputs map[string]script.ScriptOutput) []Fie
 		{Name: "Time"},
 		{Name: "Core (Avg.)"},
 	}
-	tsRowValues, err := turbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"Bzy_MHz"})
+	platformRows, err := turbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"Bzy_MHz"})
 	if err != nil {
 		slog.Error(err.Error())
 		return []Field{}
 	}
-	for _, tsRow := range tsRowValues {
-		fields[0].Values = append(fields[0].Values, tsRow[0])
-		fields[1].Values = append(fields[1].Values, tsRow[1])
+	packageRows, err := turbostatPackageRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"UncMHz"})
+	if err != nil {
+		slog.Error(err.Error())
+		return []Field{}
+	}
+	if len(platformRows) == 0 || len(packageRows) == 0 {
+		slog.Warn("no platform or package rows found in turbostat telemetry output")
+		return []Field{}
+	}
+	// add the package rows to the fields
+	for i := range packageRows {
+		fields = append(fields, Field{Name: fmt.Sprintf("Uncore Package %d", i)})
+	}
+	// for each platform row
+	for i := range platformRows {
+		// append the timestamp to the fields
+		fields[0].Values = append(fields[0].Values, platformRows[i][0]) // Timestamp
+		// append the core frequency values to the fields
+		fields[1].Values = append(fields[1].Values, platformRows[i][1]) // Core frequency
+	}
+	// for each package
+	for i := range packageRows {
+		// traverse the rows
+		for _, row := range packageRows[i] {
+			// append the package frequency to the fields
+			fields[i+2].Values = append(fields[i+2].Values, row[1]) // Package frequency
+		}
 	}
 	return fields
 }

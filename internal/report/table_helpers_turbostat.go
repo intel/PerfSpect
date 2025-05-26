@@ -95,12 +95,11 @@ func turbostatPlatformRows(turboStatScriptOutput string, fieldNames []string) ([
 	}
 	rows, err := parseTurbostatOutput(turboStatScriptOutput)
 	if err != nil {
-		slog.Error("unable to parse turbostat output", slog.String("output", turboStatScriptOutput), slog.Any("fieldNames", fieldNames), slog.String("error", err.Error()))
+		err := fmt.Errorf("unable to parse turbostat output: %w", err)
 		return nil, err
 	}
 	if len(rows) == 0 {
 		err := fmt.Errorf("turbostat output is empty")
-		slog.Error("turbostat output is empty", slog.String("output", turboStatScriptOutput), slog.Any("fieldNames", fieldNames), slog.String("error", err.Error()))
 		return nil, err
 	}
 	// filter the rows to the summary rows only
@@ -118,7 +117,6 @@ func turbostatPlatformRows(turboStatScriptOutput string, fieldNames []string) ([
 			if value, ok := row[fieldName]; ok {
 				rowValues[i+1] = value // +1 for the sample time
 			} else {
-				slog.Error("field not found in turbostat output", slog.String("fieldName", fieldName))
 				return nil, fmt.Errorf("field %s not found in turbostat output", fieldName)
 			}
 		}
@@ -136,17 +134,15 @@ func turbostatPlatformRows(turboStatScriptOutput string, fieldNames []string) ([
 func turbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([][][]string, error) {
 	if len(fieldNames) == 0 {
 		err := fmt.Errorf("no field names provided")
-		slog.Error(err.Error())
 		return nil, err
 	}
 	rows, err := parseTurbostatOutput(turboStatScriptOutput)
 	if err != nil {
-		slog.Error("unable to parse turbostat output", slog.String("output", turboStatScriptOutput), slog.Any("fieldNames", fieldNames), slog.String("error", err.Error()))
+		err := fmt.Errorf("unable to parse turbostat output: %w", err)
 		return nil, err
 	}
 	if len(rows) == 0 {
 		err := fmt.Errorf("turbostat output is empty")
-		slog.Error("turbostat output is empty", slog.String("output", turboStatScriptOutput), slog.Any("fieldNames", fieldNames), slog.String("error", err.Error()))
 		return nil, err
 	}
 	var packageRows [][][]string
@@ -167,13 +163,11 @@ func turbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([]
 			if value, ok := row[fieldName]; ok {
 				rowValues[i+1] = value // +1 for the sample time
 			} else {
-				slog.Error("field not found in turbostat output", slog.String("fieldName", fieldName))
 				return nil, fmt.Errorf("field %s not found in turbostat output", fieldName)
 			}
 		}
 		packageNum, err := strconv.Atoi(row["Package"])
 		if err != nil {
-			slog.Error("unable to parse package number", slog.String("package", row["Package"]), slog.String("error", err.Error()))
 			return nil, fmt.Errorf("unable to parse package number: %s", row["Package"])
 		}
 		// if we have a new package, start a new package row
