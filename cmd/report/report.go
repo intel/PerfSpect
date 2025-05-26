@@ -48,6 +48,7 @@ var Cmd = &cobra.Command{
 var (
 	flagAll bool
 	// categories
+	flagSystemSummary  bool
 	flagHost           bool
 	flagPcie           bool
 	flagBios           bool
@@ -80,7 +81,6 @@ var (
 	flagPmu            bool
 	flagSystemEventLog bool
 	flagKernelLog      bool
-	flagSystemSummary  bool
 
 	flagBenchmark  []string
 	flagStorageDir string
@@ -90,6 +90,7 @@ var (
 const (
 	flagAllName = "all"
 	// categories
+	flagSystemSummaryName  = "system-summary"
 	flagHostName           = "host"
 	flagPcieName           = "pcie"
 	flagBiosName           = "bios"
@@ -122,7 +123,6 @@ const (
 	flagPmuName            = "pmu"
 	flagSystemEventLogName = "sel"
 	flagKernelLogName      = "kernellog"
-	flagSystemSummaryName  = "system-summary"
 
 	flagBenchmarkName  = "benchmark"
 	flagStorageDirName = "storage-dir"
@@ -154,6 +154,7 @@ var benchmarkSummaryTableName = "Benchmark Summary"
 
 // categories maps flag names to tables that will be included in report
 var categories = []common.Category{
+	{FlagName: flagSystemSummaryName, FlagVar: &flagSystemSummary, Help: "System Summary", TableNames: []string{report.SystemSummaryTableName}},
 	{FlagName: flagHostName, FlagVar: &flagHost, Help: "Host", TableNames: []string{report.HostTableName}},
 	{FlagName: flagBiosName, FlagVar: &flagBios, Help: "BIOS", TableNames: []string{report.BIOSTableName}},
 	{FlagName: flagOsName, FlagVar: &flagOs, Help: "Operating System", TableNames: []string{report.OperatingSystemTableName}},
@@ -186,7 +187,6 @@ var categories = []common.Category{
 	{FlagName: flagPmuName, FlagVar: &flagPmu, Help: "Performance Monitoring Unit Status", TableNames: []string{report.PMUTableName}},
 	{FlagName: flagSystemEventLogName, FlagVar: &flagSystemEventLog, Help: "System Event Log", TableNames: []string{report.SystemEventLogTableName}},
 	{FlagName: flagKernelLogName, FlagVar: &flagKernelLog, Help: "Kernel Log", TableNames: []string{report.KernelLogTableName}},
-	{FlagName: flagSystemSummaryName, FlagVar: &flagSystemSummary, Help: "System Summary", TableNames: []string{report.SystemSummaryTableName}},
 }
 
 func init() {
@@ -355,12 +355,13 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		insightsFunc = common.DefaultInsightsFunc
 	}
 	reportingCommand := common.ReportingCommand{
-		Cmd:              cmd,
-		ScriptParams:     map[string]string{"StorageDir": flagStorageDir},
-		TableNames:       tableNames,
-		SummaryFunc:      summaryFunc,
-		SummaryTableName: benchmarkSummaryTableName,
-		InsightsFunc:     insightsFunc,
+		Cmd:                    cmd,
+		ScriptParams:           map[string]string{"StorageDir": flagStorageDir},
+		TableNames:             tableNames,
+		SummaryFunc:            summaryFunc,
+		SummaryTableName:       benchmarkSummaryTableName,
+		SummaryBeforeTableName: report.SpeedBenchmarkTableName,
+		InsightsFunc:           insightsFunc,
 	}
 	return reportingCommand.Run()
 }

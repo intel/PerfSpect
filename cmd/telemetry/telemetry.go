@@ -300,10 +300,11 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			"PID":      strconv.Itoa(flagInstrMixPid),
 			"Filter":   strings.Join(flagInstrMixFilter, " "),
 		},
-		TableNames:       tableNames,
-		SummaryFunc:      summaryFunc,
-		SummaryTableName: telemetrySummaryTableName,
-		InsightsFunc:     insightsFunc,
+		TableNames:             tableNames,
+		SummaryFunc:            summaryFunc,
+		SummaryTableName:       telemetrySummaryTableName,
+		SummaryBeforeTableName: report.CPUUtilizationTelemetryTableName,
+		InsightsFunc:           insightsFunc,
 	}
 	return reportingCommand.Run()
 }
