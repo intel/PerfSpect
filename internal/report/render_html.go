@@ -807,7 +807,7 @@ func memoryBenchmarkTableMultiTargetHtmlRenderer(allTableValues []TableValues, t
 	}
 	chartConfig := chartTemplateStruct{
 		ID:            fmt.Sprintf("latencyBandwidth%d", util.RandUint(10000)),
-		XaxisText:     "Bandwidth (MB/s)",
+		XaxisText:     "Bandwidth (GB/s)",
 		YaxisText:     "Latency (ns)",
 		TitleText:     "",
 		DisplayTitle:  "false",
