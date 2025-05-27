@@ -324,9 +324,7 @@ func summaryFromTableValues(allTableValues []report.TableValues, _ map[string]sc
 	c6 := getCPUAveragePercentage(getTableValues(allTableValues, report.C6TelemetryTableName), "Core (Avg.)", false)
 	avgCoreFreq := getMetricAverage(getTableValues(allTableValues, report.FrequencyTelemetryTableName), []string{"Core (Avg.)"}, "Time")
 	pkgPower := getPkgAveragePower(allTableValues)
-	dramPower := getDramAveragePower(allTableValues)
 	pkgTemperature := getPkgAverageTemperature(allTableValues)
-	coreTemperature := getMetricAverage(getTableValues(allTableValues, report.TemperatureTelemetryTableName), []string{"Core (Avg.)"}, "")
 	driveReads := getMetricAverage(getTableValues(allTableValues, report.DriveTelemetryTableName), []string{"kB_read/s"}, "Device")
 	driveWrites := getMetricAverage(getTableValues(allTableValues, report.DriveTelemetryTableName), []string{"kB_wrtn/s"}, "Device")
 	networkReads := getMetricAverage(getTableValues(allTableValues, report.NetworkTelemetryTableName), []string{"rxkB/s"}, "Time")
@@ -344,9 +342,7 @@ func summaryFromTableValues(allTableValues []report.TableValues, _ map[string]sc
 			{Name: "C6 Core Residency (%)", Values: []string{c6}},
 			{Name: "Core Frequency (MHz)", Values: []string{avgCoreFreq}},
 			{Name: "Package Power (Watts)", Values: []string{pkgPower}},
-			{Name: "DRAM Power (Watts)", Values: []string{dramPower}},
 			{Name: "Package Temperature (C)", Values: []string{pkgTemperature}},
-			{Name: "Core Temperature (C)", Values: []string{coreTemperature}},
 			{Name: "Memory Available (kB)", Values: []string{memAvail}},
 			{Name: "Drive Reads (kB/s)", Values: []string{driveReads}},
 			{Name: "Drive Writes (kB/s)", Values: []string{driveWrites}},
@@ -507,39 +503,6 @@ func getPkgAveragePower(allTableValues []report.TableValues) string {
 	}
 	if sum != 0 {
 		averageFloat := sum / float64(len(pkgPowerFieldIndices)) / float64(len(tableValues.Fields[pkgPowerFieldIndices[0]].Values))
-		return fmt.Sprintf("%0.2f", averageFloat)
-	}
-	return ""
-}
-
-func getDramAveragePower(allTableValues []report.TableValues) string {
-	tableValues := getTableValues(allTableValues, report.PowerTelemetryTableName)
-	// number of DRAMs can vary, so we need to find the average power across all DRAMs
-	if len(tableValues.Fields) == 0 {
-		return ""
-	}
-	dramPowerFieldIndices := make([]int, 0)
-	for i, field := range tableValues.Fields {
-		if strings.HasPrefix(field.Name, "DRAM") {
-			dramPowerFieldIndices = append(dramPowerFieldIndices, i)
-		}
-	}
-	if len(dramPowerFieldIndices) == 0 {
-		return ""
-	}
-	sum := 0.0
-	for _, fieldIndex := range dramPowerFieldIndices {
-		for _, value := range tableValues.Fields[fieldIndex].Values {
-			valueFloat, err := strconv.ParseFloat(value, 64)
-			if err != nil {
-				slog.Warn("failed to parse float value", slog.String("value", value), slog.String("error", err.Error()))
-				return ""
-			}
-			sum += valueFloat
-		}
-	}
-	if sum != 0 {
-		averageFloat := sum / float64(len(dramPowerFieldIndices)) / float64(len(tableValues.Fields[dramPowerFieldIndices[0]].Values))
 		return fmt.Sprintf("%0.2f", averageFloat)
 	}
 	return ""
