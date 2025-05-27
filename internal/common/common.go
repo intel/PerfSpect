@@ -85,14 +85,15 @@ type InsightsFunc SummaryFunc
 type AdhocFunc func(AppContext, map[string]script.ScriptOutput, target.Target, progress.MultiSpinnerUpdateFunc) error
 
 type ReportingCommand struct {
-	Cmd              *cobra.Command
-	ReportNamePost   string
-	TableNames       []string
-	ScriptParams     map[string]string
-	SummaryFunc      SummaryFunc
-	SummaryTableName string
-	InsightsFunc     InsightsFunc
-	AdhocFunc        AdhocFunc
+	Cmd                    *cobra.Command
+	ReportNamePost         string
+	TableNames             []string
+	ScriptParams           map[string]string
+	SummaryFunc            SummaryFunc
+	SummaryTableName       string
+	SummaryBeforeTableName string // the name of the table that the summary table should be placed before in the report
+	InsightsFunc           InsightsFunc
+	AdhocFunc              AdhocFunc
 }
 
 // Run is the common flow/logic for all reporting commands, i.e., 'report', 'telemetry', 'flame', 'lock'
@@ -354,7 +355,22 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 		// special case - the summary table is built from the post-processed data, i.e., table values
 		if rc.SummaryFunc != nil {
 			summaryTableValues := rc.SummaryFunc(allTableValues, targetScriptOutputs.ScriptOutputs)
-			allTableValues = append(allTableValues, summaryTableValues)
+			// insert the summary table before the table specified by SummaryBeforeTableName, otherwise append it at the end
+			summaryBeforeTableFound := false
+			if rc.SummaryBeforeTableName != "" {
+				for i, tableValues := range allTableValues {
+					if tableValues.TableDefinition.Name == rc.SummaryBeforeTableName {
+						summaryBeforeTableFound = true
+						// insert the summary table before this table
+						allTableValues = append(allTableValues[:i], append([]report.TableValues{summaryTableValues}, allTableValues[i:]...)...)
+						break
+					}
+				}
+			}
+			if !summaryBeforeTableFound {
+				// append the summary table at the end
+				allTableValues = append(allTableValues, summaryTableValues)
+			}
 		}
 		// special case - add tableValues for Insights
 		if rc.InsightsFunc != nil {

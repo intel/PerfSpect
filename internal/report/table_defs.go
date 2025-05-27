@@ -118,13 +118,16 @@ const (
 	// telemetry table names
 	CPUUtilizationTelemetryTableName        = "CPU Utilization Telemetry"
 	UtilizationCategoriesTelemetryTableName = "Utilization Categories Telemetry"
-	AverageFrequencyTelemetryTableName      = "Average Frequency Telemetry"
+	IPCTelemetryTableName                   = "IPC Telemetry"
+	C6TelemetryTableName                    = "C6 Telemetry"
+	FrequencyTelemetryTableName             = "Frequency Telemetry"
 	IRQRateTelemetryTableName               = "IRQ Rate Telemetry"
 	InstructionTelemetryTableName           = "Instruction Telemetry"
 	DriveTelemetryTableName                 = "Drive Telemetry"
 	NetworkTelemetryTableName               = "Network Telemetry"
 	MemoryTelemetryTableName                = "Memory Telemetry"
 	PowerTelemetryTableName                 = "Power Telemetry"
+	TemperatureTelemetryTableName           = "Temperature Telemetry"
 	GaudiTelemetryTableName                 = "Gaudi Telemetry"
 	// config  table names
 	ConfigurationTableName = "Configuration"
@@ -141,13 +144,16 @@ const (
 	// telemetry table menu labels
 	CPUUtilizationTelemetryMenuLabel        = "CPU Utilization"
 	UtilizationCategoriesTelemetryMenuLabel = "Utilization Categories"
-	AverageFrequencyTelemetryMenuLabel      = "Average Frequency"
+	IPCTelemetryMenuLabel                   = "IPC"
+	C6TelemetryMenuLabel                    = "C6"
+	FrequencyTelemetryMenuLabel             = "Frequency"
 	IRQRateTelemetryMenuLabel               = "IRQ Rate"
 	InstructionTelemetryMenuLabel           = "Instruction"
 	DriveTelemetryMenuLabel                 = "Drive"
 	NetworkTelemetryMenuLabel               = "Network"
 	MemoryTelemetryMenuLabel                = "Memory"
 	PowerTelemetryMenuLabel                 = "Power"
+	TemperatureTelemetryMenuLabel           = "Temperature"
 	GaudiTelemetryMenuLabel                 = "Gaudi"
 )
 
@@ -671,14 +677,32 @@ var tableDefinitions = map[string]TableDefinition{
 		},
 		FieldsFunc:            utilizationCategoriesTelemetryTableValues,
 		HTMLTableRendererFunc: utilizationCategoriesTelemetryTableHTMLRenderer},
-	AverageFrequencyTelemetryTableName: {
-		Name:      AverageFrequencyTelemetryTableName,
-		MenuLabel: AverageFrequencyTelemetryMenuLabel,
+	IPCTelemetryTableName: {
+		Name:      IPCTelemetryTableName,
+		MenuLabel: IPCTelemetryMenuLabel,
 		HasRows:   true,
 		ScriptNames: []string{
 			script.TurbostatTelemetryScriptName,
 		},
-		FieldsFunc:            averageFrequencyTelemetryTableValues,
+		FieldsFunc:            ipcTelemetryTableValues,
+		HTMLTableRendererFunc: ipcTelemetryTableHTMLRenderer},
+	C6TelemetryTableName: {
+		Name:      C6TelemetryTableName,
+		MenuLabel: C6TelemetryMenuLabel,
+		HasRows:   true,
+		ScriptNames: []string{
+			script.TurbostatTelemetryScriptName,
+		},
+		FieldsFunc:            c6TelemetryTableValues,
+		HTMLTableRendererFunc: c6TelemetryTableHTMLRenderer},
+	FrequencyTelemetryTableName: {
+		Name:      FrequencyTelemetryTableName,
+		MenuLabel: FrequencyTelemetryMenuLabel,
+		HasRows:   true,
+		ScriptNames: []string{
+			script.TurbostatTelemetryScriptName,
+		},
+		FieldsFunc:            frequencyTelemetryTableValues,
 		HTMLTableRendererFunc: averageFrequencyTelemetryTableHTMLRenderer},
 	IRQRateTelemetryTableName: {
 		Name:      IRQRateTelemetryTableName,
@@ -725,6 +749,15 @@ var tableDefinitions = map[string]TableDefinition{
 		},
 		FieldsFunc:            powerTelemetryTableValues,
 		HTMLTableRendererFunc: powerTelemetryTableHTMLRenderer},
+	TemperatureTelemetryTableName: {
+		Name:      TemperatureTelemetryTableName,
+		MenuLabel: TemperatureTelemetryMenuLabel,
+		HasRows:   true,
+		ScriptNames: []string{
+			script.TurbostatTelemetryScriptName,
+		},
+		FieldsFunc:            temperatureTelemetryTableValues,
+		HTMLTableRendererFunc: temperatureTelemetryTableHTMLRenderer},
 	InstructionTelemetryTableName: {
 		Name:      InstructionTelemetryTableName,
 		MenuLabel: InstructionTelemetryMenuLabel,
@@ -833,7 +866,7 @@ func validateTableValues(tableValues TableValues) {
 	numEntries := len(tableValues.Fields[0].Values)
 	for i, field := range tableValues.Fields {
 		if len(field.Values) != numEntries {
-			panic(fmt.Sprintf("table %s, field %d, %s, number of entries must be the same for all fields", tableValues.Name, i, field.Name))
+			panic(fmt.Sprintf("table %s, field %d, %s, number of entries must be the same for all fields, expected %d, got %d", tableValues.Name, i, field.Name, numEntries, len(field.Values)))
 		}
 	}
 }
@@ -1990,14 +2023,14 @@ func speedBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
 
 func powerBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return []Field{
-		{Name: "Maximum Power", Values: []string{maxPowerFromOutput(outputs)}},
-		{Name: "Minimum Power", Values: []string{minPowerFromOutput(outputs)}},
+		{Name: "Maximum Power", Values: []string{maxTotalPackagePowerFromOutput(outputs[script.PowerBenchmarkScriptName].Stdout)}},
+		{Name: "Minimum Power", Values: []string{minTotalPackagePowerFromOutput(outputs[script.IdlePowerBenchmarkScriptName].Stdout)}},
 	}
 }
 
 func temperatureBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return []Field{
-		{Name: "Maximum Temperature", Values: []string{maxTemperatureFromOutput(outputs)}},
+		{Name: "Maximum Temperature", Values: []string{maxPackageTemperatureFromOutput(outputs[script.PowerBenchmarkScriptName].Stdout)}},
 	}
 }
 
@@ -2320,35 +2353,161 @@ func memoryTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field 
 func powerTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
 		{Name: "Time"},
-		{Name: "Package"},
-		{Name: "DRAM"},
 	}
-	tsRowValues, err := turbostatSummaryRows(outputs[script.TurbostatTelemetryScriptName], []string{"PkgWatt", "RAMWatt"})
+	packageRows, err := turbostatPackageRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"PkgWatt", "RAMWatt"})
 	if err != nil {
 		slog.Error(err.Error())
 		return []Field{}
 	}
-	for _, tsRow := range tsRowValues {
-		fields[0].Values = append(fields[0].Values, tsRow[0])
-		fields[1].Values = append(fields[1].Values, tsRow[1])
-		fields[2].Values = append(fields[2].Values, tsRow[2])
+	for i := range packageRows {
+		fields = append(fields, Field{Name: fmt.Sprintf("Package %d", i)})
+		fields = append(fields, Field{Name: fmt.Sprintf("DRAM %d", i)})
+	}
+	// for each package
+	numPackages := len(packageRows)
+	for i := range packageRows {
+		// traverse the rows
+		for _, row := range packageRows[i] {
+			if i == 0 {
+				fields[0].Values = append(fields[0].Values, row[0]) // Timestamp
+			}
+			// append the package power and DRAM power to the fields
+			fields[i*numPackages+1].Values = append(fields[i*numPackages+1].Values, row[1]) // Package power
+			fields[i*numPackages+2].Values = append(fields[i*numPackages+2].Values, row[2]) // DRAM power
+		}
 	}
 	return fields
 }
 
-func averageFrequencyTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
+func temperatureTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
 		{Name: "Time"},
-		{Name: "Frequency"},
+		{Name: "Core (Avg.)"},
 	}
-	tsRowValues, err := turbostatSummaryRows(outputs[script.TurbostatTelemetryScriptName], []string{"Bzy_MHz"})
+	platformRows, err := turbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"CoreTmp"})
 	if err != nil {
 		slog.Error(err.Error())
 		return []Field{}
 	}
-	for _, tsRow := range tsRowValues {
-		fields[0].Values = append(fields[0].Values, tsRow[0])
-		fields[1].Values = append(fields[1].Values, tsRow[1])
+	packageRows, err := turbostatPackageRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"PkgTmp"})
+	if err != nil {
+		slog.Error(err.Error())
+		return []Field{}
+	}
+	if len(platformRows) == 0 || len(packageRows) == 0 {
+		slog.Warn("no platform or package rows found in turbostat telemetry output")
+		return []Field{}
+	}
+	// add the package rows to the fields
+	for i := range packageRows {
+		fields = append(fields, Field{Name: fmt.Sprintf("Package %d", i)})
+	}
+	// for each platform row
+	for i := range platformRows {
+		// append the timestamp to the fields
+		fields[0].Values = append(fields[0].Values, platformRows[i][0]) // Timestamp
+		// append the core temperature values to the fields
+		fields[1].Values = append(fields[1].Values, platformRows[i][1]) // Core temperature
+	}
+	// for each package
+	for i := range packageRows {
+		// traverse the rows
+		for _, row := range packageRows[i] {
+			// append the package temperature to the fields
+			fields[i+2].Values = append(fields[i+2].Values, row[1]) // Package temperature
+		}
+	}
+	return fields
+}
+
+func frequencyTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
+	fields := []Field{
+		{Name: "Time"},
+		{Name: "Core (Avg.)"},
+	}
+	platformRows, err := turbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"Bzy_MHz"})
+	if err != nil {
+		slog.Error(err.Error())
+		return []Field{}
+	}
+	packageRows, err := turbostatPackageRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"UncMHz"})
+	if err != nil {
+		slog.Error(err.Error())
+		return []Field{}
+	}
+	if len(platformRows) == 0 || len(packageRows) == 0 {
+		slog.Warn("no platform or package rows found in turbostat telemetry output")
+		return []Field{}
+	}
+	// add the package rows to the fields
+	for i := range packageRows {
+		fields = append(fields, Field{Name: fmt.Sprintf("Uncore Package %d", i)})
+	}
+	// for each platform row
+	for i := range platformRows {
+		// append the timestamp to the fields
+		fields[0].Values = append(fields[0].Values, platformRows[i][0]) // Timestamp
+		// append the core frequency values to the fields
+		fields[1].Values = append(fields[1].Values, platformRows[i][1]) // Core frequency
+	}
+	// for each package
+	for i := range packageRows {
+		// traverse the rows
+		for _, row := range packageRows[i] {
+			// append the package frequency to the fields
+			fields[i+2].Values = append(fields[i+2].Values, row[1]) // Package frequency
+		}
+	}
+	return fields
+}
+
+func ipcTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
+	fields := []Field{
+		{Name: "Time"},
+		{Name: "Core (Avg.)"},
+	}
+	platformRows, err := turbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"IPC"})
+	if err != nil {
+		slog.Error(err.Error())
+		return []Field{}
+	}
+	if len(platformRows) == 0 {
+		slog.Warn("no platform rows found in turbostat telemetry output")
+		return []Field{}
+	}
+	// for each platform row
+	for i := range platformRows {
+		// append the timestamp to the fields
+		fields[0].Values = append(fields[0].Values, platformRows[i][0]) // Timestamp
+		// append the core IPC values to the fields
+		fields[1].Values = append(fields[1].Values, platformRows[i][1]) // Core IPC
+	}
+	return fields
+}
+
+func c6TelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
+	fields := []Field{
+		{Name: "Time"},
+		{Name: "Package (Avg.)"},
+		{Name: "Core (Avg.)"},
+	}
+	platformRows, err := turbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"C6%", "CPU%c6"})
+	if err != nil {
+		slog.Error(err.Error())
+		return []Field{}
+	}
+	if len(platformRows) == 0 {
+		slog.Warn("no platform rows found in turbostat telemetry output")
+		return []Field{}
+	}
+	// for each platform row
+	for i := range platformRows {
+		// append the timestamp to the fields
+		fields[0].Values = append(fields[0].Values, platformRows[i][0]) // Timestamp
+		// append the C6 residency values to the fields
+		fields[1].Values = append(fields[1].Values, platformRows[i][1]) // C6%
+		// append the CPU C6 residency values to the fields
+		fields[2].Values = append(fields[2].Values, platformRows[i][2]) // CPU%c6
 	}
 	return fields
 }

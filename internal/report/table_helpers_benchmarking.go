@@ -9,7 +9,6 @@ import (
 	"perfspect/internal/script"
 	"perfspect/internal/util"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 )
@@ -57,114 +56,6 @@ func storagePerfFromOutput(outputs map[string]script.ScriptOutput) (readBW, writ
 		}
 	}
 	return
-}
-
-// parseTurbostatOutput parses the output of turbostat and returns the turbo frequencies, power and temperature
-// turbostat output format:
-// PkgTmp  PkgWatt
-// 55      537.14
-// 51      266.41
-// 55      267.45
-// 54      445.73
-// 51      252.80
-// 54      252.17
-// 55      569.81
-// 52      248.99
-// 55      249.12
-// 57      498.30
-// 53      249.78
-// 57      249.63
-// It is possible that
-// -- the output is empty
-// -- the output includes only one column (PkgTmp or PkgWatt)
-// -- the output includes both columns
-// We capture the max of the power and temperature values
-func parseTurbostatOutput(output string) (turboPower, turboTemperature string) {
-	// confirm output is in expected format
-	var fieldNames []string
-	var temps []float64
-	var watts []float64
-	lines := strings.Split(output, "\n")
-	for i, line := range lines {
-		if i == 0 {
-			fieldNames = strings.Fields(line)
-			if len(fieldNames) < 1 {
-				slog.Warn("unexpected turbostat output format", slog.String("line", line))
-				return
-			}
-			continue
-		}
-		if line == "" {
-			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) < len(fieldNames) {
-			slog.Warn("unexpected turbostat output format", slog.String("line", line))
-			return
-		}
-		if len(fields) == 2 {
-			tmp, err := strconv.ParseFloat(fields[0], 64)
-			if err != nil {
-				slog.Warn("unexpected turbostat output format", slog.String("line", line))
-				return
-			}
-			temps = append(temps, tmp)
-			watt, err := strconv.ParseFloat(fields[1], 64)
-			if err != nil {
-				slog.Warn("unexpected turbostat output format", slog.String("line", line))
-				return
-			}
-			watts = append(watts, watt)
-		}
-		if len(fields) == 1 {
-			if strings.Contains(fieldNames[0], "PkgTmp") {
-				tmp, err := strconv.ParseFloat(fields[0], 64)
-				if err != nil {
-					slog.Warn("unexpected turbostat output format", slog.String("line", line))
-					return
-				}
-				temps = append(temps, tmp)
-			} else {
-				watt, err := strconv.ParseFloat(fields[0], 64)
-				if err != nil {
-					slog.Warn("unexpected turbostat output format", slog.String("line", line))
-					return
-				}
-				watts = append(watts, watt)
-			}
-		}
-	}
-	if len(temps) > 1 {
-		maxTemp := slices.Max(temps[1:]) // max temperature, skip first entry as it can be misleading
-		if maxTemp > 0 {
-			turboTemperature = fmt.Sprintf("%.0f C", maxTemp)
-		}
-	}
-	if len(watts) > 1 {
-		maxWatt := slices.Max(watts[1:]) // max power, skip first entry as it can be misleading
-		if maxWatt > 0 {
-			turboPower = fmt.Sprintf("%.2f Watts", maxWatt)
-		}
-	}
-	return
-}
-
-func maxPowerFromOutput(outputs map[string]script.ScriptOutput) string {
-	power, _ := parseTurbostatOutput(outputs[script.PowerBenchmarkScriptName].Stdout)
-	return power
-}
-
-func minPowerFromOutput(outputs map[string]script.ScriptOutput) string {
-	watts := strings.TrimSpace(outputs[script.IdlePowerBenchmarkScriptName].Stdout)
-	if watts == "" || watts == "0.00" {
-		return ""
-	}
-	return watts + " Watts"
-}
-
-func maxTemperatureFromOutput(outputs map[string]script.ScriptOutput) string {
-	_, temperature := parseTurbostatOutput(outputs[script.PowerBenchmarkScriptName].Stdout)
-	return temperature
 }
 
 // avxTurboFrequenciesFromOutput parses the output of avx-turbo and returns the turbo frequencies as a map of instruction type to frequencies
