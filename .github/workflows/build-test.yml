@@ -39,22 +39,6 @@ jobs:
         with:
           name: oss_source
           path: dist/oss_source.tgz
-      - name: build experimental
-        run: |
-          mkdir perfspect_experimental
-          echo -n "9.9.9-experimental" > version.txt
-          make
-          cp LICENSE perfspect_experimental/
-          cp THIRD_PARTY_PROGRAMS perfspect_experimental/
-          cp NOTICE perfspect_experimental/
-          cp targets.yaml perfspect_experimental/
-          cp perfspect perfspect_experimental/
-          tar -czf perfspect_experimental.tgz perfspect_experimental
-      - name: upload experimental package
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
-        with:
-          name: perfspect_experimental.tgz
-          path: ./perfspect_experimental.tgz
   test:
     needs: [build]
     runs-on: ubuntu-latest
@@ -79,63 +63,3 @@ jobs:
         with:
           name: ${{ matrix.runner }} report
           path: perfspect/output/
-  publish_experimental:
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
-    needs: [build,test]
-    runs-on: ubuntu-latest
-    steps:
-      - name: download experimental artifact
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
-        with:
-          name: perfspect_experimental.tgz
-      - name: publish experimental release
-        uses: actions/github-script@v7
-        with:
-          result-encoding: string
-          script: |
-            const fs = require('fs').promises;
-            const commonOptions = {
-              owner: "intel",
-              repo: "PerfSpect",
-            };
-            let previousRelease = undefined;
-            try {
-              previousRelease = await github.rest.repos.getReleaseByTag({
-                ...commonOptions,
-                tag: "experimental",
-              });
-            } catch (e) {
-              console.log("No previous experimental release");
-              // ignore, there was no previous experimental release
-            }
-            if (previousRelease !== undefined) {
-              // delete previous release and experimental tag
-              await github.rest.repos.deleteRelease({
-                ...commonOptions,
-                release_id: previousRelease.data.id,
-              });
-              await github.rest.git.deleteRef({...commonOptions, ref: "tags/experimental"});
-            }
-            // create draft release
-            const newReleaseId = (await github.rest.repos.createRelease({
-              ...commonOptions,
-              tag_name: "experimental",
-              target_commitish: "${{ github.sha }}",
-              name: "Experimental builds",
-              body: "PerfSpect experimental binary published automatically from the latest sources in `main` upon a successful build.",
-              prerelease: true,
-              draft: true,
-            })).data.id;
-            // upload experimental binary to draft release
-            await github.rest.repos.uploadReleaseAsset({
-              ...commonOptions,
-              release_id: newReleaseId,
-              name: "perfspect_experimental.tgz",
-              data: await fs.readFile("perfspect_experimental.tgz"),
-            });
-            // publish release
-            await github.rest.repos.updateRelease({
-              ...commonOptions,
-              release_id: newReleaseId,
-              draft: false,
-            });
