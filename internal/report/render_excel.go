@@ -92,7 +92,7 @@ func renderXlsxTableMultiTarget(targetTableValues []TableValues, targetNames []s
 			col++
 			for targetIdx := range targetNames {
 				var fieldValue string
-				if len(targetTableValues[targetIdx].Fields) > 0 && len(targetTableValues[targetIdx].Fields[fieldIdx].Values) > 0 {
+				if fieldIdx < len(targetTableValues[targetIdx].Fields) && len(targetTableValues[targetIdx].Fields[fieldIdx].Values) > 0 {
 					fieldValue = targetTableValues[targetIdx].Fields[fieldIdx].Values[0]
 				}
 				_ = f.SetCellValue(sheetName, cellName(col, *row), fieldValue)
