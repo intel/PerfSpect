@@ -414,19 +414,21 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 		// keep all the targets table values for combined reports
 		allTargetsTableValues = append(allTargetsTableValues, allTableValues)
 	}
-	if len(allTargetsTableValues) > 1 {
+	if len(allTargetsTableValues) > 1 && len(orderedTargetScriptOutputs) > 1 {
 		// list of target names for the combined report
 		// - only those that we received output from
 		targetNames := make([]string, 0)
 		for _, targetScriptOutputs := range orderedTargetScriptOutputs {
 			targetNames = append(targetNames, targetScriptOutputs.TargetName)
 		}
+		// merge table names from all targets maintaining the order of the tables
+		mergedTableNames := util.MergeOrderedUnique(extractTableNamesFromValues(allTargetsTableValues))
 		multiTargetFormats := []string{report.FormatHtml, report.FormatXlsx}
 		for _, format := range multiTargetFormats {
 			if !slices.Contains(formats, format) {
 				continue
 			}
-			reportBytes, err := report.CreateMultiTarget(format, allTargetsTableValues, targetNames, rc.TableNames)
+			reportBytes, err := report.CreateMultiTarget(format, allTargetsTableValues, targetNames, mergedTableNames)
 			if err != nil {
 				err = fmt.Errorf("failed to create multi-target %s report: %w", format, err)
 				return nil, err
@@ -441,6 +443,20 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 		}
 	}
 	return reportFilePaths, nil
+}
+
+// extractTableNamesFromValues extracts the table names from the processed table values for each target.
+// It returns a slice of slices, where each inner slice contains the table names for a target.
+func extractTableNamesFromValues(allTargetsTableValues [][]report.TableValues) [][]string {
+	targetTableNames := make([][]string, 0, len(allTargetsTableValues))
+	for _, tableValues := range allTargetsTableValues {
+		names := make([]string, 0, len(tableValues))
+		for _, tv := range tableValues {
+			names = append(names, tv.TableDefinition.Name)
+		}
+		targetTableNames = append(targetTableNames, names)
+	}
+	return targetTableNames
 }
 
 // outputsFromInput reads the raw file(s) and returns the data in the order of the raw files

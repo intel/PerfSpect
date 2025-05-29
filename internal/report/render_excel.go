@@ -253,12 +253,12 @@ func createXlsxReportMultiTarget(allTargetsTableValues [][]TableValues, targetNa
 		}
 		// render the table, if system summary table put it in a separate sheet
 		if tableName == SystemSummaryTableName {
-			row = 1
+			summaryRow := 1
 			sheetName := XlsxBriefSheetName
 			_, _ = f.NewSheet(sheetName)
 			_ = f.SetColWidth(sheetName, "A", "A", 15)
 			_ = f.SetColWidth(sheetName, "B", "L", 25)
-			renderXlsxTableMultiTarget(tableValues, tableTargets, f, sheetName, &row)
+			renderXlsxTableMultiTarget(tableValues, tableTargets, f, sheetName, &summaryRow)
 		} else {
 			renderXlsxTableMultiTarget(tableValues, tableTargets, f, sheetName, &row)
 		}
