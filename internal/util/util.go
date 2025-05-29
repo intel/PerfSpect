@@ -280,10 +280,13 @@ func MergeOrderedUnique[T comparable](allSlices [][]T) []T {
 		for idx, item := range slice {
 			if !slices.Contains(merged, item) {
 				inserted := false
+				// If the current item has a preceding element in the slice, attempt to insert it after the preceding element in the merged slice.
 				if idx > 0 {
 					prev := slice[idx-1]
+					// Find the position of the preceding element (`prev`) in the merged slice.
 					for j := len(merged) - 1; j >= 0; j-- {
 						if merged[j] == prev {
+							// Insert the current item (`item`) immediately after `prev` in the merged slice.
 							merged = append(merged[:j+1], append([]T{item}, merged[j+1:]...)...)
 							inserted = true
 							break
