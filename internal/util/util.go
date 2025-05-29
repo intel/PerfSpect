@@ -267,6 +267,38 @@ func UniqueAppend[T comparable](slice []T, item T) []T {
 	return append(slice, item)
 }
 
+// MergeOrderedUnique merges a slice of slices of type T, maintaining order and inserting new items in the order found in subsequent slices.
+// T must be comparable.
+func MergeOrderedUnique[T comparable](allSlices [][]T) []T {
+	var merged []T
+	if len(allSlices) == 0 {
+		return merged
+	}
+	merged = append(merged, allSlices[0]...)
+	for i := 1; i < len(allSlices); i++ {
+		slice := allSlices[i]
+		for idx, item := range slice {
+			if !slices.Contains(merged, item) {
+				inserted := false
+				if idx > 0 {
+					prev := slice[idx-1]
+					for j := len(merged) - 1; j >= 0; j-- {
+						if merged[j] == prev {
+							merged = append(merged[:j+1], append([]T{item}, merged[j+1:]...)...)
+							inserted = true
+							break
+						}
+					}
+				}
+				if !inserted {
+					merged = append(merged, item)
+				}
+			}
+		}
+	}
+	return merged
+}
+
 // CompareVersions compares two version strings
 // version format: major.minor.patch<-alpha|beta|rc><.build>
 // examples: 1.2.3, 1.2.3-alpha.4

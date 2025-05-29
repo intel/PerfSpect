@@ -403,3 +403,104 @@ func TestIsUint64BitSet(t *testing.T) {
 		})
 	}
 }
+func TestMergeOrderedUnique(t *testing.T) {
+	type testCase[T comparable] struct {
+		name     string
+		input    [][]T
+		expected []T
+	}
+
+	stringTests := []testCase[string]{
+		{
+			name:     "empty input",
+			input:    [][]string{},
+			expected: []string{},
+		},
+		{
+			name:     "single slice",
+			input:    [][]string{{"a", "b", "c"}},
+			expected: []string{"a", "b", "c"},
+		},
+		{
+			name:     "two slices, no overlap",
+			input:    [][]string{{"a", "b"}, {"c", "d"}},
+			expected: []string{"a", "b", "c", "d"},
+		},
+		{
+			name:     "two slices, some overlap",
+			input:    [][]string{{"a", "b"}, {"b", "c"}},
+			expected: []string{"a", "b", "c"},
+		},
+		{
+			name:     "multiple slices, complex order",
+			input:    [][]string{{"a", "b"}, {"b", "c", "d"}, {"d", "e", "f"}, {"a", "f", "g"}},
+			expected: []string{"a", "b", "c", "d", "e", "f", "g"},
+		},
+		{
+			name:     "insertion after previous",
+			input:    [][]string{{"a", "b"}, {"a", "c", "b"}},
+			expected: []string{"a", "c", "b"},
+		},
+		{
+			name:     "all duplicates",
+			input:    [][]string{{"a", "b"}, {"a", "b"}, {"a", "b"}},
+			expected: []string{"a", "b"},
+		},
+		{
+			name:     "empty inner slices",
+			input:    [][]string{{}, {}, {}},
+			expected: []string{},
+		},
+		{
+			name:     "first slice empty, others non-empty",
+			input:    [][]string{{}, {"a", "b"}, {"b", "c"}},
+			expected: []string{"a", "b", "c"},
+		},
+		{
+			name:     "second slice empty",
+			input:    [][]string{{"a", "b"}, {}, {"c"}},
+			expected: []string{"a", "b", "c"},
+		},
+	}
+
+	intTests := []testCase[int]{
+		{
+			name:     "integers, no overlap",
+			input:    [][]int{{1, 2}, {3, 4}},
+			expected: []int{1, 2, 3, 4},
+		},
+		{
+			name:     "integers, with overlap",
+			input:    [][]int{{1, 2}, {2, 3, 4}, {4, 5}},
+			expected: []int{1, 2, 3, 4, 5},
+		},
+		{
+			name:     "integers, all duplicates",
+			input:    [][]int{{1, 2}, {1, 2}, {1, 2}},
+			expected: []int{1, 2},
+		},
+		{
+			name:     "integers, insertion after previous",
+			input:    [][]int{{1, 2}, {1, 3, 2}},
+			expected: []int{1, 3, 2},
+		},
+	}
+
+	for _, tc := range stringTests {
+		t.Run("string/"+tc.name, func(t *testing.T) {
+			got := MergeOrderedUnique(tc.input)
+			if !slices.Equal(got, tc.expected) {
+				t.Errorf("MergeOrderedUnique(%v) = %v, want %v", tc.input, got, tc.expected)
+			}
+		})
+	}
+
+	for _, tc := range intTests {
+		t.Run("int/"+tc.name, func(t *testing.T) {
+			got := MergeOrderedUnique(tc.input)
+			if !slices.Equal(got, tc.expected) {
+				t.Errorf("MergeOrderedUnique(%v) = %v, want %v", tc.input, got, tc.expected)
+			}
+		})
+	}
+}
