@@ -17,14 +17,16 @@ import (
 )
 
 func printMetrics(metricFrames []MetricFrame, frameCount int, targetName string, collectionStartTime time.Time, outputDir string) (printedFiles []string) {
-	fileName, err := printMetricsTxt(metricFrames, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatTxt, !flagLive && slices.Contains(flagOutputFormat, formatTxt), outputDir)
+	printToFile := !flagLive && !flagPrometheusServer && slices.Contains(flagOutputFormat, formatTxt)
+	fileName, err := printMetricsTxt(metricFrames, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatTxt, printToFile, outputDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
 	} else if fileName != "" {
 		printedFiles = util.UniqueAppend(printedFiles, fileName)
 	}
-	fileName, err = printMetricsJSON(metricFrames, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatJSON, !flagLive && slices.Contains(flagOutputFormat, formatJSON), outputDir)
+	printToFile = !flagLive && !flagPrometheusServer && slices.Contains(flagOutputFormat, formatJSON)
+	fileName, err = printMetricsJSON(metricFrames, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatJSON, printToFile, outputDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
@@ -32,14 +34,16 @@ func printMetrics(metricFrames []MetricFrame, frameCount int, targetName string,
 		printedFiles = util.UniqueAppend(printedFiles, fileName)
 	}
 	// csv is always written to file unless no files are requested -- we need it to create the summary reports
-	fileName, err = printMetricsCSV(metricFrames, frameCount, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatCSV, !flagLive, outputDir)
+	printToFile = !flagLive && !flagPrometheusServer
+	fileName, err = printMetricsCSV(metricFrames, frameCount, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatCSV, printToFile, outputDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
 	} else if fileName != "" {
 		printedFiles = util.UniqueAppend(printedFiles, fileName)
 	}
-	fileName, err = printMetricsWide(metricFrames, frameCount, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatWide, !flagLive && slices.Contains(flagOutputFormat, formatWide), outputDir)
+	printToFile = !flagLive && !flagPrometheusServer && slices.Contains(flagOutputFormat, formatWide)
+	fileName, err = printMetricsWide(metricFrames, frameCount, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatWide, printToFile, outputDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
@@ -77,6 +81,9 @@ func printMetricsAsync(targetContext *targetContext, outputDir string, frameChan
 	// block until next set of metric frames arrives, will exit loop when frameChannel is closed
 	for metricFrames := range frameChannel {
 		printedFiles := printMetrics(metricFrames, frameCount, targetContext.target.GetName(), targetContext.perfStartTime, outputDir)
+		if flagPrometheusServerAddr != "" {
+			updatePrometheusMetrics(metricFrames)
+		}
 		for _, file := range printedFiles {
 			allPrintedFiles = util.UniqueAppend(allPrintedFiles, file)
 		}

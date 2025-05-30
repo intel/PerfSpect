@@ -1,0 +1,64 @@
+package metrics
+
+import (
+	"log/slog"
+	"math"
+	"net/http"
+	"regexp"
+	"strings"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+)
+
+const promMetricPrefix = "perfspect_"
+
+var prometheusMetricsGaugeVec = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "perfspect_metrics",
+		Help: "PerfSpect metrics",
+	},
+	[]string{"metric_name", "socket", "cpu", "cgroup", "pid", "cmd"},
+)
+var rxTrailingChars = regexp.MustCompile(`\)$`)
+var promMetrics = make(map[string]*prometheus.GaugeVec)
+
+func shortenMetricName(name string) string {
+	shortened := rxTrailingChars.ReplaceAllString(name, "")
+	shortened = strings.ReplaceAll(shortened, "%", "pct")
+	return shortened
+}
+func startPrometheusServer(listenAddr string) {
+	slog.Info("startPrometheusServer", slog.String("listenAddr", listenAddr))
+	prometheus.MustRegister(prometheusMetricsGaugeVec)
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	slog.Info("Starting Prometheus metrics server", slog.String("address", listenAddr))
+	go func() {
+		err := http.ListenAndServe(listenAddr, mux)
+		if err != nil && err != http.ErrServerClosed {
+			slog.Error("Prometheus HTTP server ListenAndServe error", slog.String("error", err.Error()))
+		}
+	}()
+}
+
+func updatePrometheusMetrics(metricFrames []MetricFrame) {
+	for _, frame := range metricFrames {
+		for _, metric := range frame.Metrics {
+			if !math.IsNaN(metric.Value) {
+				metricKey := promMetricPrefix + shortenMetricName(metric.Name)
+				if m, ok := promMetrics[metricKey]; ok {
+					m.WithLabelValues(
+						frame.Socket,
+						frame.CPU,
+						frame.Cgroup,
+						frame.PID,
+						frame.Cmd,
+					).Set(metric.Value)
+				} else {
+					slog.Warn("Unable to find metric", slog.String("metric", metricKey))
+				}
+			}
+		}
+	}
+}

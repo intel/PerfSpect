@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -27,6 +28,8 @@ import (
 	"perfspect/internal/script"
 	"perfspect/internal/target"
 	"perfspect/internal/util"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"slices"
 
@@ -102,16 +105,18 @@ var (
 	flagLive            bool
 	flagTransactionRate float64
 	// advanced options
-	flagShowMetricNames   bool
-	flagMetricsList       []string
-	flagEventFilePath     string
-	flagMetricFilePath    string
-	flagPerfPrintInterval int
-	flagPerfMuxInterval   int
-	flagNoRoot            bool
-	flagWriteEventsToFile bool
-	flagInput             string
-	flagNoSystemSummary   bool
+	flagShowMetricNames      bool
+	flagMetricsList          []string
+	flagEventFilePath        string
+	flagMetricFilePath       string
+	flagPerfPrintInterval    int
+	flagPerfMuxInterval      int
+	flagNoRoot               bool
+	flagWriteEventsToFile    bool
+	flagInput                string
+	flagNoSystemSummary      bool
+	flagPrometheusServer     bool
+	flagPrometheusServerAddr string
 
 	// positional arguments
 	argsApplication []string
@@ -131,16 +136,18 @@ const (
 	flagLiveName            = "live"
 	flagTransactionRateName = "txnrate"
 
-	flagShowMetricNamesName   = "list"
-	flagMetricsListName       = "metrics"
-	flagEventFilePathName     = "eventfile"
-	flagMetricFilePathName    = "metricfile"
-	flagPerfPrintIntervalName = "interval"
-	flagPerfMuxIntervalName   = "muxinterval"
-	flagNoRootName            = "noroot"
-	flagWriteEventsToFileName = "raw"
-	flagInputName             = "input"
-	flagNoSystemSummaryName   = "no-summary"
+	flagShowMetricNamesName      = "list"
+	flagMetricsListName          = "metrics"
+	flagEventFilePathName        = "eventfile"
+	flagMetricFilePathName       = "metricfile"
+	flagPerfPrintIntervalName    = "interval"
+	flagPerfMuxIntervalName      = "muxinterval"
+	flagNoRootName               = "noroot"
+	flagWriteEventsToFileName    = "raw"
+	flagInputName                = "input"
+	flagNoSystemSummaryName      = "no-summary"
+	flagPrometheusServerName     = "prometheus-server"
+	flagPrometheusServerAddrName = "prometheus-server-addr"
 )
 
 const (
@@ -192,6 +199,8 @@ func init() {
 	Cmd.Flags().BoolVar(&flagWriteEventsToFile, flagWriteEventsToFileName, false, "")
 	Cmd.Flags().StringVar(&flagInput, flagInputName, "", "")
 	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
+	Cmd.Flags().BoolVar(&flagPrometheusServer, flagPrometheusServerName, false, "")
+	Cmd.Flags().StringVar(&flagPrometheusServerAddr, flagPrometheusServerAddrName, ":9090", "")
 
 	common.AddTargetFlags(Cmd)
 
@@ -279,6 +288,14 @@ func getFlagGroups() []common.FlagGroup {
 		{
 			Name: flagTransactionRateName,
 			Help: "number of transactions per second. Will divide relevant metrics by transactions/second.",
+		},
+		{
+			Name: flagPrometheusServerName,
+			Help: "enable promtheus metrics server",
+		},
+		{
+			Name: flagPrometheusServerAddrName,
+			Help: "address (e.g., host:port) to start Prometheus metrics server on (implies --promtheus-server true)",
 		},
 	}
 	groups = append(groups, common.FlagGroup{
@@ -517,6 +534,23 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	// common target flags
 	if err := common.ValidateTargetFlags(cmd); err != nil {
 		return common.FlagValidationError(cmd, err.Error())
+	}
+	// prometheus server address
+	if cmd.Flags().Changed(flagPrometheusServerAddrName) {
+		flagPrometheusServer = true
+		_, port, err := net.SplitHostPort(flagPrometheusServerAddr)
+		if err != nil {
+			slog.Error(err.Error())
+			err = fmt.Errorf("invalid prometheus server address format: %s, expected host:port", flagPrometheusServerAddr)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
+		if _, err := strconv.Atoi(port); err != nil {
+			slog.Error(err.Error())
+			err = fmt.Errorf("invalid port in prometheus server address: %s, port must be an integer", flagPrometheusServerAddr)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
 	}
 	return nil
 }
@@ -921,7 +955,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 	// create the local output directory
-	if !flagLive {
+	if !flagLive && !flagPrometheusServer {
 		err = common.CreateOutputDir(localOutputDir)
 		if err != nil {
 			err = fmt.Errorf("failed to create output directory: %w", err)
@@ -947,6 +981,14 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 	if flagLive {
 		multiSpinner.Finish()
+	}
+	// Start Prometheus server if requested
+	if flagPrometheusServer && flagPrometheusServerAddr != "" {
+		multiSpinner.Finish()
+		slog.Info("starting metrics server", slog.String("flagPrometheusServerAddr", flagPrometheusServerAddr))
+		fmt.Printf("starting metrics server on %s\n", flagPrometheusServerAddr)
+		startPrometheusServer(flagPrometheusServerAddr)
+		cmd.SilenceUsage = true
 	}
 	// wait for all collectOnTarget goroutines to finish
 	collectOnTargetWG.Wait()
@@ -983,7 +1025,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}
-	if !flagLive {
+	if !flagLive && !flagPrometheusServer {
 		multiSpinner.Finish()
 		printOutputFileNames(allPrintedFileNames)
 	}
@@ -1132,6 +1174,22 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
 		return
+	}
+	slog.Debug("create prom metrics")
+	for _, def := range targetContext.metricDefinitions {
+		desc := fmt.Sprintf("%s (expr: %s)", def.Name, def.Expression)
+		name := promMetricPrefix + shortenMetricName(def.Name)
+		gauge := prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: name,
+				Help: desc,
+			},
+			[]string{"socket", "cpu", "cgroup", "pid", "cmd"},
+		)
+		promMetrics[name] = gauge
+	}
+	for _, m := range promMetrics {
+		prometheus.MustRegister(m)
 	}
 	channelError <- targetError{target: myTarget, err: nil}
 }
