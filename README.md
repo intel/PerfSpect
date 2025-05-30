@@ -54,6 +54,71 @@ Once the configuration changes are applied, use the `--noroot` flag on the comma
 
 See `perfspect metrics -h` for the extensive set of options and examples.
 
+##### Prometheus Endpoint
+The `metrics` command can expose metrics via a Prometheus compatible `metrics` endpoint. This allows integration with Prometheus monitoring systems. To enable the Prometheus endpoint, use the `--prometheus-server` flag. By default, the endpoint listens on port 9090. The port can be changed using the `--prometheus-server-addr` flag. Run `perfspect metrics --prometheus-server`.
+
+###### Example Daemonset for GKE
+```
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: perfspect
+  namespace: default
+  labels:
+    name: perfspect
+spec:
+  selector:
+    matchLabels:
+      name: perfspect
+  template:
+    metadata:
+      labels:
+        name: perfspect
+    spec:
+      containers:
+      - name: perfspect
+        image: docker.registry/user-sandbox/ar-us/perfspect
+        imagePullPolicy: Always
+        securityContext:
+          privileged: true
+        args:
+          - "/perfspect"
+          - "metrics"
+          - "--log-stdout"
+          - "--granularity"
+          - "cpu"
+          - "--noroot"
+          - "--interval"
+          - "15"
+          - "--prometheus-server-addr"
+          - ":9090"
+        ports:
+        - name: metrics-port # Name of the port, referenced by PodMonitoring
+          containerPort: 9090 # The port your application inside the container listens on for metrics
+          protocol: TCP
+        resources:
+          requests:
+            memory: "200Mi"
+            cpu: "500m"
+
+---
+apiVersion: monitoring.googleapis.com/v1
+kind: PodMonitoring
+metadata:
+  name: perfspect-podmonitoring
+  namespace: default
+  labels:
+    name: perfspect
+spec:
+  selector:
+    matchLabels:
+      name: perfspect
+  endpoints:
+  - port: metrics-port
+    interval: 30s
+```
+Replace `docker.registry/user-sandbox/ar-us/perfspect` with the location of your perfspect container image.
+
 #### Report Command
 The `report` command generates system configuration reports in a variety of formats. All categories of information are collected by default. See `perfspect report -h` for all options.
 
