@@ -63,8 +63,9 @@ var rootCmd = &cobra.Command{
 
 var (
 	// logging
-	flagDebug  bool
-	flagSyslog bool
+	flagDebug     bool
+	flagSyslog    bool
+	flagLogStdOut bool
 	// output
 	flagOutputDir      string
 	flagTargetTempRoot string
@@ -74,6 +75,7 @@ var (
 const (
 	flagDebugName          = "debug"
 	flagSyslogName         = "syslog"
+	flagLogStdOutName      = "log-stdout"
 	flagOutputDirName      = "output"
 	flagTargetTempRootName = "tempdir"
 	flagNoCheckUpdateName  = "noupdate"
@@ -123,6 +125,7 @@ Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
 	// Global (persistent) flags
 	rootCmd.PersistentFlags().BoolVar(&flagDebug, flagDebugName, false, "enable debug logging and retain temporary directories")
 	rootCmd.PersistentFlags().BoolVar(&flagSyslog, flagSyslogName, false, "write logs to syslog instead of a file")
+	rootCmd.PersistentFlags().BoolVar(&flagLogStdOut, flagLogStdOutName, false, "write logs to stdout")
 	rootCmd.PersistentFlags().StringVar(&flagOutputDir, flagOutputDirName, "", "override the output directory")
 	rootCmd.PersistentFlags().StringVar(&flagTargetTempRoot, flagTargetTempRootName, "", "override the temporary target directory, must exist and allow execution")
 	rootCmd.PersistentFlags().BoolVar(&flagNoCheckUpdate, flagNoCheckUpdateName, false, "skip application update check")
@@ -190,6 +193,9 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 			fmt.Printf("Error: failed to create syslog handler: %v\n", err)
 			os.Exit(1)
 		}
+		slog.SetDefault(slog.New(handler))
+	} else if flagLogStdOut {
+		handler := slog.NewJSONHandler(os.Stdout, &logOpts)
 		slog.SetDefault(slog.New(handler))
 	} else { // log to file
 		// open log file in current directory
