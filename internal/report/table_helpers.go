@@ -1329,6 +1329,7 @@ func clusteringModeFromOutput(outputs map[string]script.ScriptOutput) string {
 
 type nicInfo struct {
 	Name            string
+	Vendor          string
 	Model           string
 	Speed           string
 	Link            string
@@ -1342,77 +1343,59 @@ type nicInfo struct {
 	IRQBalance      string
 }
 
-func nicInfoFromOutput(outputs map[string]script.ScriptOutput) []nicInfo {
-	// get nic names and models from lshw
-	namesAndModels := valsArrayFromRegexSubmatch(outputs[script.LshwScriptName].Stdout, `^\S+\s+(\S+)\s+network\s+([^\[]+?)(?:\s+\[.*\])?$`)
-	usbNICs := valsArrayFromRegexSubmatch(outputs[script.LshwScriptName].Stdout, `^usb.*? (\S+)\s+network\s+(\S.*?)$`)
-	// if USB NIC name isn't already in the list, add it
-	for _, usbNIC := range usbNICs {
-		found := false
-		for _, nameAndModel := range namesAndModels {
-			if nameAndModel[0] == usbNIC[0] {
-				found = true
-				break
-			}
-		}
-		if !found {
-			namesAndModels = append(namesAndModels, usbNIC)
-		}
-	}
-	if len(namesAndModels) == 0 {
-		return nil
-	}
-
-	var nicInfos []nicInfo
-	for _, nameAndModel := range namesAndModels {
-		nicInfos = append(nicInfos, nicInfo{Name: nameAndModel[0], Model: nameAndModel[1]})
-	}
-	// separate output from the nic info script into per-nic output
-	var perNicOutput [][]string
-	reBeginNicInfo := regexp.MustCompile(`Settings for (.*):`)
-	nicIndex := -1
-	for line := range strings.SplitSeq(outputs[script.NicInfoScriptName].Stdout, "\n") {
-		match := reBeginNicInfo.FindStringSubmatch(line)
-		if len(match) > 0 {
-			nicIndex++
-			perNicOutput = append(perNicOutput, []string{})
-		}
-		if nicIndex == -1 { // we shouldn't be able to get here while nicIndex is -1
-			slog.Warn("unexpected line in nic info output", slog.String("line", line))
+func parseNicInfo(scriptOutput string) []nicInfo {
+	var nics []nicInfo
+	for nicOutput := range strings.SplitSeq(scriptOutput, "----------------------------------------") {
+		if strings.TrimSpace(nicOutput) == "" {
 			continue
 		}
-		perNicOutput[nicIndex] = append(perNicOutput[nicIndex], line)
-	}
-	if len(perNicOutput) != len(nicInfos) {
-		slog.Error("number of nics in lshw and nicinfo output do not match")
-		return nil
-	}
-	for nicIndex := range nicInfos {
-		for _, line := range perNicOutput[nicIndex] {
-			if strings.Contains(line, "Speed:") {
-				nicInfos[nicIndex].Speed = strings.TrimSpace(line[strings.Index(line, ":")+1:])
-			} else if strings.Contains(line, "Link detected:") {
-				nicInfos[nicIndex].Link = strings.TrimSpace(line[strings.Index(line, ":")+1:])
-			} else if strings.HasPrefix(line, "bus-info:") {
-				nicInfos[nicIndex].Bus = strings.TrimSpace(line[strings.Index(line, ":")+1:])
-			} else if strings.HasPrefix(line, "driver:") {
-				nicInfos[nicIndex].Driver = strings.TrimSpace(line[strings.Index(line, ":")+1:])
-			} else if strings.HasPrefix(line, "version:") {
-				nicInfos[nicIndex].DriverVersion = strings.TrimSpace(line[strings.Index(line, ":")+1:])
-			} else if strings.HasPrefix(line, "firmware-version:") {
-				nicInfos[nicIndex].FirmwareVersion = strings.TrimSpace(line[strings.Index(line, ":")+1:])
-			} else if strings.HasPrefix(line, "MAC Address:") {
-				nicInfos[nicIndex].MACAddress = strings.TrimSpace(line[strings.Index(line, ":")+1:])
-			} else if strings.HasPrefix(line, "NUMA Node:") {
-				nicInfos[nicIndex].NUMANode = strings.TrimSpace(line[strings.Index(line, ":")+1:])
-			} else if strings.Contains(line, "CPU Affinity:") {
-				nicInfos[nicIndex].CPUAffinity = strings.TrimSpace(line[strings.Index(line, ":")+1:])
-			} else if strings.Contains(line, "IRQ Balance:") {
-				nicInfos[nicIndex].IRQBalance = strings.TrimSpace(line[strings.Index(line, ":")+1:])
+		var nic nicInfo
+		for line := range strings.SplitSeq(nicOutput, "\n") {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "Interface: ") {
+				nic.Name = strings.TrimPrefix(line, "Interface: ")
+			}
+			if strings.HasPrefix(line, "Vendor: ") {
+				nic.Vendor = strings.TrimPrefix(line, "Vendor: ")
+			}
+			if strings.HasPrefix(line, "Model: ") {
+				// sometimes the model name has additional information in parentheses, we want to keep only the model name
+				nic.Model = strings.TrimSpace(strings.TrimPrefix(strings.Split(line, "(")[0], "Model: "))
+			}
+			if strings.HasPrefix(line, "Speed: ") {
+				nic.Speed = strings.TrimPrefix(line, "Speed: ")
+			}
+			if strings.HasPrefix(line, "Link detected: ") {
+				nic.Link = strings.TrimPrefix(line, "Link detected: ")
+			}
+			if strings.HasPrefix(line, "bus-info: ") {
+				nic.Bus = strings.TrimPrefix(line, "bus-info: ")
+			}
+			if strings.HasPrefix(line, "driver: ") {
+				nic.Driver = strings.TrimPrefix(line, "driver: ")
+			}
+			if strings.HasPrefix(line, "version: ") {
+				nic.DriverVersion = strings.TrimPrefix(line, "version: ")
+			}
+			if strings.HasPrefix(line, "firmware-version: ") {
+				nic.FirmwareVersion = strings.TrimPrefix(line, "firmware-version: ")
+			}
+			if strings.HasPrefix(line, "MAC Address: ") {
+				nic.MACAddress = strings.TrimPrefix(line, "MAC Address: ")
+			}
+			if strings.HasPrefix(line, "NUMA Node: ") {
+				nic.NUMANode = strings.TrimPrefix(line, "NUMA Node: ")
+			}
+			if strings.HasPrefix(line, "CPU Affinity: ") {
+				nic.CPUAffinity = strings.TrimPrefix(line, "CPU Affinity: ")
+			}
+			if strings.HasPrefix(line, "IRQ Balance: ") {
+				nic.IRQBalance = strings.TrimPrefix(line, "IRQ Balance: ")
 			}
 		}
+		nics = append(nics, nic)
 	}
-	return nicInfos
+	return nics
 }
 
 type diskInfo struct {
@@ -1766,58 +1749,23 @@ func cveInfoFromOutput(outputs map[string]script.ScriptOutput) [][]string {
 }
 
 func nicIRQMappingsFromOutput(outputs map[string]script.ScriptOutput) [][]string {
-	nicInfos := nicInfoFromOutput(outputs)
-	if len(nicInfos) == 0 {
+	nics := parseNicInfo(outputs[script.NicInfoScriptName].Stdout)
+	if len(nics) == 0 {
 		return nil
 	}
 	nicIRQMappings := [][]string{}
-	for _, nic := range nicInfos {
-		// command output is formatted like this: 200:1;201:1-17,36-53;202:44
-		// which is <irq>:<cpu(s)>
-		// we need to reverse it to <cpu>:<irq(s)>
-		cpuIRQMappings := make(map[int][]int)
-		for pair := range strings.SplitSeq(nic.CPUAffinity, ";") {
-			if pair == "" {
-				continue
-			}
-			tokens := strings.Split(pair, ":")
-			irq, err := strconv.Atoi(tokens[0])
-			if err != nil {
-				continue
-			}
-			cpuList := tokens[1]
-			cpus, err := util.SelectiveIntRangeToIntList(cpuList)
-			if err != nil {
-				slog.Warn("failed to parse CPU list", slog.String("cpuList", cpuList), slog.String("error", err.Error()))
-				continue
-			}
-			for _, cpu := range cpus {
-				cpuIRQMappings[cpu] = append(cpuIRQMappings[cpu], irq)
-			}
+	for _, nic := range nics {
+		if nic.CPUAffinity == "" {
+			continue // skip NICs without CPU affinity
 		}
-		var cpuIRQs []string
-		var cpus []int
-		for k := range cpuIRQMappings {
-			cpus = append(cpus, k)
-		}
-		sort.Ints(cpus)
-		for _, cpu := range cpus {
-			irqs := cpuIRQMappings[cpu]
-			cpuIRQ := fmt.Sprintf("%d:", cpu)
-			var irqStrings []string
-			for _, irq := range irqs {
-				irqStrings = append(irqStrings, fmt.Sprintf("%d", irq))
-			}
-			cpuIRQ += strings.Join(irqStrings, ",")
-			cpuIRQs = append(cpuIRQs, cpuIRQ)
-		}
-		nicIRQMappings = append(nicIRQMappings, []string{nic.Name, strings.Join(cpuIRQs, " ")})
+		affinities := strings.Split(strings.TrimSuffix(nic.CPUAffinity, ";"), ";")
+		nicIRQMappings = append(nicIRQMappings, []string{nic.Name, strings.Join(affinities, "|")})
 	}
 	return nicIRQMappings
 }
 
 func nicSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
-	nics := nicInfoFromOutput(outputs)
+	nics := parseNicInfo(outputs[script.NicInfoScriptName].Stdout)
 	if len(nics) == 0 {
 		return "N/A"
 	}

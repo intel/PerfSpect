@@ -369,17 +369,8 @@ var tableDefinitions = map[string]TableDefinition{
 		MenuLabel: NetworkMenuLabel,
 		ScriptNames: []string{
 			script.NicInfoScriptName,
-			script.LshwScriptName,
 		},
 		FieldsFunc: nicTableValues},
-	NetworkIRQMappingTableName: {
-		Name:    NetworkIRQMappingTableName,
-		HasRows: true,
-		ScriptNames: []string{
-			script.LshwScriptName,
-			script.NicInfoScriptName,
-		},
-		FieldsFunc: networkIRQMappingTableValues},
 	NetworkConfigTableName: {
 		Name:    NetworkConfigTableName,
 		HasRows: false,
@@ -387,6 +378,13 @@ var tableDefinitions = map[string]TableDefinition{
 			script.SysctlScriptName,
 		},
 		FieldsFunc: networkConfigTableValues},
+	NetworkIRQMappingTableName: {
+		Name:    NetworkIRQMappingTableName,
+		HasRows: true,
+		ScriptNames: []string{
+			script.NicInfoScriptName,
+		},
+		FieldsFunc: networkIRQMappingTableValues},
 	DiskTableName: {
 		Name:      DiskTableName,
 		HasRows:   true,
@@ -510,7 +508,6 @@ var tableDefinitions = map[string]TableDefinition{
 			script.PrefetchersName,
 			script.PrefetchersAtomName,
 			script.PPINName,
-			script.LshwScriptName,
 			script.MeminfoScriptName,
 			script.TransparentHugePagesScriptName,
 			script.NumaBalancingScriptName,
@@ -540,7 +537,6 @@ var tableDefinitions = map[string]TableDefinition{
 			script.LspciDevicesScriptName,
 			script.MaximumFrequencyScriptName,
 			script.SpecCoreFrequenciesScriptName,
-			script.LshwScriptName,
 			script.MeminfoScriptName,
 			script.NicInfoScriptName,
 			script.DiskInfoScriptName,
@@ -1518,6 +1514,7 @@ func dimmTableInsights(outputs map[string]script.ScriptOutput, tableValues Table
 func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
 		{Name: "Name"},
+		{Name: "Vendor"},
 		{Name: "Model"},
 		{Name: "Speed"},
 		{Name: "Link"},
@@ -1529,19 +1526,20 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "NUMA Node"},
 		{Name: "IRQBalance"},
 	}
-	allNicsInfo := nicInfoFromOutput(outputs)
+	allNicsInfo := parseNicInfo(outputs[script.NicInfoScriptName].Stdout)
 	for _, nicInfo := range allNicsInfo {
 		fields[0].Values = append(fields[0].Values, nicInfo.Name)
-		fields[1].Values = append(fields[1].Values, nicInfo.Model)
-		fields[2].Values = append(fields[2].Values, nicInfo.Speed)
-		fields[3].Values = append(fields[3].Values, nicInfo.Link)
-		fields[4].Values = append(fields[4].Values, nicInfo.Bus)
-		fields[5].Values = append(fields[5].Values, nicInfo.Driver)
-		fields[6].Values = append(fields[6].Values, nicInfo.DriverVersion)
-		fields[7].Values = append(fields[7].Values, nicInfo.FirmwareVersion)
-		fields[8].Values = append(fields[8].Values, nicInfo.MACAddress)
-		fields[9].Values = append(fields[9].Values, nicInfo.NUMANode)
-		fields[10].Values = append(fields[10].Values, nicInfo.IRQBalance)
+		fields[1].Values = append(fields[1].Values, nicInfo.Vendor)
+		fields[2].Values = append(fields[2].Values, nicInfo.Model)
+		fields[3].Values = append(fields[3].Values, nicInfo.Speed)
+		fields[4].Values = append(fields[4].Values, nicInfo.Link)
+		fields[5].Values = append(fields[5].Values, nicInfo.Bus)
+		fields[6].Values = append(fields[6].Values, nicInfo.Driver)
+		fields[7].Values = append(fields[7].Values, nicInfo.DriverVersion)
+		fields[8].Values = append(fields[8].Values, nicInfo.FirmwareVersion)
+		fields[9].Values = append(fields[9].Values, nicInfo.MACAddress)
+		fields[10].Values = append(fields[10].Values, nicInfo.NUMANode)
+		fields[11].Values = append(fields[11].Values, nicInfo.IRQBalance)
 	}
 	return fields
 }
@@ -1549,7 +1547,7 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 func networkIRQMappingTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
 		{Name: "Interface"},
-		{Name: "CPU:IRQs CPU:IRQs ..."},
+		{Name: "IRQ:CPUs|IRQ:CPUs|..."},
 	}
 	nicIRQMappings := nicIRQMappingsFromOutput(outputs)
 	for _, nicIRQMapping := range nicIRQMappings {
