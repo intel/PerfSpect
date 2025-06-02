@@ -723,26 +723,36 @@ rdmsr 0x2FFE
 	},
 	NicInfoScriptName: {
 		Name: NicInfoScriptName,
-		ScriptTemplate: `timeout 30 lshw -businfo -numeric | grep -E "^(pci|usb).*? \S+\s+network\s+\S.*?" \
-| while read -r a ifc c ; do
-	ethtool "$ifc"
-	ethtool -i "$ifc"
-	echo -n "MAC Address: "
-	cat /sys/class/net/"$ifc"/address
-	echo -n "NUMA Node: "
-	cat /sys/class/net/"$ifc"/device/numa_node
+		ScriptTemplate: `for ifc_path in /sys/class/net/*; do
+	ifc=$(basename "$ifc_path")
+	if [ "$ifc" = "lo" ]; then
+		continue
+	fi
+	if ! ethtool_out=$(ethtool "$ifc" 2>/dev/null); then
+		continue
+	fi
+	if ! ethtool_i_out=$(ethtool -i "$ifc" 2>/dev/null); then
+		continue
+	fi
+    echo "Interface: $ifc"
+    echo "Vendor: $(udevadm info --query=all --path=/sys/class/net/"$ifc" | grep ID_VENDOR_FROM_DATABASE= | cut -d'=' -f2)"
+    echo "Model: $(udevadm info --query=all --path=/sys/class/net/"$ifc" | grep ID_MODEL_FROM_DATABASE= | cut -d'=' -f2)"
+	echo "$ethtool_out"
+	echo "$ethtool_i_out"
+	echo "MAC Address: $(cat /sys/class/net/"$ifc"/address 2>/dev/null)"
+	echo "NUMA Node: $(cat /sys/class/net/"$ifc"/device/numa_node 2>/dev/null)"
 	echo -n "CPU Affinity: "
 	intlist=$( grep -e "$ifc" /proc/interrupts | cut -d':' -f1 | sed -e 's/^[[:space:]]*//' )
 	for int in $intlist; do
-		cpu=$( cat /proc/irq/"$int"/smp_affinity_list )
+		cpu=$( cat /proc/irq/"$int"/smp_affinity_list 2>/dev/null)
 		printf "%s:%s;" "$int" "$cpu"
 	done
 	printf "\n"
-	echo -n "IRQ Balance: "
-	pgrep irqbalance >/dev/null && echo "Enabled" || echo "Disabled"
+	echo "IRQ Balance: $(pgrep irqbalance >/dev/null 2>&1 && echo "Enabled" || echo "Disabled")"
+    echo "----------------------------------------"
 done
 `,
-		Depends:   []string{"lshw"},
+		Depends:   []string{"ethtool"},
 		Superuser: true,
 	},
 	DiskInfoScriptName: {
