@@ -53,71 +53,8 @@ If neither sudo nor root access is available, an administrator must apply the fo
 Once the configuration changes are applied, use the `--noroot` flag on the command line, for example, `perfspect metrics --noroot`.
 
 ##### Prometheus Endpoint
-The `metrics` command can expose metrics via a Prometheus compatible `metrics` endpoint. This allows integration with Prometheus monitoring systems. To enable the Prometheus endpoint, use the `--prometheus-server` flag. By default, the endpoint listens on port 9090. The port can be changed using the `--prometheus-server-addr` flag. Run `perfspect metrics --prometheus-server`.
+The `metrics` command can expose metrics via a Prometheus compatible `metrics` endpoint. This allows integration with Prometheus monitoring systems. To enable the Prometheus endpoint, use the `--prometheus-server` flag. By default, the endpoint listens on port 9090. The port can be changed using the `--prometheus-server-addr` flag. Run `perfspect metrics --prometheus-server`. See the [example daemonset](docs/perfspect-daemonset.md) for deploying in Kubernetes.
 
-###### Example Daemonset for GKE
-```
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  name: perfspect
-  namespace: default
-  labels:
-    name: perfspect
-spec:
-  selector:
-    matchLabels:
-      name: perfspect
-  template:
-    metadata:
-      labels:
-        name: perfspect
-    spec:
-      containers:
-      - name: perfspect
-        image: docker.registry/user-sandbox/ar-us/perfspect
-        imagePullPolicy: Always
-        securityContext:
-          privileged: true
-        args:
-          - "/perfspect"
-          - "metrics"
-          - "--log-stdout"
-          - "--granularity"
-          - "cpu"
-          - "--noroot"
-          - "--interval"
-          - "15"
-          - "--prometheus-server-addr"
-          - ":9090"
-        ports:
-        - name: metrics-port # Name of the port, referenced by PodMonitoring
-          containerPort: 9090 # The port your application inside the container listens on for metrics
-          protocol: TCP
-        resources:
-          requests:
-            memory: "200Mi"
-            cpu: "500m"
-
----
-apiVersion: monitoring.googleapis.com/v1
-kind: PodMonitoring
-metadata:
-  name: perfspect-podmonitoring
-  namespace: default
-  labels:
-    name: perfspect
-spec:
-  selector:
-    matchLabels:
-      name: perfspect
-  endpoints:
-  - port: metrics-port
-    interval: 30s
-```
-Replace `docker.registry/user-sandbox/ar-us/perfspect` with the location of your perfspect container image.
-
-##### Additional options
 See `perfspect metrics -h` for the extensive set of options and examples.
 
 #### Report Command
