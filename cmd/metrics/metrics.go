@@ -985,7 +985,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	// Start Prometheus server if requested
 	if flagPrometheusServer && flagPrometheusServerAddr != "" {
 		multiSpinner.Finish()
-		slog.Info("starting metrics server", slog.String("flagPrometheusServerAddr", flagPrometheusServerAddr))
 		fmt.Printf("starting metrics server on %s\n", flagPrometheusServerAddr)
 		startPrometheusServer(flagPrometheusServerAddr)
 		cmd.SilenceUsage = true
