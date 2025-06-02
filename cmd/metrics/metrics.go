@@ -1174,7 +1174,6 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 		channelError <- targetError{target: myTarget, err: err}
 		return
 	}
-	slog.Debug("create prom metrics")
 	for _, def := range targetContext.metricDefinitions {
 		desc := fmt.Sprintf("%s (expr: %s)", def.Name, def.Expression)
 		name := promMetricPrefix + sanitizeMetricName(def.Name)
