@@ -1178,7 +1178,7 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 	slog.Debug("create prom metrics")
 	for _, def := range targetContext.metricDefinitions {
 		desc := fmt.Sprintf("%s (expr: %s)", def.Name, def.Expression)
-		name := promMetricPrefix + shortenMetricName(def.Name)
+		name := promMetricPrefix + sanitizeMetricName(def.Name)
 		gauge := prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: name,

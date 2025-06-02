@@ -26,10 +26,10 @@ var prometheusMetricsGaugeVec = prometheus.NewGaugeVec(
 var rxTrailingChars = regexp.MustCompile(`\)$`)
 var promMetrics = make(map[string]*prometheus.GaugeVec)
 
-func shortenMetricName(name string) string {
-	shortened := rxTrailingChars.ReplaceAllString(name, "")
-	shortened = strings.ReplaceAll(shortened, "%", "pct")
-	return shortened
+func sanitizeMetricName(name string) string {
+	sanitized := rxTrailingChars.ReplaceAllString(name, "")
+	sanitized = strings.ReplaceAll(sanitized, "%", "pct")
+	return sanitized
 }
 func startPrometheusServer(listenAddr string) {
 	slog.Info("startPrometheusServer", slog.String("listenAddr", listenAddr))
@@ -49,7 +49,7 @@ func updatePrometheusMetrics(metricFrames []MetricFrame) {
 	for _, frame := range metricFrames {
 		for _, metric := range frame.Metrics {
 			if !math.IsNaN(metric.Value) {
-				metricKey := promMetricPrefix + shortenMetricName(metric.Name)
+				metricKey := promMetricPrefix + sanitizeMetricName(metric.Name)
 				if m, ok := promMetrics[metricKey]; ok {
 					m.WithLabelValues(
 						frame.Socket,
