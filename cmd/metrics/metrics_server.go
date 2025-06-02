@@ -32,7 +32,6 @@ func sanitizeMetricName(name string) string {
 	return sanitized
 }
 func startPrometheusServer(listenAddr string) {
-	slog.Info("startPrometheusServer", slog.String("listenAddr", listenAddr))
 	prometheus.MustRegister(prometheusMetricsGaugeVec)
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
