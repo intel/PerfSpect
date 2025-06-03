@@ -145,7 +145,7 @@ func Execute() {
 }
 
 func initializeApplication(cmd *cobra.Command, args []string) error {
-	var err error
+	timestamp := time.Now().Local().Format("2006-01-02_15-04-05") // app startup time
 	// verify requested output directory exists or create an output directory
 	var outputDir string
 	if flagOutputDir != "" {
@@ -166,7 +166,7 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 		}
 	} else {
 		// set output dir path to app name + timestamp (dont' create the directory)
-		outputDirName := common.AppName + "_" + time.Now().Local().Format("2006-01-02_15-04-05")
+		outputDirName := common.AppName + "_" + timestamp
 		var err error
 		// outputDir will be in current working directory
 		outputDir, err = util.AbsPath(outputDirName)
@@ -193,6 +193,7 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 		slog.SetDefault(slog.New(handler))
 	} else { // log to file
 		// open log file in current directory
+		var err error
 		gLogFile, err = os.OpenFile(common.AppName+".log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644) // #nosec G302
 		if err != nil {
 			fmt.Printf("Error: failed to open log file: %v\n", err)
@@ -207,14 +208,20 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Error: failed to create temp dir: %v\n", err)
 		os.Exit(1)
 	}
+	var logFilePath string
+	if gLogFile != nil {
+		logFilePath = gLogFile.Name()
+	}
 	// set app context
 	cmd.Parent().SetContext(
 		context.WithValue(
 			context.Background(),
 			common.AppContext{},
 			common.AppContext{
+				Timestamp:      timestamp,
 				OutputDir:      outputDir,
 				LocalTempDir:   localTempDir,
+				LogFilePath:    logFilePath,
 				TargetTempRoot: flagTargetTempRoot,
 				Version:        gVersion},
 		),

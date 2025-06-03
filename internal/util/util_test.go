@@ -4,7 +4,12 @@ package util
 // SPDX-License-Identifier: BSD-3-Clause
 
 import (
+	"archive/tar"
+	"compress/gzip"
+	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -502,5 +507,83 @@ func TestMergeOrderedUnique(t *testing.T) {
 				t.Errorf("MergeOrderedUnique(%v) = %v, want %v", tc.input, got, tc.expected)
 			}
 		})
+	}
+}
+func TestCreateFlatTGZ(t *testing.T) {
+	// Create a temporary directory for test files and tarball
+	tempDir := t.TempDir()
+
+	// Create some test files with known content
+	files := []string{}
+	contents := []string{"hello world", "foo bar", "baz qux"}
+	for i, content := range contents {
+		filePath := filepath.Join(tempDir, fmt.Sprintf("file%d.txt", i))
+		if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+			t.Fatalf("failed to create test file: %v", err)
+		}
+		files = append(files, filePath)
+	}
+
+	// Path for the tarball
+	tarballPath := filepath.Join(tempDir, "test.tar.gz")
+
+	// Call CreateFlatTGZ
+	if err := CreateFlatTGZ(files, tarballPath); err != nil {
+		t.Fatalf("CreateFlatTGZ failed: %v", err)
+	}
+
+	// Open and read the tarball, check contents
+	tarball, err := os.Open(tarballPath)
+	if err != nil {
+		t.Fatalf("failed to open tarball: %v", err)
+	}
+	defer tarball.Close()
+
+	gzipReader, err := gzip.NewReader(tarball)
+	if err != nil {
+		t.Fatalf("failed to create gzip reader: %v", err)
+	}
+	defer gzipReader.Close()
+
+	tarReader := tar.NewReader(gzipReader)
+	foundFiles := map[string]string{}
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("error reading tarball: %v", err)
+		}
+		data, err := io.ReadAll(tarReader)
+		if err != nil {
+			t.Fatalf("failed to read file from tarball: %v", err)
+		}
+		foundFiles[header.Name] = string(data)
+	}
+
+	// Check that all files are present and contents match
+	for i, content := range contents {
+		base := filepath.Base(files[i])
+		got, ok := foundFiles[base]
+		if !ok {
+			t.Errorf("file %s not found in tarball", base)
+		}
+		if got != content {
+			t.Errorf("file %s content mismatch: got %q, want %q", base, got, content)
+		}
+	}
+
+	// Test error when file does not exist
+	badTarball := filepath.Join(tempDir, "bad.tar.gz")
+	err = CreateFlatTGZ([]string{filepath.Join(tempDir, "doesnotexist.txt")}, badTarball)
+	if err == nil {
+		t.Errorf("expected error for non-existent file, got nil")
+	}
+
+	// Test error when tarball path is invalid
+	err = CreateFlatTGZ(files, "/invalid/path/to/tarball.tar.gz")
+	if err == nil {
+		t.Errorf("expected error for invalid tarball path, got nil")
 	}
 }

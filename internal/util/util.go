@@ -470,6 +470,55 @@ func ExtractTGZ(tarballPath, destDir string, stripComponent bool) error {
 	return nil
 }
 
+// CreateFlatTGZ creates a tarball from a list of files. It strips the paths
+// of the files so that they are stored in the tarball without any directory structure.
+func CreateFlatTGZ(files []string, tarballPath string) error {
+	// Open the tarball for writing
+	tarball, err := os.Create(tarballPath) // #nosec G304 -- tarballPath is not a user provided path
+	if err != nil {
+		return fmt.Errorf("failed to create tarball: %w", err)
+	}
+	defer tarball.Close()
+
+	// Create a gzip writer
+	gzipWriter := gzip.NewWriter(tarball)
+	defer gzipWriter.Close()
+
+	// Create a new tar writer
+	tarWriter := tar.NewWriter(gzipWriter)
+	defer tarWriter.Close()
+
+	for _, file := range files {
+		fileInfo, err := os.Stat(file)
+		if err != nil {
+			return fmt.Errorf("failed to stat file %s: %w", file, err)
+		}
+
+		header, err := tar.FileInfoHeader(fileInfo, "")
+		if err != nil {
+			return fmt.Errorf("failed to create tar header for file %s: %w", file, err)
+		}
+
+		header.Name = filepath.Base(file) // Strip the path, only keep the base name
+
+		if err := tarWriter.WriteHeader(header); err != nil {
+			return fmt.Errorf("failed to write header for file %s: %w", file, err)
+		}
+
+		srcFile, err := os.Open(file) // #nosec G304 -- file is not a user provided path
+		if err != nil {
+			return fmt.Errorf("failed to open file %s: %w", file, err)
+		}
+		defer srcFile.Close()
+
+		if _, err := io.Copy(tarWriter, srcFile); err != nil {
+			return fmt.Errorf("failed to copy file %s to tarball: %w", file, err)
+		}
+	}
+
+	return nil
+}
+
 // GetAppDir returns the directory of the executable
 func GetAppDir() string {
 	exePath, _ := os.Executable()

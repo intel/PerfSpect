@@ -29,8 +29,10 @@ var AppName = filepath.Base(os.Args[0])
 
 // AppContext represents the application context that can be accessed from all commands.
 type AppContext struct {
+	Timestamp      string // Timestamp is the timestamp when the application was started.
 	OutputDir      string // OutputDir is the directory where the application will write output files.
 	LocalTempDir   string // LocalTempDir is the temp directory on the local host (created by the application).
+	LogFilePath    string // LogFilePath is the path to the log file.
 	TargetTempRoot string // TargetTempRoot is the path to a directory on the target host where the application can create temporary directories.
 	Version        string // Version is the version of the application.
 }
@@ -102,8 +104,10 @@ type ReportingCommand struct {
 func (rc *ReportingCommand) Run() error {
 	// appContext is the application context that holds common data and resources.
 	appContext := rc.Cmd.Parent().Context().Value(AppContext{}).(AppContext)
+	timestamp := appContext.Timestamp
 	localTempDir := appContext.LocalTempDir
 	outputDir := appContext.OutputDir
+	logFilePath := appContext.LogFilePath
 	// handle signals
 	// child processes will exit when the signals are received which will
 	// allow this app to exit normally
@@ -208,7 +212,8 @@ func (rc *ReportingCommand) Run() error {
 		return err
 	}
 	// create the raw report before processing the data, so that we can save the raw data even if there is an error while processing
-	err = rc.createRawReports(appContext, orderedTargetScriptOutputs)
+	var rawReports []string
+	rawReports, err = rc.createRawReports(appContext, orderedTargetScriptOutputs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
@@ -227,6 +232,19 @@ func (rc *ReportingCommand) Run() error {
 		slog.Error(err.Error())
 		rc.Cmd.SilenceUsage = true
 		return err
+	}
+	if len(reportFilePaths) > 0 || len(rawReports) > 0 {
+		archiveFiles := append(reportFilePaths, rawReports...)
+		if logFilePath != "" {
+			archiveFiles = append(archiveFiles, logFilePath)
+		}
+		err := util.CreateFlatTGZ(archiveFiles, filepath.Join(outputDir, AppName+"_"+timestamp+".tgz"))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			rc.Cmd.SilenceUsage = true
+			return err
+		}
 	}
 	if len(reportFilePaths) > 0 {
 		fmt.Println("Report files:")
@@ -308,12 +326,14 @@ func FlagValidationError(cmd *cobra.Command, msg string) error {
 }
 
 // createRawReports creates the raw report(s) from the collected data
-func (rc *ReportingCommand) createRawReports(appContext AppContext, orderedTargetScriptOutputs []TargetScriptOutputs) error {
+// returns the list of report files creates or an error if the report creation failed.
+func (rc *ReportingCommand) createRawReports(appContext AppContext, orderedTargetScriptOutputs []TargetScriptOutputs) ([]string, error) {
+	var reports []string
 	for _, targetScriptOutputs := range orderedTargetScriptOutputs {
 		reportBytes, err := report.CreateRawReport(rc.TableNames, targetScriptOutputs.ScriptOutputs, targetScriptOutputs.TargetName)
 		if err != nil {
 			err = fmt.Errorf("failed to create raw report: %w", err)
-			return err
+			return reports, err
 		}
 		post := ""
 		if rc.ReportNamePost != "" {
@@ -323,10 +343,11 @@ func (rc *ReportingCommand) createRawReports(appContext AppContext, orderedTarge
 		reportPath := filepath.Join(appContext.OutputDir, reportFilename)
 		if err = writeReport(reportBytes, reportPath); err != nil {
 			err = fmt.Errorf("failed to write report: %w", err)
-			return err
+			return reports, err
 		}
+		reports = append(reports, reportPath)
 	}
-	return nil
+	return reports, nil
 }
 
 // writeReport writes the report bytes to the specified path.
