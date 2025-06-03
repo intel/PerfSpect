@@ -1174,20 +1174,22 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 		channelError <- targetError{target: myTarget, err: err}
 		return
 	}
-	for _, def := range targetContext.metricDefinitions {
-		desc := fmt.Sprintf("%s (expr: %s)", def.Name, def.Expression)
-		name := promMetricPrefix + sanitizeMetricName(def.Name)
-		gauge := prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Name: name,
-				Help: desc,
-			},
-			[]string{"socket", "cpu", "cgroup", "pid", "cmd"},
-		)
-		promMetrics[name] = gauge
-	}
-	for _, m := range promMetrics {
-		prometheus.MustRegister(m)
+	if flagPrometheusServer {
+		for _, def := range targetContext.metricDefinitions {
+			desc := fmt.Sprintf("%s (expr: %s)", def.Name, def.Expression)
+			name := promMetricPrefix + sanitizeMetricName(def.Name)
+			gauge := prometheus.NewGaugeVec(
+				prometheus.GaugeOpts{
+					Name: name,
+					Help: desc,
+				},
+				[]string{"socket", "cpu", "cgroup", "pid", "cmd"},
+			)
+			promMetrics[name] = gauge
+		}
+		for _, m := range promMetrics {
+			prometheus.MustRegister(m)
+		}
 	}
 	channelError <- targetError{target: myTarget, err: nil}
 }
