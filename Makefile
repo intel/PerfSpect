@@ -38,12 +38,12 @@ perfspect:
 # Copy prebuilt tools to script resources
 .PHONY: resources
 resources:
-	mkdir -p internal/script/resources/x86_64
+	mkdir -p internal/script/resources/$(ARCH)
 ifneq ("$(wildcard /prebuilt/tools)","") # /prebuilt/tools is a directory in the container
-	cp -r /prebuilt/tools/* internal/script/resources/x86_64
+	cp -r /prebuilt/tools/* internal/script/resources/$(ARCH)
 else # copy dev system tools to script resources
 ifneq ("$(wildcard tools/bin)","")
-		cp -r tools/bin/* internal/script/resources/x86_64
+		cp -r tools/bin/* internal/script/resources/$(ARCH)
 else # no prebuilt tools found
 		@echo "No prebuilt tools found in /prebuilt/tools or tools/bin"
 endif
@@ -54,7 +54,7 @@ endif
 .PHONY: dist
 dist: resources check perfspect
 	rm -rf dist/perfspect
-	mkdir -p dist/perfspect/tools/x86_64
+	mkdir -p dist/perfspect/tools/$(ARCH)
 	cp LICENSE dist/perfspect/
 	cp THIRD_PARTY_PROGRAMS dist/perfspect/
 	cp NOTICE dist/perfspect/

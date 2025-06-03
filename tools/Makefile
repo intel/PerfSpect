@@ -1,17 +1,31 @@
+
 #!make
 #
 # Copyright (C) 2021-2025 Intel Corporation
 # SPDX-License-Identifier: BSD-3-Clause
 #
 
+ARCH := $(shell uname -m)
+
+# Check for x86_64 (common for amd64)
+ifeq ($(ARCH), x86_64)
+  ARCH := amd64
+  ARCH_SPECIFIC_TOOLS := avx-turbo cpuid msr-tools pcm turbostat
+  ASYNC_PROFILER_ARCH := x64
+endif
+
+ifeq ($(ARCH), aarch64)
+  ARCH := arm64
+  ARCH_SPECIFIC_TOOLS :=
+  ASYNC_PROFILER_ARCH := arm64
+endif
+
 default: tools
 .PHONY: default tools async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm perf processwatch spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc turbostat
 
-tools: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc turbostat
+tools: async-profiler dmidecode ethtool fio ipmitool lshw lspci spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc $(ARCH_SPECIFIC_TOOLS)
 	mkdir -p bin
 	cp -R async-profiler bin/
-	cp avx-turbo/avx-turbo bin/
-	cp cpuid/cpuid bin/
 	cp dmidecode/dmidecode bin/
 	cp ethtool/ethtool bin/
 	cp fio/fio bin/
@@ -20,10 +34,6 @@ tools: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci 
 	cp lshw/src/lshw-static bin/lshw
 	cp lspci/lspci bin/
 	cp lspci/pci.ids.gz bin/
-	cp msr-tools/rdmsr bin/
-	cp msr-tools/wrmsr bin/
-	cp pcm/build/bin/pcm-tpmi bin/
-	cp pcm/scripts/bhs-power-mode.sh bin/
 	cp spectre-meltdown-checker/spectre-meltdown-checker.sh bin/
 	cp sshpass/sshpass bin/
 	cp stress-ng/stress-ng bin/
@@ -32,16 +42,24 @@ tools: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci 
 	cp sysstat/sar bin/
 	cp sysstat/sadc bin/
 	cp tsc/tsc bin/
+ifeq ($(ARCH),amd64)
+	cp avx-turbo/avx-turbo bin/
+	cp cpuid/cpuid bin/
+	cp msr-tools/rdmsr bin/
+	cp msr-tools/wrmsr bin/
+	cp pcm/build/bin/pcm-tpmi bin/
+	cp pcm/scripts/bhs-power-mode.sh bin/
 	cp linux_turbostat/tools/power/x86/turbostat/turbostat bin/
+endif
 	-cd bin && strip --strip-unneeded *
 
 ASYNC_PROFILER_VERSION := "4.0"
 async-profiler:
 ifeq ("$(wildcard async-profiler)","")
-ifeq ("$(wildcard async-profiler-$(ASYNC_PROFILER_VERSION)-linux-x64.tar.gz)","")
-	wget https://github.com/jvm-profiling-tools/async-profiler/releases/download/v$(ASYNC_PROFILER_VERSION)/async-profiler-$(ASYNC_PROFILER_VERSION)-linux-x64.tar.gz
+ifeq ("$(wildcard async-profiler-$(ASYNC_PROFILER_VERSION)-linux-$(ASYNC_PROFILER_ARCH).tar.gz)","")
+	wget https://github.com/jvm-profiling-tools/async-profiler/releases/download/v$(ASYNC_PROFILER_VERSION)/async-profiler-$(ASYNC_PROFILER_VERSION)-linux-$(ASYNC_PROFILER_ARCH).tar.gz
 endif
-	tar -xf async-profiler-$(ASYNC_PROFILER_VERSION)-linux-x64.tar.gz && mv async-profiler-$(ASYNC_PROFILER_VERSION)-linux-x64 async-profiler
+	tar -xf async-profiler-$(ASYNC_PROFILER_VERSION)-linux-$(ASYNC_PROFILER_ARCH).tar.gz && mv async-profiler-$(ASYNC_PROFILER_VERSION)-linux-$(ASYNC_PROFILER_ARCH) async-profiler
 endif
 
 AVX_TURBO_VERSION := "threadcpuid"
@@ -161,7 +179,7 @@ endif
 	cd pcm/build &&	cmake -DNO_ASAN=1 ..
 	cd pcm/build && cmake --build .
 
-PERF_VERSION := "6.8.12"
+PERF_VERSION := "6.15"
 perf:
 	wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$(PERF_VERSION).tar.xz
 	tar -xf linux-$(PERF_VERSION).tar.xz && mv linux-$(PERF_VERSION)/ linux_perf/
@@ -206,7 +224,7 @@ endif
 	cd sshpass && make
 
 stackcollapse-perf:
-	cd stackcollapse-perf && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build
+	cd stackcollapse-perf && CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build
 
 STRESS_NG_VERSION := "V0.13.08"
 stress-ng:
@@ -216,7 +234,7 @@ else
 	cd stress-ng && git checkout master && git pull
 endif
 	cd stress-ng && git checkout $(STRESS_NG_VERSION)
-	cd stress-ng && STATIC=1 make
+	cd stress-ng && STATIC=1 make -j$(nproc)
 
 SYSSTAT_VERSION := "v12.7.6"
 sysstat:
@@ -232,7 +250,7 @@ endif
 	cd sysstat && make
 
 tsc:
-	cd tsc && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build
+	cd tsc && CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build
 
 TURBOSTAT_VERSION := "6.9.12"
 turbostat:
@@ -243,21 +261,23 @@ turbostat:
 
 reset:
 	cd async-profiler
-	cd cpuid && make clean
 	cd dmidecode && git clean -fdx && git reset --hard
 	cd ethtool && git clean -fdx && git reset --hard
 	cd fio && git clean -fdx && git reset --hard
 	cd ipmitool && git clean -fdx && git reset --hard
 	cd lshw && git clean -fdx && git reset --hard
 	cd lspci && git clean -fdx && git reset --hard
-	cd pcm && git clean -fdx && git reset --hard
-	cd msr-tools && git clean -fdx && git reset --hard
 	cd spectre-meltdown-checker
 	cd sshpass && make clean
 	cd stress-ng && git clean -fdx && git reset --hard
 	cd sysstat && git clean -fdx && git reset --hard
 	cd tsc && rm -f tsc
+ifeq ($(GOARCH),amd64)
+	cd cpuid && make clean
+	cd pcm && git clean -fdx && git reset --hard
+	cd msr-tools && git clean -fdx && git reset --hard
 	cd linux_turbostat/tools/power/x86/turbostat && make clean
+endif
 
 # not used in build but required in oss archive file because some of the tools are statically linked
 glibc-2.19.tar.bz2:
@@ -268,6 +288,10 @@ libcrypt.tar.gz:
 	wget https://github.com/gpg/libgcrypt/archive/refs/heads/master.tar.gz -O libcrypt.tar.gz
 libs: glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
 
-oss-source: reset libs
-	tar --exclude-vcs -czf oss_source.tgz async-profiler/ cpuid/ dmidecode/ ethtool/ fio/ ipmitool/ lshw/ lspci/ msr-tools/ pcm/ spectre-meltdown-checker/ sshpass/ stress-ng/ sysstat/ linux_turbostat/tools/power/x86/turbostat glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
+OSS_SOURCE_FILES := async-profiler/ dmidecode/ ethtool/ fio/ ipmitool/ lshw/ lspci/ spectre-meltdown-checker/ sshpass/ stress-ng/ sysstat/ tsc/ glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz	
+ifeq ($(ARCH),amd64)
+	OSS_SOURCE_FILES += cpuid/ msr-tools/ pcm/ linux_turbostat/tools/power/x86/turbostat
+endif
+oss-source: reset libs	
+	tar --exclude-vcs -czf oss_source.tgz $(OSS_SOURCE_FILES)
 	md5sum oss_source.tgz > oss_source.tgz.md5

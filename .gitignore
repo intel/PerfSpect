@@ -5,5 +5,6 @@
 /tools/bin
 /dist
 /internal/script/resources/x86_64
-/test
+/internal/script/resources/arm64
+//test
 /__debug_bin*.log

@@ -28,18 +28,38 @@ RUN for i in {1..5}; do \
         libreadline-dev default-jre default-jdk cmake flex bison libssl-dev && break; \
         echo "Retrying in 5 seconds... ($i/5)" && sleep 5; \
     done
-ENV JAVA_HOME=/usr/lib/jvm/java-1.11.0-openjdk-amd64
-# need golang to build go tools
-RUN rm -rf /usr/local/go && wget -qO- https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -C /usr/local -xz
-ENV PATH="${PATH}:/usr/local/go/bin"
-# need up-to-date zlib (used by stress-ng static build) to fix security vulnerabilities
-RUN git clone https://github.com/madler/zlib.git && cd zlib && ./configure && make install
-RUN cp /usr/local/lib/libz.a /usr/lib/x86_64-linux-gnu/libz.a
-# Build third-party components
+
+
 RUN mkdir workdir
 ADD . /workdir
-WORKDIR /workdir
-RUN make tools && make oss-source
+
+RUN ARCH=$(uname -m); \
+if [ "$ARCH" = "x86_64" ]; then \
+    PKG_ARCH="amd64"; \
+elif [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then \
+    PKG_ARCH="arm64"; \
+fi; \
+echo PKG_ARCH=$PKG_ARCH; \
+JAVA_HOME="/usr/lib/jvm/java-1.11.0-openjdk-${PKG_ARCH}" ; export JAVA_HOME; \
+rm -rf /usr/local/go && wget -qO- https://go.dev/dl/go${GO_VERSION}.linux-${PKG_ARCH}.tar.gz | tar -C /usr/local -xz && \
+PATH="${PATH}:/usr/local/go/bin" && \
+git clone https://github.com/madler/zlib.git && cd zlib && ./configure && make install && \
+cp /usr/local/lib/libz.a /usr/lib/${ARCH}-linux-gnu/libz.a && \
+cd /workdir && \
+make -j$(nproc) tools
+
+RUN ARCH=$(uname -m); \
+if [ "$ARCH" = "x86_64" ]; then \
+    PKG_ARCH="amd64"; \
+elif [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then \
+    PKG_ARCH="arm64"; \
+fi; \
+echo PKG_ARCH=$PKG_ARCH; \
+JAVA_HOME="/usr/lib/jvm/java-1.11.0-openjdk-${PKG_ARCH}" ; export JAVA_HOME; \
+PATH="${PATH}:/usr/local/go/bin" && \
+cd /workdir && \
+make oss-source
+ENV PATH="${PATH}:/usr/local/go/bin"
 
 FROM ubuntu:22.04 AS perf-builder
 # Define default values for proxy environment variables
