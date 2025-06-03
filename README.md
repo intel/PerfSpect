@@ -52,6 +52,9 @@ If neither sudo nor root access is available, an administrator must apply the fo
 
 Once the configuration changes are applied, use the `--noroot` flag on the command line, for example, `perfspect metrics --noroot`.
 
+##### Prometheus Endpoint
+The `metrics` command can expose metrics via a Prometheus compatible `metrics` endpoint. This allows integration with Prometheus monitoring systems. To enable the Prometheus endpoint, use the `--prometheus-server` flag. By default, the endpoint listens on port 9090. The port can be changed using the `--prometheus-server-addr` flag. Run `perfspect metrics --prometheus-server`. See the [example daemonset](docs/perfspect-daemonset.md) for deploying in Kubernetes.
+
 See `perfspect metrics -h` for the extensive set of options and examples.
 
 #### Report Command
