@@ -81,7 +81,7 @@ func printMetricsAsync(targetContext *targetContext, outputDir string, frameChan
 	// block until next set of metric frames arrives, will exit loop when frameChannel is closed
 	for metricFrames := range frameChannel {
 		printedFiles := printMetrics(metricFrames, frameCount, targetContext.target.GetName(), targetContext.perfStartTime, outputDir)
-		if flagPrometheusServerAddr != "" {
+		if flagPrometheusServer {
 			updatePrometheusMetrics(metricFrames)
 		}
 		for _, file := range printedFiles {
