@@ -734,11 +734,12 @@ rdmsr 0x2FFE
 	if ! ethtool_i_out=$(ethtool -i "$ifc" 2>/dev/null); then
 		continue
 	fi
-    echo "Interface: $ifc"
-	echo "Vendor ID: $(udevadm info --query=all --path=/sys/class/net/"$ifc" | grep ID_VENDOR_ID= | cut -d'=' -f2)"
-	echo "Model ID: $(udevadm info --query=all --path=/sys/class/net/"$ifc" | grep ID_MODEL_ID= | cut -d'=' -f2)"
-    echo "Vendor: $(udevadm info --query=all --path=/sys/class/net/"$ifc" | grep ID_VENDOR_FROM_DATABASE= | cut -d'=' -f2)"
-    echo "Model: $(udevadm info --query=all --path=/sys/class/net/"$ifc" | grep ID_MODEL_FROM_DATABASE= | cut -d'=' -f2)"
+	echo "Interface: $ifc"
+	udevadm_out=$(udevadm info --query=all --path=/sys/class/net/"$ifc")
+	echo "Vendor ID: $(echo "$udevadm_out" | grep ID_VENDOR_ID= | cut -d'=' -f2)"
+	echo "Model ID: $(echo "$udevadm_out" | grep ID_MODEL_ID= | cut -d'=' -f2)"
+	echo "Vendor: $(echo "$udevadm_out" | grep ID_VENDOR_FROM_DATABASE= | cut -d'=' -f2)"
+	echo "Model: $(echo "$udevadm_out" | grep ID_MODEL_FROM_DATABASE= | cut -d'=' -f2)"
 	echo "$ethtool_out"
 	echo "$ethtool_i_out"
 	echo "MAC Address: $(cat /sys/class/net/"$ifc"/address 2>/dev/null)"
@@ -751,7 +752,7 @@ rdmsr 0x2FFE
 	done
 	printf "\n"
 	echo "IRQ Balance: $(pgrep irqbalance >/dev/null 2>&1 && echo "Enabled" || echo "Disabled")"
-    echo "----------------------------------------"
+	echo "----------------------------------------"
 done
 `,
 		Depends:   []string{"ethtool"},
