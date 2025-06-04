@@ -17,6 +17,7 @@ ARCH := $(shell uname -m)
 # Check for x86_64 (common for amd64)
 ifeq ($(ARCH), x86_64)
   ARCH := amd64
+  TOOLS_ARCH := x86_64
 endif
 
 ifeq ($(ARCH), aarch64)
@@ -38,12 +39,12 @@ perfspect:
 # Copy prebuilt tools to script resources
 .PHONY: resources
 resources:
-	mkdir -p internal/script/resources/$(ARCH)
+	mkdir -p internal/script/resources/$(TOOLS_ARCH)
 ifneq ("$(wildcard /prebuilt/tools)","") # /prebuilt/tools is a directory in the container
-	cp -r /prebuilt/tools/* internal/script/resources/$(ARCH)
+	cp -r /prebuilt/tools/* internal/script/resources/$(TOOLS_ARCH)
 else # copy dev system tools to script resources
 ifneq ("$(wildcard tools/bin)","")
-		cp -r tools/bin/* internal/script/resources/$(ARCH)
+		cp -r tools/bin/* internal/script/resources/$(TOOLS_ARCH)
 else # no prebuilt tools found
 		@echo "No prebuilt tools found in /prebuilt/tools or tools/bin"
 endif
@@ -54,7 +55,7 @@ endif
 .PHONY: dist
 dist: resources check perfspect
 	rm -rf dist/perfspect
-	mkdir -p dist/perfspect/tools/$(ARCH)
+	mkdir -p dist/perfspect/tools/$(TOOLS_ARCH)
 	cp LICENSE dist/perfspect/
 	cp THIRD_PARTY_PROGRAMS dist/perfspect/
 	cp NOTICE dist/perfspect/
@@ -164,4 +165,4 @@ clean: sweep
 	@echo "Cleaning up..."
 	rm -f perfspect
 	sudo rm -rf dist
-	rm -rf internal/script/resources/x86_64/*
+	rm -rf internal/script/resources/$(TOOLS_ARCH)/*
