@@ -288,10 +288,10 @@ libcrypt.tar.gz:
 	wget https://github.com/gpg/libgcrypt/archive/refs/heads/master.tar.gz -O libcrypt.tar.gz
 libs: glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
 
-OSS_SOURCE_FILES := async-profiler/ dmidecode/ ethtool/ fio/ ipmitool/ lshw/ lspci/ spectre-meltdown-checker/ sshpass/ stress-ng/ sysstat/ tsc/ glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz	
+OSS_SOURCE_FILES := async-profiler/ dmidecode/ ethtool/ fio/ ipmitool/ lshw/ lspci/ spectre-meltdown-checker/ sshpass/ stress-ng/ sysstat/ tsc/ glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
 ifeq ($(ARCH),amd64)
 	OSS_SOURCE_FILES += cpuid/ msr-tools/ pcm/ linux_turbostat/tools/power/x86/turbostat
 endif
-oss-source: reset libs	
+oss-source: reset libs
 	tar --exclude-vcs -czf oss_source.tgz $(OSS_SOURCE_FILES)
 	md5sum oss_source.tgz > oss_source.tgz.md5

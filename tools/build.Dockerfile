@@ -46,19 +46,8 @@ PATH="${PATH}:/usr/local/go/bin" && \
 git clone https://github.com/madler/zlib.git && cd zlib && ./configure && make install && \
 cp /usr/local/lib/libz.a /usr/lib/${ARCH}-linux-gnu/libz.a && \
 cd /workdir && \
-make -j$(nproc) tools
+make tools && make oss-source
 
-RUN ARCH=$(uname -m); \
-if [ "$ARCH" = "x86_64" ]; then \
-    PKG_ARCH="amd64"; \
-elif [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then \
-    PKG_ARCH="arm64"; \
-fi; \
-echo PKG_ARCH=$PKG_ARCH; \
-JAVA_HOME="/usr/lib/jvm/java-1.11.0-openjdk-${PKG_ARCH}" ; export JAVA_HOME; \
-PATH="${PATH}:/usr/local/go/bin" && \
-cd /workdir && \
-make oss-source
 ENV PATH="${PATH}:/usr/local/go/bin"
 
 FROM ubuntu:22.04 AS perf-builder
