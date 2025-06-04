@@ -223,7 +223,8 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 				LocalTempDir:   localTempDir,
 				LogFilePath:    logFilePath,
 				TargetTempRoot: flagTargetTempRoot,
-				Version:        gVersion},
+				Version:        gVersion,
+				Debug:          flagDebug},
 		),
 	)
 	// check for updates unless the user has disabled this feature or is not on the Intel network or is running the update command

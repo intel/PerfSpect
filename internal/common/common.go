@@ -35,6 +35,7 @@ type AppContext struct {
 	LogFilePath    string // LogFilePath is the path to the log file.
 	TargetTempRoot string // TargetTempRoot is the path to a directory on the target host where the application can create temporary directories.
 	Version        string // Version is the version of the application.
+	Debug          bool   // Debug is true if the application is running in debug mode.
 }
 
 type Flag struct {
@@ -233,17 +234,20 @@ func (rc *ReportingCommand) Run() error {
 		rc.Cmd.SilenceUsage = true
 		return err
 	}
-	if len(reportFilePaths) > 0 || len(rawReports) > 0 {
+	// if we are debugging, create a tgz archive with the raw reports, formatted reports, and log file
+	if appContext.Debug {
 		archiveFiles := append(reportFilePaths, rawReports...)
-		if logFilePath != "" {
-			archiveFiles = append(archiveFiles, logFilePath)
-		}
-		err := util.CreateFlatTGZ(archiveFiles, filepath.Join(outputDir, AppName+"_"+timestamp+".tgz"))
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			slog.Error(err.Error())
-			rc.Cmd.SilenceUsage = true
-			return err
+		if len(archiveFiles) > 0 {
+			if logFilePath != "" {
+				archiveFiles = append(archiveFiles, logFilePath)
+			}
+			err := util.CreateFlatTGZ(archiveFiles, filepath.Join(outputDir, AppName+"_"+timestamp+".tgz"))
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				slog.Error(err.Error())
+				rc.Cmd.SilenceUsage = true
+				return err
+			}
 		}
 	}
 	if len(reportFilePaths) > 0 {
