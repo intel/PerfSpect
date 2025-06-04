@@ -1330,7 +1330,9 @@ func clusteringModeFromOutput(outputs map[string]script.ScriptOutput) string {
 type nicInfo struct {
 	Name            string
 	Vendor          string
+	VendorID        string
 	Model           string
+	ModelID         string
 	Speed           string
 	Link            string
 	Bus             string
@@ -1358,9 +1360,15 @@ func parseNicInfo(scriptOutput string) []nicInfo {
 			if strings.HasPrefix(line, "Vendor: ") {
 				nic.Vendor = strings.TrimPrefix(line, "Vendor: ")
 			}
+			if strings.HasPrefix(line, "Vendor ID: ") {
+				nic.VendorID = strings.TrimPrefix(line, "Vendor ID: ")
+			}
 			if strings.HasPrefix(line, "Model: ") {
 				// sometimes the model name has additional information in parentheses, we want to keep only the model name
 				nic.Model = strings.TrimSpace(strings.TrimPrefix(strings.Split(line, "(")[0], "Model: "))
+			}
+			if strings.HasPrefix(line, "Model ID: ") {
+				nic.ModelID = strings.TrimPrefix(line, "Model ID: ")
 			}
 			if strings.HasPrefix(line, "Speed: ") {
 				nic.Speed = strings.TrimPrefix(line, "Speed: ")

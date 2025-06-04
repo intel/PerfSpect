@@ -735,6 +735,8 @@ rdmsr 0x2FFE
 		continue
 	fi
     echo "Interface: $ifc"
+	echo "Vendor ID: $(udevadm info --query=all --path=/sys/class/net/"$ifc" | grep ID_VENDOR_ID= | cut -d'=' -f2)"
+	echo "Model ID: $(udevadm info --query=all --path=/sys/class/net/"$ifc" | grep ID_MODEL_ID= | cut -d'=' -f2)"
     echo "Vendor: $(udevadm info --query=all --path=/sys/class/net/"$ifc" | grep ID_VENDOR_FROM_DATABASE= | cut -d'=' -f2)"
     echo "Model: $(udevadm info --query=all --path=/sys/class/net/"$ifc" | grep ID_MODEL_FROM_DATABASE= | cut -d'=' -f2)"
 	echo "$ethtool_out"

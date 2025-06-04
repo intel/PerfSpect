@@ -1514,8 +1514,8 @@ func dimmTableInsights(outputs map[string]script.ScriptOutput, tableValues Table
 func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
 		{Name: "Name"},
-		{Name: "Vendor"},
-		{Name: "Model"},
+		{Name: "Vendor (ID)"},
+		{Name: "Model (ID)"},
 		{Name: "Speed"},
 		{Name: "Link"},
 		{Name: "Bus"},
@@ -1530,7 +1530,13 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 	for _, nicInfo := range allNicsInfo {
 		fields[0].Values = append(fields[0].Values, nicInfo.Name)
 		fields[1].Values = append(fields[1].Values, nicInfo.Vendor)
+		if nicInfo.VendorID != "" {
+			fields[1].Values[len(fields[1].Values)-1] += fmt.Sprintf(" (%s)", nicInfo.VendorID)
+		}
 		fields[2].Values = append(fields[2].Values, nicInfo.Model)
+		if nicInfo.ModelID != "" {
+			fields[2].Values[len(fields[2].Values)-1] += fmt.Sprintf(" (%s)", nicInfo.ModelID)
+		}
 		fields[3].Values = append(fields[3].Values, nicInfo.Speed)
 		fields[4].Values = append(fields[4].Values, nicInfo.Link)
 		fields[5].Values = append(fields[5].Values, nicInfo.Bus)
