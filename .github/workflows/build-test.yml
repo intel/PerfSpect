@@ -74,7 +74,7 @@ jobs:
           name: ${{ matrix.runner }} report
           path: perfspect/output/
 
-  test aarch64:
+  test_aarch64:
     needs: [build]
     runs-on: ubuntu-latest-arm64
     steps:
