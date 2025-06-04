@@ -187,7 +187,10 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 		logOpts.Level = slog.LevelInfo
 		logOpts.AddSource = false
 	}
-	if flagSyslog { // log to syslog
+	if flagSyslog && flagLogStdOut {
+		fmt.Println("Error: both syslog handler and stdout output specified. Please pick one only.")
+		os.Exit(1)
+	} else if flagSyslog { // log to syslog
 		handler, err := NewSyslogHandler(&logOpts)
 		if err != nil {
 			fmt.Printf("Error: failed to create syslog handler: %v\n", err)
