@@ -168,7 +168,7 @@ perf:
 	cd linux_perf/tools/perf && make LDFLAGS="-static --static" BUILD_BPF_SKEL=1 NO_JVMTI=1
 	mkdir -p bin
 	cp linux_perf/tools/perf/perf bin/
-	strip --strip-unneeded bin/perf
+	-strip --strip-unneeded bin/perf || true
 	cp linux_perf/tools/perf/perf-archive.sh bin/perf-archive
 	chmod +x bin/perf-archive
 

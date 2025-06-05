@@ -73,7 +73,28 @@ WORKDIR /workdir
 RUN make perf
 RUN make processwatch
 
+# --- aarch64 perf build stage ---
+FROM ubuntu:22.04 AS perf-builder-arm64
+ARG http_proxy=""
+ARG https_proxy=""
+ENV http_proxy=${http_proxy}
+ENV https_proxy=${https_proxy}
+ENV LANG=en_US.UTF-8
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y apt-utils locales wget curl git netcat-openbsd \
+    software-properties-common jq zip unzip gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+    make pkgconf flex bison libssl-dev libelf-dev libdw-dev libiberty-dev libzstd-dev \
+    python3 python3-dev libtraceevent-dev
+RUN locale-gen en_US.UTF-8 &&  echo "LANG=en_US.UTF-8" > /etc/default/locale
+RUN mkdir workdir
+ADD . /workdir
+WORKDIR /workdir
+# Build perf for aarch64
+RUN make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- NO_LIBELF=1 NO_LIBTRACEEVENT=1 perf
+
 FROM scratch AS output
-COPY --from=builder workdir/bin /bin
-COPY --from=builder workdir/oss_source* /
-COPY --from=perf-builder workdir/bin/ /bin
+COPY --from=builder workdir/oss_source.tgz /
+COPY --from=builder workdir/oss_source.tgz.md5 /
+COPY --from=builder workdir/bin /bin/x86_64
+COPY --from=perf-builder workdir/bin /bin/x86_64
+COPY --from=perf-builder-arm64 workdir/bin /bin/aarch64

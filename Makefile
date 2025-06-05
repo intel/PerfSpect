@@ -30,10 +30,12 @@ resources:
 	mkdir -p internal/script/resources/x86_64
 	mkdir -p internal/script/resources/aarch64
 ifneq ("$(wildcard /prebuilt/tools)","") # /prebuilt/tools is a directory in the container
-	cp -r /prebuilt/tools/* internal/script/resources/x86_64
+	cp -r /prebuilt/tools/x86_64/* internal/script/resources/x86_64
+	cp -r /prebuilt/tools/aarch64/* internal/script/resources/aarch64
 else # copy dev system tools to script resources
 ifneq ("$(wildcard tools/bin)","")
-		cp -r tools/bin/* internal/script/resources/x86_64
+		cp -r tools/bin/x86_64/* internal/script/resources/x86_64
+		cp -r tools/bin/aarch64/* internal/script/resources/aarch64
 else # no prebuilt tools found
 		@echo "No prebuilt tools found in /prebuilt/tools or tools/bin"
 endif
