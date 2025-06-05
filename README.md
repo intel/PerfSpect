@@ -96,9 +96,6 @@ The `telemetry` command reports CPU utilization, instruction mix, disk stats, ne
 #### Flame Command
 Software flamegraphs are useful in diagnosing software performance bottlenecks. Run `perfspect flame` to capture a system-wide software flamegraph.
 
-> [!NOTE]
-> Perl is required on the target system to process the data needed for flamegraphs.
-
 ![screenshot of a flame graph from the HTML output of the flame command](docs/flamegraph.png)
 
 #### Lock Command
