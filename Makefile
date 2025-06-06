@@ -12,8 +12,24 @@ VERSION := $(VERSION_NUMBER)_$(COMMIT_DATE)_$(COMMIT_ID)
 
 default: perfspect
 
-GO=CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go
-GOFLAGS=-trimpath -mod=readonly -gcflags="all=-spectre=all -N -l" -asmflags="all=-spectre=all" -ldflags="-X perfspect/cmd.gVersion=$(VERSION) -s -w"
+ARCH := $(shell uname -m)
+
+# Check for x86_64 (common for amd64)
+ifeq ($(ARCH), x86_64)
+  ARCH := amd64
+  TOOLS_ARCH := x86_64
+endif
+
+ifeq ($(ARCH), aarch64)
+  ARCH := arm64
+endif
+
+ifeq ($(ARCH), amd64)
+        GOFLAGS_EXTRA := -gcflags="all=-spectre=all -N -l" -asmflags="all=-spectre=all"
+endif
+
+GO=CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go
+GOFLAGS=-trimpath -mod=readonly $(GOFLAGS_EXTRA) -ldflags="-X perfspect/cmd.gVersion=$(VERSION) -s -w"
 
 # Build the perfspect binary
 .PHONY: perfspect
@@ -23,12 +39,12 @@ perfspect:
 # Copy prebuilt tools to script resources
 .PHONY: resources
 resources:
-	mkdir -p internal/script/resources/x86_64
+	mkdir -p internal/script/resources/$(TOOLS_ARCH)
 ifneq ("$(wildcard /prebuilt/tools)","") # /prebuilt/tools is a directory in the container
-	cp -r /prebuilt/tools/* internal/script/resources/x86_64
+	cp -r /prebuilt/tools/* internal/script/resources/$(TOOLS_ARCH)
 else # copy dev system tools to script resources
 ifneq ("$(wildcard tools/bin)","")
-		cp -r tools/bin/* internal/script/resources/x86_64
+		cp -r tools/bin/* internal/script/resources/$(TOOLS_ARCH)
 else # no prebuilt tools found
 		@echo "No prebuilt tools found in /prebuilt/tools or tools/bin"
 endif
@@ -39,7 +55,7 @@ endif
 .PHONY: dist
 dist: resources check perfspect
 	rm -rf dist/perfspect
-	mkdir -p dist/perfspect/tools/x86_64
+	mkdir -p dist/perfspect/tools/$(TOOLS_ARCH)
 	cp LICENSE dist/perfspect/
 	cp THIRD_PARTY_PROGRAMS dist/perfspect/
 	cp NOTICE dist/perfspect/
@@ -149,4 +165,4 @@ clean: sweep
 	@echo "Cleaning up..."
 	rm -f perfspect
 	sudo rm -rf dist
-	rm -rf internal/script/resources/x86_64/*
+	rm -rf internal/script/resources/$(TOOLS_ARCH)/*
