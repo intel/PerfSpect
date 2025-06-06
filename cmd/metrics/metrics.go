@@ -1056,7 +1056,7 @@ func prepareTarget(targetContext *targetContext, localTempDir string, localPerfP
 			// if one of the PMU MSR registers is active, then the PMU is in use (ignore cpu_cycles)
 			if strings.Contains(line, "Active") && !strings.Contains(line, "0x30a") {
 				slog.Warn("PMU is in use on target", slog.String("target", myTarget.GetName()), slog.String("line", line))
-				statusUpdate(myTarget.GetName(), "Warning: PMU in use, see log for details")
+				_ = statusUpdate(myTarget.GetName(), "Warning: PMU in use, see log for details")
 			}
 		}
 	}
