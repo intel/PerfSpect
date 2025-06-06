@@ -511,7 +511,10 @@ func CreateFlatTGZ(files []string, tarballPath string) error {
 		}
 
 		if _, err := io.Copy(tarWriter, srcFile); err != nil {
-			srcFile.Close() // Ensure file is closed before returning
+			closeErr := srcFile.Close() // Ensure file is closed before returning
+			if closeErr != nil {
+				return fmt.Errorf("failed to close file %s after copy error: %w", file, closeErr)
+			}
 			return fmt.Errorf("failed to copy file %s to tarball: %w", file, err)
 		}
 

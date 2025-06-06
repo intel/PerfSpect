@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -37,7 +38,12 @@ func startPrometheusServer(listenAddr string) {
 	mux.Handle("/metrics", promhttp.Handler())
 	slog.Info("Starting Prometheus metrics server", slog.String("address", listenAddr))
 	go func() {
-		err := http.ListenAndServe(listenAddr, mux)
+		server := &http.Server{
+			Addr:              listenAddr,
+			Handler:           mux,
+			ReadHeaderTimeout: 3 * time.Second,
+		}
+		err := server.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
 			slog.Error("Prometheus HTTP server ListenAndServe error", slog.String("error", err.Error()))
 		}
