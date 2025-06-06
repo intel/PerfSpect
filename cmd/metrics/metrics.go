@@ -1042,7 +1042,7 @@ func prepareTarget(targetContext *targetContext, localTempDir string, localPerfP
 	myTarget := targetContext.target
 	var err error
 	_ = statusUpdate(myTarget.GetName(), "configuring target")
-	// make sure PMUs are not in use on target
+	// are PMUs being used on target?
 	if family, err := myTarget.GetFamily(); err == nil && family == "6" {
 		output, err := script.RunScript(myTarget, script.GetScriptByName(script.PMUBusyScriptName), localTempDir)
 		if err != nil {
@@ -1053,13 +1053,10 @@ func prepareTarget(targetContext *targetContext, localTempDir string, localPerfP
 			return
 		}
 		for line := range strings.SplitSeq(output.Stdout, "\n") {
-			// if one of the MSR registers is active (ignore cpu_cycles), then the PMU is in use
+			// if one of the PMU MSR registers is active, then the PMU is in use (ignore cpu_cycles)
 			if strings.Contains(line, "Active") && !strings.Contains(line, "0x30a") {
-				err = fmt.Errorf("PMU in use on target: %s", line)
-				_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %v", err))
-				targetContext.err = err
-				channelError <- targetError{target: myTarget, err: err}
-				return
+				slog.Warn("PMU is in use on target", slog.String("target", myTarget.GetName()), slog.String("line", line))
+				statusUpdate(myTarget.GetName(), "Warning: PMU in use, see log for details")
 			}
 		}
 	}
