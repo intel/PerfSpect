@@ -25,7 +25,9 @@ RUN for i in {1..5}; do \
 RUN for i in {1..5}; do \
         apt-get update && apt-get install -y git build-essential autotools-dev automake \
         gawk zlib1g-dev libtool libaio-dev libaio1 pandoc pkgconf libcap-dev docbook-utils \
-        libreadline-dev default-jre default-jdk cmake flex bison libssl-dev && break; \
+        libreadline-dev default-jre default-jdk cmake flex bison gettext libssl-dev \
+        gcc-aarch64-linux-gnu g++-aarch64-linux-gnu binutils-aarch64-linux-gnu cpp-aarch64-linux-gnu \
+        && break; \
         echo "Retrying in 5 seconds... ($i/5)" && sleep 5; \
     done
 ENV JAVA_HOME=/usr/lib/jvm/java-1.11.0-openjdk-amd64
@@ -39,7 +41,9 @@ RUN cp /usr/local/lib/libz.a /usr/lib/x86_64-linux-gnu/libz.a
 RUN mkdir workdir
 ADD . /workdir
 WORKDIR /workdir
-RUN make tools && make oss-source
+RUN make tools
+RUN make tools-aarch64
+RUN make oss-source
 
 FROM ubuntu:22.04 AS perf-builder
 # Define default values for proxy environment variables
@@ -63,7 +67,8 @@ RUN for i in {1..5}; do \
         libiberty-dev liblzma-dev libnuma-dev libperl-dev libpfm4-dev libreadline-dev \
         libslang2-dev libssl-dev libtool libtraceevent-dev libunwind-dev libzstd-dev \
         libzstd1 llvm-13 pandoc pkgconf python-setuptools python2-dev python3 python3-dev \
-        python3-pip systemtap-sdt-dev zlib1g-dev && break; \
+        python3-pip systemtap-sdt-dev zlib1g-dev \
+        gcc-aarch64-linux-gnu g++-aarch64-linux-gnu binutils-aarch64-linux-gnu cpp-aarch64-linux-gnu && break; \
         echo "Retrying in 5 seconds... ($i/5)" && sleep 5; \
     done
 ENV PATH="${PATH}:/usr/lib/llvm-13/bin"
@@ -71,9 +76,12 @@ RUN mkdir workdir
 ADD . /workdir
 WORKDIR /workdir
 RUN make perf
+RUN make perf-aarch64
 RUN make processwatch
 
 FROM scratch AS output
 COPY --from=builder workdir/bin /bin
+COPY --from=builder workdir/bin-aarch64 /bin-aarch64
 COPY --from=builder workdir/oss_source* /
 COPY --from=perf-builder workdir/bin/ /bin
+COPY --from=perf-builder workdir/bin-aarch64/ /bin-aarch64

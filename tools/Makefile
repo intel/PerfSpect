@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 #
 
+NPROC := $(shell nproc)
+
 default: tools
 .PHONY: default tools async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm perf perf-archive processwatch spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc turbostat
 
@@ -35,6 +37,28 @@ tools: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci 
 	cp linux_turbostat/tools/power/x86/turbostat/turbostat bin/
 	-cd bin && strip --strip-unneeded *
 
+tools-aarch64: async-profiler-aarch64 dmidecode-aarch64 ethtool-aarch64 fio-aarch64 ipmitool-aarch64 lshw-aarch64 lspci-aarch64 spectre-meltdown-checker sshpass-aarch64 stackcollapse-perf-aarch64 stress-ng-aarch64 sysstat-aarch64 tsc-aarch64
+	mkdir -p bin-aarch64
+	cp -R async-profiler-aarch64 bin-aarch64/
+	cp dmidecode-aarch64/dmidecode bin-aarch64/
+	cp ethtool-aarch64/ethtool bin-aarch64/
+	cp fio-aarch64/fio bin-aarch64/	
+	cp stackcollapse-perf/stackcollapse-perf-aarch64 bin-aarch64/stackcollapse-perf
+	cp ipmitool-aarch64/src/ipmitool.static bin-aarch64/ipmitool
+	cp lshw-aarch64/src/lshw-static bin-aarch64/lshw
+	cp lspci-aarch64/lspci bin-aarch64/
+	cp lspci-aarch64/pci.ids bin-aarch64/
+	cp spectre-meltdown-checker/spectre-meltdown-checker.sh bin-aarch64/
+	cp sshpass-aarch64/sshpass bin-aarch64/
+	cp stress-ng-aarch64/stress-ng bin-aarch64/
+	cp sysstat-aarch64/mpstat bin-aarch64/
+	cp sysstat-aarch64/iostat bin-aarch64/
+	cp sysstat-aarch64/sar bin-aarch64/
+	cp sysstat-aarch64/sadc bin-aarch64/
+	cp tsc/tsc-aarch64 bin-aarch64/tsc
+	-cd bin-aarch64 && aarch64-linux-gnu-strip --strip-unneeded * || true
+
+
 ASYNC_PROFILER_VERSION := "4.0"
 async-profiler:
 ifeq ("$(wildcard async-profiler)","")
@@ -43,6 +67,15 @@ ifeq ("$(wildcard async-profiler-$(ASYNC_PROFILER_VERSION)-linux-x64.tar.gz)",""
 endif
 	tar -xf async-profiler-$(ASYNC_PROFILER_VERSION)-linux-x64.tar.gz && mv async-profiler-$(ASYNC_PROFILER_VERSION)-linux-x64 async-profiler
 endif
+
+async-profiler-aarch64:
+ifeq ("$(wildcard async-profiler-aarch64)","")
+ifeq ("$(wildcard async-profiler-$(ASYNC_PROFILER_VERSION)-linux-arm64.tar.gz)","")
+	wget https://github.com/jvm-profiling-tools/async-profiler/releases/download/v$(ASYNC_PROFILER_VERSION)/async-profiler-$(ASYNC_PROFILER_VERSION)-linux-arm64.tar.gz
+endif
+	tar -xf async-profiler-$(ASYNC_PROFILER_VERSION)-linux-arm64.tar.gz && mv async-profiler-$(ASYNC_PROFILER_VERSION)-linux-arm64 async-profiler-aarch64
+endif
+
 
 AVX_TURBO_VERSION := "9cfe8bf"
 avx-turbo:
@@ -80,6 +113,27 @@ endif
 	cd dmidecode && git checkout $(DMIDECODE_VERSION)
 	cd dmidecode && make
 
+dmidecode-aarch64:
+ifeq ("$(wildcard dmidecode-aarch64)","")
+	git clone https://github.com/mirror/dmidecode.git dmidecode-aarch64
+else
+	cd dmidecode-aarch64 && git checkout master && git pull
+endif
+	cd dmidecode-aarch64 && git checkout $(DMIDECODE_VERSION)
+	cd dmidecode-aarch64 && CC=aarch64-linux-gnu-gcc make -j$(NPROC)
+
+ELFUTILS_VERSION := "0.186"
+elfutils-aarch64: zlib-aarch64
+ifeq ("$(wildcard elfutils-aarch64)","")
+	wget https://sourceware.org/elfutils/ftp/0.186/elfutils-$(ELFUTILS_VERSION).tar.bz2 
+	mkdir -p elfutils-tmp
+	bzip2 -dc elfutils-$(ELFUTILS_VERSION).tar.bz2 | tar -C elfutils-tmp -xf -
+	mv elfutils-tmp/elfutils-$(ELFUTILS_VERSION) elfutils-aarch64 && rm -rf elfutils-tmp
+endif
+	cd elfutils-aarch64 && ./configure --host=aarch64-linux-gnu --disable-debuginfod --disable-libdebuginfod
+	cd elfutils-aarch64 && make -j$(NPROC)
+	cd elfutils-aarch64 && cp libelf/libelf.a /usr/lib/aarch64-linux-gnu/
+
 ETHTOOL_VERSION := "v6.5"
 ethtool:
 ifeq ("$(wildcard ethtool)","")
@@ -93,6 +147,18 @@ ifeq ("$(wildcard ethtool/Makefile)","")
 endif
 	cd ethtool && make
 
+ethtool-aarch64:
+ifeq ("$(wildcard ethtool-aarch64)","")
+	git clone https://git.kernel.org/pub/scm/network/ethtool/ethtool.git ethtool-aarch64
+else
+	cd ethtool-aarch64 && git checkout master && git pull
+endif
+	cd ethtool-aarch64 && git checkout $(ETHTOOL_VERSION)
+ifeq ("$(wildcard ethtool-aarch64/Makefile)","")
+	cd ethtool-aarch64 && ./autogen.sh && ./configure --host aarch64-linux-gnu enable_netlink=no
+endif
+	cd ethtool-aarch64 && make -j$(NPROC)
+
 FIO_VERSION := "fio-3.38"
 fio:
 ifeq ("$(wildcard fio)","")
@@ -105,6 +171,18 @@ ifeq ("$(wildcard fio/config.log)","")
 	cd fio && ./configure --build-static --disable-native
 endif
 	cd fio && make
+
+fio-aarch64:
+ifeq ("$(wildcard fio-aarch64)","")
+	git clone https://github.com/axboe/fio.git fio-aarch64
+else
+	cd fio-aarch64 && git checkout master && git pull
+endif
+	cd fio-aarch64 && git checkout $(FIO_VERSION)
+ifeq ("$(wildcard fio-aarch64/config.log)","")
+	cd fio-aarch64 && ./configure --build-static --disable-native --cc=aarch64-linux-gnu-gcc
+endif
+	cd fio-aarch64 && make -j$(NPROC)
 
 IPMITOOL_VERSION := "IPMITOOL_1_8_19"
 ipmitool:
@@ -120,6 +198,29 @@ endif
 	cd ipmitool && make
 	cd ipmitool/src && ../libtool --silent --tag=CC --mode=link gcc -fno-strict-aliasing -Wreturn-type -all-static -o ipmitool.static ipmitool.o ipmishell.o ../lib/libipmitool.la plugins/libintf.la
 
+ipmitool-aarch64:
+ifeq ("$(wildcard ipmitool-aarch64)","")
+	git clone https://github.com/ipmitool/ipmitool.git ipmitool-aarch64
+endif
+	cd ipmitool-aarch64 && git checkout $(IPMITOOL_VERSION)
+ifeq ("$(wildcard ipmitool-aarch64/Makefile)","")
+	# hack to get around static build problem - don't check for libreadline
+	sed -i "s#x\$$xenable_ipmishell#xno#" ipmitool-aarch64/configure.ac
+	cd ipmitool-aarch64 && ./bootstrap && LDFLAGS=-static ./configure --host=aarch64-linux-gnu
+endif
+	cd ipmitool-aarch64 && CC=aarch64-linux-gnu-gcc make -j$(NPROC)
+	cd ipmitool-aarch64/src && ../libtool --silent --tag=CC --mode=link aarch64-linux-gnu-gcc -fno-strict-aliasing -Wreturn-type -all-static -o ipmitool.static ipmitool.o ipmishell.o ../lib/libipmitool.la plugins/libintf.la
+
+LIBPFM4_VERSION := "v4.11.1"
+libpfm4-aarch64:
+ifeq ("$(wildcard libpfm4-aarch64)","")
+	git clone https://git.code.sf.net/p/perfmon2/libpfm4 libpfm4-aarch64
+endif
+	cd libpfm4-aarch64 && git checkout $(LIBPFM4_VERSION)
+	cd libpfm4-aarch64 && sed -i 's/^ARCH :=/ARCH ?=/' config.mk
+	cd libpfm4-aarch64 && ARCH=arm64 CC=aarch64-linux-gnu-gcc make -j$(NPROC)
+	cd libpfm4-aarch64 && cp lib/libpfm.a /usr/lib/aarch64-linux-gnu/
+
 LSHW_VERSION := "B.02.19"
 lshw:
 ifeq ("$(wildcard lshw)","")
@@ -129,6 +230,15 @@ else
 endif
 	cd lshw && git checkout $(LSHW_VERSION)
 	cd lshw/src && make static
+
+lshw-aarch64:
+ifeq ("$(wildcard lshw-aarch64)","")
+	git clone https://github.com/lyonel/lshw.git lshw-aarch64
+else
+	cd lshw-aarch64 && git checkout master && git pull
+endif
+	cd lshw-aarch64 && git checkout $(LSHW_VERSION)
+	cd lshw-aarch64/src && STRIP=aarch64-linux-gnu-strip CXX=aarch64-linux-gnu-g++ make static
 
 LSPCI_VERSION := "v3.13.0"
 lspci:
@@ -141,6 +251,21 @@ endif
 	cd lspci && make
 	cd lspci && ./update-pciids.sh
 	cd lspci && gzip -c pci.ids > pci.ids.gz
+
+lspci-aarch64: zlib-aarch64
+ifeq ("$(wildcard lspc-aarch64)","")
+	git clone https://github.com/pciutils/pciutils.git lspci-aarch64
+else
+	cd lspci-aarch64 && git checkout master && git pull
+endif
+	cd lspci-aarch64 && git checkout $(LSPCI_VERSION)
+	#cd lspci-aarch64 && sed -i '/^.*cpu=/d' lib/configure
+	cd lspci-aarch64 && sed -i '/cpu=.*/cpu=aarch64/g' lib/configure
+	cd lspci-aarch64 && sed -i 's/^CROSS_COMPILE=/CROSS_COMPILE?=/g' Makefile
+	cd lspci-aarch64 && sed -i 's/^SHARED=/SHARED?=/g' Makefile
+	cd lspci-aarch64 && sed -i 's/^ZLIB=/ZLIB?=/g' Makefile
+	cd lspci-aarch64 && CROSS_COMPILE=aarch64-linux-gnu- SHARED=no ZLIB=no make -j$(NPROC)
+	cd lspci-aarch64 && ./update-pciids.sh
 
 MSR_TOOLS_VERSION := "master"
 msr-tools:
@@ -172,6 +297,17 @@ perf:
 	mkdir -p bin
 	cp linux_perf/tools/perf/perf bin/
 	strip --strip-unneeded bin/perf
+
+perf-aarch64: PERF_VERSION := "6.15.3"
+perf-aarch64: zlib-aarch64 elfutils-aarch64 libpfm4-aarch64
+ifeq ("$(wildcard perf-aarch64)","")
+	wget -N https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$(PERF_VERSION).tar.xz
+	tar -xf linux-$(PERF_VERSION).tar.xz && mv linux-$(PERF_VERSION)/ linux_perf-aarch64/
+endif
+	cd linux_perf-aarch64/tools/perf && make LDFLAGS="-static --static" BUILD_BPF_SKEL=1 NO_JVMTI=1 ARCH=arm64 NO_LIBTRACEEVENT=1 CROSS_COMPILE=aarch64-linux-gnu-
+	mkdir -p bin-aarch64
+	cp linux_perf-aarch64/tools/perf/perf bin-aarch64/
+	aarch64-linux-gnu-strip --strip-unneeded bin-aarch64/perf
 
 perf-archive:
 	mkdir -p bin
@@ -211,8 +347,21 @@ ifeq ("$(wildcard sshpass)","")
 endif
 	cd sshpass && make
 
+sshpass-aarch64:
+ifeq ("$(wildcard sshpass-aarch64)","")
+	wget https://sourceforge.net/projects/sshpass/files/sshpass/$(SSHPASS_VERSION)/sshpass-$(SSHPASS_VERSION).tar.gz
+	tar -xf sshpass-$(SSHPASS_VERSION).tar.gz
+	mv sshpass-$(SSHPASS_VERSION) sshpass-aarch64
+	rm sshpass-$(SSHPASS_VERSION).tar.gz
+	cd sshpass-aarch64 && ./configure --host=aarch64-linux-gnu
+endif
+	cd sshpass-aarch64 && make -j$(NPROC)
+
 stackcollapse-perf:
 	cd stackcollapse-perf && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build
+
+stackcollapse-perf-aarch64:
+	cd stackcollapse-perf && CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o $@
 
 STRESS_NG_VERSION := "V0.13.08"
 stress-ng:
@@ -222,7 +371,16 @@ else
 	cd stress-ng && git checkout master && git pull
 endif
 	cd stress-ng && git checkout $(STRESS_NG_VERSION)
-	cd stress-ng && STATIC=1 make
+	cd stress-ng && STATIC=1 make -j$(NPROC)
+
+stress-ng-aarch64:
+ifeq ("$(wildcard stress-ng-aarch64)","")
+	git clone https://github.com/ColinIanKing/stress-ng.git stress-ng-aarch64
+else
+	cd stress-ng-aarch64 && git checkout master && git pull
+endif
+	cd stress-ng-aarch64 && git checkout $(STRESS_NG_VERSION)
+	cd stress-ng-aarch64 && CC=aarch64-linux-gnu-gcc STATIC=1 make -j$(NPROC)
 
 SYSSTAT_VERSION := "v12.7.6"
 sysstat:
@@ -237,8 +395,23 @@ ifeq ("$(wildcard sysstat/Makefile)","")
 endif
 	cd sysstat && make
 
+sysstat-aarch64:
+ifeq ("$(wildcard sysstat-aarch64)","")
+	git clone https://github.com/sysstat/sysstat.git sysstat-aarch64
+else
+	cd sysstat-aarch64 && git checkout master && git pull
+endif
+	cd sysstat-aarch64 && git checkout $(SYSSTAT_VERSION)
+ifeq ("$(wildcard sysstat-aarch64/Makefile)","")
+	cd sysstat-aarch64 && ./configure --host=aarch64-linux-gnu
+endif
+	cd sysstat-aarch64 && make -j$(NPROC)
+
 tsc:
 	cd tsc && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build
+
+tsc-aarch64:
+	cd tsc && CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o tsc-aarch64
 
 TURBOSTAT_VERSION := "6.9.12"
 turbostat:
@@ -246,6 +419,14 @@ turbostat:
 	tar -xf linux-$(TURBOSTAT_VERSION).tar.xz && mv linux-$(TURBOSTAT_VERSION)/ linux_turbostat/
 	sed -i '/_Static_assert/d' linux_turbostat/tools/power/x86/turbostat/turbostat.c
 	cd linux_turbostat/tools/power/x86/turbostat && make
+
+zlib-aarch64:
+ifeq ("$(wildcard zlib-aarch64)","")
+	git clone https://github.com/madler/zlib.git zlib-aarch64
+endif
+	cd zlib-aarch64 && CHOST=aarch64-linux-gnu ./configure --archs="" --static
+	cd zlib-aarch64 && make -j$(NPROC)
+	cd zlib-aarch64 && cp libz.a /usr/lib/aarch64-linux-gnu/
 
 reset:
 	cd async-profiler
