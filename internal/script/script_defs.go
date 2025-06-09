@@ -13,7 +13,7 @@ import (
 type ScriptDefinition struct {
 	Name           string   // just a name
 	ScriptTemplate string   // the bash script that will be run
-	Architectures  []string // architectures, i.e., x86_64, arm64. If empty, it will run on all architectures.
+	Architectures  []string // architectures, i.e., x86_64, aarch64. If empty, it will run on all architectures.
 	Vendors        []string // vendors, i.e., GenuineIntel, AuthenticAMD. If empty, it will run on all vendors.
 	Families       []string // families, e.g., 6, 7. If empty, it will run on all families.
 	Models         []string // models, e.g., 62, 63. If empty, it will run on all models.
