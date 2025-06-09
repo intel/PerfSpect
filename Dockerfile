@@ -24,5 +24,3 @@ RUN apt-get update --fix-missing \
 COPY ./perfspect /usr/bin/perfspect
 RUN mkdir -p /output
 WORKDIR /output
-# ENTRYPOINT ["perfspect"]
-# CMD ["-h"]

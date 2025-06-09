@@ -14,10 +14,12 @@ ARG TAG=
 FROM ${REGISTRY}${PREFIX}perfspect-tools:${TAG} AS tools
 
 # STAGE 2 - image contains perfspect's Go components build environment
-FROM ${REGISTRY}${PREFIX}perfspect-builder:${TAG} AS perfspect
+FROM golang:1.24.4@sha256:db5d0afbfb4ab648af2393b92e87eaae9ad5e01132803d80caef91b5752d289c
+# copy the tools binaries and source from the previous stage
 RUN mkdir /prebuilt
 RUN mkdir /prebuilt/tools
 COPY --from=tools /bin/ /prebuilt/tools
 COPY --from=tools /oss_source.tgz /prebuilt/
 COPY --from=tools /oss_source.tgz.md5 /prebuilt/
+# allow git to operate in the mounted repository regardless of the user
 RUN git config --global --add safe.directory /localrepo
