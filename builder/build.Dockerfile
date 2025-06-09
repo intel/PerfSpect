@@ -23,3 +23,6 @@ COPY --from=tools /oss_source.tgz /prebuilt/
 COPY --from=tools /oss_source.tgz.md5 /prebuilt/
 # allow git to operate in the mounted repository regardless of the user
 RUN git config --global --add safe.directory /localrepo
+# install jq as it is used in the Makefile to create the manifest
+RUN apt-get update
+RUN apt-get install -y jq
