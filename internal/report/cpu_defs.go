@@ -41,6 +41,7 @@ var cpuDefinitions = []CPUDefinition{
 	{MicroArchitecture: "TGL", Family: "6", Model: "(140|141)", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0},              // Tiger Lake
 	{MicroArchitecture: "ADL", Family: "6", Model: "(151|154)", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0},              // Alder Lake
 	{MicroArchitecture: "MTL", Family: "6", Model: "170", Stepping: "4", Architecture: "x86_64", MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0},                   // Meteor Lake
+	{MicroArchitecture: "ARL", Family: "6", Model: "197", Stepping: "2", Architecture: "x86_64", MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0},                   // Arrow Lake
 	// Intel Xeon CPUs
 	{MicroArchitecture: "HSX", Family: "6", Model: "63", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 4, LogicalThreadCount: 2, CacheWayCount: 20},            // Haswell
 	{MicroArchitecture: "BDX", Family: "6", Model: "(79|86)", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 4, LogicalThreadCount: 2, CacheWayCount: 20},       // Broadwell
@@ -73,8 +74,9 @@ var cpuDefinitions = []CPUDefinition{
 	{MicroArchitecture: "Turin (Zen 5c)", Family: "26", Model: "17", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 0},           // Turin (Zen 5c)
 
 	// ARM CPUs
-	{MicroArchitecture: "Neoverse N1", Family: "", Model: "1", Stepping: "r3p1", Architecture: "arm64", MemoryChannelCount: 8, LogicalThreadCount: 1, CacheWayCount: 0}, // AWS Graviton 2
-	{MicroArchitecture: "Neoverse V1", Family: "", Model: "1", Stepping: "r1p1", Architecture: "arm64", MemoryChannelCount: 8, LogicalThreadCount: 1, CacheWayCount: 0}, // AWS Graviton 3
+	{MicroArchitecture: "Neoverse-N1", Family: "", Model: "1", Stepping: "r3p1", Architecture: "aarch64", MemoryChannelCount: 8, LogicalThreadCount: 1, CacheWayCount: 0}, // AWS Graviton 2
+	{MicroArchitecture: "Neoverse-V1", Family: "", Model: "1", Stepping: "r1p1", Architecture: "aarch64", MemoryChannelCount: 8, LogicalThreadCount: 1, CacheWayCount: 0}, // AWS Graviton 3
+	{MicroArchitecture: "Neoverse-V2", Family: "", Model: "1", Stepping: "r0p1", Architecture: "aarch64", MemoryChannelCount: 8, LogicalThreadCount: 1, CacheWayCount: 0}, // AWS Graviton 4
 }
 
 // getCPUExtended retrieves the CPU structure that matches the provided args

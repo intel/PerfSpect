@@ -10,26 +10,24 @@ TAG=v1
 
 # build tools image
 docker build -f tools/build.Dockerfile --tag perfspect-tools:$TAG ./tools
-# Create a temporary container
+
+# Create a temporary container from the tools image
 id=$(docker create perfspect-tools:$TAG foo)
 
-# Copy the files from the container to your local disk
+# Copy the tools from the temporary container to your local disk
 # Note: not used in build process, but useful to have around
 docker cp "$id":/bin ./tools
 
 # Remove the temporary container
 docker rm "$id"
 
-# build go app builder image
-docker build -f build.Dockerfile --tag perfspect-builder:$TAG .
+# build the perfspect builder image
+docker build -f builder/build.Dockerfile --build-arg TAG=$TAG --tag perfspect-builder:$TAG .
 
-# build perfspect release package builder image
-docker build -f builder/build.Dockerfile --build-arg TAG=$TAG --tag perfspect-package-builder:$TAG .
-
-# build perfspect release package
+# build perfspect using the builder image
 docker container run                                  \
     --volume "$(pwd)":/localrepo                      \
     -w /localrepo                                     \
     --rm                                              \
-    perfspect-package-builder:$TAG                           \
+    perfspect-builder:$TAG                            \
     make dist

@@ -50,7 +50,7 @@ type XlsxTableRenderer func(TableValues, *excelize.File, string, *int)
 type TableDefinition struct {
 	Name          string
 	ScriptNames   []string
-	Architectures []string // architectures, i.e., x86_64, arm64. If empty, it will be present for all architectures.
+	Architectures []string // architectures, i.e., x86_64, aarch64. If empty, it will be present for all architectures.
 	Vendors       []string // vendors, e.g., GenuineIntel, AuthenticAMD. If empty, it will be present for all vendors.
 	Families      []string // families, e.g., 6, 7. If empty, it will be present for all families.
 	Models        []string // models, e.g., 62, 63. If empty, it will be present for all models.
