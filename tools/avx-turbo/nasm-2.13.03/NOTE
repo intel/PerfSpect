@@ -1,0 +1,3 @@
+This stable version of the nasm binary is here in avx-turbo since many version of nasm included in distributions are
+capable of compiling AVX-512 (2.11 is required at a minimum). So we include the binary here along with the LICENSE
+(which allows such binary distribution). 

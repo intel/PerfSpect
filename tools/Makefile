@@ -44,14 +44,8 @@ endif
 	tar -xf async-profiler-$(ASYNC_PROFILER_VERSION)-linux-x64.tar.gz && mv async-profiler-$(ASYNC_PROFILER_VERSION)-linux-x64 async-profiler
 endif
 
-AVX_TURBO_VERSION := "threadcpuid"
+# Use a local copy of avx-turbo source until the upstream makes the required changes
 avx-turbo:
-ifeq ("$(wildcard avx-turbo)","")
-	git clone https://github.com/harp-intel/avx-turbo.git
-else
-	cd avx-turbo && git checkout master && git pull
-endif
-	cd avx-turbo && git checkout $(AVX_TURBO_VERSION) && git pull
 	cd avx-turbo && make
 
 # if you change the version, check the sed hacks below
