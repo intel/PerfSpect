@@ -1,0 +1,59 @@
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+avx-turbo
+unit-test
+
+# Eclipse CDT artifacts
+.cproject
+.project
+.settings
+
+# nasm listing file
+*.list
+
+# libpfm4 directory
+libpfm-4*/*
+
+# core files
+/core*
+/vgcore*
+
+# perf files
+/perf.*
+
+/tmp/*
+
+dummy.rebuild
+
+# local make config file
+local.mk
