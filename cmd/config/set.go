@@ -474,7 +474,7 @@ func setEPB(epb int, myTarget target.Target, localTempDir string, completeChanne
 	// mask out 4 bits starting at bitOffset
 	maskedValue := msrValue &^ (0xF << bitOffset)
 	// put the EPB value in the masked bits
-	msrValue = maskedValue | uint64(epb)<<bitOffset
+	msrValue = maskedValue | uint64(epb)<<bitOffset // #nosec G115
 	// write the new value to the MSR
 	setScript := script.ScriptDefinition{
 		Name:           "set epb",
@@ -517,7 +517,7 @@ func setEPP(epp int, myTarget target.Target, localTempDir string, completeChanne
 	// mask out bits 24-31 IA32_HWP_REQUEST MSR value
 	maskedValue := msrValue & 0xFFFFFFFF00FFFFFF
 	// put the EPP value in bits 24-31
-	eppValue := maskedValue | uint64(epp)<<24
+	eppValue := maskedValue | uint64(epp)<<24 // #nosec G115
 	// write it back to the MSR
 	setScript := script.ScriptDefinition{
 		Name:           "set epp",
@@ -554,7 +554,7 @@ func setEPP(epp int, myTarget target.Target, localTempDir string, completeChanne
 	// mask out bits 24-31 IA32_HWP_REQUEST_PKG MSR value
 	maskedValue = msrValue & 0xFFFFFFFF00FFFFFF
 	// put the EPP value in bits 24-31
-	eppValue = maskedValue | uint64(epp)<<24
+	eppValue = maskedValue | uint64(epp)<<24 // #nosec G115
 	// write it back to the MSR
 	setScript = script.ScriptDefinition{
 		Name:           "set epp",
