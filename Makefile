@@ -94,7 +94,7 @@ check_static:
 .PHONY: check_license
 check_license:
 	@echo "Confirming source files have license headers..."
-	@for f in `find . -type f ! -path './perfspect_202*' ! -path './tools/bin/*' ! -path './internal/script/resources/*' ! -path './scripts/.venv/*' ! -path './test/output/*' ! -path './debug_out/*' ! -path './tools/perf-archive/*' \( -name "*.go" -o -name "*.s" -o -name "*.html" -o -name "Makefile" -o -name "*.sh" -o -name "*.Dockerfile" -o -name "*.py" \)`; do \
+	@for f in `find . -type f ! -path './perfspect_202*' ! -path './tools/bin/*' ! -path './internal/script/resources/*' ! -path './scripts/.venv/*' ! -path './test/output/*' ! -path './debug_out/*' ! -path './tools/perf-archive/*' ! -path './tools/avx-turbo/*' \( -name "*.go" -o -name "*.s" -o -name "*.html" -o -name "Makefile" -o -name "*.sh" -o -name "*.Dockerfile" -o -name "*.py" \)`; do \
 		if ! grep -E 'SPDX-License-Identifier: BSD-3-Clause' "$$f" >/dev/null; then echo "Error: license not found: $$f"; fail=1; fi; \
 	done; if [ -n "$$fail" ]; then exit 1; fi
 
