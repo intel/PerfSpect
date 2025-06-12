@@ -5,9 +5,9 @@
 #
 
 default: tools
-.PHONY: default tools async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm perf processwatch spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc turbostat
+.PHONY: default tools async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm perf perf-archive processwatch spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc turbostat
 
-tools: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc turbostat
+tools: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm perf-archive spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc turbostat
 	mkdir -p bin
 	cp -R async-profiler bin/
 	cp avx-turbo/avx-turbo bin/
@@ -169,7 +169,12 @@ perf:
 	mkdir -p bin
 	cp linux_perf/tools/perf/perf bin/
 	strip --strip-unneeded bin/perf
-	cp linux_perf/tools/perf/perf-archive.sh bin/perf-archive
+    # cp linux_perf/tools/perf/perf-archive.sh bin/perf-archive
+	# chmod +x bin/perf-archive
+	
+perf-archive:
+	mkdir -p bin
+	cp perf-archive/perf-archive.sh bin/perf-archive
 	chmod +x bin/perf-archive
 
 PROCESSWATCH_VERSION := "c394065"	
