@@ -169,9 +169,9 @@ perf:
 	mkdir -p bin
 	cp linux_perf/tools/perf/perf bin/
 	strip --strip-unneeded bin/perf
-    # cp linux_perf/tools/perf/perf-archive.sh bin/perf-archive
-	# chmod +x bin/perf-archive
-	
+#	cp linux_perf/tools/perf/perf-archive.sh bin/perf-archive
+#	chmod +x bin/perf-archive
+
 perf-archive:
 	mkdir -p bin
 	cp perf-archive/perf-archive.sh bin/perf-archive
