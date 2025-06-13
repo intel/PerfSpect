@@ -44,8 +44,17 @@ endif
 	tar -xf async-profiler-$(ASYNC_PROFILER_VERSION)-linux-x64.tar.gz && mv async-profiler-$(ASYNC_PROFILER_VERSION)-linux-x64 async-profiler
 endif
 
-# Use a local copy of avx-turbo source until the upstream makes the required changes
+AVX_TURBO_VERSION := "9cfe8bf"
 avx-turbo:
+ifeq ("$(wildcard avx-turbo)","")
+	git clone https://github.com/travisdowns/avx-turbo.git
+else
+	cd avx-turbo && git checkout master && git pull
+endif
+	cd avx-turbo && git checkout $(AVX_TURBO_VERSION)
+	# apply our patches to avx-turbo, aperf/mperf first because it doesn't add/remove any lines
+	cd avx-turbo && git apply ../avx-turbo-patches/0001-use-fixed-CPU-number-to-determine-if-APERF-MPERF-are.patch
+	cd avx-turbo && git apply ../avx-turbo-patches/0001-Add-CPU-ID-pinning-option.patch
 	cd avx-turbo && make
 
 # if you change the version, check the sed hacks below

@@ -1,0 +1,28 @@
+From 261bb31a67dd21834150fdbbad07d1f094407752 Mon Sep 17 00:00:00 2001
+From: "Harper, Jason M" <jason.m.harper@intel.com>
+Date: Fri, 30 May 2025 06:59:56 -0700
+Subject: [PATCH] use fixed CPU number to determine if APERF/MPERF are
+ supported
+
+---
+ avx-turbo.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/avx-turbo.cpp b/avx-turbo.cpp
+index c7d4dc0..96bc1c2 100644
+--- a/avx-turbo.cpp
++++ b/avx-turbo.cpp
+@@ -279,8 +279,8 @@ struct aperf_ghz : outer_timer {
+      */
+     static bool is_supported() {
+         uint64_t dummy;
+-        return     read_msr_cur_cpu(MSR_IA32_MPERF, &dummy) == 0
+-                && read_msr_cur_cpu(MSR_IA32_APERF, &dummy) == 0;
++        return     read_msr(1, MSR_IA32_MPERF, &dummy) == 0
++                && read_msr(1, MSR_IA32_APERF, &dummy) == 0;
+     }
+ 
+     virtual void start() override {
+-- 
+2.34.1
+

@@ -1,0 +1,82 @@
+From aedb82d512237e761abd909bbd5d9036a3b39bef Mon Sep 17 00:00:00 2001
+From: "Harper, Jason M" <jason.m.harper@intel.com>
+Date: Fri, 30 May 2025 08:05:00 -0700
+Subject: [PATCH] Add CPU ID pinning option
+
+Signed-off-by: Harper, Jason M <jason.m.harper@intel.com>
+---
+ avx-turbo.cpp | 23 ++++++++++++++++++-----
+ 1 file changed, 18 insertions(+), 5 deletions(-)
+
+diff --git a/avx-turbo.cpp b/avx-turbo.cpp
+index c7d4dc0..c794b7b 100644
+--- a/avx-turbo.cpp
++++ b/avx-turbo.cpp
+@@ -189,7 +189,7 @@ args::ValueFlag<int> arg_min_threads{parser, "MIN", "The minimum number of threa
+ args::ValueFlag<int> arg_max_threads{parser, "MAX", "The maximum number of threads to use", {"max-threads"}};
+ args::ValueFlag<int> arg_num_cpus{parser, "CPUS", "Override number of available CPUs", {"num-cpus"}};
+ args::ValueFlag<uint64_t> arg_warm_ms{parser, "MILLISECONDS", "Warmup milliseconds for each thread after pinning (default 100)", {"warmup-ms"}, 100};
+-
++args::ValueFlag<std::string> arg_cpuids{parser, "CPUIDS", "Pin threads to comma-separated list of CPU IDs (default sequential ids)", {"cpuids"}};
+ 
+ bool verbose;
+ 
+@@ -614,6 +614,7 @@ struct warmup {
+ 
+ struct test_thread {
+     size_t id;
++    size_t cpu_id;
+     hot_barrier* start_barrier;
+     hot_barrier* stop_barrier;
+ 
+@@ -627,8 +628,8 @@ struct test_thread {
+ 
+     std::thread thread;
+ 
+-    test_thread(size_t id, hot_barrier& start_barrier, hot_barrier& stop_barrier, const test_func *test, size_t iters, bool use_aperf) :
+-        id{id}, start_barrier{&start_barrier}, stop_barrier{&stop_barrier}, test{test},
++    test_thread(size_t id, size_t cpu_id, hot_barrier& start_barrier, hot_barrier& stop_barrier, const test_func *test, size_t iters, bool use_aperf) :
++        id{id}, cpu_id{cpu_id}, start_barrier{&start_barrier}, stop_barrier{&stop_barrier}, test{test},
+         iters{iters}, use_aperf{use_aperf}, thread{std::ref(*this)}
+     {
+         // if (verbose) printf("Constructed test in thread %lu, this = %p\n", id, this);
+@@ -641,7 +642,7 @@ struct test_thread {
+     void operator()() {
+         // if (verbose) printf("Running test in thread %lu, this = %p\n", id, this);
+         if (!arg_no_pin) {
+-            pin_to_cpu(id);
++            pin_to_cpu(cpu_id);
+         }
+         aperf_ghz aperf_timer;
+         outer_timer& outer = use_aperf ? static_cast<outer_timer&>(aperf_timer) : dummy_outer::dummy;
+@@ -839,6 +840,18 @@ int main(int argc, char** argv) {
+     zeroupper();
+     auto specs = filter_tests(isas_supported, cpus);
+ 
++    // parse comma separate list of cpu_ids into an array
++    std::vector<int> cpu_ids;
++    if (arg_cpuids) {
++        for (auto& id : split(arg_cpuids.Get(), ",")) {
++            cpu_ids.push_back(std::atoi(id.c_str()));
++        }
++    } else {
++        for (int i = 0; i < (int)cpus.size(); i++) {
++            cpu_ids.push_back(i);
++        }
++    }
++
+     size_t last_thread_count = -1u;
+     std::vector<result_holder> results_list;
+     for (auto& spec : specs) {
+@@ -857,7 +870,7 @@ int main(int argc, char** argv) {
+         std::deque<test_thread> threads;
+         hot_barrier start{spec.count()}, stop{spec.count()};
+         for (auto& test : spec.thread_funcs) {
+-            threads.emplace_back(threads.size(), start, stop, &test, iters, use_aperf);
++            threads.emplace_back(threads.size(), cpu_ids[threads.size()], start, stop, &test, iters, use_aperf);
+         }
+ 
+         results_list.emplace_back(&spec);
+-- 
+2.34.1
+
