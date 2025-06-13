@@ -204,7 +204,7 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 	}
 	var setScript script.ScriptDefinition
 	freqInt := uint64(coreFrequency * 10)
-	if targetFamily == "6" && targetModel == "175" { // SRF
+	if targetFamily == "6" && (targetModel == "175" || targetModel == "221") { // SRF, CWF
 		// get the pstate driver
 		getScript := script.ScriptDefinition{
 			Name:           "get pstate driver",

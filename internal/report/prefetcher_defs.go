@@ -112,7 +112,7 @@ var prefetcherDefinitions = []PrefetcherDefinition{
 		Description: "Last level cache stream prefetcher.",
 		Msr:         MsrAtomPrefTuning1,
 		Bit:         43,
-		Uarchs:      []string{"SRF"},
+		Uarchs:      []string{"SRF", "CWF"},
 	},
 }
 

@@ -1971,7 +1971,7 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Energy Performance Preference", Values: []string{eppFromOutput(outputs)}},
 		{Name: "Scaling Governor", Values: []string{strings.TrimSpace(outputs[script.ScalingGovernorScriptName].Stdout)}},
 	}...)
-	// add ELC (for SRF and GNR only)
+	// add ELC (for SRF, CWF and GNR only)
 	if strings.Contains(uarch, "SRF") || strings.Contains(uarch, "GNR") || strings.Contains(uarch, "CWF") {
 		fields = append(fields, Field{Name: "Efficiency Latency Control", Values: []string{elcSummaryFromOutput(outputs)}})
 	}
