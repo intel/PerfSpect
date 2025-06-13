@@ -184,8 +184,8 @@ var scriptDefinitions = map[string]ScriptDefinition{
 	LspciDevicesScriptName: {
 		Name:           LspciDevicesScriptName,
 		ScriptTemplate: "lspci -d 8086:3258 | wc -l",
-		Families:       []string{"6"},          // Intel
-		Models:         []string{"173", "175"}, // GNR, SRF
+		Families:       []string{"6"},                 // Intel
+		Models:         []string{"173", "175", "221"}, // GNR, SRF, CWF
 		Depends:        []string{"lspci"},
 	},
 	LspciVmmScriptName: {
@@ -324,7 +324,7 @@ if [ "$family" -eq 6 ] && [ "$model" -eq 173 ]; then  # GNR
 	avx512=$(pcm-tpmi 0x5 0xB8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_6
 	avx512h=$(pcm-tpmi 0x5 0xC0 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_7
 	amx=$(pcm-tpmi 0x5 0xC8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_8
-elif [ "$family" -eq 6 ] && [ "$model" -eq 175 ]; then  # SRF
+elif [ "$family" -eq 6 ] && ( [ "$model" -eq 175 ] || [ "$model" -eq 221 ] ); then  # SRF, CWF
 	cores=$(rdmsr 0x1ae) # MSR_TURBO_GROUP_CORE_CNT: Group Size of Active Cores for Turbo Mode Operation
 	# if pstate driver is intel_pstate use 0x774 else use 0x199
 	driver=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver)
@@ -337,7 +337,7 @@ elif [ "$family" -eq 6 ] && [ "$model" -eq 175 ]; then  # SRF
 	avx512=0
 	avx512h=0
 	amx=0
-else # not SRF or GNR
+else # not SRF, CWF or GNR
 	cores=$(rdmsr 0x1ae) # MSR_TURBO_GROUP_CORE_CNT: Group Size of Active Cores for Turbo Mode Operation
 	sse=$(rdmsr 0x1ad) # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
 	avx2=0
@@ -385,7 +385,7 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		ScriptTemplate: "rdmsr 0x1320", // Atom Pref_tuning1
 		Architectures:  []string{x86_64},
 		Vendors:        []string{"GenuineIntel"},
-		Models:         []string{"175"}, // SRF
+		Models:         []string{"175", "221"}, // SRF, CWF
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
