@@ -11,7 +11,7 @@ We welcome bug reports and enhancement requests, which can be submitted via the 
 ## Getting PerfSpect
 Pre-built PerfSpect releases are available in the repository's [Releases](https://github.com/intel/PerfSpect/releases). Download and extract perfspect.tgz.
 ```
-wget -qO- https://github.com/intel/PerfSpect/releases/latest/download/perfspect.tgz | tar xvz
+wget -qO- https://github.com/intel/PerfSpect/releases/latest/download/perfspect.tgz | tar -xvz
 cd perfspect
 ```
 ## Running PerfSpect
