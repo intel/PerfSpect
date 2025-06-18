@@ -31,7 +31,7 @@ if __name__ == "__main__":
         events = f.readlines()
 
     # for each event name, find corresponding event in perfmon json and create a perfspect formatted event
-    # example: cpu/event=0x71,umask=0x00,name='TOPDOWN_FE_BOUND.ALL'/
+    # example: cpu/event=0x71,umask=0x00,period=1000003,name='TOPDOWN_FE_BOUND.ALL'/
     # if event name is not found in perfmon json file, it is added to a list of not found events
     result = []
     notfound = []
@@ -39,8 +39,30 @@ if __name__ == "__main__":
         e = e.strip()
         for p in perfmon["Events"]:
             if p["EventName"] == e:
-                # event = f"cpu/event={p['EventCode']},umask={p['UMask']},cmask={p['CMask']},name='{p['EventName']}'/"
-                event = f"cpu/event={p['EventCode']},umask={p['UMask']},name='{p['EventName']}'/"
+                eventParts = []
+                unit = p.get("Unit", "cpu")
+                unit = unit.split(" ")[0]  # take the first part of the unit if it has multiple parts
+                unit = unit.lower()
+                eventParts.append(f"{unit}/event={p['EventCode']}")
+                eventParts.append(f"umask={p['UMask']}")
+                if p.get("SampleAfterValue", "") != "":
+                    eventParts.append(f"period={p['SampleAfterValue']}")
+                eventParts.append(f"name='{p['EventName']}'")
+                event = ",".join(eventParts)
+                event += "/"
+                # Add optional comment with counter and takenAlone info
+                # if counter is not "0,1,2,3,4,5,6,7" or takenAlone is "1", add them to the comment
+                counter = ""
+                takenAlone = ""
+                comment = ""
+                if p["Counter"] != "0,1,2,3,4,5,6,7":
+                    counter = p['Counter']
+                if p.get("TakenAlone", "0") == "1":
+                    takenAlone = "[*]"
+                if counter != "" or takenAlone != "":
+                    comment = f"     # {counter}{takenAlone}"
+                if comment != "":
+                    event = event.ljust(80) + comment
                 result.append(event)
                 break
         else:
