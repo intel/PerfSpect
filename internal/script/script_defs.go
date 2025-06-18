@@ -184,8 +184,8 @@ var scriptDefinitions = map[string]ScriptDefinition{
 	LspciDevicesScriptName: {
 		Name:           LspciDevicesScriptName,
 		ScriptTemplate: "lspci -d 8086:3258 | wc -l",
-		Families:       []string{"6"},                 // Intel
-		Models:         []string{"173", "175", "221"}, // GNR, SRF, CWF
+		Families:       []string{"6"},                        // Intel
+		Models:         []string{"173", "174", "175", "221"}, // GNR, GNR-D, SRF, CWF
 		Depends:        []string{"lspci"},
 	},
 	LspciVmmScriptName: {
@@ -504,8 +504,8 @@ echo "$epb"`,
 		Name:           UncoreMaxFromTPMIScriptName,
 		ScriptTemplate: "pcm-tpmi 2 0x18 -d -b 8:14",
 		Architectures:  []string{x86_64},
-		Families:       []string{"6"},                 // Intel
-		Models:         []string{"173", "175", "221"}, // GNR, SRF, CWF
+		Families:       []string{"6"},                        // Intel
+		Models:         []string{"173", "174", "175", "221"}, // GNR, GNR-D, SRF, CWF
 		Depends:        []string{"pcm-tpmi"},
 		Superuser:      true,
 	},
@@ -513,8 +513,8 @@ echo "$epb"`,
 		Name:           UncoreMinFromTPMIScriptName,
 		ScriptTemplate: "pcm-tpmi 2 0x18 -d -b 15:21",
 		Architectures:  []string{x86_64},
-		Families:       []string{"6"},                 // Intel
-		Models:         []string{"173", "175", "221"}, // GNR, SRF, CWF
+		Families:       []string{"6"},                        // Intel
+		Models:         []string{"173", "174", "175", "221"}, // GNR, GNR-D, SRF, CWF
 		Depends:        []string{"pcm-tpmi"},
 		Superuser:      true,
 	},
@@ -522,8 +522,8 @@ echo "$epb"`,
 		Name:           UncoreDieTypesFromTPMIScriptName,
 		ScriptTemplate: "pcm-tpmi 2 0x10 -d -b 26:26",
 		Architectures:  []string{x86_64},
-		Families:       []string{"6"},                 // Intel
-		Models:         []string{"173", "175", "221"}, // GNR, SRF, CWF
+		Families:       []string{"6"},                        // Intel
+		Models:         []string{"173", "174", "175", "221"}, // GNR, GNR-D, SRF, CWF
 		Depends:        []string{"pcm-tpmi"},
 		Superuser:      true,
 	},
@@ -595,8 +595,8 @@ for die in "${!die_types[@]}"; do
 done
 `,
 		Architectures: []string{x86_64},
-		Families:      []string{"6"},                 // Intel
-		Models:        []string{"173", "175", "221"}, // GNR, SRF, CWF
+		Families:      []string{"6"},                        // Intel
+		Models:        []string{"173", "174", "175", "221"}, // GNR, GNR-D, SRF, CWF
 		Depends:       []string{"pcm-tpmi"},
 		Superuser:     true,
 	},
@@ -644,8 +644,8 @@ do
 done
 `,
 		Architectures: []string{x86_64},
-		Families:      []string{"6"},   // Intel
-		Models:        []string{"173"}, // GNR
+		Families:      []string{"6"},          // Intel
+		Models:        []string{"173", "174"}, // GNR, GNR-D
 		Depends:       []string{"pcm-tpmi"},
 		Superuser:     true,
 	},
@@ -678,8 +678,8 @@ done
 echo "" # finish the line
 `,
 		Architectures: []string{x86_64},
-		Families:      []string{"6"},   // Intel
-		Models:        []string{"173"}, // GNR
+		Families:      []string{"6"},          // Intel
+		Models:        []string{"173", "174"}, // GNR, GNR-D
 		Depends:       []string{"pcm-tpmi"},
 		Superuser:     true,
 	},
