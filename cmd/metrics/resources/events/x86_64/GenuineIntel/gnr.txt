@@ -5,8 +5,6 @@ cpu/event=0x24,umask=0xe4,period=200003,name='L2_RQSTS.ALL_CODE_RD'/,
 cpu/event=0xd1,umask=0x01,period=1000003,name='MEM_LOAD_RETIRED.L1_HIT'/,
 cpu/event=0x25,umask=0x1f,period=100003,name='L2_LINES_IN.ALL'/,
 cpu/event=0xa6,umask=0x02,period=2000003,name='EXE_ACTIVITY.1_PORTS_UTIL'/,
-cpu/event=0xa6,umask=0x04,period=2000003,name='EXE_ACTIVITY.2_PORTS_UTIL'/,
-cpu/event=0xa6,umask=0xc,period=2000003,name='EXE_ACTIVITY.2_PORTS_UTIL:u0xc'/,
 cpu-cycles,
 ref-cycles,
 instructions;
@@ -49,19 +47,8 @@ cpu-cycles,
 ref-cycles,
 instructions;
 
-cpu/event=0xcf,umask=0x10,cmask=0x00,period=100003,name='FP_ARITH_INST_RETIRED2.512B_PACKED_HALF'/,
-cpu/event=0xcf,umask=0x08,cmask=0x00,period=100003,name='FP_ARITH_INST_RETIRED2.256B_PACKED_HALF'/,
-cpu/event=0xc7,umask=0x80,cmask=0x00,period=100003,name='FP_ARITH_INST_RETIRED.512B_PACKED_SINGLE'/,
-cpu/event=0xc7,umask=0x40,cmask=0x00,period=100003,name='FP_ARITH_INST_RETIRED.512B_PACKED_DOUBLE'/,
-cpu/event=0xc7,umask=0x20,cmask=0x00,period=100003,name='FP_ARITH_INST_RETIRED.256B_PACKED_SINGLE'/,
-cpu/event=0xc7,umask=0x10,cmask=0x00,period=100003,name='FP_ARITH_INST_RETIRED.256B_PACKED_DOUBLE'/,
-cpu-cycles,
-ref-cycles,
-instructions;
-
 cpu/event=0x47,umask=0x03,cmask=0x03,period=1000003,name='MEMORY_ACTIVITY.STALLS_L1D_MISS'/,
 cpu/event=0x47,umask=0x05,cmask=0x05,period=1000003,name='MEMORY_ACTIVITY.STALLS_L2_MISS'/,
-cpu/event=0x12,umask=0x20,cmask=0x01,period=100003,name='DTLB_LOAD_MISSES.STLB_HIT:c1'/,
 cpu/event=0x12,umask=0x10,cmask=0x01,period=100003,name='DTLB_LOAD_MISSES.WALK_ACTIVE'/,
 cpu/event=0xa3,umask=0x10,cmask=0x10,period=1000003,name='CYCLE_ACTIVITY.CYCLES_MEM_ANY'/,
 cpu/event=0xad,umask=0x80,period=500009,name='INT_MISC.CLEAR_RESTEER_CYCLES'/,
@@ -71,7 +58,6 @@ ref-cycles,
 instructions;
 
 cpu/event=0xd1,umask=0x08,cmask=0x00,period=200003,name='MEM_LOAD_RETIRED.L1_MISS'/,
-cpu/event=0xb1,umask=0x01,cmask=0x03,period=2000003,name='UOPS_EXECUTED.CYCLES_GE_3'/,
 cpu/event=0xc2,umask=0x04,period=2000003,name='UOPS_RETIRED.MS'/,
 cpu-cycles,
 ref-cycles,
@@ -79,8 +65,6 @@ instructions;
 
 cpu/event=0xd0,umask=0x21,cmask=0x00,period=1000003,name='MEM_INST_RETIRED.LOCK_LOADS'/,
 cpu/event=0xd0,umask=0x82,cmask=0x00,period=1000003,name='MEM_INST_RETIRED.ALL_STORES'/,
-cpu/event=0x24,umask=0xe2,cmask=0x00,period=2000003,name='L2_RQSTS.ALL_RFO'/,
-cpu/event=0x24,umask=0xc2,cmask=0x00,period=2000003,name='L2_RQSTS.RFO_HIT'/,
 cpu-cycles,
 ref-cycles,
 instructions;
@@ -93,10 +77,6 @@ cpu-cycles,
 ref-cycles,
 instructions;
 
-cpu/event=0xd3,umask=0x02,cmask=0x00,period=1000003,name='MEM_LOAD_L3_MISS_RETIRED.REMOTE_DRAM'/,
-cpu/event=0xd3,umask=0x01,cmask=0x00,period=100007,name='MEM_LOAD_L3_MISS_RETIRED.LOCAL_DRAM'/,
-cpu/event=0x2a,umask=0x01,offcore_rsp=0x104004477,name='OCR.READS_TO_CORE.LOCAL_DRAM'/,
-cpu/event=0x2a,umask=0x01,offcore_rsp=0x730004477,name='OCR.READS_TO_CORE.REMOTE_DRAM'/,
 cpu/event=0xec,umask=0x02,period=2000003,name='CPU_CLK_UNHALTED.DISTRIBUTED'/,
 cpu/event=0xb7,umask=0x02,period=2000003,name='EXE.AMX_BUSY'/,
 cpu-cycles,
@@ -106,13 +86,11 @@ instructions;
 cpu/event=0xd2,umask=0x02,cmask=0x00,period=20011,name='MEM_LOAD_L3_HIT_RETIRED.XSNP_NO_FWD'/,
 cpu/event=0xd2,umask=0x04,cmask=0x00,period=20011,name='MEM_LOAD_L3_HIT_RETIRED.XSNP_FWD'/,
 cpu/event=0x47,umask=0x02,cmask=0x02,period=1000003,name='MEMORY_ACTIVITY.CYCLES_L1D_MISS'/,
-cpu/event=0x2a,umask=0x01,offcore_rsp=0x90002380,name='OCR.HWPF_L3.REMOTE'/,
 cpu-cycles,
 ref-cycles,
 instructions;
 
 cpu/event=0x2a,umask=0x01,cmask=0x00,offcore_rsp=0x1030004477,name='OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HITM'/,
-cpu/event=0x2a,umask=0x01,offcore_rsp=0x84002380,name='OCR.HWPF_L3.L3_MISS_LOCAL'/,
 cpu/event=0x20,umask=0x08,cmask=0x01,period=1000003,name='OFFCORE_REQUESTS_OUTSTANDING.CYCLES_WITH_DATA_RD'/,
 cpu/event=0x20,umask=0x08,cmask=0x04,period=1000003,name='OFFCORE_REQUESTS_OUTSTANDING.DATA_RD:c4'/,
 cpu-cycles,
@@ -130,17 +108,11 @@ cpu-cycles,
 ref-cycles,
 instructions;
 
-cpu/event=0xd3,umask=0x08,cmask=0x00,period=100007,name='MEM_LOAD_L3_MISS_RETIRED.REMOTE_FWD'/,
-cpu/event=0xd3,umask=0x04,cmask=0x00,period=100007,name='MEM_LOAD_L3_MISS_RETIRED.REMOTE_HITM'/,
 cpu/event=0x2a,umask=0x01,offcore_rsp=0x1030004477,name='OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HITM'/,
 cpu/event=0x2a,umask=0x01,offcore_rsp=0x830004477,name='OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HIT_WITH_FWD'/,
 cpu-cycles:k,
 ref-cycles:k,
 instructions:k;
-
-#C6
-cstate_core/c6-residency/;
-cstate_pkg/c6-residency/;
 
 #UPI
 upi/event=0x02,umask=0x0f,name='UNC_UPI_TxL_FLITS.ALL_DATA'/;
@@ -171,6 +143,72 @@ imc/event=0x05,umask=0xcf,name='UNC_M_CAS_COUNT_SCH0.RD'/,
 imc/event=0x06,umask=0xcf,name='UNC_M_CAS_COUNT_SCH1.RD'/,
 imc/event=0x05,umask=0xf0,name='UNC_M_CAS_COUNT_SCH0.WR'/,
 imc/event=0x06,umask=0xf0,name='UNC_M_CAS_COUNT_SCH1.WR'/;
+
+cpu/event=0xc2,umask=0x02,name='UOPS_RETIRED.SLOTS'/,
+cpu/event=0xae,umask=0x01,name='UOPS_ISSUED.ANY'/;
+
+cpu/event=0x87,umask=0x01,name='DECODE.LCP'/,
+cpu/event=0x61,umask=0x02,name='DSB2MITE_SWITCHES.PENALTY_CYCLES'/,
+cpu/event=0x79,umask=0x04,name='IDQ.MITE_CYCLES_ANY'/,
+cpu/event=0x79,umask=0x04,name='IDQ.MITE_CYCLES_OK'/;
+
+cpu/event=0x79,umask=0x08,name='IDQ.DSB_CYCLES_ANY'/,
+cpu/event=0x79,umask=0x08,name='IDQ.DSB_CYCLES_OK'/,
+cpu/event=0x79,umask=0x20,name='IDQ.MS_CYCLES_ANY'/;
+
+cpu/event=0xc5,umask=0x50,name='BR_MISP_RETIRED.COND_NTAKEN_COST'/,
+cpu/event=0xc5,umask=0x41,name='BR_MISP_RETIRED.COND_TAKEN_COST'/,
+cpu/event=0xc5,umask=0x42,name='BR_MISP_RETIRED.INDIRECT_CALL_COST'/,
+cpu/event=0xc5,umask=0xc0,name='BR_MISP_RETIRED.INDIRECT_COST'/,
+cpu/event=0xc5,umask=0x48,name='BR_MISP_RETIRED.RET_COST'/;
+
+cpu/event=0xad,umask=0x01,name='INT_MISC.CLEARS_COUNT'/,
+cpu/event=0xc3,umask=0x01,name='MACHINE_CLEARS.COUNT'/,
+cpu/event=0xc3,umask=0x02,name='MACHINE_CLEARS.MEMORY_ORDERING'/,
+cpu/event=0xd0,umask=0x09,name='MEM_INST_RETIRED.STLB_HIT_LOADS'/,
+cpu/event=0x03,umask=0x82,name='LD_BLOCKS.STORE_FORWARD'/,
+cpu/event=0xd0,umask=0x81,name='MEM_INST_RETIRED.ALL_LOADS'/,
+cpu/event=0xd0,umask=0x41,name='MEM_INST_RETIRED.SPLIT_LOADS'/;
+
+cpu/event=0x48,umask=0x01,name='L1D_PEND_MISS.PENDING'/,
+cpu/event=0x43,umask=0xfd,name='MEM_LOAD_COMPLETED.L1_MISS_ANY'/,
+cpu/event=0x48,umask=0x02,name='L1D_PEND_MISS.FB_FULL'/,
+cpu/event=0xd2,umask=0x01,name='MEM_LOAD_L3_HIT_RETIRED.XSNP_MISS'/;
+
+cpu/event=0xd1,umask=0x04,name='MEM_LOAD_RETIRED.L3_HIT'/,
+cpu/event=0x2d,umask=0x01,name='XQ.FULL_CYCLES'/;
+
+cpu/event=0x48,umask=0x04,name='L1D_PEND_MISS.L2_STALLS'/,
+cpu/event=0x44,umask=0x01,name='MEM_STORE_RETIRED.L2_HIT'/,
+cpu/event=0x2A,umask=0x01,name='OCR.DEMAND_RFO.L3_MISS'/,
+cpu/event=0xd0,umask=0x42,name='MEM_INST_RETIRED.SPLIT_STORES'/;
+
+cpu/event=0x2A,umask=0x01,name='OCR.STREAMING_WR.ANY_RESPONSE'/,
+cpu/event=0xd0,umask=0x0a,name='MEM_INST_RETIRED.STLB_HIT_STORES'/,
+cpu/event=0x13,umask=0x10,name='DTLB_STORE_MISSES.WALK_ACTIVE'/;
+
+cpu/event=0xb0,umask=0x09,name='ARITH.DIV_ACTIVE'/,
+cpu/event=0xa2,umask=0x02,name='RESOURCE_STALLS.SCOREBOARD'/,
+cpu/event=0xec,umask=0x20,name='CPU_CLK_UNHALTED.C02'/,
+cpu/event=0xa6,umask=0x80,name='EXE_ACTIVITY.EXE_BOUND_0_PORTS'/,
+cpu/event=0xa6,umask=0xC,name='EXE_ACTIVITY.2_3_PORTS_UTIL'/,
+cpu/event=0xa3,umask=0x04,name='CYCLE_ACTIVITY.STALLS_TOTAL'/;
+
+cpu/event=0xb1,umask=0x10,name='UOPS_EXECUTED.X87'/,
+cpu/event=0xb1,umask=0x01,name='UOPS_EXECUTED.THREAD'/,
+cpu/event=0xc7,umask=0x03,name='FP_ARITH_INST_RETIRED.SCALAR'/,
+cpu/event=0xcf,umask=0x03,name='FP_ARITH_INST_RETIRED2.SCALAR'/,
+cpu/event=0xc7,umask=0xfc,name='FP_ARITH_INST_RETIRED.VECTOR'/,
+cpu/event=0xcf,umask=0x1c,name='FP_ARITH_INST_RETIRED2.VECTOR'/,
+cpu/event=0xe7,umask=0x03,name='INT_VEC_RETIRED.ADD_128'/,
+cpu/event=0xe7,umask=0x10,name='INT_VEC_RETIRED.VNNI_128'/;
+
+cpu/event=0xe5,umask=0x03,name='MEM_UOP_RETIRED.ANY'/,
+cpu/event=0xc0,umask=0x10,name='INST_RETIRED.MACRO_FUSED'/;
+
+#C6
+cstate_core/c6-residency/;
+cstate_pkg/c6-residency/;
 
 #power
 power/energy-pkg/,
