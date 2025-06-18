@@ -56,6 +56,7 @@ def main():
                 "CORES_PER_SOCKET",
                 "HYPERTHREADING_ON",
                 "CONST_THREAD_COUNT",
+                "TXN",
             ]:
                 if event.find(":") > 0 and event[-1] != "k":
                     event = event[0 : event.find(":")]
