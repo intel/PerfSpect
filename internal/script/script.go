@@ -390,8 +390,8 @@ func parseMasterScriptOutput(masterScriptOutput string) (scriptOutputs []ScriptO
 				stdoutStarted = false
 				continue
 			}
-			if strings.HasPrefix(line, "EXIT CODE:") {
-				exitcode = strings.TrimSpace(strings.TrimPrefix(line, "EXIT CODE:"))
+			if exitCodeStr, found := strings.CutPrefix(line, "EXIT CODE:"); found {
+				exitcode = strings.TrimSpace(exitCodeStr)
 				stdoutStarted = false
 				stderrStarted = false
 				break

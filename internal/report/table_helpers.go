@@ -1354,52 +1354,24 @@ func parseNicInfo(scriptOutput string) []nicInfo {
 		var nic nicInfo
 		for line := range strings.SplitSeq(nicOutput, "\n") {
 			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "Interface: ") {
-				nic.Name = strings.TrimPrefix(line, "Interface: ")
-			}
-			if strings.HasPrefix(line, "Vendor: ") {
-				nic.Vendor = strings.TrimPrefix(line, "Vendor: ")
-			}
-			if strings.HasPrefix(line, "Vendor ID: ") {
-				nic.VendorID = strings.TrimPrefix(line, "Vendor ID: ")
-			}
+			nic.Name, _ = strings.CutPrefix(line, "Interface: ")
+			nic.Vendor, _ = strings.CutPrefix(line, "Vendor: ")
+			nic.VendorID, _ = strings.CutPrefix(line, "Vendor ID: ")
 			if strings.HasPrefix(line, "Model: ") {
 				// sometimes the model name has additional information in parentheses, we want to keep only the model name
 				nic.Model = strings.TrimSpace(strings.TrimPrefix(strings.Split(line, "(")[0], "Model: "))
 			}
-			if strings.HasPrefix(line, "Model ID: ") {
-				nic.ModelID = strings.TrimPrefix(line, "Model ID: ")
-			}
-			if strings.HasPrefix(line, "Speed: ") {
-				nic.Speed = strings.TrimPrefix(line, "Speed: ")
-			}
-			if strings.HasPrefix(line, "Link detected: ") {
-				nic.Link = strings.TrimPrefix(line, "Link detected: ")
-			}
-			if strings.HasPrefix(line, "bus-info: ") {
-				nic.Bus = strings.TrimPrefix(line, "bus-info: ")
-			}
-			if strings.HasPrefix(line, "driver: ") {
-				nic.Driver = strings.TrimPrefix(line, "driver: ")
-			}
-			if strings.HasPrefix(line, "version: ") {
-				nic.DriverVersion = strings.TrimPrefix(line, "version: ")
-			}
-			if strings.HasPrefix(line, "firmware-version: ") {
-				nic.FirmwareVersion = strings.TrimPrefix(line, "firmware-version: ")
-			}
-			if strings.HasPrefix(line, "MAC Address: ") {
-				nic.MACAddress = strings.TrimPrefix(line, "MAC Address: ")
-			}
-			if strings.HasPrefix(line, "NUMA Node: ") {
-				nic.NUMANode = strings.TrimPrefix(line, "NUMA Node: ")
-			}
-			if strings.HasPrefix(line, "CPU Affinity: ") {
-				nic.CPUAffinity = strings.TrimPrefix(line, "CPU Affinity: ")
-			}
-			if strings.HasPrefix(line, "IRQ Balance: ") {
-				nic.IRQBalance = strings.TrimPrefix(line, "IRQ Balance: ")
-			}
+			nic.ModelID, _ = strings.CutPrefix(line, "Model ID: ")
+			nic.Speed, _ = strings.CutPrefix(line, "Speed: ")
+			nic.Link, _ = strings.CutPrefix(line, "Link detected: ")
+			nic.Bus, _ = strings.CutPrefix(line, "bus-info: ")
+			nic.Driver, _ = strings.CutPrefix(line, "driver: ")
+			nic.DriverVersion, _ = strings.CutPrefix(line, "version: ")
+			nic.FirmwareVersion, _ = strings.CutPrefix(line, "firmware-version: ")
+			nic.MACAddress, _ = strings.CutPrefix(line, "MAC Address: ")
+			nic.NUMANode, _ = strings.CutPrefix(line, "NUMA Node: ")
+			nic.CPUAffinity, _ = strings.CutPrefix(line, "CPU Affinity: ")
+			nic.IRQBalance, _ = strings.CutPrefix(line, "IRQ Balance: ")
 		}
 		nics = append(nics, nic)
 	}
