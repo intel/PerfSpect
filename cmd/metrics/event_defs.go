@@ -63,6 +63,12 @@ func LoadEventGroups(eventDefinitionOverridePath string, metadata Metadata) (gro
 		if len(line) == 0 || line[0] == '#' {
 			continue
 		}
+		// strip end of line comment
+		if idx := strings.Index(line, "#"); idx != -1 {
+			line = line[:idx]
+		}
+		// remove trailing spaces
+		line = strings.TrimSpace(line)
 		var event EventDefinition
 		if event, err = parseEventDefinition(line[:len(line)-1]); err != nil {
 			return
