@@ -413,7 +413,7 @@
     },
     {
         "name": "TMA_......False_Sharing(%)",
-        "expression": "100 * ( ( ( 170 * ( ( ( [cpu-cycles] ) / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) * [OCR.DEMAND_RFO.L3_MISS:ocr_msr_val=0x103b800002] + ( 81 * ( ( ( [cpu-cycles] ) / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) * [OCR.DEMAND_RFO.L3_HIT.SNOOP_HITM] ) / ( [cpu-cycles] ) )"
+        "expression": "100 * ( ( ( 170 * ( ( ( [cpu-cycles] ) / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) * [OCR.DEMAND_RFO.L3_MISS] + ( 81 * ( ( ( [cpu-cycles] ) / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) * [OCR.DEMAND_RFO.L3_HIT.SNOOP_HITM] ) / ( [cpu-cycles] ) )"
     },
     {
         "name": "TMA_......Split_Stores(%)",

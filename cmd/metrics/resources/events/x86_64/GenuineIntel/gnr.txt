@@ -71,9 +71,9 @@ ref-cycles,
 instructions;
 
 cpu/event=0xc2,umask=0x04,cmask=0x01,period=2000003,name='UOPS_RETIRED.MS:c1:e1'/,                        # [*]
-cpu/event=0x2a,umask=0x01,period=100003,offcore_rsp=0x8003C0001,name='OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HIT_WITH_FWD'/,       # 0,1,2,3
-cpu/event=0x2b,umask=0x01,period=100003,offcore_rsp=0x10003C0002,name='OCR.DEMAND_RFO.L3_HIT.SNOOP_HITM'/,                   # 0,1,2,3
-cpu/event=0x20,umask=0x04,cmask=0x01,period=1000003,name='OFFCORE_REQUESTS_OUTSTANDING.CYCLES_WITH_DEMAND_RFO'/,     # 0,1,2,3
+cpu/event=0x2a,umask=0x01,period=100003,offcore_rsp=0x8003C0001,name='OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HIT_WITH_FWD'/,    # 0,1,2,3
+cpu/event=0x2b,umask=0x01,period=100003,offcore_rsp=0x10003C0002,name='OCR.DEMAND_RFO.L3_HIT.SNOOP_HITM'/,               # 0,1,2,3
+cpu/event=0x20,umask=0x04,cmask=0x01,period=1000003,name='OFFCORE_REQUESTS_OUTSTANDING.CYCLES_WITH_DEMAND_RFO'/,         # 0,1,2,3
 cpu/event=0xd1,umask=0x40,period=100007,name='MEM_LOAD_RETIRED.FB_HIT'/,                                 # 0,1,2,3
 cpu-cycles,
 ref-cycles,
@@ -152,10 +152,10 @@ cpu/event=0x2d,umask=0x01,cmask=0x01,period=1000003,name='XQ.FULL_CYCLES'/;     
 
 cpu/event=0x48,umask=0x04,period=1000003,name='L1D_PEND_MISS.L2_STALLS'/,                                # 0,1,2,3
 cpu/event=0x44,umask=0x01,period=200003,name='MEM_STORE_RETIRED.L2_HIT'/,                                # 0,1,2,3
-cpu/event=0x2a,umask=0x01,period=100003,name='OCR.DEMAND_RFO.L3_MISS'/,                             # 0,1,2,3
+cpu/event=0x2a,umask=0x01,period=100003,offcore_rsp=0x103b800002,name='OCR.DEMAND_RFO.L3_MISS'/,         # 0,1,2,3
 cpu/event=0xd0,umask=0x42,period=100003,name='MEM_INST_RETIRED.SPLIT_STORES'/;                           # 0,1,2,3
 
-cpu/event=0x2a,umask=0x01,period=100003,name='OCR.STREAMING_WR.ANY_RESPONSE'/,                      # 0,1,2,3
+cpu/event=0x2a,umask=0x01,period=100003,offcore_rsp=0x10800,name='OCR.STREAMING_WR.ANY_RESPONSE'/,       # 0,1,2,3
 cpu/event=0xd0,umask=0x0a,period=100003,name='MEM_INST_RETIRED.STLB_HIT_STORES'/,                        # 0,1,2,3
 cpu/event=0x13,umask=0x10,cmask=0x01,period=100003,name='DTLB_STORE_MISSES.WALK_ACTIVE'/;                # 0,1,2,3
 
