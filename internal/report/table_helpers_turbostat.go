@@ -29,8 +29,8 @@ func parseTurbostatOutput(output string) ([]map[string]string, error) {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		if strings.HasPrefix(line, "INTERVAL:") {
-			val := strings.TrimSpace(strings.TrimPrefix(line, "INTERVAL:"))
+		if val, found := strings.CutPrefix(line, "INTERVAL:"); found {
+			val = strings.TrimSpace(val)
 			f, err := strconv.ParseFloat(val, 64)
 			if err != nil {
 				return nil, err
@@ -38,8 +38,8 @@ func parseTurbostatOutput(output string) ([]map[string]string, error) {
 			interval = f
 			continue
 		}
-		if strings.HasPrefix(line, "TIME:") {
-			val := strings.TrimSpace(strings.TrimPrefix(line, "TIME:"))
+		if val, found := strings.CutPrefix(line, "TIME:"); found {
+			val = strings.TrimSpace(val)
 			// Try to parse as HH:MM:SS
 			var err error
 			timestamp, err = time.Parse("15:04:05", val)
