@@ -251,7 +251,7 @@ var tableDefinitions = map[string]TableDefinition{
 	AcceleratorTableName: {
 		Name:    AcceleratorTableName,
 		Vendors: []string{"GenuineIntel"},
-		Models:  []string{"143", "207", "173", "175", "221"}, // Sapphire Rapids, Emerald Rapids, Granite Rapids, Sierra Forest, Clearwater Forest
+		Models:  []string{"143", "207", "173", "174", "175", "221"}, // Sapphire Rapids, Emerald Rapids, Granite Rapids, Granite Rapids D, Sierra Forest, Clearwater Forest
 		HasRows: true,
 		ScriptNames: []string{
 			script.LshwScriptName,
@@ -310,8 +310,8 @@ var tableDefinitions = map[string]TableDefinition{
 		FieldsFunc: uncoreTableValues},
 	ElcTableName: {
 		Name:     ElcTableName,
-		Families: []string{"6"},                 // Intel CPUs only
-		Models:   []string{"173", "175", "221"}, // Granite Rapids, Sierra Forest, Clearwater Forest
+		Families: []string{"6"},                        // Intel CPUs only
+		Models:   []string{"173", "174", "175", "221"}, // Granite Rapids, Granite Rapids D, Sierra Forest, Clearwater Forest
 		HasRows:  true,
 		ScriptNames: []string{
 			script.ElcScriptName,
@@ -320,8 +320,8 @@ var tableDefinitions = map[string]TableDefinition{
 		InsightsFunc: elcTableInsights},
 	SSTTFHPTableName: {
 		Name:     SSTTFHPTableName,
-		Families: []string{"6"},                 // Intel CPUs only
-		Models:   []string{"173", "175", "221"}, // Granite Rapids, Sierra Forest, Clearwater Forest
+		Families: []string{"6"},                        // Intel CPUs only
+		Models:   []string{"173", "174", "175", "221"}, // Granite Rapids, Granite Rapids D, Sierra Forest, Clearwater Forest
 		HasRows:  true,
 		ScriptNames: []string{
 			script.SSTTFHPScriptName,
@@ -329,8 +329,8 @@ var tableDefinitions = map[string]TableDefinition{
 		FieldsFunc: sstTFHPTableValues},
 	SSTTFLPTableName: {
 		Name:     SSTTFLPTableName,
-		Families: []string{"6"},                 // Intel CPUs only
-		Models:   []string{"173", "175", "221"}, // Granite Rapids, Sierra Forest, Clearwater Forest
+		Families: []string{"6"},                        // Intel CPUs only
+		Models:   []string{"173", "174", "175", "221"}, // Granite Rapids, Granite Rapids D, Sierra Forest, Clearwater Forest
 		HasRows:  true,
 		ScriptNames: []string{
 			script.SSTTFLPScriptName,
