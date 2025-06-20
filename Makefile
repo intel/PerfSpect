@@ -134,7 +134,7 @@ modernize:
 	go run golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize@latest -fix -test ./...
 
 .PHONY: check
-check: check_format check_vet check_static check_license check_lint check_vuln
+check: check_format check_vet check_static check_license check_lint check_vuln check_modernize
 
 .PHONY: sweep
 sweep:
