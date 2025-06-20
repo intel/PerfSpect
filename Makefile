@@ -24,6 +24,7 @@ perfspect:
 .PHONY: resources
 resources:
 	mkdir -p internal/script/resources/x86_64
+	mkdir -p internal/script/resources/aarch64
 ifneq ("$(wildcard /prebuilt/tools)","") # /prebuilt/tools is a directory in the container
 	cp -r /prebuilt/tools/* internal/script/resources/x86_64
 else # copy dev system tools to script resources
@@ -31,6 +32,11 @@ ifneq ("$(wildcard tools/bin)","")
 		cp -r tools/bin/* internal/script/resources/x86_64
 else # no prebuilt tools found
 		@echo "No prebuilt tools found in /prebuilt/tools or tools/bin"
+endif
+ifneq ("$(wildcard tools/bin-aarch64)","")
+		cp -r tools/bin-aarch64/* internal/script/resources/aarch64
+else # no prebuilt tools found
+		@echo "No prebuilt tools (aarch64) found in /prebuilt/tools or tools/bin-aarch64"
 endif
 endif
 
@@ -40,6 +46,7 @@ endif
 dist: resources check perfspect
 	rm -rf dist/perfspect
 	mkdir -p dist/perfspect/tools/x86_64
+	mkdir -p dist/perfspect/tools/aarch64
 	cp LICENSE dist/perfspect/
 	cp THIRD_PARTY_PROGRAMS dist/perfspect/
 	cp NOTICE dist/perfspect/
@@ -94,7 +101,7 @@ check_static:
 .PHONY: check_license
 check_license:
 	@echo "Confirming source files have license headers..."
-	@for f in `find . -type f ! -path './perfspect_202*' ! -path './tools/bin/*' ! -path './internal/script/resources/*' ! -path './scripts/.venv/*' ! -path './test/output/*' ! -path './debug_out/*' ! -path './tools/perf-archive/*' ! -path './tools/avx-turbo/*' \( -name "*.go" -o -name "*.s" -o -name "*.html" -o -name "Makefile" -o -name "*.sh" -o -name "*.Dockerfile" -o -name "*.py" \)`; do \
+	@for f in `find . -type f ! -path './perfspect_202*' ! -path './tools/bin/*' ! -path './tools/bin-aarch64/*' ! -path './internal/script/resources/*' ! -path './scripts/.venv/*' ! -path './test/output/*' ! -path './debug_out/*' ! -path './tools/perf-archive/*' ! -path './tools/avx-turbo/*' \( -name "*.go" -o -name "*.s" -o -name "*.html" -o -name "Makefile" -o -name "*.sh" -o -name "*.Dockerfile" -o -name "*.py" \)`; do \
 		if ! grep -E 'SPDX-License-Identifier: BSD-3-Clause' "$$f" >/dev/null; then echo "Error: license not found: $$f"; fail=1; fi; \
 	done; if [ -n "$$fail" ]; then exit 1; fi
 
