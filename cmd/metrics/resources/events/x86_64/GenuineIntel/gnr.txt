@@ -1,5 +1,6 @@
 # GraniteRapids event list
 
+# cpu groups
 cpu/event=0x51,umask=0x01,period=100003,name='L1D.REPLACEMENT'/,                                         # 0,1,2,3
 cpu/event=0x24,umask=0xe4,period=200003,name='L2_RQSTS.ALL_CODE_RD'/,                                    # 0,1,2,3
 cpu/event=0xd1,umask=0x01,period=1000003,name='MEM_LOAD_RETIRED.L1_HIT'/,                                # 0,1,2,3
@@ -190,10 +191,10 @@ cpu-cycles,
 ref-cycles,
 instructions;
 
-#UPI
+# upi groups
 upi/event=0x02,umask=0x0f,name='UNC_UPI_TxL_FLITS.ALL_DATA'/;                                             # 0,1,2,3
 
-#CHA (Cache)
+# cha groups
 cha/event=0x35,umask=0xc80ffe01,name='UNC_CHA_TOR_INSERTS.IA_MISS_CRD'/,                                  # 0,1,2,3
 cha/event=0x35,umask=0xc8177e01,name='UNC_CHA_TOR_INSERTS.IA_MISS_DRD_REMOTE'/,                           # 0,1,2,3
 cha/event=0x36,umask=0xc8177e01,name='UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD_REMOTE'/;                         # 0
@@ -208,22 +209,23 @@ cha/event=0x35,umask=0xc817fe01,name='UNC_CHA_TOR_INSERTS.IA_MISS_DRD'/,        
 cha/event=0x35,umask=0xc897fe01,name='UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF'/,                             # 0,1,2,3
 cha/event=0x36,umask=0xc817fe01,name='UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD'/;                                # 0
 
-#CHA (IO Bandwidth)
 cha/event=0x35,umask=0xc8f3ff04,name='UNC_CHA_TOR_INSERTS.IO_PCIRDCUR'/,                                  # 0,1,2,3
 cha/event=0x35,umask=0xcc43ff04,name='UNC_CHA_TOR_INSERTS.IO_ITOM'/,                                      # 0,1,2,3
 cha/event=0x35,umask=0xcd43ff04,name='UNC_CHA_TOR_INSERTS.IO_ITOMCACHENEAR'/,                             # 0,1,2,3
 cha/event=0x01,umask=0x00,name='UNC_CHA_CLOCKTICKS'/;                                                     # 0,1,2,3
 
-#IMC (memory read/writes)
+# imc groups
 imc/event=0x05,umask=0xcf,name='UNC_M_CAS_COUNT_SCH0.RD'/,                                                # 0,1,2,3
 imc/event=0x06,umask=0xcf,name='UNC_M_CAS_COUNT_SCH1.RD'/,                                                # 0,1,2,3
 imc/event=0x05,umask=0xf0,name='UNC_M_CAS_COUNT_SCH0.WR'/,                                                # 0,1,2,3
 imc/event=0x06,umask=0xf0,name='UNC_M_CAS_COUNT_SCH1.WR'/;                                                # 0,1,2,3
 
-#C6
+# cstate_core groups
 cstate_core/c6-residency/;
+
+# cstate_pkg groups
 cstate_pkg/c6-residency/;
 
-#power
+# power groups
 power/energy-pkg/,
 power/energy-ram/;
