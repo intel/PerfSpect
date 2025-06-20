@@ -54,12 +54,21 @@ func LoadEventGroups(eventDefinitionOverridePath string, metadata Metadata) (gro
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
 	uncollectable := mapset.NewSet[string]()
+	if flagTransactionRate == 0 {
+		uncollectable.Add("TXN")
+	}
 	var group GroupDefinition
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if len(line) == 0 || line[0] == '#' {
 			continue
 		}
+		// strip end of line comment
+		if idx := strings.Index(line, "#"); idx != -1 {
+			line = line[:idx]
+		}
+		// remove trailing spaces
+		line = strings.TrimSpace(line)
 		var event EventDefinition
 		if event, err = parseEventDefinition(line[:len(line)-1]); err != nil {
 			return
