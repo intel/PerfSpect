@@ -64,14 +64,6 @@ def translate_perfmon_json_metrics_to_perfspect(inFile):
     vars = {}
     result = []
     for m in mf["Metrics"]:
-        # if m.get("Category") != "TMA":
-        #     continue
-        # if m.get("Category") == "TMA" and m.get("Level") > 4:
-        #     continue
-        # if m.get("LegacyName") and m["LegacyName"].startswith("metric_TMA_Info_"):
-        #     continue
-        # if m.get("LegacyName") and m["LegacyName"].startswith("metric_TMA_Bottleneck_"):
-        #     continue
         vars.clear()
         metric = {}
         # strip metric_ prefix from the name
