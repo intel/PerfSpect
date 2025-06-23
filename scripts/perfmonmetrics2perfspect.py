@@ -66,14 +66,36 @@ def translate_perfmon_json_metrics_to_perfspect(inFile):
     for m in mf["Metrics"]:
         vars.clear()
         metric = {}
-        metric["name"] = m["LegacyName"]
+        # strip metric_ prefix from the name
+        if m.get("LegacyName") is None:
+            print(f"ERROR: Metric {m['Name']} has no LegacyName", file=sys.stderr)
+            continue
+        if m["LegacyName"].startswith("metric_"):
+            metric["name"] = m["LegacyName"][len("metric_") :]
+        else:
+            metric["name"] = m["LegacyName"]
+        # not yet :metric["description"] = m.get("BriefDescription", "")
         # extract the events and constants
         for e in m["Events"]:
             vars[e["Alias"]] = e["Name"]
         for c in m["Constants"]:
             vars[c["Alias"]] = c["Name"]
+        # count the parentheses in the formula
+        if m["Formula"].count("(") != m["Formula"].count(")"):
+            print(
+                f"ERROR: Perfmon metric {m['Name']} has mismatched parentheses in Formula: {m['Formula']}",
+                file=sys.stderr,
+            )
+            continue
         # convert the formula
         metric["expression"] = replace_vars_in_formula(vars, m["Formula"])
+        # count the parentheses in the expression
+        if metric["expression"].count("(") != metric["expression"].count(")"):
+            print(
+                f"ERROR: PerfSpect metric {m['Name']} has mismatched parentheses in expression: {metric['expression']}",
+                file=sys.stderr,
+            )
+            continue
         result.append(metric)
     return result
 
