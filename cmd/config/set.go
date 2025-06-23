@@ -271,7 +271,7 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get target model: %w", err)}
 		return
 	}
-	if targetFamily != "6" || (targetFamily == "6" && targetModel != "173" && targetModel != "175" && targetModel != "221") {
+	if targetFamily != "6" || (targetFamily == "6" && targetModel != "173" && targetModel != "174" && targetModel != "175" && targetModel != "221") { // not Intel || not GNR, GNR-D, SRF, CWF
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())}
 		return
 	}
@@ -352,7 +352,7 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get target model: %w", err)}
 		return
 	}
-	if targetFamily != "6" || (targetFamily == "6" && (targetModel == "173" || targetModel == "175" || targetModel == "221")) { // not Intel || not GNR, SRF, CWF
+	if targetFamily != "6" || (targetFamily == "6" && (targetModel == "173" || targetModel == "174" || targetModel == "175" || targetModel == "221")) { // not Intel || not GNR, GNR-D, SRF, CWF
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())}
 		return
 	}
@@ -599,7 +599,7 @@ func setELC(elc string, myTarget target.Target, localTempDir string, completeCha
 		ScriptTemplate: fmt.Sprintf("bhs-power-mode.sh --%s", mode),
 		Superuser:      true,
 		Vendors:        []string{"GenuineIntel"},
-		Models:         []string{"173", "175", "221"}, // GNR, SRF, CWF
+		Models:         []string{"173", "174", "175", "221"}, // GNR, GNR-D, SRF, CWF
 		Depends:        []string{"bhs-power-mode.sh"},
 	}
 	_, err := runScript(myTarget, setScript, localTempDir)
