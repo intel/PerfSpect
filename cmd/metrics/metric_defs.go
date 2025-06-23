@@ -105,6 +105,7 @@ func ConfigureMetrics(loadedMetrics []MetricDefinition, uncollectableEvents []st
 		return
 	}
 	// configure each metric
+	reConstantInt := regexp.MustCompile(`\[(\d+)\]`)
 	for metricIdx := range loadedMetrics {
 		tmpMetric := loadedMetrics[metricIdx]
 		// abbreviate event names in metric expressions to match abbreviations used in uncollectableEvents
@@ -149,13 +150,16 @@ func ConfigureMetrics(loadedMetrics []MetricDefinition, uncollectableEvents []st
 		}
 		// replace constant numbers masquerading as variables with their values, e.g., [20] -> 20
 		// there may be more than one with differing values in the expression, so use a regex to find them all
-		re := regexp.MustCompile(`\[(\d+)\]`)
-		found := re.FindAllStringSubmatchIndex(tmpMetric.Expression, -1)
-		for _, match := range found {
+		for {
+			// find the first match
+			found := reConstantInt.FindStringSubmatchIndex(tmpMetric.Expression)
+			if found == nil {
+				break // no more matches
+			}
 			// match[2] is the start of the number, match[3] is the end of the number
-			number := tmpMetric.Expression[match[2]:match[3]]
+			number := tmpMetric.Expression[found[2]:found[3]]
 			// replace the whole match with the number
-			tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, tmpMetric.Expression[match[0]:match[1]], number)
+			tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, tmpMetric.Expression[found[0]:found[1]], number)
 		}
 		// get a list of the variables in the expression
 		tmpMetric.Variables = make(map[string]int)
