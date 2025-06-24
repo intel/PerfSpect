@@ -43,7 +43,7 @@ func LoadEventGroups(eventDefinitionOverridePath string, metadata Metadata) (gro
 		uarch = strings.Split(uarch, " ")[0]
 		// use alternate events/metrics when TMA fixed counters are not supported
 		alternate := ""
-		if (uarch == "icx" || uarch == "spr" || uarch == "emr") && !metadata.SupportsFixedTMA { // AWS VM instances
+		if (uarch == "icx" || uarch == "spr" || uarch == "emr" || uarch == "gnr") && !metadata.SupportsFixedTMA { // AWS/GCP VM instances
 			alternate = "_nofixedtma"
 		}
 		eventFileName := fmt.Sprintf("%s%s.txt", uarch, alternate)
