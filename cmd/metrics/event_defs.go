@@ -145,9 +145,13 @@ func isCollectableEvent(event EventDefinition, metadata Metadata) bool {
 	}
 	// PEBS events (not supported on GCP c4 VMs)
 	pebsEventNames := []string{"INT_MISC.UNKNOWN_BRANCH_CYCLES", "UOPS_RETIRED.MS"}
-	if !metadata.SupportsPEBS && slices.Contains(pebsEventNames, event.Name) {
-		slog.Debug("PEBS events not supported on target", slog.String("event", event.Name))
-		return false
+	if !metadata.SupportsPEBS {
+		for _, pebsEventName := range pebsEventNames {
+			if strings.Contains(event.Name, pebsEventName) {
+				slog.Debug("PEBS events not supported on target", slog.String("event", event.Name))
+				return false
+			}
+		}
 	}
 	// short-circuit for cpu events that aren't off-core response events
 	if event.Device == "cpu" && !(strings.HasPrefix(event.Name, "OCR") || strings.HasPrefix(event.Name, "OFFCORE_REQUESTS_OUTSTANDING")) {
