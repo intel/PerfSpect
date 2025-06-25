@@ -429,7 +429,7 @@
     },
     {
         "name": "TMA_..Core_Bound(%)",
-        "expression": "max( 0 , ( [TOPDOWN.BACKEND_BOUND_SLOTS] / [TOPDOWN.SLOTS_P] ) - ( [TOPDOWN.MEMORY_BOUND_SLOTS] / [TOPDOWN.SLOTS_P] ) )"
+        "expression": "100 * max( 0 , ( [TOPDOWN.BACKEND_BOUND_SLOTS] / [TOPDOWN.SLOTS_P] ) - ( [TOPDOWN.MEMORY_BOUND_SLOTS] / [TOPDOWN.SLOTS_P] ) )"
     },
     {
         "name": "TMA_....Divider(%)",
@@ -469,7 +469,7 @@
     },
     {
         "name": "TMA_....Few_Uops_Instructions(%)",
-        "expression": "max( 0 , ( 100 * ( [UOPS_RETIRED.HEAVY] / [TOPDOWN.SLOTS_P] ) ) - ( 100 * ( [UOPS_RETIRED.MS] / [TOPDOWN.SLOTS_P] ) ) )"
+        "expression": "100 * max( 0 , ( [UOPS_RETIRED.HEAVY] / [TOPDOWN.SLOTS_P] ) - ( [UOPS_RETIRED.MS] / [TOPDOWN.SLOTS_P] ) )"
     },
     {
         "name": "TMA_....Microcode_Sequencer(%)",
