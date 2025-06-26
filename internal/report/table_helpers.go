@@ -1361,27 +1361,35 @@ func parseNicInfo(scriptOutput string) []nicInfo {
 			continue
 		}
 		var nic nicInfo
+		// Map of prefixes to field pointers
+		fieldMap := map[string]*string{
+			"Interface: ":        &nic.Name,
+			"Vendor: ":           &nic.Vendor,
+			"Vendor ID: ":        &nic.VendorID,
+			"Model: ":            &nic.Model,
+			"Model ID: ":         &nic.ModelID,
+			"Speed: ":            &nic.Speed,
+			"Link detected: ":    &nic.Link,
+			"bus-info: ":         &nic.Bus,
+			"driver: ":           &nic.Driver,
+			"version: ":          &nic.DriverVersion,
+			"firmware-version: ": &nic.FirmwareVersion,
+			"MAC Address: ":      &nic.MACAddress,
+			"NUMA Node: ":        &nic.NUMANode,
+			"CPU Affinity: ":     &nic.CPUAffinity,
+			"IRQ Balance: ":      &nic.IRQBalance,
+		}
 		for line := range strings.SplitSeq(nicOutput, "\n") {
 			line = strings.TrimSpace(line)
-			nic.Name, _ = strings.CutPrefix(line, "Interface: ")
-			nic.Vendor, _ = strings.CutPrefix(line, "Vendor: ")
-			nic.VendorID, _ = strings.CutPrefix(line, "Vendor ID: ")
-			if strings.HasPrefix(line, "Model: ") {
-				// sometimes the model name has additional information in parentheses, we want to keep only the model name
-				nic.Model = strings.TrimSpace(strings.TrimPrefix(strings.Split(line, "(")[0], "Model: "))
+			for prefix, fieldPtr := range fieldMap {
+				if after, ok := strings.CutPrefix(line, prefix); ok {
+					*fieldPtr = after
+					break
+				}
 			}
-			nic.ModelID, _ = strings.CutPrefix(line, "Model ID: ")
-			nic.Speed, _ = strings.CutPrefix(line, "Speed: ")
-			nic.Link, _ = strings.CutPrefix(line, "Link detected: ")
-			nic.Bus, _ = strings.CutPrefix(line, "bus-info: ")
-			nic.Driver, _ = strings.CutPrefix(line, "driver: ")
-			nic.DriverVersion, _ = strings.CutPrefix(line, "version: ")
-			nic.FirmwareVersion, _ = strings.CutPrefix(line, "firmware-version: ")
-			nic.MACAddress, _ = strings.CutPrefix(line, "MAC Address: ")
-			nic.NUMANode, _ = strings.CutPrefix(line, "NUMA Node: ")
-			nic.CPUAffinity, _ = strings.CutPrefix(line, "CPU Affinity: ")
-			nic.IRQBalance, _ = strings.CutPrefix(line, "IRQ Balance: ")
 		}
+		// special case for model as it sometimes has additional information in parentheses
+		nic.Model = strings.TrimSpace(strings.Split(nic.Model, "(")[0])
 		nics = append(nics, nic)
 	}
 	return nics
