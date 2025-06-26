@@ -664,11 +664,12 @@ func renderChart(chartType string, allFormattedPoints []string, datasetNames []s
 		datasets = append(datasets, buf.String())
 	}
 	var chartTemplate string
-	if chartType == "line" {
+	switch chartType {
+	case "line":
 		chartTemplate = lineChartTemplate
-	} else if chartType == "scatter" {
+	case "scatter":
 		chartTemplate = scatterChartTemplate
-	} else {
+	default:
 		panic("unknown chart type")
 	}
 	sct := texttemplate.Must(texttemplate.New("chartTemplate").Parse(chartTemplate))

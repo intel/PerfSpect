@@ -586,11 +586,12 @@ func setGovernor(governor string, myTarget target.Target, localTempDir string, c
 
 func setELC(elc string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
 	var mode string
-	if elc == elcOptions[0] {
+	switch elc {
+	case elcOptions[0]:
 		mode = "latency-optimized-mode"
-	} else if elc == elcOptions[1] {
+	case elcOptions[1]:
 		mode = "default"
-	} else {
+	default:
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("invalid ELC mode: %s", elc)}
 		return
 	}
@@ -657,11 +658,12 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 	}
 	// set the prefetcher bit to bitValue determined by the onOff value, note: 0 is enable, 1 is disable
 	var bitVal uint64
-	if enableDisable == prefetcherOptions[0] {
+	switch enableDisable {
+	case prefetcherOptions[0]:
 		bitVal = 0
-	} else if enableDisable == prefetcherOptions[1] {
+	case prefetcherOptions[1]:
 		bitVal = 1
-	} else {
+	default:
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("invalid prefetcher setting: %s", enableDisable)}
 		return
 	}
@@ -714,11 +716,12 @@ fi
 		return
 	}
 	var enableDisableValue int
-	if enableDisable == c6Options[0] { // enable
+	switch enableDisable {
+	case c6Options[0]: // enable
 		enableDisableValue = 0
-	} else if enableDisable == c6Options[1] { // disable
+	case c6Options[1]: // disable
 		enableDisableValue = 1
-	} else {
+	default:
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("invalid C6 setting: %s", enableDisable)}
 		return
 	}
@@ -760,11 +763,12 @@ func setC1Demotion(enableDisable string, myTarget target.Target, localTempDir st
 	}
 	// set the c1 demotion bits to bitValue, note: 1 is enable, 0 is disable
 	var bitVal uint64
-	if enableDisable == c1DemotionOptions[0] { // enable
+	switch enableDisable {
+	case c1DemotionOptions[0]: // enable
 		bitVal = 1
-	} else if enableDisable == c1DemotionOptions[1] { // disable
+	case c1DemotionOptions[1]: // disable
 		bitVal = 0
-	} else {
+	default:
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("invalid C1 demotion setting: %s", enableDisable)}
 		return
 	}

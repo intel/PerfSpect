@@ -401,11 +401,12 @@ func getPassword(prompt string) (string, error) {
 }
 
 func getHostArchitecture() (string, error) {
-	if runtime.GOARCH == "amd64" {
+	switch runtime.GOARCH {
+	case "amd64":
 		return "x86_64", nil
-	} else if runtime.GOARCH == "arm64" {
+	case "arm64":
 		return "aarch64", nil
-	} else {
+	default:
 		slog.Error("unsupported architecture", slog.String("architecture", runtime.GOARCH))
 		err := fmt.Errorf("unsupported architecture: %s", runtime.GOARCH)
 		return "", err

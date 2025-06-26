@@ -157,9 +157,10 @@ func getSPRCPU(capid4 string) (cpu CPUDefinition, err error) {
 			return
 		}
 		bits = (capid4Int >> 6) & 0b11
-		if bits == 3 {
+		switch bits {
+		case 3:
 			uarch = "SPR_XCC"
-		} else if bits == 1 {
+		case 1:
 			uarch = "SPR_MCC"
 		}
 	}
@@ -186,9 +187,10 @@ func getEMRCPU(capid4 string) (cpu CPUDefinition, err error) {
 			return
 		}
 		bits = (capid4Int >> 6) & 0b11
-		if bits == 3 {
+		switch bits {
+		case 3:
 			uarch = "EMR_XCC"
-		} else if bits == 1 {
+		case 1:
 			uarch = "EMR_MCC"
 		}
 	}

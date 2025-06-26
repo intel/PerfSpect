@@ -101,19 +101,20 @@ type row struct {
 func newRow(fields []string, names []string) (r row, err error) {
 	r.metrics = make(map[string]float64)
 	for fIdx, field := range fields {
-		if fIdx == idxTimestamp {
+		switch fIdx {
+		case idxTimestamp:
 			var ts float64
 			if ts, err = strconv.ParseFloat(field, 64); err != nil {
 				return
 			}
 			r.timestamp = ts
-		} else if fIdx == idxSocket {
+		case idxSocket:
 			r.socket = field
-		} else if fIdx == idxCPU {
+		case idxCPU:
 			r.cpu = field
-		} else if fIdx == idxCgroup {
+		case idxCgroup:
 			r.cgroup = field
-		} else {
+		default:
 			// metrics
 			var v float64
 			if field != "" {
@@ -211,11 +212,12 @@ func newMetricsFromCSV(csvPath string) (metrics []metricsFromCSV, err error) {
 				metrics = append(metrics, metricsFromCSV{})
 				listIdx = len(metrics) - 1
 				metrics[listIdx].names = metricNames
-				if groupByField == idxSocket {
+				switch groupByField {
+				case idxSocket:
 					metrics[listIdx].groupByField = nonMetricNames[idxSocket]
-				} else if groupByField == idxCPU {
+				case idxCPU:
 					metrics[listIdx].groupByField = nonMetricNames[idxCPU]
-				} else if groupByField == idxCgroup {
+				case idxCgroup:
 					metrics[listIdx].groupByField = nonMetricNames[idxCgroup]
 				}
 				metrics[listIdx].groupByValue = groupByValue
