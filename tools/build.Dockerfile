@@ -59,7 +59,10 @@ RUN for i in {1..5}; do \
         add-apt-repository ppa:git-core/ppa -y && break; \
         echo "Retrying in 5 seconds... ($i/5)" && sleep 5; \
     done
-RUN for i in {1..5}; do \
+
+# Use relatively small ulimit. This is due to pycompile, see: https://github.com/MaastrichtUniversity/docker-dev/commit/97ab4fd04534f73c023371b07e188918b73ac9d0
+# This works around python-pkg-resources taking a extremely long time to install
+RUN ulimit -n 4096 && for i in {1..5}; do \
         apt-get update && apt-get install -y \
         automake autotools-dev binutils-dev bison build-essential clang cmake debuginfod \
         default-jdk default-jre docbook-utils flex gawk git libaio-dev libaio1 \
