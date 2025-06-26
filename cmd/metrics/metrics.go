@@ -1242,11 +1242,12 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 	// only refresh if duration is 0, i.e., no timeout and pids/cids are not specified
 	var needsRefresh bool
 	if flagDuration == 0 {
-		if flagScope == scopeProcess {
+		switch flagScope {
+		case scopeProcess:
 			if len(flagPidList) == 0 {
 				needsRefresh = true
 			}
-		} else if flagScope == scopeCgroup {
+		case scopeCgroup:
 			if len(flagCidList) == 0 {
 				needsRefresh = true
 			}
@@ -1280,7 +1281,7 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 			// get the list of cids to collect
 			cids, err = getCidsForPerf(myTarget, flagCidList, flagCount, flagFilter, localTempDir)
 			if err != nil {
-				if targetContext.perfStartTime == (time.Time{}) {
+				if targetContext.perfStartTime.Equal((time.Time{})) {
 					targetContext.perfStartTime = time.Now()
 				}
 				exceededDuration := flagDuration != 0 && time.Since(targetContext.perfStartTime) > time.Duration(flagDuration)*time.Second

@@ -1979,13 +1979,14 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []Field {
 	for _, pf := range prefetcherDefinitions {
 		if slices.Contains(pf.Uarchs, "all") || slices.Contains(pf.Uarchs, uarch[:3]) {
 			var scriptName string
-			if pf.Msr == MsrPrefetchControl {
+			switch pf.Msr {
+			case MsrPrefetchControl:
 				scriptName = script.PrefetchControlName
-			} else if pf.Msr == MsrPrefetchers {
+			case MsrPrefetchers:
 				scriptName = script.PrefetchersName
-			} else if pf.Msr == MsrAtomPrefTuning1 {
+			case MsrAtomPrefTuning1:
 				scriptName = script.PrefetchersAtomName
-			} else {
+			default:
 				slog.Error("unknown msr for prefetcher", slog.String("msr", fmt.Sprintf("0x%x", pf.Msr)))
 				continue
 			}

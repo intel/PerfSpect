@@ -83,13 +83,14 @@ func ConfigureMetrics(loadedMetrics []MetricDefinition, uncollectableEvents []st
 	// get constants as strings
 	tscFreq := fmt.Sprintf("%f", float64(metadata.TSCFrequencyHz))
 	var tsc string
-	if flagGranularity == granularitySystem {
+	switch flagGranularity {
+	case granularitySystem:
 		tsc = fmt.Sprintf("%f", float64(metadata.TSC))
-	} else if flagGranularity == granularitySocket {
+	case granularitySocket:
 		tsc = fmt.Sprintf("%f", float64(metadata.TSC)/float64(metadata.SocketCount))
-	} else if flagGranularity == granularityCPU {
+	case granularityCPU:
 		tsc = fmt.Sprintf("%f", float64(metadata.TSC)/(float64(metadata.SocketCount*metadata.CoresPerSocket*metadata.ThreadsPerCore)))
-	} else {
+	default:
 		err = fmt.Errorf("unknown granularity: %s", flagGranularity)
 		return
 	}
@@ -218,11 +219,12 @@ func transformConditional(origIn string) (out string, err error) {
 		var parens int
 		for i := idxIf - 1; i >= 0; i-- {
 			c := in[i]
-			if c == ')' {
+			switch c {
+			case ')':
 				parens += 1
-			} else if c == '(' {
+			case '(':
 				parens -= 1
-			} else {
+			default:
 				continue
 			}
 			if parens < 0 {
@@ -233,11 +235,12 @@ func transformConditional(origIn string) (out string, err error) {
 		// find the end of expression 2 (also beginning of expression 3)
 		parens = 0
 		for i, c := range in[idxElse+5:] {
-			if c == '(' {
+			switch c {
+			case '(':
 				parens += 1
-			} else if c == ')' {
+			case ')':
 				parens -= 1
-			} else {
+			default:
 				continue
 			}
 			if parens < 0 {

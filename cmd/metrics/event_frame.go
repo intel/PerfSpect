@@ -80,9 +80,10 @@ func GetEventFrames(rawEvents [][]byte, eventGroupDefinitions []GroupDefinition,
 			if eventIdx == 0 {
 				lastGroupID = event.Group
 				eventFrame.Timestamp = event.Interval
-				if flagGranularity == granularityCPU {
+				switch flagGranularity {
+				case granularityCPU:
 					eventFrame.CPU = event.CPU
-				} else if flagGranularity == granularitySocket {
+				case granularitySocket:
 					eventFrame.Socket = event.Socket
 				}
 				if flagScope == scopeCgroup {
@@ -123,11 +124,12 @@ func parseEvents(rawEvents [][]byte, eventGroupDefinitions []GroupDefinition) ([
 			slog.Error(err.Error(), slog.String("event", string(rawEvent)))
 			return nil, err
 		}
-		if event.CounterValue == "<not counted>" {
+		switch event.CounterValue {
+		case "<not counted>":
 			slog.Debug("event not counted", slog.String("event", string(rawEvent)))
 			eventsNotCounted = append(eventsNotCounted, event.Event)
 			event.Value = math.NaN()
-		} else if event.CounterValue == "<not supported>" {
+		case "<not supported>":
 			slog.Debug("event not supported", slog.String("event", string(rawEvent)))
 			eventsNotSupported = append(eventsNotSupported, event.Event)
 			event.Value = math.NaN()
@@ -162,11 +164,13 @@ func parseEvents(rawEvents [][]byte, eventGroupDefinitions []GroupDefinition) ([
 
 // coalesceEvents separates the events into a number of event lists by granularity and scope
 func coalesceEvents(allEvents []Event, scope string, granularity string, metadata Metadata) (coalescedEvents [][]Event, err error) {
-	if scope == scopeSystem {
-		if granularity == granularitySystem {
+	switch scope {
+	case scopeSystem:
+		switch granularity {
+		case granularitySystem:
 			coalescedEvents = append(coalescedEvents, allEvents)
 			return
-		} else if granularity == granularitySocket {
+		case granularitySocket:
 			// create one list of Events per Socket
 			newEvents := make([][]Event, metadata.SocketCount)
 			for i := range metadata.SocketCount {
@@ -205,7 +209,7 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 			}
 			coalescedEvents = append(coalescedEvents, newEvents...)
 			return
-		} else if granularity == granularityCPU {
+		case granularityCPU:
 			// create one list of Events per CPU
 			numCPUs := metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore
 			// note: if some cores have been off-lined, this may cause an issue because 'perf' seems
@@ -229,14 +233,14 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 				newEvents[cpu] = append(newEvents[cpu], event)
 			}
 			coalescedEvents = append(coalescedEvents, newEvents...)
-		} else {
+		default:
 			err = fmt.Errorf("unsupported granularity: %s", granularity)
 			return
 		}
-	} else if scope == scopeProcess {
+	case scopeProcess:
 		coalescedEvents = append(coalescedEvents, allEvents)
 		return
-	} else if scope == scopeCgroup {
+	case scopeCgroup:
 		// expand events list to one list per cgroup
 		var allCgroupEvents [][]Event
 		var cgroups []string
@@ -250,7 +254,7 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 			allCgroupEvents[cgroupIdx] = append(allCgroupEvents[cgroupIdx], event)
 		}
 		coalescedEvents = append(coalescedEvents, allCgroupEvents...)
-	} else {
+	default:
 		err = fmt.Errorf("unsupported scope: %s", scope)
 		return
 	}

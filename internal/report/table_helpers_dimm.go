@@ -311,49 +311,50 @@ these fields as they see fit.
 Returns None when there's no match.
 */
 func getDIMMSocketSlot(dimmType DIMMType, reBankLoc *regexp.Regexp, reLoc *regexp.Regexp, bankLocator string, locator string) (socket int, slot int, err error) {
-	if dimmType == DIMMType0 {
+	switch dimmType {
+	case DIMMType0:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
 			slot, _ = strconv.Atoi(match[3])
 		}
 		return
-	} else if dimmType == DIMMType1 {
+	case DIMMType1:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
 			slot, _ = strconv.Atoi(match[3])
 			return
 		}
-	} else if dimmType == DIMMType2 {
+	case DIMMType2:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
 			slot, _ = strconv.Atoi(match[3])
 			return
 		}
-	} else if dimmType == DIMMType3 {
+	case DIMMType3:
 		match := reBankLoc.FindStringSubmatch(bankLocator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
 			slot, _ = strconv.Atoi(match[3])
 			return
 		}
-	} else if dimmType == DIMMType4 {
+	case DIMMType4:
 		match := reBankLoc.FindStringSubmatch(bankLocator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
 			slot, _ = strconv.Atoi(match[4])
 			return
 		}
-	} else if dimmType == DIMMType5 {
+	case DIMMType5:
 		match := reBankLoc.FindStringSubmatch(bankLocator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
 			slot, _ = strconv.Atoi(match[3])
 			return
 		}
-	} else if dimmType == DIMMType6 {
+	case DIMMType6:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
@@ -362,7 +363,7 @@ func getDIMMSocketSlot(dimmType DIMMType, reBankLoc *regexp.Regexp, reLoc *regex
 			slot -= 1
 			return
 		}
-	} else if dimmType == DIMMType7 {
+	case DIMMType7:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
@@ -370,7 +371,7 @@ func getDIMMSocketSlot(dimmType DIMMType, reBankLoc *regexp.Regexp, reLoc *regex
 			slot -= 1
 			return
 		}
-	} else if dimmType == DIMMType8 {
+	case DIMMType8:
 		match := reBankLoc.FindStringSubmatch(bankLocator)
 		if match != nil {
 			match2 := reLoc.FindStringSubmatch(locator)
@@ -382,28 +383,28 @@ func getDIMMSocketSlot(dimmType DIMMType, reBankLoc *regexp.Regexp, reLoc *regex
 				return
 			}
 		}
-	} else if dimmType == DIMMType9 {
+	case DIMMType9:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
 			slot, _ = strconv.Atoi(match[2])
 			return
 		}
-	} else if dimmType == DIMMType10 {
+	case DIMMType10:
 		match := reBankLoc.FindStringSubmatch(bankLocator)
 		if match != nil {
 			socket = 0
 			slot, _ = strconv.Atoi(match[2])
 			return
 		}
-	} else if dimmType == DIMMType11 {
+	case DIMMType11:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket = 0
 			slot, _ = strconv.Atoi(match[2])
 			return
 		}
-	} else if dimmType == DIMMType12 {
+	case DIMMType12:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
@@ -412,7 +413,7 @@ func getDIMMSocketSlot(dimmType DIMMType, reBankLoc *regexp.Regexp, reLoc *regex
 			slot = slot - 1
 			return
 		}
-	} else if dimmType == DIMMType13 {
+	case DIMMType13:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
@@ -420,14 +421,14 @@ func getDIMMSocketSlot(dimmType DIMMType, reBankLoc *regexp.Regexp, reLoc *regex
 			slot = slot - 1
 			return
 		}
-	} else if dimmType == DIMMType14 {
+	case DIMMType14:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
 			slot = 0
 			return
 		}
-	} else if dimmType == DIMMType15 {
+	case DIMMType15:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])

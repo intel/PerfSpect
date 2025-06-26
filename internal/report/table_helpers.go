@@ -524,7 +524,8 @@ func channelsFromOutput(outputs map[string]script.ScriptOutput) string {
 
 func turboEnabledFromOutput(outputs map[string]script.ScriptOutput) string {
 	vendor := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Vendor ID:\s*(.+)$`)
-	if vendor == "GenuineIntel" {
+	switch vendor {
+	case "GenuineIntel":
 		val := valFromRegexSubmatch(outputs[script.CpuidScriptName].Stdout, `^Intel Turbo Boost Technology\s*= (.+?)$`)
 		if val == "true" {
 			return "Enabled"
@@ -533,7 +534,7 @@ func turboEnabledFromOutput(outputs map[string]script.ScriptOutput) string {
 			return "Disabled"
 		}
 		return "" // unknown value
-	} else if vendor == "AuthenticAMD" {
+	case "AuthenticAMD":
 		val := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Frequency boost.*:\s*(.+?)$`)
 		if val != "" {
 			return val + " (AMD Frequency Boost)"
@@ -565,13 +566,14 @@ func prefetchersFromOutput(outputs map[string]script.ScriptOutput) [][]string {
 	for _, pf := range prefetcherDefinitions {
 		if slices.Contains(pf.Uarchs, "all") || slices.Contains(pf.Uarchs, uarch[:3]) {
 			var scriptName string
-			if pf.Msr == MsrPrefetchControl {
+			switch pf.Msr {
+			case MsrPrefetchControl:
 				scriptName = script.PrefetchControlName
-			} else if pf.Msr == MsrPrefetchers {
+			case MsrPrefetchers:
 				scriptName = script.PrefetchersName
-			} else if pf.Msr == MsrAtomPrefTuning1 {
+			case MsrAtomPrefTuning1:
 				scriptName = script.PrefetchersAtomName
-			} else {
+			default:
 				slog.Error("unknown msr for prefetcher", slog.String("msr", fmt.Sprintf("0x%x", pf.Msr)))
 				continue
 			}
@@ -606,13 +608,14 @@ func prefetchersSummaryFromOutput(outputs map[string]script.ScriptOutput) string
 	for _, pf := range prefetcherDefinitions {
 		if slices.Contains(pf.Uarchs, "all") || slices.Contains(pf.Uarchs, uarch[:3]) {
 			var scriptName string
-			if pf.Msr == MsrPrefetchControl {
+			switch pf.Msr {
+			case MsrPrefetchControl:
 				scriptName = script.PrefetchControlName
-			} else if pf.Msr == MsrPrefetchers {
+			case MsrPrefetchers:
 				scriptName = script.PrefetchersName
-			} else if pf.Msr == MsrAtomPrefTuning1 {
+			case MsrAtomPrefTuning1:
 				scriptName = script.PrefetchersAtomName
-			} else {
+			default:
 				slog.Error("unknown msr for prefetcher", slog.String("msr", fmt.Sprintf("0x%x", pf.Msr)))
 				continue
 			}
@@ -1009,11 +1012,12 @@ func elcFieldValuesFromOutput(outputs map[string]script.ScriptOutput) (fieldValu
 				mode = "Custom"
 			}
 		} else { // COMPUTE
-			if row[5] == "0" {
+			switch row[5] {
+			case "0":
 				mode = "Latency Optimized"
-			} else if row[5] == "1200" {
+			case "1200":
 				mode = "Default"
-			} else {
+			default:
 				mode = "Custom"
 			}
 		}
@@ -1295,32 +1299,37 @@ func clusteringModeFromOutput(outputs map[string]script.ScriptOutput) string {
 		return ""
 	}
 	nodesPerSocket := nodeCount / socketCount
-	if uarch == "GNR_X1" {
+	switch uarch {
+	case "GNR_X1":
 		return "All2All"
-	} else if uarch == "GNR_X2" {
-		if nodesPerSocket == 1 {
+	case "GNR_X2":
+		switch nodesPerSocket {
+		case 1:
 			return "UMA 4 (Quad)"
-		} else if nodesPerSocket == 2 {
+		case 2:
 			return "SNC 2"
 		}
-	} else if uarch == "GNR_X3" {
-		if nodesPerSocket == 1 {
+	case "GNR_X3":
+		switch nodesPerSocket {
+		case 1:
 			return "UMA 6 (Hex)"
-		} else if nodesPerSocket == 3 {
+		case 3:
 			return "SNC 3"
 		}
-	} else if uarch == "SRF_SP" {
+	case "SRF_SP":
 		return "UMA 2 (Hemi)"
-	} else if uarch == "SRF_AP" {
-		if nodesPerSocket == 1 {
+	case "SRF_AP":
+		switch nodesPerSocket {
+		case 1:
 			return "UMA 4 (Quad)"
-		} else if nodesPerSocket == 2 {
+		case 2:
 			return "SNC 2"
 		}
-	} else if uarch == "CWF" {
-		if nodesPerSocket == 1 {
+	case "CWF":
+		switch nodesPerSocket {
+		case 1:
 			return "UMA 6 (Hex)"
-		} else if nodesPerSocket == 3 {
+		case 3:
 			return "SNC 3"
 		}
 	}
@@ -1834,13 +1843,14 @@ func systemSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 	}
 	// hyperthreading
 	htOnOff = hyperthreadingFromOutput(outputs)
-	if htOnOff == "Enabled" {
+	switch htOnOff {
+	case "Enabled":
 		htOnOff = "On"
-	} else if htOnOff == "Disabled" {
+	case "Disabled":
 		htOnOff = "Off"
-	} else if htOnOff == "N/A" {
+	case "N/A":
 		htOnOff = "N/A"
-	} else {
+	default:
 		htOnOff = "?"
 	}
 	// turbo
@@ -1974,9 +1984,10 @@ func nativeFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
 	}
 	var dwarfFolded, fpFolded string
 	for header, content := range sections {
-		if header == "perf_dwarf" {
+		switch header {
+		case "perf_dwarf":
 			dwarfFolded = content
-		} else if header == "perf_fp" {
+		case "perf_fp":
 			fpFolded = content
 		}
 	}

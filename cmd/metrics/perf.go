@@ -98,14 +98,15 @@ func getPerfCommandArgs(pids []string, cgroups []string, timeout int, eventGroup
 	// -I: print interval in ms
 	// -j: json formatted event output
 	args = append(args, "stat", "-I", fmt.Sprintf("%d", flagPerfPrintInterval*1000), "-j")
-	if flagScope == scopeSystem {
+	switch flagScope {
+	case scopeSystem:
 		args = append(args, "-a") // system-wide collection
 		if flagGranularity == granularityCPU || flagGranularity == granularitySocket {
 			args = append(args, "-A") // no aggregation
 		}
-	} else if flagScope == scopeProcess {
+	case scopeProcess:
 		args = append(args, "-p", strings.Join(pids, ",")) // collect only for these processes
-	} else if flagScope == scopeCgroup {
+	case scopeCgroup:
 		args = append(args, "--for-each-cgroup", strings.Join(cgroups, ",")) // collect only for these cgroups
 	}
 	// -e: event groups to collect
@@ -134,15 +135,16 @@ func getPerfCommandArgs(pids []string, cgroups []string, timeout int, eventGroup
 // executed to collect event data
 func getPerfCommand(perfPath string, eventGroups []GroupDefinition, pids []string, cids []string) (*exec.Cmd, error) {
 	var duration int
-	if flagScope == scopeSystem {
+	switch flagScope {
+	case scopeSystem:
 		duration = flagDuration
-	} else if flagScope == scopeProcess {
+	case scopeProcess:
 		if flagDuration > 0 {
 			duration = flagDuration
 		} else if len(flagPidList) == 0 { // don't refresh if PIDs are specified
 			duration = flagRefresh // refresh hot processes every flagRefresh seconds
 		}
-	} else if flagScope == scopeCgroup {
+	case scopeCgroup:
 		duration = 0
 	}
 
