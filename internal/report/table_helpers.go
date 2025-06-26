@@ -1756,7 +1756,7 @@ func nicIRQMappingsFromOutput(outputs map[string]script.ScriptOutput) [][]string
 			continue // skip NICs without CPU affinity
 		}
 		affinities := strings.Split(strings.TrimSuffix(nic.CPUAffinity, ";"), ";")
-		nicIRQMappings = append(nicIRQMappings, []string{nic.Name, strings.Join(affinities, "|")})
+		nicIRQMappings = append(nicIRQMappings, []string{nic.Name, strings.Join(affinities, " | ")})
 	}
 	return nicIRQMappings
 }
