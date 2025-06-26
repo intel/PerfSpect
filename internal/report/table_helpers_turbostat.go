@@ -3,6 +3,7 @@ package report
 import (
 	"fmt"
 	"log/slog"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -53,9 +54,9 @@ func parseTurbostatOutput(output string) ([]map[string]string, error) {
 		// parse the fields in the line
 		fields := strings.Fields(line)
 		// if this is a header line
-		if len(fields) > 1 && (fields[0] == "CPU" || fields[0] == "Package" || fields[0] == "Core") {
+		if len(fields) >= 1 && slices.Contains([]string{"package", "die", "node", "core", "cpu"}, strings.ToLower(fields[0])) {
 			if len(headers) == 0 {
-				headers = fields
+				headers = fields // first line with a column name is the header
 			} else {
 				// bump the timestamp to the next interval
 				if timeParsed && interval > 0 {
@@ -67,13 +68,12 @@ func parseTurbostatOutput(output string) ([]map[string]string, error) {
 		if len(headers) == 0 {
 			continue // skip data lines before first header
 		}
-		values := strings.Fields(line)
-		if len(values) != len(headers) {
+		if len(fields) != len(headers) {
 			continue // skip core lines
 		}
-		row := make(map[string]string)
+		row := make(map[string]string, len(headers))
 		for i, h := range headers {
-			row[h] = values[i]
+			row[h] = fields[i]
 		}
 		// Add timestamp to row
 		if timeParsed && interval > 0 {
