@@ -1363,24 +1363,67 @@ func parseNicInfo(scriptOutput string) []nicInfo {
 		var nic nicInfo
 		for line := range strings.SplitSeq(nicOutput, "\n") {
 			line = strings.TrimSpace(line)
-			nic.Name, _ = strings.CutPrefix(line, "Interface: ")
-			nic.Vendor, _ = strings.CutPrefix(line, "Vendor: ")
-			nic.VendorID, _ = strings.CutPrefix(line, "Vendor ID: ")
+			if after, ok := strings.CutPrefix(line, "Interface: "); ok {
+				nic.Name = after
+				continue
+			}
+			if after, ok := strings.CutPrefix(line, "Vendor: "); ok {
+				nic.Vendor = after
+				continue
+			}
+			if after, ok := strings.CutPrefix(line, "Vendor ID: "); ok {
+				nic.VendorID = after
+				continue
+			}
 			if strings.HasPrefix(line, "Model: ") {
 				// sometimes the model name has additional information in parentheses, we want to keep only the model name
 				nic.Model = strings.TrimSpace(strings.TrimPrefix(strings.Split(line, "(")[0], "Model: "))
+				continue
 			}
-			nic.ModelID, _ = strings.CutPrefix(line, "Model ID: ")
-			nic.Speed, _ = strings.CutPrefix(line, "Speed: ")
-			nic.Link, _ = strings.CutPrefix(line, "Link detected: ")
-			nic.Bus, _ = strings.CutPrefix(line, "bus-info: ")
-			nic.Driver, _ = strings.CutPrefix(line, "driver: ")
-			nic.DriverVersion, _ = strings.CutPrefix(line, "version: ")
-			nic.FirmwareVersion, _ = strings.CutPrefix(line, "firmware-version: ")
-			nic.MACAddress, _ = strings.CutPrefix(line, "MAC Address: ")
-			nic.NUMANode, _ = strings.CutPrefix(line, "NUMA Node: ")
-			nic.CPUAffinity, _ = strings.CutPrefix(line, "CPU Affinity: ")
-			nic.IRQBalance, _ = strings.CutPrefix(line, "IRQ Balance: ")
+			if after, ok := strings.CutPrefix(line, "Model ID: "); ok {
+				nic.ModelID = after
+				continue
+			}
+			if after, ok := strings.CutPrefix(line, "Speed: "); ok {
+				nic.Speed = after
+				continue
+			}
+			if after, ok := strings.CutPrefix(line, "Link detected: "); ok {
+				nic.Link = after
+				continue
+			}
+			if after, ok := strings.CutPrefix(line, "bus-info: "); ok {
+				nic.Bus = after
+				continue
+			}
+			if after, ok := strings.CutPrefix(line, "driver: "); ok {
+				nic.Driver = after
+				continue
+			}
+			if after, ok := strings.CutPrefix(line, "version: "); ok {
+				nic.DriverVersion = after
+				continue
+			}
+			if after, ok := strings.CutPrefix(line, "firmware-version: "); ok {
+				nic.FirmwareVersion = after
+				continue
+			}
+			if after, ok := strings.CutPrefix(line, "MAC Address: "); ok {
+				nic.MACAddress = after
+				continue
+			}
+			if after, ok := strings.CutPrefix(line, "NUMA Node: "); ok {
+				nic.NUMANode = after
+				continue
+			}
+			if after, ok := strings.CutPrefix(line, "CPU Affinity: "); ok {
+				nic.CPUAffinity = after
+				continue
+			}
+			if after, ok := strings.CutPrefix(line, "IRQ Balance: "); ok {
+				nic.IRQBalance = after
+				continue
+			}
 		}
 		nics = append(nics, nic)
 	}
