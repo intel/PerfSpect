@@ -1553,7 +1553,7 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 func networkIRQMappingTableValues(outputs map[string]script.ScriptOutput) []Field {
 	fields := []Field{
 		{Name: "Interface"},
-		{Name: "IRQ:CPUs|IRQ:CPUs|..."},
+		{Name: "IRQ:CPU | IRQ:CPU | ..."},
 	}
 	nicIRQMappings := nicIRQMappingsFromOutput(outputs)
 	for _, nicIRQMapping := range nicIRQMappings {
