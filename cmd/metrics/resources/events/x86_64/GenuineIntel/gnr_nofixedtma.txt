@@ -1,0 +1,214 @@
+# GraniteRapids event list
+
+# cpu groups
+cpu/event=0x51,umask=0x01,period=100003,name='L1D.REPLACEMENT'/,                                         # 0,1,2,3
+cpu/event=0x24,umask=0xe4,period=200003,name='L2_RQSTS.ALL_CODE_RD'/,                                    # 0,1,2,3
+cpu/event=0xd1,umask=0x01,period=1000003,name='MEM_LOAD_RETIRED.L1_HIT'/,                                # 0,1,2,3
+cpu/event=0x25,umask=0x1f,period=100003,name='L2_LINES_IN.ALL'/,                                         # 0,1,2,3
+cpu/event=0xec,umask=0x02,period=2000003,name='CPU_CLK_UNHALTED.DISTRIBUTED'/,
+cpu/event=0xb7,umask=0x02,period=2000003,name='EXE.AMX_BUSY'/,
+cpu-cycles,
+ref-cycles,
+instructions;
+
+cpu/event=0xd1,umask=0x10,period=100021,name='MEM_LOAD_RETIRED.L2_MISS'/,                                # 0,1,2,3
+cpu/event=0x24,umask=0x24,period=200003,name='L2_RQSTS.CODE_RD_MISS'/,                                   # 0,1,2,3
+cpu/event=0x11,umask=0x0e,period=100003,name='ITLB_MISSES.WALK_COMPLETED'/,                              # 0,1,2,3
+cpu/event=0x47,umask=0x03,cmask=0x03,period=1000003,name='MEMORY_ACTIVITY.STALLS_L1D_MISS'/,             # 0,1,2,3
+cpu/event=0xa6,umask=0x40,cmask=0x02,period=1000003,name='EXE_ACTIVITY.BOUND_ON_STORES'/,
+cpu/event=0xa6,umask=0x21,cmask=0x05,period=2000003,name='EXE_ACTIVITY.BOUND_ON_LOADS'/,
+cpu/event=0xad,umask=0x10,period=1000003,name='INT_MISC.UOP_DROPPING'/,
+cpu/event=0xad,umask=0x40,period=1000003,name='INT_MISC.UNKNOWN_BRANCH_CYCLES'/,                         # [*]
+cpu-cycles,
+ref-cycles,
+instructions;
+
+cpu/event=0xe5,umask=0x03,period=1000003,name='MEM_UOP_RETIRED.ANY'/,
+cpu/event=0xc0,umask=0x10,period=2000003,name='INST_RETIRED.MACRO_FUSED'/,
+cpu/event=0xc4,umask=0x00,period=400009,name='BR_INST_RETIRED.ALL_BRANCHES'/,
+cpu/event=0xc5,umask=0x00,period=400009,name='BR_MISP_RETIRED.ALL_BRANCHES'/,
+cpu/event=0x12,umask=0x0e,period=100003,name='DTLB_LOAD_MISSES.WALK_COMPLETED'/,                         # 0,1,2,3
+cpu/event=0x12,umask=0x04,period=100003,name='DTLB_LOAD_MISSES.WALK_COMPLETED_2M_4M'/,                   # 0,1,2,3
+cpu/event=0x13,umask=0x0e,period=100003,name='DTLB_STORE_MISSES.WALK_COMPLETED'/,                        # 0,1,2,3
+cpu/event=0xd1,umask=0x02,period=200003,name='MEM_LOAD_RETIRED.L2_HIT'/,                                 # 0,1,2,3
+cpu-cycles,
+ref-cycles,
+instructions;
+
+cpu/event=0x47,umask=0x09,cmask=0x09,period=1000003,name='MEMORY_ACTIVITY.STALLS_L3_MISS'/,              # 0,1,2,3
+cpu/event=0x80,umask=0x04,period=500009,name='ICACHE_DATA.STALLS'/,                                      # 0,1,2,3
+cpu/event=0x83,umask=0x04,period=200003,name='ICACHE_TAG.STALLS'/,                                       # 0,1,2,3
+cpu/event=0xc2,umask=0x02,period=2000003,name='UOPS_RETIRED.SLOTS'/,
+cpu/event=0xae,umask=0x01,period=2000003,name='UOPS_ISSUED.ANY'/;
+cpu-cycles,
+ref-cycles,
+instructions;
+
+cpu/event=0x47,umask=0x03,cmask=0x03,period=1000003,name='MEMORY_ACTIVITY.STALLS_L1D_MISS'/,             # 0,1,2,3
+cpu/event=0x47,umask=0x05,cmask=0x05,period=1000003,name='MEMORY_ACTIVITY.STALLS_L2_MISS'/,              # 0,1,2,3
+cpu/event=0x12,umask=0x10,cmask=0x01,period=100003,name='DTLB_LOAD_MISSES.WALK_ACTIVE'/,                 # 0,1,2,3
+cpu/event=0xa3,umask=0x10,cmask=0x10,period=1000003,name='CYCLE_ACTIVITY.CYCLES_MEM_ANY'/,
+cpu/event=0xad,umask=0x80,period=500009,name='INT_MISC.CLEAR_RESTEER_CYCLES'/,
+cpu/event=0xec,umask=0x02,period=2000003,name='CPU_CLK_UNHALTED.DISTRIBUTED'/,
+cpu/event=0xd1,umask=0x08,period=200003,name='MEM_LOAD_RETIRED.L1_MISS'/,                                # 0,1,2,3
+cpu/event=0xc2,umask=0x04,period=2000003,name='UOPS_RETIRED.MS'/,                                        # [*]
+cpu-cycles,
+ref-cycles,
+instructions;
+
+cpu/event=0xc2,umask=0x04,cmask=0x01,period=2000003,name='UOPS_RETIRED.MS:c1'/,                                   # [*]
+cpu/event=0xd0,umask=0x21,period=100007,name='MEM_INST_RETIRED.LOCK_LOADS'/,                                      # 0,1,2,3
+cpu/event=0xd0,umask=0x82,period=1000003,name='MEM_INST_RETIRED.ALL_STORES'/,                                     # 0,1,2,3
+cpu-cycles,
+ref-cycles,
+instructions;
+
+cpu/event=0xc2,umask=0x04,cmask=0x01,period=2000003,name='UOPS_RETIRED.MS:c1:e1'/,                        # [*]
+cpu/event=0x2a,umask=0x01,period=100003,offcore_rsp=0x8003C0001,name='OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HIT_WITH_FWD'/,    # 0,1,2,3
+cpu/event=0x2b,umask=0x01,period=100003,offcore_rsp=0x10003C0002,name='OCR.DEMAND_RFO.L3_HIT.SNOOP_HITM'/,               # 0,1,2,3
+cpu/event=0x20,umask=0x04,cmask=0x01,period=1000003,name='OFFCORE_REQUESTS_OUTSTANDING.CYCLES_WITH_DEMAND_RFO'/,         # 0,1,2,3
+cpu/event=0xd1,umask=0x40,period=100007,name='MEM_LOAD_RETIRED.FB_HIT'/,                                 # 0,1,2,3
+cpu-cycles,
+ref-cycles,
+instructions;
+
+cpu/event=0xd2,umask=0x02,period=20011,name='MEM_LOAD_L3_HIT_RETIRED.XSNP_NO_FWD'/,                      # 0,1,2,3
+cpu/event=0xd2,umask=0x04,period=20011,name='MEM_LOAD_L3_HIT_RETIRED.XSNP_FWD'/,                         # 0,1,2,3
+cpu/event=0x47,umask=0x02,cmask=0x02,period=1000003,name='MEMORY_ACTIVITY.CYCLES_L1D_MISS'/,             # 0,1,2,3
+cpu/event=0xc5,umask=0x50,period=400009,name='BR_MISP_RETIRED.COND_NTAKEN_COST'/,
+cpu/event=0xc5,umask=0x41,period=400009,name='BR_MISP_RETIRED.COND_TAKEN_COST'/,
+cpu/event=0xc5,umask=0x42,period=400009,name='BR_MISP_RETIRED.INDIRECT_CALL_COST'/,
+cpu/event=0xc5,umask=0xc0,period=100003,name='BR_MISP_RETIRED.INDIRECT_COST'/,
+cpu/event=0xc5,umask=0x48,period=100007,name='BR_MISP_RETIRED.RET_COST'/,
+cpu-cycles,
+ref-cycles,
+instructions;
+
+cpu/event=0x79,umask=0x08,period=2000003,name='IDQ.DSB_UOPS'/,                                           # 0,1,2,3
+cpu/event=0x79,umask=0x04,period=2000003,name='IDQ.MITE_UOPS'/,                                          # 0,1,2,3
+cpu/event=0x79,umask=0x20,period=1000003,name='IDQ.MS_UOPS'/,                                            # 0,1,2,3
+cpu/event=0xa8,umask=0x01,period=2000003,name='LSD.UOPS'/,
+cpu-cycles,
+ref-cycles,
+instructions;
+
+cpu/event=0x2a,umask=0x01,period=100003,offcore_rsp=0x1030004477,name='OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HITM'/,          # 0,1,2,3
+cpu/event=0x2a,umask=0x01,period=100003,offcore_rsp=0x830004477,name='OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HIT_WITH_FWD'/,     # 0,1,2,3
+cpu/event=0xb0,umask=0x09,cmask=0x01,period=1000003,name='ARITH.DIV_ACTIVE'/,
+cpu/event=0xa2,umask=0x02,period=100003,name='RESOURCE_STALLS.SCOREBOARD'/,
+cpu/event=0xec,umask=0x20,period=2000003,name='CPU_CLK_UNHALTED.C02'/,
+cpu-cycles:k,
+ref-cycles:k,
+instructions:k;
+
+cpu/event=0x87,umask=0x01,period=500009,name='DECODE.LCP'/,                                              # 0,1,2,3
+cpu/event=0x61,umask=0x02,period=100003,name='DSB2MITE_SWITCHES.PENALTY_CYCLES'/,                        # 0,1,2,3
+cpu/event=0x79,umask=0x04,cmask=0x01,period=2000003,name='IDQ.MITE_CYCLES_ANY'/,                         # 0,1,2,3
+cpu/event=0x79,umask=0x04,cmask=0x06,period=2000003,name='IDQ.MITE_CYCLES_OK'/,                          # 0,1,2,3
+cpu-cycles,
+ref-cycles,
+instructions;
+
+cpu/event=0x79,umask=0x08,cmask=0x01,period=2000003,name='IDQ.DSB_CYCLES_ANY'/,                          # 0,1,2,3
+cpu/event=0x79,umask=0x08,cmask=0x06,period=2000003,name='IDQ.DSB_CYCLES_OK'/,                           # 0,1,2,3
+cpu/event=0x79,umask=0x20,cmask=0x01,period=2000003,name='IDQ.MS_CYCLES_ANY'/,                           # 0,1,2,3
+cpu-cycles,
+ref-cycles,
+instructions;
+
+cpu/event=0xad,umask=0x01,cmask=0x01,period=500009,name='INT_MISC.CLEARS_COUNT'/,
+cpu/event=0xc3,umask=0x01,cmask=0x01,period=100003,name='MACHINE_CLEARS.COUNT'/,
+cpu/event=0xc3,umask=0x02,period=100003,name='MACHINE_CLEARS.MEMORY_ORDERING'/,
+cpu/event=0xd0,umask=0x09,period=100003,name='MEM_INST_RETIRED.STLB_HIT_LOADS'/,                         # 0,1,2,3
+cpu/event=0x03,umask=0x82,period=100003,name='LD_BLOCKS.STORE_FORWARD'/,                                 # 0,1,2,3
+cpu/event=0xd0,umask=0x81,period=1000003,name='MEM_INST_RETIRED.ALL_LOADS'/,                             # 0,1,2,3
+cpu/event=0xd0,umask=0x41,period=100003,name='MEM_INST_RETIRED.SPLIT_LOADS'/,                            # 0,1,2,3
+cpu-cycles,
+ref-cycles,
+instructions;
+
+cpu/event=0x48,umask=0x01,period=1000003,name='L1D_PEND_MISS.PENDING'/,                                  # 0,1,2,3
+cpu/event=0x43,umask=0xfd,period=1000003,name='MEM_LOAD_COMPLETED.L1_MISS_ANY'/,                         # 0,1,2,3
+cpu/event=0x48,umask=0x02,period=1000003,name='L1D_PEND_MISS.FB_FULL'/,                                  # 0,1,2,3
+cpu/event=0xd2,umask=0x01,period=20011,name='MEM_LOAD_L3_HIT_RETIRED.XSNP_MISS'/,                        # 0,1,2,3
+cpu/event=0x9c,umask=0x01,period=1000003,name='IDQ_BUBBLES.CORE'/,
+cpu/event=0x9c,umask=0x01,cmask=0x06,period=1000003,name='IDQ_BUBBLES.CYCLES_0_UOPS_DELIV.CORE'/;
+cpu-cycles,
+ref-cycles,
+instructions;
+
+cpu/event=0xa4,umask=0x01,period=10000003,name='TOPDOWN.SLOTS_P'/,
+cpu/event=0xa4,umask=0x02,period=10000003,name='TOPDOWN.BACKEND_BOUND_SLOTS'/,
+cpu/event=0xa4,umask=0x08,period=10000003,name='TOPDOWN.BR_MISPREDICT_SLOTS'/,                           # 0
+cpu/event=0xa4,umask=0x10,period=10000003,name='TOPDOWN.MEMORY_BOUND_SLOTS'/,
+cpu/event=0xc2,umask=0x01,period=2000003,name='UOPS_RETIRED.HEAVY'/,
+cpu-cycles,
+ref-cycles,
+instructions;
+
+cpu/event=0xd1,umask=0x04,period=100021,name='MEM_LOAD_RETIRED.L3_HIT'/,                                 # 0,1,2,3
+cpu/event=0x2d,umask=0x01,cmask=0x01,period=1000003,name='XQ.FULL_CYCLES'/,                              # 0,1,2,3
+cpu-cycles,
+ref-cycles,
+instructions;
+
+cpu/event=0x48,umask=0x04,period=1000003,name='L1D_PEND_MISS.L2_STALLS'/,                                # 0,1,2,3
+cpu/event=0x44,umask=0x01,period=200003,name='MEM_STORE_RETIRED.L2_HIT'/,                                # 0,1,2,3
+cpu/event=0x2a,umask=0x01,period=100003,offcore_rsp=0x103b800002,name='OCR.DEMAND_RFO.L3_MISS'/,         # 0,1,2,3
+cpu/event=0xd0,umask=0x42,period=100003,name='MEM_INST_RETIRED.SPLIT_STORES'/,                           # 0,1,2,3
+cpu-cycles,
+ref-cycles,
+instructions;
+
+cpu/event=0x2a,umask=0x01,period=100003,offcore_rsp=0x10800,name='OCR.STREAMING_WR.ANY_RESPONSE'/,       # 0,1,2,3
+cpu/event=0xd0,umask=0x0a,period=100003,name='MEM_INST_RETIRED.STLB_HIT_STORES'/,                        # 0,1,2,3
+cpu/event=0x13,umask=0x10,cmask=0x01,period=100003,name='DTLB_STORE_MISSES.WALK_ACTIVE'/,                # 0,1,2,3
+cpu-cycles,
+ref-cycles,
+instructions;
+
+cpu/event=0x2a,umask=0x01,period=100003,offcore_rsp=0x1030004477,name='OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HITM'/,    # 0,1,2,3
+cpu/event=0x20,umask=0x08,cmask=0x01,period=1000003,name='OFFCORE_REQUESTS_OUTSTANDING.CYCLES_WITH_DATA_RD'/,     # 0,1,2,3
+cpu/event=0x20,umask=0x08,cmask=0x04,period=1000003,name='OFFCORE_REQUESTS_OUTSTANDING.DATA_RD:c4'/,              # 0,1,2,3
+cpu-cycles,
+ref-cycles,
+instructions;
+
+# upi groups
+upi/event=0x02,umask=0x0f,name='UNC_UPI_TxL_FLITS.ALL_DATA'/;                                             # 0,1,2,3
+
+# cha groups
+cha/event=0x35,umask=0xc80ffe01,name='UNC_CHA_TOR_INSERTS.IA_MISS_CRD'/,                                  # 0,1,2,3
+cha/event=0x35,umask=0xc8177e01,name='UNC_CHA_TOR_INSERTS.IA_MISS_DRD_REMOTE'/,                           # 0,1,2,3
+cha/event=0x36,umask=0xc8177e01,name='UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD_REMOTE'/;                         # 0
+
+cha/event=0x35,umask=0xc816fe01,name='UNC_CHA_TOR_INSERTS.IA_MISS_DRD_LOCAL'/,                            # 0,1,2,3
+cha/event=0x36,umask=0xc816fe01,name='UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD_LOCAL'/,                          # 0
+cha/event=0x35,umask=0xc896fe01,name='UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF_LOCAL'/,                       # 0,1,2,3
+cha/event=0x35,umask=0xc8977e01,name='UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF_REMOTE'/;                      # 0,1,2,3
+
+cha/event=0x35,umask=0xccd7fe01,name='UNC_CHA_TOR_INSERTS.IA_MISS_LLCPREFDATA'/,                          # 0,1,2,3
+cha/event=0x35,umask=0xc817fe01,name='UNC_CHA_TOR_INSERTS.IA_MISS_DRD'/,                                  # 0,1,2,3
+cha/event=0x35,umask=0xc897fe01,name='UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF'/,                             # 0,1,2,3
+cha/event=0x36,umask=0xc817fe01,name='UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD'/;                                # 0
+
+cha/event=0x35,umask=0xc8f3ff04,name='UNC_CHA_TOR_INSERTS.IO_PCIRDCUR'/,                                  # 0,1,2,3
+cha/event=0x35,umask=0xcc43ff04,name='UNC_CHA_TOR_INSERTS.IO_ITOM'/,                                      # 0,1,2,3
+cha/event=0x35,umask=0xcd43ff04,name='UNC_CHA_TOR_INSERTS.IO_ITOMCACHENEAR'/,                             # 0,1,2,3
+cha/event=0x01,umask=0x00,name='UNC_CHA_CLOCKTICKS'/;                                                     # 0,1,2,3
+
+# imc groups
+imc/event=0x05,umask=0xcf,name='UNC_M_CAS_COUNT_SCH0.RD'/,                                                # 0,1,2,3
+imc/event=0x06,umask=0xcf,name='UNC_M_CAS_COUNT_SCH1.RD'/,                                                # 0,1,2,3
+imc/event=0x05,umask=0xf0,name='UNC_M_CAS_COUNT_SCH0.WR'/,                                                # 0,1,2,3
+imc/event=0x06,umask=0xf0,name='UNC_M_CAS_COUNT_SCH1.WR'/;                                                # 0,1,2,3
+
+# cstate_core groups
+cstate_core/c6-residency/;
+
+# cstate_pkg groups
+cstate_pkg/c6-residency/;
+
+# power groups
+power/energy-pkg/,
+power/energy-ram/;

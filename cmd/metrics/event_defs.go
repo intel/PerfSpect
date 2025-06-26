@@ -43,7 +43,7 @@ func LoadEventGroups(eventDefinitionOverridePath string, metadata Metadata) (gro
 		uarch = strings.Split(uarch, " ")[0]
 		// use alternate events/metrics when TMA fixed counters are not supported
 		alternate := ""
-		if (uarch == "icx" || uarch == "spr" || uarch == "emr") && !metadata.SupportsFixedTMA { // AWS VM instances
+		if (uarch == "icx" || uarch == "spr" || uarch == "emr" || uarch == "gnr") && !metadata.SupportsFixedTMA { // AWS/GCP VM instances
 			alternate = "_nofixedtma"
 		}
 		eventFileName := fmt.Sprintf("%s%s.txt", uarch, alternate)
@@ -145,9 +145,13 @@ func isCollectableEvent(event EventDefinition, metadata Metadata) bool {
 	}
 	// PEBS events (not supported on GCP c4 VMs)
 	pebsEventNames := []string{"INT_MISC.UNKNOWN_BRANCH_CYCLES", "UOPS_RETIRED.MS"}
-	if !metadata.SupportsPEBS && slices.Contains(pebsEventNames, event.Name) {
-		slog.Debug("PEBS events not supported on target", slog.String("event", event.Name))
-		return false
+	if !metadata.SupportsPEBS {
+		for _, pebsEventName := range pebsEventNames {
+			if strings.Contains(event.Name, pebsEventName) {
+				slog.Debug("PEBS events not supported on target", slog.String("event", event.Name))
+				return false
+			}
+		}
 	}
 	// short-circuit for cpu events that aren't off-core response events
 	if event.Device == "cpu" && !(strings.HasPrefix(event.Name, "OCR") || strings.HasPrefix(event.Name, "OFFCORE_REQUESTS_OUTSTANDING")) {

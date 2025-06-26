@@ -1,0 +1,478 @@
+[
+    {
+        "name": "CPU operating frequency (in GHz)",
+        "expression": "([cpu-cycles] / [ref-cycles] * [SYSTEM_TSC_FREQ]) / 1000000000"
+    },
+    {
+        "name": "CPU utilization %",
+        "expression": "100 * [ref-cycles] / [TSC]"
+    },
+    {
+        "name": "CPU utilization% in kernel mode",
+        "expression": "100 * [ref-cycles:k] / [TSC]"
+    },
+    {
+        "name": "CPI",
+        "expression": "[cpu-cycles] / [instructions]"
+    },
+    {
+        "name": "cycles per txn",
+        "expression": "[cpu-cycles] / [TXN]"
+    },
+    {
+        "name": "kernel_CPI",
+        "expression": "[cpu-cycles:k] / [instructions:k]"
+    },
+    {
+        "name": "kernel_cycles per txn",
+        "expression": "[cpu-cycles:k] / [TXN]"
+    },
+    {
+        "name": "IPC",
+        "expression": "[instructions] / [cpu-cycles]"
+    },
+    {
+        "name": "txn per cycle",
+        "expression": "[TXN] / [cpu-cycles]"
+    },
+    {
+        "name": "giga_instructions_per_sec",
+        "expression": "[instructions] / 1000000000"
+    },
+    {
+        "name": "branch misprediction ratio",
+        "expression": "[BR_MISP_RETIRED.ALL_BRANCHES] / [BR_INST_RETIRED.ALL_BRANCHES]"
+    },
+    {
+        "name": "locks retired per instr",
+        "expression": "[MEM_INST_RETIRED.LOCK_LOADS] / [instructions]"
+    },
+    {
+        "name": "locks retired per txn",
+        "expression": "[MEM_INST_RETIRED.LOCK_LOADS] / [TXN]"
+    },
+    {
+        "name": "L1D MPI (includes data+rfo w/ prefetches)",
+        "expression": "[L1D.REPLACEMENT] / [instructions]"
+    },
+    {
+        "name": "L1D misses per txn (includes data+rfo w/ prefetches)",
+        "expression": "[L1D.REPLACEMENT] / [TXN]"
+    },
+    {
+        "name": "L1D demand data read hits per instr",
+        "expression": "[MEM_LOAD_RETIRED.L1_HIT] / [instructions]"
+    },
+    {
+        "name": "L1D demand data read hits per txn",
+        "expression": "[MEM_LOAD_RETIRED.L1_HIT] / [TXN]"
+    },
+    {
+        "name": "L1-I code read misses (w/ prefetches) per instr",
+        "expression": "[L2_RQSTS.ALL_CODE_RD] / [instructions]"
+    },
+    {
+        "name": "L1I code read misses (includes prefetches) per txn",
+        "expression": "[L2_RQSTS.ALL_CODE_RD] / [TXN]"
+    },
+    {
+        "name": "L2 demand data read hits per instr",
+        "expression": "[MEM_LOAD_RETIRED.L2_HIT] / [instructions]"
+    },
+    {
+        "name": "L2 demand data read hits per txn",
+        "expression": "[MEM_LOAD_RETIRED.L2_HIT] / [TXN]"
+    },
+    {
+        "name": "L2 MPI (includes code+data+rfo w/ prefetches)",
+        "expression": "[L2_LINES_IN.ALL] / [instructions]"
+    },
+    {
+        "name": "L2 misses per txn (includes code+data+rfo w/ prefetches)",
+        "expression": "[L2_LINES_IN.ALL] / [TXN]"
+    },
+    {
+        "name": "L2 demand data read MPI",
+        "expression": "[MEM_LOAD_RETIRED.L2_MISS] / [instructions]"
+    },
+    {
+        "name": "L2 demand data read misses per txn",
+        "expression": "[MEM_LOAD_RETIRED.L2_MISS] / [TXN]"
+    },
+    {
+        "name": "L2 demand code MPI",
+        "expression": "[L2_RQSTS.CODE_RD_MISS] / [instructions]"
+    },
+    {
+        "name": "L2 demand code misses per txn",
+        "expression": "[L2_RQSTS.CODE_RD_MISS] / [TXN]"
+    },
+    {
+        "name": "LLC code read MPI (demand+prefetch)",
+        "expression": "[UNC_CHA_TOR_INSERTS.IA_MISS_CRD] / [instructions]"
+    },
+    {
+        "name": "LLC code read (demand+prefetch) misses per txn",
+        "expression": "[UNC_CHA_TOR_INSERTS.IA_MISS_CRD] / [TXN]"
+    },
+    {
+        "name": "LLC data read MPI (demand+prefetch)",
+        "expression": "([UNC_CHA_TOR_INSERTS.IA_MISS_LLCPREFDATA] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF]) / [instructions]"
+    },
+    {
+        "name": "LLC data read (demand+prefetch) misses per txn",
+        "expression": "([UNC_CHA_TOR_INSERTS.IA_MISS_LLCPREFDATA] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF]) / [TXN]"
+    },
+    {
+        "name": "LLC total HITM (per instr) (excludes LLC prefetches)",
+        "expression": "[OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HITM] / [instructions]"
+    },
+    {
+        "name": "LLC total HITM per txn (excludes LLC prefetches)",
+        "expression": "[OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HITM] / [TXN]"
+    },
+    {
+        "name": "LLC total HIT clean line forwards (per instr) (excludes LLC prefetches)",
+        "expression": "[OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HIT_WITH_FWD] / [instructions]"
+    },
+    {
+        "name": "LLC total HIT clean line forwards per txn (excludes LLC prefetches)",
+        "expression": "[OCR.READS_TO_CORE.REMOTE_CACHE.SNOOP_HIT_WITH_FWD] / [TXN]"
+    },
+    {
+        "name": "Average LLC demand data read miss latency (in ns)",
+        "expression": "1000000000 * ([UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD] / [UNC_CHA_TOR_INSERTS.IA_MISS_DRD]) / ([UNC_CHA_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]))"
+    },
+    {
+        "name": "Average LLC demand data read miss latency for LOCAL requests (in ns)",
+        "expression": "1000000000 * ([UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD_LOCAL] / [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_LOCAL]) / ([UNC_CHA_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]))"
+    },
+    {
+        "name": "Average LLC demand data read miss latency for REMOTE requests (in ns)",
+        "expression": "1000000000 * ([UNC_CHA_TOR_OCCUPANCY.IA_MISS_DRD_REMOTE] / [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_REMOTE]) / ([UNC_CHA_CLOCKTICKS]/([CHAS_PER_SOCKET] * [SOCKET_COUNT]))"
+    },
+    {
+        "name": "UPI Data transmit BW (MB/sec) (only data)",
+        "expression": "[UNC_UPI_TxL_FLITS.ALL_DATA] * (64/9.0) / 1000000"
+    },
+    {
+        "name": "package power (watts)",
+        "expression": "[power/energy-pkg/]"
+    },
+    {
+        "name": "DRAM power (watts)",
+        "expression": "[power/energy-ram/]"
+    },
+    {
+        "name": "core c6 residency %",
+        "expression": "100 * [cstate_core/c6-residency/] / [TSC]"
+    },
+    {
+        "name": "package c6 residency %",
+        "expression": "100 * [cstate_pkg/c6-residency/] * [CORES_PER_SOCKET] / [TSC]"
+    },
+    {
+        "name": "% Uops delivered from decoded Icache (DSB)",
+        "expression": "100 * ([IDQ.DSB_UOPS] / ([IDQ.DSB_UOPS] + [IDQ.MITE_UOPS] + [IDQ.MS_UOPS] + [LSD.UOPS]))"
+    },
+    {
+        "name": "% Uops delivered from legacy decode pipeline (MITE)",
+        "expression": "100 * ([IDQ.MITE_UOPS] / ([IDQ.DSB_UOPS] + [IDQ.MITE_UOPS] + [IDQ.MS_UOPS] + [LSD.UOPS]))"
+    },
+    {
+        "name": "memory bandwidth read (MB/sec)",
+        "expression": "([UNC_M_CAS_COUNT_SCH0.RD] + [UNC_M_CAS_COUNT_SCH1.RD]) * 64 / 1000000"
+    },
+    {
+        "name": "memory bandwidth write (MB/sec)",
+        "expression": "([UNC_M_CAS_COUNT_SCH0.WR] + [UNC_M_CAS_COUNT_SCH1.WR]) * 64 / 1000000"
+    },
+    {
+        "name": "memory bandwidth total (MB/sec)",
+        "expression": "([UNC_M_CAS_COUNT_SCH0.RD] + [UNC_M_CAS_COUNT_SCH1.RD] + [UNC_M_CAS_COUNT_SCH0.WR] + [UNC_M_CAS_COUNT_SCH1.WR]) * 64 / 1000000"
+    },
+    {
+        "name": "ITLB (2nd level) MPI",
+        "expression": "[ITLB_MISSES.WALK_COMPLETED] / [instructions]"
+    },
+    {
+        "name": "ITLB (2nd level) misses per txn",
+        "expression": "[ITLB_MISSES.WALK_COMPLETED] / [TXN]"
+    },
+    {
+        "name": "DTLB (2nd level) load MPI",
+        "expression": "[DTLB_LOAD_MISSES.WALK_COMPLETED] / [instructions]"
+    },
+    {
+        "name": "DTLB (2nd level) load misses per txn",
+        "expression": "[DTLB_LOAD_MISSES.WALK_COMPLETED] / [TXN]"
+    },
+    {
+        "name": "DTLB (2nd level) 2MB large page load MPI",
+        "expression": "[DTLB_LOAD_MISSES.WALK_COMPLETED_2M_4M] / [instructions]"
+    },
+    {
+        "name": "DTLB (2nd level) 2MB large page load misses per txn",
+        "expression": "[DTLB_LOAD_MISSES.WALK_COMPLETED_2M_4M] / [TXN]"
+    },
+    {
+        "name": "DTLB (2nd level) store MPI",
+        "expression": "[DTLB_STORE_MISSES.WALK_COMPLETED] / [instructions]"
+    },
+    {
+        "name": "DTLB (2nd level) store misses per txn",
+        "expression": "[DTLB_STORE_MISSES.WALK_COMPLETED] / [TXN]"
+    },
+    {
+        "name": "NUMA %_Reads addressed to local DRAM",
+        "expression": "100 * ([UNC_CHA_TOR_INSERTS.IA_MISS_DRD_LOCAL] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF_LOCAL]) / ([UNC_CHA_TOR_INSERTS.IA_MISS_DRD_LOCAL] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF_LOCAL] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_REMOTE] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF_REMOTE])"
+    },
+    {
+        "name": "NUMA %_Reads addressed to remote DRAM",
+        "expression": "100 * ([UNC_CHA_TOR_INSERTS.IA_MISS_DRD_REMOTE] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF_REMOTE]) / ([UNC_CHA_TOR_INSERTS.IA_MISS_DRD_LOCAL] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF_LOCAL] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_REMOTE] + [UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF_REMOTE])"
+    },
+    {
+        "name": "uncore frequency GHz",
+        "expression": "([UNC_CHA_CLOCKTICKS] / ([CHAS_PER_SOCKET] * [SOCKET_COUNT]) / 1000000000) / 1"
+    },
+    {
+        "name": "IO_bandwidth_disk_or_network_writes (MB/sec)",
+        "expression": "([UNC_CHA_TOR_INSERTS.IO_PCIRDCUR] * 64 / 1000000) / 1"
+    },
+    {
+        "name": "IO_bandwidth_disk_or_network_reads (MB/sec)",
+        "expression": "(([UNC_CHA_TOR_INSERTS.IO_ITOM] + [UNC_CHA_TOR_INSERTS.IO_ITOMCACHENEAR]) * 64 / 1000000) / 1"
+    },
+    {
+        "name": "TMA_Frontend_Bound(%)",
+        "expression": "100 * ( ( [IDQ_BUBBLES.CORE] - [INT_MISC.UOP_DROPPING] ) / [TOPDOWN.SLOTS_P] )"
+    },
+    {
+        "name": "TMA_..Fetch_Latency(%)",
+        "expression": "100 * ( ( [IDQ_BUBBLES.CYCLES_0_UOPS_DELIV.CORE] * ( 6 ) - [INT_MISC.UOP_DROPPING] ) / [TOPDOWN.SLOTS_P] )"
+    },
+    {
+        "name": "TMA_....ICache_Misses(%)",
+        "expression": "100 * ( [ICACHE_DATA.STALLS] / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_....ITLB_Misses(%)",
+        "expression": "100 * ( [ICACHE_TAG.STALLS] / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_....Branch_Resteers(%)",
+        "expression": "100 * ( [INT_MISC.CLEAR_RESTEER_CYCLES] / [cpu-cycles] + ( [INT_MISC.UNKNOWN_BRANCH_CYCLES] / [cpu-cycles] ) )"
+    },
+    {
+        "name": "TMA_....MS_Switches(%)",
+        "expression": "100 * ( ( 3 ) * [UOPS_RETIRED.MS:c1:e1] / ( [UOPS_RETIRED.SLOTS] / [UOPS_ISSUED.ANY] ) / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_....LCP(%)",
+        "expression": "100 * ( [DECODE.LCP] / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_....DSB_Switches(%)",
+        "expression": "100 * ( [DSB2MITE_SWITCHES.PENALTY_CYCLES] / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_..Fetch_Bandwidth(%)",
+        "expression": "100 * ( max( 0 , ( ( [IDQ_BUBBLES.CORE] - [INT_MISC.UOP_DROPPING] ) / [TOPDOWN.SLOTS_P] ) - ( ( [IDQ_BUBBLES.CYCLES_0_UOPS_DELIV.CORE] * ( 6 ) - [INT_MISC.UOP_DROPPING] ) / [TOPDOWN.SLOTS_P] ) ) )"
+    },
+    {
+        "name": "TMA_....MITE(%)",
+        "expression": "100 * ( ( [IDQ.MITE_CYCLES_ANY] - [IDQ.MITE_CYCLES_OK] ) / ( [CPU_CLK_UNHALTED.DISTRIBUTED] if [HYPERTHREADING_ON] else [cpu-cycles] ) / 2 )"
+    },
+    {
+        "name": "TMA_....DSB(%)",
+        "expression": "100 * ( ( [IDQ.DSB_CYCLES_ANY] - [IDQ.DSB_CYCLES_OK] ) / ( [CPU_CLK_UNHALTED.DISTRIBUTED] if [HYPERTHREADING_ON] else [cpu-cycles] ) / 2 )"
+    },
+    {
+        "name": "TMA_....MS(%)",
+        "expression": "100 * ( max( [IDQ.MS_CYCLES_ANY] , [UOPS_RETIRED.MS:c1] / ( [UOPS_RETIRED.SLOTS] / [UOPS_ISSUED.ANY] ) ) / ( [CPU_CLK_UNHALTED.DISTRIBUTED] if [HYPERTHREADING_ON] else [cpu-cycles] ) / 2 )"
+    },
+    {
+        "name": "TMA_Bad_Speculation(%)",
+        "expression": "100 * ( max( 1 - ( ( ( [IDQ_BUBBLES.CORE] - [INT_MISC.UOP_DROPPING] ) / [TOPDOWN.SLOTS_P] ) + ( [TOPDOWN.BACKEND_BOUND_SLOTS] / [TOPDOWN.SLOTS_P] ) + ( [UOPS_RETIRED.SLOTS] / [TOPDOWN.SLOTS_P] ) ) , 0 ) )"
+    },
+    {
+        "name": "TMA_..Branch_Mispredicts(%)",
+        "expression": "100 * ( [TOPDOWN.BR_MISPREDICT_SLOTS] / [TOPDOWN.SLOTS_P] )"
+    },
+    {
+        "name": "TMA_....Cond_NT_Mispredicts(%)",
+        "expression": "100 * ( ( [BR_MISP_RETIRED.COND_NTAKEN_COST] * [BR_MISP_RETIRED.COND_NTAKEN_COST:retire_latency] ) / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_....Cond_TK_Mispredicts(%)",
+        "expression": "100 * ( ( [BR_MISP_RETIRED.COND_TAKEN_COST] * [BR_MISP_RETIRED.COND_TAKEN_COST:retire_latency] ) / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_....Ind_Call_Mispredicts(%)",
+        "expression": "100 * ( ( [BR_MISP_RETIRED.INDIRECT_CALL_COST] * [BR_MISP_RETIRED.INDIRECT_CALL_COST:retire_latency] ) / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_....Ind_Jump_Mispredicts(%)",
+        "expression": "100 * ( max( ( ( [BR_MISP_RETIRED.INDIRECT_COST] * [BR_MISP_RETIRED.INDIRECT_COST:retire_latency] ) - ( [BR_MISP_RETIRED.INDIRECT_CALL_COST] * [BR_MISP_RETIRED.INDIRECT_CALL_COST:retire_latency] ) ) / [cpu-cycles] , 0 ) )"
+    },
+    {
+        "name": "TMA_....Ret_Mispredicts(%)",
+        "expression": "100 * ( ( [BR_MISP_RETIRED.RET_COST] * [BR_MISP_RETIRED.RET_COST:retire_latency] ) / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_....Other_Mispredicts(%)",
+        "expression": "max( ( 100 * ( [TOPDOWN.BR_MISPREDICT_SLOTS] / [TOPDOWN.SLOTS_P] ) ) * ( 1 - [BR_MISP_RETIRED.ALL_BRANCHES] / ( [INT_MISC.CLEARS_COUNT] - [MACHINE_CLEARS.COUNT] ) ) , 0.0001 )"
+    },
+    {
+        "name": "TMA_..Machine_Clears(%)",
+        "expression": "100 * ( max( 0 , ( max( 1 - ( ( ( [IDQ_BUBBLES.CORE] - [INT_MISC.UOP_DROPPING] ) / [TOPDOWN.SLOTS_P] ) + ( [TOPDOWN.BACKEND_BOUND_SLOTS] / [TOPDOWN.SLOTS_P] ) + ( [UOPS_RETIRED.SLOTS] / [TOPDOWN.SLOTS_P] ) ) , 0 ) ) - ( [TOPDOWN.BR_MISPREDICT_SLOTS] / [TOPDOWN.SLOTS_P] ) ) )"
+    },
+    {
+        "name": "TMA_....Other_Nukes(%)",
+        "expression": "max ( ( 100 * ( max( 0 , ( max( 1 - ( ( ( [IDQ_BUBBLES.CORE] - [INT_MISC.UOP_DROPPING] ) / [TOPDOWN.SLOTS_P] ) + ( [TOPDOWN.BACKEND_BOUND_SLOTS] / [TOPDOWN.SLOTS_P] ) + ( [UOPS_RETIRED.SLOTS] / [TOPDOWN.SLOTS_P] ) ) , 0 ) ) - ( [TOPDOWN.BR_MISPREDICT_SLOTS] / [TOPDOWN.SLOTS_P] ) ) ) ) * ( 1 - [MACHINE_CLEARS.MEMORY_ORDERING] / [MACHINE_CLEARS.COUNT] ), 0.0001 )"
+    },
+    {
+        "name": "TMA_Backend_Bound(%)",
+        "expression": "100 * ( [TOPDOWN.BACKEND_BOUND_SLOTS] / [TOPDOWN.SLOTS_P] )"
+    },
+    {
+        "name": "TMA_..Memory_Bound(%)",
+        "expression": "100 * ( [TOPDOWN.MEMORY_BOUND_SLOTS] / [TOPDOWN.SLOTS_P] )"
+    },
+    {
+        "name": "TMA_....L1_Bound(%)",
+        "expression": "100 * ( max( ( [EXE_ACTIVITY.BOUND_ON_LOADS] - [MEMORY_ACTIVITY.STALLS_L1D_MISS] ) / [cpu-cycles] , 0 ) )"
+    },
+    {
+        "name": "TMA_......DTLB_Load(%)",
+        "expression": "100 * ( ( min( ( [MEM_INST_RETIRED.STLB_HIT_LOADS] * [MEM_INST_RETIRED.STLB_HIT_LOADS:retire_latency] ) , [MEM_INST_RETIRED.STLB_HIT_LOADS] * ( 7 ) ) if ( [MEM_INST_RETIRED.STLB_HIT_LOADS:retire_latency] >= 0 ) else ( [MEM_INST_RETIRED.STLB_HIT_LOADS] * ( 7 ) ) ) / [cpu-cycles] + ( [DTLB_LOAD_MISSES.WALK_ACTIVE] / [cpu-cycles] ) )"
+    },
+    {
+        "name": "TMA_......Store_Fwd_Blk(%)",
+        "expression": "100 * ( 13 * [LD_BLOCKS.STORE_FORWARD] / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_......L1_Latency_Dependency(%)",
+        "expression": "100 * ( min( 2 * ( [MEM_INST_RETIRED.ALL_LOADS] - [MEM_LOAD_RETIRED.FB_HIT] - [MEM_LOAD_RETIRED.L1_MISS] ) * 20 / 100 , max( [CYCLE_ACTIVITY.CYCLES_MEM_ANY] - [MEMORY_ACTIVITY.CYCLES_L1D_MISS] , 0 ) ) / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_......Lock_Latency(%)",
+        "expression": "100 * ( ( [MEM_INST_RETIRED.LOCK_LOADS] * [MEM_INST_RETIRED.LOCK_LOADS:retire_latency] ) / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_......Split_Loads(%)",
+        "expression": "100 * ( ( min( ( [MEM_INST_RETIRED.SPLIT_LOADS] * [MEM_INST_RETIRED.SPLIT_LOADS:retire_latency] ) , [MEM_INST_RETIRED.SPLIT_LOADS] * ( [L1D_PEND_MISS.PENDING] / [MEM_LOAD_COMPLETED.L1_MISS_ANY] ) ) if ( [MEM_INST_RETIRED.SPLIT_LOADS:retire_latency] >= 0 ) else ( [MEM_INST_RETIRED.SPLIT_LOADS] * ( [L1D_PEND_MISS.PENDING] / [MEM_LOAD_COMPLETED.L1_MISS_ANY] ) ) ) / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_......FB_Full(%)",
+        "expression": "100 * ( [L1D_PEND_MISS.FB_FULL] / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_....L2_Bound(%)",
+        "expression": "100 * ( ( [MEMORY_ACTIVITY.STALLS_L1D_MISS] - [MEMORY_ACTIVITY.STALLS_L2_MISS] ) / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_....L3_Bound(%)",
+        "expression": "100 * ( ( [MEMORY_ACTIVITY.STALLS_L2_MISS] - [MEMORY_ACTIVITY.STALLS_L3_MISS] ) / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_......Contested_Accesses(%)",
+        "expression": "100 * ( ( ( min( ( [MEM_LOAD_L3_HIT_RETIRED.XSNP_MISS] * [MEM_LOAD_L3_HIT_RETIRED.XSNP_MISS:retire_latency] ) , [MEM_LOAD_L3_HIT_RETIRED.XSNP_MISS] * ( 79 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) - ( 4.4 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) ) if ( [MEM_LOAD_L3_HIT_RETIRED.XSNP_MISS:retire_latency] >= 0 ) else ( [MEM_LOAD_L3_HIT_RETIRED.XSNP_MISS] * ( 79 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) - ( 4.4 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) ) ) + ( min( ( [MEM_LOAD_L3_HIT_RETIRED.XSNP_FWD] * [MEM_LOAD_L3_HIT_RETIRED.XSNP_FWD:retire_latency] ) , [MEM_LOAD_L3_HIT_RETIRED.XSNP_FWD] * ( 81 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) - ( 4.4 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) ) if ( [MEM_LOAD_L3_HIT_RETIRED.XSNP_FWD:retire_latency] >= 0 ) else ( [MEM_LOAD_L3_HIT_RETIRED.XSNP_FWD] * ( 81 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) - ( 4.4 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) ) ) * ( [OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HITM] / ( [OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HITM] + [OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HIT_WITH_FWD] ) ) ) * ( 1 + ( [MEM_LOAD_RETIRED.FB_HIT] / [MEM_LOAD_RETIRED.L1_MISS] ) / 2 ) / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_......Data_Sharing(%)",
+        "expression": "100 * ( ( ( min( ( [MEM_LOAD_L3_HIT_RETIRED.XSNP_NO_FWD] * [MEM_LOAD_L3_HIT_RETIRED.XSNP_NO_FWD:retire_latency] ) , [MEM_LOAD_L3_HIT_RETIRED.XSNP_NO_FWD] * ( 79 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) - ( 4.4 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) ) if ( [MEM_LOAD_L3_HIT_RETIRED.XSNP_NO_FWD:retire_latency] >= 0 ) else ( [MEM_LOAD_L3_HIT_RETIRED.XSNP_NO_FWD] * ( 79 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) - ( 4.4 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) ) ) + ( min( ( [MEM_LOAD_L3_HIT_RETIRED.XSNP_FWD] * [MEM_LOAD_L3_HIT_RETIRED.XSNP_FWD:retire_latency] ) , [MEM_LOAD_L3_HIT_RETIRED.XSNP_FWD] * ( 79 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) - ( 4.4 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) ) if ( [MEM_LOAD_L3_HIT_RETIRED.XSNP_FWD:retire_latency] >= 0 ) else ( [MEM_LOAD_L3_HIT_RETIRED.XSNP_FWD] * ( 79 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) - ( 4.4 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) ) ) * ( 1 - ( [OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HITM] / ( [OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HITM] + [OCR.DEMAND_DATA_RD.L3_HIT.SNOOP_HIT_WITH_FWD] ) ) ) ) * ( 1 + ( [MEM_LOAD_RETIRED.FB_HIT] / [MEM_LOAD_RETIRED.L1_MISS] ) / 2 ) / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_......L3_Hit_Latency(%)",
+        "expression": "100 * ( ( min( ( [MEM_LOAD_RETIRED.L3_HIT] * [MEM_LOAD_RETIRED.L3_HIT:retire_latency] ) , [MEM_LOAD_RETIRED.L3_HIT] * ( 37 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) - ( 4.4 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) ) if ( [MEM_LOAD_RETIRED.L3_HIT:retire_latency] >= 0 ) else ( [MEM_LOAD_RETIRED.L3_HIT] * ( 37 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) - ( 4.4 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) ) ) * ( 1 + ( [MEM_LOAD_RETIRED.FB_HIT] / [MEM_LOAD_RETIRED.L1_MISS] ) / 2 ) / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_......SQ_Full(%)",
+        "expression": "100 * ( ( [XQ.FULL_CYCLES] + [L1D_PEND_MISS.L2_STALLS] ) / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_....DRAM_Bound(%)",
+        "expression": "100 * ( ( [MEMORY_ACTIVITY.STALLS_L3_MISS] / [cpu-cycles] ) )"
+    },
+    {
+        "name": "TMA_......MEM_Bandwidth(%)",
+        "expression": "100 * ( ( min( [cpu-cycles] , [OFFCORE_REQUESTS_OUTSTANDING.DATA_RD:c4] ) ) / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_......MEM_Latency(%)",
+        "expression": "100 * ( ( min( [cpu-cycles] , [OFFCORE_REQUESTS_OUTSTANDING.CYCLES_WITH_DATA_RD] ) ) / [cpu-cycles] - ( ( min( [cpu-cycles] , [OFFCORE_REQUESTS_OUTSTANDING.DATA_RD:c4] ) ) / [cpu-cycles] ) )"
+    },
+    {
+        "name": "TMA_....Store_Bound(%)",
+        "expression": "100 * ( [EXE_ACTIVITY.BOUND_ON_STORES] / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_......Store_Latency(%)",
+        "expression": "100 * ( ( ( [MEM_STORE_RETIRED.L2_HIT] * ( 10 ) * ( 1 - ( [MEM_INST_RETIRED.LOCK_LOADS] / [MEM_INST_RETIRED.ALL_STORES] ) ) ) + ( 1 - ( [MEM_INST_RETIRED.LOCK_LOADS] / [MEM_INST_RETIRED.ALL_STORES] ) ) * ( min( [cpu-cycles] , [OFFCORE_REQUESTS_OUTSTANDING.CYCLES_WITH_DEMAND_RFO] ) ) ) / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_......False_Sharing(%)",
+        "expression": "100 * ( ( ( 170 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) * [OCR.DEMAND_RFO.L3_MISS] + ( 81 * ( ( [cpu-cycles] / [ref-cycles] ) * [SYSTEM_TSC_FREQ] / ( 1000000000 ) / ( ( 1000 / 1000 ) ) ) ) * [OCR.DEMAND_RFO.L3_HIT.SNOOP_HITM] ) / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_......Split_Stores(%)",
+        "expression": "100 * ( ( min( ( [MEM_INST_RETIRED.SPLIT_STORES] * [MEM_INST_RETIRED.SPLIT_STORES:retire_latency] ) , [MEM_INST_RETIRED.SPLIT_STORES] * 1 ) if ( [MEM_INST_RETIRED.SPLIT_STORES:retire_latency] >= 0 ) else ( [MEM_INST_RETIRED.SPLIT_STORES] * 1 ) ) / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_......Streaming_Stores(%)",
+        "expression": "100 * ( 9 * [OCR.STREAMING_WR.ANY_RESPONSE] / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_......DTLB_Store(%)",
+        "expression": "100 * ( ( min( ( [MEM_INST_RETIRED.STLB_HIT_STORES] * [MEM_INST_RETIRED.STLB_HIT_STORES:retire_latency] ) , [MEM_INST_RETIRED.STLB_HIT_STORES] * ( 7 ) ) if ( [MEM_INST_RETIRED.STLB_HIT_STORES:retire_latency] >= 0 ) else ( [MEM_INST_RETIRED.STLB_HIT_STORES] * ( 7 ) ) ) / [cpu-cycles] + ( [DTLB_STORE_MISSES.WALK_ACTIVE] / ( [CPU_CLK_UNHALTED.DISTRIBUTED] if [HYPERTHREADING_ON] else [cpu-cycles] ) ) )"
+    },
+    {
+        "name": "TMA_..Core_Bound(%)",
+        "expression": "100 * max( 0 , ( [TOPDOWN.BACKEND_BOUND_SLOTS] / [TOPDOWN.SLOTS_P] ) - ( [TOPDOWN.MEMORY_BOUND_SLOTS] / [TOPDOWN.SLOTS_P] ) )"
+    },
+    {
+        "name": "TMA_....Divider(%)",
+        "expression": "100 * ( [ARITH.DIV_ACTIVE] / [cpu-cycles] )"
+    },
+    {
+        "name": "TMA_....Serializing_Operation(%)",
+        "expression": "100 * ( [RESOURCE_STALLS.SCOREBOARD] / [cpu-cycles] + ( [CPU_CLK_UNHALTED.C02] / [cpu-cycles] ) )"
+    },
+    {
+        "name": "TMA_....AMX_Busy(%)",
+        "expression": "100 * ( [EXE.AMX_BUSY] / ( [CPU_CLK_UNHALTED.DISTRIBUTED] if [HYPERTHREADING_ON] else [cpu-cycles] ) )"
+    },
+    {
+        "name": "TMA_Retiring(%)",
+        "expression": "100 * ( [UOPS_RETIRED.SLOTS] / [TOPDOWN.SLOTS_P] )"
+    },
+    {
+        "name": "TMA_..Light_Operations(%)",
+        "expression": "100 * ( max( 0 , ( [UOPS_RETIRED.SLOTS] / ( [TOPDOWN.SLOTS_P] ) ) - ( [UOPS_RETIRED.HEAVY] / ( [TOPDOWN.SLOTS_P] ) ) ) )"
+    },
+    {
+        "name": "TMA_....Memory_Operations(%)",
+        "expression": "100 * ( ( max( 0 , ( [UOPS_RETIRED.SLOTS] / ( [TOPDOWN.SLOTS_P] ) ) - ( [UOPS_RETIRED.HEAVY] / ( [TOPDOWN.SLOTS_P] ) ) ) ) * [MEM_UOP_RETIRED.ANY] / ( ( [UOPS_RETIRED.SLOTS] / ( [TOPDOWN.SLOTS_P] ) ) * ( [TOPDOWN.SLOTS_P] ) ) )"
+    },
+    {
+        "name": "TMA_....Fused_Instructions(%)",
+        "expression": "100 * ( ( max( 0 , ( [UOPS_RETIRED.SLOTS] / ( [TOPDOWN.SLOTS_P] ) ) - ( [UOPS_RETIRED.HEAVY] / ( [TOPDOWN.SLOTS_P] ) ) ) ) * [INST_RETIRED.MACRO_FUSED] / ( ( [UOPS_RETIRED.SLOTS] / ( [TOPDOWN.SLOTS_P] ) ) * ( [TOPDOWN.SLOTS_P] ) ) )"
+    },
+    {
+        "name": "TMA_....Non_Fused_Branches(%)",
+        "expression": "100 * ( ( max( 0 , ( [UOPS_RETIRED.SLOTS] / ( [TOPDOWN.SLOTS_P] ) ) - ( [UOPS_RETIRED.HEAVY] / ( [TOPDOWN.SLOTS_P] ) ) ) ) * ( [BR_INST_RETIRED.ALL_BRANCHES] - [INST_RETIRED.MACRO_FUSED] ) / ( ( [UOPS_RETIRED.SLOTS] / ( [TOPDOWN.SLOTS_P] ) ) * ( [TOPDOWN.SLOTS_P] ) ) )"
+    },
+    {
+        "name": "TMA_..Heavy_Operations(%)",
+        "expression": "100 * ( [UOPS_RETIRED.HEAVY] / [TOPDOWN.SLOTS_P] )"
+    },
+    {
+        "name": "TMA_....Few_Uops_Instructions(%)",
+        "expression": "100 * max( 0 , ( [UOPS_RETIRED.HEAVY] / [TOPDOWN.SLOTS_P] ) - ( [UOPS_RETIRED.MS] / [TOPDOWN.SLOTS_P] ) )"
+    },
+    {
+        "name": "TMA_....Microcode_Sequencer(%)",
+        "expression": "100 * ( [UOPS_RETIRED.MS] / [TOPDOWN.SLOTS_P] )"
+    }
+]
