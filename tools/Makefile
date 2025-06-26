@@ -47,7 +47,7 @@ tools-aarch64: async-profiler-aarch64 dmidecode-aarch64 ethtool-aarch64 fio-aarc
 	cp ipmitool-aarch64/src/ipmitool.static bin-aarch64/ipmitool
 	cp lshw-aarch64/src/lshw-static bin-aarch64/lshw
 	cp lspci-aarch64/lspci bin-aarch64/
-	cp lspci-aarch64/pci.ids bin-aarch64/
+	cp lspci-aarch64/pci.ids.gz bin-aarch64/
 	cp spectre-meltdown-checker/spectre-meltdown-checker.sh bin-aarch64/
 	cp sshpass-aarch64/sshpass bin-aarch64/
 	cp stress-ng-aarch64/stress-ng bin-aarch64/
@@ -111,7 +111,7 @@ else
 	cd dmidecode && git checkout master && git pull
 endif
 	cd dmidecode && git checkout $(DMIDECODE_VERSION)
-	cd dmidecode && make
+	cd dmidecode && make -j$(NPROC)
 
 dmidecode-aarch64:
 ifeq ("$(wildcard dmidecode-aarch64)","")
@@ -145,7 +145,7 @@ endif
 ifeq ("$(wildcard ethtool/Makefile)","")
 	cd ethtool && ./autogen.sh && ./configure enable_netlink=no
 endif
-	cd ethtool && make
+	cd ethtool && make -j$(NPROC)
 
 ethtool-aarch64:
 ifeq ("$(wildcard ethtool-aarch64)","")
@@ -170,7 +170,7 @@ endif
 ifeq ("$(wildcard fio/config.log)","")
 	cd fio && ./configure --build-static --disable-native
 endif
-	cd fio && make
+	cd fio && make -j$(NPROC)
 
 fio-aarch64:
 ifeq ("$(wildcard fio-aarch64)","")
@@ -195,7 +195,7 @@ ifeq ("$(wildcard ipmitool/Makefile)","")
 	sed -i "s#x\$$xenable_ipmishell#xno#" ipmitool/configure.ac
 	cd ipmitool && ./bootstrap && LDFLAGS=-static ./configure
 endif
-	cd ipmitool && make
+	cd ipmitool && make -j$(NPROC)
 	cd ipmitool/src && ../libtool --silent --tag=CC --mode=link gcc -fno-strict-aliasing -Wreturn-type -all-static -o ipmitool.static ipmitool.o ipmishell.o ../lib/libipmitool.la plugins/libintf.la
 
 ipmitool-aarch64:
@@ -248,7 +248,7 @@ else
 	cd lspci && git checkout master && git pull
 endif
 	cd lspci && git checkout $(LSPCI_VERSION)
-	cd lspci && make
+	cd lspci && make -j$(NPROC)
 	cd lspci && ./update-pciids.sh
 	cd lspci && gzip -c pci.ids > pci.ids.gz
 
@@ -259,13 +259,12 @@ else
 	cd lspci-aarch64 && git checkout master && git pull
 endif
 	cd lspci-aarch64 && git checkout $(LSPCI_VERSION)
-	#cd lspci-aarch64 && sed -i '/^.*cpu=/d' lib/configure
 	cd lspci-aarch64 && sed -i '/cpu=.*/cpu=aarch64/g' lib/configure
 	cd lspci-aarch64 && sed -i 's/^CROSS_COMPILE=/CROSS_COMPILE?=/g' Makefile
 	cd lspci-aarch64 && sed -i 's/^SHARED=/SHARED?=/g' Makefile
-	cd lspci-aarch64 && sed -i 's/^ZLIB=/ZLIB?=/g' Makefile
-	cd lspci-aarch64 && CROSS_COMPILE=aarch64-linux-gnu- SHARED=no ZLIB=no make -j$(NPROC)
+	cd lspci-aarch64 && CROSS_COMPILE=aarch64-linux-gnu- SHARED=no make -j$(NPROC)
 	cd lspci-aarch64 && ./update-pciids.sh
+	cd lspci-aarch64 && gzip -c pci.ids > pci.ids.gz
 
 MSR_TOOLS_VERSION := "master"
 msr-tools:
@@ -293,7 +292,7 @@ PERF_VERSION := "6.8.12"
 perf:
 	wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$(PERF_VERSION).tar.xz
 	tar -xf linux-$(PERF_VERSION).tar.xz && mv linux-$(PERF_VERSION)/ linux_perf/
-	cd linux_perf/tools/perf && make LDFLAGS="-static --static" BUILD_BPF_SKEL=1 NO_JVMTI=1
+	cd linux_perf/tools/perf && make LDFLAGS="-static --static" BUILD_BPF_SKEL=1 NO_JVMTI=1 -j$(NPROC)
 	mkdir -p bin
 	cp linux_perf/tools/perf/perf bin/
 	strip --strip-unneeded bin/perf
@@ -304,7 +303,7 @@ ifeq ("$(wildcard perf-aarch64)","")
 	wget -N https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$(PERF_VERSION).tar.xz
 	tar -xf linux-$(PERF_VERSION).tar.xz && mv linux-$(PERF_VERSION)/ linux_perf-aarch64/
 endif
-	cd linux_perf-aarch64/tools/perf && make LDFLAGS="-static --static" BUILD_BPF_SKEL=1 NO_JVMTI=1 ARCH=arm64 NO_LIBTRACEEVENT=1 CROSS_COMPILE=aarch64-linux-gnu-
+	cd linux_perf-aarch64/tools/perf && make LDFLAGS="-static --static" BUILD_BPF_SKEL=1 NO_JVMTI=1 ARCH=arm64 NO_LIBTRACEEVENT=1 CROSS_COMPILE=aarch64-linux-gnu- -j$(NPROC)
 	mkdir -p bin-aarch64
 	cp linux_perf-aarch64/tools/perf/perf bin-aarch64/
 	aarch64-linux-gnu-strip --strip-unneeded bin-aarch64/perf
@@ -345,7 +344,7 @@ ifeq ("$(wildcard sshpass)","")
 	rm sshpass-$(SSHPASS_VERSION).tar.gz
 	cd sshpass && ./configure
 endif
-	cd sshpass && make
+	cd sshpass && make -j$(NPROC)
 
 sshpass-aarch64:
 ifeq ("$(wildcard sshpass-aarch64)","")
@@ -393,7 +392,7 @@ endif
 ifeq ("$(wildcard sysstat/Makefile)","")
 	cd sysstat && ./configure
 endif
-	cd sysstat && make
+	cd sysstat && make -j$(NPROC)
 
 sysstat-aarch64:
 ifeq ("$(wildcard sysstat-aarch64)","")
