@@ -54,18 +54,16 @@ func parseTurbostatOutput(output string) ([]map[string]string, error) {
 		// parse the fields in the line
 		fields := strings.Fields(line)
 		// if this is a header line
-		if len(fields) >= 1 {
-			if slices.Contains([]string{"package", "die", "node", "core", "cpu"}, strings.ToLower(fields[0])) {
-				if len(headers) == 0 {
-					headers = fields // first line with a column name is the header
-				} else {
-					// bump the timestamp to the next interval
-					if timeParsed && interval > 0 {
-						timestamp = timestamp.Add(time.Duration(interval) * time.Second)
-					}
+		if len(fields) >= 1 && slices.Contains([]string{"package", "die", "node", "core", "cpu"}, strings.ToLower(fields[0])) {
+			if len(headers) == 0 {
+				headers = fields // first line with a column name is the header
+			} else {
+				// bump the timestamp to the next interval
+				if timeParsed && interval > 0 {
+					timestamp = timestamp.Add(time.Duration(interval) * time.Second)
 				}
-				continue
 			}
+			continue
 		}
 		if len(headers) == 0 {
 			continue // skip data lines before first header
