@@ -1,4 +1,4 @@
-# EmeraldRapids event list
+# SapphireRapids event list
 
 cpu/event=0x51,umask=0x01,period=100003,name='L1D.REPLACEMENT'/,
 cpu/event=0x24,umask=0xe4,period=200003,name='L2_RQSTS.ALL_CODE_RD'/,
@@ -52,6 +52,16 @@ cpu-cycles,
 ref-cycles,
 instructions;
 
+cpu/event=0xc2,umask=0x02,period=2000003,name='UOPS_RETIRED.SLOTS'/,
+cpu/event=0xae,umask=0x01,period=2000003,name='UOPS_ISSUED.ANY'/,
+cpu/event=0x87,umask=0x01,period=500009,name='DECODE.LCP'/,                                               # 0,1,2,3
+cpu/event=0x61,umask=0x02,period=100003,name='DSB2MITE_SWITCHES.PENALTY_CYCLES'/,                         # 0,1,2,3
+cpu/event=0xe5,umask=0x03,period=1000003,name='MEM_UOP_RETIRED.ANY'/,
+cpu/event=0xc0,umask=0x10,period=2000003,name='INST_RETIRED.MACRO_FUSED'/,
+cpu/event=0xc2,umask=0x04,cmask=0x01,period=2000003,name='UOPS_RETIRED.MS:c1:e1'/,                        # [*]cpu-cycles,
+ref-cycles,
+instructions;
+
 cpu/event=0xc4,umask=0x00,period=100003,name='BR_INST_RETIRED.ALL_BRANCHES'/,
 cpu/event=0xc5,umask=0x00,period=100003,name='BR_MISP_RETIRED.ALL_BRANCHES'/,
 cpu/event=0xcf,umask=0x10,cmask=0x00,period=100003,name='FP_ARITH_INST_RETIRED2.512B_PACKED_HALF'/,
@@ -80,8 +90,6 @@ cpu/event=0xd3,umask=0x10,cmask=0x00,period=100007,name='MEM_LOAD_L3_MISS_RETIRE
 cpu/event=0xd1,umask=0x08,cmask=0x00,period=200003,name='MEM_LOAD_RETIRED.L1_MISS'/,
 cpu/event=0xd1,umask=0x80,cmask=0x00,period=1000003,name='MEM_LOAD_RETIRED.LOCAL_PMM'/,
 cpu/event=0xb1,umask=0x01,cmask=0x03,period=2000003,name='UOPS_EXECUTED.CYCLES_GE_3'/,
-cpu/event=0xb1,umask=0x01,cmask=0x00,period=2000003,name='UOPS_EXECUTED.THREAD'/,
-cpu/event=0xb1,umask=0x10,cmask=0x00,period=2000003,name='UOPS_EXECUTED.X87'/,
 cpu/event=0xc2,umask=0x04,period=2000003,name='UOPS_RETIRED.MS'/,
 cpu-cycles,
 ref-cycles,
@@ -91,8 +99,6 @@ cpu/event=0xd0,umask=0x21,cmask=0x00,period=1000003,name='MEM_INST_RETIRED.LOCK_
 cpu/event=0xd0,umask=0x82,cmask=0x00,period=1000003,name='MEM_INST_RETIRED.ALL_STORES'/,
 cpu/event=0x24,umask=0xe2,cmask=0x00,period=2000003,name='L2_RQSTS.ALL_RFO'/,
 cpu/event=0x24,umask=0xc2,cmask=0x00,period=2000003,name='L2_RQSTS.RFO_HIT'/,
-cpu/event=0xcf,umask=0x1c,cmask=0x00,period=100003,name='FP_ARITH_INST_RETIRED2.VECTOR'/,
-cpu/event=0xc7,umask=0x3c,period=100003,name='FP_ARITH_INST_RETIRED.128B_PACKED_DOUBLE:u0x3c'/,
 cpu-cycles,
 ref-cycles,
 instructions;
