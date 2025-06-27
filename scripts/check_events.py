@@ -16,8 +16,8 @@ def get_event(line):
             x = line[line.find("name=") + 5 :]
             x = x[x.find("'") + 1 :]
             x = x[0 : x.find("'")]
-            if x.find(":") > 0:
-                x = x[0 : x.find(":")]
+            #if x.find(":") > 0:
+            #    x = x[0 : x.find(":")]
         else:
             x = line[0:-2]
     else:
@@ -58,8 +58,8 @@ def main():
                 "CONST_THREAD_COUNT",
                 "TXN",
             ]:
-                if event.find(":") > 0 and event[-1] != "k":
-                    event = event[0 : event.find(":")]
+                #if event.find(":") > 0 and event[-1] != "k":
+                #    event = event[0 : event.find(":")]
                 if not event.startswith("const_"):
                     used_events[event] = used_events.get(event, 0) + 1
                 m_events.append(event)
