@@ -49,7 +49,7 @@
     },
     {
         "name": "locks retired per txn",
-        "expression": "[MEM_INST_RETIRED.LOCK_LOADS] / [TXN]"
+        "expression": "[MEM_UOPS_RETIRED.LOCK_LOADS] / [TXN]"
     },
     {
         "name": "L1D demand data read MPI",
