@@ -149,7 +149,32 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// prepareTarget prepares the target for configuration changes
+// almost all set scripts require the msr kernel module to be loaded and
+// use wrmsr and rdmsr, so we do that here so that the goroutines for the
+// set scripts can run in parallel without conflicts
+func prepareTarget(myTarget target.Target, localTempDir string) (err error) {
+	prepareScript := script.ScriptDefinition{
+		Name:           "prepare-target",
+		ScriptTemplate: "exit 0",
+		Superuser:      true,
+		Vendors:        []string{"GenuineIntel"},
+		Depends:        []string{"wrmsr", "rdmsr"},
+		Lkms:           []string{"msr"},
+	}
+	_, err = runScript(myTarget, prepareScript, localTempDir)
+	return err
+}
+
 func setOnTarget(cmd *cobra.Command, myTarget target.Target, flagGroups []flagGroup, localTempDir string, channelError chan error, statusUpdate progress.MultiSpinnerUpdateFunc) {
+	// prepare the target for configuration changes
+	_ = statusUpdate(myTarget.GetName(), "preparing target for configuration changes")
+	if err := prepareTarget(myTarget, localTempDir); err != nil {
+		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("error preparing target: %v", err))
+		slog.Error(fmt.Sprintf("error preparing target %s: %v", myTarget.GetName(), err))
+		channelError <- nil
+		return
+	}
 	channelSetComplete := make(chan setOutput)
 	var successMessages []string
 	var errorMessages []string
