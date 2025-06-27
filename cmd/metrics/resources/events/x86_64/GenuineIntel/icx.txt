@@ -14,16 +14,13 @@ instructions;
 
 cpu/event=0xc4,umask=0x00,period=100003,name='BR_INST_RETIRED.ALL_BRANCHES'/,
 cpu/event=0xc5,umask=0x00,period=100003,name='BR_MISP_RETIRED.ALL_BRANCHES'/,
-cpu/event=0xf1,umask=0x1f,period=100003,name='L2_LINES_IN.ALL'/,
+cpu/event=0xf1,umask=0x1f,period=100003,name='L2_LINES_IN.ALL'/,                  # 0,1,2,3
 cpu/event=0xd1,umask=0x10,period=100021,name='MEM_LOAD_RETIRED.L2_MISS'/,
+cpu/event=0x24,umask=0x24,period=200003,name='L2_RQSTS.CODE_RD_MISS'/,            # 0,1,2,3
 cpu-cycles,
 ref-cycles,
 instructions;
 
-cpu/event=0x24,umask=0x24,period=200003,name='L2_RQSTS.CODE_RD_MISS'/,
-cpu/event=0x28,umask=0x07,period=200003,name='CORE_POWER.LVL0_TURBO_LICENSE'/,
-cpu/event=0x28,umask=0x18,period=200003,name='CORE_POWER.LVL1_TURBO_LICENSE'/,
-cpu/event=0x28,umask=0x20,period=200003,name='CORE_POWER.LVL2_TURBO_LICENSE'/,
 cpu-cycles,
 ref-cycles,
 instructions;
@@ -64,6 +61,17 @@ cpu/event=0x0d,umask=0x01,cmask=0x01,edge=0x01,period=500009,name='INT_MISC.RECO
 cpu-cycles,
 ref-cycles,
 instructions;
+
+# more TMA
+cpu/event=0x79,umask=0x30,period=100003,name='IDQ.MS_SWITCHES'/,                  # 0,1,2,3
+cpu/event=0x87,umask=0x01,period=500009,name='DECODE.LCP'/,                       # 0,1,2,3
+cpu/event=0xab,umask=0x02,period=100003,name='DSB2MITE_SWITCHES.PENALTY_CYCLES'/, # 0,1,2,3
+cpu/event=0xc2,umask=0x02,period=2000003,name='UOPS_RETIRED.SLOTS'/,
+cpu/event=0xd0,umask=0x83,period=1000003,name='MEM_INST_RETIRED.ANY'/,            # 0,1,2,3
+cpu-cycles,
+ref-cycles,
+instructions;
+
 
 #TMA AVX512 related
 cpu/event=0xc7,umask=0x80,cmask=0x00,period=100003,name='FP_ARITH_INST_RETIRED.512B_PACKED_SINGLE'/,
