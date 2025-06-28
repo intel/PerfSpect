@@ -58,7 +58,7 @@ endif
 	cd avx-turbo && make
 
 # if you change the version, check the sed hacks below
-CPUID_VERSION := "20240409"
+CPUID_VERSION := "20250513"
 cpuid:
 ifeq ("$(wildcard cpuid)","")
 ifeq ("$(wildcard cpuid-$(CPUID_VERSION).src.tar.gz)","")
