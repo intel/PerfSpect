@@ -1222,7 +1222,7 @@ type ISA struct {
 var isas = []ISA{
 	{"AES", "Advanced Encryption Standard New Instructions (AES-NI)", "AES instruction"},
 	{"AMX", "Advanced Matrix Extensions (AMX)", "AMX-BF16: tile bfloat16 support"},
-	{"AMX-COMPLEX", "AMX-COMPLEX Instruction", "AVX-COMPLEX instructions"},
+	{"AMX-COMPLEX", "AMX-COMPLEX Instruction", "AMX-COMPLEX instructions"},
 	{"AMX-FP16", "AMX-FP16 Instruction", "AMX-FP16: FP16 tile operations"},
 	{"AVX-IFMA", "AVX-IFMA Instruction", "AVX-IFMA: integer fused multiply add"},
 	{"AVX-NE-CONVERT", "AVX-NE-CONVERT Instruction", "AVX-NE-CONVERT instructions"},
