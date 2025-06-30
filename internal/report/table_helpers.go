@@ -522,6 +522,27 @@ func channelsFromOutput(outputs map[string]script.ScriptOutput) string {
 	return fmt.Sprintf("%d", cpu.MemoryChannelCount)
 }
 
+func turboEnabledFromOutput(outputs map[string]script.ScriptOutput) string {
+	vendor := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Vendor ID:\s*(.+)$`)
+	switch vendor {
+	case "GenuineIntel":
+		val := valFromRegexSubmatch(outputs[script.CpuidScriptName].Stdout, `^Intel Turbo Boost Technology\s*= (.+?)$`)
+		if val == "true" {
+			return "Enabled"
+		}
+		if val == "false" {
+			return "Disabled"
+		}
+		return "" // unknown value
+	case "AuthenticAMD":
+		val := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Frequency boost.*:\s*(.+?)$`)
+		if val != "" {
+			return val + " (AMD Frequency Boost)"
+		}
+	}
+	return ""
+}
+
 func isPrefetcherEnabled(msrValue string, bit int) (bool, error) {
 	if msrValue == "" {
 		return false, fmt.Errorf("msrValue is empty")
@@ -1813,9 +1834,9 @@ func cveSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 }
 
 func systemSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
-	// BASELINE: 1-node, 2x Intel® Xeon® <SKU, processor>, xx cores, 100W TDP, HT On/Off?, Total Memory xxx GB (xx slots/ xx GB/ xxxx MHz [run @ xxxx MHz] ), <BIOS version>, <ucode version>, <OS Version>, <kernel version>. Test by Intel as of <mm/dd/yy>.
-	template := "1-node, %sx %s, %s cores, %s TDP, HT %s, Total Memory %s, BIOS %s, microcode %s, %s, %s, %s, %s. Test by Intel as of %s."
-	var socketCount, cpuModel, coreCount, tdp, htOnOff, installedMem, biosVersion, uCodeVersion, nics, disks, operatingSystem, kernelVersion, date string
+	// BASELINE: 1-node, 2x Intel® Xeon® <SKU, processor>, xx cores, 100W TDP, HT On/Off?, Turbo On/Off?, Total Memory xxx GB (xx slots/ xx GB/ xxxx MHz [run @ xxxx MHz] ), <BIOS version>, <ucode version>, <OS Version>, <kernel version>. Test by Intel as of <mm/dd/yy>.
+	template := "1-node, %sx %s, %s cores, %s TDP, HT %s, Turbo %s, Total Memory %s, BIOS %s, microcode %s, %s, %s, %s, %s. Test by Intel as of %s."
+	var socketCount, cpuModel, coreCount, tdp, htOnOff, turboOnOff, installedMem, biosVersion, uCodeVersion, nics, disks, operatingSystem, kernelVersion, date string
 
 	// socket count
 	socketCount = valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(\d+)$`)
@@ -1840,6 +1861,15 @@ func systemSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 	default:
 		htOnOff = "?"
 	}
+	// turbo
+	turboOnOff = turboEnabledFromOutput(outputs)
+	if strings.Contains(strings.ToLower(turboOnOff), "enabled") {
+		turboOnOff = "On"
+	} else if strings.Contains(strings.ToLower(turboOnOff), "disabled") {
+		turboOnOff = "Off"
+	} else {
+		turboOnOff = "?"
+	}
 	// memory
 	installedMem = installedMemoryFromOutput(outputs)
 	// BIOS
@@ -1857,7 +1887,7 @@ func systemSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 	// date
 	date = strings.TrimSpace(outputs[script.DateScriptName].Stdout)
 	// put it all together
-	return fmt.Sprintf(template, socketCount, cpuModel, coreCount, tdp, htOnOff, installedMem, biosVersion, uCodeVersion, nics, disks, operatingSystem, kernelVersion, date)
+	return fmt.Sprintf(template, socketCount, cpuModel, coreCount, tdp, htOnOff, turboOnOff, installedMem, biosVersion, uCodeVersion, nics, disks, operatingSystem, kernelVersion, date)
 }
 
 // getSectionsFromOutput parses output into sections, where the section name
