@@ -36,7 +36,6 @@ type Metadata struct {
 	PerfSupportedEvents       string
 	PMUDriverVersion          string
 	SocketCount               int
-	CollectionStartTime       time.Time
 	SupportsInstructions      bool
 	SupportsFixedCycles       bool
 	SupportsFixedInstructions bool
@@ -49,6 +48,9 @@ type Metadata struct {
 	TSC                       int
 	TSCFrequencyHz            int
 	SystemSummaryFields       [][]string // slice of key-value pairs
+	// below are not loaded by LoadMetadata, but are set by the caller
+	CollectionStartTime time.Time
+	PerfSpectVersion    string
 }
 
 // LoadMetadata - populates and returns a Metadata structure containing state of the
@@ -356,7 +358,8 @@ func (md Metadata) String() string {
 		"OCR supported: %t, "+
 		"PMU Driver version: %s, "+
 		"Kernel version: %s, "+
-		"Collection Start Time: %s, ",
+		"Collection Start Time: %s, "+
+		"PerfSpect Version: %s\n",
 		md.Hostname,
 		md.ModelName,
 		md.Architecture,
@@ -378,6 +381,7 @@ func (md Metadata) String() string {
 		md.PMUDriverVersion,
 		md.KernelVersion,
 		md.CollectionStartTime.Format(time.RFC3339),
+		md.PerfSpectVersion,
 	)
 	for deviceName, deviceIds := range md.UncoreDeviceIDs {
 		var ids []string
