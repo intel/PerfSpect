@@ -598,7 +598,7 @@ func readRawData(directory string) (metadata Metadata, eventFile *os.File, err e
 		}
 		if strings.HasSuffix(file.Name(), "_metadata.json") {
 			metadataPath = directory + "/" + file.Name()
-		} else if strings.HasSuffix(file.Name(), "_events.json") {
+		} else if strings.HasSuffix(file.Name(), "_events.jsonl") {
 			eventPath = directory + "/" + file.Name()
 		}
 	}
@@ -1466,7 +1466,7 @@ func processPerfOutput(
 		if len(*outputLines) != 0 {
 			// write the events to a file
 			if flagWriteEventsToFile {
-				if err := writeEventsToFile(outputDir+"/"+myTarget.GetName()+"_"+"events.json", *outputLines); err != nil {
+				if err := writeEventsToFile(outputDir+"/"+myTarget.GetName()+"_"+"events.jsonl", *outputLines); err != nil {
 					slog.Error("failed to write events to file", slog.String("error", err.Error()))
 				}
 			}
