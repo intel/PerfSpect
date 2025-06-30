@@ -1003,6 +1003,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 				if !exists {
 					_ = multiSpinner.Status(targetContext.target.GetName(), "no metrics collected")
 				} else {
+					targetContext.metadata.PerfSpectVersion = appContext.Version
 					summaryFiles, err := summarizeMetrics(localOutputDir, targetContext.target.GetName(), targetContext.metadata)
 					if err != nil {
 						err = fmt.Errorf("failed to summarize metrics: %w", err)
