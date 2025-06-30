@@ -972,6 +972,7 @@ func cpuTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "L3 Cache", Values: []string{l3FromOutput(outputs)}},
 		{Name: "L3 per Core", Values: []string{l3PerCoreFromOutput(outputs)}},
 		{Name: "Memory Channels", Values: []string{channelsFromOutput(outputs)}},
+		{Name: "Intel Turbo Boost", Values: []string{turboEnabledFromOutput(outputs)}},
 		{Name: "Virtualization", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Virtualization:\s*(.+)$`)}},
 		{Name: "PPINs", Values: []string{ppinsFromOutput(outputs)}},
 	}
@@ -1883,6 +1884,7 @@ func systemSummaryTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Sockets", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)}},
 		{Name: "Hyperthreading", Values: []string{hyperthreadingFromOutput(outputs)}},
 		{Name: "CPUs", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU\(s\):\s*(.+)$`)}},
+		{Name: "Intel Turbo Boost", Values: []string{turboEnabledFromOutput(outputs)}},
 		{Name: "Base Frequency", Values: []string{baseFrequencyFromOutput(outputs)}},
 		{Name: "All-core Maximum Frequency", Values: []string{allCoreMaxFrequencyFromOutput(outputs)}},
 		{Name: "Maximum Frequency", Values: []string{maxFrequencyFromOutput(outputs)}},
