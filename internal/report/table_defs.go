@@ -824,7 +824,13 @@ func GetValuesForTable(name string, outputs map[string]script.ScriptOutput) Tabl
 		Fields:          fields,
 	}
 	// sanity check
-	validateTableValues(tableValues)
+	if err := validateTableValues(tableValues); err != nil {
+		slog.Error("table validation failed", "table", name, "error", err)
+		return TableValues{
+			TableDefinition: tableDefinitions[name],
+			Fields:          []Field{},
+		}
+	}
 	// call the table's InsightsFunc to get insights about the data in the table
 	if table.InsightsFunc != nil {
 		tableValues.Insights = table.InsightsFunc(outputs, tableValues)
@@ -844,27 +850,28 @@ func getFieldIndex(fieldName string, tableValues TableValues) (int, error) {
 	return -1, fmt.Errorf("field [%s] not found in table [%s]", fieldName, tableValues.Name)
 }
 
-func validateTableValues(tableValues TableValues) {
+func validateTableValues(tableValues TableValues) error {
 	if tableValues.Name == "" {
-		panic("table name cannot be empty")
+		return fmt.Errorf("table name cannot be empty")
 	}
 	// no field values is a valid state
 	if len(tableValues.Fields) == 0 {
-		return
+		return nil
 	}
 	// field names cannot be empty
 	for i, field := range tableValues.Fields {
 		if field.Name == "" {
-			panic(fmt.Sprintf("table %s, field %d, name cannot be empty", tableValues.Name, i))
+			return fmt.Errorf("table %s, field %d, name cannot be empty", tableValues.Name, i)
 		}
 	}
 	// the number of entries in each field must be the same
 	numEntries := len(tableValues.Fields[0].Values)
 	for i, field := range tableValues.Fields {
 		if len(field.Values) != numEntries {
-			panic(fmt.Sprintf("table %s, field %d, %s, number of entries must be the same for all fields, expected %d, got %d", tableValues.Name, i, field.Name, numEntries, len(field.Values)))
+			return fmt.Errorf("table %s, field %d, %s, number of entries must be the same for all fields, expected %d, got %d", tableValues.Name, i, field.Name, numEntries, len(field.Values))
 		}
 	}
+	return nil
 }
 
 //
@@ -2151,8 +2158,8 @@ func numaBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
 	/* MLC Output:
 			Numa node
 	Numa node	     0	     1
-	       0	175610.3	55579.7
-	       1	55575.2	175656.7
+	       0	175610.3	 55579.7
+	       1	 55575.2	175656.7
 	*/
 	nodeBandwidthsPairs := valsArrayFromRegexSubmatch(outputs[script.NumaBenchmarkScriptName].Stdout, `^\s+(\d)\s+(\d.*)$`)
 	// add 1 field per numa node
@@ -2168,6 +2175,7 @@ func numaBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
 			return []Field{}
 		}
 		for i, bw := range bandwidths {
+			bw = strings.TrimSpace(bw)
 			val, err := strconv.ParseFloat(bw, 64)
 			if err != nil {
 				slog.Error(fmt.Sprintf("Unable to convert bandwidth to float: %s", bw))
