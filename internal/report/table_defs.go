@@ -2077,6 +2077,14 @@ func frequencyBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Fie
 		if len(scalarIaddFreqs) < len(specSSEFreqs) {
 			specSSEFreqs = specSSEFreqs[:len(scalarIaddFreqs)]
 		}
+		// pad the spec frequencies with the last value if they are shorter than the scalar_iadd frequencies
+		// this can happen when the first die has fewer cores than other dies
+		if len(specSSEFreqs) < len(scalarIaddFreqs) {
+			diff := len(scalarIaddFreqs) - len(specSSEFreqs)
+			for range diff {
+				specSSEFreqs = append(specSSEFreqs, specSSEFreqs[len(specSSEFreqs)-1])
+			}
+		}
 	}
 	// create the fields
 	fields := []Field{
@@ -2107,16 +2115,32 @@ func frequencyBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Fie
 	for i := range scalarIaddFreqs { // scalarIaddFreqs is required
 		fields[coresIdx].Values = append(fields[coresIdx].Values, fmt.Sprintf("%d", i+1))
 		if specSSEFieldIdx > 0 {
-			fields[specSSEFieldIdx].Values = append(fields[specSSEFieldIdx].Values, specSSEFreqs[i])
+			if len(specSSEFreqs) > i {
+				fields[specSSEFieldIdx].Values = append(fields[specSSEFieldIdx].Values, specSSEFreqs[i])
+			} else {
+				fields[specSSEFieldIdx].Values = append(fields[specSSEFieldIdx].Values, "")
+			}
 		}
 		if scalarIaddFieldIdx > 0 {
-			fields[scalarIaddFieldIdx].Values = append(fields[scalarIaddFieldIdx].Values, fmt.Sprintf("%.1f", scalarIaddFreqs[i]))
+			if len(scalarIaddFreqs) > i {
+				fields[scalarIaddFieldIdx].Values = append(fields[scalarIaddFieldIdx].Values, fmt.Sprintf("%.1f", scalarIaddFreqs[i]))
+			} else {
+				fields[scalarIaddFieldIdx].Values = append(fields[scalarIaddFieldIdx].Values, "")
+			}
 		}
 		if avx2FieldIdx > 0 {
-			fields[avx2FieldIdx].Values = append(fields[avx2FieldIdx].Values, fmt.Sprintf("%.1f", avx256FmaFreqs[i]))
+			if len(avx256FmaFreqs) > i {
+				fields[avx2FieldIdx].Values = append(fields[avx2FieldIdx].Values, fmt.Sprintf("%.1f", avx256FmaFreqs[i]))
+			} else {
+				fields[avx2FieldIdx].Values = append(fields[avx2FieldIdx].Values, "")
+			}
 		}
 		if avx512FieldIdx > 0 {
-			fields[avx512FieldIdx].Values = append(fields[avx512FieldIdx].Values, fmt.Sprintf("%.1f", avx512FmaFreqs[i]))
+			if len(avx512FmaFreqs) > i {
+				fields[avx512FieldIdx].Values = append(fields[avx512FieldIdx].Values, fmt.Sprintf("%.1f", avx512FmaFreqs[i]))
+			} else {
+				fields[avx512FieldIdx].Values = append(fields[avx512FieldIdx].Values, "")
+			}
 		}
 	}
 	return fields
