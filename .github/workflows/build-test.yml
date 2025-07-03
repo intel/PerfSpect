@@ -51,7 +51,7 @@ jobs:
           name: perfspect
       - name: run test
         run: |
-          tar -xf perfspect*
+          tar -xf perfspect.tgz
           cp .github/mock_mlc perfspect/tools/x86_64/
           cd perfspect
           mkdir output
