@@ -12,13 +12,18 @@ VERSION := $(VERSION_NUMBER)_$(COMMIT_DATE)_$(COMMIT_ID)
 
 default: perfspect
 
-GO=CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go
-GOFLAGS=-trimpath -mod=readonly -gcflags="all=-spectre=all -N -l" -asmflags="all=-spectre=all" -ldflags="-X perfspect/cmd.gVersion=$(VERSION) -s -w"
+GOFLAGS_COMMON=-trimpath -mod=readonly -ldflags="-X perfspect/cmd.gVersion=$(VERSION) -s -w"
+GO=CGO_ENABLED=0 GOOS=linux go
 
 # Build the perfspect binary
 .PHONY: perfspect
 perfspect:
-	$(GO) build $(GOFLAGS) -o $@
+	GOARCH=amd64 $(GO) build $(GOFLAGS_COMMON) -gcflags="all=-spectre=all -N -l" -asmflags="all=-spectre=all" -o $@
+
+# Build the perfspect binary for AARCH64
+.PHONY: perfspect-aarch64
+perfspect-aarch64:
+	GOARCH=arm64 $(GO) build $(GOFLAGS_COMMON) -o $@
 
 # Copy prebuilt tools to script resources
 .PHONY: resources
@@ -33,6 +38,10 @@ ifneq ("$(wildcard tools/bin)","")
 else # no prebuilt tools found
 		@echo "No prebuilt tools found in /prebuilt/tools or tools/bin"
 endif
+endif
+ifneq ("$(wildcard /prebuild/tools/bin-aarch64)","")
+		cp -r tools/bin-aarch64/* internal/script/resources/aarch64
+else # copy dev system tools to script resources
 ifneq ("$(wildcard tools/bin-aarch64)","")
 		cp -r tools/bin-aarch64/* internal/script/resources/aarch64
 else # no prebuilt tools found
@@ -43,7 +52,7 @@ endif
 
 # Build the distribution package
 .PHONY: dist
-dist: resources check perfspect
+dist: resources check perfspect perfspect-aarch64
 	rm -rf dist/perfspect
 	mkdir -p dist/perfspect/tools/x86_64
 	mkdir -p dist/perfspect/tools/aarch64
@@ -54,6 +63,10 @@ dist: resources check perfspect
 	cp perfspect dist/perfspect/
 	cd dist && tar -czf perfspect.tgz perfspect
 	cd dist && md5sum perfspect.tgz > perfspect.tgz.md5.txt
+	# for aarch64 dist, overwrite perfspect binary
+	cp perfspect-aarch64 dist/perfspect/perfspect
+	cd dist && tar -czf perfspect-aarch64.tgz perfspect
+	cd dist && md5sum perfspect-aarch64.tgz > perfspect-aarch64.tgz.md5.txt
 	rm -rf dist/perfspect
 	echo '{"version": "$(VERSION_NUMBER)", "date": "$(COMMIT_DATE)", "time": "$(COMMIT_TIME)", "commit": "$(COMMIT_ID)" }' | jq '.' > dist/manifest.json
 ifneq ("$(wildcard /prebuilt)","") # /prebuilt is a directory in the container
@@ -157,3 +170,4 @@ clean: sweep
 	rm -f perfspect
 	sudo rm -rf dist
 	rm -rf internal/script/resources/x86_64/*
+	rm -rf internal/script/resources/aarch64/*

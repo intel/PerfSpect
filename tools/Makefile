@@ -311,7 +311,7 @@ endif
 perf-archive:
 	mkdir -p bin
 	cp perf-archive/perf-archive.sh bin/perf-archive
-	chmod +x bin/perf-archive
+	chmod +rx bin/perf-archive
 
 PROCESSWATCH_VERSION := "c394065"	
 processwatch:
