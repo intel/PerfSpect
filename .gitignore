@@ -1,9 +1,12 @@
 /perfspect
+/perfspect-aarch64
 /perfspect.log
 /perfspect_202*
 /debug_out
 /tools/bin
+/tools/bin-aarch64
 /dist
 /internal/script/resources/x86_64
-/test
+/internal/script/resources/aarch64
+//test
 /__debug_bin*.log

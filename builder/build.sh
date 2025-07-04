@@ -17,6 +17,7 @@ id=$(docker create perfspect-tools:$TAG foo)
 # Copy the tools from the temporary container to your local disk
 # Note: not used in build process, but useful to have around
 docker cp "$id":/bin ./tools
+docker cp "$id":/bin-aarch64 ./tools/bin-aarch64
 
 # Remove the temporary container
 docker rm "$id"
