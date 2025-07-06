@@ -42,7 +42,6 @@ RUN mkdir workdir
 ADD . /workdir
 WORKDIR /workdir
 RUN make tools
-RUN make tools-aarch64
 RUN make oss-source
 
 FROM ubuntu:22.04 AS perf-builder
@@ -79,12 +78,9 @@ RUN mkdir workdir
 ADD . /workdir
 WORKDIR /workdir
 RUN make perf
-RUN make perf-aarch64
 RUN make processwatch
 
 FROM scratch AS output
 COPY --from=builder workdir/bin /bin
-COPY --from=builder workdir/bin-aarch64 /bin-aarch64
 COPY --from=builder workdir/oss_source* /
 COPY --from=perf-builder workdir/bin/ /bin
-COPY --from=perf-builder workdir/bin-aarch64/ /bin-aarch64
