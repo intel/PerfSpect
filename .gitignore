@@ -8,5 +8,5 @@
 /dist
 /internal/script/resources/x86_64
 /internal/script/resources/aarch64
-//test
+/test
 /__debug_bin*.log
