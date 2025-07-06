@@ -159,6 +159,6 @@ sweep:
 clean: sweep
 	@echo "Cleaning up..."
 	rm -f perfspect
+	rm -f perfspect-aarch64
 	sudo rm -rf dist
-	rm -rf internal/script/resources/x86_64/*
-	rm -rf internal/script/resources/aarch64/*
+	rm -rf internal/script/resources
