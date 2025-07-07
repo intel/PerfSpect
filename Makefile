@@ -28,27 +28,18 @@ perfspect-aarch64:
 # Copy prebuilt tools to script resources
 .PHONY: resources
 resources:
-	mkdir -p internal/script/resources/x86_64
-	mkdir -p internal/script/resources/aarch64
+	mkdir -p internal/script/resources
 ifneq ("$(wildcard /prebuilt/tools)","") # /prebuilt/tools is a directory in the container
-	cp -r /prebuilt/tools/* internal/script/resources/x86_64
+	@echo "Copying prebuilt tools from /prebuilt/tools to script resources"
+	cp -r /prebuilt/tools/* internal/script/resources/
 else # copy dev system tools to script resources
 ifneq ("$(wildcard tools/bin)","")
-		cp -r tools/bin/* internal/script/resources/x86_64
+		@echo "Copying dev system tools from tools/bin to script resources"
+		cp -r tools/bin/* internal/script/resources/
 else # no prebuilt tools found
 		@echo "No prebuilt tools found in /prebuilt/tools or tools/bin"
 endif
 endif
-ifneq ("$(wildcard /prebuild/tools/bin-aarch64)","")
-		cp -r tools/bin-aarch64/* internal/script/resources/aarch64
-else # copy dev system tools to script resources
-ifneq ("$(wildcard tools/bin-aarch64)","")
-		cp -r tools/bin-aarch64/* internal/script/resources/aarch64
-else # no prebuilt tools found
-		@echo "No prebuilt tools (aarch64) found in /prebuilt/tools or tools/bin-aarch64"
-endif
-endif
-
 
 # Build the distribution package
 .PHONY: dist
@@ -168,6 +159,6 @@ sweep:
 clean: sweep
 	@echo "Cleaning up..."
 	rm -f perfspect
+	rm -f perfspect-aarch64
 	sudo rm -rf dist
-	rm -rf internal/script/resources/x86_64/*
-	rm -rf internal/script/resources/aarch64/*
+	rm -rf internal/script/resources
