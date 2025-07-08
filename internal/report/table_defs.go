@@ -2428,12 +2428,8 @@ func temperatureTelemetryTableValues(outputs map[string]script.ScriptOutput) []F
 	}
 	packageRows, err := turbostatPackageRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"PkgTmp"})
 	if err != nil {
-		slog.Error(err.Error())
-		return []Field{}
-	}
-	if len(platformRows) == 0 || len(packageRows) == 0 {
-		slog.Warn("no platform or package rows found in turbostat telemetry output")
-		return []Field{}
+		// not an error, just means no package rows (package temperature)
+		slog.Warn(err.Error())
 	}
 	// add the package rows to the fields
 	for i := range packageRows {
@@ -2469,12 +2465,8 @@ func frequencyTelemetryTableValues(outputs map[string]script.ScriptOutput) []Fie
 	}
 	packageRows, err := turbostatPackageRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"UncMHz"})
 	if err != nil {
-		slog.Error(err.Error())
-		return []Field{}
-	}
-	if len(platformRows) == 0 || len(packageRows) == 0 {
-		slog.Warn("no platform or package rows found in turbostat telemetry output")
-		return []Field{}
+		// not an error, just means no package rows (uncore frequency)
+		slog.Warn(err.Error())
 	}
 	// add the package rows to the fields
 	for i := range packageRows {
