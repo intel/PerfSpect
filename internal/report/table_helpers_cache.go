@@ -161,7 +161,7 @@ func getCacheLscpuParts(lscpuCache string) (size float64, units string, instance
 	}
 	size, err = strconv.ParseFloat(match[1], 64)
 	if err != nil {
-		err = fmt.Errorf("failed to parse L3 size from lscpu: %s, %v", lscpuCache, err)
+		err = fmt.Errorf("failed to parse cache size from lscpu: %s, %v", lscpuCache, err)
 		return
 	}
 	units = match[2]
