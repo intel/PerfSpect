@@ -15,7 +15,7 @@ import (
 
 // GetL3LscpuMB returns the L3 cache size (per socket) in MB from lscpu output.
 func GetL3LscpuMB(outputs map[string]script.ScriptOutput) (float64, error) {
-	l3MB, err := getCacheMBLscpu(outputs, `^L3 cache.*:\s*(.+?)$`)
+	l3MB, err := getCacheMBLscpu(outputs[script.LscpuScriptName].Stdout, `^L3 cache.*:\s*(.+?)$`)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get L3 cache size from lscpu: %v", err)
 	}
@@ -114,7 +114,7 @@ func l3PerCoreFromOutput(outputs map[string]script.ScriptOutput) string {
 }
 
 func l2FromOutput(outputs map[string]script.ScriptOutput) string {
-	l2MB, err := getCacheMBLscpu(outputs, `^L2 cache:\s*(.+)$`)
+	l2MB, err := getCacheMBLscpu(outputs[script.LscpuScriptName].Stdout, `^L2 cache:\s*(.+)$`)
 	if err != nil {
 		slog.Error("Failed to get L2 cache size from lscpu", slog.String("error", err.Error()))
 		return ""
@@ -123,7 +123,7 @@ func l2FromOutput(outputs map[string]script.ScriptOutput) string {
 }
 
 func l1dFromOutput(outputs map[string]script.ScriptOutput) string {
-	l1dMB, err := getCacheMBLscpu(outputs, `^L1d cache:\s*(.+)$`)
+	l1dMB, err := getCacheMBLscpu(outputs[script.LscpuScriptName].Stdout, `^L1d cache:\s*(.+)$`)
 	if err != nil {
 		slog.Error("Failed to get L1d cache size from lscpu", slog.String("error", err.Error()))
 		return ""
@@ -132,7 +132,7 @@ func l1dFromOutput(outputs map[string]script.ScriptOutput) string {
 }
 
 func l1iFromOutput(outputs map[string]script.ScriptOutput) string {
-	l1iMB, err := getCacheMBLscpu(outputs, `^L1i cache:\s*(.+)$`)
+	l1iMB, err := getCacheMBLscpu(outputs[script.LscpuScriptName].Stdout, `^L1i cache:\s*(.+)$`)
 	if err != nil {
 		slog.Error("Failed to get L1i cache size from lscpu", slog.String("error", err.Error()))
 		return ""
@@ -141,7 +141,7 @@ func l1iFromOutput(outputs map[string]script.ScriptOutput) string {
 }
 
 func getCacheLscpuParts(lscpuCache string) (size float64, units string, instances int, err error) {
-	re := regexp.MustCompile(`(\d+\.?\d*)\s*(\w+)\s+\((\d+) instance[s]*\)`) // match known formats
+	re := regexp.MustCompile(`(\d+\.?\d*)\s*(\w+)\s+\((.*) instance[s]*\)`) // match known formats
 	match := re.FindStringSubmatch(lscpuCache)
 	if match != nil {
 		instances, err = strconv.Atoi(match[3])
@@ -172,8 +172,8 @@ func formatCacheSizeMB(size float64) string {
 	return fmt.Sprintf("%s MiB", strconv.FormatFloat(size, 'f', -1, 64))
 }
 
-func getCacheMBLscpu(outputs map[string]script.ScriptOutput, cacheRegex string) (float64, error) {
-	sockets := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)
+func getCacheMBLscpu(lscpuOutput string, cacheRegex string) (float64, error) {
+	sockets := valFromRegexSubmatch(lscpuOutput, `^Socket\(s\):\s*(.+)$`)
 	if sockets == "" {
 		return 0, fmt.Errorf("failed to parse sockets from lscpu output")
 	}
@@ -181,7 +181,7 @@ func getCacheMBLscpu(outputs map[string]script.ScriptOutput, cacheRegex string) 
 	if err != nil || numSockets == 0 {
 		return 0, fmt.Errorf("failed to parse sockets from lscpu output: %s, %v", sockets, err)
 	}
-	cacheSize := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, cacheRegex)
+	cacheSize := valFromRegexSubmatch(lscpuOutput, cacheRegex)
 	if cacheSize == "" {
 		return 0, fmt.Errorf("cache size not found in lscpu output")
 	}
