@@ -461,7 +461,8 @@ func hyperthreadingFromOutput(outputs map[string]script.ScriptOutput) string {
 		slog.Error("error parsing cpus from lscpu")
 		return ""
 	}
-	numOnlineCpus, err := parseCPURangeCount(onlineCpus) // logical online CPUs
+	onlineCpusList, err := util.SelectiveIntRangeToIntList(onlineCpus) // logical online CPUs
+	numOnlineCpus := len(onlineCpusList)
 	if err != nil {
 		slog.Error("error parsing online cpus from lscpu")
 		return ""
@@ -2047,70 +2048,4 @@ func maxRenderDepthFromOutput(outputs map[string]script.ScriptOutput) string {
 		}
 	}
 	return ""
-}
-
-// parseCPURanges parses CPU range strings like "0-7,32-35" and returns the total count
-// of CPUs and a slice containing all individual CPU numbers
-func parseCPURanges(rangeStr string) (count int, cpuList []int, err error) {
-	if rangeStr == "" {
-		return 0, nil, nil
-	}
-
-	ranges := strings.Split(rangeStr, ",")
-	cpuSet := make(map[int]bool) // use map to avoid duplicates
-
-	for _, r := range ranges {
-		r = strings.TrimSpace(r)
-		if r == "" {
-			continue
-		}
-
-		if strings.Contains(r, "-") {
-			// Handle range like "0-7"
-			parts := strings.Split(r, "-")
-			if len(parts) != 2 {
-				err = fmt.Errorf("invalid range format: %s", r)
-				return
-			}
-
-			start, err1 := strconv.Atoi(strings.TrimSpace(parts[0]))
-			end, err2 := strconv.Atoi(strings.TrimSpace(parts[1]))
-			if err1 != nil || err2 != nil {
-				err = fmt.Errorf("invalid range numbers in: %s", r)
-				return
-			}
-
-			if start > end {
-				err = fmt.Errorf("invalid range (start > end): %s", r)
-				return
-			}
-
-			for i := start; i <= end; i++ {
-				cpuSet[i] = true
-			}
-		} else {
-			// Handle single number
-			cpu, parseErr := strconv.Atoi(r)
-			if parseErr != nil {
-				err = fmt.Errorf("invalid CPU number: %s", r)
-				return
-			}
-			cpuSet[cpu] = true
-		}
-	}
-
-	// Convert map to sorted slice
-	for cpu := range cpuSet {
-		cpuList = append(cpuList, cpu)
-	}
-	sort.Ints(cpuList)
-	count = len(cpuList)
-
-	return
-}
-
-// parseCPURangeCount is a convenience function that only returns the count
-func parseCPURangeCount(rangeStr string) (int, error) {
-	count, _, err := parseCPURanges(rangeStr)
-	return count, err
 }
