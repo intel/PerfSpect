@@ -453,10 +453,23 @@ func hyperthreadingFromOutput(outputs map[string]script.ScriptOutput) string {
 	sockets := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)
 	coresPerSocket := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)
 	cpus := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU\(.*:\s*(.+?)$`)
+	onlineCpus := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^On-line CPU\(.*:\s*(.+?)$`)
+	threadsPerCore := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Thread\(s\) per core:\s*(.+)$`)
+
 	numCPUs, err := strconv.Atoi(cpus) // logical CPUs
 	if err != nil {
 		slog.Error("error parsing cpus from lscpu")
 		return ""
+	}
+	numOnlineCpus, err := parseCPURangeCount(onlineCpus) // logical online CPUs
+	if err != nil {
+		slog.Error("error parsing online cpus from lscpu")
+		return ""
+	}
+	numThreadsPerCore, err := strconv.Atoi(threadsPerCore) // logical threads per core
+	if err != nil {
+		slog.Error("error parsing threads per core from lscpu")
+		numThreadsPerCore = 0
 	}
 	numSockets, err := strconv.Atoi(sockets)
 	if err != nil {
@@ -472,9 +485,22 @@ func hyperthreadingFromOutput(outputs map[string]script.ScriptOutput) string {
 	if err != nil {
 		return ""
 	}
+	if numOnlineCpus > 0 && numOnlineCpus < numCPUs {
+		// if online CPUs list is available, use it to determine the number of CPUs
+		// supersedes lscpu output of numCPUs which counts CPUs on the system, not online CPUs
+		numCPUs = numOnlineCpus
+	}
 	if cpu.LogicalThreadCount < 2 {
 		return "N/A"
+	} else if numThreadsPerCore == 1 {
+		// if threads per core is 1, hyperthreading is disabled
+		return "Disabled"
+	} else if numThreadsPerCore >= 2 {
+		// if threads per core is greater than or equal to 2, hyperthreading is enabled
+		return "Enabled"
 	} else if numCPUs > numCoresPerSocket*numSockets {
+		// if the threads per core attribute is not available, we can still check if hyperthreading is enabled
+		// by checking if the number of logical CPUs is greater than the number of physical cores
 		return "Enabled"
 	} else {
 		return "Disabled"
@@ -2021,4 +2047,70 @@ func maxRenderDepthFromOutput(outputs map[string]script.ScriptOutput) string {
 		}
 	}
 	return ""
+}
+
+// parseCPURanges parses CPU range strings like "0-7,32-35" and returns the total count
+// of CPUs and a slice containing all individual CPU numbers
+func parseCPURanges(rangeStr string) (count int, cpuList []int, err error) {
+	if rangeStr == "" {
+		return 0, nil, nil
+	}
+
+	ranges := strings.Split(rangeStr, ",")
+	cpuSet := make(map[int]bool) // use map to avoid duplicates
+
+	for _, r := range ranges {
+		r = strings.TrimSpace(r)
+		if r == "" {
+			continue
+		}
+
+		if strings.Contains(r, "-") {
+			// Handle range like "0-7"
+			parts := strings.Split(r, "-")
+			if len(parts) != 2 {
+				err = fmt.Errorf("invalid range format: %s", r)
+				return
+			}
+
+			start, err1 := strconv.Atoi(strings.TrimSpace(parts[0]))
+			end, err2 := strconv.Atoi(strings.TrimSpace(parts[1]))
+			if err1 != nil || err2 != nil {
+				err = fmt.Errorf("invalid range numbers in: %s", r)
+				return
+			}
+
+			if start > end {
+				err = fmt.Errorf("invalid range (start > end): %s", r)
+				return
+			}
+
+			for i := start; i <= end; i++ {
+				cpuSet[i] = true
+			}
+		} else {
+			// Handle single number
+			cpu, parseErr := strconv.Atoi(r)
+			if parseErr != nil {
+				err = fmt.Errorf("invalid CPU number: %s", r)
+				return
+			}
+			cpuSet[cpu] = true
+		}
+	}
+
+	// Convert map to sorted slice
+	for cpu := range cpuSet {
+		cpuList = append(cpuList, cpu)
+	}
+	sort.Ints(cpuList)
+	count = len(cpuList)
+
+	return
+}
+
+// parseCPURangeCount is a convenience function that only returns the count
+func parseCPURangeCount(rangeStr string) (int, error) {
+	count, _, err := parseCPURanges(rangeStr)
+	return count, err
 }
