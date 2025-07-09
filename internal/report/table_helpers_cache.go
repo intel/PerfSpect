@@ -65,6 +65,10 @@ func GetL3MSRMB(outputs map[string]script.ScriptOutput) (float64, error) {
 	return currentL3SizeGB * 1024, nil
 }
 
+// l3FromOutput attempts to retrieve the L3 cache size in megabytes from the provided
+// script outputs. It first tries to obtain the value using GetL3MSRMB. If that fails,
+// it falls back to using GetL3LscpuMB. If both methods fail, it logs the errors and
+// returns an empty string. On success, it returns the formatted cache size as a string.
 func l3FromOutput(outputs map[string]script.ScriptOutput) string {
 	l3MB, err := GetL3MSRMB(outputs)
 	if err != nil {
@@ -78,6 +82,14 @@ func l3FromOutput(outputs map[string]script.ScriptOutput) string {
 	return formatCacheSizeMB(l3MB)
 }
 
+// l3PerCoreFromOutput calculates the amount of L3 cache (in MiB) available per core
+// based on the provided script outputs. It first checks if the host is virtualized,
+// in which case it returns an empty string since the calculation is not applicable.
+// It parses the number of cores per socket and the number of sockets from the lscpu
+// output. It attempts to retrieve the total L3 cache size using MSR data, falling
+// back to parsing lscpu output if necessary. The result is formatted as a string
+// with up to three decimal places, followed by " MiB". If any required data cannot
+// be parsed, it logs an error and returns an empty string.
 func l3PerCoreFromOutput(outputs map[string]script.ScriptOutput) string {
 	virtualization := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Virtualization.*:\s*(.+?)$`)
 	if virtualization == "full" {
@@ -113,6 +125,9 @@ func l3PerCoreFromOutput(outputs map[string]script.ScriptOutput) string {
 	return val
 }
 
+// l2FromOutput extracts the L2 cache size from the provided script outputs map,
+// formats it as a human-readable string, and returns it. If extraction or formatting
+// fails, it logs an error and returns an empty string.
 func l2FromOutput(outputs map[string]script.ScriptOutput) string {
 	l2MB, err := getCacheMBLscpu(outputs[script.LscpuScriptName].Stdout, `^L2 cache:\s*(.+)$`)
 	if err != nil {
@@ -122,6 +137,9 @@ func l2FromOutput(outputs map[string]script.ScriptOutput) string {
 	return formatCacheSizeMB(l2MB)
 }
 
+// l1dFromOutput extracts the L1 data cache size from the provided script outputs map,
+// formats it as a human-readable string, and returns it. If extraction or formatting fails,
+// it logs an error and returns an empty string.
 func l1dFromOutput(outputs map[string]script.ScriptOutput) string {
 	l1dMB, err := getCacheMBLscpu(outputs[script.LscpuScriptName].Stdout, `^L1d cache:\s*(.+)$`)
 	if err != nil {
@@ -131,6 +149,9 @@ func l1dFromOutput(outputs map[string]script.ScriptOutput) string {
 	return formatCacheSizeMB(l1dMB)
 }
 
+// l1iFromOutput extracts the L1 instruction cache size from the provided script outputs map,
+// formats it as a human-readable string, and returns it. If extraction or formatting fails,
+// it logs an error and returns an empty string.
 func l1iFromOutput(outputs map[string]script.ScriptOutput) string {
 	l1iMB, err := getCacheMBLscpu(outputs[script.LscpuScriptName].Stdout, `^L1i cache:\s*(.+)$`)
 	if err != nil {
@@ -140,6 +161,9 @@ func l1iFromOutput(outputs map[string]script.ScriptOutput) string {
 	return formatCacheSizeMB(l1iMB)
 }
 
+// getCacheLscpuParts parses an lscpu cache string and extracts the cache size, units, and number of instances.
+// The input string is expected to be in the format "<size> <units> (<instances> instance[s])" or "<size> <units>".
+// Returns the parsed size as float64, units as string, instances as int, and an error if parsing fails.
 func getCacheLscpuParts(lscpuCache string) (size float64, units string, instances int, err error) {
 	re := regexp.MustCompile(`(\d+\.?\d*)\s*(\w+)\s+\((.*) instance[s]*\)`) // match known formats
 	match := re.FindStringSubmatch(lscpuCache)
@@ -168,10 +192,16 @@ func getCacheLscpuParts(lscpuCache string) (size float64, units string, instance
 	return
 }
 
+// formatCacheSizeMB formats a floating-point cache size value (in MiB) as a string
+// with the "MiB" unit suffix. The size is formatted using decimal notation
+// with no fixed precision.
 func formatCacheSizeMB(size float64) string {
 	return fmt.Sprintf("%s MiB", strconv.FormatFloat(size, 'f', -1, 64))
 }
 
+// getCacheMBLscpu parses the output of the `lscpu` command to extract the cache size (in MB) per socket.
+// It takes the lscpu output as a string and a regular expression to match the desired cache line.
+// The function returns the cache size in megabytes per socket, or an error if parsing fails.
 func getCacheMBLscpu(lscpuOutput string, cacheRegex string) (float64, error) {
 	sockets := valFromRegexSubmatch(lscpuOutput, `^Socket\(s\):\s*(.+)$`)
 	if sockets == "" {
