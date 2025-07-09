@@ -146,7 +146,7 @@ func getCacheLscpuParts(lscpuCache string) (size float64, units string, instance
 	if match != nil {
 		instances, err = strconv.Atoi(match[3])
 		if err != nil {
-			err = fmt.Errorf("failed to parse L3 instances from lscpu: %s, %v", lscpuCache, err)
+			err = fmt.Errorf("failed to parse cache instances from lscpu: %s, %v", lscpuCache, err)
 			return
 		}
 	} else {
