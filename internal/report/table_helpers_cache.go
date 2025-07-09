@@ -154,7 +154,7 @@ func getCacheLscpuParts(lscpuCache string) (size float64, units string, instance
 		re = regexp.MustCompile(`(\d+\.?\d*)\s*(\w+)`)
 		match = re.FindStringSubmatch(lscpuCache)
 		if match == nil {
-			err = fmt.Errorf("unknown L3 format in lscpu: %s", lscpuCache)
+			err = fmt.Errorf("unknown cache format in lscpu: %s", lscpuCache)
 			return
 		}
 		instances = 1
