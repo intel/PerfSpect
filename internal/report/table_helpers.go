@@ -453,7 +453,7 @@ func hyperthreadingFromOutput(outputs map[string]script.ScriptOutput) string {
 	sockets := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)
 	coresPerSocket := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)
 	cpus := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU\(.*:\s*(.+?)$`)
-	onlineCpus := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^On-line CPU\(.*:\s*(.+?)$`)
+	onlineCpus := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^On-line CPU\(s\) list:\s*(.+)$`)
 	threadsPerCore := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Thread\(s\) per core:\s*(.+)$`)
 
 	numCPUs, err := strconv.Atoi(cpus) // logical CPUs
