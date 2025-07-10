@@ -136,7 +136,7 @@ func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir str
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("cache way count is zero")}
 		return
 	}
-	maximumLlcSize, _, err := report.GetL3LscpuMB(outputs)
+	maximumLlcSize, err := report.GetL3LscpuMB(outputs)
 	if err != nil {
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get maximum LLC size: %w", err)}
 		return
