@@ -1229,23 +1229,23 @@ wait
 		ScriptTemplate: `interval={{.Interval}}
 duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
-	count=$((duration / interval))
-	arg_count="-n $count"
+    count=$((duration / interval))
+    arg_count="-n $count"
 fi
 if [ $interval -ne 0 ]; then
-	arg_interval="-i $interval"
+    arg_interval="-i $interval"
 fi
 echo TIME: $(date +"%H:%M:%S")
 echo INTERVAL: $interval
 # if no PID specified, increase the sampling interval (defaults to 100,000) to reduce overhead
-if [ {{.PID}} -eq 0 ]; then
-	arg_sampling_rate="-s 1000000"
+if [ {{.InstrMixPID}} -eq 0 ]; then
+    arg_sampling_rate="-s {{.InstrMixFrequency}}"
 else
-	arg_pid="-p {{.PID}}"
+    arg_pid="-p {{.InstrMixPID}}"
 fi
-# .Filter is a space separated list of ISA categories
+# .InstrMixFilter is a space separated list of ISA categories
 # for each category in the list, add -f <category> to the command line
-for category in {{.Filter}}; do
+for category in {{.InstrMixFilter}}; do
     arg_filter="$arg_filter -f $category"
 done
 
