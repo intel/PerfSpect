@@ -65,8 +65,9 @@ var (
 
 	flagNoSystemSummary bool
 
-	flagInstrMixPid    int
-	flagInstrMixFilter []string
+	flagInstrMixPid       int
+	flagInstrMixFilter    []string
+	flagInstrMixFrequency int
 )
 
 const (
@@ -90,8 +91,9 @@ const (
 
 	flagNoSystemSummaryName = "no-summary"
 
-	flagInstrMixPidName    = "instrmix-pid"
-	flagInstrMixFilterName = "instrmix-filter"
+	flagInstrMixPidName       = "instrmix-pid"
+	flagInstrMixFilterName    = "instrmix-filter"
+	flagInstrMixFrequencyName = "instrmix-frequency"
 )
 
 var telemetrySummaryTableName = "Telemetry Summary"
@@ -123,6 +125,7 @@ func init() {
 	Cmd.Flags().IntVar(&flagInterval, flagIntervalName, 2, "")
 	Cmd.Flags().IntVar(&flagInstrMixPid, flagInstrMixPidName, 0, "")
 	Cmd.Flags().StringSliceVar(&flagInstrMixFilter, flagInstrMixFilterName, []string{"SSE", "AVX", "AVX2", "AVX512", "AMX_TILE"}, "")
+	Cmd.Flags().IntVar(&flagInstrMixFrequency, flagInstrMixFrequencyName, 10000000, "") // 10 million
 	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
 
 	common.AddTargetFlags(Cmd)
@@ -188,11 +191,15 @@ func getFlagGroups() []common.FlagGroup {
 		},
 		{
 			Name: flagInstrMixPidName,
-			Help: "pid to monitor for instruction mix, no pid means all processes",
+			Help: "PID to monitor for instruction mix, no PID means all processes",
 		},
 		{
 			Name: flagInstrMixFilterName,
 			Help: "filter to apply to instruction mix",
+		},
+		{
+			Name: flagInstrMixFrequencyName,
+			Help: "number of instructions between samples when no PID specified",
 		},
 		{
 			Name: flagNoSystemSummaryName,
@@ -264,6 +271,9 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 			}
 		}
 	}
+	if flagInstrMixFrequency < 100000 { // 100,000 instructions is the minimum frequency
+		return common.FlagValidationError(cmd, "instruction mix frequency must be 100,000 or greater")
+	}
 	// common target flags
 	if err := common.ValidateTargetFlags(cmd); err != nil {
 		return common.FlagValidationError(cmd, err.Error())
@@ -295,10 +305,11 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		Cmd:            cmd,
 		ReportNamePost: "telem",
 		ScriptParams: map[string]string{
-			"Interval": strconv.Itoa(flagInterval),
-			"Duration": strconv.Itoa(flagDuration),
-			"PID":      strconv.Itoa(flagInstrMixPid),
-			"Filter":   strings.Join(flagInstrMixFilter, " "),
+			"Interval":          strconv.Itoa(flagInterval),
+			"Duration":          strconv.Itoa(flagDuration),
+			"InstrMixPID":       strconv.Itoa(flagInstrMixPid),
+			"InstrMixFilter":    strings.Join(flagInstrMixFilter, " "),
+			"InstrMixFrequency": strconv.Itoa(flagInstrMixFrequency),
 		},
 		TableNames:             tableNames,
 		SummaryFunc:            summaryFunc,
