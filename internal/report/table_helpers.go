@@ -465,7 +465,7 @@ func hyperthreadingFromOutput(outputs map[string]script.ScriptOutput) string {
 	numOnlineCpus := len(onlineCpusList)
 	if err != nil {
 		slog.Error("error parsing online cpus from lscpu")
-		return ""
+		numOnlineCpus = 0 // set to 0 to indicate parsing failed, will use numCPUs instead
 	}
 	numThreadsPerCore, err := strconv.Atoi(threadsPerCore) // logical threads per core
 	if err != nil {
