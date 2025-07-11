@@ -331,18 +331,15 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 
 func runCmd(cmd *cobra.Command, args []string) error {
 	tableNames := []string{}
+	// add category tables
 	for _, cat := range categories {
-		if (cat.FlagVar != nil && *cat.FlagVar) || (flagAll) {
-			for _, tableName := range cat.TableNames {
-				tableNames = util.UniqueAppend(tableNames, tableName)
-			}
+		if *cat.FlagVar || flagAll {
+			tableNames = append(tableNames, cat.TableNames...)
 		}
 	}
 	// add benchmark tables
 	for _, benchmark := range flagBenchmark {
-		for _, tableName := range benchmarkTableNames[benchmark] {
-			tableNames = util.UniqueAppend(tableNames, tableName)
-		}
+		tableNames = append(tableNames, benchmarkTableNames[benchmark]...)
 	}
 	// include benchmark summary table if all benchmark options are selected
 	var summaryFunc common.SummaryFunc
