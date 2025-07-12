@@ -48,9 +48,9 @@ type DynamicLoader struct {
 
 func NewLoader(uarch string) (Loader, error) {
 	switch strings.ToLower(uarch) {
-	case "gnrxxx", "srf", "emr", "spr", "icx", "clx", "skx", "bdx", "bergamo", "genoa", "turin":
+	case "gnrxxx", "srf", "emrxx", "spr", "icx", "clx", "skx", "bdx", "bergamo", "genoa", "turin":
 		return newStaticLoader(strings.ToLower(uarch)), nil
-	case "gnr":
+	case "gnr", "emr":
 		return newDynamicLoader(strings.ToLower(uarch)), nil
 	default:
 		return nil, fmt.Errorf("unsupported microarchitecture: %s", uarch)
