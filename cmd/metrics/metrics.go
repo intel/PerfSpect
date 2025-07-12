@@ -683,23 +683,15 @@ func processRawData(localOutputDir string) error {
 		return err
 	}
 	defer eventsFile.Close()
-	// load event definitions
-	var eventGroupDefinitions []GroupDefinition
-	var uncollectableEvents []string
-	if eventGroupDefinitions, uncollectableEvents, err = LoadEventGroups(flagEventFilePath, metadata); err != nil {
-		err = fmt.Errorf("failed to load event definitions: %w", err)
+	// load metric and event group definitions
+	loader, err := NewLoader(metadata.Microarchitecture)
+	if err != nil {
+		err = fmt.Errorf("failed to create metric and event loader: %w", err)
 		return err
 	}
-	// load metric definitions
-	var loadedMetrics []MetricDefinition
-	if loadedMetrics, err = LoadMetricDefinitions(flagMetricFilePath, flagMetricsList, metadata); err != nil {
-		err = fmt.Errorf("failed to load metric definitions: %w", err)
-		return err
-	}
-	// configure metrics
-	var metricDefinitions []MetricDefinition
-	if metricDefinitions, err = ConfigureMetrics(loadedMetrics, uncollectableEvents, GetEvaluatorFunctions(), metadata); err != nil {
-		err = fmt.Errorf("failed to configure metrics: %w", err)
+	metricDefinitions, eventGroupDefinitions, err := loader.Load(flagMetricFilePath, flagEventFilePath, flagMetricsList, metadata)
+	if err != nil {
+		err = fmt.Errorf("failed to load metric and event definitions: %w", err)
 		return err
 	}
 
@@ -1146,32 +1138,24 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 		channelError <- targetError{target: myTarget, err: targetContext.err}
 		return
 	}
-	// load event definitions
-	var uncollectableEvents []string
-	if targetContext.groupDefinitions, uncollectableEvents, err = LoadEventGroups(flagEventFilePath, targetContext.metadata); err != nil {
-		err = fmt.Errorf("failed to load event definitions: %w", err)
+	// load metric and event groups
+	loader, err := NewLoader(targetContext.metadata.Microarchitecture)
+	if err != nil {
+		err = fmt.Errorf("failed to create metric and event loader: %w", err)
 		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
 		return
 	}
-	// load metric definitions
-	var loadedMetrics []MetricDefinition
-	if loadedMetrics, err = LoadMetricDefinitions(flagMetricFilePath, flagMetricsList, targetContext.metadata); err != nil {
-		err = fmt.Errorf("failed to load metric definitions: %w", err)
+	targetContext.metricDefinitions, targetContext.groupDefinitions, err = loader.Load(flagMetricFilePath, flagEventFilePath, flagMetricsList, targetContext.metadata)
+	if err != nil {
+		err = fmt.Errorf("failed to load metric and event definitions: %w", err)
 		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
 		return
 	}
-	// configure metrics
-	if targetContext.metricDefinitions, err = ConfigureMetrics(loadedMetrics, uncollectableEvents, GetEvaluatorFunctions(), targetContext.metadata); err != nil {
-		err = fmt.Errorf("failed to configure metrics: %w", err)
-		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
-		targetContext.err = err
-		channelError <- targetError{target: myTarget, err: err}
-		return
-	}
+	// configure the prometheus metrics if requested
 	if flagPrometheusServer {
 		for _, def := range targetContext.metricDefinitions {
 			desc := fmt.Sprintf("%s (expr: %s)", def.Name, def.Expression)
@@ -1189,6 +1173,7 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 			prometheus.MustRegister(m)
 		}
 	}
+	// signal exit with no error
 	channelError <- targetError{target: myTarget, err: nil}
 }
 
