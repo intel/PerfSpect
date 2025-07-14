@@ -292,16 +292,15 @@ endif
 	cd pcm/build &&	cmake -DNO_ASAN=1 ..
 	cd pcm/build && cmake --build .
 
-PERF_VERSION := "6.8.12"
+PERF_VERSION := "6.15.3"
 perf-x86_64:
 	wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$(PERF_VERSION).tar.xz
 	tar -xf linux-$(PERF_VERSION).tar.xz && mv linux-$(PERF_VERSION)/ linux_perf/
-	cd linux_perf/tools/perf && make LDFLAGS="-static --static" BUILD_BPF_SKEL=1 NO_JVMTI=1 -j$(NPROC)
+	cd linux_perf/tools/perf && make LLVM_CONFIG="llvm-config --link-static" LDFLAGS="-static --static" BUILD_BPF_SKEL=1 NO_JVMTI=1 BUILD_NONDISTRO=1 LIBUNWIND=1 -j$(NPROC)
 	mkdir -p bin/x86_64
 	cp linux_perf/tools/perf/perf bin/x86_64/
 	strip --strip-unneeded bin/x86_64/perf
 
-perf-aarch64: PERF_VERSION := "6.15.3"
 perf-aarch64: zlib-aarch64 elfutils-aarch64 libpfm4-aarch64
 ifeq ("$(wildcard perf-aarch64)","")
 	wget -N https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$(PERF_VERSION).tar.xz
