@@ -68,12 +68,16 @@ RUN ulimit -n 4096 && for i in {1..5}; do \
         libbabeltrace-dev libbpf-dev libc6 libcap-dev libdw-dev libdwarf-dev libelf-dev \
         libiberty-dev liblzma-dev libnuma-dev libperl-dev libpfm4-dev libreadline-dev \
         libslang2-dev libssl-dev libtool libtraceevent-dev libunwind-dev libzstd-dev \
-        libzstd1 llvm-13 pandoc pkgconf python-setuptools python2-dev python3 python3-dev \
+        libzstd1 llvm-14 pandoc pkgconf python-setuptools python2-dev python3 python3-dev \
         python3-pip systemtap-sdt-dev zlib1g-dev \
+        libbz2-dev libcapstone-dev libtracefs-dev \
         gcc-aarch64-linux-gnu g++-aarch64-linux-gnu binutils-aarch64-linux-gnu cpp-aarch64-linux-gnu && break; \
         echo "Retrying in 5 seconds... ($i/5)" && sleep 5; \
     done
-ENV PATH="${PATH}:/usr/lib/llvm-13/bin"
+
+# libdwfl will dlopen libdebuginfod at runtime, may cause segment fault in static build, disablt it. ref: https://github.com/vgteam/vg/pull/3600
+RUN wget https://sourceware.org/elfutils/ftp/0.190/elfutils-0.190.tar.bz2 && tar -xf elfutils-0.190.tar.bz2 && cd elfutils-0.190 && ./configure --disable-debuginfod --disable-libdebuginfod && make install -j
+ENV PATH="${PATH}:/usr/lib/llvm-14/bin"
 RUN mkdir workdir
 ADD . /workdir
 WORKDIR /workdir
