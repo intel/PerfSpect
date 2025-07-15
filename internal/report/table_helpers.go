@@ -453,10 +453,24 @@ func hyperthreadingFromOutput(outputs map[string]script.ScriptOutput) string {
 	sockets := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)
 	coresPerSocket := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)
 	cpus := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU\(.*:\s*(.+?)$`)
+	onlineCpus := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^On-line CPU\(s\) list:\s*(.+)$`)
+	threadsPerCore := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Thread\(s\) per core:\s*(.+)$`)
+
 	numCPUs, err := strconv.Atoi(cpus) // logical CPUs
 	if err != nil {
 		slog.Error("error parsing cpus from lscpu")
 		return ""
+	}
+	onlineCpusList, err := util.SelectiveIntRangeToIntList(onlineCpus) // logical online CPUs
+	numOnlineCpus := len(onlineCpusList)
+	if err != nil {
+		slog.Error("error parsing online cpus from lscpu")
+		numOnlineCpus = 0 // set to 0 to indicate parsing failed, will use numCPUs instead
+	}
+	numThreadsPerCore, err := strconv.Atoi(threadsPerCore) // logical threads per core
+	if err != nil {
+		slog.Error("error parsing threads per core from lscpu")
+		numThreadsPerCore = 0
 	}
 	numSockets, err := strconv.Atoi(sockets)
 	if err != nil {
@@ -472,9 +486,22 @@ func hyperthreadingFromOutput(outputs map[string]script.ScriptOutput) string {
 	if err != nil {
 		return ""
 	}
+	if numOnlineCpus > 0 && numOnlineCpus < numCPUs {
+		// if online CPUs list is available, use it to determine the number of CPUs
+		// supersedes lscpu output of numCPUs which counts CPUs on the system, not online CPUs
+		numCPUs = numOnlineCpus
+	}
 	if cpu.LogicalThreadCount < 2 {
 		return "N/A"
+	} else if numThreadsPerCore == 1 {
+		// if threads per core is 1, hyperthreading is disabled
+		return "Disabled"
+	} else if numThreadsPerCore >= 2 {
+		// if threads per core is greater than or equal to 2, hyperthreading is enabled
+		return "Enabled"
 	} else if numCPUs > numCoresPerSocket*numSockets {
+		// if the threads per core attribute is not available, we can still check if hyperthreading is enabled
+		// by checking if the number of logical CPUs is greater than the number of physical cores
 		return "Enabled"
 	} else {
 		return "Disabled"
