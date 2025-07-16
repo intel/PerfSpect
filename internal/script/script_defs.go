@@ -190,8 +190,8 @@ var scriptDefinitions = map[string]ScriptDefinition{
 	},
 	LspciVmmScriptName: {
 		Name:           LspciVmmScriptName,
-		ScriptTemplate: "lspci -vmm",
-		Depends:        []string{"lspci"},
+		ScriptTemplate: "lspci -i pci.ids.gz -vmm",
+		Depends:        []string{"lspci", "pci.ids.gz"},
 	},
 	UnameScriptName: {
 		Name:           UnameScriptName,
