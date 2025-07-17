@@ -1718,11 +1718,11 @@ func cxlTableValues(outputs map[string]script.ScriptOutput) []Field {
 	}
 	cxlDevices := getPCIDevices("CXL", outputs)
 	for _, cxlDevice := range cxlDevices {
-		for _, field := range fields {
+		for fieldIdx, field := range fields {
 			if value, ok := cxlDevice[field.Name]; ok {
-				field.Values = append(field.Values, value)
+				fields[fieldIdx].Values = append(fields[fieldIdx].Values, value)
 			} else {
-				field.Values = append(field.Values, "")
+				fields[fieldIdx].Values = append(fields[fieldIdx].Values, "")
 			}
 		}
 	}
