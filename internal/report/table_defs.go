@@ -1113,13 +1113,13 @@ func acceleratorTableInsights(outputs map[string]script.ScriptOutput, tableValue
 	for i, count := range tableValues.Fields[countFieldIndex].Values {
 		name := tableValues.Fields[nameFieldIndex].Values[i]
 		queues := tableValues.Fields[queuesFieldIndex].Values[i]
-		if name == "DSA" && count != "0" && queues != "None" {
+		if name == "DSA" && count != "0" && queues == "None" {
 			insights = append(insights, Insight{
 				Recommendation: "Consider configuring DSA to allow accelerated data copy and transformation in DSA-enabled software.",
 				Justification:  "No work queues are configured for DSA accelerator(s).",
 			})
 		}
-		if name == "IAA" && count != "0" && queues != "None" {
+		if name == "IAA" && count != "0" && queues == "None" {
 			insights = append(insights, Insight{
 				Recommendation: "Consider configuring IAA to allow accelerated compression and decompression in IAA-enabled software.",
 				Justification:  "No work queues are configured for IAA accelerator(s).",
