@@ -1,0 +1,947 @@
+{
+  "Header": {
+    "Copyright": "Copyright (c) 2001 - 2025 Intel Corporation. All rights reserved.",
+    "Info": "PerfSpect Performance Monitoring Metrics for Intel(R) Xeon(R) 6 Processor with P-cores (Granite Rapids)"
+  },
+  "PerfmonMetricsFile": "graniterapids_metrics.json",
+  "PerfmonCoreEventsFile": "graniterapids_core.json",
+  "PerfmonUncoreEventsFile": "graniterapids_uncore.json",
+  "PerfmonRetireLatencyFile": "graniterapids_retire_latency.json",
+  "ReportMetrics": [
+  {
+    "Name": "metric_CPU operating frequency (in GHz)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_CPU utilization %",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_CPU utilization % in kernel mode",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_CPI",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_cycles per txn",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_kernel_CPI",
+    "Origin": "perfspect" 
+  },
+  {
+    "Name": "metric_kernel_cycles per txn",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_IPC",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_giga_instructions_per_sec",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_branch misprediction ratio",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_locks retired per instr",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_locks retired per txn",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_L1D MPI (includes data+rfo w/ prefetches)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_L1D misses per txn (includes data+rfo w/ prefetches)",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_L1D demand data read hits per instr",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_L1D demand data read hits per txn",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_L1-I code read misses (w/ prefetches) per instr",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_L1I code read misses (includes prefetches) per txn",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_L2 demand data read hits per instr",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_L2 demand data read hits per txn",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_L2 MPI (includes code+data+rfo w/ prefetches)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_L2 misses per txn (includes code+data+rfo w/ prefetches)",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_L2 demand data read MPI",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_L2 demand data read misses per txn",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_L2 demand code MPI",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_L2 demand code misses per txn",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_LLC code read MPI (demand+prefetch)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_LLC code read (demand+prefetch) misses per txn",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_LLC data read MPI (demand+prefetch)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_LLC data read (demand+prefetch) misses per txn",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_Average LLC demand data read miss latency (in ns)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_Average LLC demand data read miss latency for LOCAL requests (in ns)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_Average LLC demand data read miss latency for REMOTE requests (in ns)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_UPI Data transmit BW (MB/sec) (only data)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_package power (watts)",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_DRAM power (watts)",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_core c6 residency %",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_package c6 residency %",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_% Uops delivered from decoded Icache (DSB)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_% Uops delivered from legacy decode pipeline (MITE)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_memory bandwidth read (MB/sec)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_memory bandwidth write (MB/sec)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_memory bandwidth total (MB/sec)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_ITLB (2nd level) MPI",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_ITLB (2nd level) misses per txn",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_DTLB (2nd level) load MPI",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_DTLB (2nd level) load misses per txn",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_DTLB (2nd level) store MPI",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_DTLB (2nd level) store misses per txn",
+    "Origin": "perfspect"
+  },
+  {
+    "Name": "metric_NUMA %_Reads addressed to local DRAM",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_NUMA %_Reads addressed to remote DRAM",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_uncore frequency GHz",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_IO_bandwidth_disk_or_network_writes (MB/sec)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_IO_bandwidth_disk_or_network_reads (MB/sec)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_Frontend_Bound(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_..Fetch_Latency(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....ICache_Misses(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....ITLB_Misses(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....Branch_Resteers(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....MS_Switches(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....LCP(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....DSB_Switches(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_..Fetch_Bandwidth(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....MITE(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....DSB(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....MS(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_Bad_Speculation(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_..Branch_Mispredicts(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....Cond_NT_Mispredicts(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....Cond_TK_Mispredicts(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....Ind_Call_Mispredicts(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....Ind_Jump_Mispredicts(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....Ret_Mispredicts(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....Other_Mispredicts(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_..Machine_Clears(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....Other_Nukes(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_Backend_Bound(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_..Memory_Bound(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....L1_Bound(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_......DTLB_Load(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_......Store_Fwd_Blk(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_......L1_Latency_Dependency(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_......Lock_Latency(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_......Split_Loads(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_......FB_Full(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....L2_Bound(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....L3_Bound(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_......Contested_Accesses(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_......Data_Sharing(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_......L3_Hit_Latency(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_......SQ_Full(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....DRAM_Bound(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_......MEM_Bandwidth(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_......MEM_Latency(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....Store_Bound(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_......Store_Latency(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_......False_Sharing(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_......Split_Stores(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_......Streaming_Stores(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_......DTLB_Store(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_..Core_Bound(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....Divider(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....Serializing_Operation(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....AMX_Busy(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....Ports_Utilization(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_Retiring(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_..Light_Operations(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....FP_Arith(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....Int_Operations(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....Memory_Operations(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....Fused_Instructions(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....Non_Fused_Branches(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....Other_Light_Ops(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_..Heavy_Operations(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....Few_Uops_Instructions(%)",
+    "Origin": "perfmon"
+  },
+  {
+    "Name": "metric_TMA_....Microcode_Sequencer(%)",
+    "Origin": "perfmon"
+  }
+],
+  "Metrics": [
+    {
+      "MetricName": "cpu_util_kernel",
+      "LegacyName": "metric_CPU utilization % in kernel mode",
+      "BriefDescription": "CPU utilization percentage in kernel mode",
+      "Events": [
+        {
+          "Name": "CPU_CLK_UNHALTED.THREAD_P:SUP",
+          "Alias": "a"
+        },
+        {
+          "Name": "TSC",
+          "Alias": "b"
+        }
+      ],
+      "Constants": [],
+      "Formula": "100 * (a / b)",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "cycles_per_txn",
+      "LegacyName": "metric_cycles per txn",
+      "BriefDescription": "Number of cycles per transaction",
+      "Events": [
+        {
+          "Name": "CPU_CLK_UNHALTED.THREAD",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }        
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "kernel_cpi",
+      "LegacyName": "metric_kernel_CPI",
+      "BriefDescription": "Kernel cycles per instruction",
+      "Events": [
+        {
+          "Name": "CPU_CLK_UNHALTED.THREAD_P:SUP",
+          "Alias": "a"
+        },
+        {
+          "Name": "INST_RETIRED.ANY",
+          "Alias": "b"
+        }
+      ],
+      "Constants": [],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "kernel_cycles_per_txn",
+      "LegacyName": "metric_kernel_cycles per txn",
+      "BriefDescription": "Number of kernel cycles per transaction",
+      "Events": [
+        {
+          "Name": "CPU_CLK_UNHALTED.THREAD_P:SUP",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }        
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "ipc",
+      "LegacyName": "metric_IPC",
+      "BriefDescription": "Instructions per cycle",
+      "Events": [
+        {
+          "Name": "INST_RETIRED.ANY",
+          "Alias": "a"
+        },
+        {
+          "Name": "CPU_CLK_UNHALTED.THREAD",
+          "Alias": "b"
+        }
+      ],
+      "Constants": [],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "giga_instructions_per_sec",
+      "LegacyName": "metric_giga_instructions_per_sec",
+      "BriefDescription": "Billions of instructions per second",
+      "Events": [
+        {
+          "Name": "INST_RETIRED.ANY",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+      ],
+      "Formula": "a / 1000000000",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "branch_misprediction_ratio",
+      "LegacyName": "metric_branch misprediction ratio",
+      "BriefDescription": "Ratio of branch mispredictions to the total number of branches retired.",
+      "Events": [
+        {
+          "Name": "BR_MISP_RETIRED.ALL_BRANCHES",
+          "Alias": "a"
+        },
+        {
+          "Name": "BR_INST_RETIRED.ALL_BRANCHES",
+          "Alias": "b"
+        }
+      ],
+      "Constants": [],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "locks_retired_per_instr",
+      "LegacyName": "metric_locks retired per instr",
+      "BriefDescription": "Locks retired per instruction",
+      "Events": [
+        {
+          "Name": "MEM_INST_RETIRED.LOCK_LOADS",
+          "Alias": "a"
+        },
+        {
+          "Name": "INST_RETIRED.ANY",
+          "Alias": "b"
+        }
+      ],
+      "Constants": [],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "locks_retired_per_txn",
+      "LegacyName": "metric_locks retired per txn",
+      "BriefDescription": "Locks retired per transaction",
+      "Events": [
+        {
+          "Name": "MEM_INST_RETIRED.LOCK_LOADS",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }        
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "l1d_misses_per_txn",
+      "LegacyName": "metric_L1D misses per txn (includes data+rfo w/ prefetches)",
+      "BriefDescription": "L1D misses per transaction (includes data+rfo with prefetches)",
+      "Events": [
+        {
+          "Name": "L1D.REPLACEMENT",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }        
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "l1d_demand_data_read_hits_per_txn",
+      "LegacyName": "metric_L1D demand data read hits per txn",
+      "BriefDescription": "L1D demand data read hits per transaction",
+      "Events": [
+        {
+          "Name": "MEM_LOAD_RETIRED.L1_HIT",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }        
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "l1i_code_read_misses_per_txn",
+      "LegacyName": "metric_L1I code read misses (includes prefetches) per txn",
+      "BriefDescription": "L1I code read misses (includes prefetches) per transaction",
+      "Events": [
+        {
+          "Name": "L2_RQSTS.ALL_CODE_RD",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }        
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "l2_demand_data_read_hits_per_txn",
+      "LegacyName": "metric_L2 demand data read hits per txn",
+      "BriefDescription": "L2 demand data read hits per transaction",
+      "Events": [
+        {
+          "Name": "MEM_LOAD_RETIRED.L2_HIT",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }        
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "l2_misses_per_txn",
+      "LegacyName": "metric_L2 misses per txn (includes code+data+rfo w/ prefetches)",
+      "BriefDescription": "L2 misses per transaction (includes code+data+rfo with prefetches)",
+      "Events": [
+        {
+          "Name": "L2_LINES_IN.ALL",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }        
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "l2_demand_data_read_misses_per_txn",
+      "LegacyName": "metric_L2 demand data read misses per txn",
+      "BriefDescription": "L2 demand data read misses per transaction",
+      "Events": [
+        {
+          "Name": "MEM_LOAD_RETIRED.L2_MISS",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }        
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "l2_demand_code_misses_per_txn",
+      "LegacyName": "metric_L2 demand code misses per txn",
+      "BriefDescription": "L2 demand code misses per transaction",
+      "Events": [
+        {
+          "Name": "L2_RQSTS.CODE_RD_MISS",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }        
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "llc_code_read_misses_per_txn",
+      "LegacyName": "metric_LLC code read (demand+prefetch) misses per txn",
+      "BriefDescription": "LLC code read (demand+prefetch) misses per transaction",
+      "Events": [
+        {
+          "Name": "UNC_CHA_TOR_INSERTS.IA_MISS_CRD",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }        
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "llc_data_read_misses_per_txn",
+      "LegacyName": "metric_LLC data read (demand+prefetch) misses per txn",
+      "BriefDescription": "LLC data read (demand+prefetch) misses per transaction",
+      "Events": [
+        {
+          "Name": "UNC_CHA_TOR_INSERTS.IA_MISS_LLCPREFDATA",
+          "Alias": "a"
+        },
+        {
+          "Name": "UNC_CHA_TOR_INSERTS.IA_MISS_DRD",
+          "Alias": "b"
+        },
+        {
+          "Name": "UNC_CHA_TOR_INSERTS.IA_MISS_DRD_PREF",
+          "Alias": "c"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "d"
+        }        
+      ],
+      "Formula": "(a + b + c) / d",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "package_power",
+      "LegacyName": "metric_package power (watts)",
+      "BriefDescription": "Package power consumption in watts",
+      "Events": [
+        {
+          "Name": "power/energy-pkg/",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+      ],
+      "Formula": "a",
+      "ResolutionLevels": "SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "dram_power",
+      "LegacyName": "metric_DRAM power (watts)",
+      "BriefDescription": "DRAM power consumption in watts",
+      "Events": [
+        {
+          "Name": "power/energy-ram/",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+      ],
+      "Formula": "a",
+      "ResolutionLevels": "SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "core_c6_residency",
+      "LegacyName": "metric_core c6 residency %",
+      "BriefDescription": "Core C6 state residency percentage",
+      "Events": [
+        {
+          "Name": "cstate_core/c6-residency/",
+          "Alias": "a"
+        },
+        {
+          "Name": "TSC",
+          "Alias": "b"
+        }      
+      ],
+      "Constants": [],
+      "Formula": "100 * a / b",
+      "ResolutionLevels": "CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "package_c6_residency",
+      "LegacyName": "metric_package c6 residency %",
+      "BriefDescription": "Package C6 state residency percentage",
+      "Events": [
+        {
+          "Name": "cstate_pkg/c6-residency/",
+          "Alias": "a"
+        },
+        {
+          "Name": "TSC",
+          "Alias": "b"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "CORES_PER_SOCKET",
+          "Alias": "c"
+        }
+      ],
+      "Formula": "100 * a * c / b",
+      "ResolutionLevels": "SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "itlb_misses_per_txn",
+      "LegacyName": "metric_ITLB (2nd level) misses per txn",
+      "BriefDescription": "ITLB (2nd level) misses per transaction",
+      "Events": [
+        {
+          "Name": "ITLB_MISSES.WALK_COMPLETED",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }        
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "dtlb_load_misses_per_txn",
+      "LegacyName": "metric_DTLB (2nd level) load misses per txn",
+      "BriefDescription": "DTLB (2nd level) load misses per transaction",
+      "Events": [
+        {
+          "Name": "DTLB_LOAD_MISSES.WALK_COMPLETED",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }        
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "dtlb_store_misses_per_txn",
+      "LegacyName": "metric_DTLB (2nd level) store misses per txn",
+      "BriefDescription": "DTLB (2nd level) store misses per transaction",
+      "Events": [
+        {
+          "Name": "DTLB_STORE_MISSES.WALK_COMPLETED",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }        
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    }
+  ]
+}

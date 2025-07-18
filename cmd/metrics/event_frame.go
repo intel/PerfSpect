@@ -118,10 +118,15 @@ func parseEvents(rawEvents [][]byte, eventGroupDefinitions []GroupDefinition) ([
 	previousEvent := ""
 	var eventsNotCounted []string
 	var eventsNotSupported []string
-	for _, rawEvent := range rawEvents {
+	for i, rawEvent := range rawEvents {
 		event, err := parseEventJSON(rawEvent) // nosemgrep
 		if err != nil {
-			slog.Error(err.Error(), slog.String("event", string(rawEvent)))
+			// if error log the current line and up to 5 more lines
+			out := string(rawEvent)
+			for j := i + 1; j < len(rawEvents) && j < i+5; j++ {
+				out += "\n" + string(rawEvents[j])
+			}
+			slog.Error(err.Error(), slog.String("perf output", out))
 			return nil, err
 		}
 		switch event.CounterValue {
