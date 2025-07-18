@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"perfspect/internal/util"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -152,44 +153,101 @@ func (l *DynamicLoader) Load(metricConfigOverridePath string, _ string, selected
 		allGroups = append(allGroups, group.ToGroupDefinition())
 	}
 
-	return metrics, allGroups, nil
+	var uncollectableEvents []string
+	configuredMetricDefinitions, err := configureMetrics(metrics, uncollectableEvents, GetEvaluatorFunctions(), metadata)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to configure metrics: %w", err)
+	}
+	return configuredMetricDefinitions, allGroups, nil
+}
+
+// getExpression retrieves the expression for a given PerfmonMetric, replacing variables with their corresponding event or constant names.
+// example formula: "( 1000000000 * (a / b) / (c / (d * socket_count) ) ) * DURATIONTIMEINSECONDS"
+// desired output: "( 1000000000 * ([event1] / [event2]) / ([constant1] / ([constant2] * socket_count) ) ) * 1"
+func getExpression(perfmonMetric PerfmonMetric) (string, error) {
+	expression := perfmonMetric.Formula
+	replacers := make(map[string]string)
+	for _, event := range perfmonMetric.Events {
+		replacers[event["Alias"]] = fmt.Sprintf("[%s]", event["Name"])
+	}
+	for _, constant := range perfmonMetric.Constants {
+		replacers[constant["Alias"]] = fmt.Sprintf("[%s]", constant["Name"])
+	}
+	for alias, replacement := range replacers {
+		// regex to match alias as a whole word
+		// this prevents replacing substrings that are part of other words
+		re, err := regexp.Compile(fmt.Sprintf(`\b%s\b`, alias))
+		if err != nil {
+			return "", fmt.Errorf("failed to compile regex for alias %s: %w", alias, err)
+		}
+		for {
+			index := re.FindStringIndex(expression)
+			if index == nil {
+				break // no more matches found
+			}
+			// replace the first occurrence of the alias with the replacement
+			expression = expression[:index[0]] + replacement + expression[index[1]:]
+		}
+	}
+	// replace common constants with their values
+	commonEventReplacements := map[string]string{
+		"DURATIONTIMEINSECONDS":        "1",
+		"[DURATIONTIMEINMILLISECONDS]": "1000",
+	}
+	for commonEvent, alias := range commonEventReplacements {
+		expression = strings.ReplaceAll(expression, commonEvent, alias)
+	}
+	// replace fixed counter event names with their corresponding aliases
+	for fixedCounterEvent, alias := range fixedCounterEventNameTranslation {
+		expression = strings.ReplaceAll(expression, fixedCounterEvent, alias)
+	}
+
+	return expression, nil
 }
 
 func loadMetricsFromDefinitions(perfmonMetrics PerfmonMetrics, metricsConfig MetricsConfig) ([]MetricDefinition, error) {
 	var metrics []MetricDefinition
 	for _, includedMetric := range metricsConfig.ReportMetrics {
+		var perfmonMetric *PerfmonMetric
+		var found bool
+
 		switch strings.ToLower(includedMetric.Origin) {
 		case "perfmon":
-			for _, perfmonMetric := range perfmonMetrics.Metrics {
-				if perfmonMetric.LegacyName == includedMetric.Name {
-					metric := MetricDefinition{
-						Name:        includedMetric.Name,
-						Description: perfmonMetric.BriefDescription,
-						Expression:  perfmonMetric.Formula,
-					}
-					metrics = append(metrics, metric)
-					break
-				}
-			}
+			perfmonMetric, found = findPerfmonMetric(perfmonMetrics.Metrics, includedMetric.Name)
 		case "perfspect":
-			for _, perfspectMetric := range metricsConfig.Metrics {
-				if perfspectMetric.LegacyName == includedMetric.Name {
-					metric := MetricDefinition{
-						Name:        includedMetric.Name,
-						Description: perfspectMetric.BriefDescription,
-						Expression:  perfspectMetric.Formula,
-					}
-					metrics = append(metrics, metric)
-					break
-				}
-			}
+			perfmonMetric, found = findPerfmonMetric(metricsConfig.Metrics, includedMetric.Name)
 		default:
 			return nil, fmt.Errorf("unknown metric origin: %s for metric: %s", includedMetric.Origin, includedMetric.Name)
 		}
+
+		if !found {
+			return nil, fmt.Errorf("metric %s not found in %s metrics", includedMetric.Name, includedMetric.Origin)
+		}
+
+		expression, err := getExpression(*perfmonMetric)
+		if err != nil {
+			return nil, fmt.Errorf("error getting expression for metric %s: %w", perfmonMetric.MetricName, err)
+		}
+
+		metric := MetricDefinition{
+			Name:        includedMetric.Name,
+			Description: perfmonMetric.BriefDescription,
+			Expression:  expression,
+		}
+		metrics = append(metrics, metric)
 	}
 	return metrics, nil
 }
 
+// Helper function to find a metric by legacy name
+func findPerfmonMetric(metricsList []PerfmonMetric, targetName string) (*PerfmonMetric, bool) {
+	for _, metric := range metricsList {
+		if metric.LegacyName == targetName {
+			return &metric, true
+		}
+	}
+	return nil, false
+}
 func loadEventGroupsFromMetrics(includedMetrics []PerfspectMetric, perfmonMetrics PerfmonMetrics, config MetricsConfig, coreEvents CoreEvents, uncoreEvents UncoreEvents, metadata Metadata) ([]CoreGroup, []UncoreGroup, []OtherGroup, error) {
 	coreGroups := make([]CoreGroup, 0)
 	uncoreGroups := make([]UncoreGroup, 0)
