@@ -13,10 +13,11 @@ type Variable struct {
 }
 
 type MetricDefinition struct {
-	Name       string                         `json:"name"`
-	Expression string                         `json:"expression"`
-	Variables  map[string]int                 // parsed from Expression for efficiency, int represents group index
-	Evaluable  *govaluate.EvaluableExpression // parse expression once, store here for use in metric evaluation
+	Name        string                         `json:"name"`
+	Expression  string                         `json:"expression"`
+	Description string                         `json:"description"`
+	Variables   map[string]int                 // parsed from Expression for efficiency, int represents group index
+	Evaluable   *govaluate.EvaluableExpression // parse expression once, store here for use in metric evaluation
 }
 
 // EventDefinition represents a single perf event
@@ -47,7 +48,7 @@ type DynamicLoader struct {
 
 func NewLoader(uarch string) (Loader, error) {
 	switch strings.ToLower(uarch) {
-	case "srf", "emr", "spr", "icx", "clx", "skx", "bdx", "bergamo", "genoa", "turin":
+	case "gnrxxx", "srf", "emr", "spr", "icx", "clx", "skx", "bdx", "bergamo", "genoa", "turin":
 		return newStaticLoader(strings.ToLower(uarch)), nil
 	case "gnr":
 		return newDynamicLoader(strings.ToLower(uarch)), nil
