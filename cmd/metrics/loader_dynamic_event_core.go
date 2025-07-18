@@ -24,8 +24,8 @@ type CoreEvent struct {
 	CounterMask        string `json:"CounterMask"`
 	Invert             string `json:"Invert"`
 	EdgeDetect         string `json:"EdgeDetect"`
-	Data_LA            string `json:"Data_LA"`
-	L1_Hit_Indication  string `json:"L1_Hit_Indication"`
+	DataLA             string `json:"Data_LA"`
+	L1HitIndication    string `json:"L1_Hit_Indication"`
 	Errata             string `json:"Errata"`
 	Offcore            string `json:"Offcore"`
 	Deprecated         string `json:"Deprecated"`
@@ -82,26 +82,28 @@ func (events CoreEvents) FindEventByName(eventName string) CoreEvent {
 	return CoreEvent{}
 }
 
+// perfmon event name to perf event name
+var fixedCounterEventNameTranslation = map[string]string{
+	"INST_RETIRED.ANY":                "instructions",
+	"INST_RETIRED.ANY_P:SUP":          "instructions:k",
+	"CPU_CLK_UNHALTED.THREAD":         "cpu-cycles",
+	"CPU_CLK_UNHALTED.THREAD_P:SUP":   "cpu-cycles:k",
+	"CPU_CLK_UNHALTED.REF_TSC":        "ref-cycles",
+	"CPU_CLK_UNHALTED.REF_TSC_P:SUP":  "ref-cycles:k",
+	"TOPDOWN.SLOTS:perf_metrics":      "topdown.slots",
+	"PERF_METRICS.BAD_SPECULATION":    "topdown-bad-spec",
+	"PERF_METRICS.BACKEND_BOUND":      "topdown-be-bound",
+	"PERF_METRICS.BRANCH_MISPREDICTS": "topdown-br-mispredict",
+	"PERF_METRICS.FRONTEND_BOUND":     "topdown-fe-bound",
+	"PERF_METRICS.FETCH_LATENCY":      "topdown-fetch-lat",
+	"PERF_METRICS.HEAVY_OPERATIONS":   "topdown-heavy-ops",
+	"PERF_METRICS.MEMORY_BOUND":       "topdown-mem-bound",
+	"PERF_METRICS.RETIRING":           "topdown-retiring",
+}
+
 func (event CoreEvent) StringForPerf() (string, error) {
 	if event == (CoreEvent{}) {
 		return "", fmt.Errorf("event is not initialized")
-	}
-	fixedCounterEventNameTranslation := map[string]string{
-		"INST_RETIRED.ANY":                "instructions",
-		"INST_RETIRED.ANY_P:SUP":          "instructions:k",
-		"CPU_CLK_UNHALTED.THREAD":         "cpu-cycles",
-		"CPU_CLK_UNHALTED.THREAD_P:SUP":   "cpu-cycles:k",
-		"CPU_CLK_UNHALTED.REF_TSC":        "ref-cycles",
-		"CPU_CLK_UNHALTED.REF_TSC_P:SUP":  "ref-cycles:k",
-		"TOPDOWN.SLOTS:perf_metrics":      "topdown.slots",
-		"PERF_METRICS.BAD_SPECULATION":    "topdown-bad-spec",
-		"PERF_METRICS.BACKEND_BOUND":      "topdown-be-bound",
-		"PERF_METRICS.BRANCH_MISPREDICTS": "topdown-br-mispredict",
-		"PERF_METRICS.FRONTEND_BOUND":     "topdown-fe-bound",
-		"PERF_METRICS.FETCH_LATENCY":      "topdown-fetch-lat",
-		"PERF_METRICS.HEAVY_OPERATIONS":   "topdown-heavy-ops",
-		"PERF_METRICS.MEMORY_BOUND":       "topdown-mem-bound",
-		"PERF_METRICS.RETIRING":           "topdown-retiring",
 	}
 	if translatedName, ok := fixedCounterEventNameTranslation[event.EventName]; ok {
 		return translatedName, nil
