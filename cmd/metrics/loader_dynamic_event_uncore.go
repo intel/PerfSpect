@@ -22,7 +22,7 @@ type UncoreEvent struct {
 	Filter            string `json:"Filter"`
 	ExtSel            string `json:"ExtSel"`
 	Deprecated        string `json:"Deprecated"`
-	FILTER_VALUE      string `json:"FILTER_VALUE"`
+	FilterValue       string `json:"FILTER_VALUE"`
 	CounterType       string `json:"CounterType"`
 	UniqueID          string // This field is not in the JSON. We set it to a unique value after unmarshaling.
 }
