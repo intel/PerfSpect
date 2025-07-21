@@ -202,11 +202,23 @@ func getExpression(perfmonMetric PerfmonMetric) (string, error) {
 	for commonEvent, alias := range commonEventReplacements {
 		expression = strings.ReplaceAll(expression, commonEvent, alias)
 	}
-	// replace fixed counter event names with their corresponding aliases
-	for fixedCounterEvent, alias := range fixedCounterEventNameTranslation {
-		expression = strings.ReplaceAll(expression, fixedCounterEvent, alias)
+	// replace fixed counter perfmon event names with their corresponding perf event names
+	for perfmonEventName, perfEventName := range fixedCounterEventNameTranslation {
+		// regex to match event name as a whole word
+		// this prevents replacing substrings that are part of other words
+		re, err := regexp.Compile(fmt.Sprintf(`\b%s\b`, perfmonEventName))
+		if err != nil {
+			return "", fmt.Errorf("failed to compile regex for perfmonEventName %s: %w", perfmonEventName, err)
+		}
+		for {
+			index := re.FindStringIndex(expression)
+			if index == nil {
+				break // no more matches found
+			}
+			// replace the first occurrence of the alias with the replacement
+			expression = expression[:index[0]] + perfEventName + expression[index[1]:]
+		}
 	}
-
 	return expression, nil
 }
 
