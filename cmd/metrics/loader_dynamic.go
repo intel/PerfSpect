@@ -169,7 +169,20 @@ func (l *DynamicLoader) Load(metricConfigOverridePath string, _ string, selected
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to configure metrics: %w", err)
 	}
+
+	metrics, err = removeMetricsPrefix(metrics)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to remove metrics prefix: %w", err)
+	}
 	return metrics, allGroups, nil
+}
+
+func removeMetricsPrefix(metrics []MetricDefinition) ([]MetricDefinition, error) {
+	for i := range metrics {
+		metric := &metrics[i]
+		metric.Name = strings.TrimPrefix(metric.Name, "metric_")
+	}
+	return metrics, nil
 }
 
 func abbreviateUncoreEventNames(metrics []MetricDefinition, uncoreEvents UncoreEvents) ([]MetricDefinition, error) {
