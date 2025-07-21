@@ -44,7 +44,7 @@ func NewUncoreEvents(path string) (UncoreEvents, error) {
 	for i := range events.Events {
 		// Set the UniqueID for each event. We use this when generating perf strings
 		// instead of the EventName to reduce the length of the perf command line.
-		events.Events[i].UniqueID = fmt.Sprintf("uce_%03d", i)
+		events.Events[i].UniqueID = fmt.Sprintf("UNC_%03d", i)
 	}
 	return events, nil
 }
