@@ -63,6 +63,24 @@ func (events UncoreEvents) FindEventByName(eventName string) UncoreEvent {
 	return UncoreEvent{}
 }
 
+func (event UncoreEvent) IsCollectable(metadata Metadata) bool {
+	if !metadata.SupportsUncore {
+		return false // uncore events are not supported
+	}
+	deviceExists := false
+	for uncoreDeviceName := range metadata.UncoreDeviceIDs {
+		if strings.EqualFold(strings.Split(event.Unit, " ")[0], uncoreDeviceName) {
+			deviceExists = true
+			break
+		}
+	}
+	if !deviceExists {
+		fmt.Printf("Warning: Uncore event %s has unit %s, but no such uncore device found in target capabilities\n", event.EventName, event.Unit)
+		return false // uncore device not found
+	}
+	return true
+}
+
 func (event UncoreEvent) StringForPerf() (string, error) {
 	if event == (UncoreEvent{}) {
 		return "", fmt.Errorf("event is not initialized")

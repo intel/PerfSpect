@@ -47,8 +47,9 @@ type MetricsConfigHeader struct {
 	Info      string `json:"Info"`
 }
 type PerfspectMetric struct {
-	Name   string `json:"Name"`
-	Origin string `json:"Origin"`
+	MetricName string `json:"MetricName"`
+	LegacyName string `json:"LegacyName"`
+	Origin     string `json:"Origin"`
 }
 type MetricsConfig struct {
 	Header                   MetricsConfigHeader `json:"Header"`
@@ -107,13 +108,18 @@ func (l *DynamicLoader) Load(metricConfigOverridePath string, _ string, selected
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading perfmon uncore events: %w", err)
 	}
+	otherEvents, err := NewOtherEvents()
+	if err != nil {
+		return nil, nil, fmt.Errorf("error loading other events: %w", err)
+	}
 	// Create event groups from the perfspect metrics
-	coreGroups, uncoreGroups, otherGroups, err := loadEventGroupsFromMetrics(
+	coreGroups, uncoreGroups, otherGroups, uncollectableEvents, err := loadEventGroupsFromMetrics(
 		config.ReportMetrics,
 		perfmonMetricDefinitions,
 		config,
 		coreEvents,
 		uncoreEvents,
+		otherEvents,
 		metadata,
 	)
 	if err != nil {
@@ -153,8 +159,7 @@ func (l *DynamicLoader) Load(metricConfigOverridePath string, _ string, selected
 		allGroups = append(allGroups, group.ToGroupDefinition())
 	}
 
-	var uncollectableEvents []string
-	configuredMetricDefinitions, err := configureMetrics(metrics, uncollectableEvents, GetEvaluatorFunctions(), metadata)
+	configuredMetricDefinitions, err := configureMetrics(metrics, uncollectableEvents, metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to configure metrics: %w", err)
 	}
@@ -213,15 +218,15 @@ func loadMetricsFromDefinitions(perfmonMetrics PerfmonMetrics, metricsConfig Met
 
 		switch strings.ToLower(includedMetric.Origin) {
 		case "perfmon":
-			perfmonMetric, found = findPerfmonMetric(perfmonMetrics.Metrics, includedMetric.Name)
+			perfmonMetric, found = findPerfmonMetric(perfmonMetrics.Metrics, includedMetric.MetricName)
 		case "perfspect":
-			perfmonMetric, found = findPerfmonMetric(metricsConfig.Metrics, includedMetric.Name)
+			perfmonMetric, found = findPerfmonMetric(metricsConfig.Metrics, includedMetric.MetricName)
 		default:
-			return nil, fmt.Errorf("unknown metric origin: %s for metric: %s", includedMetric.Origin, includedMetric.Name)
+			return nil, fmt.Errorf("unknown metric origin: %s for metric: %s", includedMetric.Origin, includedMetric.MetricName)
 		}
 
 		if !found {
-			return nil, fmt.Errorf("metric %s not found in %s metrics", includedMetric.Name, includedMetric.Origin)
+			return nil, fmt.Errorf("metric %s not found in %s metrics", includedMetric.MetricName, includedMetric.Origin)
 		}
 
 		expression, err := getExpression(*perfmonMetric)
@@ -230,7 +235,7 @@ func loadMetricsFromDefinitions(perfmonMetrics PerfmonMetrics, metricsConfig Met
 		}
 
 		metric := MetricDefinition{
-			Name:        includedMetric.Name,
+			Name:        includedMetric.MetricName,
 			Description: perfmonMetric.BriefDescription,
 			Expression:  expression,
 		}
@@ -239,74 +244,89 @@ func loadMetricsFromDefinitions(perfmonMetrics PerfmonMetrics, metricsConfig Met
 	return metrics, nil
 }
 
-// Helper function to find a metric by legacy name
-func findPerfmonMetric(metricsList []PerfmonMetric, targetName string) (*PerfmonMetric, bool) {
-	for _, metric := range metricsList {
-		if metric.LegacyName == targetName {
-			return &metric, true
-		}
-	}
-	return nil, false
-}
-func loadEventGroupsFromMetrics(includedMetrics []PerfspectMetric, perfmonMetrics PerfmonMetrics, config MetricsConfig, coreEvents CoreEvents, uncoreEvents UncoreEvents, metadata Metadata) ([]CoreGroup, []UncoreGroup, []OtherGroup, error) {
+// loadEventGroupsFromMetrics
+func loadEventGroupsFromMetrics(includedMetrics []PerfspectMetric, perfmonMetrics PerfmonMetrics, metricsConfig MetricsConfig, coreEvents CoreEvents, uncoreEvents UncoreEvents, otherEvents OtherEvents, metadata Metadata) ([]CoreGroup, []UncoreGroup, []OtherGroup, []string, error) {
 	coreGroups := make([]CoreGroup, 0)
 	uncoreGroups := make([]UncoreGroup, 0)
 	otherGroups := make([]OtherGroup, 0)
-	for _, perfspectMetric := range includedMetrics {
+	uncollectableEvents := make([]string, 0)
+
+	for _, includedMetric := range includedMetrics {
 		var metricEventNames []string
-		if perfspectMetric.Origin == "perfmon" {
-			// find this metric name in the perfmon metrics
-			var perfmonMetric *PerfmonMetric
-			found := false
-			for _, metric := range perfmonMetrics.Metrics {
-				if metric.LegacyName == perfspectMetric.Name {
-					perfmonMetric = &metric
-					found = true
-					break
-				}
-			}
-			if !found {
-				return nil, nil, nil, fmt.Errorf("metric %s not found in perfmon metrics", perfspectMetric.Name)
-			}
-			for _, event := range perfmonMetric.Events {
-				metricEventNames = append(metricEventNames, event["Name"])
-			}
-		} else if perfspectMetric.Origin == "perfspect" {
-			// find the metric name in the perfspect metrics
-			var perfmonMetric *PerfmonMetric
-			found := false
-			for _, metric := range config.Metrics {
-				if metric.LegacyName == perfspectMetric.Name {
-					perfmonMetric = &metric
-					found = true
-					break
-				}
-			}
-			if !found {
-				return nil, nil, nil, fmt.Errorf("metric %s not found in perfspect metrics", perfspectMetric.Name)
-			}
-			for _, event := range perfmonMetric.Events {
-				metricEventNames = append(metricEventNames, event["Name"])
-			}
-		} else {
-			return nil, nil, nil, fmt.Errorf("unknown origin for metric %s: %s", perfspectMetric.Name, perfspectMetric.Origin)
+		var perfmonMetric *PerfmonMetric
+		var found bool
+
+		switch strings.ToLower(includedMetric.Origin) {
+		case "perfmon":
+			perfmonMetric, found = findPerfmonMetric(perfmonMetrics.Metrics, includedMetric.MetricName)
+		case "perfspect":
+			perfmonMetric, found = findPerfmonMetric(metricsConfig.Metrics, includedMetric.MetricName)
+		default:
+			return nil, nil, nil, nil, fmt.Errorf("unknown metric origin: %s for metric: %s", includedMetric.Origin, includedMetric.MetricName)
+		}
+		if !found {
+			return nil, nil, nil, nil, fmt.Errorf("metric %s not found in %s metrics", includedMetric.MetricName, includedMetric.Origin)
+		}
+		for _, event := range perfmonMetric.Events {
+			metricEventNames = append(metricEventNames, event["Name"])
+		}
+		uncollectableMetricEvents := getUncollectableEvents(metricEventNames, coreEvents, uncoreEvents, otherEvents, metadata)
+		if len(uncollectableMetricEvents) > 0 {
+			fmt.Printf("Warning: Metric %s contains uncollectable events: %v\n", includedMetric.MetricName, uncollectableMetricEvents)
+			uncollectableEvents = append(uncollectableEvents, uncollectableMetricEvents...)
+			// don't create groups for this metric
+			continue
 		}
 		metricCoreGroups, metricUncoreGroups, metricOtherGroups, err := groupsFromEventNames(
-			perfspectMetric.Name,
+			includedMetric.MetricName,
 			metricEventNames,
 			coreEvents,
 			uncoreEvents,
+			otherEvents,
 			metadata,
 		)
 		if err != nil {
-			fmt.Printf("Error grouping events for metric %s: %v\n", perfspectMetric.Name, err)
+			fmt.Printf("Error grouping events for metric %s: %v\n", includedMetric.MetricName, err)
 			continue
 		}
+		// Add the groups to the main lists
 		coreGroups = append(coreGroups, metricCoreGroups...)
 		uncoreGroups = append(uncoreGroups, metricUncoreGroups...)
 		otherGroups = append(otherGroups, metricOtherGroups...)
 	}
-	return coreGroups, uncoreGroups, otherGroups, nil
+	return coreGroups, uncoreGroups, otherGroups, uncollectableEvents, nil
+}
+
+func getUncollectableEvents(eventNames []string, coreEvents CoreEvents, uncoreEvents UncoreEvents, otherEvents OtherEvents, metadata Metadata) []string {
+	uncollectableEvents := make([]string, 0)
+	for _, eventName := range eventNames {
+		coreEvent := coreEvents.FindEventByName(eventName)
+		if coreEvent != (CoreEvent{}) {
+			if !coreEvent.IsCollectable(metadata) {
+				uncollectableEvents = util.UniqueAppend(uncollectableEvents, coreEvent.EventName)
+			}
+			continue
+		}
+		uncoreEvent := uncoreEvents.FindEventByName(eventName)
+		if uncoreEvent != (UncoreEvent{}) {
+			if !uncoreEvent.IsCollectable(metadata) {
+				uncollectableEvents = util.UniqueAppend(uncollectableEvents, uncoreEvent.EventName)
+			}
+			continue
+		}
+		otherEvent := otherEvents.FindEventByName(eventName)
+		if otherEvent != (OtherEvent{}) {
+			if !otherEvent.IsCollectable(metadata) {
+				uncollectableEvents = util.UniqueAppend(uncollectableEvents, otherEvent.EventName)
+			}
+			continue
+		}
+		if !slices.Contains(constants, eventName) { // ignore constants, they'll be handled separately
+			fmt.Printf("Warning: Event %s not found in core or uncore events\n", eventName)
+			uncollectableEvents = util.UniqueAppend(uncollectableEvents, eventName) // if the event is not found in either core or uncore events, we consider it uncollectable
+		}
+	}
+	return uncollectableEvents
 }
 
 func eliminateDuplicateGroups(coreGroups []CoreGroup, uncoreGroups []UncoreGroup) ([]CoreGroup, []UncoreGroup, error) {
@@ -333,55 +353,11 @@ func mergeGroups(coreGroups []CoreGroup, uncoreGroups []UncoreGroup) ([]CoreGrou
 	return coreGroups, uncoreGroups, nil
 }
 
-func (md Metadata) isCollectableCoreEvent(event CoreEvent) bool {
-	if !md.SupportsFixedTMA && (strings.HasPrefix(event.EventName, "TOPDOWN.SLOTS") || strings.HasPrefix(event.EventName, "PERF_METRICS")) {
-		return false // TOPDOWN.SLOTS and PERF_METRICS.* events are not supported
-	}
-	pebsEventNames := []string{"INT_MISC.UNKNOWN_BRANCH_CYCLES", "UOPS_RETIRED.MS"}
-	if !md.SupportsPEBS {
-		for _, pebsEventName := range pebsEventNames {
-			if strings.Contains(event.EventName, pebsEventName) {
-				return false // PEBS events are not supported
-			}
-		}
-	}
-	if !md.SupportsOCR && (strings.HasPrefix(event.EventName, "OCR") || strings.HasPrefix(event.EventName, "OFFCORE_REQUESTS_OUTSTANDING")) {
-		return false // OCR events are not supported
-	}
-	if !md.SupportsRefCycles && strings.Contains(event.EventName, "ref-cycles") {
-		return false // ref-cycles events are not supported
-	}
-	return true
-}
-
-func (md Metadata) isCollectableUncoreEvent(event UncoreEvent) bool {
-	if !md.SupportsUncore {
-		return false // uncore events are not supported
-	}
-	deviceExists := false
-	for uncoreDeviceName := range md.UncoreDeviceIDs {
-		if strings.EqualFold(strings.Split(event.Unit, " ")[0], uncoreDeviceName) {
-			deviceExists = true
-			break
-		}
-	}
-	if !deviceExists {
-		fmt.Printf("Warning: Uncore event %s has unit %s, but no such uncore device found in target capabilities\n", event.EventName, event.Unit)
-		return false // uncore device not found
-	}
-	return true
-}
-
-func (md Metadata) isSupportedPerfEvent(eventName string) bool {
-	// Check if the event name is in the list of supported perf event names
-	return strings.Contains(md.PerfSupportedEvents, eventName)
-}
-
 var constants []string = []string{
 	"TSC",
 }
 
-func groupsFromEventNames(metricName string, eventNames []string, coreEvents CoreEvents, uncoreEvents UncoreEvents, metadata Metadata) ([]CoreGroup, []UncoreGroup, []OtherGroup, error) {
+func groupsFromEventNames(metricName string, eventNames []string, coreEvents CoreEvents, uncoreEvents UncoreEvents, otherEvents OtherEvents, metadata Metadata) ([]CoreGroup, []UncoreGroup, []OtherGroup, error) {
 	var coreGroups []CoreGroup
 	var uncoreGroups []UncoreGroup
 	var otherGroups []OtherGroup
@@ -398,7 +374,7 @@ func groupsFromEventNames(metricName string, eventNames []string, coreEvents Cor
 		}
 		coreEvent := coreEvents.FindEventByName(eventName)
 		if coreEvent != (CoreEvent{}) { // this is a core event
-			if !metadata.isCollectableCoreEvent(coreEvent) {
+			if !coreEvent.IsCollectable(metadata) {
 				return nil, nil, nil, fmt.Errorf("core event %s is not collectable on target", eventName)
 			}
 			// if the event has been customized with :c<val>, :e<val>, or both, we create a new event with
@@ -421,7 +397,7 @@ func groupsFromEventNames(metricName string, eventNames []string, coreEvents Cor
 		} else {
 			uncoreEvent := uncoreEvents.FindEventByName(eventName)
 			if uncoreEvent != (UncoreEvent{}) { // this is an uncore event
-				if !metadata.isCollectableUncoreEvent(uncoreEvent) {
+				if !uncoreEvent.IsCollectable(metadata) {
 					return nil, nil, nil, fmt.Errorf("uncore event %s is not collectable on target", eventName)
 				}
 				uncoreGroup.MetricNames = util.UniqueAppend(uncoreGroup.MetricNames, metricName)
@@ -436,28 +412,18 @@ func groupsFromEventNames(metricName string, eventNames []string, coreEvents Cor
 					}
 				}
 			} else {
-				// not a core event or uncore event
-				// TODO: load these from file
-				uncategorizedEvents := []string{
-					"power/energy-pkg/",
-					"power/energy-ram/",
-					"cstate_core/c6-residency/",
-					"cstate_pkg/c6-residency/",
-				}
-				if metadata.isSupportedPerfEvent(eventName) {
-					for _, uncategorizedEvent := range uncategorizedEvents {
-						if strings.Contains(eventName, uncategorizedEvent) {
-							// add a group for this uncategorized event
-							otherGroup := NewOtherGroup(metadata.NumGeneralPurposeCounters)
-							otherGroup.MetricNames = util.UniqueAppend(otherGroup.MetricNames, metricName)
-							err := otherGroup.AddEvent(OtherEvent{EventName: uncategorizedEvent}, false)
-							if err != nil {
-								fmt.Printf("Failed to add other event %s to group for metric %s: %v\n", uncategorizedEvent, metricName, err)
-							} else {
-								otherGroups = append(otherGroups, otherGroup)
-							}
-
-						}
+				otherEvent := otherEvents.FindEventByName(eventName)
+				if otherEvent != (OtherEvent{}) { // this is an other event
+					if !otherEvent.IsCollectable(metadata) {
+						return nil, nil, nil, fmt.Errorf("other event %s is not collectable on target", eventName)
+					}
+					otherGroup := NewOtherGroup(metadata.NumGeneralPurposeCounters)
+					otherGroup.MetricNames = util.UniqueAppend(otherGroup.MetricNames, metricName)
+					err := otherGroup.AddEvent(otherEvent, false)
+					if err != nil {
+						return nil, nil, nil, fmt.Errorf("error adding other event %s to group for metric %s: %w", eventName, metricName, err)
+					} else {
+						otherGroups = append(otherGroups, otherGroup)
 					}
 				}
 			}
@@ -472,4 +438,14 @@ func groupsFromEventNames(metricName string, eventNames []string, coreEvents Cor
 		uncoreGroups = append(uncoreGroups, uncoreGroup)
 	}
 	return coreGroups, uncoreGroups, otherGroups, nil
+}
+
+// findPerfmonMetric -- Helper function to find a metric by name
+func findPerfmonMetric(metricsList []PerfmonMetric, metricName string) (*PerfmonMetric, bool) {
+	for _, metric := range metricsList {
+		if metric.MetricName == metricName {
+			return &metric, true
+		}
+	}
+	return nil, false
 }

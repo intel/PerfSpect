@@ -9,467 +9,583 @@
   "PerfmonRetireLatencyFile": "graniterapids_retire_latency.json",
   "ReportMetrics": [
   {
-    "Name": "metric_CPU operating frequency (in GHz)",
+    "MetricName": "cpu_operating_frequency",
+    "LegacyName": "metric_CPU operating frequency (in GHz)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_CPU utilization %",
+    "MetricName": "cpu_utilization",
+    "LegacyName": "metric_CPU utilization %",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_CPU utilization % in kernel mode",
+    "MetricName": "cpu_util_kernel",
+    "LegacyName": "metric_CPU utilization % in kernel mode",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_CPI",
+    "MetricName": "cpi",
+    "LegacyName": "metric_CPI",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_cycles per txn",
+    "MetricName": "cycles_per_txn",
+    "LegacyName": "metric_cycles per txn",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_kernel_CPI",
+    "MetricName": "kernel_cpi",
+    "LegacyName": "metric_kernel_CPI",
     "Origin": "perfspect" 
   },
   {
-    "Name": "metric_kernel_cycles per txn",
+    "MetricName": "kernel_cycles_per_txn",
+    "LegacyName": "metric_kernel_cycles per txn",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_IPC",
+    "MetricName": "ipc",
+    "LegacyName": "metric_IPC",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_giga_instructions_per_sec",
+    "MetricName": "giga_instructions_per_sec",
+    "LegacyName": "metric_giga_instructions_per_sec",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_branch misprediction ratio",
+    "MetricName": "branch_misprediction_ratio",
+    "LegacyName": "metric_branch misprediction ratio",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_locks retired per instr",
+    "MetricName": "locks_retired_per_instr",
+    "LegacyName": "metric_locks retired per instr",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_locks retired per txn",
+    "MetricName": "locks_retired_per_txn",
+    "LegacyName": "metric_locks retired per txn",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_L1D MPI (includes data+rfo w/ prefetches)",
+    "MetricName": "l1d_mpi",
+    "LegacyName": "metric_L1D MPI (includes data+rfo w/ prefetches)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_L1D misses per txn (includes data+rfo w/ prefetches)",
+    "MetricName": "l1d_misses_per_txn",
+    "LegacyName": "metric_L1D misses per txn (includes data+rfo w/ prefetches)",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_L1D demand data read hits per instr",
+    "MetricName": "l1d_demand_data_read_hits_per_instr",
+    "LegacyName": "metric_L1D demand data read hits per instr",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_L1D demand data read hits per txn",
+    "MetricName": "l1d_demand_data_read_hits_per_txn",
+    "LegacyName": "metric_L1D demand data read hits per txn",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_L1-I code read misses (w/ prefetches) per instr",
+    "MetricName": "l1_i_code_read_misses_with_prefetches_per_instr",
+    "LegacyName": "metric_L1-I code read misses (w/ prefetches) per instr",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_L1I code read misses (includes prefetches) per txn",
+    "MetricName": "l1i_code_read_misses_per_txn",
+    "LegacyName": "metric_L1I code read misses (includes prefetches) per txn",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_L2 demand data read hits per instr",
+    "MetricName": "l2_demand_data_read_hits_per_instr",
+    "LegacyName": "metric_L2 demand data read hits per instr",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_L2 demand data read hits per txn",
+    "MetricName": "l2_demand_data_read_hits_per_txn",
+    "LegacyName": "metric_L2 demand data read hits per txn",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_L2 MPI (includes code+data+rfo w/ prefetches)",
+    "MetricName": "l2_mpi",
+    "LegacyName": "metric_L2 MPI (includes code+data+rfo w/ prefetches)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_L2 misses per txn (includes code+data+rfo w/ prefetches)",
+    "MetricName": "l2_misses_per_txn",
+    "LegacyName": "metric_L2 misses per txn (includes code+data+rfo w/ prefetches)",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_L2 demand data read MPI",
+    "MetricName": "l2_demand_data_read_mpi",
+    "LegacyName": "metric_L2 demand data read MPI",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_L2 demand data read misses per txn",
+    "MetricName": "l2_demand_data_read_misses_per_txn",
+    "LegacyName": "metric_L2 demand data read misses per txn",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_L2 demand code MPI",
+    "MetricName": "l2_demand_code_mpi",
+    "LegacyName": "metric_L2 demand code MPI",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_L2 demand code misses per txn",
+    "MetricName": "l2_demand_code_misses_per_txn",
+    "LegacyName": "metric_L2 demand code misses per txn",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_LLC code read MPI (demand+prefetch)",
+    "MetricName": "llc_code_read_mpi_demand_plus_prefetch",
+    "LegacyName": "metric_LLC code read MPI (demand+prefetch)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_LLC code read (demand+prefetch) misses per txn",
+    "MetricName": "llc_code_read_misses_per_txn",
+    "LegacyName": "metric_LLC code read (demand+prefetch) misses per txn",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_LLC data read MPI (demand+prefetch)",
+    "MetricName": "llc_data_read_mpi_demand_plus_prefetch",
+    "LegacyName": "metric_LLC data read MPI (demand+prefetch)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_LLC data read (demand+prefetch) misses per txn",
+    "MetricName": "llc_data_read_misses_per_txn",
+    "LegacyName": "metric_LLC data read (demand+prefetch) misses per txn",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_Average LLC demand data read miss latency (in ns)",
+    "MetricName": "llc_demand_data_read_miss_latency",
+    "LegacyName": "metric_Average LLC demand data read miss latency (in ns)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_Average LLC demand data read miss latency for LOCAL requests (in ns)",
+    "MetricName": "llc_demand_data_read_miss_latency_for_local_requests",
+    "LegacyName": "metric_Average LLC demand data read miss latency for LOCAL requests (in ns)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_Average LLC demand data read miss latency for REMOTE requests (in ns)",
+    "MetricName": "llc_demand_data_read_miss_latency_for_remote_requests",
+    "LegacyName": "metric_Average LLC demand data read miss latency for REMOTE requests (in ns)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_UPI Data transmit BW (MB/sec) (only data)",
+    "MetricName": "upi_data_transmit_bw",
+    "LegacyName": "metric_UPI Data transmit BW (MB/sec) (only data)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_package power (watts)",
+    "MetricName": "package_power",
+    "LegacyName": "metric_package power (watts)",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_DRAM power (watts)",
+    "MetricName": "dram_power",
+    "LegacyName": "metric_DRAM power (watts)",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_core c6 residency %",
+    "MetricName": "core_c6_residency",
+    "LegacyName": "metric_core c6 residency %",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_package c6 residency %",
+    "MetricName": "package_c6_residency",
+    "LegacyName": "metric_package c6 residency %",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_% Uops delivered from decoded Icache (DSB)",
+    "MetricName": "percent_uops_delivered_from_decoded_icache",
+    "LegacyName": "metric_% Uops delivered from decoded Icache (DSB)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_% Uops delivered from legacy decode pipeline (MITE)",
+    "MetricName": "percent_uops_delivered_from_legacy_decode_pipeline",
+    "LegacyName": "metric_% Uops delivered from legacy decode pipeline (MITE)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_memory bandwidth read (MB/sec)",
+    "MetricName": "memory_bandwidth_read",
+    "LegacyName": "metric_memory bandwidth read (MB/sec)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_memory bandwidth write (MB/sec)",
+    "MetricName": "memory_bandwidth_write",
+    "LegacyName": "metric_memory bandwidth write (MB/sec)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_memory bandwidth total (MB/sec)",
+    "MetricName": "memory_bandwidth_total",
+    "LegacyName": "metric_memory bandwidth total (MB/sec)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_ITLB (2nd level) MPI",
+    "MetricName": "itlb_2nd_level_mpi",
+    "LegacyName": "metric_ITLB (2nd level) MPI",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_ITLB (2nd level) misses per txn",
+    "MetricName": "itlb_misses_per_txn",
+    "LegacyName": "metric_ITLB (2nd level) misses per txn",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_DTLB (2nd level) load MPI",
+    "MetricName": "dtlb_2nd_level_load_mpi",
+    "LegacyName": "metric_DTLB (2nd level) load MPI",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_DTLB (2nd level) load misses per txn",
+    "MetricName": "dtlb_load_misses_per_txn",
+    "LegacyName": "metric_DTLB (2nd level) load misses per txn",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_DTLB (2nd level) store MPI",
+    "MetricName": "dtlb_2nd_level_store_mpi",
+    "LegacyName": "metric_DTLB (2nd level) store MPI",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_DTLB (2nd level) store misses per txn",
+    "MetricName": "dtlb_store_misses_per_txn",
+    "LegacyName": "metric_DTLB (2nd level) store misses per txn",
     "Origin": "perfspect"
   },
   {
-    "Name": "metric_NUMA %_Reads addressed to local DRAM",
+    "MetricName": "numa_reads_addressed_to_local_dram",
+    "LegacyName": "metric_NUMA %_Reads addressed to local DRAM",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_NUMA %_Reads addressed to remote DRAM",
+    "MetricName": "numa_reads_addressed_to_remote_dram",
+    "LegacyName": "metric_NUMA %_Reads addressed to remote DRAM",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_uncore frequency GHz",
+    "MetricName": "uncore_frequency",
+    "LegacyName": "metric_uncore frequency GHz",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_IO_bandwidth_disk_or_network_writes (MB/sec)",
+    "MetricName": "io_bandwidth_write",
+    "LegacyName": "metric_IO_bandwidth_disk_or_network_writes (MB/sec)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_IO_bandwidth_disk_or_network_reads (MB/sec)",
+    "MetricName": "io_bandwidth_read",
+    "LegacyName": "metric_IO_bandwidth_disk_or_network_reads (MB/sec)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_Frontend_Bound(%)",
+    "MetricName": "Frontend_Bound",
+    "LegacyName": "metric_TMA_Frontend_Bound(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_..Fetch_Latency(%)",
+    "MetricName": "Fetch_Latency",
+    "LegacyName": "metric_TMA_..Fetch_Latency(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....ICache_Misses(%)",
+    "MetricName": "ICache_Misses",
+    "LegacyName": "metric_TMA_....ICache_Misses(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....ITLB_Misses(%)",
+    "MetricName": "ITLB_Misses",
+    "LegacyName": "metric_TMA_....ITLB_Misses(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....Branch_Resteers(%)",
+    "MetricName": "Branch_Resteers",
+    "LegacyName": "metric_TMA_....Branch_Resteers(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....MS_Switches(%)",
+    "MetricName": "MS_Switches",
+    "LegacyName": "metric_TMA_....MS_Switches(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....LCP(%)",
+    "MetricName": "LCP",
+    "LegacyName": "metric_TMA_....LCP(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....DSB_Switches(%)",
+    "MetricName": "DSB_Switches",
+    "LegacyName": "metric_TMA_....DSB_Switches(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_..Fetch_Bandwidth(%)",
+    "MetricName": "Fetch_Bandwidth",
+    "LegacyName": "metric_TMA_..Fetch_Bandwidth(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....MITE(%)",
+    "MetricName": "MITE",
+    "LegacyName": "metric_TMA_....MITE(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....DSB(%)",
+    "MetricName": "DSB",
+    "LegacyName": "metric_TMA_....DSB(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....MS(%)",
+    "MetricName": "MS",
+    "LegacyName": "metric_TMA_....MS(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_Bad_Speculation(%)",
+    "MetricName": "Bad_Speculation",
+    "LegacyName": "metric_TMA_Bad_Speculation(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_..Branch_Mispredicts(%)",
+    "MetricName": "Branch_Mispredicts",
+    "LegacyName": "metric_TMA_..Branch_Mispredicts(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....Cond_NT_Mispredicts(%)",
+    "MetricName": "Cond_NT_Mispredicts",
+    "LegacyName": "metric_TMA_....Cond_NT_Mispredicts(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....Cond_TK_Mispredicts(%)",
+    "MetricName": "Cond_TK_Mispredicts",
+    "LegacyName": "metric_TMA_....Cond_TK_Mispredicts(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....Ind_Call_Mispredicts(%)",
+    "MetricName": "Ind_Call_Mispredicts",
+    "LegacyName": "metric_TMA_....Ind_Call_Mispredicts(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....Ind_Jump_Mispredicts(%)",
+    "MetricName": "Ind_Jump_Mispredicts",
+    "LegacyName": "metric_TMA_....Ind_Jump_Mispredicts(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....Ret_Mispredicts(%)",
+    "MetricName": "Ret_Mispredicts",
+    "LegacyName": "metric_TMA_....Ret_Mispredicts(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....Other_Mispredicts(%)",
+    "MetricName": "Other_Mispredicts",
+    "LegacyName": "metric_TMA_....Other_Mispredicts(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_..Machine_Clears(%)",
+    "MetricName": "Machine_Clears",
+    "LegacyName": "metric_TMA_..Machine_Clears(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....Other_Nukes(%)",
+    "MetricName": "Other_Nukes",
+    "LegacyName": "metric_TMA_....Other_Nukes(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_Backend_Bound(%)",
+    "MetricName": "Backend_Bound",
+    "LegacyName": "metric_TMA_Backend_Bound(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_..Memory_Bound(%)",
+    "MetricName": "Memory_Bound",
+    "LegacyName": "metric_TMA_..Memory_Bound(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....L1_Bound(%)",
+    "MetricName": "L1_Bound",
+    "LegacyName": "metric_TMA_....L1_Bound(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_......DTLB_Load(%)",
+    "MetricName": "DTLB_Load",
+    "LegacyName": "metric_TMA_......DTLB_Load(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_......Store_Fwd_Blk(%)",
+    "MetricName": "Store_Fwd_Blk",
+    "LegacyName": "metric_TMA_......Store_Fwd_Blk(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_......L1_Latency_Dependency(%)",
+    "MetricName": "L1_Latency_Dependency",
+    "LegacyName": "metric_TMA_......L1_Latency_Dependency(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_......Lock_Latency(%)",
+    "MetricName": "Lock_Latency",
+    "LegacyName": "metric_TMA_......Lock_Latency(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_......Split_Loads(%)",
+    "MetricName": "Split_Loads",
+    "LegacyName": "metric_TMA_......Split_Loads(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_......FB_Full(%)",
+    "MetricName": "FB_Full",
+    "LegacyName": "metric_TMA_......FB_Full(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....L2_Bound(%)",
+    "MetricName": "L2_Bound",
+    "LegacyName": "metric_TMA_....L2_Bound(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....L3_Bound(%)",
+    "MetricName": "L3_Bound",
+    "LegacyName": "metric_TMA_....L3_Bound(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_......Contested_Accesses(%)",
+    "MetricName": "Contested_Accesses",
+    "LegacyName": "metric_TMA_......Contested_Accesses(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_......Data_Sharing(%)",
+    "MetricName": "Data_Sharing",
+    "LegacyName": "metric_TMA_......Data_Sharing(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_......L3_Hit_Latency(%)",
+    "MetricName": "L3_Hit_Latency",
+    "LegacyName": "metric_TMA_......L3_Hit_Latency(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_......SQ_Full(%)",
+    "MetricName": "SQ_Full",
+    "LegacyName": "metric_TMA_......SQ_Full(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....DRAM_Bound(%)",
+    "MetricName": "DRAM_Bound",
+    "LegacyName": "metric_TMA_....DRAM_Bound(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_......MEM_Bandwidth(%)",
+    "MetricName": "MEM_Bandwidth",
+    "LegacyName": "metric_TMA_......MEM_Bandwidth(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_......MEM_Latency(%)",
+    "MetricName": "MEM_Latency",
+    "LegacyName": "metric_TMA_......MEM_Latency(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....Store_Bound(%)",
+    "MetricName": "Store_Bound",
+    "LegacyName": "metric_TMA_....Store_Bound(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_......Store_Latency(%)",
+    "MetricName": "Store_Latency",
+    "LegacyName": "metric_TMA_......Store_Latency(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_......False_Sharing(%)",
+    "MetricName": "False_Sharing",
+    "LegacyName": "metric_TMA_......False_Sharing(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_......Split_Stores(%)",
+    "MetricName": "Split_Stores",
+    "LegacyName": "metric_TMA_......Split_Stores(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_......Streaming_Stores(%)",
+    "MetricName": "Streaming_Stores",
+    "LegacyName": "metric_TMA_......Streaming_Stores(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_......DTLB_Store(%)",
+    "MetricName": "DTLB_Store",
+    "LegacyName": "metric_TMA_......DTLB_Store(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_..Core_Bound(%)",
+    "MetricName": "Core_Bound",
+    "LegacyName": "metric_TMA_..Core_Bound(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....Divider(%)",
+    "MetricName": "Divider",
+    "LegacyName": "metric_TMA_....Divider(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....Serializing_Operation(%)",
+    "MetricName": "Serializing_Operation",
+    "LegacyName": "metric_TMA_....Serializing_Operation(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....AMX_Busy(%)",
+    "MetricName": "AMX_Busy",
+    "LegacyName": "metric_TMA_....AMX_Busy(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....Ports_Utilization(%)",
+    "MetricName": "Ports_Utilization",
+    "LegacyName": "metric_TMA_....Ports_Utilization(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_Retiring(%)",
+    "MetricName": "Retiring",
+    "LegacyName": "metric_TMA_Retiring(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_..Light_Operations(%)",
+    "MetricName": "Light_Operations",
+    "LegacyName": "metric_TMA_..Light_Operations(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....FP_Arith(%)",
+    "MetricName": "FP_Arith",
+    "LegacyName": "metric_TMA_....FP_Arith(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....Int_Operations(%)",
+    "MetricName": "Int_Operations",
+    "LegacyName": "metric_TMA_....Int_Operations(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....Memory_Operations(%)",
+    "MetricName": "Memory_Operations",
+    "LegacyName": "metric_TMA_....Memory_Operations(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....Fused_Instructions(%)",
+    "MetricName": "Fused_Instructions",
+    "LegacyName": "metric_TMA_....Fused_Instructions(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....Non_Fused_Branches(%)",
+    "MetricName": "Non_Fused_Branches",
+    "LegacyName": "metric_TMA_....Non_Fused_Branches(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....Other_Light_Ops(%)",
+    "MetricName": "Other_Light_Ops",
+    "LegacyName": "metric_TMA_....Other_Light_Ops(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_..Heavy_Operations(%)",
+    "MetricName": "Heavy_Operations",
+    "LegacyName": "metric_TMA_..Heavy_Operations(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....Few_Uops_Instructions(%)",
+    "MetricName": "Few_Uops_Instructions",
+    "LegacyName": "metric_TMA_....Few_Uops_Instructions(%)",
     "Origin": "perfmon"
   },
   {
-    "Name": "metric_TMA_....Microcode_Sequencer(%)",
+    "MetricName": "Microcode_Sequencer",
+    "LegacyName": "metric_TMA_....Microcode_Sequencer(%)",
     "Origin": "perfmon"
   }
 ],
