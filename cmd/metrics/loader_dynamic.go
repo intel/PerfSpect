@@ -261,24 +261,24 @@ func loadMetricsFromDefinitions(perfmonMetrics PerfmonMetrics, metricsConfig Met
 
 		switch strings.ToLower(includedMetric.Origin) {
 		case "perfmon":
-			perfmonMetric, found = findPerfmonMetric(perfmonMetrics.Metrics, includedMetric.MetricName)
+			perfmonMetric, found = findPerfmonMetric(perfmonMetrics.Metrics, includedMetric.LegacyName)
 		case "perfspect":
-			perfmonMetric, found = findPerfmonMetric(metricsConfig.Metrics, includedMetric.MetricName)
+			perfmonMetric, found = findPerfmonMetric(metricsConfig.Metrics, includedMetric.LegacyName)
 		default:
-			return nil, fmt.Errorf("unknown metric origin: %s for metric: %s", includedMetric.Origin, includedMetric.MetricName)
+			return nil, fmt.Errorf("unknown metric origin: %s for metric: %s", includedMetric.Origin, includedMetric.LegacyName)
 		}
 
 		if !found {
-			return nil, fmt.Errorf("metric %s not found in %s metrics", includedMetric.MetricName, includedMetric.Origin)
+			return nil, fmt.Errorf("metric %s not found in %s metrics", includedMetric.LegacyName, includedMetric.Origin)
 		}
 
 		expression, err := getExpression(*perfmonMetric)
 		if err != nil {
-			return nil, fmt.Errorf("error getting expression for metric %s: %w", perfmonMetric.MetricName, err)
+			return nil, fmt.Errorf("error getting expression for metric %s: %w", perfmonMetric.LegacyName, err)
 		}
 
 		metric := MetricDefinition{
-			Name:        includedMetric.MetricName,
+			Name:        includedMetric.LegacyName,
 			Description: perfmonMetric.BriefDescription,
 			Expression:  expression,
 		}
@@ -305,27 +305,27 @@ func loadEventGroupsFromMetrics(includedMetrics []PerfspectMetric, perfmonMetric
 
 		switch strings.ToLower(includedMetric.Origin) {
 		case "perfmon":
-			perfmonMetric, found = findPerfmonMetric(perfmonMetrics, includedMetric.MetricName)
+			perfmonMetric, found = findPerfmonMetric(perfmonMetrics, includedMetric.LegacyName)
 		case "perfspect":
-			perfmonMetric, found = findPerfmonMetric(perfspectMetrics, includedMetric.MetricName)
+			perfmonMetric, found = findPerfmonMetric(perfspectMetrics, includedMetric.LegacyName)
 		default:
-			return nil, nil, nil, nil, fmt.Errorf("unknown metric origin: %s for metric: %s", includedMetric.Origin, includedMetric.MetricName)
+			return nil, nil, nil, nil, fmt.Errorf("unknown metric origin: %s for metric: %s", includedMetric.Origin, includedMetric.LegacyName)
 		}
 		if !found {
-			return nil, nil, nil, nil, fmt.Errorf("metric %s not found in %s metrics", includedMetric.MetricName, includedMetric.Origin)
+			return nil, nil, nil, nil, fmt.Errorf("metric %s not found in %s metrics", includedMetric.LegacyName, includedMetric.Origin)
 		}
 		for _, event := range perfmonMetric.Events {
 			metricEventNames = util.UniqueAppend(metricEventNames, event["Name"])
 		}
 		uncollectableMetricEvents := getUncollectableEvents(metricEventNames, coreEvents, uncoreEvents, otherEvents, metadata)
 		if len(uncollectableMetricEvents) > 0 {
-			fmt.Printf("Warning: Metric %s contains uncollectable events: %v\n", includedMetric.MetricName, uncollectableMetricEvents)
+			fmt.Printf("Warning: Metric %s contains uncollectable events: %v\n", includedMetric.LegacyName, uncollectableMetricEvents)
 			uncollectableEvents = util.UniqueAppend(uncollectableEvents, uncollectableMetricEvents...)
 			// don't create groups for this metric
 			continue
 		}
 		metricCoreGroups, metricUncoreGroups, metricOtherGroups, err := groupsFromEventNames(
-			includedMetric.MetricName,
+			includedMetric.LegacyName,
 			metricEventNames,
 			coreEvents,
 			uncoreEvents,
@@ -333,7 +333,7 @@ func loadEventGroupsFromMetrics(includedMetrics []PerfspectMetric, perfmonMetric
 			metadata,
 		)
 		if err != nil {
-			fmt.Printf("Error grouping events for metric %s: %v\n", includedMetric.MetricName, err)
+			fmt.Printf("Error grouping events for metric %s: %v\n", includedMetric.LegacyName, err)
 			continue
 		}
 		// Add the groups to the main lists
@@ -490,7 +490,7 @@ func groupsFromEventNames(metricName string, eventNames []string, coreEvents Cor
 // findPerfmonMetric -- Helper function to find a metric by name
 func findPerfmonMetric(metricsList []PerfmonMetric, metricName string) (*PerfmonMetric, bool) {
 	for _, metric := range metricsList {
-		if metric.MetricName == metricName {
+		if metric.LegacyName == metricName {
 			return &metric, true
 		}
 	}
