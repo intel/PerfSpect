@@ -82,6 +82,27 @@ func (events CoreEvents) FindEventByName(eventName string) CoreEvent {
 	return CoreEvent{}
 }
 
+func (event CoreEvent) IsCollectable(metadata Metadata) bool {
+	if !metadata.SupportsFixedTMA && (strings.HasPrefix(event.EventName, "TOPDOWN.SLOTS") || strings.HasPrefix(event.EventName, "PERF_METRICS")) {
+		return false // TOPDOWN.SLOTS and PERF_METRICS.* events are not supported
+	}
+	pebsEventNames := []string{"INT_MISC.UNKNOWN_BRANCH_CYCLES", "UOPS_RETIRED.MS"}
+	if !metadata.SupportsPEBS {
+		for _, pebsEventName := range pebsEventNames {
+			if strings.Contains(event.EventName, pebsEventName) {
+				return false // PEBS events are not supported
+			}
+		}
+	}
+	if !metadata.SupportsOCR && (strings.HasPrefix(event.EventName, "OCR") || strings.HasPrefix(event.EventName, "OFFCORE_REQUESTS_OUTSTANDING")) {
+		return false // OCR events are not supported
+	}
+	if !metadata.SupportsRefCycles && strings.Contains(event.EventName, "ref-cycles") {
+		return false // ref-cycles events are not supported
+	}
+	return true
+}
+
 // perfmon event name to perf event name
 var fixedCounterEventNameTranslation = map[string]string{
 	"INST_RETIRED.ANY":                "instructions",
