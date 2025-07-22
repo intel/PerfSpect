@@ -295,7 +295,7 @@ func transformMetricExpressions(metrics []MetricDefinition) ([]MetricDefinition,
 		transformed = strings.ReplaceAll(transformed, "> =", ">=")
 		transformed = strings.ReplaceAll(transformed, "< =", "<=")
 		if transformed != metric.Expression {
-			slog.Debug("transformed metric", slog.String("metric name", metric.Name), slog.String("transformed", transformed))
+			slog.Debug("transformed metric", slog.String("name", metric.Name), slog.String("transformed", transformed))
 			metric.Expression = transformed
 		}
 		// add the transformed metric to the list
@@ -310,7 +310,7 @@ func setEvaluableExpressions(metrics []MetricDefinition) ([]MetricDefinition, er
 		metric := &metrics[i]
 		var err error
 		if metric.Evaluable, err = govaluate.NewEvaluableExpressionWithFunctions(metric.Expression, evaluatorFunctions); err != nil {
-			slog.Error("failed to create evaluable expression for metric", slog.String("error", err.Error()), slog.String("metric name", metric.Name), slog.String("metric expression", metric.Expression))
+			slog.Error("failed to create evaluable expression for metric", slog.String("error", err.Error()), slog.String("name", metric.Name), slog.String("expression", metric.Expression))
 			return nil, err
 		}
 	}
