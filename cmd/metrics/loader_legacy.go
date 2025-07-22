@@ -15,7 +15,7 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 )
 
-func (l *StaticLoader) Load(metricDefinitionOverridePath string, eventDefinitionOverridePath string, selectedMetrics []string, metadata Metadata) ([]MetricDefinition, []GroupDefinition, error) {
+func (l *LegacyLoader) Load(metricDefinitionOverridePath string, eventDefinitionOverridePath string, selectedMetrics []string, metadata Metadata) ([]MetricDefinition, []GroupDefinition, error) {
 	loadedMetricDefinitions, err := loadMetricDefinitions(metricDefinitionOverridePath, selectedMetrics, metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load metric definitions: %w", err)
