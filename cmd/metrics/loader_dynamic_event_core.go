@@ -159,19 +159,9 @@ func (event CoreEvent) StringForPerf() (string, error) {
 	}
 	// offcore_rsp, name
 	if event.Offcore == "1" {
-		// some offcore events have a MSR value appended to their name, like this:
-		// OCR.DEMAND_RFO.L3_MISS:ocr_msr_val=0x103b8000. If we see this, set oc_rsp
-		// to the ocr_msr_val and remove it from the name.
-		name := event.EventName
-		msr := event.MSRValue
-		if strings.Contains(name, ":ocr_msr_val=") {
-			// get the msr value
-			parts := strings.Split(name, ":ocr_msr_val=")
-			if len(parts) != 2 {
-				return "", fmt.Errorf("error parsing offcore event name %s: expected format 'name:ocr_msr_val=msr_value'", name)
-			}
-			name = parts[0]
-			msr = parts[1]
+		name, msr, err := customizeOCREventName(event)
+		if err != nil {
+			return "", fmt.Errorf("error customizing offcore event name %s: %w", event.EventName, err)
 		}
 		parts = append(parts, fmt.Sprintf("offcore_rsp=%s", msr))
 		parts = append(parts, fmt.Sprintf("name='%s'/", name))
@@ -180,4 +170,25 @@ func (event CoreEvent) StringForPerf() (string, error) {
 		parts = append(parts, fmt.Sprintf("name='%s'/", event.EventName))
 	}
 	return strings.Join(parts, ","), nil
+}
+
+// some offcore events have a MSR value appended to their name, like this:
+// OCR.DEMAND_RFO.L3_MISS:ocr_msr_val=0x103b8000.
+// Returns:
+// - the event name
+// - the MSR value
+// - an error if the event name is not in the expected format
+func customizeOCREventName(event CoreEvent) (string, string, error) {
+	if !strings.Contains(event.EventName, ":ocr_msr_val=") {
+		return event.EventName, event.MSRValue, nil
+	}
+	// parse the msr value from the event name
+	parts := strings.Split(event.EventName, ":ocr_msr_val=")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("error parsing offcore event name %s: expected format 'name:ocr_msr_val=msr_value'", event.EventName)
+	}
+	name := parts[0]
+	msrValue := parts[1]
+	customizedName := fmt.Sprintf("%s.%s", name, msrValue)
+	return customizedName, msrValue, nil
 }
