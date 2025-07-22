@@ -109,9 +109,6 @@ func loadEventGroups(eventDefinitionOverridePath string, metadata Metadata) (gro
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
 	uncollectable := mapset.NewSet[string]()
-	if flagTransactionRate == 0 {
-		uncollectable.Add("TXN")
-	}
 	var group GroupDefinition
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())

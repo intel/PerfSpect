@@ -3,6 +3,7 @@ package metrics
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"perfspect/internal/util"
@@ -85,6 +86,7 @@ func (l *DynamicLoader) loadMetricsConfig(metricConfigOverridePath string, metad
 }
 
 func (l *DynamicLoader) Load(metricConfigOverridePath string, _ string, selectedMetrics []string, metadata Metadata) ([]MetricDefinition, []GroupDefinition, error) {
+	// Load the metrics configuration from the JSON file
 	config, err := l.loadMetricsConfig(metricConfigOverridePath, metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load metrics config: %w", err)
@@ -93,10 +95,6 @@ func (l *DynamicLoader) Load(metricConfigOverridePath string, _ string, selected
 	perfmonMetricDefinitions, err := LoadPerfmonMetrics(filepath.Join("resources", "metrics", metadata.Architecture, metadata.Vendor, strings.ToLower(l.microarchitecture), config.PerfmonMetricsFile))
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading perfmon metrics: %w", err)
-	}
-	metrics, err := loadMetricsFromDefinitions(perfmonMetricDefinitions, config)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error loading metrics from definitions: %w", err)
 	}
 	// Load the perfmon core events from the JSON file
 	coreEvents, err := NewCoreEvents(filepath.Join("resources", "metrics", metadata.Architecture, metadata.Vendor, strings.ToLower(l.microarchitecture), config.PerfmonCoreEventsFile))
@@ -108,13 +106,24 @@ func (l *DynamicLoader) Load(metricConfigOverridePath string, _ string, selected
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading perfmon uncore events: %w", err)
 	}
+	// Load the other events (not core or uncore)
 	otherEvents, err := NewOtherEvents()
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading other events: %w", err)
 	}
+	// remove metrics that use uncollectable events
+	includedMetrics, err := removeUncollectableMetrics(config.ReportMetrics, perfmonMetricDefinitions.Metrics, config.Metrics, coreEvents, uncoreEvents, otherEvents, metadata)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error removing uncollectable metrics: %w", err)
+	}
+	// Filter the metrics based on the selected metrics and load the metrics definitions
+	metrics, err := loadMetricsFromDefinitions(includedMetrics, perfmonMetricDefinitions.Metrics, config.Metrics)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error loading metrics from definitions: %w", err)
+	}
 	// Create event groups from the perfspect metrics
 	coreGroups, uncoreGroups, otherGroups, uncollectableEvents, err := loadEventGroupsFromMetrics(
-		config.ReportMetrics,
+		includedMetrics,
 		perfmonMetricDefinitions.Metrics,
 		config.Metrics,
 		coreEvents,
@@ -140,37 +149,27 @@ func (l *DynamicLoader) Load(metricConfigOverridePath string, _ string, selected
 	if err != nil {
 		return nil, nil, fmt.Errorf("error expanding uncore groups: %v", err)
 	}
-
 	// Merge all groups into a single slice of GroupDefinition
 	allGroups := make([]GroupDefinition, 0)
 	for _, group := range coreGroups {
-		// perfGroup, _ := group.StringForPerf()
-		// fmt.Printf("echo \"core group %d\"\nsudo ./perf stat -e '%s' sleep 1\n\n", i, perfGroup)
 		allGroups = append(allGroups, group.ToGroupDefinition())
 	}
 	for _, group := range uncoreGroups {
-		// perfGroup, _ := group.StringForPerf()
-		// fmt.Printf("echo \"uncore group %d\"\nsudo ./perf stat -e '%s' sleep 1\n\n", i, perfGroup)
 		allGroups = append(allGroups, group.ToGroupDefinition())
 	}
 	for _, group := range otherGroups {
-		// perfGroup, _ := group.StringForPerf()
-		// fmt.Printf("echo \"other group %d\"\nsudo ./perf stat -e '%s' sleep 1\n\n", i, perfGroup)
 		allGroups = append(allGroups, group.ToGroupDefinition())
 	}
-
 	// abbreviate uncore event names in metric expressions
 	metrics, err = abbreviateUncoreEventNames(metrics, uncoreEvents)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error abbreviating uncore event names: %w", err)
 	}
-
 	// apply common modifications to metric expressions
 	metrics, err = configureMetrics(metrics, uncollectableEvents, metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to configure metrics: %w", err)
 	}
-
 	return metrics, allGroups, nil
 }
 
@@ -251,17 +250,17 @@ func getExpression(perfmonMetric PerfmonMetric) (string, error) {
 	return expression, nil
 }
 
-func loadMetricsFromDefinitions(perfmonMetrics PerfmonMetrics, metricsConfig MetricsConfig) ([]MetricDefinition, error) {
+func loadMetricsFromDefinitions(includedMetrics []PerfspectMetric, perfmonMetrics []PerfmonMetric, perfspectMetrics []PerfmonMetric) ([]MetricDefinition, error) {
 	var metrics []MetricDefinition
-	for _, includedMetric := range metricsConfig.ReportMetrics {
+	for _, includedMetric := range includedMetrics {
 		var perfmonMetric *PerfmonMetric
 		var found bool
 
 		switch strings.ToLower(includedMetric.Origin) {
 		case "perfmon":
-			perfmonMetric, found = findPerfmonMetric(perfmonMetrics.Metrics, includedMetric.LegacyName)
+			perfmonMetric, found = findPerfmonMetric(perfmonMetrics, includedMetric.LegacyName)
 		case "perfspect":
-			perfmonMetric, found = findPerfmonMetric(metricsConfig.Metrics, includedMetric.LegacyName)
+			perfmonMetric, found = findPerfmonMetric(perfspectMetrics, includedMetric.LegacyName)
 		default:
 			return nil, fmt.Errorf("unknown metric origin: %s for metric: %s", includedMetric.Origin, includedMetric.LegacyName)
 		}
@@ -285,22 +284,50 @@ func loadMetricsFromDefinitions(perfmonMetrics PerfmonMetrics, metricsConfig Met
 	return metrics, nil
 }
 
-// loadEventGroupsFromMetrics
+func removeUncollectableMetrics(includedMetrics []PerfspectMetric, perfmonMetrics []PerfmonMetric, perfspectMetrics []PerfmonMetric, coreEvents CoreEvents, uncoreEvents UncoreEvents, otherEvents OtherEvents, metadata Metadata) ([]PerfspectMetric, error) {
+	var collectableMetrics []PerfspectMetric
+	for _, includedMetric := range includedMetrics {
+		var perfmonMetric *PerfmonMetric
+		var found bool
+		// find the metric in the perfmon metrics or perfspect metrics based on the origin
+		// and collect the event names from the metric
+		switch strings.ToLower(includedMetric.Origin) {
+		case "perfmon":
+			perfmonMetric, found = findPerfmonMetric(perfmonMetrics, includedMetric.LegacyName)
+		case "perfspect":
+			perfmonMetric, found = findPerfmonMetric(perfspectMetrics, includedMetric.LegacyName)
+		default:
+			return nil, fmt.Errorf("unknown metric origin: %s for metric: %s", includedMetric.Origin, includedMetric.LegacyName)
+		}
+		if !found {
+			return nil, fmt.Errorf("metric %s not found in %s metrics", includedMetric.LegacyName, includedMetric.Origin)
+		}
+		var eventNames []string
+		for _, event := range perfmonMetric.Events {
+			eventNames = util.UniqueAppend(eventNames, event["Name"])
+		}
+		uncollectableEvents := getUncollectableEvents(eventNames, coreEvents, uncoreEvents, otherEvents, metadata)
+		if len(uncollectableEvents) > 0 {
+			slog.Warn("Metric contains uncollectable events", "metric", includedMetric.LegacyName, "uncollectableEvents", uncollectableEvents)
+			continue // skip this metric if it has uncollectable events
+		}
+		collectableMetrics = append(collectableMetrics, includedMetric)
+	}
+	return collectableMetrics, nil
+}
+
 func loadEventGroupsFromMetrics(includedMetrics []PerfspectMetric, perfmonMetrics []PerfmonMetric, perfspectMetrics []PerfmonMetric, coreEvents CoreEvents, uncoreEvents UncoreEvents, otherEvents OtherEvents, metadata Metadata) ([]CoreGroup, []UncoreGroup, []OtherGroup, []string, error) {
 	coreGroups := make([]CoreGroup, 0)
 	uncoreGroups := make([]UncoreGroup, 0)
 	otherGroups := make([]OtherGroup, 0)
 	uncollectableEvents := make([]string, 0)
 
-	if flagTransactionRate == 0 {
-		uncollectableEvents = append(uncollectableEvents, "TXN")
-	}
-
 	for _, includedMetric := range includedMetrics {
 		var metricEventNames []string
 		var perfmonMetric *PerfmonMetric
 		var found bool
-
+		// find the metric in the perfmon metrics or perfspect metrics based on the origin
+		// and collect the event names from the metric
 		switch strings.ToLower(includedMetric.Origin) {
 		case "perfmon":
 			perfmonMetric, found = findPerfmonMetric(perfmonMetrics, includedMetric.LegacyName)
@@ -315,11 +342,13 @@ func loadEventGroupsFromMetrics(includedMetrics []PerfspectMetric, perfmonMetric
 		for _, event := range perfmonMetric.Events {
 			metricEventNames = util.UniqueAppend(metricEventNames, event["Name"])
 		}
+		// check if the metric has uncollectable events
 		uncollectableMetricEvents := getUncollectableEvents(metricEventNames, coreEvents, uncoreEvents, otherEvents, metadata)
+		// if there are uncollectable events, add them to the uncollectableEvents list
+		uncollectableEvents = util.UniqueAppend(uncollectableEvents, uncollectableMetricEvents...)
+		// skip metrics that have uncollectable events
 		if len(uncollectableMetricEvents) > 0 {
 			fmt.Printf("Warning: Metric %s contains uncollectable events: %v\n", includedMetric.LegacyName, uncollectableMetricEvents)
-			uncollectableEvents = util.UniqueAppend(uncollectableEvents, uncollectableMetricEvents...)
-			// don't create groups for this metric
 			continue
 		}
 		metricCoreGroups, metricUncoreGroups, metricOtherGroups, err := groupsFromEventNames(
@@ -419,9 +448,6 @@ func groupsFromEventNames(metricName string, eventNames []string, coreEvents Cor
 		}
 		coreEvent := coreEvents.FindEventByName(eventName)
 		if coreEvent != (CoreEvent{}) { // this is a core event
-			if !coreEvent.IsCollectable(metadata) {
-				return nil, nil, nil, fmt.Errorf("core event %s is not collectable on target", eventName)
-			}
 			// if the event has been customized with :c<val>, :e<val>, or both, we create a new event with
 			// customizations in the name
 			if strings.Contains(eventName, ":") {
@@ -442,9 +468,6 @@ func groupsFromEventNames(metricName string, eventNames []string, coreEvents Cor
 		} else {
 			uncoreEvent := uncoreEvents.FindEventByName(eventName)
 			if uncoreEvent != (UncoreEvent{}) { // this is an uncore event
-				if !uncoreEvent.IsCollectable(metadata) {
-					return nil, nil, nil, fmt.Errorf("uncore event %s is not collectable on target", eventName)
-				}
 				uncoreGroup.MetricNames = util.UniqueAppend(uncoreGroup.MetricNames, metricName)
 				err := uncoreGroup.AddEvent(uncoreEvent, false)
 				if err != nil {
@@ -459,9 +482,6 @@ func groupsFromEventNames(metricName string, eventNames []string, coreEvents Cor
 			} else {
 				otherEvent := otherEvents.FindEventByName(eventName)
 				if otherEvent != (OtherEvent{}) { // this is an other event
-					if !otherEvent.IsCollectable(metadata) {
-						return nil, nil, nil, fmt.Errorf("other event %s is not collectable on target", eventName)
-					}
 					otherGroup := NewOtherGroup(metadata.NumGeneralPurposeCounters)
 					otherGroup.MetricNames = util.UniqueAppend(otherGroup.MetricNames, metricName)
 					err := otherGroup.AddEvent(otherEvent, false)
