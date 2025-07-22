@@ -3,6 +3,7 @@ package metrics
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 )
@@ -75,7 +76,7 @@ func (event UncoreEvent) IsCollectable(metadata Metadata) bool {
 		}
 	}
 	if !deviceExists {
-		fmt.Printf("Warning: Uncore event %s has unit %s, but no such uncore device found in target capabilities\n", event.EventName, event.Unit)
+		slog.Warn("Uncore event unit not found on target", "name", event.EventName, "unit", event.Unit)
 		return false // uncore device not found
 	}
 	return true
