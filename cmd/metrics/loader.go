@@ -209,10 +209,7 @@ func perfmonToPerfspectConditional(origIn string) (out string, err error) {
 	return
 }
 
-// configureMetrics prepares metrics for use by the evaluator, by e.g., replacing
-// metric constants with known values and aligning metric variables to perf event
-// groups
-func configureMetrics(loadedMetrics []MetricDefinition, uncollectableEvents []string, metadata Metadata) (metrics []MetricDefinition, err error) {
+func replaceConstants(metrics []MetricDefinition, metadata Metadata) ([]MetricDefinition, error) {
 	// get constants as strings
 	tscFreq := fmt.Sprintf("%f", float64(metadata.TSCFrequencyHz))
 	var tsc string
@@ -224,100 +221,203 @@ func configureMetrics(loadedMetrics []MetricDefinition, uncollectableEvents []st
 	case granularityCPU:
 		tsc = fmt.Sprintf("%f", float64(metadata.TSC)/(float64(metadata.SocketCount*metadata.CoresPerSocket*metadata.ThreadsPerCore)))
 	default:
-		err = fmt.Errorf("unknown granularity: %s", flagGranularity)
-		return
+		return nil, fmt.Errorf("unknown granularity: %s", flagGranularity)
 	}
 	coresPerSocket := fmt.Sprintf("%f", float64(metadata.CoresPerSocket))
 	chasPerSocket := fmt.Sprintf("%f", float64(len(metadata.UncoreDeviceIDs["cha"])))
 	socketCount := fmt.Sprintf("%f", float64(metadata.SocketCount))
 	hyperThreadingOn := fmt.Sprintf("%t", metadata.ThreadsPerCore > 1)
 	threadsPerCore := fmt.Sprintf("%f", float64(metadata.ThreadsPerCore))
-	// load retire latency constants
-	var retireLatencies map[string]string
-	if retireLatencies, err = loadRetireLatencies(metadata); err != nil {
-		slog.Error("failed to load retire latencies", slog.String("error", err.Error()))
-		return
+
+	for i := range metrics {
+		metric := &metrics[i]
+		// replace constants with their values
+		metric.Expression = strings.ReplaceAll(metric.Expression, "[SYSTEM_TSC_FREQ]", tscFreq)
+		metric.Expression = strings.ReplaceAll(metric.Expression, "[TSC]", tsc)
+		metric.Expression = strings.ReplaceAll(metric.Expression, "[CORES_PER_SOCKET]", coresPerSocket)
+		metric.Expression = strings.ReplaceAll(metric.Expression, "[CHAS_PER_SOCKET]", chasPerSocket)
+		metric.Expression = strings.ReplaceAll(metric.Expression, "[SOCKET_COUNT]", socketCount)
+		metric.Expression = strings.ReplaceAll(metric.Expression, "[HYPERTHREADING_ON]", hyperThreadingOn)
+		metric.Expression = strings.ReplaceAll(metric.Expression, "[CONST_THREAD_COUNT]", threadsPerCore)
+		metric.Expression = strings.ReplaceAll(metric.Expression, "[TXN]", fmt.Sprintf("%f", flagTransactionRate))
 	}
-	// configure each metric
-	reConstantInt := regexp.MustCompile(`\[(\d+)\]`)
-	evaluatorFunctions := getEvaluatorFunctions()
-	for metricIdx := range loadedMetrics {
-		tmpMetric := loadedMetrics[metricIdx]
-		// skip metrics that use uncollectable events
+	return metrics, nil
+}
+
+func replaceRetireLatencies(metrics []MetricDefinition, metadata Metadata) ([]MetricDefinition, error) {
+	// load retire latencies
+	retireLatencies, err := loadRetireLatencies(metadata)
+	if err != nil {
+		slog.Error("failed to load retire latencies", slog.String("error", err.Error()))
+		return nil, err
+	}
+	// replace retire latencies in metrics
+	for i := range metrics {
+		metric := &metrics[i]
+		for retireEvent, retireLatency := range retireLatencies {
+			// replace <event>:retire_latency with value
+			metric.Expression = strings.ReplaceAll(metric.Expression, fmt.Sprintf("[%s:retire_latency]", retireEvent), retireLatency)
+		}
+	}
+	return metrics, nil
+}
+
+func removeIfUncollectableEvents(metrics []MetricDefinition, uncollectableEvents []string) ([]MetricDefinition, error) {
+	// remove metrics that use uncollectable events
+	var filteredMetrics []MetricDefinition
+	for _, metric := range metrics {
 		foundUncollectable := false
 		for _, uncollectableEvent := range uncollectableEvents {
-			if strings.Contains(tmpMetric.Expression, uncollectableEvent) {
-				slog.Debug("removing metric that uses uncollectable event", slog.String("metric", tmpMetric.Name), slog.String("event", uncollectableEvent))
+			if strings.Contains(metric.Expression, uncollectableEvent) {
+				slog.Debug("removing metric that uses uncollectable event", slog.String("metric", metric.Name), slog.String("event", uncollectableEvent))
 				foundUncollectable = true
 				break
 			}
 		}
-		if foundUncollectable {
-			continue
+		if !foundUncollectable {
+			filteredMetrics = append(filteredMetrics, metric)
 		}
-		// transform if/else to ?/:
-		var transformed string
-		if transformed, err = perfmonToPerfspectConditional(tmpMetric.Expression); err != nil {
-			return
+	}
+	return filteredMetrics, nil
+}
+
+func transformMetricExpressions(metrics []MetricDefinition) ([]MetricDefinition, error) {
+	// transform if/else to ?/:
+	var transformedMetrics []MetricDefinition
+	for _, metric := range metrics {
+		transformed, err := perfmonToPerfspectConditional(metric.Expression)
+		if err != nil {
+			return nil, fmt.Errorf("failed to transform metric expression: %w", err)
 		}
 		// replace "> =" with ">=" and "< =" with "<="
 		transformed = strings.ReplaceAll(transformed, "> =", ">=")
 		transformed = strings.ReplaceAll(transformed, "< =", "<=")
-		if transformed != tmpMetric.Expression {
-			slog.Debug("transformed metric", slog.String("metric name", tmpMetric.Name), slog.String("transformed", transformed))
-			tmpMetric.Expression = transformed
+		if transformed != metric.Expression {
+			slog.Debug("transformed metric", slog.String("metric name", metric.Name), slog.String("transformed", transformed))
+			metric.Expression = transformed
 		}
-		// replace constants with their values
-		tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, "[SYSTEM_TSC_FREQ]", tscFreq)
-		tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, "[TSC]", tsc)
-		tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, "[CORES_PER_SOCKET]", coresPerSocket)
-		tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, "[CHAS_PER_SOCKET]", chasPerSocket)
-		tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, "[SOCKET_COUNT]", socketCount)
-		tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, "[HYPERTHREADING_ON]", hyperThreadingOn)
-		tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, "[CONST_THREAD_COUNT]", threadsPerCore)
-		tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, "[TXN]", fmt.Sprintf("%f", flagTransactionRate))
-		// replace retire latencies
-		for retireEvent, retireLatency := range retireLatencies {
-			// replace <event>:retire_latency with value
-			tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, fmt.Sprintf("[%s:retire_latency]", retireEvent), retireLatency)
+		// add the transformed metric to the list
+		transformedMetrics = append(transformedMetrics, metric)
+	}
+	return transformedMetrics, nil
+}
+
+func setEvaluableExpressions(metrics []MetricDefinition) ([]MetricDefinition, error) {
+	evaluatorFunctions := getEvaluatorFunctions()
+	for i := range metrics {
+		metric := &metrics[i]
+		var err error
+		if metric.Evaluable, err = govaluate.NewEvaluableExpressionWithFunctions(metric.Expression, evaluatorFunctions); err != nil {
+			slog.Error("failed to create evaluable expression for metric", slog.String("error", err.Error()), slog.String("metric name", metric.Name), slog.String("metric expression", metric.Expression))
+			return nil, err
 		}
-		// replace constant numbers masquerading as variables with their values, e.g., [20] -> 20
-		// there may be more than one with differing values in the expression, so use a regex to find them all
+	}
+	return metrics, nil
+}
+
+func replaceConstantNumbers(metrics []MetricDefinition) ([]MetricDefinition, error) {
+	// replace constant numbers masquerading as variables with their values, e.g., [20] -> 20
+	// there may be more than one with differing values in the expression, so use a regex to find them all
+	reConstantInt := regexp.MustCompile(`\[(\d+)\]`)
+	for i := range metrics {
+		metric := &metrics[i]
 		for {
 			// find the first match
-			found := reConstantInt.FindStringSubmatchIndex(tmpMetric.Expression)
+			found := reConstantInt.FindStringSubmatchIndex(metric.Expression)
 			if found == nil {
 				break // no more matches
 			}
 			// match[2] is the start of the number, match[3] is the end of the number
-			number := tmpMetric.Expression[found[2]:found[3]]
+			number := metric.Expression[found[2]:found[3]]
 			// replace the whole match with the number
-			tmpMetric.Expression = strings.ReplaceAll(tmpMetric.Expression, tmpMetric.Expression[found[0]:found[1]], number)
+			metric.Expression = strings.ReplaceAll(metric.Expression, metric.Expression[found[0]:found[1]], number)
 		}
-		// get a list of the variables in the expression
-		tmpMetric.Variables = make(map[string]int)
+	}
+	return metrics, nil
+}
+
+func initializeMetricVariables(metrics []MetricDefinition) ([]MetricDefinition, error) {
+	// get a list of the variables in the expression
+	for i := range metrics {
+		metric := &metrics[i]
+		metric.Variables = make(map[string]int)
 		expressionIdx := 0
 		for {
-			startVar := strings.IndexRune(tmpMetric.Expression[expressionIdx:], '[')
+			startVar := strings.IndexRune(metric.Expression[expressionIdx:], '[')
 			if startVar == -1 { // no more vars in this expression
 				break
 			}
-			endVar := strings.IndexRune(tmpMetric.Expression[expressionIdx:], ']')
+			endVar := strings.IndexRune(metric.Expression[expressionIdx:], ']')
 			if endVar == -1 {
-				err = fmt.Errorf("didn't find end of variable indicator (]) in expression: %s", tmpMetric.Expression[expressionIdx:])
-				return
+				return nil, fmt.Errorf("didn't find end of variable indicator (]) in expression: %s", metric.Expression[expressionIdx:])
 			}
 			// add the variable name to the map, set group index to -1 to indicate it has not yet been determined
-			tmpMetric.Variables[tmpMetric.Expression[expressionIdx:][startVar+1:endVar]] = -1
+			metric.Variables[metric.Expression[expressionIdx:][startVar+1:endVar]] = -1
 			expressionIdx += endVar + 1
 		}
-		if tmpMetric.Evaluable, err = govaluate.NewEvaluableExpressionWithFunctions(tmpMetric.Expression, evaluatorFunctions); err != nil {
-			slog.Error("failed to create evaluable expression for metric", slog.String("error", err.Error()), slog.String("metric name", tmpMetric.Name), slog.String("metric expression", tmpMetric.Expression))
-			return
-		}
-		metrics = append(metrics, tmpMetric)
 	}
-	return
+	return metrics, nil
+}
+
+func removeMetricsPrefix(metrics []MetricDefinition) ([]MetricDefinition, error) {
+	for i := range metrics {
+		metric := &metrics[i]
+		metric.Name = strings.TrimPrefix(metric.Name, "metric_")
+	}
+	return metrics, nil
+}
+
+func configureMetrics(metrics []MetricDefinition, uncollectableEvents []string, metadata Metadata) ([]MetricDefinition, error) {
+	var err error
+	// remove metrics that use uncollectable events
+	metrics, err = removeIfUncollectableEvents(metrics, uncollectableEvents)
+	if err != nil {
+		return nil, fmt.Errorf("failed to remove uncollectable events: %w", err)
+	}
+
+	// replace constants variables with their values
+	metrics, err = replaceConstants(metrics, metadata)
+	if err != nil {
+		return nil, fmt.Errorf("failed to replace constants: %w", err)
+	}
+
+	// replace retire latencies variables with their values
+	metrics, err = replaceRetireLatencies(metrics, metadata)
+	if err != nil {
+		return nil, fmt.Errorf("failed to replace retire latencies: %w", err)
+	}
+
+	// transform metric expressions from perfmon format to perfspect format
+	metrics, err = transformMetricExpressions(metrics)
+	if err != nil {
+		return nil, fmt.Errorf("failed to transform metric expressions: %w", err)
+	}
+
+	// replace constant numbers masquerading as variables with their values
+	metrics, err = replaceConstantNumbers(metrics)
+	if err != nil {
+		return nil, fmt.Errorf("failed to replace constant numbers: %w", err)
+	}
+
+	// set evaluable expressions for each metric
+	metrics, err = setEvaluableExpressions(metrics)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set evaluable expressions: %w", err)
+	}
+
+	// initialize metric variables
+	metrics, err = initializeMetricVariables(metrics)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize metric variables: %w", err)
+	}
+
+	// remove "metric_" prefix from metric names
+	metrics, err = removeMetricsPrefix(metrics)
+	if err != nil {
+		return nil, fmt.Errorf("failed to remove metrics prefix: %w", err)
+	}
+
+	return metrics, nil
 }
 
 // getEvaluatorFunctions defines functions that can be called in metric expressions
