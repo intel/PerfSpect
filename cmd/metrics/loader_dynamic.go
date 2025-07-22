@@ -143,19 +143,19 @@ func (l *DynamicLoader) Load(metricConfigOverridePath string, _ string, selected
 
 	// Merge all groups into a single slice of GroupDefinition
 	allGroups := make([]GroupDefinition, 0)
-	for i, group := range coreGroups {
-		perfGroup, _ := group.StringForPerf()
-		fmt.Printf("echo \"core group %d\"\nsudo ./perf stat -e '%s' sleep 1\n\n", i, perfGroup)
+	for _, group := range coreGroups {
+		// perfGroup, _ := group.StringForPerf()
+		// fmt.Printf("echo \"core group %d\"\nsudo ./perf stat -e '%s' sleep 1\n\n", i, perfGroup)
 		allGroups = append(allGroups, group.ToGroupDefinition())
 	}
-	for i, group := range uncoreGroups {
-		perfGroup, _ := group.StringForPerf()
-		fmt.Printf("echo \"uncore group %d\"\nsudo ./perf stat -e '%s' sleep 1\n\n", i, perfGroup)
+	for _, group := range uncoreGroups {
+		// perfGroup, _ := group.StringForPerf()
+		// fmt.Printf("echo \"uncore group %d\"\nsudo ./perf stat -e '%s' sleep 1\n\n", i, perfGroup)
 		allGroups = append(allGroups, group.ToGroupDefinition())
 	}
-	for i, group := range otherGroups {
-		perfGroup, _ := group.StringForPerf()
-		fmt.Printf("echo \"other group %d\"\nsudo ./perf stat -e '%s' sleep 1\n\n", i, perfGroup)
+	for _, group := range otherGroups {
+		// perfGroup, _ := group.StringForPerf()
+		// fmt.Printf("echo \"other group %d\"\nsudo ./perf stat -e '%s' sleep 1\n\n", i, perfGroup)
 		allGroups = append(allGroups, group.ToGroupDefinition())
 	}
 
@@ -165,49 +165,34 @@ func (l *DynamicLoader) Load(metricConfigOverridePath string, _ string, selected
 		return nil, nil, fmt.Errorf("error abbreviating uncore event names: %w", err)
 	}
 
+	// apply common modifications to metric expressions
 	metrics, err = configureMetrics(metrics, uncollectableEvents, metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to configure metrics: %w", err)
 	}
 
-	metrics, err = removeMetricsPrefix(metrics)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to remove metrics prefix: %w", err)
-	}
 	return metrics, allGroups, nil
 }
 
-func removeMetricsPrefix(metrics []MetricDefinition) ([]MetricDefinition, error) {
+func abbreviateUncoreEventNames(metrics []MetricDefinition, uncoreEvents UncoreEvents) ([]MetricDefinition, error) {
 	for i := range metrics {
 		metric := &metrics[i]
-		metric.Name = strings.TrimPrefix(metric.Name, "metric_")
-	}
-	return metrics, nil
-}
-
-func abbreviateUncoreEventNames(metrics []MetricDefinition, uncoreEvents UncoreEvents) ([]MetricDefinition, error) {
-	abbreviatedMetrics := make([]MetricDefinition, 0, len(metrics))
-	for i := range metrics {
-		metric := metrics[i]
-		abbreviatedExpression := metric.Expression
 		for _, uncoreEvent := range uncoreEvents.Events {
 			re, err := regexp.Compile(fmt.Sprintf(`\b%s\b`, uncoreEvent.EventName))
 			if err != nil {
 				return nil, fmt.Errorf("failed to compile regex for uncore event %s: %w", uncoreEvent.EventName, err)
 			}
 			for {
-				index := re.FindStringIndex(abbreviatedExpression)
+				index := re.FindStringIndex(metric.Expression)
 				if index == nil {
 					break // no more matches found
 				}
 				// replace the first occurrence of the alias with the replacement
-				abbreviatedExpression = abbreviatedExpression[:index[0]] + uncoreEvent.UniqueID + abbreviatedExpression[index[1]:]
+				metric.Expression = metric.Expression[:index[0]] + uncoreEvent.UniqueID + metric.Expression[index[1]:]
 			}
 		}
-		metric.Expression = abbreviatedExpression
-		abbreviatedMetrics = append(abbreviatedMetrics, metric)
 	}
-	return abbreviatedMetrics, nil
+	return metrics, nil
 }
 
 // getExpression retrieves the expression for a given PerfmonMetric, replacing variables with their corresponding event or constant names.
