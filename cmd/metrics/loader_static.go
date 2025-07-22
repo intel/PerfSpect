@@ -78,8 +78,8 @@ func loadMetricDefinitions(metricDefinitionOverridePath string, selectedMetrics 
 		metrics = metricsInFile
 	}
 	// abbreviate event names in metrics to shorten the eventual perf stat command line
-	for _, metric := range metrics {
-		metric.Expression = abbreviateEventName(metric.Expression)
+	for i := range metrics {
+		metrics[i].Expression = abbreviateEventName(metrics[i].Expression)
 	}
 	return
 }

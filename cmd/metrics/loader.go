@@ -265,7 +265,8 @@ func replaceRetireLatencies(metrics []MetricDefinition, metadata Metadata) ([]Me
 func removeIfUncollectableEvents(metrics []MetricDefinition, uncollectableEvents []string) ([]MetricDefinition, error) {
 	// remove metrics that use uncollectable events
 	var filteredMetrics []MetricDefinition
-	for _, metric := range metrics {
+	for i := range metrics {
+		metric := &metrics[i]
 		foundUncollectable := false
 		for _, uncollectableEvent := range uncollectableEvents {
 			if strings.Contains(metric.Expression, uncollectableEvent) {
@@ -275,7 +276,7 @@ func removeIfUncollectableEvents(metrics []MetricDefinition, uncollectableEvents
 			}
 		}
 		if !foundUncollectable {
-			filteredMetrics = append(filteredMetrics, metric)
+			filteredMetrics = append(filteredMetrics, *metric)
 		}
 	}
 	return filteredMetrics, nil
@@ -284,7 +285,8 @@ func removeIfUncollectableEvents(metrics []MetricDefinition, uncollectableEvents
 func transformMetricExpressions(metrics []MetricDefinition) ([]MetricDefinition, error) {
 	// transform if/else to ?/:
 	var transformedMetrics []MetricDefinition
-	for _, metric := range metrics {
+	for i := range metrics {
+		metric := &metrics[i]
 		transformed, err := perfmonToPerfspectConditional(metric.Expression)
 		if err != nil {
 			return nil, fmt.Errorf("failed to transform metric expression: %w", err)
@@ -297,7 +299,7 @@ func transformMetricExpressions(metrics []MetricDefinition) ([]MetricDefinition,
 			metric.Expression = transformed
 		}
 		// add the transformed metric to the list
-		transformedMetrics = append(transformedMetrics, metric)
+		transformedMetrics = append(transformedMetrics, *metric)
 	}
 	return transformedMetrics, nil
 }
