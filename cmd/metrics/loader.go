@@ -372,6 +372,9 @@ func removeMetricsPrefix(metrics []MetricDefinition) ([]MetricDefinition, error)
 func configureMetrics(metrics []MetricDefinition, uncollectableEvents []string, metadata Metadata) ([]MetricDefinition, error) {
 	var err error
 	// remove metrics that use uncollectable events
+	if flagTransactionRate == 0 {
+		uncollectableEvents = append(uncollectableEvents, "TXN") // if transaction rate is not set, remove TXN event
+	}
 	metrics, err = removeIfUncollectableEvents(metrics, uncollectableEvents)
 	if err != nil {
 		return nil, fmt.Errorf("failed to remove uncollectable events: %w", err)
