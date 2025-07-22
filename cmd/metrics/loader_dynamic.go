@@ -121,6 +121,16 @@ func (l *DynamicLoader) Load(metricConfigOverridePath string, _ string, selected
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading metrics from definitions: %w", err)
 	}
+	// abbreviate uncore event names in metric expressions
+	metrics, err = abbreviateUncoreEventNames(metrics, uncoreEvents)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error abbreviating uncore event names: %w", err)
+	}
+	// simplify OCR event names in metric expressions
+	metrics, err = customizeOCREventNames(metrics)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error simplifying OCR event names: %w", err)
+	}
 	// Create event groups from the perfspect metrics
 	coreGroups, uncoreGroups, otherGroups, uncollectableEvents, err := loadEventGroupsFromMetrics(
 		includedMetrics,
@@ -160,11 +170,6 @@ func (l *DynamicLoader) Load(metricConfigOverridePath string, _ string, selected
 	for _, group := range otherGroups {
 		allGroups = append(allGroups, group.ToGroupDefinition())
 	}
-	// abbreviate uncore event names in metric expressions
-	metrics, err = abbreviateUncoreEventNames(metrics, uncoreEvents)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error abbreviating uncore event names: %w", err)
-	}
 	// apply common modifications to metric expressions
 	metrics, err = configureMetrics(metrics, uncollectableEvents, metadata)
 	if err != nil {
@@ -186,9 +191,36 @@ func abbreviateUncoreEventNames(metrics []MetricDefinition, uncoreEvents UncoreE
 				if index == nil {
 					break // no more matches found
 				}
-				// replace the first occurrence of the alias with the replacement
+				// replace this occurrence of the original with the replacement
 				metric.Expression = metric.Expression[:index[0]] + uncoreEvent.UniqueID + metric.Expression[index[1]:]
 			}
+		}
+	}
+	return metrics, nil
+}
+
+func customizeOCREventNames(metrics []MetricDefinition) ([]MetricDefinition, error) {
+	for i := range metrics {
+		metric := &metrics[i]
+		// example portion of expression: [OCR.DEMAND_RFO.L3_MISS:ocr_msr_val=0x103b8000]
+		if !strings.Contains(metric.Expression, ":ocr_msr_val=") {
+			continue // only customize OCR events with this format
+		}
+		re, err := regexp.Compile(`(OCR\.[^\]]+):ocr_msr_val=([0-9a-fx]+)`)
+		if err != nil {
+			return nil, fmt.Errorf("failed to compile regex for OCR event: %w", err)
+		}
+		for {
+			index := re.FindStringSubmatchIndex(metric.Expression)
+			if index == nil {
+				break // no more matches found
+			}
+			// extract the event name and MSR value from the match
+			eventName := metric.Expression[index[2]:index[3]]
+			msrValue := metric.Expression[index[4]:index[5]]
+			// replace the OCR event with its customized name
+			customizedName := fmt.Sprintf("%s.%s", eventName, msrValue)
+			metric.Expression = metric.Expression[:index[0]] + customizedName + metric.Expression[index[1]:]
 		}
 	}
 	return metrics, nil
