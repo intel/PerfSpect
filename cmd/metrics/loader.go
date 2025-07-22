@@ -37,35 +37,35 @@ type BaseLoader struct {
 	microarchitecture string
 }
 
-type StaticLoader struct {
+type LegacyLoader struct {
 	BaseLoader
 }
 
-type DynamicLoader struct {
+type PerfmonLoader struct {
 	BaseLoader
 }
 
 func NewLoader(uarch string) (Loader, error) {
 	switch strings.ToLower(uarch) {
 	case "gnrxxx", "srf", "emrxxx", "spr", "icx", "clx", "skx", "bdx", "bergamo", "genoa", "turin":
-		return newStaticLoader(strings.ToLower(uarch)), nil
+		return newLegacyLoader(strings.ToLower(uarch)), nil
 	case "gnr", "emr":
-		return newDynamicLoader(strings.ToLower(uarch)), nil
+		return newPerfmonLoader(strings.ToLower(uarch)), nil
 	default:
 		return nil, fmt.Errorf("unsupported microarchitecture: %s", uarch)
 	}
 }
 
-func newStaticLoader(uarch string) *StaticLoader {
-	return &StaticLoader{
+func newLegacyLoader(uarch string) *LegacyLoader {
+	return &LegacyLoader{
 		BaseLoader: BaseLoader{
 			microarchitecture: uarch,
 		},
 	}
 }
 
-func newDynamicLoader(uarch string) *DynamicLoader {
-	return &DynamicLoader{
+func newPerfmonLoader(uarch string) *PerfmonLoader {
+	return &PerfmonLoader{
 		BaseLoader: BaseLoader{
 			microarchitecture: uarch,
 		},

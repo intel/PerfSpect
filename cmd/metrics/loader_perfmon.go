@@ -63,7 +63,7 @@ type MetricsConfig struct {
 	ReportMetrics            []PerfspectMetric   `json:"ReportMetrics"`            // Metrics that are reported in the PerfSpect report
 }
 
-func (l *DynamicLoader) loadMetricsConfig(metricConfigOverridePath string, metadata Metadata) (MetricsConfig, error) {
+func (l *PerfmonLoader) loadMetricsConfig(metricConfigOverridePath string, metadata Metadata) (MetricsConfig, error) {
 	var config MetricsConfig
 	var bytes []byte
 	if metricConfigOverridePath != "" {
@@ -85,7 +85,7 @@ func (l *DynamicLoader) loadMetricsConfig(metricConfigOverridePath string, metad
 	return config, nil
 }
 
-func (l *DynamicLoader) Load(metricConfigOverridePath string, _ string, selectedMetrics []string, metadata Metadata) ([]MetricDefinition, []GroupDefinition, error) {
+func (l *PerfmonLoader) Load(metricConfigOverridePath string, _ string, selectedMetrics []string, metadata Metadata) ([]MetricDefinition, []GroupDefinition, error) {
 	// Load the metrics configuration from the JSON file
 	config, err := l.loadMetricsConfig(metricConfigOverridePath, metadata)
 	if err != nil {
