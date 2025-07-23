@@ -51,7 +51,7 @@ type PerfmonLoader struct {
 func NewLoader(uarch string) (Loader, error) {
 	switch strings.ToLower(uarch) {
 	case "gnrxxx", "srf", "emrxx", "spr", "icx", "clx", "skx", "bdx", "bergamo", "genoa", "turin":
-		return newStaticLoader(strings.ToLower(uarch)), nil
+		return newLegacyLoader(strings.ToLower(uarch)), nil
 	case "gnr", "emr":
 		return newPerfmonLoader(strings.ToLower(uarch)), nil
 	default:
