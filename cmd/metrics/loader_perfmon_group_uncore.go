@@ -6,6 +6,7 @@ package metrics
 import (
 	"fmt"
 	"io"
+	"maps"
 	"perfspect/internal/util"
 	"slices"
 	"strings"
@@ -72,9 +73,7 @@ func (group UncoreGroup) Equal(other UncoreGroup) bool {
 func (group UncoreGroup) Copy() UncoreGroup {
 	newGroup := NewUncoreGroup(group.MaxGeneralPurposeCounters)
 	copy(newGroup.MetricNames, group.MetricNames)
-	for k, v := range group.GeneralPurposeCounters {
-		newGroup.GeneralPurposeCounters[k] = v // Copy general purpose counters
-	}
+	maps.Copy(newGroup.GeneralPurposeCounters, group.GeneralPurposeCounters)
 	return newGroup
 }
 
