@@ -303,8 +303,24 @@ func terminateApplication(cmd *cobra.Command, args []string) error {
 func onIntelNetwork() bool {
 	// If we can't lookup the Intel autoproxy domain then we aren't on the Intel
 	// network
-	_, err := net.LookupHost("wpad.intel.com")
-	return err == nil
+	timeout := 1 * time.Second // quick timeout
+	host := "wpad.intel.com"
+	// create a context with a timeout
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	// create a resolver
+	resolver := &net.Resolver{}
+	// perform the lookup
+	_, err := resolver.LookupHost(ctx, host)
+	if err != nil {
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			slog.Debug("DNS lookup timed out", "host", host)
+		} else {
+			slog.Debug("DNS lookup failed", "host", host, "error", err.Error())
+		}
+		return false
+	}
+	return true
 }
 
 func checkForUpdates(version string) (bool, manifest, error) {
