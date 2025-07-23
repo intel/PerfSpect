@@ -18,29 +18,29 @@ import (
 type PerfmonMetricsHeader map[string]string
 
 type PerfmonMetricThreshold struct {
-	ThresholdMetrics []map[string]string `json:"ThresholdMetrics,omitempty"`
-	Formula          string              `json:"Formula,omitempty"`
-	BaseFormula      string              `json:"BaseFormula,omitempty"`
-	ThresholdIssues  string              `json:"ThresholdIssues,omitempty"`
+	ThresholdMetrics []map[string]string `json:"ThresholdMetrics"`
+	Formula          string              `json:"Formula"`
+	BaseFormula      string              `json:"BaseFormula"`
+	ThresholdIssues  string              `json:"ThresholdIssues"`
 }
 
 type PerfmonMetric struct {
 	MetricName       string                  `json:"MetricName"`
 	LegacyName       string                  `json:"LegacyName"`
-	ParentCategory   string                  `json:"ParentCategory,omitempty"`
+	ParentCategory   string                  `json:"ParentCategory"`
 	Level            int                     `json:"Level"`
 	BriefDescription string                  `json:"BriefDescription"`
 	UnitOfMeasure    string                  `json:"UnitOfMeasure"`
 	Events           []map[string]string     `json:"Events"`
 	Constants        []map[string]string     `json:"Constants"`
 	Formula          string                  `json:"Formula"`
-	BaseFormula      string                  `json:"BaseFormula,omitempty"`
+	BaseFormula      string                  `json:"BaseFormula"`
 	Category         string                  `json:"Category"`
-	CountDomain      string                  `json:"CountDomain,omitempty"`
-	Threshold        *PerfmonMetricThreshold `json:"Threshold,omitempty"`
+	CountDomain      string                  `json:"CountDomain"`
+	Threshold        *PerfmonMetricThreshold `json:"Threshold"`
 	ResolutionLevels string                  `json:"ResolutionLevels"`
 	MetricGroup      string                  `json:"MetricGroup"`
-	LocateWith       string                  `json:"LocateWith,omitempty"`
+	LocateWith       string                  `json:"LocateWith"`
 }
 
 type PerfmonMetrics struct {
