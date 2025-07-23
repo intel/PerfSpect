@@ -31,6 +31,7 @@ import (
 	"perfspect/internal/common"
 	"perfspect/internal/util"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -311,7 +312,7 @@ func onIntelNetwork() bool {
 	// perform the lookup
 	_, err := resolver.LookupHost(ctx, host)
 	if err != nil {
-		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+		if errors.Is(err, context.DeadlineExceeded) {
 			slog.Debug("DNS lookup timed out", "host", host)
 		} else {
 			slog.Debug("DNS lookup failed", "host", host, "error", err.Error())
