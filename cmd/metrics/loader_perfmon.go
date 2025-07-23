@@ -15,23 +15,37 @@ import (
 	"strings"
 )
 
-type PerfmonMetricHeader map[string]string
-type PerfmonMetric struct {
-	MetricName       string              `json:"MetricName"`
-	LegacyName       string              `json:"LegacyName"`
-	Level            int                 `json:"Level"`
-	BriefDescription string              `json:"BriefDescription"`
-	UnitOfMeasure    string              `json:"UnitOfMeasure"`
-	Events           []map[string]string `json:"Events"`    // Each event is a map with string keys and values
-	Constants        []map[string]string `json:"Constants"` // Each constant is a map with string keys and values
-	Formula          string              `json:"Formula"`
-	Category         string              `json:"Category"`
-	ResolutionLevels string              `json:"ResolutionLevels"` // List of resolution levels
-	MetricGroup      string              `json:"MetricGroup"`
+type PerfmonMetricsHeader map[string]string
+
+type PerfmonMetricThreshold struct {
+	ThresholdMetrics []map[string]string `json:"ThresholdMetrics,omitempty"`
+	Formula          string              `json:"Formula,omitempty"`
+	BaseFormula      string              `json:"BaseFormula,omitempty"`
+	ThresholdIssues  string              `json:"ThresholdIssues,omitempty"`
 }
+
+type PerfmonMetric struct {
+	MetricName       string                  `json:"MetricName"`
+	LegacyName       string                  `json:"LegacyName"`
+	ParentCategory   string                  `json:"ParentCategory,omitempty"`
+	Level            int                     `json:"Level"`
+	BriefDescription string                  `json:"BriefDescription"`
+	UnitOfMeasure    string                  `json:"UnitOfMeasure"`
+	Events           []map[string]string     `json:"Events"`
+	Constants        []map[string]string     `json:"Constants"`
+	Formula          string                  `json:"Formula"`
+	BaseFormula      string                  `json:"BaseFormula,omitempty"`
+	Category         string                  `json:"Category"`
+	CountDomain      string                  `json:"CountDomain,omitempty"`
+	Threshold        *PerfmonMetricThreshold `json:"Threshold,omitempty"`
+	ResolutionLevels string                  `json:"ResolutionLevels"`
+	MetricGroup      string                  `json:"MetricGroup"`
+	LocateWith       string                  `json:"LocateWith,omitempty"`
+}
+
 type PerfmonMetrics struct {
-	Header  PerfmonMetricHeader `json:"Header"`
-	Metrics []PerfmonMetric     `json:"Metrics"`
+	Header  PerfmonMetricsHeader `json:"Header"`
+	Metrics []PerfmonMetric      `json:"Metrics"`
 }
 
 func LoadPerfmonMetrics(path string) (PerfmonMetrics, error) {
