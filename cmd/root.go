@@ -118,10 +118,8 @@ Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
 	rootCmd.AddCommand(flame.Cmd)
 	rootCmd.AddCommand(lock.Cmd)
 	rootCmd.AddCommand(config.Cmd)
-	if onIntelNetwork() {
-		rootCmd.AddGroup([]*cobra.Group{{ID: "other", Title: "Other Commands:"}}...)
-		rootCmd.AddCommand(updateCmd)
-	}
+	rootCmd.AddGroup([]*cobra.Group{{ID: "other", Title: "Other Commands:"}}...)
+	rootCmd.AddCommand(updateCmd)
 	// Global (persistent) flags
 	rootCmd.PersistentFlags().BoolVar(&flagDebug, flagDebugName, false, "enable debug logging and retain temporary directories")
 	rootCmd.PersistentFlags().BoolVar(&flagSyslog, flagSyslogName, false, "write logs to syslog instead of a file")
@@ -344,8 +342,11 @@ const (
 var updateCmd = &cobra.Command{
 	GroupID: "other",
 	Use:     updateCommandName,
-	Short:   "Update the application",
+	Short:   "Update the application (Intel network only)",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if !onIntelNetwork() {
+			return fmt.Errorf("update command is only available on the Intel network")
+		}
 		appContext := cmd.Parent().Context().Value(common.AppContext{}).(common.AppContext)
 		localTempDir := appContext.LocalTempDir
 		updateAvailable, latestManifest, err := checkForUpdates(gVersion)
