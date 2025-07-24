@@ -75,8 +75,8 @@ type MetricsConfig struct {
 	PerfmonCoreEventsFile    string              `json:"PerfmonCoreEventsFile"`    // Path to the perfmon core events file
 	PerfmonUncoreEventsFile  string              `json:"PerfmonUncoreEventsFile"`  // Path to the perfmon uncore events file
 	PerfmonRetireLatencyFile string              `json:"PerfmonRetireLatencyFile"` // Path to the perfmon retire latency file
-	AlternateTMAMetricsFile  string              `json:"AlternateTMAMetricsFile"`  // Path to the alternate TMA metrics file
 	Metrics                  []PerfmonMetric     `json:"Metrics"`                  // Metrics defined by PerfSpect
+	AlternateTMAMetrics      []PerfmonMetric     `json:"AlternateTMAMetrics"`      // Alternate TMA metrics that can be used in place of the main TMA metrics
 	ReportMetrics            []PerfspectMetric   `json:"ReportMetrics"`            // Metrics that are reported in the PerfSpect report
 }
 
@@ -129,12 +129,12 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, _ string, selected
 		return nil, nil, fmt.Errorf("error loading other events: %w", err)
 	}
 	// remove metrics that use uncollectable events
-	includedMetrics, err := removeUncollectableMetrics(config.ReportMetrics, perfmonMetricDefinitions.Metrics, config.Metrics, coreEvents, uncoreEvents, otherEvents, metadata)
+	includedMetrics, err := removeUncollectableMetrics(config.ReportMetrics, perfmonMetricDefinitions.Metrics, config.Metrics, config.AlternateTMAMetrics, coreEvents, uncoreEvents, otherEvents, metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error removing uncollectable metrics: %w", err)
 	}
 	// Filter the metrics based on the selected metrics and load the metrics definitions
-	metrics, err := loadMetricsFromDefinitions(includedMetrics, perfmonMetricDefinitions.Metrics, config.Metrics)
+	metrics, err := loadMetricsFromDefinitions(includedMetrics, perfmonMetricDefinitions.Metrics, config.Metrics, config.AlternateTMAMetrics, metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading metrics from definitions: %w", err)
 	}
@@ -299,7 +299,7 @@ func getExpression(perfmonMetric PerfmonMetric) (string, error) {
 	return expression, nil
 }
 
-func loadMetricsFromDefinitions(includedMetrics []PerfspectMetric, perfmonMetrics []PerfmonMetric, perfspectMetrics []PerfmonMetric) ([]MetricDefinition, error) {
+func loadMetricsFromDefinitions(includedMetrics []PerfspectMetric, perfmonMetrics []PerfmonMetric, perfspectMetrics []PerfmonMetric, alternateTMAMetrics []PerfmonMetric, metadata Metadata) ([]MetricDefinition, error) {
 	var metrics []MetricDefinition
 	for _, includedMetric := range includedMetrics {
 		var perfmonMetric *PerfmonMetric
@@ -307,7 +307,11 @@ func loadMetricsFromDefinitions(includedMetrics []PerfspectMetric, perfmonMetric
 
 		switch strings.ToLower(includedMetric.Origin) {
 		case "perfmon":
-			perfmonMetric, found = findPerfmonMetric(perfmonMetrics, includedMetric.LegacyName)
+			if !metadata.SupportsFixedTMA {
+				perfmonMetric, found = findPerfmonMetric(alternateTMAMetrics, includedMetric.LegacyName)
+			} else if !found {
+				perfmonMetric, found = findPerfmonMetric(perfmonMetrics, includedMetric.LegacyName)
+			}
 		case "perfspect":
 			perfmonMetric, found = findPerfmonMetric(perfspectMetrics, includedMetric.LegacyName)
 		default:
@@ -333,7 +337,7 @@ func loadMetricsFromDefinitions(includedMetrics []PerfspectMetric, perfmonMetric
 	return metrics, nil
 }
 
-func removeUncollectableMetrics(includedMetrics []PerfspectMetric, perfmonMetrics []PerfmonMetric, perfspectMetrics []PerfmonMetric, coreEvents CoreEvents, uncoreEvents UncoreEvents, otherEvents OtherEvents, metadata Metadata) ([]PerfspectMetric, error) {
+func removeUncollectableMetrics(includedMetrics []PerfspectMetric, perfmonMetrics []PerfmonMetric, perfspectMetrics []PerfmonMetric, alternateTMAMetrics []PerfmonMetric, coreEvents CoreEvents, uncoreEvents UncoreEvents, otherEvents OtherEvents, metadata Metadata) ([]PerfspectMetric, error) {
 	var collectableMetrics []PerfspectMetric
 	for _, includedMetric := range includedMetrics {
 		var perfmonMetric *PerfmonMetric
@@ -358,9 +362,27 @@ func removeUncollectableMetrics(includedMetrics []PerfspectMetric, perfmonMetric
 		uncollectableEvents := getUncollectableEvents(eventNames, coreEvents, uncoreEvents, otherEvents, metadata)
 		if len(uncollectableEvents) > 0 {
 			slog.Warn("Metric contains uncollectable events", "metric", includedMetric.LegacyName, "uncollectableEvents", uncollectableEvents)
-			continue // skip this metric if it has uncollectable events
+			// check if there is an alternate TMA metric that can be used instead
+			for _, altMetric := range alternateTMAMetrics {
+				if altMetric.LegacyName == includedMetric.LegacyName {
+					var eventNames []string
+					for _, event := range altMetric.Events {
+						eventNames = util.UniqueAppend(eventNames, event["Name"])
+					}
+					// check if the alternate metric has uncollectable events
+					uncollectableAltEvents := getUncollectableEvents(eventNames, coreEvents, uncoreEvents, otherEvents, metadata)
+					if len(uncollectableAltEvents) > 0 {
+						slog.Warn("Alternate TMA metric also has uncollectable events", "metric", altMetric.LegacyName, "uncollectableEvents", uncollectableAltEvents)
+					} else {
+						slog.Info("Using alternate TMA metric", "metric", altMetric.LegacyName)
+						collectableMetrics = append(collectableMetrics, includedMetric)
+					}
+					break
+				}
+			}
+		} else {
+			collectableMetrics = append(collectableMetrics, includedMetric)
 		}
-		collectableMetrics = append(collectableMetrics, includedMetric)
 	}
 	return collectableMetrics, nil
 }
