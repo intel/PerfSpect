@@ -304,34 +304,38 @@ func loadMetricsFromDefinitions(includedMetrics []PerfspectMetric, perfmonMetric
 	for _, includedMetric := range includedMetrics {
 		var perfmonMetric *PerfmonMetric
 		var found bool
-
+		// find the metric in the perfmon metrics or perfspect metrics based on the origin
 		switch strings.ToLower(includedMetric.Origin) {
 		case "perfmon":
 			if !metadata.SupportsFixedTMA {
 				perfmonMetric, found = findPerfmonMetric(alternateTMAMetrics, includedMetric.LegacyName)
-			} else if !found {
+			}
+			if !found {
 				perfmonMetric, found = findPerfmonMetric(perfmonMetrics, includedMetric.LegacyName)
 			}
 		case "perfspect":
 			perfmonMetric, found = findPerfmonMetric(perfspectMetrics, includedMetric.LegacyName)
 		default:
-			return nil, fmt.Errorf("unknown metric origin: %s for metric: %s", includedMetric.Origin, includedMetric.LegacyName)
+			slog.Warn("Unknown metric origin", "origin", includedMetric.Origin, "metric", includedMetric.LegacyName)
+			continue
 		}
-
 		if !found {
-			return nil, fmt.Errorf("metric %s not found in %s metrics", includedMetric.LegacyName, includedMetric.Origin)
+			slog.Warn("Metric not found in metric definitions", "metric", includedMetric.LegacyName, "origin", includedMetric.Origin)
+			continue
 		}
-
+		// get the expression for the metric
 		expression, err := getExpression(*perfmonMetric)
 		if err != nil {
-			return nil, fmt.Errorf("error getting expression for metric %s: %w", perfmonMetric.LegacyName, err)
+			slog.Warn("Failed getting expression for metric", "metric", perfmonMetric.LegacyName, "error", err)
+			continue
 		}
-
+		// create a MetricDefinition from the perfmon metric
 		metric := MetricDefinition{
 			Name:        includedMetric.LegacyName,
 			Description: perfmonMetric.BriefDescription,
 			Expression:  expression,
 		}
+		// add the metric to the list of metrics
 		metrics = append(metrics, metric)
 	}
 	return metrics, nil
@@ -343,18 +347,25 @@ func removeUncollectableMetrics(includedMetrics []PerfspectMetric, perfmonMetric
 		var perfmonMetric *PerfmonMetric
 		var found bool
 		// find the metric in the perfmon metrics or perfspect metrics based on the origin
-		// and collect the event names from the metric
 		switch strings.ToLower(includedMetric.Origin) {
 		case "perfmon":
-			perfmonMetric, found = findPerfmonMetric(perfmonMetrics, includedMetric.LegacyName)
+			if !metadata.SupportsFixedTMA {
+				perfmonMetric, found = findPerfmonMetric(alternateTMAMetrics, includedMetric.LegacyName)
+			}
+			if !found {
+				perfmonMetric, found = findPerfmonMetric(perfmonMetrics, includedMetric.LegacyName)
+			}
 		case "perfspect":
 			perfmonMetric, found = findPerfmonMetric(perfspectMetrics, includedMetric.LegacyName)
 		default:
-			return nil, fmt.Errorf("unknown metric origin: %s for metric: %s", includedMetric.Origin, includedMetric.LegacyName)
+			slog.Warn("Unknown metric origin", "origin", includedMetric.Origin, "metric", includedMetric.LegacyName)
+			continue
 		}
 		if !found {
-			return nil, fmt.Errorf("metric %s not found in %s metrics", includedMetric.LegacyName, includedMetric.Origin)
+			slog.Warn("Metric not found in metric definitions", "metric", includedMetric.LegacyName, "origin", includedMetric.Origin)
+			continue
 		}
+		// collect the event names from the metric and check if any of them are uncollectable
 		var eventNames []string
 		for _, event := range perfmonMetric.Events {
 			eventNames = util.UniqueAppend(eventNames, event["Name"])
@@ -362,27 +373,10 @@ func removeUncollectableMetrics(includedMetrics []PerfspectMetric, perfmonMetric
 		uncollectableEvents := getUncollectableEvents(eventNames, coreEvents, uncoreEvents, otherEvents, metadata)
 		if len(uncollectableEvents) > 0 {
 			slog.Warn("Metric contains uncollectable events", "metric", includedMetric.LegacyName, "uncollectableEvents", uncollectableEvents)
-			// check if there is an alternate TMA metric that can be used instead
-			for _, altMetric := range alternateTMAMetrics {
-				if altMetric.LegacyName == includedMetric.LegacyName {
-					var eventNames []string
-					for _, event := range altMetric.Events {
-						eventNames = util.UniqueAppend(eventNames, event["Name"])
-					}
-					// check if the alternate metric has uncollectable events
-					uncollectableAltEvents := getUncollectableEvents(eventNames, coreEvents, uncoreEvents, otherEvents, metadata)
-					if len(uncollectableAltEvents) > 0 {
-						slog.Warn("Alternate TMA metric also has uncollectable events", "metric", altMetric.LegacyName, "uncollectableEvents", uncollectableAltEvents)
-					} else {
-						slog.Info("Using alternate TMA metric", "metric", altMetric.LegacyName)
-						collectableMetrics = append(collectableMetrics, includedMetric)
-					}
-					break
-				}
-			}
-		} else {
-			collectableMetrics = append(collectableMetrics, includedMetric)
+			continue
 		}
+		// if the metric is collectable, add it to the list of collectable metrics
+		collectableMetrics = append(collectableMetrics, includedMetric)
 	}
 	return collectableMetrics, nil
 }
