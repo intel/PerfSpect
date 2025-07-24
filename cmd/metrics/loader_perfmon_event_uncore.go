@@ -69,7 +69,12 @@ func (events UncoreEvents) FindEventByName(eventName string) UncoreEvent {
 
 func (event UncoreEvent) IsCollectable(metadata Metadata) bool {
 	if !metadata.SupportsUncore {
+		slog.Debug("Uncore events not supported", slog.String("event", event.EventName))
 		return false // uncore events are not supported
+	}
+	if flagScope == scopeProcess || flagScope == scopeCgroup {
+		slog.Debug("Uncore events not supported in process or cgroup scope", slog.String("event", event.EventName))
+		return false
 	}
 	deviceExists := false
 	for uncoreDeviceName := range metadata.UncoreDeviceIDs {

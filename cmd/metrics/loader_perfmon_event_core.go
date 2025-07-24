@@ -6,6 +6,7 @@ package metrics
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 )
@@ -87,21 +88,25 @@ func (events CoreEvents) FindEventByName(eventName string) CoreEvent {
 
 func (event CoreEvent) IsCollectable(metadata Metadata) bool {
 	if !metadata.SupportsFixedTMA && (strings.HasPrefix(event.EventName, "TOPDOWN.SLOTS") || strings.HasPrefix(event.EventName, "PERF_METRICS")) {
+		slog.Debug("Fixed TMA events not supported", slog.String("event", event.EventName))
 		return false // TOPDOWN.SLOTS and PERF_METRICS.* events are not supported
+	}
+	if !metadata.SupportsOCR || ((flagScope == scopeProcess || flagScope == scopeCgroup) && strings.HasPrefix(event.EventName, "OCR") || strings.HasPrefix(event.EventName, "OFFCORE_REQUESTS_OUTSTANDING")) {
+		slog.Debug("Off-core response events not supported", slog.String("event", event.EventName))
+		return false // OCR events are not supported in process or cgroup scope
+	}
+	if !metadata.SupportsRefCycles && strings.Contains(event.EventName, "ref-cycles") {
+		slog.Debug("Ref-cycles events not supported", slog.String("event", event.EventName))
+		return false // ref-cycles events are not supported
 	}
 	pebsEventNames := []string{"INT_MISC.UNKNOWN_BRANCH_CYCLES", "UOPS_RETIRED.MS"}
 	if !metadata.SupportsPEBS {
 		for _, pebsEventName := range pebsEventNames {
 			if strings.Contains(event.EventName, pebsEventName) {
+				slog.Debug("PEBS events not supported", slog.String("event", event.EventName))
 				return false // PEBS events are not supported
 			}
 		}
-	}
-	if !metadata.SupportsOCR && (strings.HasPrefix(event.EventName, "OCR") || strings.HasPrefix(event.EventName, "OFFCORE_REQUESTS_OUTSTANDING")) {
-		return false // OCR events are not supported
-	}
-	if !metadata.SupportsRefCycles && strings.Contains(event.EventName, "ref-cycles") {
-		return false // ref-cycles events are not supported
 	}
 	return true
 }

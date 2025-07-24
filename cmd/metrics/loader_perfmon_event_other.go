@@ -1,5 +1,7 @@
 package metrics
 
+import "log/slog"
+
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
@@ -29,6 +31,10 @@ func (events OtherEvents) FindEventByName(eventName string) OtherEvent {
 }
 
 func (event OtherEvent) IsCollectable(metadata Metadata) bool {
+	if flagScope == scopeProcess || flagScope == scopeCgroup {
+		slog.Debug("Other events not supported in process or cgroup scope", slog.String("event", event.EventName))
+		return false // other events are not supported in process or cgroup scope
+	}
 	return true
 }
 
