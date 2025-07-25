@@ -24,6 +24,7 @@ import (
 
 // Metadata is the representation of the platform's state and capabilities
 type Metadata struct {
+	NumGeneralPurposeCounters int // number of general purpose counters
 	CoresPerSocket            int
 	CPUSocketMap              map[int]int
 	UncoreDeviceIDs           map[string][]int
@@ -36,10 +37,11 @@ type Metadata struct {
 	PerfSupportedEvents       string
 	PMUDriverVersion          string
 	SocketCount               int
-	SupportsInstructions      bool
 	SupportsFixedCycles       bool
 	SupportsFixedInstructions bool
 	SupportsFixedTMA          bool
+	SupportsFixedRefCycles    bool
+	SupportsInstructions      bool
 	SupportsRefCycles         bool
 	SupportsUncore            bool
 	SupportsPEBS              bool
@@ -96,6 +98,12 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 		return
 	}
 	metadata.Microarchitecture = cpu.MicroArchitecture
+	// Number of General Purpose Counters
+	metadata.NumGeneralPurposeCounters, err = getNumGPCounters(metadata.Microarchitecture)
+	if err != nil {
+		err = fmt.Errorf("failed to get number of general purpose counters: %v", err)
+		return
+	}
 	// the rest of the metadata is retrieved by running scripts in parallel
 	metadataScripts, err := getMetadataScripts(noRoot, perfPath, metadata.Microarchitecture, noSystemSummary)
 	if err != nil {
@@ -167,6 +175,15 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 	} else {
 		if !metadata.SupportsFixedCycles {
 			slog.Warn("Fixed-counter 'cpu-cycles' events not supported", slog.String("output", output))
+		}
+	}
+	// Fixed-counter ref-cycles events
+	if metadata.SupportsFixedRefCycles, output, err = getSupportsFixedEvent("ref-cycles", scriptOutputs); err != nil {
+		slog.Warn("failed to determine if fixed-counter 'ref-cycles' is supported, assuming not supported", slog.String("error", err.Error()))
+		err = nil
+	} else {
+		if !metadata.SupportsFixedRefCycles {
+			slog.Warn("Fixed-counter 'ref-cycles' events not supported", slog.String("output", output))
 		}
 	}
 	// Fixed-counter instructions events
@@ -285,6 +302,11 @@ func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSumm
 			Superuser:      !noRoot,
 		},
 		{
+			Name:           "perf stat fixed ref-cycles",
+			ScriptTemplate: perfPath + " stat -a -e '{{{.RefCyclesList}}}' sleep 1",
+			Superuser:      !noRoot,
+		},
+		{
 			Name:           "pmu driver version",
 			ScriptTemplate: "dmesg | grep -A 1 \"Intel PMU driver\" | tail -1 | awk '{print $NF}'",
 			Superuser:      !noRoot,
@@ -321,6 +343,12 @@ func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSumm
 				eventList = append(eventList, "cpu-cycles")
 			}
 			scriptDef.ScriptTemplate = strings.Replace(scriptDef.ScriptTemplate, "{{.CpuCyclesList}}", strings.Join(eventList, ","), -1)
+		case "perf stat fixed ref-cycles":
+			var eventList []string
+			for range numGPCounters + 1 {
+				eventList = append(eventList, "ref-cycles")
+			}
+			scriptDef.ScriptTemplate = strings.Replace(scriptDef.ScriptTemplate, "{{.RefCyclesList}}", strings.Join(eventList, ","), -1)
 		}
 		metadataScripts = append(metadataScripts, scriptDef)
 	}
@@ -616,29 +644,11 @@ func getSupportsFixedTMA(scriptOutputs map[string]script.ScriptOutput) (supporte
 func getNumGPCounters(uarch string) (numGPCounters int, err error) {
 	shortUarch := uarch[:3]
 	switch shortUarch {
-	case "BDX":
-		fallthrough
-	case "SKX":
-		fallthrough
-	case "CLX":
+	case "BDX", "SKX", "CLX":
 		numGPCounters = 4
-	case "ICX":
-		fallthrough
-	case "SPR":
-		fallthrough
-	case "EMR":
-		fallthrough
-	case "SRF":
-		fallthrough
-	case "CWF":
-		fallthrough
-	case "GNR":
+	case "ICX", "SPR", "EMR", "SRF", "CWF", "GNR":
 		numGPCounters = 8
-	case "Gen":
-		fallthrough
-	case "Ber":
-		fallthrough
-	case "Tur":
+	case "Gen", "Ber", "Tur":
 		numGPCounters = 5
 	default:
 		err = fmt.Errorf("unsupported uarch: %s", uarch)
