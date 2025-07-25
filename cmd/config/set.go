@@ -12,10 +12,14 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+var uncoreDieFrequencyMutex sync.Mutex
+var uncoreFrequencyMutex sync.Mutex
 
 func setCoreCount(cores int, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
 	setScript := script.ScriptDefinition{
@@ -264,6 +268,10 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 }
 
 func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float64, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+	// Acquire mutex lock to protect concurrent access
+	uncoreDieFrequencyMutex.Lock()
+	defer uncoreDieFrequencyMutex.Unlock()
+
 	targetFamily, err := myTarget.GetFamily()
 	if err != nil {
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get target family: %w", err)}
@@ -331,6 +339,10 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 }
 
 func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+	// Acquire mutex lock to protect concurrent access
+	uncoreFrequencyMutex.Lock()
+	defer uncoreFrequencyMutex.Unlock()
+
 	scripts := []script.ScriptDefinition{}
 	scripts = append(scripts, script.ScriptDefinition{
 		Name:           "get uncore frequency MSR",
