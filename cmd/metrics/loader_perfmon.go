@@ -387,6 +387,11 @@ func loadEventGroupsFromMetrics(includedMetrics []PerfspectMetric, perfmonMetric
 	otherGroups := make([]OtherGroup, 0)
 	uncollectableEvents := make([]string, 0)
 
+	// create a group for the TMA events as we can only have one group that includes TMA events (starting in perf 6.13)
+	if metadata.SupportsFixedTMA {
+		coreGroups = append(coreGroups, NewCoreGroupWithTMAEvents(metadata))
+	}
+
 	for _, includedMetric := range includedMetrics {
 		var metricEventNames []string
 		var perfmonMetric *PerfmonMetric

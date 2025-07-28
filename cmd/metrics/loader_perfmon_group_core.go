@@ -22,11 +22,6 @@ type CoreGroup struct {
 func NewCoreGroup(metadata Metadata) CoreGroup {
 	// initialize core group by setting up the fixed purpose counters
 	var fixedCounters []CoreEvent
-	// if supported, TOPDOWN_SLOTS is always first (perf requirement)
-	if metadata.SupportsFixedTMA {
-		fixedCounters = append(fixedCounters, CoreEvent{EventName: "TOPDOWN.SLOTS:perf_metrics", EventCode: "0x00", UMask: "0x04", SampleAfterValue: "10000003"})
-		fixedCounters = append(fixedCounters, perfMetricsEvents...) // add perf metrics events to fixed counters
-	}
 	if metadata.SupportsFixedCycles {
 		fixedCounters = append(fixedCounters, CoreEvent{EventName: "CPU_CLK_UNHALTED.THREAD", EventCode: "0x00", UMask: "0x02", SampleAfterValue: "2000003"})
 	}
@@ -42,6 +37,17 @@ func NewCoreGroup(metadata Metadata) CoreGroup {
 		GeneralPurposeCounters:    make(map[int]CoreEvent, 0),
 		MetricNames:               make([]string, 0),
 	}
+}
+
+func NewCoreGroupWithTMAEvents(metadata Metadata) CoreGroup {
+	group := NewCoreGroup(metadata)
+	// prepend TMA events to the fixed purpose counters
+	tmaEvents := []CoreEvent{
+		{EventName: "TOPDOWN.SLOTS:perf_metrics", EventCode: "0x00", UMask: "0x04", SampleAfterValue: "10000003"},
+	}
+	tmaEvents = append(tmaEvents, perfMetricsEvents...)
+	group.FixedPurposeCounters = append(tmaEvents, group.FixedPurposeCounters...)
+	return group
 }
 
 func (group CoreGroup) ToGroupDefinition() GroupDefinition {
@@ -178,6 +184,10 @@ func (group CoreGroup) AddEvent(event CoreEvent, reorder bool) error {
 		if offcoreCount >= 2 {
 			return fmt.Errorf("group already has two OCR events, cannot add %s", event.EventName)
 		}
+	}
+	// ignore TMA events, they are in there own special core group
+	if strings.HasPrefix(event.EventName, "PERF_METRICS.") || event.EventName == "TOPDOWN.SLOTS:perf_metrics" {
+		return nil
 	}
 	// get the list of valid counters for this event
 	validCounters := event.Counter

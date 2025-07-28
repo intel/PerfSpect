@@ -11,7 +11,6 @@ import (
 	"perfspect/internal/script"
 	"perfspect/internal/target"
 	"perfspect/internal/util"
-	"strconv"
 	"strings"
 )
 
@@ -44,35 +43,16 @@ func getPerfPath(myTarget target.Target, localPerfPath string) (string, error) {
 	if _, ok := myTarget.(*target.LocalTarget); ok {
 		perfPath = localPerfPath
 	} else {
-		hasPerf := false
-		cmd := exec.Command("perf", "--version")
-		output, _, _, err := myTarget.RunCommand(cmd, 0, true)
-		if err == nil && strings.Contains(output, "perf version") {
-			// get the version number
-			version := strings.Split(strings.TrimSpace(output), " ")[2]
-			// split version into major and minor and build numbers
-			versionParts := strings.Split(version, ".")
-			if len(versionParts) >= 2 {
-				major, _ := strconv.Atoi(versionParts[0])
-				minor, _ := strconv.Atoi(versionParts[1])
-				if major > 6 || (major == 6 && minor >= 1) {
-					hasPerf = true
-				}
-			}
+		targetTempDir := myTarget.GetTempDirectory()
+		if targetTempDir == "" {
+			slog.Error("targetTempDir is empty for remote target", slog.String("target", myTarget.GetName()))
+			return "", fmt.Errorf("targetTempDir is empty for target %s", myTarget.GetName())
 		}
-		if hasPerf {
-			perfPath = "perf"
-		} else {
-			targetTempDir := myTarget.GetTempDirectory()
-			if targetTempDir == "" {
-				panic("targetTempDir is empty")
-			}
-			if err = myTarget.PushFile(localPerfPath, targetTempDir); err != nil {
-				slog.Error("failed to push perf binary to remote directory", slog.String("error", err.Error()))
-				return "", err
-			}
-			perfPath = path.Join(targetTempDir, "perf")
+		if err := myTarget.PushFile(localPerfPath, targetTempDir); err != nil {
+			slog.Error("failed to push perf binary to remote directory", slog.String("error", err.Error()))
+			return "", err
 		}
+		perfPath = path.Join(targetTempDir, "perf")
 	}
 	return perfPath, nil
 }
