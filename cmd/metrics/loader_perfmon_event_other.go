@@ -38,7 +38,7 @@ func (event OtherEvent) IsCollectable(metadata Metadata) bool {
 		slog.Debug("Other events not supported in process or cgroup scope", slog.String("event", event.EventName))
 		return false // other events are not supported in process or cgroup scope
 	}
-	if strings.Contains(metadata.PerfSupportedEvents, event.EventName) {
+	if !strings.Contains(metadata.PerfSupportedEvents, event.EventName) {
 		slog.Debug("Other event is not supported by perf", slog.String("event", event.EventName))
 		return false // other events are not supported
 	}

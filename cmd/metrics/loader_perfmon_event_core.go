@@ -87,7 +87,7 @@ func (events CoreEvents) FindEventByName(eventName string) CoreEvent {
 }
 
 func (event CoreEvent) IsCollectable(metadata Metadata) bool {
-	if !metadata.SupportsFixedTMA && (strings.HasPrefix(event.EventName, "TOPDOWN.SLOTS") || strings.HasPrefix(event.EventName, "PERF_METRICS")) {
+	if !metadata.SupportsFixedTMA && (strings.HasPrefix(event.EventName, "TOPDOWN.SLOTS") || strings.HasPrefix(event.EventName, "PERF_METRICS")) && event.EventName != "TOPDOWN.SLOTS_P" {
 		slog.Debug("Fixed TMA events not supported", slog.String("event", event.EventName))
 		return false // TOPDOWN.SLOTS and PERF_METRICS.* events are not supported
 	}

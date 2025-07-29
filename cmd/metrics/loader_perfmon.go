@@ -153,6 +153,7 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, _ string, selected
 		includedMetrics,
 		perfmonMetricDefinitions.Metrics,
 		config.Metrics,
+		config.AlternateTMAMetrics,
 		coreEvents,
 		uncoreEvents,
 		otherEvents,
@@ -381,7 +382,7 @@ func removeUncollectableMetrics(includedMetrics []PerfspectMetric, perfmonMetric
 	return collectableMetrics, nil
 }
 
-func loadEventGroupsFromMetrics(includedMetrics []PerfspectMetric, perfmonMetrics []PerfmonMetric, perfspectMetrics []PerfmonMetric, coreEvents CoreEvents, uncoreEvents UncoreEvents, otherEvents OtherEvents, metadata Metadata) ([]CoreGroup, []UncoreGroup, []OtherGroup, []string, error) {
+func loadEventGroupsFromMetrics(includedMetrics []PerfspectMetric, perfmonMetrics []PerfmonMetric, perfspectMetrics []PerfmonMetric, alternateTMAMetrics []PerfmonMetric, coreEvents CoreEvents, uncoreEvents UncoreEvents, otherEvents OtherEvents, metadata Metadata) ([]CoreGroup, []UncoreGroup, []OtherGroup, []string, error) {
 	coreGroups := make([]CoreGroup, 0)
 	uncoreGroups := make([]UncoreGroup, 0)
 	otherGroups := make([]OtherGroup, 0)
@@ -400,7 +401,12 @@ func loadEventGroupsFromMetrics(includedMetrics []PerfspectMetric, perfmonMetric
 		// and collect the event names from the metric
 		switch strings.ToLower(includedMetric.Origin) {
 		case "perfmon":
-			perfmonMetric, found = findPerfmonMetric(perfmonMetrics, includedMetric.LegacyName)
+			if !metadata.SupportsFixedTMA {
+				perfmonMetric, found = findPerfmonMetric(alternateTMAMetrics, includedMetric.LegacyName)
+			}
+			if !found {
+				perfmonMetric, found = findPerfmonMetric(perfmonMetrics, includedMetric.LegacyName)
+			}
 		case "perfspect":
 			perfmonMetric, found = findPerfmonMetric(perfspectMetrics, includedMetric.LegacyName)
 		default:

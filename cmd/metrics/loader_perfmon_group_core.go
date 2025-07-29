@@ -194,59 +194,63 @@ func (group CoreGroup) AddEvent(event CoreEvent, reorder bool) error {
 	if validCounters == "" {
 		return fmt.Errorf("event %s has no valid counters defined", event.EventName)
 	}
-	// does this event require a fixed counter that isn't already in the group?
-	// this should only happen if the ":k" variant is being added
 	if strings.HasPrefix(validCounters, "Fixed counter") {
-		// find the non :k variant of the event name
-		baseEventName := strings.TrimSuffix(event.EventName, ":k")
-		for i, fixedEvent := range group.FixedPurposeCounters {
-			if fixedEvent.EventName == baseEventName {
-				group.FixedPurposeCounters[i] = event // replace the fixed purpose counter with the new event
+		// two scenarios when a fixed counter isn't already in the group:
+		// 1. it's the ":k" variant of the event name
+		// 2. the event isn't supported in a fixed purpose counter, so we need to add it to a general purpose counter
+		if strings.HasSuffix(event.EventName, ":k") {
+			baseEventName := strings.TrimSuffix(event.EventName, ":k")
+			for i, fixedEvent := range group.FixedPurposeCounters {
+				if fixedEvent.EventName == baseEventName {
+					group.FixedPurposeCounters[i] = event // replace the fixed purpose counter with the new event
+					return nil
+				}
+			}
+		}
+		// fall through to add the event to a general purpose counter
+		validCounters = ""
+		for i := range group.MaxGeneralPurposeCounters {
+			validCounters += fmt.Sprintf("%d,", i)
+		}
+	}
+	// otherwise, it is a general purpose event, check if we can place it in one of the general purpose counters
+	if len(group.GeneralPurposeCounters) >= group.MaxGeneralPurposeCounters {
+		return fmt.Errorf("group already has maximum number of general purpose events (%d), cannot add %s", group.MaxGeneralPurposeCounters, event.EventName)
+	}
+	for i := 0; i < group.MaxGeneralPurposeCounters; i++ {
+		if _, ok := group.GeneralPurposeCounters[i]; !ok {
+			// this counter is empty, check if it is a valid counter for this event
+			counterIndex := fmt.Sprintf("%d", i)
+			if strings.Contains(validCounters, counterIndex) {
+				group.GeneralPurposeCounters[i] = event // place the event in this counter
 				return nil
 			}
 		}
-		// if we reach here, the fixed purpose counter was not found, that shouldn't happen
-		return fmt.Errorf("fixed purpose counter for %s not found in group", baseEventName)
-	} else {
-		// otherwise, it is a general purpose event, check if we can place it in one of the general purpose counters
-		if len(group.GeneralPurposeCounters) >= group.MaxGeneralPurposeCounters {
-			return fmt.Errorf("group already has maximum number of general purpose events (%d), cannot add %s", group.MaxGeneralPurposeCounters, event.EventName)
-		}
-		for i := 0; i < group.MaxGeneralPurposeCounters; i++ {
-			if _, ok := group.GeneralPurposeCounters[i]; !ok {
-				// this counter is empty, check if it is a valid counter for this event
-				counterIndex := fmt.Sprintf("%d", i)
-				if strings.Contains(validCounters, counterIndex) {
-					group.GeneralPurposeCounters[i] = event // place the event in this counter
-					return nil
-				}
+	}
+	if reorder {
+		// check if we can move an event that's already in the group to make room for the new event
+		for counter, existingEvent := range group.GeneralPurposeCounters {
+			// check if the new event can be placed in the current counter
+			if !strings.Contains(validCounters, fmt.Sprintf("%d", counter)) {
+				continue // not a valid counter for this event
 			}
-		}
-		if reorder {
-			// check if we can move an event that's already in the group to make room for the new event
-			for counter, existingEvent := range group.GeneralPurposeCounters {
-				// check if the new event can be placed in the current counter
-				if !strings.Contains(validCounters, fmt.Sprintf("%d", counter)) {
+			// check if the existing event can be moved to another unoccupied counter
+			for otherCounter := 0; otherCounter < group.MaxGeneralPurposeCounters; otherCounter++ {
+				if otherCounter == counter {
+					continue // skip the current counter
+				}
+				if _, ok := group.GeneralPurposeCounters[otherCounter]; ok {
+					continue // skip occupied counters
+				}
+				// check if the existing event is compatible with the other counter
+				if !strings.Contains(existingEvent.Counter, fmt.Sprintf("%d", otherCounter)) {
 					continue // not a valid counter for this event
 				}
-				// check if the existing event can be moved to another unoccupied counter
-				for otherCounter := 0; otherCounter < group.MaxGeneralPurposeCounters; otherCounter++ {
-					if otherCounter == counter {
-						continue // skip the current counter
-					}
-					if _, ok := group.GeneralPurposeCounters[otherCounter]; ok {
-						continue // skip occupied counters
-					}
-					// check if the existing event is compatible with the other counter
-					if !strings.Contains(existingEvent.Counter, fmt.Sprintf("%d", otherCounter)) {
-						continue // not a valid counter for this event
-					}
-					// we can move the event to a different counter
-					fmt.Printf("Moving %s [%s] from counter %d to %d for %s [%s]\n", existingEvent.EventName, existingEvent.Counter, counter, otherCounter, event.EventName, event.Counter)
-					group.GeneralPurposeCounters[otherCounter] = existingEvent // move the existing event to the new counter
-					group.GeneralPurposeCounters[counter] = event              // place the new event in the current counter
-					return nil
-				}
+				// we can move the event to a different counter
+				fmt.Printf("Moving %s [%s] from counter %d to %d for %s [%s]\n", existingEvent.EventName, existingEvent.Counter, counter, otherCounter, event.EventName, event.Counter)
+				group.GeneralPurposeCounters[otherCounter] = existingEvent // move the existing event to the new counter
+				group.GeneralPurposeCounters[counter] = event              // place the new event in the current counter
+				return nil
 			}
 		}
 	}
