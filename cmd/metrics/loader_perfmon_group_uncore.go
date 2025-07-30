@@ -77,20 +77,16 @@ func (group UncoreGroup) Copy() UncoreGroup {
 	return newGroup
 }
 
-func (group UncoreGroup) CanMerge(other UncoreGroup) bool {
-	// Check if the groups have the same max GP events
-	if group.MaxGeneralPurposeCounters != other.MaxGeneralPurposeCounters {
-		return false
-	}
-	// Check if all events in other can be added to this group
-	// Create a copy of group so we do not alter this group in this check
-	tempGroup := group.Copy()
+func (group UncoreGroup) Merge(other UncoreGroup) error {
+	// Merge metric names
+	group.MetricNames = util.UniqueAppend(group.MetricNames, other.MetricNames...)
+	// Merge general purpose counters
 	for _, event := range other.GeneralPurposeCounters {
-		if err := tempGroup.AddEvent(event, true); err != nil {
-			return false // Cannot add general purpose counter from other group
+		if err := group.AddEvent(event, false); err != nil {
+			return fmt.Errorf("error adding event %s to group: %w", event.EventName, err)
 		}
 	}
-	return true
+	return nil
 }
 
 func (group UncoreGroup) AddEvent(event UncoreEvent, reorder bool) error {
@@ -189,21 +185,18 @@ func (group UncoreGroup) StringForPerf() (string, error) {
 func MergeUncoreGroups(uncoreGroups []UncoreGroup) ([]UncoreGroup, error) {
 	for i := 0; i < len(uncoreGroups); i++ {
 		for j := i + 1; j < len(uncoreGroups); j++ {
-			if uncoreGroups[i].CanMerge(uncoreGroups[j]) {
-				fmt.Printf("Merging uncore group %d into group %d\n", j, i)
-				// merge the metric names
-				uncoreGroups[i].MetricNames = util.UniqueAppend(uncoreGroups[i].MetricNames, uncoreGroups[j].MetricNames...)
-				// merge the events
-				for _, event := range uncoreGroups[j].GeneralPurposeCounters {
-					err := uncoreGroups[i].AddEvent(event, true)
-					if err != nil {
-						return nil, fmt.Errorf("error adding event %s to group %d: %w", event.EventName, i, err)
-					}
-				}
-				// remove the group at index j
-				uncoreGroups = append(uncoreGroups[:j], uncoreGroups[j+1:]...)
-				j-- // adjust index since we removed an element
+			fmt.Printf("Attempting to merge uncore group %d into group %d\n", j, i)
+			tmpGroup := uncoreGroups[i].Copy() // Copy the group to avoid modifying the original
+			err := tmpGroup.Merge(uncoreGroups[j])
+			if err != nil {
+				fmt.Printf("Failed to merge uncore group %d into group %d: %v\n", j, i, err)
+				continue // Cannot merge these groups, try the next pair
 			}
+			fmt.Printf("Successfully merged uncore group %d into group %d\n", j, i)
+			uncoreGroups[i] = tmpGroup // Update the group at index i with the merged group
+			// remove the group at index j
+			uncoreGroups = append(uncoreGroups[:j], uncoreGroups[j+1:]...)
+			j-- // adjust index since we removed an element
 		}
 	}
 	return uncoreGroups, nil

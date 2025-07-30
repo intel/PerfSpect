@@ -133,25 +133,22 @@ func (group CoreGroup) Copy() CoreGroup {
 	return newGroup
 }
 
-func (group CoreGroup) CanMerge(other CoreGroup) bool {
-	// Check if the groups have the same max GP events
-	if group.MaxGeneralPurposeCounters != other.MaxGeneralPurposeCounters {
-		return false
-	}
-	// Check if all events in other can be added to this group
-	// Create a copy of group so we do not alter this group in this check
-	tempGroup := group.Copy()
+func (group CoreGroup) Merge(other CoreGroup) error {
+	// Merge fixed purpose counters
 	for _, event := range other.FixedPurposeCounters {
-		if err := tempGroup.AddEvent(event, false); err != nil {
-			return false // Cannot add fixed purpose counter from other group
+		if err := group.AddEvent(event, false); err != nil {
+			return fmt.Errorf("error adding fixed purpose counter %s: %w", event.EventName, err)
 		}
 	}
+	// Merge general purpose counters
 	for _, event := range other.GeneralPurposeCounters {
-		if err := tempGroup.AddEvent(event, true); err != nil {
-			return false // Cannot add general purpose counter from other group
+		if err := group.AddEvent(event, true); err != nil {
+			return fmt.Errorf("error adding general purpose counter %s: %w", event.EventName, err)
 		}
 	}
-	return true
+	// Merge metric names
+	group.MetricNames = util.UniqueAppend(group.MetricNames, other.MetricNames...)
+	return nil
 }
 
 func (group CoreGroup) HasTakenAloneEvent() bool {
@@ -315,27 +312,18 @@ func (group CoreGroup) StringForPerf() (string, error) {
 func MergeCoreGroups(coreGroups []CoreGroup) ([]CoreGroup, error) {
 	for i := 0; i < len(coreGroups); i++ {
 		for j := i + 1; j < len(coreGroups); j++ {
-			if coreGroups[i].CanMerge(coreGroups[j]) {
-				fmt.Printf("Merging core group %d into group %d\n", j, i)
-				// merge the metric names
-				coreGroups[i].MetricNames = util.UniqueAppend(coreGroups[i].MetricNames, coreGroups[j].MetricNames...)
-				// merge the events
-				for _, event := range coreGroups[j].FixedPurposeCounters {
-					err := coreGroups[i].AddEvent(event, true)
-					if err != nil {
-						return nil, fmt.Errorf("error adding event %s to group %d: %w", event.EventName, i, err)
-					}
-				}
-				for _, event := range coreGroups[j].GeneralPurposeCounters {
-					err := coreGroups[i].AddEvent(event, true)
-					if err != nil {
-						return nil, fmt.Errorf("error adding event %s to group %d: %w", event.EventName, i, err)
-					}
-				}
-				// remove the group at index j
-				coreGroups = append(coreGroups[:j], coreGroups[j+1:]...)
-				j-- // adjust index since we removed an element
+			fmt.Printf("Attempting to merge core group %d into group %d\n", j, i)
+			tmpGroup := coreGroups[i].Copy() // Copy the group to avoid modifying the original
+			err := tmpGroup.Merge(coreGroups[j])
+			if err != nil {
+				fmt.Printf("Failed to merge core group %d into group %d: %v\n", j, i, err)
+				continue // Cannot merge these groups, try the next pair
 			}
+			fmt.Printf("Successfully merged core group %d into group %d\n", j, i)
+			coreGroups[i] = tmpGroup // Update the group at index i with the merged group
+			// remove the group at index j
+			coreGroups = append(coreGroups[:j], coreGroups[j+1:]...)
+			j-- // adjust index since we removed an element
 		}
 	}
 	return coreGroups, nil
