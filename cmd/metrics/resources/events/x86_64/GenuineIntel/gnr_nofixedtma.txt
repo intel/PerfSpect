@@ -31,7 +31,6 @@ cpu/event=0x12,umask=0x0e,period=100003,name='DTLB_LOAD_MISSES.WALK_COMPLETED'/,
 cpu/event=0x12,umask=0x04,period=100003,name='DTLB_LOAD_MISSES.WALK_COMPLETED_2M_4M'/,                   # 0,1,2,3
 cpu/event=0x13,umask=0x0e,period=100003,name='DTLB_STORE_MISSES.WALK_COMPLETED'/,                        # 0,1,2,3
 cpu/event=0xd1,umask=0x02,period=200003,name='MEM_LOAD_RETIRED.L2_HIT'/,                                 # 0,1,2,3
-cpu-cycles,
 ref-cycles,
 instructions;
 
@@ -80,7 +79,6 @@ cpu/event=0xc5,umask=0x41,period=400009,name='BR_MISP_RETIRED.COND_TAKEN_COST'/,
 cpu/event=0xc5,umask=0x42,period=400009,name='BR_MISP_RETIRED.INDIRECT_CALL_COST'/,
 cpu/event=0xc5,umask=0xc0,period=100003,name='BR_MISP_RETIRED.INDIRECT_COST'/,
 cpu/event=0xc5,umask=0x48,period=100007,name='BR_MISP_RETIRED.RET_COST'/,
-cpu-cycles,
 ref-cycles,
 instructions;
 
