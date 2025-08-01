@@ -31,6 +31,7 @@ import (
 	"perfspect/internal/common"
 	"perfspect/internal/util"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -118,10 +119,8 @@ Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
 	rootCmd.AddCommand(flame.Cmd)
 	rootCmd.AddCommand(lock.Cmd)
 	rootCmd.AddCommand(config.Cmd)
-	if onIntelNetwork() {
-		rootCmd.AddGroup([]*cobra.Group{{ID: "other", Title: "Other Commands:"}}...)
-		rootCmd.AddCommand(updateCmd)
-	}
+	rootCmd.AddGroup([]*cobra.Group{{ID: "other", Title: "Other Commands:"}}...)
+	rootCmd.AddCommand(updateCmd)
 	// Global (persistent) flags
 	rootCmd.PersistentFlags().BoolVar(&flagDebug, flagDebugName, false, "enable debug logging and retain temporary directories")
 	rootCmd.PersistentFlags().BoolVar(&flagSyslog, flagSyslogName, false, "write logs to syslog instead of a file")
@@ -303,8 +302,24 @@ func terminateApplication(cmd *cobra.Command, args []string) error {
 func onIntelNetwork() bool {
 	// If we can't lookup the Intel autoproxy domain then we aren't on the Intel
 	// network
-	_, err := net.LookupHost("wpad.intel.com")
-	return err == nil
+	timeout := 1 * time.Second // quick timeout
+	host := "wpad.intel.com"
+	// create a context with a timeout
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	// create a resolver
+	resolver := &net.Resolver{}
+	// perform the lookup
+	_, err := resolver.LookupHost(ctx, host)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			slog.Debug("DNS lookup timed out", "host", host)
+		} else {
+			slog.Debug("DNS lookup failed", "host", host, "error", err.Error())
+		}
+		return false
+	}
+	return true
 }
 
 func checkForUpdates(version string) (bool, manifest, error) {
@@ -328,8 +343,11 @@ const (
 var updateCmd = &cobra.Command{
 	GroupID: "other",
 	Use:     updateCommandName,
-	Short:   "Update the application",
+	Short:   "Update the application (Intel network only)",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if !onIntelNetwork() {
+			return fmt.Errorf("update command is only available on the Intel network")
+		}
 		appContext := cmd.Parent().Context().Value(common.AppContext{}).(common.AppContext)
 		localTempDir := appContext.LocalTempDir
 		updateAvailable, latestManifest, err := checkForUpdates(gVersion)

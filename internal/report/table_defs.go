@@ -879,12 +879,23 @@ func validateTableValues(tableValues TableValues) error {
 //
 
 func hostTableValues(outputs map[string]script.ScriptOutput) []Field {
+	hostName := strings.TrimSpace(outputs[script.HostnameScriptName].Stdout)
+	time := strings.TrimSpace(outputs[script.DateScriptName].Stdout)
+	system := valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Manufacturer:\s*(.+?)$`) +
+		" " + valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Product Name:\s*(.+?)$`) +
+		", " + valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Version:\s*(.+?)$`)
+	baseboard := valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Manufacturer:\s*(.+?)$`) +
+		" " + valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Product Name:\s*(.+?)$`) +
+		", " + valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Version:\s*(.+?)$`)
+	chassis := valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Manufacturer:\s*(.+?)$`) +
+		" " + valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Type:\s*(.+?)$`) +
+		", " + valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Version:\s*(.+?)$`)
 	return []Field{
-		{Name: "Host Name", Values: []string{strings.TrimSpace(outputs[script.HostnameScriptName].Stdout)}},
-		{Name: "Time", Values: []string{strings.TrimSpace(outputs[script.DateScriptName].Stdout)}},
-		{Name: "System", Values: []string{valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Manufacturer:\s*(.+?)$`) + " " + valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Product Name:\s*(.+?)$`)}},
-		{Name: "Baseboard", Values: []string{valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Manufacturer:\s*(.+?)$`) + " " + valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Product Name:\s*(.+?)$`)}},
-		{Name: "Chassis", Values: []string{valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Manufacturer:\s*(.+?)$`) + " " + valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Type:\s*(.+?)$`)}},
+		{Name: "Host Name", Values: []string{hostName}},
+		{Name: "Time", Values: []string{time}},
+		{Name: "System", Values: []string{system}},
+		{Name: "Baseboard", Values: []string{baseboard}},
+		{Name: "Chassis", Values: []string{chassis}},
 	}
 }
 
@@ -1113,13 +1124,13 @@ func acceleratorTableInsights(outputs map[string]script.ScriptOutput, tableValue
 	for i, count := range tableValues.Fields[countFieldIndex].Values {
 		name := tableValues.Fields[nameFieldIndex].Values[i]
 		queues := tableValues.Fields[queuesFieldIndex].Values[i]
-		if name == "DSA" && count != "0" && queues != "None" {
+		if name == "DSA" && count != "0" && queues == "None" {
 			insights = append(insights, Insight{
 				Recommendation: "Consider configuring DSA to allow accelerated data copy and transformation in DSA-enabled software.",
 				Justification:  "No work queues are configured for DSA accelerator(s).",
 			})
 		}
-		if name == "IAA" && count != "0" && queues != "None" {
+		if name == "IAA" && count != "0" && queues == "None" {
 			insights = append(insights, Insight{
 				Recommendation: "Consider configuring IAA to allow accelerated compression and decompression in IAA-enabled software.",
 				Justification:  "No work queues are configured for IAA accelerator(s).",
@@ -1718,11 +1729,11 @@ func cxlTableValues(outputs map[string]script.ScriptOutput) []Field {
 	}
 	cxlDevices := getPCIDevices("CXL", outputs)
 	for _, cxlDevice := range cxlDevices {
-		for _, field := range fields {
+		for fieldIdx, field := range fields {
 			if value, ok := cxlDevice[field.Name]; ok {
-				field.Values = append(field.Values, value)
+				fields[fieldIdx].Values = append(fields[fieldIdx].Values, value)
 			} else {
-				field.Values = append(field.Values, "")
+				fields[fieldIdx].Values = append(fields[fieldIdx].Values, "")
 			}
 		}
 	}
@@ -1877,12 +1888,22 @@ func pmuTableValues(outputs map[string]script.ScriptOutput) []Field {
 }
 
 func systemSummaryTableValues(outputs map[string]script.ScriptOutput) []Field {
+	system := valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Manufacturer:\s*(.+?)$`) +
+		" " + valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Product Name:\s*(.+?)$`) +
+		", " + valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Version:\s*(.+?)$`)
+	baseboard := valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Manufacturer:\s*(.+?)$`) +
+		" " + valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Product Name:\s*(.+?)$`) +
+		", " + valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Version:\s*(.+?)$`)
+	chassis := valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Manufacturer:\s*(.+?)$`) +
+		" " + valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Type:\s*(.+?)$`) +
+		", " + valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Version:\s*(.+?)$`)
+
 	return []Field{
 		{Name: "Host Name", Values: []string{strings.TrimSpace(outputs[script.HostnameScriptName].Stdout)}},
 		{Name: "Time", Values: []string{strings.TrimSpace(outputs[script.DateScriptName].Stdout)}},
-		{Name: "System", Values: []string{valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Manufacturer:\s*(.+?)$`) + " " + valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Product Name:\s*(.+?)$`)}},
-		{Name: "Baseboard", Values: []string{valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Manufacturer:\s*(.+?)$`) + " " + valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Product Name:\s*(.+?)$`)}},
-		{Name: "Chassis", Values: []string{valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Manufacturer:\s*(.+?)$`) + " " + valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Type:\s*(.+?)$`)}},
+		{Name: "System", Values: []string{system}},
+		{Name: "Baseboard", Values: []string{baseboard}},
+		{Name: "Chassis", Values: []string{chassis}},
 		{Name: "CPU Model", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^[Mm]odel name:\s*(.+)$`)}},
 		{Name: "Architecture", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Architecture:\s*(.+)$`)}},
 		{Name: "Microarchitecture", Values: []string{UarchFromOutput(outputs)}},
