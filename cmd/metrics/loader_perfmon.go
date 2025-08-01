@@ -163,9 +163,6 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, _ string, selected
 		return nil, nil, fmt.Errorf("error loading event groups from metrics: %v", err)
 	}
 	fmt.Printf("Number of core groups: %d, uncore groups: %d, other groups: %d\n", len(coreGroups), len(uncoreGroups), len(otherGroups))
-	for _, group := range coreGroups {
-		group.Print(os.Stdout)
-	}
 	// eliminate duplicate groups
 	coreGroups, uncoreGroups, err = eliminateDuplicateGroups(coreGroups, uncoreGroups)
 	if err != nil {
@@ -195,6 +192,20 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, _ string, selected
 	for _, group := range otherGroups {
 		allGroups = append(allGroups, group.ToGroupDefinition())
 	}
+	// Print the groups for debugging
+	for i, group := range coreGroups {
+		fmt.Printf("Core Group %d:\n", i)
+		group.Print(os.Stdout)
+	}
+	for i, group := range uncoreGroups {
+		fmt.Printf("Uncore Group %d:\n", i)
+		group.Print(os.Stdout)
+	}
+	for i, group := range otherGroups {
+		fmt.Printf("Other Group %d:\n", i)
+		group.Print(os.Stdout)
+	}
+
 	// apply common modifications to metric expressions
 	metrics, err = configureMetrics(metrics, uncollectableEvents, metadata)
 	if err != nil {
