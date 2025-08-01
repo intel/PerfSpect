@@ -86,6 +86,10 @@ func (events CoreEvents) FindEventByName(eventName string) CoreEvent {
 	return CoreEvent{}
 }
 
+func (event CoreEvent) IsEmpty() bool {
+	return event == CoreEvent{}
+}
+
 func (event CoreEvent) IsCollectable(metadata Metadata) bool {
 	if !metadata.SupportsFixedTMA && (strings.HasPrefix(event.EventName, "TOPDOWN.SLOTS") || strings.HasPrefix(event.EventName, "PERF_METRICS")) && event.EventName != "TOPDOWN.SLOTS_P" {
 		slog.Debug("Fixed TMA events not supported", slog.String("event", event.EventName))
@@ -93,12 +97,12 @@ func (event CoreEvent) IsCollectable(metadata Metadata) bool {
 	}
 	if strings.HasPrefix(event.EventName, "OCR") || strings.HasPrefix(event.EventName, "OFFCORE_REQUESTS_OUTSTANDING") {
 		if !metadata.SupportsOCR {
-			slog.Debug("Off-core response events not supported on taget", slog.String("event", event.EventName))
+			slog.Debug("Off-core request and response events not supported on target", slog.String("event", event.EventName))
 			return false // OCR events are not supported
 		}
 		// If the event is in process or cgroup scope, we do not collect OCR
 		if flagScope == scopeProcess || flagScope == scopeCgroup {
-			slog.Debug("Off-core response events not supported in process or cgroup scope", slog.String("event", event.EventName))
+			slog.Debug("Off-core request and response events not supported in process or cgroup scope", slog.String("event", event.EventName))
 			return false // OCR events are not supported in process or cgroup scope
 		}
 	}
@@ -138,7 +142,7 @@ var fixedCounterEventNameTranslation = map[string]string{
 }
 
 func (event CoreEvent) StringForPerf() (string, error) {
-	if event == (CoreEvent{}) {
+	if event.IsEmpty() {
 		return "", fmt.Errorf("event is not initialized")
 	}
 	if translatedName, ok := fixedCounterEventNameTranslation[event.EventName]; ok {

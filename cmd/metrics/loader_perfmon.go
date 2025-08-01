@@ -163,6 +163,9 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, _ string, selected
 		return nil, nil, fmt.Errorf("error loading event groups from metrics: %v", err)
 	}
 	fmt.Printf("Number of core groups: %d, uncore groups: %d, other groups: %d\n", len(coreGroups), len(uncoreGroups), len(otherGroups))
+	for _, group := range coreGroups {
+		group.Print(os.Stdout)
+	}
 	// eliminate duplicate groups
 	coreGroups, uncoreGroups, err = eliminateDuplicateGroups(coreGroups, uncoreGroups)
 	if err != nil {
@@ -170,7 +173,7 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, _ string, selected
 	}
 	fmt.Printf("Number of core groups after eliminating duplicates: %d, uncore groups: %d\n", len(coreGroups), len(uncoreGroups))
 	// merge groups that can be merged, i.e., if 2nd group's events fit in the first group
-	coreGroups, uncoreGroups, err = mergeGroups(coreGroups, uncoreGroups)
+	coreGroups, uncoreGroups, err = mergeGroups(coreGroups, uncoreGroups, metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error merging groups: %v", err)
 	}
@@ -495,8 +498,8 @@ func eliminateDuplicateGroups(coreGroups []CoreGroup, uncoreGroups []UncoreGroup
 	return coreGroups, uncoreGroups, nil
 }
 
-func mergeGroups(coreGroups []CoreGroup, uncoreGroups []UncoreGroup) ([]CoreGroup, []UncoreGroup, error) {
-	coreGroups, err := MergeCoreGroups(coreGroups)
+func mergeGroups(coreGroups []CoreGroup, uncoreGroups []UncoreGroup, metadata Metadata) ([]CoreGroup, []UncoreGroup, error) {
+	coreGroups, err := MergeCoreGroups(coreGroups, metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error merging core groups: %w", err)
 	}
@@ -516,7 +519,7 @@ func groupsFromEventNames(metricName string, eventNames []string, coreEvents Cor
 	var uncoreGroups []UncoreGroup
 	var otherGroups []OtherGroup
 	coreGroup := NewCoreGroup(metadata)
-	uncoreGroup := NewUncoreGroup(metadata.NumGeneralPurposeCounters)
+	uncoreGroup := NewUncoreGroup(metadata)
 	for _, eventName := range eventNames {
 		// Skip constants, they are not events
 		if slices.Contains(constants, eventName) {
@@ -535,34 +538,36 @@ func groupsFromEventNames(metricName string, eventNames []string, coreEvents Cor
 				coreEvent.EventName = eventName
 			}
 			coreGroup.MetricNames = util.UniqueAppend(coreGroup.MetricNames, metricName)
-			err := coreGroup.AddEvent(coreEvent, false)
+			err := coreGroup.AddEvent(coreEvent, false, metadata)
 			if err != nil {
 				fmt.Printf("Creating additional core group for metric %s, event %s: %v\n", metricName, eventName, err)
 				coreGroups = append(coreGroups, coreGroup)
-				coreGroup = NewCoreGroup(metadata)         // Reset coreGroup for the next set of events
-				err = coreGroup.AddEvent(coreEvent, false) // Add the event to the new group
+				coreGroup = NewCoreGroup(metadata) // Reset coreGroup for the next set of events
+				coreGroup.MetricNames = util.UniqueAppend(coreGroup.MetricNames, metricName)
+				err = coreGroup.AddEvent(coreEvent, false, metadata) // Add the event to the new group
 				if err != nil {
 					return nil, nil, nil, fmt.Errorf("error adding event %s to new core group: %w", eventName, err)
 				}
 			}
 		} else {
 			uncoreEvent := uncoreEvents.FindEventByName(eventName)
-			if uncoreEvent != (UncoreEvent{}) { // this is an uncore event
+			if !uncoreEvent.IsEmpty() { // this is an uncore event
 				uncoreGroup.MetricNames = util.UniqueAppend(uncoreGroup.MetricNames, metricName)
 				err := uncoreGroup.AddEvent(uncoreEvent, false)
 				if err != nil {
 					fmt.Printf("Creating additional uncore group for metric %s, event %s: %v\n", metricName, eventName, err)
 					uncoreGroups = append(uncoreGroups, uncoreGroup)
-					uncoreGroup = NewUncoreGroup(metadata.NumGeneralPurposeCounters) // Reset uncoreGroup for the next set of events
-					err = uncoreGroup.AddEvent(uncoreEvent, false)                   // Add the event
+					uncoreGroup = NewUncoreGroup(metadata) // Reset uncoreGroup for the next set of events
+					uncoreGroup.MetricNames = util.UniqueAppend(uncoreGroup.MetricNames, metricName)
+					err = uncoreGroup.AddEvent(uncoreEvent, false) // Add the event
 					if err != nil {
 						return nil, nil, nil, fmt.Errorf("error adding event %s to new uncore group: %w", eventName, err)
 					}
 				}
 			} else {
 				otherEvent := otherEvents.FindEventByName(eventName)
-				if otherEvent != (OtherEvent{}) { // this is an other event
-					otherGroup := NewOtherGroup(metadata.NumGeneralPurposeCounters)
+				if !otherEvent.IsEmpty() { // this is an other event
+					otherGroup := NewOtherGroup(metadata)
 					otherGroup.MetricNames = util.UniqueAppend(otherGroup.MetricNames, metricName)
 					err := otherGroup.AddEvent(otherEvent, false)
 					if err != nil {
@@ -575,12 +580,28 @@ func groupsFromEventNames(metricName string, eventNames []string, coreEvents Cor
 		}
 	}
 	// if there are any events in the core group, add it to the groups
-	if len(coreGroup.FixedPurposeCounters) != 0 || len(coreGroup.GeneralPurposeCounters) != 0 {
-		coreGroups = append(coreGroups, coreGroup)
+	coreGroupAdded := false
+	for _, event := range coreGroup.FixedPurposeCounters {
+		if !event.IsEmpty() {
+			coreGroups = append(coreGroups, coreGroup)
+			coreGroupAdded = true
+			break
+		}
+	}
+	if !coreGroupAdded {
+		for _, event := range coreGroup.GeneralPurposeCounters {
+			if !event.IsEmpty() {
+				coreGroups = append(coreGroups, coreGroup)
+				break
+			}
+		}
 	}
 	// if there are any events in the uncore group, add it to the groups
-	if len(uncoreGroup.GeneralPurposeCounters) != 0 {
-		uncoreGroups = append(uncoreGroups, uncoreGroup)
+	for _, event := range uncoreGroup.GeneralPurposeCounters {
+		if !event.IsEmpty() {
+			uncoreGroups = append(uncoreGroups, uncoreGroup)
+			break
+		}
 	}
 	return coreGroups, uncoreGroups, otherGroups, nil
 }

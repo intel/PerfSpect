@@ -67,6 +67,10 @@ func (events UncoreEvents) FindEventByName(eventName string) UncoreEvent {
 	return UncoreEvent{}
 }
 
+func (event UncoreEvent) IsEmpty() bool {
+	return event == UncoreEvent{}
+}
+
 func (event UncoreEvent) IsCollectable(metadata Metadata) bool {
 	if !metadata.SupportsUncore {
 		slog.Debug("Uncore events not supported", slog.String("event", event.EventName))
@@ -91,7 +95,7 @@ func (event UncoreEvent) IsCollectable(metadata Metadata) bool {
 }
 
 func (event UncoreEvent) StringForPerf() (string, error) {
-	if event == (UncoreEvent{}) {
+	if event.IsEmpty() {
 		return "", fmt.Errorf("event is not initialized")
 	}
 	if event.EventCode == "" {

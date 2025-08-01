@@ -6,20 +6,18 @@ package metrics
 import (
 	"fmt"
 	"io"
-	"slices"
 	"strings"
 )
 
 type OtherGroup struct {
-	MaxGeneralPurposeCounters int
-	GeneralPurposeCounters    map[int]OtherEvent
-	MetricNames               []string
+	GeneralPurposeCounters []OtherEvent
+	MetricNames            []string
 }
 
-func NewOtherGroup(maxGeneralPurposeCounters int) OtherGroup {
+func NewOtherGroup(metadata Metadata) OtherGroup {
 	return OtherGroup{
-		MaxGeneralPurposeCounters: maxGeneralPurposeCounters,
-		GeneralPurposeCounters:    make(map[int]OtherEvent, 0),
+		GeneralPurposeCounters: make([]OtherEvent, metadata.NumGeneralPurposeCounters),
+		MetricNames:            make([]string, 0),
 	}
 }
 
@@ -28,6 +26,9 @@ func (group OtherGroup) ToGroupDefinition() GroupDefinition {
 	groupDef := make(GroupDefinition, 0)
 	// Add general purpose counters
 	for _, event := range group.GeneralPurposeCounters {
+		if event.IsEmpty() {
+			continue // Skip empty events
+		}
 		raw, err := event.StringForPerf()
 		if err != nil {
 			fmt.Printf("Error formatting event %s for perf: %v\n", event.EventName, err)
@@ -41,29 +42,37 @@ func (group OtherGroup) ToGroupDefinition() GroupDefinition {
 	return groupDef
 }
 
-func (group OtherGroup) AddEvent(event OtherEvent, _ bool) error {
-	group.GeneralPurposeCounters[len(group.GeneralPurposeCounters)] = event
-	return nil
+func (group *OtherGroup) AddEvent(event OtherEvent, _ bool) error {
+	if event.IsEmpty() {
+		return fmt.Errorf("cannot add empty event")
+	}
+	for i, existingEvent := range group.GeneralPurposeCounters {
+		if existingEvent.IsEmpty() {
+			// Found an empty slot, add the event here
+			group.GeneralPurposeCounters[i] = event
+			return nil
+		}
+	}
+	return fmt.Errorf("no empty slot available in OtherGroup for event %s", event.EventName)
 }
 
 func (group OtherGroup) Print(w io.Writer) {
 	fmt.Fprintf(w, "  Metric Names: %s\n", strings.Join(group.MetricNames, ", "))
 	fmt.Fprintln(w, "  General Purpose Counters:")
-	// print sorted by keys
-	keys := make([]int, 0, len(group.GeneralPurposeCounters))
-	for k := range group.GeneralPurposeCounters {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	for _, k := range keys {
-		event := group.GeneralPurposeCounters[k]
-		fmt.Fprintf(w, "    Counter %d: %s\n", k, event.EventName)
+	for i, event := range group.GeneralPurposeCounters {
+		if event.IsEmpty() {
+			continue // Skip empty events
+		}
+		fmt.Fprintf(w, "    Counter %d: %s\n", i, event.EventName)
 	}
 }
 
 func (group OtherGroup) StringForPerf() (string, error) {
 	var formattedEvents []string
 	for _, event := range group.GeneralPurposeCounters {
+		if event.IsEmpty() {
+			continue // Skip empty events
+		}
 		// Format the event for perf
 		formattedEvent, err := event.StringForPerf()
 		if err != nil {

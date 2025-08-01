@@ -6,36 +6,33 @@ package metrics
 import (
 	"fmt"
 	"io"
-	"maps"
 	"perfspect/internal/util"
-	"slices"
+	"strconv"
 	"strings"
 )
 
 type CoreGroup struct {
-	MaxGeneralPurposeCounters int
-	GeneralPurposeCounters    map[int]CoreEvent
-	FixedPurposeCounters      []CoreEvent
-	MetricNames               []string // List of metric names that this group represents
+	GeneralPurposeCounters []CoreEvent
+	FixedPurposeCounters   []CoreEvent
+	MetricNames            []string // List of metric names that this group represents
 }
 
 func NewCoreGroup(metadata Metadata) CoreGroup {
 	// initialize core group by setting up the fixed purpose counters
 	var fixedCounters []CoreEvent
-	if metadata.SupportsFixedCycles {
-		fixedCounters = append(fixedCounters, CoreEvent{EventName: "CPU_CLK_UNHALTED.THREAD", EventCode: "0x00", UMask: "0x02", SampleAfterValue: "2000003"})
-	}
-	if metadata.SupportsFixedInstructions {
-		fixedCounters = append(fixedCounters, CoreEvent{EventName: "INST_RETIRED.ANY", EventCode: "0x00", UMask: "0x01", SampleAfterValue: "2000003"})
-	}
-	if metadata.SupportsFixedRefCycles {
-		fixedCounters = append(fixedCounters, CoreEvent{EventName: "CPU_CLK_UNHALTED.REF_TSC", EventCode: "0x00", UMask: "0x03", SampleAfterValue: "2000003"})
-	}
+	// if metadata.SupportsFixedCycles {
+	// 	fixedCounters = append(fixedCounters, CoreEvent{EventName: "CPU_CLK_UNHALTED.THREAD", EventCode: "0x00", UMask: "0x02", SampleAfterValue: "2000003", Counter: "Fixed counter 0"})
+	// }
+	// if metadata.SupportsFixedInstructions {
+	// 	fixedCounters = append(fixedCounters, CoreEvent{EventName: "INST_RETIRED.ANY", EventCode: "0x00", UMask: "0x01", SampleAfterValue: "2000003", Counter: "Fixed counter 1"})
+	// }
+	// if metadata.SupportsFixedRefCycles {
+	// 	fixedCounters = append(fixedCounters, CoreEvent{EventName: "CPU_CLK_UNHALTED.REF_TSC", EventCode: "0x00", UMask: "0x03", SampleAfterValue: "2000003", Counter: "Fixed counter 2"})
+	// }
 	return CoreGroup{
-		MaxGeneralPurposeCounters: metadata.NumGeneralPurposeCounters,
-		FixedPurposeCounters:      fixedCounters,
-		GeneralPurposeCounters:    make(map[int]CoreEvent, 0),
-		MetricNames:               make([]string, 0),
+		FixedPurposeCounters:   fixedCounters,
+		GeneralPurposeCounters: make([]CoreEvent, metadata.NumGeneralPurposeCounters),
+		MetricNames:            make([]string, 0),
 	}
 }
 
@@ -43,7 +40,7 @@ func NewCoreGroupWithTMAEvents(metadata Metadata) CoreGroup {
 	group := NewCoreGroup(metadata)
 	// prepend TMA events to the fixed purpose counters
 	tmaEvents := []CoreEvent{
-		{EventName: "TOPDOWN.SLOTS:perf_metrics", EventCode: "0x00", UMask: "0x04", SampleAfterValue: "10000003"},
+		{EventName: "TOPDOWN.SLOTS:perf_metrics", EventCode: "0x00", UMask: "0x04", SampleAfterValue: "10000003", Counter: "Fixed counter 3"},
 	}
 	tmaEvents = append(tmaEvents, perfMetricsEvents...)
 	group.FixedPurposeCounters = append(tmaEvents, group.FixedPurposeCounters...)
@@ -55,6 +52,9 @@ func (group CoreGroup) ToGroupDefinition() GroupDefinition {
 	groupDef := make(GroupDefinition, 0)
 	// Add fixed purpose counters
 	for _, event := range group.FixedPurposeCounters {
+		if event.IsEmpty() {
+			continue // Skip empty events
+		}
 		raw, err := event.StringForPerf()
 		if err != nil {
 			fmt.Printf("Error formatting event %s for perf: %v\n", event.EventName, err)
@@ -67,6 +67,9 @@ func (group CoreGroup) ToGroupDefinition() GroupDefinition {
 	}
 	// Add general purpose counters
 	for _, event := range group.GeneralPurposeCounters {
+		if event.IsEmpty() {
+			continue // Skip empty events
+		}
 		raw, err := event.StringForPerf()
 		if err != nil {
 			fmt.Printf("Error formatting event %s for perf: %v\n", event.EventName, err)
@@ -96,9 +99,6 @@ func (group CoreGroup) FindEventByName(eventName string) CoreEvent {
 }
 
 func (group CoreGroup) Equal(other CoreGroup) bool {
-	if group.MaxGeneralPurposeCounters != other.MaxGeneralPurposeCounters {
-		return false // Different max GP events
-	}
 	if len(group.FixedPurposeCounters) != len(other.FixedPurposeCounters) {
 		return false // Different number of fixed purpose counters
 	}
@@ -112,10 +112,24 @@ func (group CoreGroup) Equal(other CoreGroup) bool {
 		return false // Different number of general purpose counters
 	}
 	// order of general purpose counters is not important
+	// check if the events present in the group are also present in the other group
 	for _, event := range group.GeneralPurposeCounters {
+		if event.IsEmpty() {
+			continue // Skip empty events
+		}
 		// if event is not in the other group, they are not equal
-		if otherEvent := other.FindEventByName(event.EventName); otherEvent == (CoreEvent{}) {
+		if otherEvent := other.FindEventByName(event.EventName); otherEvent.IsEmpty() {
 			return false // Event not found in other group
+		}
+	}
+	// check if the events present in the other group are also present in this group
+	for _, event := range other.GeneralPurposeCounters {
+		if event.IsEmpty() {
+			continue // Skip empty events
+		}
+		// if event is not in the group, they are not equal
+		if groupEvent := group.FindEventByName(event.EventName); groupEvent.IsEmpty() {
+			return false // Event not found in group
 		}
 	}
 	return true // All checks passed, groups are equal
@@ -123,26 +137,40 @@ func (group CoreGroup) Equal(other CoreGroup) bool {
 
 func (group CoreGroup) Copy() CoreGroup {
 	newGroup := CoreGroup{}
-	newGroup.GeneralPurposeCounters = make(map[int]CoreEvent, len(group.GeneralPurposeCounters))
-	newGroup.FixedPurposeCounters = make([]CoreEvent, len(group.FixedPurposeCounters))
 	newGroup.MetricNames = make([]string, len(group.MetricNames))
-	newGroup.MaxGeneralPurposeCounters = group.MaxGeneralPurposeCounters
-	copy(newGroup.MetricNames, group.MetricNames)
-	copy(newGroup.FixedPurposeCounters, group.FixedPurposeCounters)
-	maps.Copy(newGroup.GeneralPurposeCounters, group.GeneralPurposeCounters)
+	copied := copy(newGroup.MetricNames, group.MetricNames)
+	if copied != len(group.MetricNames) {
+		fmt.Printf("Warning: copied %d metric names, expected %d\n", copied, len(group.MetricNames))
+	}
+	newGroup.FixedPurposeCounters = make([]CoreEvent, len(group.FixedPurposeCounters))
+	copied = copy(newGroup.FixedPurposeCounters, group.FixedPurposeCounters)
+	if copied != len(group.FixedPurposeCounters) {
+		fmt.Printf("Warning: copied %d fixed purpose counters, expected %d\n", copied, len(group.FixedPurposeCounters))
+	}
+	newGroup.GeneralPurposeCounters = make([]CoreEvent, len(group.GeneralPurposeCounters))
+	copied = copy(newGroup.GeneralPurposeCounters, group.GeneralPurposeCounters)
+	if copied != len(group.GeneralPurposeCounters) {
+		fmt.Printf("Warning: copied %d general purpose counters, expected %d\n", copied, len(group.GeneralPurposeCounters))
+	}
 	return newGroup
 }
 
-func (group CoreGroup) Merge(other CoreGroup) error {
+func (group *CoreGroup) Merge(other CoreGroup, metadata Metadata) error {
 	// Merge fixed purpose counters
 	for _, event := range other.FixedPurposeCounters {
-		if err := group.AddEvent(event, false); err != nil {
+		if event.IsEmpty() {
+			continue // Skip empty events
+		}
+		if err := group.AddEvent(event, false, metadata); err != nil {
 			return fmt.Errorf("error adding fixed purpose counter %s: %w", event.EventName, err)
 		}
 	}
 	// Merge general purpose counters
 	for _, event := range other.GeneralPurposeCounters {
-		if err := group.AddEvent(event, true); err != nil {
+		if event.IsEmpty() {
+			continue // Skip empty events
+		}
+		if err := group.AddEvent(event, true, metadata); err != nil {
 			return fmt.Errorf("error adding general purpose counter %s: %w", event.EventName, err)
 		}
 	}
@@ -153,17 +181,21 @@ func (group CoreGroup) Merge(other CoreGroup) error {
 
 func (group CoreGroup) HasTakenAloneEvent() bool {
 	// Check if the group has an event tagged with "TakenAlone"
-	for _, counter := range group.GeneralPurposeCounters {
-		if counter.TakenAlone == "true" {
+	for i := range group.FixedPurposeCounters {
+		event := &group.FixedPurposeCounters[i]
+		if event.TakenAlone == "true" {
 			return true
 		}
 	}
 	return false
 }
 
-func (group CoreGroup) AddEvent(event CoreEvent, reorder bool) error {
+func (group *CoreGroup) AddEvent(event CoreEvent, reorder bool, metadata Metadata) error {
+	if event.IsEmpty() {
+		return fmt.Errorf("event is not initialized")
+	}
 	// If the event is already in the group, no need to insert it again
-	if group.FindEventByName(event.EventName) != (CoreEvent{}) {
+	if !group.FindEventByName(event.EventName).IsEmpty() {
 		return nil
 	}
 	// check if group already has an event that is tagged with "TakenAlone"
@@ -192,33 +224,34 @@ func (group CoreGroup) AddEvent(event CoreEvent, reorder bool) error {
 		return fmt.Errorf("event %s has no valid counters defined", event.EventName)
 	}
 	if strings.HasPrefix(validCounters, "Fixed counter") {
-		// two scenarios when a fixed counter isn't already in the group:
-		// 1. it's the ":k" variant of the event name
-		// 2. the event isn't supported in a fixed purpose counter, so we need to add it to a general purpose counter
-		if strings.HasSuffix(event.EventName, ":k") {
-			baseEventName := strings.TrimSuffix(event.EventName, ":k")
-			for i, fixedEvent := range group.FixedPurposeCounters {
-				if fixedEvent.EventName == baseEventName {
-					group.FixedPurposeCounters[i] = event // replace the fixed purpose counter with the new event
-					return nil
-				}
-			}
+		fixedCounter := strings.TrimPrefix(validCounters, "Fixed counter ")
+		fixedCounterIndex, err := strconv.Atoi(fixedCounter)
+		if err != nil {
+			return fmt.Errorf("invalid fixed counter index %s for event %s: %w", fixedCounter, event.EventName, err)
+		}
+		if metadata.SupportsFixedInstructions && fixedCounterIndex == 0 {
+			group.FixedPurposeCounters = append(group.FixedPurposeCounters, event)
+			return nil
+		}
+		if metadata.SupportsFixedCycles && fixedCounterIndex == 1 {
+			group.FixedPurposeCounters = append(group.FixedPurposeCounters, event)
+			return nil
+		}
+		if metadata.SupportsFixedRefCycles && fixedCounterIndex == 2 {
+			group.FixedPurposeCounters = append(group.FixedPurposeCounters, event)
+			return nil
 		}
 		// fall through to add the event to a general purpose counter
 		validCounters = ""
-		for i := range group.MaxGeneralPurposeCounters {
+		for i := range len(group.GeneralPurposeCounters) {
 			validCounters += fmt.Sprintf("%d,", i)
 		}
 	}
 	// otherwise, it is a general purpose event, check if we can place it in one of the general purpose counters
-	if len(group.GeneralPurposeCounters) >= group.MaxGeneralPurposeCounters {
-		return fmt.Errorf("group already has maximum number of general purpose events (%d), cannot add %s", group.MaxGeneralPurposeCounters, event.EventName)
-	}
-	for i := 0; i < group.MaxGeneralPurposeCounters; i++ {
-		if _, ok := group.GeneralPurposeCounters[i]; !ok {
+	for i := range group.GeneralPurposeCounters {
+		if counter := group.GeneralPurposeCounters[i]; counter.IsEmpty() {
 			// this counter is empty, check if it is a valid counter for this event
-			counterIndex := fmt.Sprintf("%d", i)
-			if strings.Contains(validCounters, counterIndex) {
+			if strings.Contains(validCounters, fmt.Sprintf("%d", i)) {
 				group.GeneralPurposeCounters[i] = event // place the event in this counter
 				return nil
 			}
@@ -232,11 +265,11 @@ func (group CoreGroup) AddEvent(event CoreEvent, reorder bool) error {
 				continue // not a valid counter for this event
 			}
 			// check if the existing event can be moved to another unoccupied counter
-			for otherCounter := 0; otherCounter < group.MaxGeneralPurposeCounters; otherCounter++ {
+			for otherCounter := 0; otherCounter < len(group.GeneralPurposeCounters); otherCounter++ {
 				if otherCounter == counter {
 					continue // skip the current counter
 				}
-				if _, ok := group.GeneralPurposeCounters[otherCounter]; ok {
+				if !group.GeneralPurposeCounters[otherCounter].IsEmpty() {
 					continue // skip occupied counters
 				}
 				// check if the existing event is compatible with the other counter
@@ -258,19 +291,20 @@ func (group CoreGroup) AddEvent(event CoreEvent, reorder bool) error {
 func (group CoreGroup) Print(w io.Writer) {
 	fmt.Fprintf(w, "  Metric Names: %s\n", strings.Join(group.MetricNames, ", "))
 	fmt.Fprintln(w, "  Fixed Purpose Counters:")
-	for i, event := range group.FixedPurposeCounters {
+	for i := range group.FixedPurposeCounters {
+		event := &group.FixedPurposeCounters[i]
+		if event.IsEmpty() {
+			continue // Skip empty events
+		}
 		fmt.Fprintf(w, "    Counter %d: %s [%s]\n", i, event.EventName, event.Counter)
 	}
 	fmt.Fprintln(w, "  General Purpose Counters:")
-	// print sorted by keys
-	keys := make([]int, 0, len(group.GeneralPurposeCounters))
-	for k := range group.GeneralPurposeCounters {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	for _, k := range keys {
-		event := group.GeneralPurposeCounters[k]
-		fmt.Fprintf(w, "    Counter %d: %s [%s]\n", k, event.EventName, event.Counter)
+	for i := range group.GeneralPurposeCounters {
+		event := &group.GeneralPurposeCounters[i]
+		if event.IsEmpty() {
+			continue // Skip empty events
+		}
+		fmt.Fprintf(w, "    Counter %d: %s [%s]\n", i, event.EventName, event.Counter)
 	}
 }
 
@@ -278,6 +312,9 @@ func (group CoreGroup) StringForPerf() (string, error) {
 	var formattedEvents []string
 	// add the fixed purpose counters first
 	for _, event := range group.FixedPurposeCounters {
+		if event.IsEmpty() {
+			continue // Skip empty events
+		}
 		// Format the event for perf
 		formattedEvent, err := event.StringForPerf()
 		if err != nil {
@@ -286,15 +323,10 @@ func (group CoreGroup) StringForPerf() (string, error) {
 		// Add the formatted event to the list
 		formattedEvents = append(formattedEvents, formattedEvent)
 	}
-	// sort the events by their counter number
-	keys := make([]int, 0, len(group.GeneralPurposeCounters))
-	for k := range group.GeneralPurposeCounters {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	// now add the general purpose counters in sorted order
-	for _, k := range keys {
-		event := group.GeneralPurposeCounters[k]
+	for _, event := range group.FixedPurposeCounters {
+		if event.IsEmpty() {
+			continue // Skip empty events
+		}
 		// Format the event for perf
 		formattedEvent, err := event.StringForPerf()
 		if err != nil {
@@ -309,22 +341,24 @@ func (group CoreGroup) StringForPerf() (string, error) {
 	return fmt.Sprintf("{%s}", strings.Join(formattedEvents, ",")), nil
 }
 
-func MergeCoreGroups(coreGroups []CoreGroup) ([]CoreGroup, error) {
-	for i := 0; i < len(coreGroups); i++ {
-		for j := i + 1; j < len(coreGroups); j++ {
+func MergeCoreGroups(coreGroups []CoreGroup, metadata Metadata) ([]CoreGroup, error) {
+	i := 0
+	for i < len(coreGroups) { // this style of for loop is used to allow for removal of elements
+		j := i + 1
+		for j < len(coreGroups) { // len(coreGroups) is recalculated on each iteration
 			fmt.Printf("Attempting to merge core group %d into group %d\n", j, i)
 			tmpGroup := coreGroups[i].Copy() // Copy the group to avoid modifying the original
-			err := tmpGroup.Merge(coreGroups[j])
-			if err != nil {
+			if err := tmpGroup.Merge(coreGroups[j], metadata); err == nil {
+				fmt.Printf("Successfully merged core group %d into group %d\n", j, i)
+				coreGroups[i] = tmpGroup // Update the group at index i with the merged group
+				// remove the group at index j
+				coreGroups = append(coreGroups[:j], coreGroups[j+1:]...)
+			} else {
 				fmt.Printf("Failed to merge core group %d into group %d: %v\n", j, i, err)
-				continue // Cannot merge these groups, try the next pair
+				j++ // Cannot merge these groups, try the next pair
 			}
-			fmt.Printf("Successfully merged core group %d into group %d\n", j, i)
-			coreGroups[i] = tmpGroup // Update the group at index i with the merged group
-			// remove the group at index j
-			coreGroups = append(coreGroups[:j], coreGroups[j+1:]...)
-			j-- // adjust index since we removed an element
 		}
+		i++
 	}
 	return coreGroups, nil
 }
@@ -332,17 +366,21 @@ func MergeCoreGroups(coreGroups []CoreGroup) ([]CoreGroup, error) {
 func EliminateDuplicateCoreGroups(coreGroups []CoreGroup) ([]CoreGroup, error) {
 	// if two groups have the same events, merge them into one group
 	// combine the metric names of the groups
-	for i := 0; i < len(coreGroups); i++ {
-		for j := i + 1; j < len(coreGroups); j++ {
+	i := 0
+	for i < len(coreGroups) {
+		j := i + 1
+		for j < len(coreGroups) {
 			if coreGroups[i].Equal(coreGroups[j]) {
 				fmt.Printf("Found duplicate core group %d and %d\n", i, j)
 				// merge the metric names
 				coreGroups[i].MetricNames = util.UniqueAppend(coreGroups[i].MetricNames, coreGroups[j].MetricNames...)
 				// remove the group at index j
 				coreGroups = append(coreGroups[:j], coreGroups[j+1:]...)
-				j-- // adjust index since we removed an element
+			} else {
+				j++ // only increment j if we didn't remove an element
 			}
 		}
+		i++
 	}
 	return coreGroups, nil
 }
