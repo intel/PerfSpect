@@ -162,21 +162,25 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, _ string, selected
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading event groups from metrics: %v", err)
 	}
+	fmt.Printf("Number of core groups: %d, uncore groups: %d, other groups: %d\n", len(coreGroups), len(uncoreGroups), len(otherGroups))
 	// eliminate duplicate groups
 	coreGroups, uncoreGroups, err = eliminateDuplicateGroups(coreGroups, uncoreGroups)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error merging duplicate groups: %v", err)
 	}
+	fmt.Printf("Number of core groups after eliminating duplicates: %d, uncore groups: %d\n", len(coreGroups), len(uncoreGroups))
 	// merge groups that can be merged, i.e., if 2nd group's events fit in the first group
 	coreGroups, uncoreGroups, err = mergeGroups(coreGroups, uncoreGroups)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error merging groups: %v", err)
 	}
+	fmt.Printf("Number of core groups after merging: %d, uncore groups: %d\n", len(coreGroups), len(uncoreGroups))
 	// expand uncore groups for uncore devices
 	uncoreGroups, err = ExpandUncoreGroups(uncoreGroups, metadata.UncoreDeviceIDs)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error expanding uncore groups: %v", err)
 	}
+	fmt.Printf("Number of uncore groups after expanding for uncore devices: %d\n", len(uncoreGroups))
 	// Merge all groups into a single slice of GroupDefinition
 	allGroups := make([]GroupDefinition, 0)
 	for _, group := range coreGroups {
@@ -451,7 +455,7 @@ func getUncollectableEvents(eventNames []string, coreEvents CoreEvents, uncoreEv
 	uncollectableEvents := make([]string, 0)
 	for _, eventName := range eventNames {
 		coreEvent := coreEvents.FindEventByName(eventName)
-		if coreEvent != (CoreEvent{}) {
+		if !coreEvent.IsEmpty() {
 			if !coreEvent.IsCollectable(metadata) {
 				uncollectableEvents = util.UniqueAppend(uncollectableEvents, coreEvent.EventName)
 			}
@@ -523,7 +527,7 @@ func groupsFromEventNames(metricName string, eventNames []string, coreEvents Cor
 			continue
 		}
 		coreEvent := coreEvents.FindEventByName(eventName)
-		if coreEvent != (CoreEvent{}) { // this is a core event
+		if !coreEvent.IsEmpty() { // this is a core event
 			// if the event has been customized with :c<val>, :e<val>, or both, we create a new event with
 			// customizations in the name
 			if strings.Contains(eventName, ":") {
