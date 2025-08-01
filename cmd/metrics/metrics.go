@@ -92,13 +92,14 @@ func getSignalReceived() bool {
 
 var (
 	// collection options
-	flagDuration int
-	flagScope    string
-	flagPidList  []string
-	flagCidList  []string
-	flagFilter   string
-	flagCount    int
-	flagRefresh  int
+	flagDuration  int
+	flagScope     string
+	flagPidList   []string
+	flagCidList   []string
+	flagFilter    string
+	flagCount     int
+	flagRefresh   int
+	flagCoreRange string
 	// output format options
 	flagGranularity     string
 	flagOutputFormat    []string
@@ -123,13 +124,14 @@ var (
 )
 
 const (
-	flagDurationName = "duration"
-	flagScopeName    = "scope"
-	flagPidListName  = "pids"
-	flagCidListName  = "cids"
-	flagFilterName   = "filter"
-	flagCountName    = "count"
-	flagRefreshName  = "refresh"
+	flagDurationName  = "duration"
+	flagScopeName     = "scope"
+	flagPidListName   = "pids"
+	flagCidListName   = "cids"
+	flagFilterName    = "filter"
+	flagCountName     = "count"
+	flagRefreshName   = "refresh"
+	flagCoreRangeName = "corerange"
 
 	flagGranularityName     = "granularity"
 	flagOutputFormatName    = "format"
@@ -183,6 +185,7 @@ func init() {
 	Cmd.Flags().StringVar(&flagFilter, flagFilterName, "", "")
 	Cmd.Flags().IntVar(&flagCount, flagCountName, 5, "")
 	Cmd.Flags().IntVar(&flagRefresh, flagRefreshName, 30, "")
+	Cmd.Flags().StringVar(&flagCoreRange, flagCoreRangeName, "", "")
 
 	Cmd.Flags().StringVar(&flagGranularity, flagGranularityName, granularitySystem, "")
 	Cmd.Flags().StringSliceVar(&flagOutputFormat, flagOutputFormatName, []string{formatCSV}, "")
@@ -265,6 +268,10 @@ func getFlagGroups() []common.FlagGroup {
 		{
 			Name: flagRefreshName,
 			Help: "number of seconds to run before refreshing the \"hot\" or \"filtered\" process or cgroup list. If 0, the list will not be refreshed.",
+		},
+		{
+			Name: flagCoreRangeName,
+			Help: "comma separated list of CPU cores to monitor. If not provided, all cores will be monitored.",
 		},
 	}
 	groups = append(groups, common.FlagGroup{
@@ -374,6 +381,9 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		}
 		if cmd.Flags().Lookup(flagCountName).Changed {
 			return common.FlagValidationError(cmd, "count is not supported with an application argument")
+		}
+		if cmd.Flags().Lookup(flagCoreRangeName).Changed {
+			return common.FlagValidationError(cmd, "core range is not supported with an application argument")
 		}
 	}
 	// confirm valid duration
@@ -1298,7 +1308,7 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 			}
 		}
 		var perfCommand *exec.Cmd
-		perfCommand, err = getPerfCommand(targetContext.perfPath, targetContext.groupDefinitions, pids, cids)
+		perfCommand, err = getPerfCommand(targetContext.perfPath, targetContext.groupDefinitions, pids, cids, flagCoreRange)
 		if err != nil {
 			err = fmt.Errorf("failed to get perf command: %w", err)
 			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
