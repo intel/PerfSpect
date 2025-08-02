@@ -6,6 +6,7 @@ package metrics
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"perfspect/internal/util"
 	"strconv"
 	"strings"
@@ -18,33 +19,11 @@ type CoreGroup struct {
 }
 
 func NewCoreGroup(metadata Metadata) CoreGroup {
-	// initialize core group by setting up the fixed purpose counters
-	var fixedCounters []CoreEvent
-	// if metadata.SupportsFixedCycles {
-	// 	fixedCounters = append(fixedCounters, CoreEvent{EventName: "CPU_CLK_UNHALTED.THREAD", EventCode: "0x00", UMask: "0x02", SampleAfterValue: "2000003", Counter: "Fixed counter 0"})
-	// }
-	// if metadata.SupportsFixedInstructions {
-	// 	fixedCounters = append(fixedCounters, CoreEvent{EventName: "INST_RETIRED.ANY", EventCode: "0x00", UMask: "0x01", SampleAfterValue: "2000003", Counter: "Fixed counter 1"})
-	// }
-	// if metadata.SupportsFixedRefCycles {
-	// 	fixedCounters = append(fixedCounters, CoreEvent{EventName: "CPU_CLK_UNHALTED.REF_TSC", EventCode: "0x00", UMask: "0x03", SampleAfterValue: "2000003", Counter: "Fixed counter 2"})
-	// }
 	return CoreGroup{
-		FixedPurposeCounters:   fixedCounters,
+		FixedPurposeCounters:   make([]CoreEvent, 0),
 		GeneralPurposeCounters: make([]CoreEvent, metadata.NumGeneralPurposeCounters),
 		MetricNames:            make([]string, 0),
 	}
-}
-
-func NewCoreGroupWithTMAEvents(metadata Metadata) CoreGroup {
-	group := NewCoreGroup(metadata)
-	// prepend TMA events to the fixed purpose counters
-	tmaEvents := []CoreEvent{
-		{EventName: "TOPDOWN.SLOTS:perf_metrics", EventCode: "0x00", UMask: "0x04", SampleAfterValue: "10000003", Counter: "Fixed counter 3"},
-	}
-	tmaEvents = append(tmaEvents, perfMetricsEvents...)
-	group.FixedPurposeCounters = append(tmaEvents, group.FixedPurposeCounters...)
-	return group
 }
 
 func (group CoreGroup) ToGroupDefinition() GroupDefinition {
@@ -214,9 +193,35 @@ func (group *CoreGroup) AddEvent(event CoreEvent, reorder bool, metadata Metadat
 			return fmt.Errorf("group already has two OCR events, cannot add %s", event.EventName)
 		}
 	}
-	// ignore TMA events, they are in there own special core group
-	if strings.HasPrefix(event.EventName, "PERF_METRICS.") || event.EventName == "TOPDOWN.SLOTS:perf_metrics" {
-		return nil
+	// If the event is a perf metrics event, we handle it separately
+	if strings.HasPrefix(event.EventName, "PERF_METRICS.") {
+		if !metadata.SupportsFixedTMA {
+			slog.Debug("PERF_METRICS events not supported", slog.String("event", event.EventName))
+			return fmt.Errorf("PERF_METRICS events not supported on target")
+		}
+		// add it to the fixed purpose counters
+		group.FixedPurposeCounters = append(group.FixedPurposeCounters, event)
+		// if TOPDOWN.SLOTS:perf_metrics isn't already in the fixed purpose counters, add it as some metric definitions don't include it
+		if group.FindEventByName("TOPDOWN.SLOTS:perf_metrics").IsEmpty() {
+			topDownEvent := CoreEvent{
+				EventName:        "TOPDOWN.SLOTS:perf_metrics",
+				EventCode:        "0x00",
+				UMask:            "0x04",
+				SampleAfterValue: "10000003",
+				Counter:          "Fixed counter 3",
+			}
+			group.FixedPurposeCounters = append([]CoreEvent{topDownEvent}, group.FixedPurposeCounters...)
+		}
+		return nil // PERF_METRICS events are always added to the fixed purpose counters
+	}
+	if event.EventName == "TOPDOWN.SLOTS:perf_metrics" {
+		if !metadata.SupportsFixedTMA {
+			slog.Debug("TOPDOWN.SLOTS:perf_metrics event not supported", slog.String("event", event.EventName))
+			return fmt.Errorf("TOPDOWN.SLOTS:perf_metrics event not supported on target")
+		}
+		// add it to the top of the fixed purpose counters
+		group.FixedPurposeCounters = append([]CoreEvent{event}, group.FixedPurposeCounters...)
+		return nil // TOPDOWN.SLOTS:perf_metrics events are always added to the fixed purpose counters
 	}
 	// get the list of valid counters for this event
 	validCounters := event.Counter
