@@ -259,12 +259,14 @@ func ExtractResource(resources embed.FS, resourcePath string, tempDir string) (s
 	return outPath, nil
 }
 
-// UniqueAppend appends an item to a slice if it is not already present
-func UniqueAppend[T comparable](slice []T, item T) []T {
-	if slices.Contains(slice, item) {
-		return slice
+// UniqueAppend appends items to a slice if they are not already present
+func UniqueAppend[T comparable](slice []T, items ...T) []T {
+	for _, item := range items {
+		if !slices.Contains(slice, item) {
+			slice = append(slice, item)
+		}
 	}
-	return append(slice, item)
+	return slice
 }
 
 // MergeOrderedUnique merges a slice of slices of type T, maintaining order and inserting new items in the order found in subsequent slices.

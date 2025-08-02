@@ -3,10 +3,9 @@ package metrics
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
-// helper functions for parsing and interpreting the architecture-specific perf event definition files
-
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -19,19 +18,78 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 )
 
-// EventDefinition represents a single perf event
-type EventDefinition struct {
-	Raw    string
-	Name   string
-	Device string
+func (l *LegacyLoader) Load(metricDefinitionOverridePath string, eventDefinitionOverridePath string, selectedMetrics []string, metadata Metadata) ([]MetricDefinition, []GroupDefinition, error) {
+	loadedMetricDefinitions, err := loadMetricDefinitions(metricDefinitionOverridePath, selectedMetrics, metadata)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to load metric definitions: %w", err)
+	}
+	loadedEventGroups, uncollectableEvents, err := loadEventGroups(eventDefinitionOverridePath, metadata)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to load event group definitions: %w", err)
+	}
+	configuredMetricDefinitions, err := configureMetrics(loadedMetricDefinitions, uncollectableEvents, metadata)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to configure metrics: %w", err)
+	}
+	return configuredMetricDefinitions, loadedEventGroups, nil
 }
 
-// GroupDefinition represents a group of perf events
-type GroupDefinition []EventDefinition
+// loadMetricDefinitions reads and parses metric definitions from an architecture-specific metric
+// definition file. When the override path argument is empty, the function will load metrics from
+// the file associated with the platform's architecture found in the provided metadata. When
+// a list of metric names is provided, only those metric definitions will be loaded.
+func loadMetricDefinitions(metricDefinitionOverridePath string, selectedMetrics []string, metadata Metadata) (metrics []MetricDefinition, err error) {
+	var bytes []byte
+	if metricDefinitionOverridePath != "" {
+		bytes, err = os.ReadFile(metricDefinitionOverridePath) // #nosec G304
+		if err != nil {
+			return
+		}
+	} else {
+		uarch := strings.ToLower(strings.Split(metadata.Microarchitecture, "_")[0])
+		uarch = strings.Split(uarch, " ")[0]
+		// use alternate events/metrics when TMA fixed counters are not supported
+		alternate := ""
+		if (uarch == "icx" || uarch == "spr" || uarch == "emr" || uarch == "gnr") && !metadata.SupportsFixedTMA {
+			alternate = "_nofixedtma"
+		}
+		metricFileName := fmt.Sprintf("%s%s.json", uarch, alternate)
+		if bytes, err = resources.ReadFile(filepath.Join("resources", "metrics", metadata.Architecture, metadata.Vendor, metricFileName)); err != nil {
+			return
+		}
+	}
+	var metricsInFile []MetricDefinition
+	if err = json.Unmarshal(bytes, &metricsInFile); err != nil {
+		return
+	}
+	// if a list of metric names provided, reduce list to match
+	if len(selectedMetrics) > 0 {
+		// confirm provided metric names are valid (included in metrics defined in file)
+		// and build list of metrics based on provided list of metric names
+		metricMap := make(map[string]MetricDefinition)
+		for _, metric := range metricsInFile {
+			metricMap[metric.Name] = metric
+		}
+		for _, selectedMetricName := range selectedMetrics {
+			if _, ok := metricMap[selectedMetricName]; !ok {
+				err = fmt.Errorf("provided metric name not found: %s", selectedMetricName)
+				return
+			}
+			metrics = append(metrics, metricMap[selectedMetricName])
+		}
+	} else {
+		metrics = metricsInFile
+	}
+	// abbreviate event names in metrics to shorten the eventual perf stat command line
+	for i := range metrics {
+		metrics[i].Expression = abbreviateEventName(metrics[i].Expression)
+	}
+	return
+}
 
-// LoadEventGroups reads the events defined in the architecture specific event definition file, then
+// loadEventGroups reads the events defined in the architecture specific event definition file, then
 // expands them to include the per-device uncore events
-func LoadEventGroups(eventDefinitionOverridePath string, metadata Metadata) (groups []GroupDefinition, uncollectableEvents []string, err error) {
+func loadEventGroups(eventDefinitionOverridePath string, metadata Metadata) (groups []GroupDefinition, uncollectableEvents []string, err error) {
 	var file fs.File
 	if eventDefinitionOverridePath != "" {
 		file, err = os.Open(eventDefinitionOverridePath) // #nosec G304
@@ -54,9 +112,6 @@ func LoadEventGroups(eventDefinitionOverridePath string, metadata Metadata) (gro
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
 	uncollectable := mapset.NewSet[string]()
-	if flagTransactionRate == 0 {
-		uncollectable.Add("TXN")
-	}
 	var group GroupDefinition
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -104,38 +159,6 @@ func LoadEventGroups(eventDefinitionOverridePath string, metadata Metadata) (gro
 	return
 }
 
-// abbreviateEventName replaces long event names with abbreviations to reduce the length of the perf command.
-// focus is on uncore events because they are repeated for each uncore device
-func abbreviateEventName(event string) string {
-	// Abbreviations must be unique and in order. And, if replacing UNC_*, the abbreviation must begin with "UNC" because this is how we identify uncore events when collapsing them.
-	var abbreviations = [][]string{
-		{"UNC_CHA_TOR_INSERTS", "UNCCTI"},
-		{"UNC_CHA_TOR_OCCUPANCY", "UNCCTO"},
-		{"UNC_CHA_CLOCKTICKS", "UNCCCT"},
-		{"UNC_M_CAS_COUNT_SCH", "UNCMCC"},
-		{"IA_MISS_DRD_REMOTE", "IMDR"},
-		{"IA_MISS_DRD_LOCAL", "IMDL"},
-		{"IA_MISS_LLCPREFDATA", "IMLP"},
-		{"IA_MISS_LLCPREFRFO", "IMLR"},
-		{"IA_MISS_DRD_PREF_LOCAL", "IMDPL"},
-		{"IA_MISS_DRD_PREF_REMOTE", "IMDRP"},
-		{"IA_MISS_CRD_PREF", "IMCP"},
-		{"IA_MISS_RFO_PREF", "IMRP"},
-		{"IA_MISS_RFO", "IMRF"},
-		{"IA_MISS_CRD", "IMC"},
-		{"IA_MISS_DRD", "IMD"},
-		{"IO_PCIRDCUR", "IPCI"},
-		{"IO_ITOMCACHENEAR", "IITN"},
-		{"IO_ITOM", "IITO"},
-		{"IMD_OPT", "IMDO"},
-	}
-	// if an abbreviation key is found in the event, replace the matching portion of the event with the abbreviation
-	for _, abbr := range abbreviations {
-		event = strings.Replace(event, abbr[0], abbr[1], -1)
-	}
-	return event
-}
-
 // isCollectableEvent confirms if given event can be collected on the platform
 func isCollectableEvent(event EventDefinition, metadata Metadata) bool {
 	// fixed-counter TMA
@@ -153,11 +176,11 @@ func isCollectableEvent(event EventDefinition, metadata Metadata) bool {
 			}
 		}
 	}
-	// short-circuit for cpu events that aren't off-core response events
+	// short-circuit for cpu events that aren't off-core request/response events
 	if event.Device == "cpu" && !(strings.HasPrefix(event.Name, "OCR") || strings.HasPrefix(event.Name, "OFFCORE_REQUESTS_OUTSTANDING")) {
 		return true
 	}
-	// off-core response events
+	// off-core request/response events
 	if event.Device == "cpu" && (strings.HasPrefix(event.Name, "OCR") || strings.HasPrefix(event.Name, "OFFCORE_REQUESTS_OUTSTANDING")) {
 		if !(metadata.SupportsOCR && metadata.SupportsUncore) {
 			slog.Debug("Off-core response events not supported on target", slog.String("event", event.Name))
@@ -295,4 +318,36 @@ func expandUncoreGroups(groups []GroupDefinition, metadata Metadata) (expandedGr
 		}
 	}
 	return
+}
+
+// abbreviateEventName replaces long event names with abbreviations to reduce the length of the perf command.
+// focus is on uncore events because they are repeated for each uncore device
+func abbreviateEventName(event string) string {
+	// Abbreviations must be unique and in order. And, if replacing UNC_*, the abbreviation must begin with "UNC" because this is how we identify uncore events when collapsing them.
+	var abbreviations = [][]string{
+		{"UNC_CHA_TOR_INSERTS", "UNCCTI"},
+		{"UNC_CHA_TOR_OCCUPANCY", "UNCCTO"},
+		{"UNC_CHA_CLOCKTICKS", "UNCCCT"},
+		{"UNC_M_CAS_COUNT_SCH", "UNCMCC"},
+		{"IA_MISS_DRD_REMOTE", "IMDR"},
+		{"IA_MISS_DRD_LOCAL", "IMDL"},
+		{"IA_MISS_LLCPREFDATA", "IMLP"},
+		{"IA_MISS_LLCPREFRFO", "IMLR"},
+		{"IA_MISS_DRD_PREF_LOCAL", "IMDPL"},
+		{"IA_MISS_DRD_PREF_REMOTE", "IMDRP"},
+		{"IA_MISS_CRD_PREF", "IMCP"},
+		{"IA_MISS_RFO_PREF", "IMRP"},
+		{"IA_MISS_RFO", "IMRF"},
+		{"IA_MISS_CRD", "IMC"},
+		{"IA_MISS_DRD", "IMD"},
+		{"IO_PCIRDCUR", "IPCI"},
+		{"IO_ITOMCACHENEAR", "IITN"},
+		{"IO_ITOM", "IITO"},
+		{"IMD_OPT", "IMDO"},
+	}
+	// if an abbreviation key is found in the event, replace the matching portion of the event with the abbreviation
+	for _, abbr := range abbreviations {
+		event = strings.Replace(event, abbr[0], abbr[1], -1)
+	}
+	return event
 }
