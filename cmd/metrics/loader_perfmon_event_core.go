@@ -95,15 +95,14 @@ func (event CoreEvent) IsCollectable(metadata Metadata) bool {
 		slog.Debug("Fixed TMA events not supported", slog.String("event", event.EventName))
 		return false // TOPDOWN.SLOTS and PERF_METRICS.* events are not supported
 	}
-	if strings.HasPrefix(event.EventName, "OCR") || strings.HasPrefix(event.EventName, "OFFCORE_REQUESTS_OUTSTANDING") {
+	if event.Offcore == "1" {
 		if !metadata.SupportsOCR {
-			slog.Debug("Off-core request and response events not supported on target", slog.String("event", event.EventName))
-			return false // OCR events are not supported
+			slog.Debug("Off-core response (OCR) events not supported", slog.String("event", event.EventName))
+			return false // Off-core response events are not supported
 		}
-		// If the event is in process or cgroup scope, we do not collect OCR
 		if flagScope == scopeProcess || flagScope == scopeCgroup {
-			slog.Debug("Off-core request and response events not supported in process or cgroup scope", slog.String("event", event.EventName))
-			return false // OCR events are not supported in process or cgroup scope
+			slog.Debug("Off-core response (OCR) events not supported in process or cgroup scope", slog.String("event", event.EventName))
+			return false // Off-core response events are not supported in process or cgroup scope
 		}
 	}
 	if !metadata.SupportsRefCycles && strings.Contains(event.EventName, "ref-cycles") {
