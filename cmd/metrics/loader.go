@@ -50,10 +50,10 @@ type PerfmonLoader struct {
 
 func NewLoader(uarch string) (Loader, error) {
 	switch strings.ToLower(uarch) {
-	case "srf", "icx", "clx", "skx", "bdx", "bergamo", "genoa", "turin":
+	case "srf", "clx", "skx", "bdx", "bergamo", "genoa", "turin":
 		slog.Debug("Using legacy loader for microarchitecture", slog.String("uarch", uarch))
 		return newLegacyLoader(strings.ToLower(uarch)), nil
-	case "gnr", "emr", "spr":
+	case "gnr", "emr", "spr", "icx":
 		slog.Debug("Using perfmon loader for microarchitecture", slog.String("uarch", uarch))
 		return newPerfmonLoader(strings.ToLower(uarch)), nil
 	default:

@@ -278,17 +278,17 @@ func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSumm
 		},
 		{
 			Name:           "perf stat pebs",
-			ScriptTemplate: perfPath + " stat -a -e cpu/event=0xad,umask=0x40,period=1000003,name='INT_MISC.UNKNOWN_BRANCH_CYCLES'/ sleep 1",
+			ScriptTemplate: perfPath + " stat -a -e INT_MISC.UNKNOWN_BRANCH_CYCLES sleep 1",
 			Superuser:      !noRoot,
 		},
 		{
 			Name:           "perf stat ocr",
-			ScriptTemplate: perfPath + " stat -a -e cpu/event=0x2a,umask=0x01,offcore_rsp=0x104004477,name='OCR.READS_TO_CORE.LOCAL_DRAM'/ sleep 1",
+			ScriptTemplate: perfPath + " stat -a -e OCR.READS_TO_CORE.LOCAL_DRAM sleep 1",
 			Superuser:      !noRoot,
 		},
 		{
 			Name:           "perf stat tma",
-			ScriptTemplate: perfPath + " stat -a -e '{cpu/event=0x00,umask=0x04,period=10000003,name='TOPDOWN.SLOTS'/,cpu/event=0x00,umask=0x81,period=10000003,name='PERF_METRICS.BAD_SPECULATION'/}' sleep 1",
+			ScriptTemplate: perfPath + " stat -a -e '{topdown.slots, topdown-bad-spec}' sleep 1",
 			Superuser:      !noRoot,
 		},
 		{
@@ -603,7 +603,7 @@ func getSupportsOCR(scriptOutputs map[string]script.ScriptOutput) (supported boo
 // getSupportsFixedTMA - checks if the fixed TMA counter events are
 // supported by perf.
 //
-// We check for the TOPDOWN.SLOTS and PERF_METRICS.BAD_SPECULATION events as
+// We check for the topdown.slots and topdown-bad-spec events as
 // an indicator of support for fixed TMA counter support. At the time of
 // writing, these events are not supported on AWS m7i VMs or AWS m6i VMs.  On
 // AWS m7i VMs, we get an error from the perf stat command below. On AWS m6i
@@ -621,8 +621,10 @@ func getSupportsFixedTMA(scriptOutputs map[string]script.ScriptOutput) (supporte
 	// event values being zero or equal to each other is 2nd indication that these events are not (properly) supported
 	vals := make(map[string]float64)
 	lines := strings.Split(output, "\n")
-	// example line: "         784333932      TOPDOWN.SLOTS                                                        (59.75%)"
-	re := regexp.MustCompile(`\s+(\d+)\s+(\w*\.*\w*)\s+.*`)
+	// example lines:
+	// "     1078623236      topdown.slots                                                           (34.40%)"
+	// "        83572327       topdown-bad-spec                                                       (34.40%)"
+	re := regexp.MustCompile(`^\s*([0-9]+)\s+(topdown[\w.\-]+)`)
 	for _, line := range lines {
 		// count may include commas as thousands separators, remove them
 		line = strings.ReplaceAll(line, ",", "")
@@ -635,8 +637,8 @@ func getSupportsFixedTMA(scriptOutputs map[string]script.ScriptOutput) (supporte
 			}
 		}
 	}
-	topDownSlots := vals["TOPDOWN.SLOTS"]
-	badSpeculation := vals["PERF_METRICS.BAD_SPECULATION"]
+	topDownSlots := vals["topdown.slots"]
+	badSpeculation := vals["topdown-bad-spec"]
 	supported = topDownSlots != badSpeculation && topDownSlots != 0 && badSpeculation != 0
 	return
 }
