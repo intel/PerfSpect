@@ -206,6 +206,14 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, _ string, selected
 		group.Print(os.Stdout)
 	}
 
+	// replace retire latencies variables with their values
+	if config.PerfmonRetireLatencyFile != "" {
+		metrics, err = replaceRetireLatencies(metrics, filepath.Join("resources", "metrics", metadata.Architecture, metadata.Vendor, strings.ToLower(l.microarchitecture), config.PerfmonRetireLatencyFile))
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to replace retire latencies: %w", err)
+		}
+	}
+
 	// apply common modifications to metric expressions
 	metrics, err = configureMetrics(metrics, uncollectableEvents, metadata)
 	if err != nil {
@@ -620,4 +628,76 @@ func findPerfmonMetric(metricsList []PerfmonMetric, metricName string) (*Perfmon
 		}
 	}
 	return nil, false
+}
+
+//
+// Retire Latency Files
+//
+
+type PlatformInfo struct {
+	ModelName      string `json:"Model name"`
+	CPUFamily      string `json:"CPU family"`
+	Model          string `json:"Model"`
+	ThreadsPerCore string `json:"Thread(s) per core"`
+	CoresPerSocket string `json:"Core(s) per socket"`
+	Sockets        string `json:"Socket(s)"`
+	Stepping       string `json:"Stepping"`
+	L3Cache        string `json:"L3 cache"`
+	NUMANodes      string `json:"NUMA node(s)"`
+	TMAVersion     string `json:"TMA version"`
+}
+
+type MetricStats struct {
+	Min  float64 `json:"MIN"`
+	Max  float64 `json:"MAX"`
+	Mean float64 `json:"MEAN"`
+}
+
+type RetireLatency struct {
+	Platform PlatformInfo           `json:"Platform"`
+	Data     map[string]MetricStats `json:"Data"`
+}
+
+// loadRetireLatencies loads the retire latencies from a JSON file based on the microarchitecture
+// it returns a map of event names to their retire latencies
+// the retire latency is the mean value of the metric stats
+func loadRetireLatencies(retireLatenciesFile string) (map[string]string, error) {
+	var bytes []byte
+	var err error
+	if bytes, err = resources.ReadFile(retireLatenciesFile); err != nil {
+		slog.Error("failed to read retire latencies file", slog.String("file", retireLatenciesFile), slog.String("error", err.Error()))
+		return nil, fmt.Errorf("failed to read retire latencies file %s: %w", retireLatenciesFile, err)
+	}
+	var retireLatency RetireLatency
+	if err = json.Unmarshal(bytes, &retireLatency); err != nil {
+		slog.Error("failed to unmarshal retire latencies", slog.String("error", err.Error()))
+		return nil, fmt.Errorf("failed to unmarshal retire latencies: %w", err)
+	}
+	// create a map of retire latencies
+	retireLatencies := make(map[string]string)
+	for event, stats := range retireLatency.Data {
+		// use the mean value for the retire latency
+		retireLatencies[event] = fmt.Sprintf("%f", stats.Mean)
+	}
+	slog.Debug("loaded retire latencies", slog.Any("latencies", retireLatencies))
+	return retireLatencies, nil
+}
+
+// replaceRetireLatencies replaces retire latencies in metrics with their values
+func replaceRetireLatencies(metrics []MetricDefinition, retireLatenciesFile string) ([]MetricDefinition, error) {
+	// load retire latencies
+	retireLatencies, err := loadRetireLatencies(retireLatenciesFile)
+	if err != nil {
+		slog.Error("failed to load retire latencies", slog.String("error", err.Error()))
+		return nil, err
+	}
+	// replace retire latencies in metrics
+	for i := range metrics {
+		metric := &metrics[i]
+		for retireEvent, retireLatency := range retireLatencies {
+			// replace <event>:retire_latency with value
+			metric.Expression = strings.ReplaceAll(metric.Expression, fmt.Sprintf("[%s:retire_latency]", retireEvent), retireLatency)
+		}
+	}
+	return metrics, nil
 }

@@ -1,10 +1,8 @@
 package metrics
 
 import (
-	"encoding/json"
 	"fmt"
 	"log/slog"
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -27,12 +25,6 @@ func configureMetrics(metrics []MetricDefinition, uncollectableEvents []string, 
 	metrics, err = replaceConstants(metrics, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to replace constants: %w", err)
-	}
-
-	// replace retire latencies variables with their values
-	metrics, err = replaceRetireLatencies(metrics, metadata)
-	if err != nil {
-		return nil, fmt.Errorf("failed to replace retire latencies: %w", err)
 	}
 
 	// transform metric expressions from perfmon format to perfspect format
@@ -66,62 +58,6 @@ func configureMetrics(metrics []MetricDefinition, uncollectableEvents []string, 
 	}
 
 	return metrics, nil
-}
-
-//
-// Retire Latency Files
-//
-
-type PlatformInfo struct {
-	ModelName      string `json:"Model name"`
-	CPUFamily      string `json:"CPU family"`
-	Model          string `json:"Model"`
-	ThreadsPerCore string `json:"Thread(s) per core"`
-	CoresPerSocket string `json:"Core(s) per socket"`
-	Sockets        string `json:"Socket(s)"`
-	Stepping       string `json:"Stepping"`
-	L3Cache        string `json:"L3 cache"`
-	NUMANodes      string `json:"NUMA node(s)"`
-	TMAVersion     string `json:"TMA version"`
-}
-
-type MetricStats struct {
-	Min  float64 `json:"MIN"`
-	Max  float64 `json:"MAX"`
-	Mean float64 `json:"MEAN"`
-}
-
-type RetireLatency struct {
-	Platform PlatformInfo           `json:"Platform"`
-	Data     map[string]MetricStats `json:"Data"`
-}
-
-// loadRetireLatencies loads the retire latencies from a JSON file based on the microarchitecture
-// it returns a map of event names to their retire latencies
-// the retire latency is the mean value of the metric stats
-func loadRetireLatencies(metadata Metadata) (retireLatencies map[string]string, err error) {
-	uarch := strings.ToLower(strings.Split(metadata.Microarchitecture, "_")[0])
-	uarch = strings.Split(uarch, " ")[0]
-	filename := fmt.Sprintf("%s_retire_latency.json", uarch)
-	var bytes []byte
-	if bytes, err = resources.ReadFile(filepath.Join("resources", "metrics", metadata.Architecture, metadata.Vendor, filename)); err != nil {
-		// not all architectures have retire latencies defined
-		err = nil
-		return
-	}
-	var retireLatency RetireLatency
-	if err = json.Unmarshal(bytes, &retireLatency); err != nil {
-		slog.Error("failed to unmarshal retire latencies", slog.String("error", err.Error()))
-		return
-	}
-	// create a map of retire latencies
-	retireLatencies = make(map[string]string)
-	for event, stats := range retireLatency.Data {
-		// use the mean value for the retire latency
-		retireLatencies[event] = fmt.Sprintf("%f", stats.Mean)
-	}
-	slog.Debug("loaded retire latencies", slog.Any("latencies", retireLatencies))
-	return
 }
 
 // perfmonToPerfspectConditional transforms if/else to ternary conditional (? :) so expression evaluator can handle it
@@ -236,25 +172,6 @@ func replaceConstants(metrics []MetricDefinition, metadata Metadata) ([]MetricDe
 		metric.Expression = strings.ReplaceAll(metric.Expression, "[HYPERTHREADING_ON]", hyperThreadingOn)
 		metric.Expression = strings.ReplaceAll(metric.Expression, "[CONST_THREAD_COUNT]", threadsPerCore)
 		metric.Expression = strings.ReplaceAll(metric.Expression, "[TXN]", fmt.Sprintf("%f", flagTransactionRate))
-	}
-	return metrics, nil
-}
-
-// replaceRetireLatencies replaces retire latencies in metrics with their values
-func replaceRetireLatencies(metrics []MetricDefinition, metadata Metadata) ([]MetricDefinition, error) {
-	// load retire latencies
-	retireLatencies, err := loadRetireLatencies(metadata)
-	if err != nil {
-		slog.Error("failed to load retire latencies", slog.String("error", err.Error()))
-		return nil, err
-	}
-	// replace retire latencies in metrics
-	for i := range metrics {
-		metric := &metrics[i]
-		for retireEvent, retireLatency := range retireLatencies {
-			// replace <event>:retire_latency with value
-			metric.Expression = strings.ReplaceAll(metric.Expression, fmt.Sprintf("[%s:retire_latency]", retireEvent), retireLatency)
-		}
 	}
 	return metrics, nil
 }
