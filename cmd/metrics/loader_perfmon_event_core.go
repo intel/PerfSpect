@@ -126,7 +126,9 @@ var fixedCounterEventNameTranslation = map[string]string{
 	"INST_RETIRED.ANY":                "instructions",
 	"INST_RETIRED.ANY_P:SUP":          "instructions:k",
 	"CPU_CLK_UNHALTED.THREAD":         "cpu-cycles",
+	"CPU_CLK_UNHALTED.CORE":           "cpu-cycles", // srf - thread and core are the same
 	"CPU_CLK_UNHALTED.THREAD_P:SUP":   "cpu-cycles:k",
+	"CPU_CLK_UNHALTED.CORE_P:SUP":     "cpu-cycles:k", // srf - thread and core are the same
 	"CPU_CLK_UNHALTED.REF_TSC":        "ref-cycles",
 	"CPU_CLK_UNHALTED.REF_TSC_P:SUP":  "ref-cycles:k",
 	"TOPDOWN.SLOTS:perf_metrics":      "topdown.slots",
