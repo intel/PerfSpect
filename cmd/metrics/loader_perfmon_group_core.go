@@ -234,15 +234,13 @@ func (group *CoreGroup) AddEvent(event CoreEvent, reorder bool, metadata Metadat
 		if err != nil {
 			return fmt.Errorf("invalid fixed counter index %s for event %s: %w", fixedCounter, event.EventName, err)
 		}
-		if metadata.SupportsFixedInstructions && fixedCounterIndex == 0 {
-			group.FixedPurposeCounters = append(group.FixedPurposeCounters, event)
-			return nil
-		}
-		if metadata.SupportsFixedCycles && fixedCounterIndex == 1 {
-			group.FixedPurposeCounters = append(group.FixedPurposeCounters, event)
-			return nil
-		}
-		if metadata.SupportsFixedRefCycles && fixedCounterIndex == 2 {
+		if (metadata.SupportsFixedInstructions && fixedCounterIndex == 0) || (metadata.SupportsFixedCycles && fixedCounterIndex == 1) || (metadata.SupportsFixedRefCycles && fixedCounterIndex == 2) {
+			// if fixed counter isn't already occupied, place the event in the fixed purpose counters
+			for _, existingEvent := range group.FixedPurposeCounters {
+				if existingEvent.Counter == event.Counter {
+					return fmt.Errorf("fixed purpose counter %s already occupied by %s", event.Counter, existingEvent.EventName)
+				}
+			}
 			group.FixedPurposeCounters = append(group.FixedPurposeCounters, event)
 			return nil
 		}
