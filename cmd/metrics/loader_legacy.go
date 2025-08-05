@@ -48,13 +48,8 @@ func loadMetricDefinitions(metricDefinitionOverridePath string, selectedMetrics 
 	} else {
 		uarch := strings.ToLower(strings.Split(metadata.Microarchitecture, "_")[0])
 		uarch = strings.Split(uarch, " ")[0]
-		// use alternate events/metrics when TMA fixed counters are not supported
-		alternate := ""
-		if (uarch == "icx" || uarch == "spr" || uarch == "emr" || uarch == "gnr") && !metadata.SupportsFixedTMA {
-			alternate = "_nofixedtma"
-		}
-		metricFileName := fmt.Sprintf("%s%s.json", uarch, alternate)
-		if bytes, err = resources.ReadFile(filepath.Join("resources", "metrics", metadata.Architecture, metadata.Vendor, metricFileName)); err != nil {
+		metricFileName := fmt.Sprintf("%s.json", uarch)
+		if bytes, err = resources.ReadFile(filepath.Join("resources", "legacy", "metrics", metadata.Architecture, metadata.Vendor, metricFileName)); err != nil {
 			return
 		}
 	}
@@ -99,13 +94,8 @@ func loadEventGroups(eventDefinitionOverridePath string, metadata Metadata) (gro
 	} else {
 		uarch := strings.ToLower(strings.Split(metadata.Microarchitecture, "_")[0])
 		uarch = strings.Split(uarch, " ")[0]
-		// use alternate events/metrics when TMA fixed counters are not supported
-		alternate := ""
-		if (uarch == "icx" || uarch == "spr" || uarch == "emr" || uarch == "gnr") && !metadata.SupportsFixedTMA { // AWS/GCP VM instances
-			alternate = "_nofixedtma"
-		}
-		eventFileName := fmt.Sprintf("%s%s.txt", uarch, alternate)
-		if file, err = resources.Open(filepath.Join("resources", "events", metadata.Architecture, metadata.Vendor, eventFileName)); err != nil {
+		eventFileName := fmt.Sprintf("%s.txt", uarch)
+		if file, err = resources.Open(filepath.Join("resources", "legacy", "events", metadata.Architecture, metadata.Vendor, eventFileName)); err != nil {
 			return
 		}
 	}
@@ -166,26 +156,15 @@ func isCollectableEvent(event EventDefinition, metadata Metadata) bool {
 		slog.Debug("Fixed counter TMA not supported on target", slog.String("event", event.Name))
 		return false
 	}
-	// PEBS events (not supported on GCP c4 VMs)
-	pebsEventNames := []string{"INT_MISC.UNKNOWN_BRANCH_CYCLES", "UOPS_RETIRED.MS"}
-	if !metadata.SupportsPEBS {
-		for _, pebsEventName := range pebsEventNames {
-			if strings.Contains(event.Name, pebsEventName) {
-				slog.Debug("PEBS events not supported on target", slog.String("event", event.Name))
-				return false
-			}
-		}
-	}
-	// short-circuit for cpu events that aren't off-core request/response events
-	if event.Device == "cpu" && !(strings.HasPrefix(event.Name, "OCR") || strings.HasPrefix(event.Name, "OFFCORE_REQUESTS_OUTSTANDING")) {
+	// short-circuit for cpu events that aren't off-core response events
+	if event.Device == "cpu" && !strings.HasPrefix(event.Name, "OCR") {
 		return true
 	}
-	// off-core request/response events
-	if event.Device == "cpu" && (strings.HasPrefix(event.Name, "OCR") || strings.HasPrefix(event.Name, "OFFCORE_REQUESTS_OUTSTANDING")) {
-		if !(metadata.SupportsOCR && metadata.SupportsUncore) {
-			slog.Debug("Off-core response events not supported on target", slog.String("event", event.Name))
-			return false
-		} else if flagScope == scopeProcess || flagScope == scopeCgroup {
+	// short-circuit off-core response events
+	if event.Device == "cpu" &&
+		strings.HasPrefix(event.Name, "OCR") &&
+		metadata.SupportsUncore {
+		if flagScope == scopeProcess || flagScope == scopeCgroup {
 			slog.Debug("Off-core response events not supported in process or cgroup scope", slog.String("event", event.Name))
 			return false
 		}

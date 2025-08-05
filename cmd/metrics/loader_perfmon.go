@@ -48,7 +48,7 @@ type PerfmonMetrics struct {
 	Metrics []PerfmonMetric      `json:"Metrics"`
 }
 
-func LoadPerfmonMetrics(path string) (PerfmonMetrics, error) {
+func loadPerfmonMetrics(path string) (PerfmonMetrics, error) {
 	var metrics PerfmonMetrics
 	bytes, err := resources.ReadFile(path)
 	if err != nil {
@@ -80,7 +80,7 @@ type MetricsConfig struct {
 	ReportMetrics            []PerfspectMetric   `json:"ReportMetrics"`            // Metrics that are reported in the PerfSpect report
 }
 
-func (l *PerfmonLoader) loadMetricsConfig(metricConfigOverridePath string, metadata Metadata) (MetricsConfig, error) {
+func (l *PerfmonLoader) loadMetricsConfig(metricConfigOverridePath string) (MetricsConfig, error) {
 	var config MetricsConfig
 	var bytes []byte
 	if metricConfigOverridePath != "" {
@@ -91,7 +91,7 @@ func (l *PerfmonLoader) loadMetricsConfig(metricConfigOverridePath string, metad
 		}
 	} else {
 		var err error
-		bytes, err = resources.ReadFile(filepath.Join("resources", "metrics", metadata.Architecture, metadata.Vendor, strings.ToLower(l.microarchitecture), strings.ToLower(l.microarchitecture)+".json"))
+		bytes, err = resources.ReadFile(filepath.Join("resources", "perfmon", strings.ToLower(l.microarchitecture), strings.ToLower(l.microarchitecture)+".json"))
 		if err != nil {
 			return MetricsConfig{}, fmt.Errorf("error reading metrics config file: %w", err)
 		}
@@ -104,22 +104,22 @@ func (l *PerfmonLoader) loadMetricsConfig(metricConfigOverridePath string, metad
 
 func (l *PerfmonLoader) Load(metricConfigOverridePath string, _ string, selectedMetrics []string, metadata Metadata) ([]MetricDefinition, []GroupDefinition, error) {
 	// Load the metrics configuration from the JSON file
-	config, err := l.loadMetricsConfig(metricConfigOverridePath, metadata)
+	config, err := l.loadMetricsConfig(metricConfigOverridePath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load metrics config: %w", err)
 	}
 	// Load the perfmon metric definitions from the JSON file
-	perfmonMetricDefinitions, err := LoadPerfmonMetrics(filepath.Join("resources", "metrics", metadata.Architecture, metadata.Vendor, strings.ToLower(l.microarchitecture), config.PerfmonMetricsFile))
+	perfmonMetricDefinitions, err := loadPerfmonMetrics(filepath.Join("resources", "perfmon", strings.ToLower(l.microarchitecture), config.PerfmonMetricsFile))
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading perfmon metrics: %w", err)
 	}
 	// Load the perfmon core events from the JSON file
-	coreEvents, err := NewCoreEvents(filepath.Join("resources", "metrics", metadata.Architecture, metadata.Vendor, strings.ToLower(l.microarchitecture), config.PerfmonCoreEventsFile))
+	coreEvents, err := NewCoreEvents(filepath.Join("resources", "perfmon", strings.ToLower(l.microarchitecture), config.PerfmonCoreEventsFile))
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading perfmon core events: %w", err)
 	}
 	// Load the perfmon uncore events from the JSON file
-	uncoreEvents, err := NewUncoreEvents(filepath.Join("resources", "metrics", metadata.Architecture, metadata.Vendor, strings.ToLower(l.microarchitecture), config.PerfmonUncoreEventsFile))
+	uncoreEvents, err := NewUncoreEvents(filepath.Join("resources", "perfmon", strings.ToLower(l.microarchitecture), config.PerfmonUncoreEventsFile))
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading perfmon uncore events: %w", err)
 	}
@@ -208,7 +208,7 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, _ string, selected
 
 	// replace retire latencies variables with their values
 	if config.PerfmonRetireLatencyFile != "" {
-		metrics, err = replaceRetireLatencies(metrics, filepath.Join("resources", "metrics", metadata.Architecture, metadata.Vendor, strings.ToLower(l.microarchitecture), config.PerfmonRetireLatencyFile))
+		metrics, err = replaceRetireLatencies(metrics, filepath.Join("resources", "perfmon", strings.ToLower(l.microarchitecture), config.PerfmonRetireLatencyFile))
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to replace retire latencies: %w", err)
 		}
