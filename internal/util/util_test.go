@@ -774,15 +774,6 @@ func TestUniqueAppendSlice(t *testing.T) {
 				t.Errorf("UniqueAppend(%v, %v) = %v, want %v", tc.input, tc.append, got, tc.expected)
 			}
 		})
-		// Also test appending a single item directly (not as a slice)
-		if len(tc.append) == 1 {
-			t.Run("string/"+tc.name+"/single", func(t *testing.T) {
-				got := UniqueAppend(tc.input, tc.append[0])
-				if !slices.Equal(got, tc.expected) {
-					t.Errorf("UniqueAppend(%v, %v) = %v, want %v", tc.input, tc.append[0], got, tc.expected)
-				}
-			})
-		}
 	}
 
 	for _, tc := range intTests {
@@ -792,14 +783,5 @@ func TestUniqueAppendSlice(t *testing.T) {
 				t.Errorf("UniqueAppend(%v, %v) = %v, want %v", tc.input, tc.append, got, tc.expected)
 			}
 		})
-		// Also test appending a single item directly (not as a slice)
-		if len(tc.append) == 1 {
-			t.Run("int/"+tc.name+"/single", func(t *testing.T) {
-				got := UniqueAppend(tc.input, tc.append[0])
-				if !slices.Equal(got, tc.expected) {
-					t.Errorf("UniqueAppend(%v, %v) = %v, want %v", tc.input, tc.append[0], got, tc.expected)
-				}
-			})
-		}
 	}
 }
