@@ -131,7 +131,6 @@ func parseEvents(rawEvents [][]byte, eventGroupDefinitions []GroupDefinition) ([
 		}
 		// sometimes perf will prepend "cpu/" to the topdown event names, e.g., cpu/topdown-retiring/, we clean it up here to match metric formulas
 		if strings.HasPrefix(event.Event, "cpu/") && strings.Contains(event.Event, "topdown") && strings.HasSuffix(event.Event, "/") {
-			slog.Debug("cleaning up topdown event name", slog.String("event", event.Event))
 			event.Event = strings.TrimPrefix(event.Event, "cpu/")
 			event.Event = strings.TrimSuffix(event.Event, "/")
 		}

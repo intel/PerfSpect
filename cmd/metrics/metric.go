@@ -165,11 +165,13 @@ func getExpressionVariableValues(metric MetricDefinition, frame EventFrame, prev
 			err = fmt.Errorf("variable value set to -2 (shouldn't happen): %s", variableName)
 			return
 		}
-		// set the variable value to the event value divided by the perf collection time to normalize the value to 1 second
-		if len(frame.EventGroups) <= metric.Variables[variableName] {
-			err = fmt.Errorf("event groups have changed")
+		// check if previously assigned event group is available
+		if metric.Variables[variableName] >= len(frame.EventGroups) {
+			// it may not be available, for example, in cpu granularity where uncore events are only in the first CPU of a socket
+			err = fmt.Errorf("variable %s assigned to group %d, but only %d groups available", variableName, metric.Variables[variableName], len(frame.EventGroups))
 			return
 		}
+		// set the variable value to the event value divided by the perf collection time to normalize the value to 1 second
 		variables[variableName] = frame.EventGroups[metric.Variables[variableName]].EventValues[variableName] / (frame.Timestamp - previousTimestamp)
 		// adjust cstate_core/c6-residency value if hyperthreading is enabled
 		// why here? so we don't have to change the perfmon metric formula
