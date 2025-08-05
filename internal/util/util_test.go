@@ -587,3 +587,219 @@ func TestCreateFlatTGZ(t *testing.T) {
 		t.Errorf("expected error for invalid tarball path, got nil")
 	}
 }
+
+func TestUniqueAppendItem(t *testing.T) {
+	type testCase[T comparable] struct {
+		name     string
+		input    []T
+		append   T
+		expected []T
+	}
+
+	stringTests := []testCase[string]{
+		{
+			name:     "append unique item",
+			input:    []string{"a", "b"},
+			append:   "c",
+			expected: []string{"a", "b", "c"},
+		},
+		{
+			name:     "append duplicate item",
+			input:    []string{"a", "b"},
+			append:   "b",
+			expected: []string{"a", "b"},
+		},
+		{
+			name:     "append to empty slice",
+			input:    []string{},
+			append:   "x",
+			expected: []string{"x"},
+		},
+	}
+
+	intTests := []testCase[int]{
+		{
+			name:     "append unique item",
+			input:    []int{1, 2},
+			append:   3,
+			expected: []int{1, 2, 3},
+		},
+		{
+			name:     "append duplicate item",
+			input:    []int{1, 2},
+			append:   2,
+			expected: []int{1, 2},
+		},
+		{
+			name:     "append to empty slice",
+			input:    []int{},
+			append:   42,
+			expected: []int{42},
+		},
+	}
+
+	for _, tc := range stringTests {
+		t.Run("string/"+tc.name, func(t *testing.T) {
+			got := UniqueAppend(tc.input, tc.append)
+			if !slices.Equal(got, tc.expected) {
+				t.Errorf("UniqueAppend(%v, %v) = %v, want %v", tc.input, tc.append, got, tc.expected)
+			}
+		})
+	}
+
+	for _, tc := range intTests {
+		t.Run("int/"+tc.name, func(t *testing.T) {
+			got := UniqueAppend(tc.input, tc.append)
+			if !slices.Equal(got, tc.expected) {
+				t.Errorf("UniqueAppend(%v, %v) = %v, want %v", tc.input, tc.append, got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestUniqueAppendSlice(t *testing.T) {
+	type testCase[T comparable] struct {
+		name     string
+		input    []T
+		append   []T
+		expected []T
+	}
+
+	stringTests := []testCase[string]{
+		{
+			name:     "append to empty slice",
+			input:    []string{},
+			append:   []string{"a", "b"},
+			expected: []string{"a", "b"},
+		},
+		{
+			name:     "append unique items",
+			input:    []string{"a"},
+			append:   []string{"b", "c"},
+			expected: []string{"a", "b", "c"},
+		},
+		{
+			name:     "append duplicate items",
+			input:    []string{"a", "b"},
+			append:   []string{"b", "c"},
+			expected: []string{"a", "b", "c"},
+		},
+		{
+			name:     "append all duplicates",
+			input:    []string{"a", "b"},
+			append:   []string{"a", "b"},
+			expected: []string{"a", "b"},
+		},
+		{
+			name:     "append nothing",
+			input:    []string{"a", "b"},
+			append:   []string{},
+			expected: []string{"a", "b"},
+		},
+		{
+			name:     "append single new item",
+			input:    []string{"x", "y"},
+			append:   []string{"z"},
+			expected: []string{"x", "y", "z"},
+		},
+		{
+			name:     "append single duplicate item",
+			input:    []string{"foo", "bar"},
+			append:   []string{"foo"},
+			expected: []string{"foo", "bar"},
+		},
+		{
+			name:     "append single item to empty slice",
+			input:    []string{},
+			append:   []string{"only"},
+			expected: []string{"only"},
+		},
+	}
+
+	intTests := []testCase[int]{
+		{
+			name:     "append to empty slice",
+			input:    []int{},
+			append:   []int{1, 2},
+			expected: []int{1, 2},
+		},
+		{
+			name:     "append unique items",
+			input:    []int{1},
+			append:   []int{2, 3},
+			expected: []int{1, 2, 3},
+		},
+		{
+			name:     "append duplicate items",
+			input:    []int{1, 2},
+			append:   []int{2, 3},
+			expected: []int{1, 2, 3},
+		},
+		{
+			name:     "append all duplicates",
+			input:    []int{1, 2},
+			append:   []int{1, 2},
+			expected: []int{1, 2},
+		},
+		{
+			name:     "append nothing",
+			input:    []int{1, 2},
+			append:   []int{},
+			expected: []int{1, 2},
+		},
+		{
+			name:     "append single new item",
+			input:    []int{10, 20},
+			append:   []int{30},
+			expected: []int{10, 20, 30},
+		},
+		{
+			name:     "append single duplicate item",
+			input:    []int{42, 99},
+			append:   []int{42},
+			expected: []int{42, 99},
+		},
+		{
+			name:     "append single item to empty slice",
+			input:    []int{},
+			append:   []int{7},
+			expected: []int{7},
+		},
+	}
+
+	for _, tc := range stringTests {
+		t.Run("string/"+tc.name, func(t *testing.T) {
+			got := UniqueAppend(tc.input, tc.append...)
+			if !slices.Equal(got, tc.expected) {
+				t.Errorf("UniqueAppend(%v, %v) = %v, want %v", tc.input, tc.append, got, tc.expected)
+			}
+		})
+		// Also test appending a single item directly (not as a slice)
+		if len(tc.append) == 1 {
+			t.Run("string/"+tc.name+"/single", func(t *testing.T) {
+				got := UniqueAppend(tc.input, tc.append[0])
+				if !slices.Equal(got, tc.expected) {
+					t.Errorf("UniqueAppend(%v, %v) = %v, want %v", tc.input, tc.append[0], got, tc.expected)
+				}
+			})
+		}
+	}
+
+	for _, tc := range intTests {
+		t.Run("int/"+tc.name, func(t *testing.T) {
+			got := UniqueAppend(tc.input, tc.append...)
+			if !slices.Equal(got, tc.expected) {
+				t.Errorf("UniqueAppend(%v, %v) = %v, want %v", tc.input, tc.append, got, tc.expected)
+			}
+		})
+		// Also test appending a single item directly (not as a slice)
+		if len(tc.append) == 1 {
+			t.Run("int/"+tc.name+"/single", func(t *testing.T) {
+				got := UniqueAppend(tc.input, tc.append[0])
+				if !slices.Equal(got, tc.expected) {
+					t.Errorf("UniqueAppend(%v, %v) = %v, want %v", tc.input, tc.append[0], got, tc.expected)
+				}
+			})
+		}
+	}
+}
