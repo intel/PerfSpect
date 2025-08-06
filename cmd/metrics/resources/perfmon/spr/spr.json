@@ -597,7 +597,7 @@
         {
           "Name": "TXN",
           "Alias": "b"
-        }        
+        }
       ],
       "Formula": "a / b",
       "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
