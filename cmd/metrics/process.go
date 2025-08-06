@@ -131,7 +131,7 @@ func GetHotCgroups(myTarget target.Target, maxCgroups int, filter string, localT
 search_dir="/sys/fs/cgroup"
 
 # Find matching cgroups
-matching_cgroups=$(find "$search_dir" -type d \( -name "docker*scope" -o -name "containerd*scope" \))
+matching_cgroups=$(find "$search_dir" -type d \( -name "docker*scope" -o -name "containerd*scope" -o -name "cri-containerd*scope" \))
 
 # Filter matching cgroups based on regex if provided
 regex=%s
