@@ -92,14 +92,14 @@ func getSignalReceived() bool {
 
 var (
 	// collection options
-	flagDuration  int
-	flagScope     string
-	flagPidList   []string
-	flagCidList   []string
-	flagFilter    string
-	flagCount     int
-	flagRefresh   int
-	flagCoreRange string
+	flagDuration int
+	flagScope    string
+	flagPidList  []string
+	flagCidList  []string
+	flagFilter   string
+	flagCount    int
+	flagRefresh  int
+	flagCpuRange string
 	// output format options
 	flagGranularity     string
 	flagOutputFormat    []string
@@ -124,14 +124,14 @@ var (
 )
 
 const (
-	flagDurationName  = "duration"
-	flagScopeName     = "scope"
-	flagPidListName   = "pids"
-	flagCidListName   = "cids"
-	flagFilterName    = "filter"
-	flagCountName     = "count"
-	flagRefreshName   = "refresh"
-	flagCoreRangeName = "corerange"
+	flagDurationName = "duration"
+	flagScopeName    = "scope"
+	flagPidListName  = "pids"
+	flagCidListName  = "cids"
+	flagFilterName   = "filter"
+	flagCountName    = "count"
+	flagRefreshName  = "refresh"
+	flagCpuRangeName = "cpus"
 
 	flagGranularityName     = "granularity"
 	flagOutputFormatName    = "format"
@@ -185,7 +185,7 @@ func init() {
 	Cmd.Flags().StringVar(&flagFilter, flagFilterName, "", "")
 	Cmd.Flags().IntVar(&flagCount, flagCountName, 5, "")
 	Cmd.Flags().IntVar(&flagRefresh, flagRefreshName, 30, "")
-	Cmd.Flags().StringVar(&flagCoreRange, flagCoreRangeName, "", "")
+	Cmd.Flags().StringVar(&flagCpuRange, flagCpuRangeName, "", "")
 
 	Cmd.Flags().StringVar(&flagGranularity, flagGranularityName, granularitySystem, "")
 	Cmd.Flags().StringSliceVar(&flagOutputFormat, flagOutputFormatName, []string{formatCSV}, "")
@@ -270,7 +270,7 @@ func getFlagGroups() []common.FlagGroup {
 			Help: "number of seconds to run before refreshing the \"hot\" or \"filtered\" process or cgroup list. If 0, the list will not be refreshed.",
 		},
 		{
-			Name: flagCoreRangeName,
+			Name: flagCpuRangeName,
 			Help: "comma separated list of CPU cores to monitor. If not provided, all cores will be monitored.",
 		},
 	}
@@ -382,7 +382,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		if cmd.Flags().Lookup(flagCountName).Changed {
 			return common.FlagValidationError(cmd, "count is not supported with an application argument")
 		}
-		if cmd.Flags().Lookup(flagCoreRangeName).Changed {
+		if cmd.Flags().Lookup(flagCpuRangeName).Changed {
 			return common.FlagValidationError(cmd, "core range is not supported with an application argument")
 		}
 	}
@@ -469,6 +469,39 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		// if refresh is less than perf print interval, error
 		if flagRefresh < flagPerfPrintInterval {
 			return common.FlagValidationError(cmd, fmt.Sprintf("refresh must be greater than or equal to the event collection interval (%d)", flagPerfPrintInterval))
+		}
+	}
+	if cmd.Flags().Lookup(flagCpuRangeName).Changed {
+		if flagCpuRange == "" {
+			return common.FlagValidationError(cmd, "cpu range must be specified")
+		} else {
+			if flagCpuRange == "all" {
+				flagCpuRange = "" // treat "all" as empty
+			} else {
+				// validate cpu range
+				cpuList, err := util.SelectiveIntRangeToIntList(flagCpuRange)
+				numCpus := len(cpuList)
+				if err != nil {
+					return common.FlagValidationError(cmd, fmt.Sprintf("invalid cpu range: %s", flagCpuRange))
+				}
+				if numCpus == 0 {
+					return common.FlagValidationError(cmd, fmt.Sprintf("cpu range must contain at least one CPU, got: %s", flagCpuRange))
+				}
+				// check if any entries in the cpu range are duplicates
+				seen := make(map[int]bool)
+				for _, cpu := range cpuList {
+					if seen[cpu] {
+						return common.FlagValidationError(cmd, fmt.Sprintf("duplicate CPU in cpu range: %s", flagCpuRange))
+					}
+					seen[cpu] = true
+				}
+				// check if any entries in the cpu range are out of bounds
+				//for _, cpu := range cpuList {
+				//	if cpu < 0 || cpu >= util.GetNumCpus() {
+				//		return common.FlagValidationError(cmd, fmt.Sprintf("cpu %d in cpu range is out of bounds, must be between 0 and %d", cpu, util.GetNumCpus()-1))
+				//	}
+				//}
+			}
 		}
 	}
 	// output options
@@ -1308,7 +1341,7 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 			}
 		}
 		var perfCommand *exec.Cmd
-		perfCommand, err = getPerfCommand(targetContext.perfPath, targetContext.groupDefinitions, pids, cids, flagCoreRange)
+		perfCommand, err = getPerfCommand(targetContext.perfPath, targetContext.groupDefinitions, pids, cids, flagCpuRange)
 		if err != nil {
 			err = fmt.Errorf("failed to get perf command: %w", err)
 			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))

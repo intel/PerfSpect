@@ -94,12 +94,12 @@ func getPerfPath(myTarget target.Target, localPerfPath string) (string, error) {
 // Returns:
 // - args: The command arguments for the 'perf stat' command.
 // - err: An error, if any.
-func getPerfCommandArgs(pids []string, cgroups []string, timeout int, eventGroups []GroupDefinition, coreRange string) (args []string, err error) {
+func getPerfCommandArgs(pids []string, cgroups []string, timeout int, eventGroups []GroupDefinition, cpuRange string) (args []string, err error) {
 	// -I: print interval in ms
 	// -j: json formatted event output
 	args = append(args, "stat", "-I", fmt.Sprintf("%d", flagPerfPrintInterval*1000), "-j")
-	if coreRange != "" {
-		args = append(args, "-C", coreRange) // collect only for these cores
+	if cpuRange != "" {
+		args = append(args, "-C", cpuRange) // collect only for these cpus
 	}
 	switch flagScope {
 	case scopeSystem:
@@ -136,7 +136,7 @@ func getPerfCommandArgs(pids []string, cgroups []string, timeout int, eventGroup
 
 // getPerfCommand is responsible for assembling the command that will be
 // executed to collect event data
-func getPerfCommand(perfPath string, eventGroups []GroupDefinition, pids []string, cids []string, coreRange string) (*exec.Cmd, error) {
+func getPerfCommand(perfPath string, eventGroups []GroupDefinition, pids []string, cids []string, cpuRange string) (*exec.Cmd, error) {
 	var duration int
 	switch flagScope {
 	case scopeSystem:
@@ -151,7 +151,7 @@ func getPerfCommand(perfPath string, eventGroups []GroupDefinition, pids []strin
 		duration = 0
 	}
 
-	args, err := getPerfCommandArgs(pids, cids, duration, eventGroups, coreRange)
+	args, err := getPerfCommandArgs(pids, cids, duration, eventGroups, cpuRange)
 	if err != nil {
 		err = fmt.Errorf("failed to assemble perf args: %v", err)
 		return nil, err
