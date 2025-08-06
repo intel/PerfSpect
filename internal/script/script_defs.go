@@ -949,7 +949,7 @@ needed_num_huge_pages=$((numa_nodes * min_kb / size_huge_pages_kb))
 if [ $needed_num_huge_pages -gt $orig_num_huge_pages ]; then
   echo $needed_num_huge_pages > /proc/sys/vm/nr_hugepages
 fi
-mlc --loaded_latency
+mlc --loaded_latency -b500m -X
 echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages
 `,
 		Architectures: []string{x86_64},
@@ -970,7 +970,7 @@ needed_num_huge_pages=$((numa_nodes * min_kb / size_huge_pages_kb))
 if [ $needed_num_huge_pages -gt $orig_num_huge_pages ]; then
   echo $needed_num_huge_pages > /proc/sys/vm/nr_hugepages
 fi
-mlc --bandwidth_matrix
+mlc --bandwidth_matrix -b500m -X
 echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages
 `,
 		Architectures: []string{x86_64},
