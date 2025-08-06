@@ -36,7 +36,7 @@ func (group CoreGroup) ToGroupDefinition() GroupDefinition {
 		}
 		raw, err := event.StringForPerf()
 		if err != nil {
-			fmt.Printf("Error formatting event %s for perf: %v\n", event.EventName, err)
+			slog.Error("Error formatting event for perf", slog.String("event", event.EventName), slog.Any("error", err))
 			continue
 		}
 		groupDef = append(groupDef, EventDefinition{
@@ -51,7 +51,7 @@ func (group CoreGroup) ToGroupDefinition() GroupDefinition {
 		}
 		raw, err := event.StringForPerf()
 		if err != nil {
-			fmt.Printf("Error formatting event %s for perf: %v\n", event.EventName, err)
+			slog.Error("Error formatting event for perf", slog.String("event", event.EventName), slog.Any("error", err))
 			continue
 		}
 		groupDef = append(groupDef, EventDefinition{
@@ -117,20 +117,11 @@ func (group CoreGroup) Equal(other CoreGroup) bool {
 func (group CoreGroup) Copy() CoreGroup {
 	newGroup := CoreGroup{}
 	newGroup.MetricNames = make([]string, len(group.MetricNames))
-	copied := copy(newGroup.MetricNames, group.MetricNames)
-	if copied != len(group.MetricNames) {
-		fmt.Printf("Warning: copied %d metric names, expected %d\n", copied, len(group.MetricNames))
-	}
+	copy(newGroup.MetricNames, group.MetricNames)
 	newGroup.FixedPurposeCounters = make([]CoreEvent, len(group.FixedPurposeCounters))
-	copied = copy(newGroup.FixedPurposeCounters, group.FixedPurposeCounters)
-	if copied != len(group.FixedPurposeCounters) {
-		fmt.Printf("Warning: copied %d fixed purpose counters, expected %d\n", copied, len(group.FixedPurposeCounters))
-	}
+	copy(newGroup.FixedPurposeCounters, group.FixedPurposeCounters)
 	newGroup.GeneralPurposeCounters = make([]CoreEvent, len(group.GeneralPurposeCounters))
-	copied = copy(newGroup.GeneralPurposeCounters, group.GeneralPurposeCounters)
-	if copied != len(group.GeneralPurposeCounters) {
-		fmt.Printf("Warning: copied %d general purpose counters, expected %d\n", copied, len(group.GeneralPurposeCounters))
-	}
+	copy(newGroup.GeneralPurposeCounters, group.GeneralPurposeCounters)
 	return newGroup
 }
 
@@ -280,7 +271,6 @@ func (group *CoreGroup) AddEvent(event CoreEvent, reorder bool, metadata Metadat
 					continue // not a valid counter for this event
 				}
 				// we can move the event to a different counter
-				fmt.Printf("Moving %s [%s] from counter %d to %d for %s [%s]\n", existingEvent.EventName, existingEvent.Counter, counter, otherCounter, event.EventName, event.Counter)
 				group.GeneralPurposeCounters[otherCounter] = existingEvent // move the existing event to the new counter
 				group.GeneralPurposeCounters[counter] = event              // place the new event in the current counter
 				return nil
@@ -349,15 +339,12 @@ func MergeCoreGroups(coreGroups []CoreGroup, metadata Metadata) ([]CoreGroup, er
 	for i < len(coreGroups) { // this style of for loop is used to allow for removal of elements
 		j := i + 1
 		for j < len(coreGroups) { // len(coreGroups) is recalculated on each iteration
-			fmt.Printf("Attempting to merge core group %d into group %d\n", j, i)
 			tmpGroup := coreGroups[i].Copy() // Copy the group to avoid modifying the original
 			if err := tmpGroup.Merge(coreGroups[j], metadata); err == nil {
-				fmt.Printf("Successfully merged core group %d into group %d\n", j, i)
 				coreGroups[i] = tmpGroup // Update the group at index i with the merged group
 				// remove the group at index j
 				coreGroups = append(coreGroups[:j], coreGroups[j+1:]...)
 			} else {
-				fmt.Printf("Failed to merge core group %d into group %d: %v\n", j, i, err)
 				j++ // Cannot merge these groups, try the next pair
 			}
 		}
@@ -374,7 +361,6 @@ func EliminateDuplicateCoreGroups(coreGroups []CoreGroup) ([]CoreGroup, error) {
 		j := i + 1
 		for j < len(coreGroups) {
 			if coreGroups[i].Equal(coreGroups[j]) {
-				fmt.Printf("Found duplicate core group %d and %d\n", i, j)
 				// merge the metric names
 				coreGroups[i].MetricNames = util.UniqueAppend(coreGroups[i].MetricNames, coreGroups[j].MetricNames...)
 				// remove the group at index j

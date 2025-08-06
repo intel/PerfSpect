@@ -162,25 +162,24 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, _ string, selected
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading event groups from metrics: %v", err)
 	}
-	fmt.Printf("Number of core groups: %d, uncore groups: %d, other groups: %d\n", len(coreGroups), len(uncoreGroups), len(otherGroups))
 	// eliminate duplicate groups
 	coreGroups, uncoreGroups, err = eliminateDuplicateGroups(coreGroups, uncoreGroups)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error merging duplicate groups: %v", err)
 	}
-	fmt.Printf("Number of core groups after eliminating duplicates: %d, uncore groups: %d\n", len(coreGroups), len(uncoreGroups))
 	// merge groups that can be merged, i.e., if 2nd group's events fit in the first group
 	coreGroups, uncoreGroups, err = mergeGroups(coreGroups, uncoreGroups, metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error merging groups: %v", err)
 	}
-	fmt.Printf("Number of core groups after merging: %d, uncore groups: %d\n", len(coreGroups), len(uncoreGroups))
 	// expand uncore groups for uncore devices
 	uncoreGroups, err = ExpandUncoreGroups(uncoreGroups, metadata.UncoreDeviceIDs)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error expanding uncore groups: %v", err)
 	}
-	fmt.Printf("Number of uncore groups after expanding for uncore devices: %d\n", len(uncoreGroups))
+	slog.Debug("Number of core groups", slog.Int("count", len(coreGroups)))
+	slog.Debug("Number of uncore groups", slog.Int("count", len(uncoreGroups)))
+	slog.Debug("Number of other groups", slog.Int("count", len(otherGroups)))
 	// Merge all groups into a single slice of GroupDefinition
 	allGroups := make([]GroupDefinition, 0)
 	for _, group := range coreGroups {
@@ -192,20 +191,6 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, _ string, selected
 	for _, group := range otherGroups {
 		allGroups = append(allGroups, group.ToGroupDefinition())
 	}
-	// Print the groups for debugging
-	for i, group := range coreGroups {
-		fmt.Printf("Core Group %d:\n", i)
-		group.Print(os.Stdout)
-	}
-	for i, group := range uncoreGroups {
-		fmt.Printf("Uncore Group %d:\n", i)
-		group.Print(os.Stdout)
-	}
-	for i, group := range otherGroups {
-		fmt.Printf("Other Group %d:\n", i)
-		group.Print(os.Stdout)
-	}
-
 	// replace retire latencies variables with their values
 	if config.PerfmonRetireLatencyFile != "" {
 		metrics, err = replaceRetireLatencies(metrics, filepath.Join("resources", "perfmon", strings.ToLower(l.microarchitecture), config.PerfmonRetireLatencyFile))
@@ -213,7 +198,6 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, _ string, selected
 			return nil, nil, fmt.Errorf("failed to replace retire latencies: %w", err)
 		}
 	}
-
 	// apply common modifications to metric expressions
 	metrics, err = configureMetrics(metrics, uncollectableEvents, metadata)
 	if err != nil {
@@ -445,7 +429,7 @@ func loadEventGroupsFromMetrics(includedMetrics []PerfspectMetric, perfmonMetric
 		uncollectableEvents = util.UniqueAppend(uncollectableEvents, uncollectableMetricEvents...)
 		// skip metrics that have uncollectable events
 		if len(uncollectableMetricEvents) > 0 {
-			fmt.Printf("Warning: Metric %s contains uncollectable events: %v\n", includedMetric.LegacyName, uncollectableMetricEvents)
+			slog.Warn("Metric contains uncollectable events", "metric", includedMetric.LegacyName, "uncollectableEvents", uncollectableMetricEvents)
 			continue
 		}
 		metricCoreGroups, metricUncoreGroups, metricOtherGroups, err := groupsFromEventNames(
@@ -457,7 +441,7 @@ func loadEventGroupsFromMetrics(includedMetrics []PerfspectMetric, perfmonMetric
 			metadata,
 		)
 		if err != nil {
-			fmt.Printf("Error grouping events for metric %s: %v\n", includedMetric.LegacyName, err)
+			slog.Error("Error creating groups from event names", "metric", includedMetric.LegacyName, "error", err)
 			continue
 		}
 		// Add the groups to the main lists
@@ -493,7 +477,7 @@ func getUncollectableEvents(eventNames []string, coreEvents CoreEvents, uncoreEv
 			continue
 		}
 		if !slices.Contains(constants, eventName) { // ignore constants, they'll be handled separately
-			fmt.Printf("Warning: Event %s not found in core or uncore events\n", eventName)
+			slog.Warn("Event not found in core or uncore events", "event", eventName)
 			uncollectableEvents = util.UniqueAppend(uncollectableEvents, eventName) // if the event is not found in either core or uncore events, we consider it uncollectable
 		}
 	}
@@ -554,7 +538,6 @@ func groupsFromEventNames(metricName string, eventNames []string, coreEvents Cor
 			coreGroup.MetricNames = util.UniqueAppend(coreGroup.MetricNames, metricName)
 			err := coreGroup.AddEvent(coreEvent, false, metadata)
 			if err != nil {
-				fmt.Printf("Creating additional core group for metric %s, event %s: %v\n", metricName, eventName, err)
 				coreGroups = append(coreGroups, coreGroup)
 				coreGroup = NewCoreGroup(metadata) // Reset coreGroup for the next set of events
 				coreGroup.MetricNames = util.UniqueAppend(coreGroup.MetricNames, metricName)
@@ -569,7 +552,6 @@ func groupsFromEventNames(metricName string, eventNames []string, coreEvents Cor
 				uncoreGroup.MetricNames = util.UniqueAppend(uncoreGroup.MetricNames, metricName)
 				err := uncoreGroup.AddEvent(uncoreEvent, false)
 				if err != nil {
-					fmt.Printf("Creating additional uncore group for metric %s, event %s: %v\n", metricName, eventName, err)
 					uncoreGroups = append(uncoreGroups, uncoreGroup)
 					uncoreGroup = NewUncoreGroup(metadata) // Reset uncoreGroup for the next set of events
 					uncoreGroup.MetricNames = util.UniqueAppend(uncoreGroup.MetricNames, metricName)

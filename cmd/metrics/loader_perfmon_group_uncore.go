@@ -6,6 +6,7 @@ package metrics
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"perfspect/internal/util"
 	"strings"
 )
@@ -32,7 +33,7 @@ func (group UncoreGroup) ToGroupDefinition() GroupDefinition {
 		// Format the event for perf
 		raw, err := event.StringForPerf()
 		if err != nil {
-			fmt.Printf("Error formatting event %s for perf: %v\n", event.EventName, err)
+			slog.Error("Error formatting event for perf", slog.String("event", event.EventName), slog.Any("error", err))
 			continue
 		}
 		// Add the formatted event to the group definition
@@ -85,15 +86,9 @@ func (group UncoreGroup) Equal(other UncoreGroup) bool {
 func (group UncoreGroup) Copy() UncoreGroup {
 	newGroup := UncoreGroup{}
 	newGroup.MetricNames = make([]string, len(group.MetricNames))
-	copied := copy(newGroup.MetricNames, group.MetricNames)
-	if copied != len(group.MetricNames) {
-		fmt.Printf("Warning: copied %d metric names, expected %d\n", copied, len(group.MetricNames))
-	}
+	copy(newGroup.MetricNames, group.MetricNames)
 	newGroup.GeneralPurposeCounters = make([]UncoreEvent, len(group.GeneralPurposeCounters))
-	copied = copy(newGroup.GeneralPurposeCounters, group.GeneralPurposeCounters)
-	if copied != len(group.GeneralPurposeCounters) {
-		fmt.Printf("Warning: copied %d general purpose counters, expected %d\n", copied, len(group.GeneralPurposeCounters))
-	}
+	copy(newGroup.GeneralPurposeCounters, group.GeneralPurposeCounters)
 	return newGroup
 }
 
@@ -164,7 +159,6 @@ func (group *UncoreGroup) AddEvent(event UncoreEvent, reorder bool) error {
 					continue // not a valid counter for this event
 				}
 				// we can move the event to a different counter
-				fmt.Printf("Moving %s [%s] from counter %d to %d for %s [%s]\n", existingEvent.EventName, existingEvent.Counter, counter, otherCounter, event.EventName, event.Counter)
 				group.GeneralPurposeCounters[otherCounter] = existingEvent // move the existing event to the new counter
 				group.GeneralPurposeCounters[counter] = event              // place the new event in the current counter
 				return nil
@@ -211,15 +205,12 @@ func MergeUncoreGroups(uncoreGroups []UncoreGroup) ([]UncoreGroup, error) {
 	for i < len(uncoreGroups) { // this style of for loop is used to allow for removal of elements
 		j := i + 1
 		for j < len(uncoreGroups) { // len(coreGroups) is recalculated on each iteration
-			fmt.Printf("Attempting to merge uncore group %d into group %d\n", j, i)
 			tmpGroup := uncoreGroups[i].Copy() // Copy the group to avoid modifying the original
 			if err := tmpGroup.Merge(uncoreGroups[j]); err == nil {
-				fmt.Printf("Successfully merged uncore group %d into group %d\n", j, i)
 				uncoreGroups[i] = tmpGroup // Update the group at index i with the merged group
 				// remove the group at index j
 				uncoreGroups = append(uncoreGroups[:j], uncoreGroups[j+1:]...)
 			} else {
-				fmt.Printf("Failed to merge uncore group %d into group %d: %v\n", j, i, err)
 				j++ // Cannot merge these groups, try the next pair
 			}
 		}
@@ -236,7 +227,6 @@ func EliminateDuplicateUncoreGroups(uncoreGroups []UncoreGroup) ([]UncoreGroup, 
 		j := i + 1
 		for j < len(uncoreGroups) {
 			if uncoreGroups[i].Equal(uncoreGroups[j]) {
-				fmt.Printf("Found duplicate uncore group %d and %d\n", i, j)
 				// merge the metric names
 				uncoreGroups[i].MetricNames = util.UniqueAppend(uncoreGroups[i].MetricNames, uncoreGroups[j].MetricNames...)
 				// remove the group at index j

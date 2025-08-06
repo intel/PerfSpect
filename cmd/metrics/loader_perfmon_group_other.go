@@ -6,6 +6,7 @@ package metrics
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 )
 
@@ -31,7 +32,7 @@ func (group OtherGroup) ToGroupDefinition() GroupDefinition {
 		}
 		raw, err := event.StringForPerf()
 		if err != nil {
-			fmt.Printf("Error formatting event %s for perf: %v\n", event.EventName, err)
+			slog.Error("Error formatting event for perf", slog.String("event", event.EventName), slog.Any("error", err))
 			continue
 		}
 		groupDef = append(groupDef, EventDefinition{
