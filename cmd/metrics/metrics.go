@@ -472,6 +472,9 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		}
 	}
 	if cmd.Flags().Lookup(flagCpuRangeName).Changed {
+		if flagGranularity != granularityCPU {
+			return common.FlagValidationError(cmd, fmt.Sprintf("cpu range can only be specified when granularity is %s. Current granularity is %s.", granularityCPU, flagGranularity))
+		}
 		if flagCpuRange == "" {
 			return common.FlagValidationError(cmd, "cpu range must be specified")
 		} else {
