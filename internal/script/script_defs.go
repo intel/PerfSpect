@@ -949,7 +949,7 @@ needed_num_huge_pages=$((numa_nodes * min_kb / size_huge_pages_kb))
 if [ $needed_num_huge_pages -gt $orig_num_huge_pages ]; then
   echo $needed_num_huge_pages > /proc/sys/vm/nr_hugepages
 fi
-mlc --loaded_latency
+mlc --loaded_latency -b500m -X
 echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages
 `,
 		Architectures: []string{x86_64},
@@ -970,7 +970,7 @@ needed_num_huge_pages=$((numa_nodes * min_kb / size_huge_pages_kb))
 if [ $needed_num_huge_pages -gt $orig_num_huge_pages ]; then
   echo $needed_num_huge_pages > /proc/sys/vm/nr_hugepages
 fi
-mlc --bandwidth_matrix
+mlc --bandwidth_matrix -b500m -X
 echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages
 `,
 		Architectures: []string{x86_64},
@@ -992,7 +992,8 @@ done
 		Sequential: true,
 	},
 	FrequencyBenchmarkScriptName: {
-		Name: FrequencyBenchmarkScriptName,
+		Name:          FrequencyBenchmarkScriptName,
+		Architectures: []string{x86_64},
 		ScriptTemplate: `# Function to expand a range of numbers, e.g. "0-24", into an array of numbers
 expand_range() {
 	local range=$1
@@ -1083,6 +1084,7 @@ avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd
 	},
 	PowerBenchmarkScriptName: {
 		Name:           PowerBenchmarkScriptName,
+		Architectures:  []string{x86_64},
 		ScriptTemplate: `((turbostat -i 2 2>/dev/null &) ; stress-ng --cpu 0 --bsearch 0 -t 60s >/dev/null 2>&1 ; pkill -9 -f turbostat)`,
 		Superuser:      true,
 		Lkms:           []string{"msr"},
@@ -1091,6 +1093,7 @@ avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd
 	},
 	IdlePowerBenchmarkScriptName: {
 		Name:           IdlePowerBenchmarkScriptName,
+		Architectures:  []string{x86_64},
 		ScriptTemplate: `turbostat -i 2 -n 2 2>/dev/null`,
 		Superuser:      true,
 		Lkms:           []string{"msr"},
@@ -1204,7 +1207,8 @@ wait
 		NeedsKill: true,
 	},
 	TurbostatTelemetryScriptName: {
-		Name: TurbostatTelemetryScriptName,
+		Name:          TurbostatTelemetryScriptName,
+		Architectures: []string{x86_64},
 		ScriptTemplate: `interval={{.Interval}}
 duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
