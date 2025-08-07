@@ -1105,18 +1105,24 @@ avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd
 		ScriptTemplate: `
 file_size_g=5
 numjobs=1
-total_file_size_g=$(($file_size_g * $numjobs))
+total_file_size_g=$((($file_size_g + 1) * $numjobs)) # add 1GB so we don't run out of space
 ramp_time=5s
 runtime=120s
 ioengine=sync
 # confirm that .StorageDir is a directory, is writeable, and has enough space
 if [[ -d "{{.StorageDir}}" && -w "{{.StorageDir}}" ]]; then
-	available_space=$(df -hP "{{.StorageDir}}")
-	count=$( echo "$available_space" | awk '/[0-9]%%/{print substr($4,1,length($4)-1)}' )
-	unit=$( echo "$available_space" | awk '/[0-9]%%/{print substr($4,length($4),1)}' )
-	is_enough_gigabytes=$(awk -v c="$count" -v f=$total_file_size_g 'BEGIN{print (c>f)?1:0}')
+	# check available space
+	# example output for df -hP <dir>:
+	# Filesystem      Size  Used Avail Use% Mounted on
+	# /dev/root       6.8G  1.7G  5.1G  26% /
+	available_space=$(df -hP "{{.StorageDir}}" | awk 'NR==2 {print $4}')
+	# available_space will be something like "5.1G" or "2.3T"
+	# parse the available space to get the numeric value and unit
+	numeric=$(echo "$available_space" | sed -E 's/([0-9.]+)([KMGTP]?)/\1/')
+	unit=$(echo "$available_space" | sed -E 's/[0-9.]+([KMGTP]?)/\1/')
+	is_enough_gigabytes=$(awk -v c="$numeric" -v f=$total_file_size_g 'BEGIN{print (c>f)?1:0}')
 	is_terabyte_or_more=$(echo "TPEZY" | grep -F -q "$unit" && echo 1 || echo 0)
-	if [[ ("$unit" == "G" && "$is_enough_gigabytes" == 0) && "$is_terabyte_or_more" == 1 ]]; then
+	if [[ ("$unit" == "G" && "$is_enough_gigabytes" == 0) && "$is_terabyte_or_more" == 0 ]]; then
 		echo "ERROR: {{.StorageDir}} does not have enough available space - $total_file_size_g GB required"
 		exit 1
 	fi
