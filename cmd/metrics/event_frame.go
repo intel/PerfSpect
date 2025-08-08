@@ -214,14 +214,33 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 		case granularityCPU:
 			// create one list of Events per CPU
 			var numCPUs int
+
+			// create a mapping of cpu numbers to event indices
+			var cpuMap map[int]int
+			var cpuList []int
+			// if cpu range is specified, use it to determine the number of cpus
+			// otherwise, use the number of sockets, cores per socket, and threads per core
+			// to determine the number of cpus
 			if len(flagCpuRange) > 0 {
-				cpuList, err := util.SelectiveIntRangeToIntList(flagCpuRange)
+				cpuList, err = util.SelectiveIntRangeToIntList(flagCpuRange)
 				if err != nil {
 					return nil, fmt.Errorf("failed to parse cpu range: %w", err)
 				}
 				numCPUs = len(cpuList)
+				cpuMap = make(map[int]int, numCPUs)
+				for i, cpu := range cpuList {
+					cpuMap[cpu] = i
+				}
 			} else {
 				numCPUs = metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore
+				cpuList, err = util.SelectiveIntRangeToIntList("0-" + strconv.Itoa(numCPUs-1))
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse cpu range: %w", err)
+				}
+				cpuMap = make(map[int]int, numCPUs)
+				for i := 0; i < numCPUs; i++ {
+					cpuMap[i] = i
+				}
 			}
 			// note: if some cores have been off-lined, this may cause an issue because 'perf' seems
 			// to still report events for those cores
@@ -234,6 +253,10 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 				if cpu, err = strconv.Atoi(event.CPU); err != nil {
 					return
 				}
+				// if cpu is not in cpuList, don't add it to any lists
+				if !slices.Contains(cpuList, cpu) {
+					return
+				}
 				// handle case where perf returns events for off-lined cores
 				if cpu > len(newEvents)-1 {
 					cpusToAdd := len(newEvents) + 1 - cpu
@@ -241,7 +264,7 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 						newEvents = append(newEvents, make([]Event, 0, len(allEvents)/numCPUs))
 					}
 				}
-				newEvents[cpu%numCPUs] = append(newEvents[cpu%numCPUs], event)
+				newEvents[cpuMap[cpu]] = append(newEvents[cpuMap[cpu]], event)
 			}
 			coalescedEvents = append(coalescedEvents, newEvents...)
 		default:
