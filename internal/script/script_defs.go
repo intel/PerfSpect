@@ -1103,33 +1103,36 @@ avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd
 	StorageBenchmarkScriptName: {
 		Name: StorageBenchmarkScriptName,
 		ScriptTemplate: `
-file_size_g=5
 numjobs=1
-total_file_size_g=$(($file_size_g * $numjobs))
+file_size_g=5
+space_needed_k=$(( (file_size_g + 1) * 1024 * 1024 * numjobs )) # space needed in kilobytes: (file_size_g + 1) GB per job
 ramp_time=5s
 runtime=120s
 ioengine=sync
-# confirm that .StorageDir is a directory, is writeable, and has enough space
-if [[ -d "{{.StorageDir}}" && -w "{{.StorageDir}}" ]]; then
-	available_space=$(df -hP "{{.StorageDir}}")
-	count=$( echo "$available_space" | awk '/[0-9]%%/{print substr($4,1,length($4)-1)}' )
-	unit=$( echo "$available_space" | awk '/[0-9]%%/{print substr($4,length($4),1)}' )
-	is_enough_gigabytes=$(awk -v c="$count" -v f=$total_file_size_g 'BEGIN{print (c>f)?1:0}')
-	is_terabyte_or_more=$(echo "TPEZY" | grep -F -q "$unit" && echo 1 || echo 0)
-	if [[ ("$unit" == "G" && "$is_enough_gigabytes" == 0) && "$is_terabyte_or_more" == 1 ]]; then
-		echo "ERROR: {{.StorageDir}} does not have enough available space - $total_file_size_g GB required"
-		exit 1
-	fi
-else
-	echo "ERROR: {{.StorageDir}} does not exist or is not writeable"
+# check if .StorageDir is a directory
+if [[ ! -d "{{.StorageDir}}" ]]; then
+	echo "ERROR: {{.StorageDir}} does not exist"
 	exit 1
 fi
-# single-threaded read & write bandwidth test
-test_dir="{{.StorageDir}}"/fio_test
-rm -rf $test_dir
-mkdir -p $test_dir
+# check if .StorageDir is writeable
+if [[ ! -w "{{.StorageDir}}" ]]; then
+	echo "ERROR: {{.StorageDir}} is not writeable"
+	exit 1
+fi
+# check if .StorageDir has enough space
+# example output for df -P /tmp:
+# Filesystem     1024-blocks      Used Available Capacity Mounted on
+# /dev/sdd        1055762868 196668944 805390452      20% /
+available_space=$(df -P "{{.StorageDir}}" | awk 'NR==2 {print $4}')
+if [[ $available_space -lt $space_needed_k ]]; then
+	echo "ERROR: {{.StorageDir}} has ${available_space}K available space. A minimum of ${space_needed_k}K is required to run this benchmark."
+	exit 1
+fi
+# create temporary directory for fio test
+test_dir=$(mktemp -d --tmpdir="{{.StorageDir}}")
 sync
 /sbin/sysctl -w vm.drop_caches=3 || true
+# single-threaded read & write bandwidth test
 fio --name=bandwidth --directory=$test_dir --numjobs=$numjobs \
 --size="$file_size_g"G --time_based --runtime=$runtime --ramp_time=$ramp_time --ioengine=$ioengine \
 --direct=1 --verify=0 --bs=1M --iodepth=64 --rw=rw \

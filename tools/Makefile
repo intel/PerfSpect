@@ -300,6 +300,7 @@ perf-x86_64:
 	mkdir -p bin/x86_64
 	cp linux_perf/tools/perf/perf bin/x86_64/
 	strip --strip-unneeded bin/x86_64/perf
+	upx --best bin/x86_64/perf || true
 
 perf-aarch64: zlib-aarch64 elfutils-aarch64 libpfm4-aarch64
 ifeq ("$(wildcard perf-aarch64)","")
@@ -310,6 +311,7 @@ endif
 	mkdir -p bin/aarch64
 	cp linux_perf-aarch64/tools/perf/perf bin/aarch64/
 	aarch64-linux-gnu-strip --strip-unneeded bin/aarch64/perf
+	upx --best bin/aarch64/perf || true
 
 perf: perf-x86_64 perf-aarch64
 	@echo "Perf tools built successfully in bin/x86_64 and bin/aarch64 directories."
