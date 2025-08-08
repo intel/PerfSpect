@@ -1125,7 +1125,7 @@ fi
 # /dev/sdd        1055762868 196668944 805390452      20% /
 available_space=$(df -P "{{.StorageDir}}" | awk 'NR==2 {print $4}')
 if [[ $available_space -lt $space_needed_k ]]; then
-	echo "ERROR: {{.StorageDir}} does not have enough available space ${available_space}K. A minimum of ${space_needed_k}K is required to continue."
+	echo "ERROR: {{.StorageDir}} has ${available_space}K available space. A minimum of ${space_needed_k}K is required to run this benchmark."
 	exit 1
 fi
 # create temporary directory for fio test
