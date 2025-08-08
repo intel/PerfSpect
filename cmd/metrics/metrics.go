@@ -471,10 +471,12 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 			return common.FlagValidationError(cmd, fmt.Sprintf("refresh must be greater than or equal to the event collection interval (%d)", flagPerfPrintInterval))
 		}
 	}
-	if cmd.Flags().Lookup(flagCpuRangeName).Changed {
-		if flagGranularity != granularityCPU {
+	// cpu range changed
+	if len(flagCpuRange) > 0 {
+		if cmd.Flags().Lookup(flagGranularityName).Changed && flagGranularity != granularityCPU {
 			return common.FlagValidationError(cmd, fmt.Sprintf("cpu range can only be specified when granularity is %s. Current granularity is %s.", granularityCPU, flagGranularity))
 		}
+		flagGranularity = granularityCPU // set granularity to cpu if cpu range is specified
 		if flagCpuRange == "" {
 			return common.FlagValidationError(cmd, "cpu range must be specified")
 		} else {

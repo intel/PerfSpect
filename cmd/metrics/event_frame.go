@@ -13,6 +13,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"perfspect/internal/util"
 )
 
 // EventGroup represents a group of perf events and their values
@@ -211,7 +213,16 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 			return
 		case granularityCPU:
 			// create one list of Events per CPU
-			numCPUs := metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore
+			var numCPUs int
+			if len(flagCpuRange) > 0 {
+				cpuList, err := util.SelectiveIntRangeToIntList(flagCpuRange)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse cpu range: %w", err)
+				}
+				numCPUs = len(cpuList)
+			} else {
+				numCPUs = metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore
+			}
 			// note: if some cores have been off-lined, this may cause an issue because 'perf' seems
 			// to still report events for those cores
 			newEvents := make([][]Event, numCPUs)
@@ -230,7 +241,7 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 						newEvents = append(newEvents, make([]Event, 0, len(allEvents)/numCPUs))
 					}
 				}
-				newEvents[cpu] = append(newEvents[cpu], event)
+				newEvents[cpu%numCPUs] = append(newEvents[cpu%numCPUs], event)
 			}
 			coalescedEvents = append(coalescedEvents, newEvents...)
 		default:
