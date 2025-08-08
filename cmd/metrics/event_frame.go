@@ -255,7 +255,7 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 				}
 				// if cpu is not in cpuList, don't add it to any lists
 				if !slices.Contains(cpuList, cpu) {
-					return
+					continue
 				}
 				// handle case where perf returns events for off-lined cores
 				if cpu > len(newEvents)-1 {
