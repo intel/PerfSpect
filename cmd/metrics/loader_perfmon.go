@@ -48,7 +48,7 @@ type PerfmonMetrics struct {
 	Metrics []PerfmonMetric      `json:"Metrics"`
 }
 
-func loadPerfmonMetrics(path string) (PerfmonMetrics, error) {
+func loadPerfmonMetricsFromFile(path string) (PerfmonMetrics, error) {
 	var metrics PerfmonMetrics
 	bytes, err := resources.ReadFile(path)
 	if err != nil {
@@ -102,16 +102,23 @@ func (l *PerfmonLoader) loadMetricsConfig(metricConfigOverridePath string) (Metr
 	return config, nil
 }
 
-func (l *PerfmonLoader) Load(metricConfigOverridePath string, _ string, selectedMetrics []string, metadata Metadata) ([]MetricDefinition, []GroupDefinition, error) {
+func (l *PerfmonLoader) Load(metricConfigOverridePath string, legacyLoaderEventFile string, selectedMetrics []string, metadata Metadata) ([]MetricDefinition, []GroupDefinition, error) {
+	if legacyLoaderEventFile != "" {
+		return nil, nil, fmt.Errorf("legacy loader event file is not supported in PerfmonLoader")
+	}
 	// Load the metrics configuration from the JSON file
 	config, err := l.loadMetricsConfig(metricConfigOverridePath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load metrics config: %w", err)
 	}
-	// Load the perfmon metric definitions from the JSON file
-	perfmonMetricDefinitions, err := loadPerfmonMetrics(filepath.Join("resources", "perfmon", strings.ToLower(l.microarchitecture), config.PerfmonMetricsFile))
+	reportMetrics, err := filterReportMetrics(config.ReportMetrics, selectedMetrics)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error loading perfmon metrics: %w", err)
+		return nil, nil, fmt.Errorf("error filtering report metrics: %w", err)
+	}
+	// Load the perfmon metric definitions from the JSON file
+	perfmonMetricDefinitions, err := loadPerfmonMetricsFromFile(filepath.Join("resources", "perfmon", strings.ToLower(l.microarchitecture), config.PerfmonMetricsFile))
+	if err != nil {
+		return nil, nil, fmt.Errorf("error loading perfmon metrics from file: %w", err)
 	}
 	// Load the perfmon core events from the JSON file
 	coreEvents, err := NewCoreEvents(filepath.Join("resources", "perfmon", strings.ToLower(l.microarchitecture), config.PerfmonCoreEventsFile))
@@ -128,32 +135,35 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, _ string, selected
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading other events: %w", err)
 	}
-	// remove metrics that use uncollectable events
-	includedMetrics, err := removeUncollectableMetrics(config.ReportMetrics, perfmonMetricDefinitions.Metrics, config.Metrics, config.AlternateTMAMetrics, coreEvents, uncoreEvents, otherEvents, metadata)
+	// Combine the PerfSpect-defined metrics with the metric definitions from perfmon and filter based on report metrics
+	// Creates one list of all metrics to be used in the loader
+	perfmonMetrics, err := loadPerfmonMetrics(reportMetrics, perfmonMetricDefinitions.Metrics, config.Metrics, config.AlternateTMAMetrics, metadata)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error loading perfmon metrics: %w", err)
+	}
+	// Remove metrics that use uncollectable events
+	perfmonMetrics, err = removeUncollectableMetrics(perfmonMetrics, coreEvents, uncoreEvents, otherEvents, metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error removing uncollectable metrics: %w", err)
 	}
-	// Filter the metrics based on the selected metrics and load the metrics definitions
-	metrics, err := loadMetricsFromDefinitions(includedMetrics, perfmonMetricDefinitions.Metrics, config.Metrics, config.AlternateTMAMetrics, metadata)
+	// Load the metric definitions (this is the type that will be returned per the interface definition)
+	metricDefs, err := perfmonToMetricDefs(perfmonMetrics)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading metrics from definitions: %w", err)
 	}
-	// abbreviate uncore event names in metric expressions
-	metrics, err = abbreviateUncoreEventNames(metrics, uncoreEvents)
+	// Abbreviate uncore event names in metric expressions
+	metricDefs, err = abbreviateUncoreEventNames(metricDefs, uncoreEvents)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error abbreviating uncore event names: %w", err)
 	}
-	// simplify OCR event names in metric expressions
-	metrics, err = customizeOCREventNames(metrics)
+	// Simplify OCR event names in metric expressions
+	metricDefs, err = customizeOCREventNames(metricDefs)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error simplifying OCR event names: %w", err)
 	}
 	// Create event groups from the perfspect metrics
 	coreGroups, uncoreGroups, otherGroups, uncollectableEvents, err := loadEventGroupsFromMetrics(
-		includedMetrics,
-		perfmonMetricDefinitions.Metrics,
-		config.Metrics,
-		config.AlternateTMAMetrics,
+		perfmonMetrics,
 		coreEvents,
 		uncoreEvents,
 		otherEvents,
@@ -162,17 +172,17 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, _ string, selected
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading event groups from metrics: %v", err)
 	}
-	// eliminate duplicate groups
+	// Eliminate duplicate groups
 	coreGroups, uncoreGroups, err = eliminateDuplicateGroups(coreGroups, uncoreGroups)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error merging duplicate groups: %v", err)
 	}
-	// merge groups that can be merged, i.e., if 2nd group's events fit in the first group
+	// Merge groups that can be merged, i.e., if 2nd group's events fit in the first group
 	coreGroups, uncoreGroups, err = mergeGroups(coreGroups, uncoreGroups, metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error merging groups: %v", err)
 	}
-	// expand uncore groups for uncore devices
+	// Expand uncore groups for uncore devices
 	uncoreGroups, err = ExpandUncoreGroups(uncoreGroups, metadata.UncoreDeviceIDs)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error expanding uncore groups: %v", err)
@@ -191,19 +201,64 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, _ string, selected
 	for _, group := range otherGroups {
 		allGroups = append(allGroups, group.ToGroupDefinition())
 	}
-	// replace retire latencies variables with their values
+	// Replace retire latencies variables with their values
 	if config.PerfmonRetireLatencyFile != "" {
-		metrics, err = replaceRetireLatencies(metrics, filepath.Join("resources", "perfmon", strings.ToLower(l.microarchitecture), config.PerfmonRetireLatencyFile))
+		metricDefs, err = replaceRetireLatencies(metricDefs, filepath.Join("resources", "perfmon", strings.ToLower(l.microarchitecture), config.PerfmonRetireLatencyFile))
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to replace retire latencies: %w", err)
 		}
 	}
-	// apply common modifications to metric expressions
-	metrics, err = configureMetrics(metrics, uncollectableEvents, metadata)
+	// Apply common modifications to metric expressions
+	metricDefs, err = configureMetrics(metricDefs, uncollectableEvents, metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to configure metrics: %w", err)
 	}
-	return metrics, allGroups, nil
+	return metricDefs, allGroups, nil
+}
+
+func filterReportMetrics(reportMetrics []PerfspectMetric, selectedMetricNames []string) ([]PerfspectMetric, error) {
+	if len(selectedMetricNames) == 0 {
+		slog.Debug("No selected metrics provided, using all report metrics")
+		return reportMetrics, nil
+	}
+	slog.Debug("Filtering report metrics based on selected metrics", slog.Any("selectedMetrics", selectedMetricNames))
+	var filteredMetrics []PerfspectMetric
+	for _, metricName := range selectedMetricNames {
+		found := false
+		for _, metric := range reportMetrics {
+			if metric.LegacyName == "metric_"+metricName {
+				filteredMetrics = append(filteredMetrics, metric)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("unknown metric: %s", metricName)
+		}
+	}
+	return filteredMetrics, nil
+}
+
+func loadPerfmonMetrics(reportMetrics []PerfspectMetric, perfmonMetrics []PerfmonMetric, configMetrics []PerfmonMetric, alternateTMAMetrics []PerfmonMetric, metadata Metadata) ([]PerfmonMetric, error) {
+	var perfmonMetricsToReturn []PerfmonMetric
+	allPerfmonMetrics := append(configMetrics, perfmonMetrics...)
+	for _, metric := range reportMetrics {
+		var perfmonMetric *PerfmonMetric
+		var found bool
+		if !metadata.SupportsFixedTMA {
+			perfmonMetric, found = findPerfmonMetric(alternateTMAMetrics, metric.LegacyName)
+		}
+		if !found {
+			perfmonMetric, found = findPerfmonMetric(allPerfmonMetrics, metric.LegacyName)
+		}
+		if !found {
+			slog.Warn("Metric not found in metric definitions", "metric", metric.LegacyName, "origin", metric.Origin)
+			continue
+		}
+		// Add the metric to the list of metrics to return
+		perfmonMetricsToReturn = append(perfmonMetricsToReturn, *perfmonMetric)
+	}
+	return perfmonMetricsToReturn, nil
 }
 
 func abbreviateUncoreEventNames(metrics []MetricDefinition, uncoreEvents UncoreEvents) ([]MetricDefinition, error) {
@@ -310,39 +365,18 @@ func getExpression(perfmonMetric PerfmonMetric) (string, error) {
 	return expression, nil
 }
 
-func loadMetricsFromDefinitions(includedMetrics []PerfspectMetric, perfmonMetrics []PerfmonMetric, perfspectMetrics []PerfmonMetric, alternateTMAMetrics []PerfmonMetric, metadata Metadata) ([]MetricDefinition, error) {
+func perfmonToMetricDefs(perfmonMetrics []PerfmonMetric) ([]MetricDefinition, error) {
 	var metrics []MetricDefinition
-	for _, includedMetric := range includedMetrics {
-		var perfmonMetric *PerfmonMetric
-		var found bool
-		// find the metric in the perfmon metrics or perfspect metrics based on the origin
-		switch strings.ToLower(includedMetric.Origin) {
-		case "perfmon":
-			if !metadata.SupportsFixedTMA {
-				perfmonMetric, found = findPerfmonMetric(alternateTMAMetrics, includedMetric.LegacyName)
-			}
-			if !found {
-				perfmonMetric, found = findPerfmonMetric(perfmonMetrics, includedMetric.LegacyName)
-			}
-		case "perfspect":
-			perfmonMetric, found = findPerfmonMetric(perfspectMetrics, includedMetric.LegacyName)
-		default:
-			slog.Warn("Unknown metric origin", "origin", includedMetric.Origin, "metric", includedMetric.LegacyName)
-			continue
-		}
-		if !found {
-			slog.Warn("Metric not found in metric definitions", "metric", includedMetric.LegacyName, "origin", includedMetric.Origin)
-			continue
-		}
+	for _, perfmonMetric := range perfmonMetrics {
 		// get the expression for the metric
-		expression, err := getExpression(*perfmonMetric)
+		expression, err := getExpression(perfmonMetric)
 		if err != nil {
 			slog.Warn("Failed getting expression for metric", "metric", perfmonMetric.LegacyName, "error", err)
 			continue
 		}
 		// create a MetricDefinition from the perfmon metric
 		metric := MetricDefinition{
-			Name:        includedMetric.LegacyName,
+			Name:        perfmonMetric.LegacyName,
 			Description: perfmonMetric.BriefDescription,
 			Expression:  expression,
 		}
@@ -352,74 +386,33 @@ func loadMetricsFromDefinitions(includedMetrics []PerfspectMetric, perfmonMetric
 	return metrics, nil
 }
 
-func removeUncollectableMetrics(includedMetrics []PerfspectMetric, perfmonMetrics []PerfmonMetric, perfspectMetrics []PerfmonMetric, alternateTMAMetrics []PerfmonMetric, coreEvents CoreEvents, uncoreEvents UncoreEvents, otherEvents OtherEvents, metadata Metadata) ([]PerfspectMetric, error) {
-	var collectableMetrics []PerfspectMetric
-	for _, includedMetric := range includedMetrics {
-		var perfmonMetric *PerfmonMetric
-		var found bool
-		// find the metric in the perfmon metrics or perfspect metrics based on the origin
-		switch strings.ToLower(includedMetric.Origin) {
-		case "perfmon":
-			if !metadata.SupportsFixedTMA {
-				perfmonMetric, found = findPerfmonMetric(alternateTMAMetrics, includedMetric.LegacyName)
-			}
-			if !found {
-				perfmonMetric, found = findPerfmonMetric(perfmonMetrics, includedMetric.LegacyName)
-			}
-		case "perfspect":
-			perfmonMetric, found = findPerfmonMetric(perfspectMetrics, includedMetric.LegacyName)
-		default:
-			slog.Warn("Unknown metric origin", "origin", includedMetric.Origin, "metric", includedMetric.LegacyName)
-			continue
-		}
-		if !found {
-			slog.Warn("Metric not found in metric definitions", "metric", includedMetric.LegacyName, "origin", includedMetric.Origin)
-			continue
-		}
-		// collect the event names from the metric and check if any of them are uncollectable
+func removeUncollectableMetrics(perfmonMetrics []PerfmonMetric, coreEvents CoreEvents, uncoreEvents UncoreEvents, otherEvents OtherEvents, metadata Metadata) ([]PerfmonMetric, error) {
+	var collectableMetrics []PerfmonMetric
+	for _, perfmonMetric := range perfmonMetrics {
+		// collect the event names from the metric and check if any of them are not collectable
 		var eventNames []string
 		for _, event := range perfmonMetric.Events {
 			eventNames = util.UniqueAppend(eventNames, event["Name"])
 		}
 		uncollectableEvents := getUncollectableEvents(eventNames, coreEvents, uncoreEvents, otherEvents, metadata)
 		if len(uncollectableEvents) > 0 {
-			slog.Warn("Metric contains uncollectable events", "metric", includedMetric.LegacyName, "uncollectableEvents", uncollectableEvents)
+			slog.Warn("Metric contains uncollectable events", "metric", perfmonMetric.LegacyName, "uncollectableEvents", uncollectableEvents)
 			continue
 		}
 		// if the metric is collectable, add it to the list of collectable metrics
-		collectableMetrics = append(collectableMetrics, includedMetric)
+		collectableMetrics = append(collectableMetrics, perfmonMetric)
 	}
 	return collectableMetrics, nil
 }
 
-func loadEventGroupsFromMetrics(includedMetrics []PerfspectMetric, perfmonMetrics []PerfmonMetric, perfspectMetrics []PerfmonMetric, alternateTMAMetrics []PerfmonMetric, coreEvents CoreEvents, uncoreEvents UncoreEvents, otherEvents OtherEvents, metadata Metadata) ([]CoreGroup, []UncoreGroup, []OtherGroup, []string, error) {
+func loadEventGroupsFromMetrics(perfmonMetrics []PerfmonMetric, coreEvents CoreEvents, uncoreEvents UncoreEvents, otherEvents OtherEvents, metadata Metadata) ([]CoreGroup, []UncoreGroup, []OtherGroup, []string, error) {
 	coreGroups := make([]CoreGroup, 0)
 	uncoreGroups := make([]UncoreGroup, 0)
 	otherGroups := make([]OtherGroup, 0)
 	uncollectableEvents := make([]string, 0)
 
-	for _, includedMetric := range includedMetrics {
+	for _, perfmonMetric := range perfmonMetrics {
 		var metricEventNames []string
-		var perfmonMetric *PerfmonMetric
-		var found bool
-		// find the metric in the perfmon metrics or perfspect metrics based on the origin
-		// and collect the event names from the metric
-		switch strings.ToLower(includedMetric.Origin) {
-		case "perfmon":
-			if !metadata.SupportsFixedTMA {
-				perfmonMetric, found = findPerfmonMetric(alternateTMAMetrics, includedMetric.LegacyName)
-			}
-			if !found {
-				perfmonMetric, found = findPerfmonMetric(perfmonMetrics, includedMetric.LegacyName)
-			}
-		case "perfspect":
-			perfmonMetric, found = findPerfmonMetric(perfspectMetrics, includedMetric.LegacyName)
-		default:
-			return nil, nil, nil, nil, fmt.Errorf("unknown metric origin: %s for metric: %s", includedMetric.Origin, includedMetric.LegacyName)
-		}
-		if !found {
-			return nil, nil, nil, nil, fmt.Errorf("metric %s not found in %s metrics", includedMetric.LegacyName, includedMetric.Origin)
-		}
 		for _, event := range perfmonMetric.Events {
 			metricEventNames = util.UniqueAppend(metricEventNames, event["Name"])
 		}
@@ -429,11 +422,11 @@ func loadEventGroupsFromMetrics(includedMetrics []PerfspectMetric, perfmonMetric
 		uncollectableEvents = util.UniqueAppend(uncollectableEvents, uncollectableMetricEvents...)
 		// skip metrics that have uncollectable events
 		if len(uncollectableMetricEvents) > 0 {
-			slog.Warn("Metric contains uncollectable events", "metric", includedMetric.LegacyName, "uncollectableEvents", uncollectableMetricEvents)
+			slog.Warn("Metric contains uncollectable events", "metric", perfmonMetric.LegacyName, "uncollectableEvents", uncollectableMetricEvents)
 			continue
 		}
 		metricCoreGroups, metricUncoreGroups, metricOtherGroups, err := groupsFromEventNames(
-			includedMetric.LegacyName,
+			perfmonMetric.LegacyName,
 			metricEventNames,
 			coreEvents,
 			uncoreEvents,
@@ -441,7 +434,7 @@ func loadEventGroupsFromMetrics(includedMetrics []PerfspectMetric, perfmonMetric
 			metadata,
 		)
 		if err != nil {
-			slog.Error("Error creating groups from event names", "metric", includedMetric.LegacyName, "error", err)
+			slog.Error("Error creating groups from event names", "metric", perfmonMetric.LegacyName, "error", err)
 			continue
 		}
 		// Add the groups to the main lists
