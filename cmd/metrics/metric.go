@@ -13,7 +13,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Knetic/govaluate"
 	mapset "github.com/deckarep/golang-set/v2"
 )
 
@@ -82,46 +81,6 @@ func ProcessEvents(perfEvents [][]byte, eventGroupDefinitions []GroupDefinition,
 			slog.Debug("processed metric", slog.String("name", metricDef.Name), slog.String("expression", metricDef.Expression), slog.String("vars", strings.Join(prettyVars, ", ")))
 		}
 		metricFrames = append(metricFrames, metricFrame)
-	}
-	return
-}
-
-// GetEvaluatorFunctions defines functions that can be called in metric expressions
-func GetEvaluatorFunctions() (functions map[string]govaluate.ExpressionFunction) {
-	functions = make(map[string]govaluate.ExpressionFunction)
-	functions["max"] = func(args ...any) (any, error) {
-		var leftVal float64
-		var rightVal float64
-		switch t := args[0].(type) {
-		case int:
-			leftVal = float64(t)
-		case float64:
-			leftVal = t
-		}
-		switch t := args[1].(type) {
-		case int:
-			rightVal = float64(t)
-		case float64:
-			rightVal = t
-		}
-		return max(leftVal, rightVal), nil
-	}
-	functions["min"] = func(args ...any) (any, error) {
-		var leftVal float64
-		var rightVal float64
-		switch t := args[0].(type) {
-		case int:
-			leftVal = float64(t)
-		case float64:
-			leftVal = t
-		}
-		switch t := args[1].(type) {
-		case int:
-			rightVal = float64(t)
-		case float64:
-			rightVal = t
-		}
-		return min(leftVal, rightVal), nil
 	}
 	return
 }
@@ -206,11 +165,13 @@ func getExpressionVariableValues(metric MetricDefinition, frame EventFrame, prev
 			err = fmt.Errorf("variable value set to -2 (shouldn't happen): %s", variableName)
 			return
 		}
-		// set the variable value to the event value divided by the perf collection time to normalize the value to 1 second
-		if len(frame.EventGroups) <= metric.Variables[variableName] {
-			err = fmt.Errorf("event groups have changed")
+		// check if previously assigned event group is available
+		if metric.Variables[variableName] >= len(frame.EventGroups) {
+			// it may not be available, for example, in cpu granularity where uncore events are only in the first CPU of a socket
+			err = fmt.Errorf("variable %s assigned to group %d, but only %d groups available", variableName, metric.Variables[variableName], len(frame.EventGroups))
 			return
 		}
+		// set the variable value to the event value divided by the perf collection time to normalize the value to 1 second
 		variables[variableName] = frame.EventGroups[metric.Variables[variableName]].EventValues[variableName] / (frame.Timestamp - previousTimestamp)
 		// adjust cstate_core/c6-residency value if hyperthreading is enabled
 		// why here? so we don't have to change the perfmon metric formula
