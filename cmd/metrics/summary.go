@@ -501,9 +501,9 @@ func getCSVMultiple(metrics []metricsFromCSV) (out string, err error) {
 	}
 	// first, get the names of the metrics
 	metricNames := metrics[0].names
-	for _, m := range metrics[1:] {
-		if len(m.names) != len(metricNames) {
-			return "", fmt.Errorf("metricsFromCSV objects have different number of metrics: %d vs %d", len(m.names), len(metricNames))
+	for idx, m := range metrics[1:] {
+		if !slices.Equal(m.names, metricNames) {
+			return "", fmt.Errorf("metricsFromCSV objects have different metric names or order at index %d: %v vs %v", idx+1, m.names, metricNames)
 		}
 	}
 	// write the header
