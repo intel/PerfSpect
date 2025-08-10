@@ -539,8 +539,6 @@ func getCSVMultiple(metrics []metricsFromCSV) (out string, err error) {
 		for j, m := range metrics {
 			if i < len(m.names) && m.names[i] == name {
 				out += fmt.Sprintf(",%f", allStats[j][name])
-			} else {
-				out += "," // if the metric is not present in this metricsFromCSV, leave it empty
 			}
 		}
 		out += "\n"
