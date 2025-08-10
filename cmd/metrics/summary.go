@@ -64,6 +64,10 @@ func summarize(csvInputPath string, html bool, metadata Metadata) (out string, e
 	if metrics, err = newMetricsFromCSV(csvInputPath); err != nil {
 		return
 	}
+	if len(metrics) == 0 {
+		err = fmt.Errorf("no metrics found in %s", csvInputPath)
+		return
+	}
 	if html {
 		if len(metrics) > 1 {
 			err = fmt.Errorf("html format is supported only when data's scope is '%s' or '%s' and granularity is '%s'", scopeSystem, scopeProcess, granularitySystem)
@@ -71,7 +75,7 @@ func summarize(csvInputPath string, html bool, metadata Metadata) (out string, e
 		}
 		out, err = metrics[0].getHTML(metadata)
 	} else {
-		if len(metrics) <= 1 {
+		if len(metrics) == 1 {
 			// if there is only one metricsFromCSV, then it is system scope and granularity
 			// so we can just use the first one
 			out, err = metrics[0].getCSV(true)
