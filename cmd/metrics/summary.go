@@ -71,12 +71,13 @@ func summarize(csvInputPath string, html bool, metadata Metadata) (out string, e
 		}
 		out, err = metrics[0].getHTML(metadata)
 	} else {
-		for i, m := range metrics {
-			var oneOut string
-			if oneOut, err = m.getCSV(i == 0); err != nil {
-				return
-			}
-			out += oneOut
+		if len(metrics) <= 1 {
+			// if there is only one metricsFromCSV, then it is system scope and granularity
+			// so we can just use the first one
+			out, err = metrics[0].getCSV(true)
+		} else {
+			// if there are multiple metricsFromCSV, then it is per-scope unit or granularity unit
+			out, err = getCSVMultiple(metrics)
 		}
 	}
 	return
@@ -478,6 +479,70 @@ func (m *metricsFromCSV) getCSV(includeFieldNames bool) (out string, err error) 
 		} else {
 			out += fmt.Sprintf("%s,%s,%f,%f,%f,%f\n", m.groupByValue, name, stats[name].mean, stats[name].min, stats[name].max, stats[name].stddev)
 		}
+	}
+	return
+}
+
+// getCSVMultiple - generate CSV string representing the summary statistics of multiple metricsFromCSV
+// This is used when there are multiple metricsFromCSV objects, e.g., one per socket, cpu, or cgroup.
+// Output format is:
+//
+//	metric,cpu0,cpu1,cpu2,cpu3
+//	metric,val0,val1,val2,val3
+//
+// where metric is the name of the metric, and val0, val1, etc. are the values for each CPU/socket/cgroup.
+func getCSVMultiple(metrics []metricsFromCSV) (out string, err error) {
+	if len(metrics) == 0 {
+		return "", fmt.Errorf("no metrics to summarize")
+	}
+	if len(metrics) == 1 {
+		return "", fmt.Errorf("only one metricsFromCSV object provided, use getCSV() instead")
+	}
+	// first, get the names of the metrics
+	metricNames := metrics[0].names
+	for _, m := range metrics[1:] {
+		if len(m.names) != len(metricNames) {
+			return "", fmt.Errorf("metricsFromCSV objects have different number of metrics: %d vs %d", len(m.names), len(metricNames))
+		}
+	}
+	// write the header
+	out = "metric"
+	var fieldPrefix string
+	switch metrics[0].groupByField {
+	case "SKT":
+		fieldPrefix = "SKT"
+	case "CPU":
+		fieldPrefix = "CPU"
+	default:
+		fieldPrefix = "" // leave empty for cgroup
+	}
+	for _, m := range metrics {
+		out += "," + fieldPrefix + m.groupByValue
+	}
+	out += "\n"
+	// get the stats for each metricsFromCSV
+	allStats := make([]map[string]float64, len(metrics))
+	for i, m := range metrics {
+		allStats[i] = make(map[string]float64)
+		stats, err := m.getStats()
+		if err != nil {
+			return "", fmt.Errorf("failed to get stats for metricsFromCSV %d: %w", i, err)
+		}
+		for name, stat := range stats {
+			allStats[i][name] = stat.mean // use mean for the summary
+		}
+	}
+	// write the metric names and values
+	for i, name := range metricNames {
+		out += name
+		for j, m := range metrics {
+			if i < len(m.names) && m.names[i] == name {
+				out += fmt.Sprintf(",%f", allStats[j][name])
+			} else {
+				out += "," // if the metric is not present in this metricsFromCSV, leave it empty
+			}
+		}
+		out += "\n"
 	}
 	return
 }
