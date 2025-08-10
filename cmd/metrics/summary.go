@@ -499,9 +499,6 @@ func getCSVMultiple(metrics []metricsFromCSV) (out string, err error) {
 	if len(metrics) == 0 {
 		return "", fmt.Errorf("no metrics to summarize")
 	}
-	if len(metrics) == 1 {
-		return "", fmt.Errorf("only one metricsFromCSV object provided, use getCSV() instead")
-	}
 	// first, get the names of the metrics
 	metricNames := metrics[0].names
 	for _, m := range metrics[1:] {
