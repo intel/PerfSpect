@@ -534,12 +534,10 @@ func getCSVMultiple(metrics []metricsFromCSV) (out string, err error) {
 		}
 	}
 	// write the metric names and values
-	for i, name := range metricNames {
+	for _, name := range metricNames {
 		out += name
-		for j, m := range metrics {
-			if i < len(m.names) && m.names[i] == name {
-				out += fmt.Sprintf(",%f", allStats[j][name])
-			}
+		for j := range metrics {
+			out += fmt.Sprintf(",%f", allStats[j][name])
 		}
 		out += "\n"
 	}
