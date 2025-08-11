@@ -499,6 +499,13 @@ func getCSVMultiple(metrics []metricsFromCSV) (out string, err error) {
 	if len(metrics) == 0 {
 		return "", fmt.Errorf("no metrics to summarize")
 	}
+	// Validate groupByField for all metrics
+	validGroupByFields := []string{"SKT", "CPU", "CID"}
+	for i, m := range metrics {
+		if !slices.Contains(validGroupByFields, m.groupByField) {
+			return "", fmt.Errorf("invalid groupByField in metrics[%d]: %s", i, m.groupByField)
+		}
+	}
 	// first, get the names of the metrics
 	metricNames := metrics[0].names
 	for idx, m := range metrics[1:] {
@@ -510,14 +517,23 @@ func getCSVMultiple(metrics []metricsFromCSV) (out string, err error) {
 	out = "metric"
 	var fieldPrefix string
 	switch metrics[0].groupByField {
-	case "SKT":
-		fieldPrefix = "SKT"
-	case "CPU":
-		fieldPrefix = "CPU"
+	case validGroupByFields[0]: // SKT
+		fieldPrefix = validGroupByFields[0] // "SKT"
+	case validGroupByFields[1]: // CPU
+		fieldPrefix = validGroupByFields[1] // "CPU"
+	case validGroupByFields[2]: // CID
+		fieldPrefix = "" // leave empty for CID
 	default:
-		fieldPrefix = "" // leave empty for cgroup
+		// shouldn't happen due to earlier validation
+		return "", fmt.Errorf("invalid groupByField: %s", metrics[0].groupByField)
 	}
 	for _, m := range metrics {
+		if m.groupByValue == "" {
+			return "", fmt.Errorf("groupByValue is empty for metricsFromCSV with groupByField %s", m.groupByField)
+		}
+		// add the groupByValue to the header
+		// e.g., SKT0, SKT1, CPU0, CPU1, etc.
+		// if groupByField is CID, it will be empty
 		out += "," + fieldPrefix + m.groupByValue
 	}
 	out += "\n"
