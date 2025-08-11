@@ -217,6 +217,8 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 
 			// create a mapping of cpu numbers to event indices
 			var cpuMap map[int]int
+
+			// create a list of targeted CPUs
 			var cpuList []int
 			// if cpu range is specified, use it to determine the number of cpus
 			// otherwise, use the number of sockets, cores per socket, and threads per core
@@ -253,7 +255,7 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 				if cpu, err = strconv.Atoi(event.CPU); err != nil {
 					return
 				}
-				// if cpu is not in cpuList, don't add it to any lists
+				// if cpu is not in cpuList, don't add its events to any lists
 				if !slices.Contains(cpuList, cpu) {
 					continue
 				}
@@ -264,6 +266,9 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 						newEvents = append(newEvents, make([]Event, 0, len(allEvents)/numCPUs))
 					}
 				}
+
+				// place the event for the current CPU into the newEvents list
+				// cpuMap ensures that events are placed in a valid index
 				newEvents[cpuMap[cpu]] = append(newEvents[cpuMap[cpu]], event)
 			}
 			coalescedEvents = append(coalescedEvents, newEvents...)

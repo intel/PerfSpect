@@ -98,6 +98,8 @@ func getPerfCommandArgs(pids []string, cgroups []string, timeout int, eventGroup
 	// -I: print interval in ms
 	// -j: json formatted event output
 	args = append(args, "stat", "-I", fmt.Sprintf("%d", flagPerfPrintInterval*1000), "-j")
+
+	// -C: collect only for these cpus
 	if cpuRange != "" {
 		args = append(args, "-C", cpuRange) // collect only for these cpus
 	}

@@ -473,17 +473,23 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	}
 	// cpu range changed
 	if len(flagCpuRange) > 0 {
+		// error if granularity specifically set to other than CPU
+		// only CPU granularity is allowed when specifying a CPU range
 		if cmd.Flags().Lookup(flagGranularityName).Changed && flagGranularity != granularityCPU {
 			return common.FlagValidationError(cmd, fmt.Sprintf("cpu range can only be specified when granularity is %s. Current granularity is %s.", granularityCPU, flagGranularity))
 		}
-		flagGranularity = granularityCPU // set granularity to cpu if cpu range is specified
+
+		// set granularity to cpu if cpu range is specified
+		flagGranularity = granularityCPU
+
 		if flagCpuRange == "" {
 			return common.FlagValidationError(cmd, "cpu range must be specified")
 		} else {
+			// treat "all" as empty
 			if flagCpuRange == "all" {
-				flagCpuRange = "" // treat "all" as empty
+				flagCpuRange = ""
 			} else {
-				// validate cpu range
+				// some basic validation on CPU range
 				cpuList, err := util.SelectiveIntRangeToIntList(flagCpuRange)
 				numCpus := len(cpuList)
 				if err != nil {
@@ -493,6 +499,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 					return common.FlagValidationError(cmd, fmt.Sprintf("cpu range must contain at least one CPU, got: %s", flagCpuRange))
 				}
 				// check if any entries in the cpu range are duplicates
+				// error if so, since perf will not accept this input
 				seen := make(map[int]bool)
 				for _, cpu := range cpuList {
 					if seen[cpu] {
@@ -500,12 +507,6 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 					}
 					seen[cpu] = true
 				}
-				// check if any entries in the cpu range are out of bounds
-				//for _, cpu := range cpuList {
-				//	if cpu < 0 || cpu >= util.GetNumCpus() {
-				//		return common.FlagValidationError(cmd, fmt.Sprintf("cpu %d in cpu range is out of bounds, must be between 0 and %d", cpu, util.GetNumCpus()-1))
-				//	}
-				//}
 			}
 		}
 	}
