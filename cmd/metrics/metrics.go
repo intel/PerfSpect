@@ -482,30 +482,27 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		// set granularity to cpu if cpu range is specified
 		flagGranularity = granularityCPU
 
-		if flagCpuRange == "" {
-			return common.FlagValidationError(cmd, "cpu range must be specified")
-			// treat "all" as empty
-			if flagCpuRange == "all" {
-				flagCpuRange = ""
-			} else {
-				// some basic validation on CPU range
-				cpuList, err := util.SelectiveIntRangeToIntList(flagCpuRange)
-				numCpus := len(cpuList)
-				if err != nil {
-					return common.FlagValidationError(cmd, fmt.Sprintf("invalid cpu range: %s", flagCpuRange))
+		// treat "all" as empty
+		if flagCpuRange == "all" {
+			flagCpuRange = ""
+		} else {
+			// some basic validation on CPU range
+			cpuList, err := util.SelectiveIntRangeToIntList(flagCpuRange)
+			numCpus := len(cpuList)
+			if err != nil {
+				return common.FlagValidationError(cmd, fmt.Sprintf("invalid cpu range: %s", flagCpuRange))
+			}
+			if numCpus == 0 {
+				return common.FlagValidationError(cmd, fmt.Sprintf("cpu range must contain at least one CPU, got: %s", flagCpuRange))
+			}
+			// check if any entries in the cpu range are duplicates
+			// error if so, since perf will not accept this input
+			seen := make(map[int]bool)
+			for _, cpu := range cpuList {
+				if seen[cpu] {
+					return common.FlagValidationError(cmd, fmt.Sprintf("duplicate CPU in cpu range: %s", flagCpuRange))
 				}
-				if numCpus == 0 {
-					return common.FlagValidationError(cmd, fmt.Sprintf("cpu range must contain at least one CPU, got: %s", flagCpuRange))
-				}
-				// check if any entries in the cpu range are duplicates
-				// error if so, since perf will not accept this input
-				seen := make(map[int]bool)
-				for _, cpu := range cpuList {
-					if seen[cpu] {
-						return common.FlagValidationError(cmd, fmt.Sprintf("duplicate CPU in cpu range: %s", flagCpuRange))
-					}
-					seen[cpu] = true
-				}
+				seen[cpu] = true
 			}
 		}
 	}
