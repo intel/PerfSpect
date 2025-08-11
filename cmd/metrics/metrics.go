@@ -484,7 +484,6 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 
 		if flagCpuRange == "" {
 			return common.FlagValidationError(cmd, "cpu range must be specified")
-		} else {
 			// treat "all" as empty
 			if flagCpuRange == "all" {
 				flagCpuRange = ""
