@@ -255,10 +255,6 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 				if cpu, err = strconv.Atoi(event.CPU); err != nil {
 					return
 				}
-				// if cpu is not in cpuList, don't add its events to any lists
-				if !slices.Contains(cpuList, cpu) {
-					continue
-				}
 				// handle case where perf returns events for off-lined cores
 				if cpu > len(newEvents)-1 {
 					cpusToAdd := len(newEvents) + 1 - cpu

@@ -271,7 +271,7 @@ func getFlagGroups() []common.FlagGroup {
 		},
 		{
 			Name: flagCpuRangeName,
-			Help: "comma separated list of CPU cores to monitor. If not provided, all cores will be monitored.",
+			Help: "range of CPUs to monitor. If not provided, all cores will be monitored.",
 		},
 	}
 	groups = append(groups, common.FlagGroup{
@@ -383,7 +383,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 			return common.FlagValidationError(cmd, "count is not supported with an application argument")
 		}
 		if cmd.Flags().Lookup(flagCpuRangeName).Changed {
-			return common.FlagValidationError(cmd, "core range is not supported with an application argument")
+			return common.FlagValidationError(cmd, "CPU range is not supported with an application argument")
 		}
 	}
 	// confirm valid duration
@@ -472,14 +472,14 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		}
 	}
 	// cpu range changed
-	if len(flagCpuRange) > 0 {
+	if flagCpuRange != "" {
 		// error if granularity specifically set to other than CPU
 		// only CPU granularity is allowed when specifying a CPU range
 		if cmd.Flags().Lookup(flagGranularityName).Changed && flagGranularity != granularityCPU {
 			return common.FlagValidationError(cmd, fmt.Sprintf("cpu range can only be specified when granularity is %s. Current granularity is %s.", granularityCPU, flagGranularity))
 		}
 
-		// set granularity to cpu if cpu range is specified
+		// set granularity to cpu if cpu range is specified and granularity not explicitly set
 		flagGranularity = granularityCPU
 
 		// treat "all" as empty
@@ -488,10 +488,10 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		} else {
 			// some basic validation on CPU range
 			cpuList, err := util.SelectiveIntRangeToIntList(flagCpuRange)
-			numCpus := len(cpuList)
 			if err != nil {
 				return common.FlagValidationError(cmd, fmt.Sprintf("invalid cpu range: %s", flagCpuRange))
 			}
+			numCpus := len(cpuList)
 			if numCpus == 0 {
 				return common.FlagValidationError(cmd, fmt.Sprintf("cpu range must contain at least one CPU, got: %s", flagCpuRange))
 			}
