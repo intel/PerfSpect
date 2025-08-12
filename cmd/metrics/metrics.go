@@ -99,6 +99,7 @@ var (
 	flagFilter   string
 	flagCount    int
 	flagRefresh  int
+	flagCpuRange string
 	// output format options
 	flagGranularity     string
 	flagOutputFormat    []string
@@ -130,6 +131,7 @@ const (
 	flagFilterName   = "filter"
 	flagCountName    = "count"
 	flagRefreshName  = "refresh"
+	flagCpuRangeName = "cpus"
 
 	flagGranularityName     = "granularity"
 	flagOutputFormatName    = "format"
@@ -183,6 +185,7 @@ func init() {
 	Cmd.Flags().StringVar(&flagFilter, flagFilterName, "", "")
 	Cmd.Flags().IntVar(&flagCount, flagCountName, 5, "")
 	Cmd.Flags().IntVar(&flagRefresh, flagRefreshName, 30, "")
+	Cmd.Flags().StringVar(&flagCpuRange, flagCpuRangeName, "", "")
 
 	Cmd.Flags().StringVar(&flagGranularity, flagGranularityName, granularitySystem, "")
 	Cmd.Flags().StringSliceVar(&flagOutputFormat, flagOutputFormatName, []string{formatCSV}, "")
@@ -265,6 +268,10 @@ func getFlagGroups() []common.FlagGroup {
 		{
 			Name: flagRefreshName,
 			Help: "number of seconds to run before refreshing the \"hot\" or \"filtered\" process or cgroup list. If 0, the list will not be refreshed.",
+		},
+		{
+			Name: flagCpuRangeName,
+			Help: "range of CPUs to monitor. If not provided, all cores will be monitored.",
 		},
 	}
 	groups = append(groups, common.FlagGroup{
@@ -375,6 +382,9 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		if cmd.Flags().Lookup(flagCountName).Changed {
 			return common.FlagValidationError(cmd, "count is not supported with an application argument")
 		}
+		if cmd.Flags().Lookup(flagCpuRangeName).Changed {
+			return common.FlagValidationError(cmd, "CPU range is not supported with an application argument")
+		}
 	}
 	// confirm valid duration
 	if cmd.Flags().Lookup(flagDurationName).Changed && flagDuration != 0 && flagDuration < flagPerfPrintInterval {
@@ -459,6 +469,41 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		// if refresh is less than perf print interval, error
 		if flagRefresh < flagPerfPrintInterval {
 			return common.FlagValidationError(cmd, fmt.Sprintf("refresh must be greater than or equal to the event collection interval (%d)", flagPerfPrintInterval))
+		}
+	}
+	// cpu range changed
+	if flagCpuRange != "" {
+		// error if granularity specifically set to other than CPU
+		// only CPU granularity is allowed when specifying a CPU range
+		if cmd.Flags().Lookup(flagGranularityName).Changed && flagGranularity != granularityCPU {
+			return common.FlagValidationError(cmd, fmt.Sprintf("cpu range can only be specified when granularity is %s. Current granularity is %s.", granularityCPU, flagGranularity))
+		}
+
+		// set granularity to cpu if cpu range is specified and granularity not explicitly set
+		flagGranularity = granularityCPU
+
+		// treat "all" as empty
+		if flagCpuRange == "all" {
+			flagCpuRange = ""
+		} else {
+			// some basic validation on CPU range
+			cpuList, err := util.SelectiveIntRangeToIntList(flagCpuRange)
+			if err != nil {
+				return common.FlagValidationError(cmd, fmt.Sprintf("invalid cpu range: %s", flagCpuRange))
+			}
+			numCpus := len(cpuList)
+			if numCpus == 0 {
+				return common.FlagValidationError(cmd, fmt.Sprintf("cpu range must contain at least one CPU, got: %s", flagCpuRange))
+			}
+			// check if any entries in the cpu range are duplicates
+			// error if so, since perf will not accept this input
+			seen := make(map[int]bool)
+			for _, cpu := range cpuList {
+				if seen[cpu] {
+					return common.FlagValidationError(cmd, fmt.Sprintf("duplicate CPU in cpu range: %s", flagCpuRange))
+				}
+				seen[cpu] = true
+			}
 		}
 	}
 	// output options
@@ -1298,7 +1343,7 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 			}
 		}
 		var perfCommand *exec.Cmd
-		perfCommand, err = getPerfCommand(targetContext.perfPath, targetContext.groupDefinitions, pids, cids)
+		perfCommand, err = getPerfCommand(targetContext.perfPath, targetContext.groupDefinitions, pids, cids, flagCpuRange)
 		if err != nil {
 			err = fmt.Errorf("failed to get perf command: %w", err)
 			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))

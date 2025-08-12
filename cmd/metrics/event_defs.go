@@ -169,6 +169,12 @@ func isCollectableEvent(event EventDefinition, metadata Metadata) bool {
 		return true
 	}
 	// uncore events
+	// if using CPU granularity, don't collect uncore events
+	if flagGranularity == granularityCPU && strings.HasPrefix(event.Name, "UNC") {
+		slog.Debug("Uncore events not supported with specified granularity", slog.String("event", event.Name))
+		return false
+	}
+	// if uncore metrics not supported, don't collect uncore events
 	if !metadata.SupportsUncore && strings.HasPrefix(event.Name, "UNC") {
 		slog.Debug("Uncore events not supported on target", slog.String("event", event.Name))
 		return false
@@ -207,6 +213,12 @@ func isCollectableEvent(event EventDefinition, metadata Metadata) bool {
 	if (flagScope == scopeProcess || flagScope == scopeCgroup) &&
 		(strings.Contains(event.Name, "cstate_") || strings.Contains(event.Name, "power/energy")) {
 		slog.Debug("Cstate and power events not supported in process or cgroup scope", slog.String("event", event.Name))
+		return false
+	}
+	// no system-level events when collecting at CPU granularity e.g. power, cstates
+	if (flagGranularity == granularityCPU) &&
+		(strings.Contains(event.Name, "power/energy") || strings.Contains(event.Name, "cstate_pkg")) {
+		slog.Debug("Power events not supported in CPU granularity", slog.String("event", event.Name))
 		return false
 	}
 	// finally, if it isn't in the perf list output, it isn't collectable
