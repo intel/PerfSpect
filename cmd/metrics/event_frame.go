@@ -218,13 +218,11 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 			// create a mapping of cpu numbers to event indices
 			var cpuMap map[int]int
 
-			// create a list of targeted CPUs
-			var cpuList []int
 			// if cpu range is specified, use it to determine the number of cpus
 			// otherwise, use the number of sockets, cores per socket, and threads per core
 			// to determine the number of cpus
-			if len(flagCpuRange) > 0 {
-				cpuList, err = util.SelectiveIntRangeToIntList(flagCpuRange)
+			if flagCpuRange != "" {
+				cpuList, err := util.SelectiveIntRangeToIntList(flagCpuRange)
 				if err != nil {
 					return nil, fmt.Errorf("failed to parse cpu range: %w", err)
 				}
@@ -235,7 +233,6 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 				}
 			} else {
 				numCPUs = metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore
-				cpuList, err = util.SelectiveIntRangeToIntList("0-" + strconv.Itoa(numCPUs-1))
 				if err != nil {
 					return nil, fmt.Errorf("failed to parse cpu range: %w", err)
 				}
