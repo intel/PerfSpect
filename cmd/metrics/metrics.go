@@ -71,77 +71,6 @@ var (
 	gSignalReceived bool
 )
 
-// SafeLineBuffer provides thread-safe access to a slice of byte slices
-// Used to synchronize access to outputLines between runPerf and processPerfOutput goroutines
-type SafeLineBuffer struct {
-	mu    sync.Mutex
-	lines [][]byte
-}
-
-// Append adds a line to the buffer in a thread-safe manner
-func (s *SafeLineBuffer) Append(line []byte) {
-	s.mu.Lock()
-	s.lines = append(s.lines, line)
-	s.mu.Unlock()
-}
-
-// DrainAndClear returns all lines and clears the buffer atomically
-// Returns nil if buffer is empty
-func (s *SafeLineBuffer) DrainAndClear() [][]byte {
-	s.mu.Lock()
-	if len(s.lines) == 0 {
-		s.mu.Unlock()
-		return nil
-	}
-	// Transfer ownership instead of copying for better performance with large batches
-	result := s.lines
-	s.lines = make([][]byte, 0, cap(result)) // Preallocate capacity to reduce future allocations
-	s.mu.Unlock()
-	return result
-}
-
-// Len returns the current number of lines in the buffer
-func (s *SafeLineBuffer) Len() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return len(s.lines)
-}
-
-// extractInterval parses the interval value from a JSON perf event line
-// Returns the interval as a float64, or -1 if parsing fails
-func extractInterval(line []byte) float64 {
-	// Look for the interval field in the JSON: "interval" : 5.005073756
-	intervalStart := strings.Index(string(line), `"interval" : `)
-	if intervalStart == -1 {
-		return -1
-	}
-
-	// Move to the start of the number
-	intervalStart += len(`"interval" : `)
-	lineStr := string(line[intervalStart:])
-
-	// Find the end of the number (comma or space)
-	var intervalEnd int
-	for i, ch := range lineStr {
-		if ch == ',' || ch == ' ' || ch == '}' {
-			intervalEnd = i
-			break
-		}
-	}
-	if intervalEnd == 0 {
-		return -1
-	}
-
-	// Parse the number
-	intervalStr := lineStr[:intervalEnd]
-	interval, err := strconv.ParseFloat(intervalStr, 64)
-	if err != nil {
-		return -1
-	}
-
-	return interval
-}
-
 func setSignalReceived() {
 	gSignalMutex.Lock()
 	defer gSignalMutex.Unlock()
@@ -1514,13 +1443,17 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 	// receive perf output and batch by interval
 	var currentInterval float64 = -1
 	var currentBatch [][]byte
+	var previousBatchSize int = 1000 // initial size of the batch
 	done := false
 	for !done {
 		select {
 		case line := <-stderrChannel: // perf output comes in on this channel, one line at a time
 			lineBytes := []byte(line)
 			interval := extractInterval(lineBytes)
-
+			if interval < 0 {
+				// If the interval is negative, it means the line is not a valid perf event line, skip it
+				continue
+			}
 			// Handle interval change or first line
 			if interval != currentInterval {
 				// If we have accumulated lines from a previous interval, send them for processing
@@ -1534,16 +1467,14 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 						done = true
 						continue
 					}
+					previousBatchSize = len(currentBatch)
 				}
 				// Start a new batch for the new interval
 				currentInterval = interval
-				currentBatch = make([][]byte, 0, 1000)
+				currentBatch = make([][]byte, 0, previousBatchSize)
 			}
-
 			// Add the line to the current batch
-			if interval >= 0 { // only add valid lines (with parseable interval)
-				currentBatch = append(currentBatch, lineBytes)
-			}
+			currentBatch = append(currentBatch, lineBytes)
 		case exitCode := <-exitcodeChannel: // when perf exits, the exit code comes to this channel
 			slog.Debug("perf exited", slog.Int("exit code", exitCode))
 			// Send the final batch if we have accumulated lines

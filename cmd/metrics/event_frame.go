@@ -6,6 +6,7 @@ package metrics
 // Linux perf event output, i.e., from 'perf stat' parsing and processing helper functions
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -412,4 +413,42 @@ func parseEventJSON(rawEvent []byte) (Event, error) {
 		}
 	}
 	return event, nil
+}
+
+// extractInterval parses the interval value from a JSON perf event line
+// Returns the interval as a float64, or -1 if parsing fails
+func extractInterval(line []byte) float64 {
+	// Look for the interval field in the JSON: "interval" : 5.005073756
+	intervalPattern := []byte(`"interval" : `)
+	intervalStart := bytes.Index(line, intervalPattern)
+	if intervalStart == -1 {
+		return -1
+	}
+
+	// Move to the start of the number
+	intervalStart += len(intervalPattern)
+	if intervalStart >= len(line) {
+		return -1
+	}
+
+	// Find the end of the number (comma, space, or closing brace)
+	intervalEnd := intervalStart
+	for intervalEnd < len(line) {
+		ch := line[intervalEnd]
+		if ch == ',' || ch == ' ' || ch == '}' {
+			break
+		}
+		intervalEnd++
+	}
+	if intervalEnd == intervalStart {
+		return -1
+	}
+
+	// Parse the number directly from bytes
+	interval, err := strconv.ParseFloat(string(line[intervalStart:intervalEnd]), 64)
+	if err != nil {
+		return -1
+	}
+
+	return interval
 }
