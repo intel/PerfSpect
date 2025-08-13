@@ -233,9 +233,6 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 				}
 			} else {
 				numCPUs = metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore
-				if err != nil {
-					return nil, fmt.Errorf("failed to parse cpu range: %w", err)
-				}
 				cpuMap = make(map[int]int, numCPUs)
 				for i := 0; i < numCPUs; i++ {
 					cpuMap[i] = i
