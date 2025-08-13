@@ -1442,9 +1442,8 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 
 	// receive perf output and batch by interval
 	var currentInterval float64 = -1
-	var currentBatch [][]byte
 	const initialBatchSize = 1000 // initial size of the batch
-	var previousBatchSize int = initialBatchSize
+	currentBatch := make([][]byte, 0, initialBatchSize)
 	done := false
 	for !done {
 		select {
@@ -1453,26 +1452,25 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 			interval := extractInterval(lineBytes)
 			if interval < 0 {
 				// If the interval is negative, it means the line is not a valid perf event line, skip it
+				slog.Warn("skipping invalid perf event line", slog.String("line", line))
 				continue
 			}
 			// Handle interval change or first line
 			if interval != currentInterval {
 				// If we have accumulated lines from a previous interval, send them for processing
 				if len(currentBatch) > 0 {
-					// Send a copy of the batch to avoid race conditions
-					batchCopy := make([][]byte, len(currentBatch))
-					copy(batchCopy, currentBatch)
+					// Send the batch and create a new one to avoid race conditions
+					batchToSend := currentBatch
+					currentBatch = make([][]byte, 0, len(currentBatch)) // batch sizes are typically the same
 					select {
-					case intervalBatchChannel <- batchCopy:
+					case intervalBatchChannel <- batchToSend:
 					case <-perfProcessingContext.Done():
 						done = true
 						continue
 					}
-					previousBatchSize = len(currentBatch)
 				}
 				// Start a new batch for the new interval
 				currentInterval = interval
-				currentBatch = make([][]byte, 0, previousBatchSize)
 			}
 			// Add the line to the current batch
 			currentBatch = append(currentBatch, lineBytes)
@@ -1480,10 +1478,10 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 			slog.Debug("perf exited", slog.Int("exit code", exitCode))
 			// Send the final batch if we have accumulated lines
 			if len(currentBatch) > 0 {
-				batchCopy := make([][]byte, len(currentBatch))
-				copy(batchCopy, currentBatch)
+				batchToSend := currentBatch
+				currentBatch = nil // clear reference since we're done
 				select {
-				case intervalBatchChannel <- batchCopy:
+				case intervalBatchChannel <- batchToSend:
 				case <-time.After(perfEventWaitTime): // timeout to avoid blocking
 				}
 			}
