@@ -401,7 +401,7 @@ func collapseUncoreGroups(inGroups []EventGroup, firstIdx int, count int) (outGr
 func parseEventJSON(rawEvent []byte) (Event, error) {
 	var event Event
 	if err := json.Unmarshal(rawEvent, &event); err != nil {
-		err = fmt.Errorf("unrecognized event format: \"%s\"", rawEvent)
+		err = fmt.Errorf("unrecognized event format")
 		return event, err
 	}
 	if !strings.Contains(event.CounterValue, "not counted") && !strings.Contains(event.CounterValue, "not supported") {
