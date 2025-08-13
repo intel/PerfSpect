@@ -71,6 +71,77 @@ var (
 	gSignalReceived bool
 )
 
+// SafeLineBuffer provides thread-safe access to a slice of byte slices
+// Used to synchronize access to outputLines between runPerf and processPerfOutput goroutines
+type SafeLineBuffer struct {
+	mu    sync.Mutex
+	lines [][]byte
+}
+
+// Append adds a line to the buffer in a thread-safe manner
+func (s *SafeLineBuffer) Append(line []byte) {
+	s.mu.Lock()
+	s.lines = append(s.lines, line)
+	s.mu.Unlock()
+}
+
+// DrainAndClear returns all lines and clears the buffer atomically
+// Returns nil if buffer is empty
+func (s *SafeLineBuffer) DrainAndClear() [][]byte {
+	s.mu.Lock()
+	if len(s.lines) == 0 {
+		s.mu.Unlock()
+		return nil
+	}
+	// Transfer ownership instead of copying for better performance with large batches
+	result := s.lines
+	s.lines = make([][]byte, 0, cap(result)) // Preallocate capacity to reduce future allocations
+	s.mu.Unlock()
+	return result
+}
+
+// Len returns the current number of lines in the buffer
+func (s *SafeLineBuffer) Len() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.lines)
+}
+
+// extractInterval parses the interval value from a JSON perf event line
+// Returns the interval as a float64, or -1 if parsing fails
+func extractInterval(line []byte) float64 {
+	// Look for the interval field in the JSON: "interval" : 5.005073756
+	intervalStart := strings.Index(string(line), `"interval" : `)
+	if intervalStart == -1 {
+		return -1
+	}
+
+	// Move to the start of the number
+	intervalStart += len(`"interval" : `)
+	lineStr := string(line[intervalStart:])
+
+	// Find the end of the number (comma or space)
+	var intervalEnd int
+	for i, ch := range lineStr {
+		if ch == ',' || ch == ' ' || ch == '}' {
+			intervalEnd = i
+			break
+		}
+	}
+	if intervalEnd == 0 {
+		return -1
+	}
+
+	// Parse the number
+	intervalStr := lineStr[:intervalEnd]
+	interval, err := strconv.ParseFloat(intervalStr, 64)
+	if err != nil {
+		return -1
+	}
+
+	return interval
+}
+
 func setSignalReceived() {
 	gSignalMutex.Lock()
 	defer gSignalMutex.Unlock()
@@ -1421,14 +1492,9 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 		}
 	}
 	// Start a goroutine to wait for and then process perf output
-	// Use a timer to determine when we received an entire frame of events from perf
-	// The timer will expire when no lines (events) have been received from perf for more than 100ms. This
-	// works because perf writes the events to stderr in a burst every collection interval, e.g., 5 seconds.
-	// When the timer expires, this code assumes that perf is done writing events to stderr.
-	const perfEventWaitTime = time.Duration(100 * time.Millisecond)                   // 100ms is somewhat arbitrary, but is long enough for perf to print a frame of events
-	perfOutputTimer := time.NewTimer(time.Duration(2 * flagPerfPrintInterval * 1000)) // #nosec G115
+	const perfEventWaitTime = time.Duration(100 * time.Millisecond) // fallback timer for final interval
 	perfProcessingContext, cancelPerfProcessing := context.WithCancel(context.Background())
-	outputLines := make([][]byte, 0)
+	intervalBatchChannel := make(chan [][]byte, 10)  // channel to send interval batches (all events for a particular interval) for processing
 	donePerfProcessingChannel := make(chan struct{}) // channel to wait for processPerfOutput to finish
 	go processPerfOutput(
 		perfProcessingContext,
@@ -1440,24 +1506,56 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 		processes,
 		cgroupTimeout,
 		startPerfTimestamp,
-		perfOutputTimer,
-		&outputLines,
+		intervalBatchChannel,
 		frameChannel,
 		donePerfProcessingChannel,
 	)
-	// receive perf output
+
+	// receive perf output and batch by interval
+	var currentInterval float64 = -1
+	var currentBatch [][]byte
 	done := false
 	for !done {
 		select {
 		case line := <-stderrChannel: // perf output comes in on this channel, one line at a time
-			perfOutputTimer.Stop()
-			perfOutputTimer.Reset(perfEventWaitTime)
-			// accumulate the lines, they will be processed in the goroutine when the timer expires
-			outputLines = append(outputLines, []byte(line))
+			lineBytes := []byte(line)
+			interval := extractInterval(lineBytes)
+
+			// Handle interval change or first line
+			if interval != currentInterval {
+				// If we have accumulated lines from a previous interval, send them for processing
+				if len(currentBatch) > 0 {
+					// Send a copy of the batch to avoid race conditions
+					batchCopy := make([][]byte, len(currentBatch))
+					copy(batchCopy, currentBatch)
+					select {
+					case intervalBatchChannel <- batchCopy:
+					case <-perfProcessingContext.Done():
+						done = true
+						continue
+					}
+				}
+				// Start a new batch for the new interval
+				currentInterval = interval
+				currentBatch = make([][]byte, 0, 1000)
+			}
+
+			// Add the line to the current batch
+			if interval >= 0 { // only add valid lines (with parseable interval)
+				currentBatch = append(currentBatch, lineBytes)
+			}
 		case exitCode := <-exitcodeChannel: // when perf exits, the exit code comes to this channel
 			slog.Debug("perf exited", slog.Int("exit code", exitCode))
-			time.Sleep(perfEventWaitTime) // wait for timer to expire so that last events can be processed
-			done = true                   // exit the loop
+			// Send the final batch if we have accumulated lines
+			if len(currentBatch) > 0 {
+				batchCopy := make([][]byte, len(currentBatch))
+				copy(batchCopy, currentBatch)
+				select {
+				case intervalBatchChannel <- batchCopy:
+				case <-time.After(perfEventWaitTime): // timeout to avoid blocking
+				}
+			}
+			done = true // exit the loop
 		case err := <-scriptErrorChannel: // if there is an error running perf, it comes here
 			if err != nil {
 				slog.Error("error from perf", slog.String("error", err.Error()))
@@ -1465,7 +1563,8 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 			done = true // exit the loop
 		}
 	}
-	perfOutputTimer.Stop()
+	// Close the interval batch channel to signal no more batches
+	close(intervalBatchChannel)
 	// cancel the context to stop processPerfOutput
 	cancelPerfProcessing()
 	// wait for processPerfOutput to finish
@@ -1489,8 +1588,7 @@ func processPerfOutput(
 	processes []Process,
 	cgroupTimeout int,
 	startPerfTimestamp time.Time,
-	perfOutputTimer *time.Timer,
-	outputLines *[][]byte,
+	intervalBatchChannel chan [][]byte,
 	frameChannel chan []MetricFrame,
 	doneChannel chan struct{},
 ) {
@@ -1501,44 +1599,47 @@ func processPerfOutput(
 	const maxConsecutiveProcessEventErrors = 2
 	for !contextCancelled {
 		select {
-		case <-perfOutputTimer.C: // waits for timer to expire the process the events in outputLines
+		case batchLines, ok := <-intervalBatchChannel:
+			if !ok {
+				// Channel closed, no more batches
+				contextCancelled = true
+				break
+			}
+			// Process the interval batch
+			if len(batchLines) > 0 {
+				// write the events to a file
+				if flagWriteEventsToFile {
+					if err := writeEventsToFile(outputDir+"/"+myTarget.GetName()+"_"+"events.jsonl", batchLines); err != nil {
+						slog.Error("failed to write events to file", slog.String("error", err.Error()))
+					}
+				}
+				// process the events
+				var metricFrames []MetricFrame
+				var err error
+				metricFrames, frameTimestamp, err = ProcessEvents(batchLines, eventGroupDefinitions, metricDefinitions, processes, frameTimestamp, metadata)
+				if err != nil {
+					slog.Error(err.Error())
+					numConsecutiveProcessEventErrors++
+					if numConsecutiveProcessEventErrors > maxConsecutiveProcessEventErrors {
+						slog.Error("too many consecutive errors processing events, killing perf", slog.Int("max errors", maxConsecutiveProcessEventErrors))
+						// signaling self with SIGUSR1 will signal child processes to exit, which will cancel the context and let this function exit
+						err := util.SignalSelf(syscall.SIGUSR1)
+						if err != nil {
+							slog.Error("failed to signal self", slog.String("error", err.Error()))
+						}
+					}
+				} else {
+					// send the metrics frames out to be printed
+					frameChannel <- metricFrames
+					// reset the error count
+					numConsecutiveProcessEventErrors = 0
+				}
+			}
 		case <-ctx.Done(): // context cancellation
-			contextCancelled = true // exit the loop after one more pass
+			contextCancelled = true
 		}
 		if contextCancelled {
 			break
-		}
-		if len(*outputLines) != 0 {
-			// write the events to a file
-			if flagWriteEventsToFile {
-				if err := writeEventsToFile(outputDir+"/"+myTarget.GetName()+"_"+"events.jsonl", *outputLines); err != nil {
-					slog.Error("failed to write events to file", slog.String("error", err.Error()))
-				}
-			}
-			// process the events
-			var metricFrames []MetricFrame
-			var err error
-			metricFrames, frameTimestamp, err = ProcessEvents(*outputLines, eventGroupDefinitions, metricDefinitions, processes, frameTimestamp, metadata)
-			if err != nil {
-				slog.Error(err.Error())
-				numConsecutiveProcessEventErrors++
-				if numConsecutiveProcessEventErrors > maxConsecutiveProcessEventErrors {
-					slog.Error("too many consecutive errors processing events, killing perf", slog.Int("max errors", maxConsecutiveProcessEventErrors))
-					// signaling self with SIGUSR1 will signal child processes to exit, which will cancel the context and let this function exit
-					err := util.SignalSelf(syscall.SIGUSR1)
-					if err != nil {
-						slog.Error("failed to signal self", slog.String("error", err.Error()))
-					}
-				}
-				*outputLines = [][]byte{} // empty it
-			} else {
-				// send the metrics frames out to be printed
-				frameChannel <- metricFrames
-				// empty the outputLines
-				*outputLines = [][]byte{}
-				// reset the error count
-				numConsecutiveProcessEventErrors = 0
-			}
 		}
 		// for cgroup scope, terminate perf if refresh timeout is reached
 		if flagScope == scopeCgroup && cgroupTimeout != 0 {
@@ -1550,6 +1651,26 @@ func processPerfOutput(
 					slog.Error("failed to signal self", slog.String("error", err.Error()))
 				}
 			}
+		}
+	}
+	// Drain any remaining batches from the channel
+	for {
+		select {
+		case batchLines, ok := <-intervalBatchChannel:
+			if !ok {
+				return // Channel closed and drained
+			}
+			// Process final batches if they exist
+			if len(batchLines) > 0 {
+				if metricFrames, _, err := ProcessEvents(batchLines, eventGroupDefinitions, metricDefinitions, processes, frameTimestamp, metadata); err == nil {
+					select {
+					case frameChannel <- metricFrames:
+					default: // Don't block if frameChannel is full
+					}
+				}
+			}
+		default:
+			return // No more batches
 		}
 	}
 }
