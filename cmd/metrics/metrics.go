@@ -1443,7 +1443,8 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 	// receive perf output and batch by interval
 	var currentInterval float64 = -1
 	var currentBatch [][]byte
-	var previousBatchSize int = 1000 // initial size of the batch
+	const initialBatchSize = 1000 // initial size of the batch
+	var previousBatchSize int = initialBatchSize
 	done := false
 	for !done {
 		select {
