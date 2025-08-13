@@ -74,7 +74,7 @@ type Target interface {
 	// - exitcodeChannel: a channel to send the exit code of the command
 	// - cmdChannel: a channel to send the command that was run
 	// It returns any error that occurred.
-	RunCommandStream(cmd *exec.Cmd, timeout int, reuseSSHConnection bool, stdoutChannel chan string, stderrChannel chan string, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) error
+	RunCommandStream(cmd *exec.Cmd, timeout int, reuseSSHConnection bool, stdoutChannel chan []byte, stderrChannel chan []byte, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) error
 
 	// PushFile transfers a file from the local system to the target.
 	// It returns any error that occurred.

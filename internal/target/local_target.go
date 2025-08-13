@@ -36,7 +36,7 @@ func (t *LocalTarget) RunCommand(cmd *exec.Cmd, timeout int, argNotUsed bool) (s
 // and the exit code is sent to the exitcodeChannel.
 // The timeout parameter specifies the maximum time allowed for the command to run.
 // Returns an error if there was a problem running the command.
-func (t *LocalTarget) RunCommandStream(cmd *exec.Cmd, timeout int, argNotUsed bool, stdoutChannel chan string, stderrChannel chan string, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) (err error) {
+func (t *LocalTarget) RunCommandStream(cmd *exec.Cmd, timeout int, argNotUsed bool, stdoutChannel chan []byte, stderrChannel chan []byte, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) (err error) {
 	localCommand := cmd
 	cmdChannel <- localCommand
 	err = runLocalCommandWithInputWithTimeoutAsync(localCommand, stdoutChannel, stderrChannel, exitcodeChannel, "", timeout)

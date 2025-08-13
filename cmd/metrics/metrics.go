@@ -1383,8 +1383,8 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec.Cmd, eventGroupDefinitions []GroupDefinition, metricDefinitions []MetricDefinition, metadata Metadata, localTempDir string, outputDir string, frameChannel chan []MetricFrame, errorChannel chan error) {
 	// start perf
 	perfCommand := strings.Join(cmd.Args, " ")
-	stdoutChannel := make(chan string)
-	stderrChannel := make(chan string)
+	stdoutChannel := make(chan []byte)
+	stderrChannel := make(chan []byte)
 	exitcodeChannel := make(chan int)
 	scriptErrorChannel := make(chan error)
 	cmdChannel := make(chan *exec.Cmd)
@@ -1447,12 +1447,11 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 	done := false
 	for !done {
 		select {
-		case line := <-stderrChannel: // perf output comes in on this channel, one line at a time
-			lineBytes := []byte(line)
+		case lineBytes := <-stderrChannel: // perf output comes in on this channel, one line at a time
 			interval := extractInterval(lineBytes)
 			if interval < 0 {
 				// If the interval is negative, it means the line is not a valid perf event line, skip it
-				slog.Warn("skipping invalid perf event line", slog.String("line", line))
+				slog.Warn("skipping invalid perf event line", slog.String("line", string(lineBytes)))
 				continue
 			}
 			// Handle interval change or first line
