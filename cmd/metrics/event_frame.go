@@ -6,6 +6,7 @@ package metrics
 // Linux perf event output, i.e., from 'perf stat' parsing and processing helper functions
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -13,6 +14,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"perfspect/internal/util"
 )
 
 // EventGroup represents a group of perf events and their values
@@ -221,7 +224,31 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 			return
 		case granularityCPU:
 			// create one list of Events per CPU
-			numCPUs := metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore
+			var numCPUs int
+
+			// create a mapping of cpu numbers to event indices
+			var cpuMap map[int]int
+
+			// if cpu range is specified, use it to determine the number of cpus
+			// otherwise, use the number of sockets, cores per socket, and threads per core
+			// to determine the number of cpus
+			if flagCpuRange != "" {
+				cpuList, err := util.SelectiveIntRangeToIntList(flagCpuRange)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse cpu range: %w", err)
+				}
+				numCPUs = len(cpuList)
+				cpuMap = make(map[int]int, numCPUs)
+				for i, cpu := range cpuList {
+					cpuMap[cpu] = i
+				}
+			} else {
+				numCPUs = metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore
+				cpuMap = make(map[int]int, numCPUs)
+				for i := 0; i < numCPUs; i++ {
+					cpuMap[i] = i
+				}
+			}
 			// note: if some cores have been off-lined, this may cause an issue because 'perf' seems
 			// to still report events for those cores
 			newEvents := make([][]Event, numCPUs)
@@ -240,7 +267,10 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 						newEvents = append(newEvents, make([]Event, 0, len(allEvents)/numCPUs))
 					}
 				}
-				newEvents[cpu] = append(newEvents[cpu], event)
+
+				// place the event for the current CPU into the newEvents list
+				// cpuMap ensures that events are placed in a valid index
+				newEvents[cpuMap[cpu]] = append(newEvents[cpuMap[cpu]], event)
 			}
 			coalescedEvents = append(coalescedEvents, newEvents...)
 		default:
@@ -382,7 +412,7 @@ func collapseUncoreGroups(inGroups []EventGroup, firstIdx int, count int) (outGr
 func parseEventJSON(rawEvent []byte) (Event, error) {
 	var event Event
 	if err := json.Unmarshal(rawEvent, &event); err != nil {
-		err = fmt.Errorf("unrecognized event format: \"%s\"", rawEvent)
+		err = fmt.Errorf("unrecognized event format")
 		return event, err
 	}
 	if !strings.Contains(event.CounterValue, "not counted") && !strings.Contains(event.CounterValue, "not supported") {
@@ -393,4 +423,42 @@ func parseEventJSON(rawEvent []byte) (Event, error) {
 		}
 	}
 	return event, nil
+}
+
+// extractInterval parses the interval value from a JSON perf event line
+// Returns the interval as a float64, or -1 if parsing fails
+func extractInterval(line []byte) float64 {
+	// Look for the interval field in the JSON: "interval" : 5.005073756
+	intervalPattern := []byte(`"interval" : `)
+	intervalStart := bytes.Index(line, intervalPattern)
+	if intervalStart == -1 {
+		return -1
+	}
+
+	// Move to the start of the number
+	intervalStart += len(intervalPattern)
+	if intervalStart >= len(line) {
+		return -1
+	}
+
+	// Find the end of the number (comma, space, or closing brace)
+	intervalEnd := intervalStart
+	for intervalEnd < len(line) {
+		ch := line[intervalEnd]
+		if ch == ',' || ch == ' ' || ch == '}' {
+			break
+		}
+		intervalEnd++
+	}
+	if intervalEnd == intervalStart {
+		return -1
+	}
+
+	// Parse the number directly from bytes
+	interval, err := strconv.ParseFloat(string(line[intervalStart:intervalEnd]), 64)
+	if err != nil {
+		return -1
+	}
+
+	return interval
 }

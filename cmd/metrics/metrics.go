@@ -99,6 +99,7 @@ var (
 	flagFilter   string
 	flagCount    int
 	flagRefresh  int
+	flagCpuRange string
 	// output format options
 	flagGranularity     string
 	flagOutputFormat    []string
@@ -130,6 +131,7 @@ const (
 	flagFilterName   = "filter"
 	flagCountName    = "count"
 	flagRefreshName  = "refresh"
+	flagCpuRangeName = "cpus"
 
 	flagGranularityName     = "granularity"
 	flagOutputFormatName    = "format"
@@ -183,6 +185,7 @@ func init() {
 	Cmd.Flags().StringVar(&flagFilter, flagFilterName, "", "")
 	Cmd.Flags().IntVar(&flagCount, flagCountName, 5, "")
 	Cmd.Flags().IntVar(&flagRefresh, flagRefreshName, 30, "")
+	Cmd.Flags().StringVar(&flagCpuRange, flagCpuRangeName, "", "")
 
 	Cmd.Flags().StringVar(&flagGranularity, flagGranularityName, granularitySystem, "")
 	Cmd.Flags().StringSliceVar(&flagOutputFormat, flagOutputFormatName, []string{formatCSV}, "")
@@ -265,6 +268,10 @@ func getFlagGroups() []common.FlagGroup {
 		{
 			Name: flagRefreshName,
 			Help: "number of seconds to run before refreshing the \"hot\" or \"filtered\" process or cgroup list. If 0, the list will not be refreshed.",
+		},
+		{
+			Name: flagCpuRangeName,
+			Help: "range of CPUs to monitor. If not provided, all cores will be monitored.",
 		},
 	}
 	groups = append(groups, common.FlagGroup{
@@ -375,6 +382,9 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		if cmd.Flags().Lookup(flagCountName).Changed {
 			return common.FlagValidationError(cmd, "count is not supported with an application argument")
 		}
+		if cmd.Flags().Lookup(flagCpuRangeName).Changed {
+			return common.FlagValidationError(cmd, "CPU range is not supported with an application argument")
+		}
 	}
 	// confirm valid duration
 	if cmd.Flags().Lookup(flagDurationName).Changed && flagDuration != 0 && flagDuration < flagPerfPrintInterval {
@@ -459,6 +469,41 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		// if refresh is less than perf print interval, error
 		if flagRefresh < flagPerfPrintInterval {
 			return common.FlagValidationError(cmd, fmt.Sprintf("refresh must be greater than or equal to the event collection interval (%d)", flagPerfPrintInterval))
+		}
+	}
+	// cpu range changed
+	if flagCpuRange != "" {
+		// error if granularity specifically set to other than CPU
+		// only CPU granularity is allowed when specifying a CPU range
+		if cmd.Flags().Lookup(flagGranularityName).Changed && flagGranularity != granularityCPU {
+			return common.FlagValidationError(cmd, fmt.Sprintf("cpu range can only be specified when granularity is %s. Current granularity is %s.", granularityCPU, flagGranularity))
+		}
+
+		// set granularity to cpu if cpu range is specified and granularity not explicitly set
+		flagGranularity = granularityCPU
+
+		// treat "all" as empty
+		if flagCpuRange == "all" {
+			flagCpuRange = ""
+		} else {
+			// some basic validation on CPU range
+			cpuList, err := util.SelectiveIntRangeToIntList(flagCpuRange)
+			if err != nil {
+				return common.FlagValidationError(cmd, fmt.Sprintf("invalid cpu range: %s", flagCpuRange))
+			}
+			numCpus := len(cpuList)
+			if numCpus == 0 {
+				return common.FlagValidationError(cmd, fmt.Sprintf("cpu range must contain at least one CPU, got: %s", flagCpuRange))
+			}
+			// check if any entries in the cpu range are duplicates
+			// error if so, since perf will not accept this input
+			seen := make(map[int]bool)
+			for _, cpu := range cpuList {
+				if seen[cpu] {
+					return common.FlagValidationError(cmd, fmt.Sprintf("duplicate CPU in cpu range: %s", flagCpuRange))
+				}
+				seen[cpu] = true
+			}
 		}
 	}
 	// output options
@@ -1283,7 +1328,7 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 			}
 		}
 		var perfCommand *exec.Cmd
-		perfCommand, err = getPerfCommand(targetContext.perfPath, targetContext.groupDefinitions, pids, cids)
+		perfCommand, err = getPerfCommand(targetContext.perfPath, targetContext.groupDefinitions, pids, cids, flagCpuRange)
 		if err != nil {
 			err = fmt.Errorf("failed to get perf command: %w", err)
 			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
@@ -1323,8 +1368,8 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec.Cmd, eventGroupDefinitions []GroupDefinition, metricDefinitions []MetricDefinition, metadata Metadata, localTempDir string, outputDir string, frameChannel chan []MetricFrame, errorChannel chan error) {
 	// start perf
 	perfCommand := strings.Join(cmd.Args, " ")
-	stdoutChannel := make(chan string)
-	stderrChannel := make(chan string)
+	stdoutChannel := make(chan []byte)
+	stderrChannel := make(chan []byte)
 	exitcodeChannel := make(chan int)
 	scriptErrorChannel := make(chan error)
 	cmdChannel := make(chan *exec.Cmd)
@@ -1361,14 +1406,9 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 		}
 	}
 	// Start a goroutine to wait for and then process perf output
-	// Use a timer to determine when we received an entire frame of events from perf
-	// The timer will expire when no lines (events) have been received from perf for more than 100ms. This
-	// works because perf writes the events to stderr in a burst every collection interval, e.g., 5 seconds.
-	// When the timer expires, this code assumes that perf is done writing events to stderr.
-	const perfEventWaitTime = time.Duration(100 * time.Millisecond)                   // 100ms is somewhat arbitrary, but is long enough for perf to print a frame of events
-	perfOutputTimer := time.NewTimer(time.Duration(2 * flagPerfPrintInterval * 1000)) // #nosec G115
+	const perfEventWaitTime = time.Duration(100 * time.Millisecond) // fallback timer for final interval
 	perfProcessingContext, cancelPerfProcessing := context.WithCancel(context.Background())
-	outputLines := make([][]byte, 0)
+	intervalBatchChannel := make(chan [][]byte, 10)  // channel to send interval batches (all events for a particular interval) for processing
 	donePerfProcessingChannel := make(chan struct{}) // channel to wait for processPerfOutput to finish
 	go processPerfOutput(
 		perfProcessingContext,
@@ -1380,24 +1420,56 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 		processes,
 		cgroupTimeout,
 		startPerfTimestamp,
-		perfOutputTimer,
-		&outputLines,
+		intervalBatchChannel,
 		frameChannel,
 		donePerfProcessingChannel,
 	)
-	// receive perf output
+
+	// receive perf output and batch by interval
+	var currentInterval float64 = -1
+	const initialBatchSize = 1000 // initial size of the batch
+	currentBatch := make([][]byte, 0, initialBatchSize)
 	done := false
 	for !done {
 		select {
-		case line := <-stderrChannel: // perf output comes in on this channel, one line at a time
-			perfOutputTimer.Stop()
-			perfOutputTimer.Reset(perfEventWaitTime)
-			// accumulate the lines, they will be processed in the goroutine when the timer expires
-			outputLines = append(outputLines, []byte(line))
+		case lineBytes := <-stderrChannel: // perf output comes in on this channel, one line at a time
+			interval := extractInterval(lineBytes)
+			if interval < 0 {
+				// If the interval is negative, it means the line is not a valid perf event line, skip it
+				slog.Warn("skipping invalid perf event line", slog.String("line", string(lineBytes)))
+				continue
+			}
+			// Handle interval change or first line
+			if interval != currentInterval {
+				// If we have accumulated lines from a previous interval, send them for processing
+				if len(currentBatch) > 0 {
+					// Send the batch and create a new one to avoid race conditions
+					batchToSend := currentBatch
+					currentBatch = make([][]byte, 0, len(currentBatch)) // batch sizes are typically the same
+					select {
+					case intervalBatchChannel <- batchToSend:
+					case <-perfProcessingContext.Done():
+						done = true
+						continue
+					}
+				}
+				// Start a new batch for the new interval
+				currentInterval = interval
+			}
+			// Add the line to the current batch
+			currentBatch = append(currentBatch, lineBytes)
 		case exitCode := <-exitcodeChannel: // when perf exits, the exit code comes to this channel
 			slog.Debug("perf exited", slog.Int("exit code", exitCode))
-			time.Sleep(perfEventWaitTime) // wait for timer to expire so that last events can be processed
-			done = true                   // exit the loop
+			// Send the final batch if we have accumulated lines
+			if len(currentBatch) > 0 {
+				batchToSend := currentBatch
+				currentBatch = nil // clear reference since we're done
+				select {
+				case intervalBatchChannel <- batchToSend:
+				case <-time.After(perfEventWaitTime): // timeout to avoid blocking
+				}
+			}
+			done = true // exit the loop
 		case err := <-scriptErrorChannel: // if there is an error running perf, it comes here
 			if err != nil {
 				slog.Error("error from perf", slog.String("error", err.Error()))
@@ -1405,7 +1477,8 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 			done = true // exit the loop
 		}
 	}
-	perfOutputTimer.Stop()
+	// Close the interval batch channel to signal no more batches
+	close(intervalBatchChannel)
 	// cancel the context to stop processPerfOutput
 	cancelPerfProcessing()
 	// wait for processPerfOutput to finish
@@ -1429,8 +1502,7 @@ func processPerfOutput(
 	processes []Process,
 	cgroupTimeout int,
 	startPerfTimestamp time.Time,
-	perfOutputTimer *time.Timer,
-	outputLines *[][]byte,
+	intervalBatchChannel chan [][]byte,
 	frameChannel chan []MetricFrame,
 	doneChannel chan struct{},
 ) {
@@ -1441,44 +1513,47 @@ func processPerfOutput(
 	const maxConsecutiveProcessEventErrors = 2
 	for !contextCancelled {
 		select {
-		case <-perfOutputTimer.C: // waits for timer to expire the process the events in outputLines
+		case batchLines, ok := <-intervalBatchChannel:
+			if !ok {
+				// Channel closed, no more batches
+				contextCancelled = true
+				break
+			}
+			// Process the interval batch
+			if len(batchLines) > 0 {
+				// write the events to a file
+				if flagWriteEventsToFile {
+					if err := writeEventsToFile(outputDir+"/"+myTarget.GetName()+"_"+"events.jsonl", batchLines); err != nil {
+						slog.Error("failed to write events to file", slog.String("error", err.Error()))
+					}
+				}
+				// process the events
+				var metricFrames []MetricFrame
+				var err error
+				metricFrames, frameTimestamp, err = ProcessEvents(batchLines, eventGroupDefinitions, metricDefinitions, processes, frameTimestamp, metadata)
+				if err != nil {
+					slog.Error(err.Error())
+					numConsecutiveProcessEventErrors++
+					if numConsecutiveProcessEventErrors > maxConsecutiveProcessEventErrors {
+						slog.Error("too many consecutive errors processing events, killing perf", slog.Int("max errors", maxConsecutiveProcessEventErrors))
+						// signaling self with SIGUSR1 will signal child processes to exit, which will cancel the context and let this function exit
+						err := util.SignalSelf(syscall.SIGUSR1)
+						if err != nil {
+							slog.Error("failed to signal self", slog.String("error", err.Error()))
+						}
+					}
+				} else {
+					// send the metrics frames out to be printed
+					frameChannel <- metricFrames
+					// reset the error count
+					numConsecutiveProcessEventErrors = 0
+				}
+			}
 		case <-ctx.Done(): // context cancellation
-			contextCancelled = true // exit the loop after one more pass
+			contextCancelled = true
 		}
 		if contextCancelled {
 			break
-		}
-		if len(*outputLines) != 0 {
-			// write the events to a file
-			if flagWriteEventsToFile {
-				if err := writeEventsToFile(outputDir+"/"+myTarget.GetName()+"_"+"events.jsonl", *outputLines); err != nil {
-					slog.Error("failed to write events to file", slog.String("error", err.Error()))
-				}
-			}
-			// process the events
-			var metricFrames []MetricFrame
-			var err error
-			metricFrames, frameTimestamp, err = ProcessEvents(*outputLines, eventGroupDefinitions, metricDefinitions, processes, frameTimestamp, metadata)
-			if err != nil {
-				slog.Error(err.Error())
-				numConsecutiveProcessEventErrors++
-				if numConsecutiveProcessEventErrors > maxConsecutiveProcessEventErrors {
-					slog.Error("too many consecutive errors processing events, killing perf", slog.Int("max errors", maxConsecutiveProcessEventErrors))
-					// signaling self with SIGUSR1 will signal child processes to exit, which will cancel the context and let this function exit
-					err := util.SignalSelf(syscall.SIGUSR1)
-					if err != nil {
-						slog.Error("failed to signal self", slog.String("error", err.Error()))
-					}
-				}
-				*outputLines = [][]byte{} // empty it
-			} else {
-				// send the metrics frames out to be printed
-				frameChannel <- metricFrames
-				// empty the outputLines
-				*outputLines = [][]byte{}
-				// reset the error count
-				numConsecutiveProcessEventErrors = 0
-			}
 		}
 		// for cgroup scope, terminate perf if refresh timeout is reached
 		if flagScope == scopeCgroup && cgroupTimeout != 0 {
@@ -1490,6 +1565,26 @@ func processPerfOutput(
 					slog.Error("failed to signal self", slog.String("error", err.Error()))
 				}
 			}
+		}
+	}
+	// Drain any remaining batches from the channel
+	for {
+		select {
+		case batchLines, ok := <-intervalBatchChannel:
+			if !ok {
+				return // Channel closed and drained
+			}
+			// Process final batches if they exist
+			if len(batchLines) > 0 {
+				if metricFrames, _, err := ProcessEvents(batchLines, eventGroupDefinitions, metricDefinitions, processes, frameTimestamp, metadata); err == nil {
+					select {
+					case frameChannel <- metricFrames:
+					default: // Don't block if frameChannel is full
+					}
+				}
+			}
+		default:
+			return // No more batches
 		}
 	}
 }

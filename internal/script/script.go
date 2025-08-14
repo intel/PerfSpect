@@ -164,7 +164,7 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 }
 
 // RunScriptStream runs a script on the specified target and streams the output to the specified channels.
-func RunScriptStream(myTarget target.Target, script ScriptDefinition, localTempDir string, stdoutChannel chan string, stderrChannel chan string, exitcodeChannel chan int, errorChannel chan error, cmdChannel chan *exec.Cmd) {
+func RunScriptStream(myTarget target.Target, script ScriptDefinition, localTempDir string, stdoutChannel chan []byte, stderrChannel chan []byte, exitcodeChannel chan int, errorChannel chan error, cmdChannel chan *exec.Cmd) {
 	targetArchitecture, err := myTarget.GetArchitecture()
 	if err != nil {
 		err = fmt.Errorf("error getting target architecture: %v", err)

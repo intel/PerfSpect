@@ -64,6 +64,10 @@ func summarize(csvInputPath string, html bool, metadata Metadata) (out string, e
 	if metrics, err = newMetricsFromCSV(csvInputPath); err != nil {
 		return
 	}
+	if len(metrics) == 0 {
+		err = fmt.Errorf("no metrics found in %s", csvInputPath)
+		return
+	}
 	if html {
 		if len(metrics) > 1 {
 			err = fmt.Errorf("html format is supported only when data's scope is '%s' or '%s' and granularity is '%s'", scopeSystem, scopeProcess, granularitySystem)
@@ -71,12 +75,13 @@ func summarize(csvInputPath string, html bool, metadata Metadata) (out string, e
 		}
 		out, err = metrics[0].getHTML(metadata)
 	} else {
-		for i, m := range metrics {
-			var oneOut string
-			if oneOut, err = m.getCSV(i == 0); err != nil {
-				return
-			}
-			out += oneOut
+		if len(metrics) == 1 {
+			// if there is only one metricsFromCSV, then it is system scope and granularity
+			// so we can just use the first one
+			out, err = metrics[0].getCSV(true)
+		} else {
+			// if there are multiple metricsFromCSV, then it is per-scope unit or granularity unit
+			out, err = getCSVMultiple(metrics)
 		}
 	}
 	return
@@ -478,6 +483,79 @@ func (m *metricsFromCSV) getCSV(includeFieldNames bool) (out string, err error) 
 		} else {
 			out += fmt.Sprintf("%s,%s,%f,%f,%f,%f\n", m.groupByValue, name, stats[name].mean, stats[name].min, stats[name].max, stats[name].stddev)
 		}
+	}
+	return
+}
+
+// getCSVMultiple - generate CSV string representing the summary statistics of multiple metricsFromCSV
+// This is used when there are multiple metricsFromCSV objects, e.g., one per socket, cpu, or cgroup.
+// Output format is:
+//
+//	metric,cpu0,cpu1,cpu2,cpu3
+//	metric,val0,val1,val2,val3
+//
+// where metric is the name of the metric, and val0, val1, etc. are the values for each CPU/socket/cgroup.
+func getCSVMultiple(metrics []metricsFromCSV) (out string, err error) {
+	if len(metrics) == 0 {
+		return "", fmt.Errorf("no metrics to summarize")
+	}
+	// Validate groupByField for all metrics
+	validGroupByFields := []string{"SKT", "CPU", "CID"}
+	for i, m := range metrics {
+		if !slices.Contains(validGroupByFields, m.groupByField) {
+			return "", fmt.Errorf("invalid groupByField in metrics[%d]: %s", i, m.groupByField)
+		}
+	}
+	// first, get the names of the metrics
+	metricNames := metrics[0].names
+	for idx, m := range metrics[1:] {
+		if !slices.Equal(m.names, metricNames) {
+			return "", fmt.Errorf("metricsFromCSV objects have different metric names or order at index %d: %v vs %v", idx+1, m.names, metricNames)
+		}
+	}
+	// write the header
+	out = "metric"
+	var fieldPrefix string
+	switch metrics[0].groupByField {
+	case validGroupByFields[0]: // SKT
+		fieldPrefix = validGroupByFields[0] // "SKT"
+	case validGroupByFields[1]: // CPU
+		fieldPrefix = validGroupByFields[1] // "CPU"
+	case validGroupByFields[2]: // CID
+		fieldPrefix = "" // leave empty for CID
+	default:
+		// shouldn't happen due to earlier validation
+		return "", fmt.Errorf("invalid groupByField: %s", metrics[0].groupByField)
+	}
+	for _, m := range metrics {
+		if m.groupByValue == "" {
+			return "", fmt.Errorf("groupByValue is empty for metricsFromCSV with groupByField %s", m.groupByField)
+		}
+		// add the groupByValue to the header
+		// e.g., SKT0, SKT1, CPU0, CPU1, etc.
+		// if groupByField is CID, it will be empty
+		out += "," + fieldPrefix + m.groupByValue
+	}
+	out += "\n"
+	// get the stats for each metricsFromCSV
+	allStats := make([]map[string]float64, len(metrics))
+	for i, m := range metrics {
+		allStats[i] = make(map[string]float64)
+		stats, err := m.getStats()
+		if err != nil {
+			return "", fmt.Errorf("failed to get stats for metricsFromCSV %d: %w", i, err)
+		}
+		for name, stat := range stats {
+			allStats[i][name] = stat.mean // use mean for the summary
+		}
+	}
+	// write the metric names and values
+	for _, name := range metricNames {
+		out += name
+		for j := range metrics {
+			out += fmt.Sprintf(",%f", allStats[j][name])
+		}
+		out += "\n"
 	}
 	return
 }
