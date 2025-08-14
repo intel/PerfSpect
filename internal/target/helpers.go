@@ -128,7 +128,7 @@ func runLocalCommandWithInputWithTimeout(cmd *exec.Cmd, input string, timeout in
 //
 // Returns:
 //   - err: An error if the command fails to start or if there are issues with pipes.
-func runLocalCommandWithInputWithTimeoutAsync(cmd *exec.Cmd, stdoutChannel chan string, stderrChannel chan string, exitcodeChannel chan int, input string, timeout int) (err error) {
+func runLocalCommandWithInputWithTimeoutAsync(cmd *exec.Cmd, stdoutChannel chan []byte, stderrChannel chan []byte, exitcodeChannel chan int, input string, timeout int) (err error) {
 	logInput := ""
 	if input != "" {
 		logInput = "******"
@@ -163,14 +163,18 @@ func runLocalCommandWithInputWithTimeoutAsync(cmd *exec.Cmd, stdoutChannel chan 
 	}
 	go func() {
 		for stdoutScanner.Scan() {
-			text := stdoutScanner.Text()
-			stdoutChannel <- text
+			internalBuf := stdoutScanner.Bytes()
+			sendBuf := make([]byte, len(internalBuf))
+			copy(sendBuf, internalBuf)
+			stdoutChannel <- sendBuf
 		}
 	}()
 	go func() {
 		for stderrScanner.Scan() {
-			text := stderrScanner.Text()
-			stderrChannel <- text
+			internalBuf := stderrScanner.Bytes()
+			sendBuf := make([]byte, len(internalBuf))
+			copy(sendBuf, internalBuf)
+			stderrChannel <- sendBuf
 		}
 	}()
 	err = cmd.Wait()

@@ -57,7 +57,7 @@ func (t *RemoteTarget) RunCommand(cmd *exec.Cmd, timeout int, reuseSSHConnection
 //
 // Returns:
 //   - err: An error object if the command fails to execute or times out.
-func (t *RemoteTarget) RunCommandStream(cmd *exec.Cmd, timeout int, reuseSSHConnection bool, stdoutChannel chan string, stderrChannel chan string, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) (err error) {
+func (t *RemoteTarget) RunCommandStream(cmd *exec.Cmd, timeout int, reuseSSHConnection bool, stdoutChannel chan []byte, stderrChannel chan []byte, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) (err error) {
 	localCommand := t.prepareLocalCommand(cmd, reuseSSHConnection)
 	cmdChannel <- localCommand
 	err = runLocalCommandWithInputWithTimeoutAsync(localCommand, stdoutChannel, stderrChannel, exitcodeChannel, "", timeout)
