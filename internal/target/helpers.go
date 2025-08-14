@@ -163,7 +163,7 @@ func runLocalCommandWithInputWithTimeoutAsync(cmd *exec.Cmd, stdoutChannel chan 
 	}
 	go func() {
 		for stdoutScanner.Scan() {
-			internalBuf := stderrScanner.Bytes()
+			internalBuf := stdoutScanner.Bytes()
 			sendBuf := make([]byte, len(internalBuf))
 			copy(sendBuf, internalBuf)
 			stdoutChannel <- sendBuf
