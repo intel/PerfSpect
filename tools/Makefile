@@ -453,7 +453,6 @@ oss-reset:
 	cd lspci && git clean -fdx && git reset --hard
 	cd pcm && git clean -fdx && git reset --hard
 	cd msr-tools && git clean -fdx && git reset --hard
-	cd processwatch && git clean -fdx && git reset --hard
 	cd sshpass && make clean
 	cd stress-ng && git clean -fdx && git reset --hard
 	cd sysstat && git clean -fdx && git reset --hard

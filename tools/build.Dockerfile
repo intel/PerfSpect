@@ -35,7 +35,17 @@ ENV JAVA_HOME=/usr/lib/jvm/java-1.11.0-openjdk-amd64
 RUN rm -rf /usr/local/go && wget -qO- https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -C /usr/local -xz
 ENV PATH="${PATH}:/usr/local/go/bin"
 # need up-to-date zlib (used by stress-ng static build) to fix security vulnerabilities
-RUN git clone https://github.com/madler/zlib.git && cd zlib && ./configure && make install
+RUN git clone https://github.com/madler/zlib.git \
+&& cd zlib \
+&& ./configure \
+&& make install
+# build zlib for aarch64
+RUN git clone https://github.com/madler/zlib.git zlib-aarch64 \
+&& cd zlib-aarch64 \
+&& CHOST=aarch64-linux-gnu ./configure --archs="" --static \
+&& make \
+&& cp libz.a /usr/lib/aarch64-linux-gnu/
+
 RUN cp /usr/local/lib/libz.a /usr/lib/x86_64-linux-gnu/libz.a
 # Build third-party components
 RUN mkdir workdir
@@ -75,8 +85,36 @@ RUN ulimit -n 4096 && for i in {1..5}; do \
         echo "Retrying in 5 seconds... ($i/5)" && sleep 5; \
     done
 
-# libdwfl will dlopen libdebuginfod at runtime, may cause segment fault in static build, disablt it. ref: https://github.com/vgteam/vg/pull/3600
-RUN wget https://sourceware.org/elfutils/ftp/0.190/elfutils-0.190.tar.bz2 && tar -xf elfutils-0.190.tar.bz2 && cd elfutils-0.190 && ./configure --disable-debuginfod --disable-libdebuginfod && make install -j
+# libdwfl will dlopen libdebuginfod at runtime, may cause segment fault in static build, disable it. ref: https://github.com/vgteam/vg/pull/3600
+RUN wget https://sourceware.org/elfutils/ftp/0.190/elfutils-0.190.tar.bz2 \
+&& tar -xf elfutils-0.190.tar.bz2 \
+&& cd elfutils-0.190 \
+&& ./configure --disable-debuginfod --disable-libdebuginfod \
+&& make install -j
+
+# build zlib for aarch64
+RUN git clone https://github.com/madler/zlib.git zlib-aarch64 \
+&& cd zlib-aarch64 \
+&& CHOST=aarch64-linux-gnu ./configure --archs="" --static \
+&& make \
+&& cp libz.a /usr/lib/aarch64-linux-gnu/
+
+# build libelf for aarch64
+RUN wget https://sourceware.org/elfutils/ftp/0.186/elfutils-0.186.tar.bz2 \
+&& tar -xf elfutils-0.186.tar.bz2 \
+&& cd elfutils-0.186 \
+&& ./configure --host=aarch64-linux-gnu --disable-debuginfod --disable-libdebuginfod \
+&& make \
+&& cp libelf/libelf.a /usr/lib/aarch64-linux-gnu/
+
+# build libpfm4 for aarch64
+RUN git clone https://git.code.sf.net/p/perfmon2/libpfm4 libpfm4-aarch64 \
+&& cd libpfm4-aarch64 \
+&& git checkout v4.11.1 \
+&& sed -i 's/^ARCH :=/ARCH ?=/' config.mk \
+&& ARCH=arm64 CC=aarch64-linux-gnu-gcc make \
+&& cp lib/libpfm.a /usr/lib/aarch64-linux-gnu/
+
 ENV PATH="${PATH}:/usr/lib/llvm-14/bin"
 RUN mkdir workdir
 ADD . /workdir
