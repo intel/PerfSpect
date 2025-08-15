@@ -27,6 +27,7 @@ RUN for i in {1..5}; do \
         gawk zlib1g-dev libtool libaio-dev libaio1 pandoc pkgconf libcap-dev docbook-utils \
         libreadline-dev default-jre default-jdk cmake flex bison gettext libssl-dev \
         gcc-aarch64-linux-gnu g++-aarch64-linux-gnu binutils-aarch64-linux-gnu cpp-aarch64-linux-gnu \
+        upx \
         && break; \
         echo "Retrying in 5 seconds... ($i/5)" && sleep 5; \
     done
@@ -79,9 +80,10 @@ RUN ulimit -n 4096 && for i in {1..5}; do \
         libiberty-dev liblzma-dev libnuma-dev libperl-dev libpfm4-dev libreadline-dev \
         libslang2-dev libssl-dev libtool libtraceevent-dev libunwind-dev libzstd-dev \
         libzstd1 llvm-14 pandoc pkgconf python-setuptools python2-dev python3 python3-dev \
-        python3-pip systemtap-sdt-dev zlib1g-dev \
-        libbz2-dev libcapstone-dev libtracefs-dev \
-        gcc-aarch64-linux-gnu g++-aarch64-linux-gnu binutils-aarch64-linux-gnu cpp-aarch64-linux-gnu && break; \
+        python3-pip systemtap-sdt-dev zlib1g-dev libbz2-dev libcapstone-dev libtracefs-dev \
+        gcc-aarch64-linux-gnu g++-aarch64-linux-gnu binutils-aarch64-linux-gnu cpp-aarch64-linux-gnu \
+        upx \
+        && break; \
         echo "Retrying in 5 seconds... ($i/5)" && sleep 5; \
     done
 
