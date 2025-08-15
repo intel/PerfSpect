@@ -7,6 +7,7 @@ package metrics
 // used during data collection and metric production
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -35,7 +36,9 @@ type Metadata struct {
 	ModelName                 string
 	PerfSupportedEvents       string
 	PMUDriverVersion          string
+	numGPCounters             int
 	SocketCount               int
+	ARMSlots                  int
 	SupportsInstructions      bool
 	SupportsFixedCycles       bool
 	SupportsFixedInstructions bool
@@ -58,6 +61,11 @@ type Metadata struct {
 func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, perfPath string, localTempDir string) (metadata Metadata, err error) {
 	// Hostname
 	metadata.Hostname = myTarget.GetName()
+	metadata.Architecture, err = myTarget.GetArchitecture()
+	if err != nil {
+		slog.Error("failed to retrieve architecture", slog.String("error", err.Error()))
+		return
+	}
 	// CPU Info (from /proc/cpuinfo)
 	var cpuInfo []map[string]string
 	cpuInfo, err = getCPUInfo(myTarget)
@@ -65,24 +73,34 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 		err = fmt.Errorf("failed to read cpu info: %v", err)
 		return
 	}
-	// Core Count (per socket) (from cpuInfo)
-	metadata.CoresPerSocket, err = strconv.Atoi(cpuInfo[0]["cpu cores"])
-	if err != nil || metadata.CoresPerSocket == 0 {
-		err = fmt.Errorf("failed to retrieve cores per socket: %v", err)
-		return
-	}
-	// Socket Count (from cpuInfo)
-	var maxPhysicalID int
-	if maxPhysicalID, err = strconv.Atoi(cpuInfo[len(cpuInfo)-1]["physical id"]); err != nil {
-		err = fmt.Errorf("failed to retrieve max physical id: %v", err)
-		return
-	}
-	metadata.SocketCount = maxPhysicalID + 1
-	// Hyperthreading - threads per core (from cpuInfo)
-	if cpuInfo[0]["siblings"] != cpuInfo[0]["cpu cores"] {
-		metadata.ThreadsPerCore = 2
+	// Core Count (per socket) (from cpuInfo or lscpu for ARM)
+	var cpuFamily, cpuModel, cpuStepping string
+	if metadata.Architecture == "aarch64" {
+		// family string, model string, stepping string, sockets int, cores int, threads int
+		cpuFamily, _, cpuStepping, metadata.SocketCount, metadata.CoresPerSocket, metadata.ThreadsPerCore, err = getCPUInfoViaLsCPU(myTarget)
+		if err != nil || metadata.CoresPerSocket == 0 || metadata.ThreadsPerCore == 0 {
+			return
+		}
+		cpuModel = cpuInfo[0]["cpu part"]
 	} else {
-		metadata.ThreadsPerCore = 1
+		metadata.CoresPerSocket, err = strconv.Atoi(cpuInfo[0]["cpu cores"])
+		if err != nil || metadata.CoresPerSocket == 0 {
+			err = fmt.Errorf("failed to retrieve cores per socket: %v", err)
+			return
+		}
+		// Socket Count (from cpuInfo)
+		var maxPhysicalID int
+		if maxPhysicalID, err = strconv.Atoi(cpuInfo[len(cpuInfo)-1]["physical id"]); err != nil {
+			err = fmt.Errorf("failed to retrieve max physical id: %v", err)
+			return
+		}
+		metadata.SocketCount = maxPhysicalID + 1
+		// Hyperthreading - threads per core (from cpuInfo)
+		if cpuInfo[0]["siblings"] != cpuInfo[0]["cpu cores"] {
+			metadata.ThreadsPerCore = 2
+		} else {
+			metadata.ThreadsPerCore = 1
+		}
 	}
 	// CPUSocketMap (from cpuInfo)
 	metadata.CPUSocketMap = createCPUSocketMap(metadata.CoresPerSocket, metadata.SocketCount, metadata.ThreadsPerCore == 2)
@@ -91,13 +109,28 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 	// Vendor (from cpuInfo)
 	metadata.Vendor = cpuInfo[0]["vendor_id"]
 	// CPU microarchitecture (from cpuInfo)
-	cpu, err := report.GetCPU(cpuInfo[0]["cpu family"], cpuInfo[0]["model"], cpuInfo[0]["stepping"])
+	var cpu report.CPUDefinition
+	// set CPU family, model, and stepping used to lookup CPUDefinition if not already set
+	if cpuFamily == "" && cpuModel == "" && cpuStepping == "" {
+		cpuFamily = cpuInfo[0]["cpu family"]
+		cpuModel = cpuInfo[0]["model"]
+		cpuStepping = cpuInfo[0]["stepping"]
+	}
+	cpu, err = report.GetCPU(cpuFamily, cpuModel, cpuStepping)
 	if err != nil {
 		return
 	}
 	metadata.Microarchitecture = cpu.MicroArchitecture
+	var numGPCounters int
+	numGPCounters, err = getNumGPCounters(myTarget, metadata.Microarchitecture)
+	if err != nil {
+		err = fmt.Errorf("failed to get number of GP counters: %v", err)
+		return
+	}
+	metadata.numGPCounters = numGPCounters
+
 	// the rest of the metadata is retrieved by running scripts in parallel
-	metadataScripts, err := getMetadataScripts(noRoot, perfPath, metadata.Microarchitecture, noSystemSummary)
+	metadataScripts, err := getMetadataScripts(noRoot, perfPath, metadata.Microarchitecture, numGPCounters, noSystemSummary)
 	if err != nil {
 		err = fmt.Errorf("failed to get metadata scripts: %v", err)
 		return
@@ -201,12 +234,22 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 		err = fmt.Errorf("failed to retrieve kernel version: %v", err)
 		return
 	}
+	// Arm Slots
+	if metadata.Architecture == "aarch64" || metadata.Architecture == "arm64" {
+		if metadata.ARMSlots, err = getArmSlots(scriptOutputs); err != nil {
+			if metadata.Architecture == "aarch64" {
+				slog.Warn("failed to retrieve ARM slots")
+			}
+		}
+	}
 	// System TSC Frequency
-	if metadata.TSCFrequencyHz, err = getTSCFreqHz(scriptOutputs); err != nil {
-		err = fmt.Errorf("failed to retrieve TSC frequency: %v", err)
-		return
-	} else {
-		metadata.TSC = metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore * metadata.TSCFrequencyHz
+	if metadata.Architecture == "x86_64" {
+		if metadata.TSCFrequencyHz, err = getTSCFreqHz(scriptOutputs); err != nil {
+			err = fmt.Errorf("failed to retrieve TSC frequency: %v", err)
+			return
+		} else {
+			metadata.TSC = metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore * metadata.TSCFrequencyHz
+		}
 	}
 	// uncore device IDs and uncore support
 	isAMDArchitecture := metadata.Vendor == "AuthenticAMD"
@@ -231,7 +274,7 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 	return
 }
 
-func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSummary bool) (metadataScripts []script.ScriptDefinition, err error) {
+func getMetadataScripts(noRoot bool, perfPath string, uarch string, numGPCounters int, noSystemSummary bool) (metadataScripts []script.ScriptDefinition, err error) {
 	// reduce startup time by running the metadata scripts in parallel
 	metadataScriptDefs := []script.ScriptDefinition{
 		{
@@ -290,6 +333,11 @@ func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSumm
 			Superuser:      !noRoot,
 		},
 		{
+			Name:           "arm slots",
+			ScriptTemplate: "cat /sys/bus/event_source/devices/armv8_pmuv3_0/caps/slots",
+			Superuser:      !noRoot,
+		},
+		{
 			Name:           "tsc",
 			ScriptTemplate: "tsc && echo",
 			Depends:        []string{"tsc"},
@@ -302,11 +350,6 @@ func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSumm
 		},
 	}
 	// replace script template vars
-	numGPCounters, err := getNumGPCounters(uarch)
-	if err != nil {
-		err = fmt.Errorf("failed to get number of GP counters: %v", err)
-		return
-	}
 	for _, scriptDef := range metadataScriptDefs {
 		switch scriptDef.Name {
 		case "perf stat fixed instructions":
@@ -348,6 +391,8 @@ func (md Metadata) String() string {
 		"Threads per Core: %d, "+
 		"TSC Frequency (Hz): %d, "+
 		"TSC: %d, "+
+		"GP Counters: %d, "+
+		"ARM Slots (if applicable): %d, "+
 		"Instructions event supported: %t, "+
 		"Fixed cycles slot supported: %t, "+
 		"Fixed instructions slot supported: %t, "+
@@ -370,6 +415,8 @@ func (md Metadata) String() string {
 		md.ThreadsPerCore,
 		md.TSCFrequencyHz,
 		md.TSC,
+		md.numGPCounters,
+		md.ARMSlots,
 		md.SupportsInstructions,
 		md.SupportsFixedCycles,
 		md.SupportsFixedInstructions,
@@ -498,6 +545,38 @@ func getUncoreDeviceIDs(isAMDArchitecture bool, scriptOutputs map[string]script.
 	return
 }
 
+func getNumGPCountersArm(target target.Target) (numGPCounters int, err error) {
+	numGPCounters = 0
+	var cmd *exec.Cmd
+	if target.CanElevatePrivileges() {
+		cmd = exec.Command("sudo", "bash", "-c", "dmesg | grep -i \"PMU Driver\"")
+	} else {
+		cmd = exec.Command("bash", "-c", "dmesg | grep -i \"PMU Driver\"")
+	}
+	stdout, stderr, exitcode, err := target.RunCommand(cmd, 0, true)
+	if err != nil {
+		err = fmt.Errorf("failed to get PMU Driver line: %s, %d, %v", stderr, exitcode, err)
+		return
+	}
+	// example [    1.339550] hw perfevents: enabled with armv8_pmuv3_0 PMU driver, 5 counters available
+	counterRegex := regexp.MustCompile(`(\d+) counters available`)
+	matches := counterRegex.FindStringSubmatch(stdout)
+	if len(matches) > 1 {
+		numberStr := matches[1]
+		numGPCounters, err = strconv.Atoi(numberStr)
+		if err != nil {
+			err = fmt.Errorf("error converting string to int: %v", err)
+			return
+		}
+		numGPCounters-- // for ARM, there is a fixed counter for cycles and the driver includes it
+		slog.Info("getNumGPCountersArm", slog.Int("numGPCounters", numGPCounters))
+	} else {
+		err = fmt.Errorf("no match for number of counters on line: %s", stdout)
+		return
+	}
+	return
+}
+
 // getCPUInfo - reads and returns all data from /proc/cpuinfo
 func getCPUInfo(myTarget target.Target) (cpuInfo []map[string]string, err error) {
 	cmd := exec.Command("cat", "/proc/cpuinfo")
@@ -520,6 +599,86 @@ func getCPUInfo(myTarget target.Target) (cpuInfo []map[string]string, err error)
 		}
 		oneCPUInfo[strings.TrimSpace(fields[0])] = strings.TrimSpace(fields[1])
 	}
+	return
+}
+
+// parseLsCPUOutput parses the stdout from the lscpu command.
+func parseLsCPUOutput(stdout string) (family string, model string, stepping string, sockets int, coresPerSocket int, threadsPerCore int, err error) {
+	familyRegex := regexp.MustCompile(`(?i)^\s*CPU family:\s*(.+)`)
+	modelRegex := regexp.MustCompile(`(?i)^\s*Model:\s*(.+)`)
+	steppingRegex := regexp.MustCompile(`(?i)^\s*Stepping:\s*(.+)`)
+	socketsRegex := regexp.MustCompile(`(?i)^\s*Socket\(s\):\s*(\d+)`)
+	coresPerSocketRegex := regexp.MustCompile(`(?i)^\s*Core\(s\) per socket:\s*(\d+)`)
+	threadsPerCoreRegex := regexp.MustCompile(`(?i)^\s*Thread\(s\)\ per core:\s*(\d+)`)
+
+	scanner := bufio.NewScanner(strings.NewReader(stdout))
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if matches := familyRegex.FindStringSubmatch(line); len(matches) > 1 {
+			family = strings.TrimSpace(matches[1])
+			continue
+		}
+
+		if matches := modelRegex.FindStringSubmatch(line); len(matches) > 1 {
+			model = strings.TrimSpace(matches[1])
+			continue
+		}
+
+		if matches := steppingRegex.FindStringSubmatch(line); len(matches) > 1 {
+			stepping = strings.TrimSpace(matches[1])
+			continue
+		}
+
+		if matches := socketsRegex.FindStringSubmatch(line); len(matches) > 1 {
+			socketsStr := strings.TrimSpace(matches[1])
+			parsedSockets, convErr := strconv.Atoi(socketsStr)
+			if convErr != nil {
+				slog.Error("Error parsing sockets", slog.String("sockets", socketsStr), slog.String("error", convErr.Error()))
+			} else {
+				sockets = parsedSockets
+			}
+			continue
+		}
+
+		if matches := coresPerSocketRegex.FindStringSubmatch(line); len(matches) > 1 {
+			coresStr := strings.TrimSpace(matches[1])
+			parsedCores, convErr := strconv.Atoi(coresStr)
+			if convErr != nil {
+				slog.Error("Error parsing coresPerSocket", slog.String("coresPerSocket", coresStr), slog.String("error", convErr.Error()))
+			} else {
+				coresPerSocket = parsedCores
+			}
+			continue
+		}
+
+		if matches := threadsPerCoreRegex.FindStringSubmatch(line); len(matches) > 1 {
+			threadsStr := strings.TrimSpace(matches[1])
+			parsedThreads, convErr := strconv.Atoi(threadsStr)
+			if convErr != nil {
+				slog.Error("Error parsing threads", slog.String("threads", threadsStr), slog.String("error", convErr.Error()))
+			} else {
+				threadsPerCore = parsedThreads
+			}
+			continue
+		}
+
+	}
+	if err = scanner.Err(); err != nil {
+		slog.Error("Error scanning lscpu output", slog.String("error", err.Error()))
+	}
+	return
+}
+
+// getCPUInfoViaLsCPU runs lscpu and parses its output. Used to lookup ARM processor information.
+func getCPUInfoViaLsCPU(myTarget target.Target) (family string, model string, stepping string, sockets int, cores int, threads int, err error) {
+	cmd := exec.Command("lscpu")
+	stdout, stderr, exitcode, runErr := myTarget.RunCommand(cmd, 60, true)
+	if runErr != nil {
+		err = fmt.Errorf("failed to get lscpu output: %s, %d, %w", stderr, exitcode, runErr)
+		return
+	}
+	family, model, stepping, sockets, cores, threads, err = parseLsCPUOutput(stdout)
 	return
 }
 
@@ -613,7 +772,15 @@ func getSupportsFixedTMA(scriptOutputs map[string]script.ScriptOutput) (supporte
 	return
 }
 
-func getNumGPCounters(uarch string) (numGPCounters int, err error) {
+func getNumGPCounters(myTarget target.Target, uarch string) (int, error) {
+	if arch, _ := myTarget.GetArchitecture(); arch == "aarch64" {
+		return getNumGPCountersArm(myTarget)
+	} else {
+		return getNumGPCountersX64(uarch)
+	}
+}
+
+func getNumGPCountersX64(uarch string) (numGPCounters int, err error) {
 	shortUarch := uarch[:3]
 	switch shortUarch {
 	case "BDX":
@@ -706,6 +873,27 @@ func getKernelVersion(scriptOutputs map[string]script.ScriptOutput) (version str
 	}
 	version = strings.TrimSpace(scriptOutputs["kernel version"].Stdout)
 	return
+}
+
+// getArmSlots
+func getArmSlots(scriptOutputs map[string]script.ScriptOutput) (slots int, err error) {
+	if scriptOutputs["arm slots"].Exitcode != 0 {
+		slog.Warn("failed to retrieve ARM slots", slog.Any("script", scriptOutputs["arm slots"]))
+		err = fmt.Errorf("failed to retrieve ARM slots: %s", scriptOutputs["arm slots"].Stderr)
+		return
+	}
+	hexString := strings.TrimSpace(string(scriptOutputs["arm slots"].Stdout))
+	hexString = strings.TrimPrefix(hexString, "0x")
+	parsedValue, err := strconv.ParseInt(hexString, 16, 64)
+	if err != nil {
+		slog.Warn("Failed to parse ARM slots value", slog.String("value", hexString), slog.Any("error", err))
+		err = fmt.Errorf("failed to parse ARM slots value (%s): %w", hexString, err)
+		return
+	} else {
+		slots = int(parsedValue)
+		slog.Info("Successfully read ARM slots value", slog.Int("slots", slots))
+		return
+	}
 }
 
 // createCPUSocketMap creates a mapping of logical CPUs to their corresponding sockets.
