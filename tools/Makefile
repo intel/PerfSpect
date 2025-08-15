@@ -12,52 +12,51 @@ default: tools-x86_64
 tools-x86_64: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc turbostat
 	mkdir -p bin/x86_64
 	cp -R async-profiler bin/x86_64/
-	cp avx-turbo/avx-turbo bin/x86_64/
-	cp cpuid/cpuid bin/x86_64/
-	cp dmidecode/dmidecode bin/x86_64/
-	cp ethtool/ethtool bin/x86_64/
-	cp fio/fio bin/x86_64/
-	cp stackcollapse-perf/stackcollapse-perf bin/x86_64/
-	cp ipmitool/src/ipmitool.static bin/x86_64/ipmitool
-	cp lshw/src/lshw-static bin/x86_64/lshw
-	cp lspci/lspci bin/x86_64/
+	cp avx-turbo/avx-turbo bin/x86_64/ && upx --best bin/x86_64/avx-turbo || true
+	cp cpuid/cpuid bin/x86_64/ && upx --best bin/x86_64/cpuid || true
+	cp dmidecode/dmidecode bin/x86_64/ && upx --best bin/x86_64/dmidecode || true
+	cp ethtool/ethtool bin/x86_64/ && upx --best bin/x86_64/ethtool || true
+	cp fio/fio bin/x86_64/ && upx --best bin/x86_64/fio || true
+	cp stackcollapse-perf/stackcollapse-perf bin/x86_64/ && upx --best bin/x86_64/stackcollapse-perf || true
+	cp ipmitool/src/ipmitool.static bin/x86_64/ipmitool && upx --best bin/x86_64/ipmitool || true
+	cp lshw/src/lshw-static bin/x86_64/lshw && upx --best bin/x86_64/lshw || true
+	cp lspci/lspci bin/x86_64/ && upx --best bin/x86_64/lspci || true
 	cp lspci/pci.ids.gz bin/x86_64/
-	cp msr-tools/rdmsr bin/x86_64/
-	cp msr-tools/wrmsr bin/x86_64/
-	cp pcm/build/bin/pcm-tpmi bin/x86_64/
+	cp msr-tools/rdmsr bin/x86_64/ && upx --best bin/x86_64/rdmsr || true
+	cp msr-tools/wrmsr bin/x86_64/ && upx --best bin/x86_64/wrmsr || true
+	cp pcm/build/bin/pcm-tpmi bin/x86_64/ && upx --best bin/x86_64/pcm-tpmi || true
 	cp pcm/scripts/bhs-power-mode.sh bin/x86_64/
 	cp perf-archive/perf-archive.sh bin/x86_64/perf-archive && chmod +rx bin/x86_64/perf-archive
 	cp spectre-meltdown-checker/spectre-meltdown-checker.sh bin/x86_64/
-	cp sshpass/sshpass bin/x86_64/
-	cp stress-ng/stress-ng bin/x86_64/
-	cp sysstat/mpstat bin/x86_64/
-	cp sysstat/iostat bin/x86_64/
-	cp sysstat/sar bin/x86_64/
-	cp sysstat/sadc bin/x86_64/
-	cp tsc/tsc bin/x86_64/
-	cp linux_turbostat/tools/power/x86/turbostat/turbostat bin/x86_64/
+	cp sshpass/sshpass bin/x86_64/ && upx --best bin/x86_64/sshpass || true
+	cp stress-ng/stress-ng bin/x86_64/ && upx --best bin/x86_64/stress-ng || true
+	cp sysstat/mpstat bin/x86_64/ && upx --best bin/x86_64/mpstat || true
+	cp sysstat/iostat bin/x86_64/ && upx --best bin/x86_64/iostat || true
+	cp sysstat/sar bin/x86_64/ && upx --best bin/x86_64/sar || true
+	cp sysstat/sadc bin/x86_64/ && upx --best bin/x86_64/sadc || true
+	cp tsc/tsc bin/x86_64/ && upx --best bin/x86_64/tsc || true
+	cp linux_turbostat/tools/power/x86/turbostat/turbostat bin/x86_64/ && upx --best bin/x86_64/turbostat || true
 	-cd bin/x86_64 && strip --strip-unneeded *
 
-tools-aarch64: async-profiler-aarch64 dmidecode-aarch64 ethtool-aarch64 fio-aarch64 ipmitool-aarch64 lshw-aarch64 lspci-aarch64 spectre-meltdown-checker sshpass-aarch64 stackcollapse-perf-aarch64 stress-ng-aarch64 sysstat-aarch64 tsc-aarch64
+tools-aarch64: async-profiler-aarch64 dmidecode-aarch64 ethtool-aarch64 fio-aarch64 ipmitool-aarch64 lshw-aarch64 lspci-aarch64 spectre-meltdown-checker sshpass-aarch64 stackcollapse-perf-aarch64 stress-ng-aarch64 sysstat-aarch64
 	mkdir -p bin/aarch64
 	cp -R async-profiler-aarch64 bin/aarch64/async-profiler
-	cp dmidecode-aarch64/dmidecode bin/aarch64/
-	cp ethtool-aarch64/ethtool bin/aarch64/
-	cp fio-aarch64/fio bin/aarch64/	
+	cp dmidecode-aarch64/dmidecode bin/aarch64/ && upx --best bin/aarch64/dmidecode || true
+	cp ethtool-aarch64/ethtool bin/aarch64/ && upx --best bin/aarch64/ethtool || true
+	cp fio-aarch64/fio bin/aarch64/ && upx --best bin/aarch64/fio || true
 	cp stackcollapse-perf/stackcollapse-perf-aarch64 bin/aarch64/stackcollapse-perf
-	cp ipmitool-aarch64/src/ipmitool.static bin/aarch64/ipmitool
-	cp lshw-aarch64/src/lshw-static bin/aarch64/lshw
-	cp lspci-aarch64/lspci bin/aarch64/
+	cp ipmitool-aarch64/src/ipmitool.static bin/aarch64/ipmitool && upx --best bin/aarch64/ipmitool || true
+	cp lshw-aarch64/src/lshw-static bin/aarch64/lshw && upx --best bin/aarch64/lshw || true
+	cp lspci-aarch64/lspci bin/aarch64/ && upx --best bin/aarch64/lspci || true
 	cp lspci-aarch64/pci.ids.gz bin/aarch64/
 	cp perf-archive/perf-archive.sh bin/aarch64/perf-archive && chmod +rx bin/aarch64/perf-archive
 	cp spectre-meltdown-checker/spectre-meltdown-checker.sh bin/aarch64/
-	cp sshpass-aarch64/sshpass bin/aarch64/
-	cp stress-ng-aarch64/stress-ng bin/aarch64/
-	cp sysstat-aarch64/mpstat bin/aarch64/
-	cp sysstat-aarch64/iostat bin/aarch64/
-	cp sysstat-aarch64/sar bin/aarch64/
-	cp sysstat-aarch64/sadc bin/aarch64/
-	cp tsc/tsc-aarch64 bin/aarch64/tsc
+	cp sshpass-aarch64/sshpass bin/aarch64/ && upx --best bin/aarch64/sshpass || true
+	cp stress-ng-aarch64/stress-ng bin/aarch64/ && upx --best bin/aarch64/stress-ng || true
+	cp sysstat-aarch64/mpstat bin/aarch64/ && upx --best bin/aarch64/mpstat || true
+	cp sysstat-aarch64/iostat bin/aarch64/ && upx --best bin/aarch64/iostat || true
+	cp sysstat-aarch64/sar bin/aarch64/ && upx --best bin/aarch64/sar || true
+	cp sysstat-aarch64/sadc bin/aarch64/ && upx --best bin/aarch64/sadc || true
 	-cd bin/aarch64 && aarch64-linux-gnu-strip --strip-unneeded * || true
 
 tools: tools-x86_64 tools-aarch64
@@ -328,6 +327,7 @@ endif
 	mkdir -p bin
 	cp processwatch/processwatch bin/x86_64/
 	strip --strip-unneeded bin/x86_64/processwatch
+	upx --best bin/x86_64/processwatch || true
 
 SPECTRE_MELTDOWN_CHECKER_VERSION := "master"
 spectre-meltdown-checker:
