@@ -26,7 +26,7 @@ X86_64_COMPRESS_BINS = avx-turbo cpuid dmidecode ethtool fio stackcollapse-perf 
 AARCH64_COMPRESS_BINS = dmidecode ethtool fio ipmitool lshw lspci sshpass stress-ng mpstat iostat sar sadc
 
 default: tools-x86_64
-.PHONY: default tools tools-aarch64 tools-x86_64 build-x86_64 package-x86_64 compress-x86_64 build-aarch64 package-aarch64 compress-aarch64 perf perf-x86_64 perf-aarch64 processwatch reset oss-source libs
+.PHONY: default tools tools-aarch64 tools-x86_64 build-x86_64 package-x86_64 compress-x86_64 build-aarch64 package-aarch64 compress-aarch64 perf perf-x86_64 perf-aarch64 processwatch oss-reset oss-source oss-libs
 
 # Main targets with improved organization
 tools-x86_64: build-x86_64 package-x86_64 compress-x86_64
@@ -167,18 +167,6 @@ endif
 	cd dmidecode-aarch64 && git checkout $(DMIDECODE_VERSION)
 	cd dmidecode-aarch64 && CC=aarch64-linux-gnu-gcc make -j$(NPROC)
 
-ELFUTILS_VERSION := "0.186"
-elfutils-aarch64: zlib-aarch64
-ifeq ("$(wildcard elfutils-aarch64)","")
-	wget https://sourceware.org/elfutils/ftp/0.186/elfutils-$(ELFUTILS_VERSION).tar.bz2 
-	mkdir -p elfutils-tmp
-	bzip2 -dc elfutils-$(ELFUTILS_VERSION).tar.bz2 | tar -C elfutils-tmp -xf -
-	mv elfutils-tmp/elfutils-$(ELFUTILS_VERSION) elfutils-aarch64 && rm -rf elfutils-tmp
-endif
-	cd elfutils-aarch64 && ./configure --host=aarch64-linux-gnu --disable-debuginfod --disable-libdebuginfod
-	cd elfutils-aarch64 && make -j$(NPROC)
-	cd elfutils-aarch64 && cp libelf/libelf.a /usr/lib/aarch64-linux-gnu/
-
 ETHTOOL_VERSION := "v6.5"
 ethtool:
 ifeq ("$(wildcard ethtool)","")
@@ -256,16 +244,6 @@ endif
 	cd ipmitool-aarch64 && CC=aarch64-linux-gnu-gcc make -j$(NPROC)
 	cd ipmitool-aarch64/src && ../libtool --silent --tag=CC --mode=link aarch64-linux-gnu-gcc -fno-strict-aliasing -Wreturn-type -all-static -o ipmitool.static ipmitool.o ipmishell.o ../lib/libipmitool.la plugins/libintf.la
 
-LIBPFM4_VERSION := "v4.11.1"
-libpfm4-aarch64:
-ifeq ("$(wildcard libpfm4-aarch64)","")
-	git clone https://git.code.sf.net/p/perfmon2/libpfm4 libpfm4-aarch64
-endif
-	cd libpfm4-aarch64 && git checkout $(LIBPFM4_VERSION)
-	cd libpfm4-aarch64 && sed -i 's/^ARCH :=/ARCH ?=/' config.mk
-	cd libpfm4-aarch64 && ARCH=arm64 CC=aarch64-linux-gnu-gcc make -j$(NPROC)
-	cd libpfm4-aarch64 && cp lib/libpfm.a /usr/lib/aarch64-linux-gnu/
-
 LSHW_VERSION := "B.02.19"
 lshw:
 ifeq ("$(wildcard lshw)","")
@@ -297,7 +275,7 @@ endif
 	cd lspci && ./update-pciids.sh
 	cd lspci && gzip -c pci.ids > pci.ids.gz
 
-lspci-aarch64: zlib-aarch64
+lspci-aarch64:
 ifeq ("$(wildcard lspci-aarch64)","")
 	git clone https://github.com/pciutils/pciutils.git lspci-aarch64
 else
@@ -343,7 +321,7 @@ perf-x86_64:
 	$(call STRIP_X86_64,bin/x86_64/perf)
 	$(call UPX_COMPRESS,bin/x86_64/perf)
 
-perf-aarch64: zlib-aarch64 elfutils-aarch64 libpfm4-aarch64
+perf-aarch64:
 ifeq ("$(wildcard perf-aarch64)","")
 	wget -N https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$(PERF_VERSION).tar.xz
 	tar -xf linux-$(PERF_VERSION).tar.xz && mv linux-$(PERF_VERSION)/ linux_perf-aarch64/
@@ -463,14 +441,6 @@ turbostat:
 	tar -xf linux-$(TURBOSTAT_VERSION).tar.xz && mv linux-$(TURBOSTAT_VERSION)/ linux_turbostat/
 	sed -i '/_Static_assert/d' linux_turbostat/tools/power/x86/turbostat/turbostat.c
 	cd linux_turbostat/tools/power/x86/turbostat && make
-
-zlib-aarch64:
-ifeq ("$(wildcard zlib-aarch64)","")
-	git clone https://github.com/madler/zlib.git zlib-aarch64
-endif
-	cd zlib-aarch64 && CHOST=aarch64-linux-gnu ./configure --archs="" --static
-	cd zlib-aarch64 && make -j$(NPROC)
-	cd zlib-aarch64 && cp libz.a /usr/lib/aarch64-linux-gnu/
 
 oss-reset:
 	cd avx-turbo && git clean -fdx && git reset --hard
