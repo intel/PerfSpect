@@ -17,7 +17,7 @@ CHMOD_EXEC = chmod +rx $(1)
 
 # The tool targets. Excludes perf and processwatch targets as they are built independently.
 X86_64_TARGETS = async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm spectre-meltdown-checker sshpass \
-                 stackcollapse-perf stress-ng sysstat tsc turbostat
+                 stackcollapse-perf/stackcollapse-perf stress-ng sysstat tsc/tsc turbostat
 AARCH64_TARGETS = async-profiler-aarch64 dmidecode-aarch64 ethtool-aarch64 fio-aarch64 ipmitool-aarch64 lshw-aarch64 lspci-aarch64 \
                   spectre-meltdown-checker sshpass-aarch64 stackcollapse-perf-aarch64 stress-ng-aarch64 sysstat-aarch64
 
@@ -379,7 +379,7 @@ ifeq ("$(wildcard sshpass-aarch64)","")
 endif
 	cd sshpass-aarch64 && make -j$(NPROC)
 
-stackcollapse-perf:
+stackcollapse-perf/stackcollapse-perf:
 	cd stackcollapse-perf && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build
 
 stackcollapse-perf-aarch64:
@@ -429,7 +429,7 @@ ifeq ("$(wildcard sysstat-aarch64/Makefile)","")
 endif
 	cd sysstat-aarch64 && make -j$(NPROC)
 
-tsc:
+tsc/tsc:
 	cd tsc && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build
 
 tsc-aarch64:
