@@ -8,8 +8,6 @@ NPROC := $(shell nproc)
 
 # Common commands and utilities
 UPX_COMPRESS = upx --best $(1) || true
-STRIP_X86_64 = strip --strip-unneeded $(1)
-STRIP_AARCH64 = aarch64-linux-gnu-strip --strip-unneeded $(1) || true
 MKDIR_BIN = mkdir -p $(1)
 COPY_FILE = cp $(1) $(2)
 COPY_DIR = cp -R $(1) $(2)
@@ -66,7 +64,6 @@ package-x86_64: build-x86_64
 
 compress-x86_64: package-x86_64
 	@echo "=== Compressing x86_64 binaries ==="
-	-cd bin/x86_64 && $(call STRIP_X86_64,*)
 	$(foreach bin,$(X86_64_COMPRESS_BINS),$(call UPX_COMPRESS,bin/x86_64/$(bin));)
 
 tools-aarch64: build-aarch64 package-aarch64 compress-aarch64
@@ -98,7 +95,6 @@ package-aarch64: build-aarch64
 
 compress-aarch64: package-aarch64
 	@echo "=== Compressing aarch64 binaries ==="
-	-cd bin/aarch64 && $(call STRIP_AARCH64,*)
 	$(foreach bin,$(AARCH64_COMPRESS_BINS),$(call UPX_COMPRESS,bin/aarch64/$(bin));)
 
 tools: tools-x86_64 tools-aarch64
@@ -318,7 +314,6 @@ perf-x86_64:
 	cd linux_perf/tools/perf && make LLVM_CONFIG="llvm-config --link-static" LDFLAGS="-static --static" BUILD_BPF_SKEL=1 NO_JVMTI=1 BUILD_NONDISTRO=1 LIBUNWIND=1 -j$(NPROC)
 	$(call MKDIR_BIN,bin/x86_64)
 	$(call COPY_FILE,linux_perf/tools/perf/perf,bin/x86_64/)
-	$(call STRIP_X86_64,bin/x86_64/perf)
 	$(call UPX_COMPRESS,bin/x86_64/perf)
 
 perf-aarch64:
@@ -329,7 +324,6 @@ endif
 	cd linux_perf-aarch64/tools/perf && make LDFLAGS="-static --static" BUILD_BPF_SKEL=1 NO_JVMTI=1 ARCH=arm64 NO_LIBTRACEEVENT=1 CROSS_COMPILE=aarch64-linux-gnu- -j$(NPROC)
 	$(call MKDIR_BIN,bin/aarch64)
 	$(call COPY_FILE,linux_perf-aarch64/tools/perf/perf,bin/aarch64/)
-	$(call STRIP_AARCH64,bin/aarch64/perf)
 	$(call UPX_COMPRESS,bin/aarch64/perf)
 
 perf: perf-x86_64 perf-aarch64
@@ -346,7 +340,6 @@ endif
 	cd processwatch && ./build.sh
 	$(call MKDIR_BIN,bin/x86_64)
 	$(call COPY_FILE,processwatch/processwatch,bin/x86_64/)
-	$(call STRIP_X86_64,bin/x86_64/processwatch)
 	$(call UPX_COMPRESS,bin/x86_64/processwatch)
 
 SPECTRE_MELTDOWN_CHECKER_VERSION := "master"
