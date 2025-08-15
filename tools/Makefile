@@ -6,61 +6,103 @@
 
 NPROC := $(shell nproc)
 
+# Common commands and utilities
+UPX_COMPRESS = upx --best $(1) || true
+STRIP_X86_64 = strip --strip-unneeded $(1)
+STRIP_AARCH64 = aarch64-linux-gnu-strip --strip-unneeded $(1) || true
+MKDIR_BIN = mkdir -p $(1)
+COPY_FILE = cp $(1) $(2)
+COPY_DIR = cp -R $(1) $(2)
+CHMOD_EXEC = chmod +rx $(1)
+
+# The tool targets. Excludes perf and processwatch targets as they are built independently.
+X86_64_TARGETS = async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm spectre-meltdown-checker sshpass \
+                 stackcollapse-perf stress-ng sysstat tsc turbostat
+AARCH64_TARGETS = async-profiler-aarch64 dmidecode-aarch64 ethtool-aarch64 fio-aarch64 ipmitool-aarch64 lshw-aarch64 lspci-aarch64 \
+                  spectre-meltdown-checker sshpass-aarch64 stackcollapse-perf-aarch64 stress-ng-aarch64 sysstat-aarch64
+
+# Binaries to compress for each architecture
+X86_64_COMPRESS_BINS = avx-turbo cpuid dmidecode ethtool fio stackcollapse-perf ipmitool lshw lspci rdmsr wrmsr pcm-tpmi sshpass stress-ng mpstat iostat sar sadc tsc turbostat
+AARCH64_COMPRESS_BINS = dmidecode ethtool fio ipmitool lshw lspci sshpass stress-ng mpstat iostat sar sadc
+
 default: tools-x86_64
-.PHONY: default tools tools-aarch64 tools-x86_64 async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm perf-x86_64 processwatch spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc turbostat
+.PHONY: default tools tools-aarch64 tools-x86_64 build-x86_64 package-x86_64 compress-x86_64 build-aarch64 package-aarch64 compress-aarch64 perf perf-x86_64 perf-aarch64 processwatch reset oss-source libs
 
-tools-x86_64: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc turbostat
-	mkdir -p bin/x86_64
-	cp -R async-profiler bin/x86_64/
-	cp avx-turbo/avx-turbo bin/x86_64/ && upx --best bin/x86_64/avx-turbo || true
-	cp cpuid/cpuid bin/x86_64/ && upx --best bin/x86_64/cpuid || true
-	cp dmidecode/dmidecode bin/x86_64/ && upx --best bin/x86_64/dmidecode || true
-	cp ethtool/ethtool bin/x86_64/ && upx --best bin/x86_64/ethtool || true
-	cp fio/fio bin/x86_64/ && upx --best bin/x86_64/fio || true
-	cp stackcollapse-perf/stackcollapse-perf bin/x86_64/ && upx --best bin/x86_64/stackcollapse-perf || true
-	cp ipmitool/src/ipmitool.static bin/x86_64/ipmitool && upx --best bin/x86_64/ipmitool || true
-	cp lshw/src/lshw-static bin/x86_64/lshw && upx --best bin/x86_64/lshw || true
-	cp lspci/lspci bin/x86_64/ && upx --best bin/x86_64/lspci || true
-	cp lspci/pci.ids.gz bin/x86_64/
-	cp msr-tools/rdmsr bin/x86_64/ && upx --best bin/x86_64/rdmsr || true
-	cp msr-tools/wrmsr bin/x86_64/ && upx --best bin/x86_64/wrmsr || true
-	cp pcm/build/bin/pcm-tpmi bin/x86_64/ && upx --best bin/x86_64/pcm-tpmi || true
-	cp pcm/scripts/bhs-power-mode.sh bin/x86_64/
-	cp perf-archive/perf-archive.sh bin/x86_64/perf-archive && chmod +rx bin/x86_64/perf-archive
-	cp spectre-meltdown-checker/spectre-meltdown-checker.sh bin/x86_64/
-	cp sshpass/sshpass bin/x86_64/ && upx --best bin/x86_64/sshpass || true
-	cp stress-ng/stress-ng bin/x86_64/ && upx --best bin/x86_64/stress-ng || true
-	cp sysstat/mpstat bin/x86_64/ && upx --best bin/x86_64/mpstat || true
-	cp sysstat/iostat bin/x86_64/ && upx --best bin/x86_64/iostat || true
-	cp sysstat/sar bin/x86_64/ && upx --best bin/x86_64/sar || true
-	cp sysstat/sadc bin/x86_64/ && upx --best bin/x86_64/sadc || true
-	cp tsc/tsc bin/x86_64/ && upx --best bin/x86_64/tsc || true
-	cp linux_turbostat/tools/power/x86/turbostat/turbostat bin/x86_64/ && upx --best bin/x86_64/turbostat || true
-	-cd bin/x86_64 && strip --strip-unneeded *
+# Main targets with improved organization
+tools-x86_64: build-x86_64 package-x86_64 compress-x86_64
 
-tools-aarch64: async-profiler-aarch64 dmidecode-aarch64 ethtool-aarch64 fio-aarch64 ipmitool-aarch64 lshw-aarch64 lspci-aarch64 spectre-meltdown-checker sshpass-aarch64 stackcollapse-perf-aarch64 stress-ng-aarch64 sysstat-aarch64
-	mkdir -p bin/aarch64
-	cp -R async-profiler-aarch64 bin/aarch64/async-profiler
-	cp dmidecode-aarch64/dmidecode bin/aarch64/ && upx --best bin/aarch64/dmidecode || true
-	cp ethtool-aarch64/ethtool bin/aarch64/ && upx --best bin/aarch64/ethtool || true
-	cp fio-aarch64/fio bin/aarch64/ && upx --best bin/aarch64/fio || true
-	cp stackcollapse-perf/stackcollapse-perf-aarch64 bin/aarch64/stackcollapse-perf
-	cp ipmitool-aarch64/src/ipmitool.static bin/aarch64/ipmitool && upx --best bin/aarch64/ipmitool || true
-	cp lshw-aarch64/src/lshw-static bin/aarch64/lshw && upx --best bin/aarch64/lshw || true
-	cp lspci-aarch64/lspci bin/aarch64/ && upx --best bin/aarch64/lspci || true
-	cp lspci-aarch64/pci.ids.gz bin/aarch64/
-	cp perf-archive/perf-archive.sh bin/aarch64/perf-archive && chmod +rx bin/aarch64/perf-archive
-	cp spectre-meltdown-checker/spectre-meltdown-checker.sh bin/aarch64/
-	cp sshpass-aarch64/sshpass bin/aarch64/ && upx --best bin/aarch64/sshpass || true
-	cp stress-ng-aarch64/stress-ng bin/aarch64/ && upx --best bin/aarch64/stress-ng || true
-	cp sysstat-aarch64/mpstat bin/aarch64/ && upx --best bin/aarch64/mpstat || true
-	cp sysstat-aarch64/iostat bin/aarch64/ && upx --best bin/aarch64/iostat || true
-	cp sysstat-aarch64/sar bin/aarch64/ && upx --best bin/aarch64/sar || true
-	cp sysstat-aarch64/sadc bin/aarch64/ && upx --best bin/aarch64/sadc || true
-	-cd bin/aarch64 && aarch64-linux-gnu-strip --strip-unneeded * || true
+build-x86_64: $(X86_64_TARGETS)
+	@echo "=== All x86_64 tools built successfully ==="
+
+package-x86_64: build-x86_64
+	@echo "=== Packaging x86_64 tools ==="
+	$(call MKDIR_BIN,bin/x86_64)
+	$(call COPY_DIR,async-profiler,bin/x86_64/)
+	$(call COPY_FILE,avx-turbo/avx-turbo,bin/x86_64/)
+	$(call COPY_FILE,cpuid/cpuid,bin/x86_64/)
+	$(call COPY_FILE,dmidecode/dmidecode,bin/x86_64/)
+	$(call COPY_FILE,ethtool/ethtool,bin/x86_64/)
+	$(call COPY_FILE,fio/fio,bin/x86_64/)
+	$(call COPY_FILE,stackcollapse-perf/stackcollapse-perf,bin/x86_64/)
+	$(call COPY_FILE,ipmitool/src/ipmitool.static,bin/x86_64/ipmitool)
+	$(call COPY_FILE,lshw/src/lshw-static,bin/x86_64/lshw)
+	$(call COPY_FILE,lspci/lspci,bin/x86_64/)
+	$(call COPY_FILE,lspci/pci.ids.gz,bin/x86_64/)
+	$(call COPY_FILE,msr-tools/rdmsr,bin/x86_64/)
+	$(call COPY_FILE,msr-tools/wrmsr,bin/x86_64/)
+	$(call COPY_FILE,pcm/build/bin/pcm-tpmi,bin/x86_64/)
+	$(call COPY_FILE,pcm/scripts/bhs-power-mode.sh,bin/x86_64/)
+	$(call COPY_FILE,perf-archive/perf-archive.sh,bin/x86_64/perf-archive)
+	$(call CHMOD_EXEC,bin/x86_64/perf-archive)
+	$(call COPY_FILE,spectre-meltdown-checker/spectre-meltdown-checker.sh,bin/x86_64/)
+	$(call COPY_FILE,sshpass/sshpass,bin/x86_64/)
+	$(call COPY_FILE,stress-ng/stress-ng,bin/x86_64/)
+	$(call COPY_FILE,sysstat/mpstat,bin/x86_64/)
+	$(call COPY_FILE,sysstat/iostat,bin/x86_64/)
+	$(call COPY_FILE,sysstat/sar,bin/x86_64/)
+	$(call COPY_FILE,sysstat/sadc,bin/x86_64/)
+	$(call COPY_FILE,tsc/tsc,bin/x86_64/)
+	$(call COPY_FILE,linux_turbostat/tools/power/x86/turbostat/turbostat,bin/x86_64/)
+
+compress-x86_64: package-x86_64
+	@echo "=== Compressing x86_64 binaries ==="
+	-cd bin/x86_64 && $(call STRIP_X86_64,*)
+	$(foreach bin,$(X86_64_COMPRESS_BINS),$(call UPX_COMPRESS,bin/x86_64/$(bin));)
+
+tools-aarch64: build-aarch64 package-aarch64 compress-aarch64
+
+build-aarch64: $(AARCH64_TARGETS)
+	@echo "=== All aarch64 tools built successfully ==="
+
+package-aarch64: build-aarch64
+	@echo "=== Packaging aarch64 tools ==="
+	$(call MKDIR_BIN,bin/aarch64)
+	$(call COPY_DIR,async-profiler-aarch64,bin/aarch64/async-profiler)
+	$(call COPY_FILE,dmidecode-aarch64/dmidecode,bin/aarch64/)
+	$(call COPY_FILE,ethtool-aarch64/ethtool,bin/aarch64/)
+	$(call COPY_FILE,fio-aarch64/fio,bin/aarch64/)
+	$(call COPY_FILE,stackcollapse-perf/stackcollapse-perf-aarch64,bin/aarch64/stackcollapse-perf)
+	$(call COPY_FILE,ipmitool-aarch64/src/ipmitool.static,bin/aarch64/ipmitool)
+	$(call COPY_FILE,lshw-aarch64/src/lshw-static,bin/aarch64/lshw)
+	$(call COPY_FILE,lspci-aarch64/lspci,bin/aarch64/)
+	$(call COPY_FILE,lspci-aarch64/pci.ids.gz,bin/aarch64/)
+	$(call COPY_FILE,perf-archive/perf-archive.sh,bin/aarch64/perf-archive)
+	$(call CHMOD_EXEC,bin/aarch64/perf-archive)
+	$(call COPY_FILE,spectre-meltdown-checker/spectre-meltdown-checker.sh,bin/aarch64/)
+	$(call COPY_FILE,sshpass-aarch64/sshpass,bin/aarch64/)
+	$(call COPY_FILE,stress-ng-aarch64/stress-ng,bin/aarch64/)
+	$(call COPY_FILE,sysstat-aarch64/mpstat,bin/aarch64/)
+	$(call COPY_FILE,sysstat-aarch64/iostat,bin/aarch64/)
+	$(call COPY_FILE,sysstat-aarch64/sar,bin/aarch64/)
+	$(call COPY_FILE,sysstat-aarch64/sadc,bin/aarch64/)
+
+compress-aarch64: package-aarch64
+	@echo "=== Compressing aarch64 binaries ==="
+	-cd bin/aarch64 && $(call STRIP_AARCH64,*)
+	$(foreach bin,$(AARCH64_COMPRESS_BINS),$(call UPX_COMPRESS,bin/aarch64/$(bin));)
 
 tools: tools-x86_64 tools-aarch64
-	@echo "Tools built successfully in bin/x86_64 and bin/aarch64 directories."
+	@echo "=== All tools built successfully in bin/x86_64 and bin/aarch64 directories ==="
 
 ASYNC_PROFILER_VERSION := "4.0"
 async-profiler:
@@ -256,7 +298,7 @@ endif
 	cd lspci && gzip -c pci.ids > pci.ids.gz
 
 lspci-aarch64: zlib-aarch64
-ifeq ("$(wildcard lspc-aarch64)","")
+ifeq ("$(wildcard lspci-aarch64)","")
 	git clone https://github.com/pciutils/pciutils.git lspci-aarch64
 else
 	cd lspci-aarch64 && git checkout master && git pull
@@ -296,10 +338,10 @@ perf-x86_64:
 	wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$(PERF_VERSION).tar.xz
 	tar -xf linux-$(PERF_VERSION).tar.xz && mv linux-$(PERF_VERSION)/ linux_perf/
 	cd linux_perf/tools/perf && make LLVM_CONFIG="llvm-config --link-static" LDFLAGS="-static --static" BUILD_BPF_SKEL=1 NO_JVMTI=1 BUILD_NONDISTRO=1 LIBUNWIND=1 -j$(NPROC)
-	mkdir -p bin/x86_64
-	cp linux_perf/tools/perf/perf bin/x86_64/
-	strip --strip-unneeded bin/x86_64/perf
-	upx --best bin/x86_64/perf || true
+	$(call MKDIR_BIN,bin/x86_64)
+	$(call COPY_FILE,linux_perf/tools/perf/perf,bin/x86_64/)
+	$(call STRIP_X86_64,bin/x86_64/perf)
+	$(call UPX_COMPRESS,bin/x86_64/perf)
 
 perf-aarch64: zlib-aarch64 elfutils-aarch64 libpfm4-aarch64
 ifeq ("$(wildcard perf-aarch64)","")
@@ -307,13 +349,13 @@ ifeq ("$(wildcard perf-aarch64)","")
 	tar -xf linux-$(PERF_VERSION).tar.xz && mv linux-$(PERF_VERSION)/ linux_perf-aarch64/
 endif
 	cd linux_perf-aarch64/tools/perf && make LDFLAGS="-static --static" BUILD_BPF_SKEL=1 NO_JVMTI=1 ARCH=arm64 NO_LIBTRACEEVENT=1 CROSS_COMPILE=aarch64-linux-gnu- -j$(NPROC)
-	mkdir -p bin/aarch64
-	cp linux_perf-aarch64/tools/perf/perf bin/aarch64/
-	aarch64-linux-gnu-strip --strip-unneeded bin/aarch64/perf
-	upx --best bin/aarch64/perf || true
+	$(call MKDIR_BIN,bin/aarch64)
+	$(call COPY_FILE,linux_perf-aarch64/tools/perf/perf,bin/aarch64/)
+	$(call STRIP_AARCH64,bin/aarch64/perf)
+	$(call UPX_COMPRESS,bin/aarch64/perf)
 
 perf: perf-x86_64 perf-aarch64
-	@echo "Perf tools built successfully in bin/x86_64 and bin/aarch64 directories."
+	@echo "=== Perf tools built successfully in bin/x86_64 and bin/aarch64 directories ==="
 
 PROCESSWATCH_VERSION := "c394065"	
 processwatch:
@@ -324,10 +366,10 @@ else
 endif
 	cd processwatch && git checkout $(PROCESSWATCH_VERSION)
 	cd processwatch && ./build.sh
-	mkdir -p bin
-	cp processwatch/processwatch bin/x86_64/
-	strip --strip-unneeded bin/x86_64/processwatch
-	upx --best bin/x86_64/processwatch || true
+	$(call MKDIR_BIN,bin/x86_64)
+	$(call COPY_FILE,processwatch/processwatch,bin/x86_64/)
+	$(call STRIP_X86_64,bin/x86_64/processwatch)
+	$(call UPX_COMPRESS,bin/x86_64/processwatch)
 
 SPECTRE_MELTDOWN_CHECKER_VERSION := "master"
 spectre-meltdown-checker:
@@ -430,8 +472,8 @@ endif
 	cd zlib-aarch64 && make -j$(NPROC)
 	cd zlib-aarch64 && cp libz.a /usr/lib/aarch64-linux-gnu/
 
-reset:
-	cd async-profiler
+oss-reset:
+	cd avx-turbo && git clean -fdx && git reset --hard
 	cd cpuid && make clean
 	cd dmidecode && git clean -fdx && git reset --hard
 	cd ethtool && git clean -fdx && git reset --hard
@@ -441,11 +483,10 @@ reset:
 	cd lspci && git clean -fdx && git reset --hard
 	cd pcm && git clean -fdx && git reset --hard
 	cd msr-tools && git clean -fdx && git reset --hard
-	cd spectre-meltdown-checker
+	cd processwatch && git clean -fdx && git reset --hard
 	cd sshpass && make clean
 	cd stress-ng && git clean -fdx && git reset --hard
 	cd sysstat && git clean -fdx && git reset --hard
-	cd tsc && rm -f tsc
 	cd linux_turbostat/tools/power/x86/turbostat && make clean
 
 # not used in build but required in oss archive file because some of the tools are statically linked
@@ -455,8 +496,8 @@ zlib.tar.gz:
 	wget https://github.com/madler/zlib/archive/refs/heads/master.tar.gz -O zlib.tar.gz
 libcrypt.tar.gz:
 	wget https://github.com/gpg/libgcrypt/archive/refs/heads/master.tar.gz -O libcrypt.tar.gz
-libs: glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
+oss-libs: glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
 
-oss-source: reset libs
-	tar --exclude-vcs -czf oss_source.tgz async-profiler/ cpuid/ dmidecode/ ethtool/ fio/ ipmitool/ lshw/ lspci/ msr-tools/ perf-archive/ pcm/ spectre-meltdown-checker/ sshpass/ stress-ng/ sysstat/ linux_turbostat/tools/power/x86/turbostat glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
+oss-source: oss-reset oss-libs
+	tar --exclude-vcs -czf oss_source.tgz async-profiler/ avx-turbo/ cpuid/ dmidecode/ ethtool/ fio/ ipmitool/ lshw/ lspci/ msr-tools/ perf-archive/ pcm/ processwatch/ spectre-meltdown-checker/ sshpass/ stress-ng/ sysstat/ linux_turbostat/tools/power/x86/turbostat glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
 	md5sum oss_source.tgz > oss_source.tgz.md5
