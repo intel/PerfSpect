@@ -7,7 +7,7 @@
 NPROC := $(shell nproc)
 
 # Common commands and utilities
-UPX_COMPRESS = upx --best $(1) || true
+UPX_COMPRESS = upx --overlay=skip $(1) || true
 MKDIR_BIN = mkdir -p $(1)
 COPY_FILE = cp $(1) $(2)
 COPY_DIR = cp -R $(1) $(2)
