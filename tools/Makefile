@@ -8,6 +8,8 @@ NPROC := $(shell nproc)
 
 # Common commands and utilities
 UPX_COMPRESS = upx --overlay=skip $(1) || true
+STRIP_X86_64 = strip --strip-unneeded $(1)
+STRIP_AARCH64 = aarch64-linux-gnu-strip --strip-unneeded $(1) || true
 MKDIR_BIN = mkdir -p $(1)
 COPY_FILE = cp $(1) $(2)
 COPY_DIR = cp -R $(1) $(2)
@@ -20,14 +22,17 @@ AARCH64_TARGETS = async-profiler-aarch64 dmidecode-aarch64 ethtool-aarch64 fio-a
                   spectre-meltdown-checker sshpass-aarch64 stackcollapse-perf-aarch64 stress-ng-aarch64 sysstat-aarch64
 
 # Binaries to compress for each architecture
-X86_64_COMPRESS_BINS = avx-turbo cpuid dmidecode ethtool fio stackcollapse-perf ipmitool lshw lspci rdmsr wrmsr pcm-tpmi sshpass stress-ng mpstat iostat sar sadc tsc turbostat
-AARCH64_COMPRESS_BINS = dmidecode ethtool fio ipmitool lshw lspci sshpass stress-ng mpstat iostat sar sadc
+X86_64_COMPRESS_BINS = fio ipmitool lshw sshpass stackcollapse-perf stress-ng tsc
+AARCH64_COMPRESS_BINS = fio ipmitool lshw sshpass stackcollapse-perf stress-ng
+
+X86_64_STRIP_BINS = avx-turbo cpuid dmidecode ethtool ipmitool lspci rdmsr wrmsr pcm-tpmi mpstat iostat sar sadc turbostat
+AARCH64_STRIP_BINS = dmidecode ethtool lspci mpstat iostat sar sadc
 
 default: tools-x86_64
 .PHONY: default tools tools-aarch64 tools-x86_64 build-x86_64 package-x86_64 compress-x86_64 build-aarch64 package-aarch64 compress-aarch64 perf perf-x86_64 perf-aarch64 processwatch oss-reset oss-source oss-libs
 
 # Main targets with improved organization
-tools-x86_64: build-x86_64 package-x86_64 compress-x86_64
+tools-x86_64: build-x86_64 package-x86_64 compress-x86_64 strip-x86_64
 
 build-x86_64: $(X86_64_TARGETS)
 	@echo "=== All x86_64 tools built successfully ==="
@@ -66,7 +71,11 @@ compress-x86_64: package-x86_64
 	@echo "=== Compressing x86_64 binaries ==="
 	$(foreach bin,$(X86_64_COMPRESS_BINS),$(call UPX_COMPRESS,bin/x86_64/$(bin));)
 
-tools-aarch64: build-aarch64 package-aarch64 compress-aarch64
+strip-x86_64:
+	@echo "=== Stripping x86_64 binaries ==="
+	$(foreach bin,$(X86_64_STRIP_BINS),$(call STRIP_X86_64,bin/x86_64/$(bin));)
+
+tools-aarch64: build-aarch64 package-aarch64 compress-aarch64 strip-aarch64
 
 build-aarch64: $(AARCH64_TARGETS)
 	@echo "=== All aarch64 tools built successfully ==="
@@ -96,6 +105,10 @@ package-aarch64: build-aarch64
 compress-aarch64: package-aarch64
 	@echo "=== Compressing aarch64 binaries ==="
 	$(foreach bin,$(AARCH64_COMPRESS_BINS),$(call UPX_COMPRESS,bin/aarch64/$(bin));)
+
+strip-aarch64:
+	@echo "=== Stripping aarch64 binaries ==="
+	$(foreach bin,$(AARCH64_STRIP_BINS),$(call STRIP_AARCH64,bin/aarch64/$(bin));)
 
 tools: tools-x86_64 tools-aarch64
 	@echo "=== All tools built successfully in bin/x86_64 and bin/aarch64 directories ==="
