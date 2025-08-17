@@ -206,15 +206,19 @@ func getExpressionVariableValues(metric MetricDefinition, frame EventFrame, prev
 			err = fmt.Errorf("variable value set to -2 (shouldn't happen): %s", variableName)
 			return
 		}
-		// set the variable value to the event value divided by the perf collection time to normalize the value to 1 second
-		if len(frame.EventGroups) <= metric.Variables[variableName] {
-			err = fmt.Errorf("event groups have changed")
+		if metric.Variables[variableName] >= len(frame.EventGroups) {
+			err = fmt.Errorf("metric variable's assigned group index is out of bounds: %s", variableName)
 			return
 		}
+		if _, ok := frame.EventGroups[metric.Variables[variableName]].EventValues[variableName]; !ok {
+			err = fmt.Errorf("metric variable's assigned group does not have the variable name: %s", variableName)
+			return
+		}
+		// normalize the value to 1 second interval, i.e., events per second
 		variables[variableName] = frame.EventGroups[metric.Variables[variableName]].EventValues[variableName] / (frame.Timestamp - previousTimestamp)
-		// adjust cstate_core/c6-residency value if hyperthreading is enabled
+		// adjust cstate_core/c6-residency value if hyperthreading is enabled and the metric is not at CPU granularity
 		// why here? so we don't have to change the perfmon metric formula
-		if metadata.ThreadsPerCore > 1 && variableName == "cstate_core/c6-residency/" {
+		if variableName == "cstate_core/c6-residency/" && flagGranularity != granularityCPU && metadata.ThreadsPerCore > 1 {
 			variables[variableName] = variables[variableName].(float64) * float64(metadata.ThreadsPerCore)
 		}
 	}
