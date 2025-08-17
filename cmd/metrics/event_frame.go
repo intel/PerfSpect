@@ -126,7 +126,7 @@ func GetEventFrames(rawEvents [][]byte, eventGroupDefinitions []GroupDefinition,
 }
 
 // parseEvents parses the raw event data into a list of Event
-func parseEvents(rawEvents [][]byte /*, eventGroupDefinitions []GroupDefinition*/) ([]Event, error) {
+func parseEvents(rawEvents [][]byte) ([]Event, error) {
 	events := make([]Event, 0, len(rawEvents))
 	var eventsNotCounted []string
 	var eventsNotSupported []string
@@ -170,20 +170,33 @@ func aggregateUncoreEvents(bucketedEvents [][]Event) ([][]Event, error) {
 	if flagGranularity != granularitySocket {
 		return bucketedEvents, nil // disaggregated uncore events are only present in socket granularity
 	}
-	for _, events := range bucketedEvents {
-		for i := 0; i < len(events); i++ {
-			if strings.HasPrefix(events[i].Event, "UNC") {
-				for j := i + 1; j < len(events); j++ {
-					if events[j].Event == events[i].Event && events[i].Interval == events[j].Interval {
-						// sum the values
-						events[i].Value += events[j].Value
-						// remove the event at index j
-						events = append(events[:j], events[j+1:]...)
-						j-- // adjust index after removal
-					}
+	for bucketIdx, events := range bucketedEvents {
+		if len(events) == 0 {
+			continue
+		}
+		// Use a map to track unique uncore events by (event_name, interval)
+		uncoreMap := make(map[string]int) // key: "event_name:interval" -> index in filtered slice
+		var filteredEvents []Event
+		for _, event := range events {
+			if strings.HasPrefix(event.Event, "UNC") {
+				// Create unique key for this uncore event
+				key := fmt.Sprintf("%s:%.9f", event.Event, event.Interval)
+				// Check if this uncore event is already in the map
+				if existingIdx, exists := uncoreMap[key]; exists {
+					// Aggregate with existing event
+					filteredEvents[existingIdx].Value += event.Value
+				} else {
+					// Add new unique uncore event
+					uncoreMap[key] = len(filteredEvents)
+					filteredEvents = append(filteredEvents, event)
 				}
+			} else {
+				// Keep non-uncore events as-is
+				filteredEvents = append(filteredEvents, event)
 			}
 		}
+		// Update the original slice
+		bucketedEvents[bucketIdx] = filteredEvents
 	}
 	return bucketedEvents, nil
 }
