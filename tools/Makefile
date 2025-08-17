@@ -6,36 +6,10 @@
 
 NPROC := $(shell nproc)
 
-# Common commands and utilities
-UPX_COMPRESS = upx --overlay=skip $(1) || true
-STRIP_X86_64 = strip --strip-unneeded $(1) || true
-STRIP_AARCH64 = aarch64-linux-gnu-strip --strip-unneeded $(1) || true
-
-# The tool targets. Excludes perf and processwatch targets as they are built independently.
-X86_64_TARGETS = async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm spectre-meltdown-checker sshpass \
-                 stackcollapse-perf/stackcollapse-perf stress-ng sysstat tsc/tsc turbostat
-AARCH64_TARGETS = async-profiler-aarch64 dmidecode-aarch64 ethtool-aarch64 fio-aarch64 ipmitool-aarch64 lshw-aarch64 lspci-aarch64 \
-                  spectre-meltdown-checker sshpass-aarch64 stackcollapse-perf-aarch64 stress-ng-aarch64 sysstat-aarch64
-
-# Binaries to upx compress for each architecture. These have been verified to work.
-X86_64_COMPRESS_BINS = fio ipmitool lshw sshpass stackcollapse-perf stress-ng tsc
-AARCH64_COMPRESS_BINS = fio ipmitool lshw sshpass stackcollapse-perf stress-ng
-
-# Binaries to strip symbols.
-X86_64_STRIP_BINS = avx-turbo cpuid dmidecode ethtool ipmitool lspci rdmsr wrmsr pcm-tpmi mpstat iostat sar sadc turbostat
-AARCH64_STRIP_BINS = dmidecode ethtool lspci mpstat iostat sar sadc
-
 default: tools-x86_64
-.PHONY: default tools tools-aarch64 tools-x86_64 build-x86_64 package-x86_64 compress-x86_64 build-aarch64 package-aarch64 compress-aarch64 perf perf-x86_64 perf-aarch64 processwatch oss-reset oss-source oss-libs
+.PHONY: default tools tools-aarch64 tools-x86_64 async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm perf-x86_64 processwatch spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc turbostat
 
-# Main targets with improved organization
-tools-x86_64: build-x86_64 package-x86_64 compress-x86_64 strip-x86_64
-
-build-x86_64: $(X86_64_TARGETS)
-	@echo "=== All x86_64 tools built successfully ==="
-
-package-x86_64: build-x86_64
-	@echo "=== Packaging x86_64 tools ==="
+tools-x86_64: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc turbostat
 	mkdir -p bin/x86_64
 	cp -R async-profiler bin/x86_64/
 	cp avx-turbo/avx-turbo bin/x86_64/
@@ -52,8 +26,7 @@ package-x86_64: build-x86_64
 	cp msr-tools/wrmsr bin/x86_64/
 	cp pcm/build/bin/pcm-tpmi bin/x86_64/
 	cp pcm/scripts/bhs-power-mode.sh bin/x86_64/
-	cp perf-archive/perf-archive.sh bin/x86_64/perf-archive
-	chmod +rx bin/x86_64/perf-archive
+	cp perf-archive/perf-archive.sh bin/x86_64/perf-archive && chmod +rx bin/x86_64/perf-archive
 	cp spectre-meltdown-checker/spectre-meltdown-checker.sh bin/x86_64/
 	cp sshpass/sshpass bin/x86_64/
 	cp stress-ng/stress-ng bin/x86_64/
@@ -63,34 +36,20 @@ package-x86_64: build-x86_64
 	cp sysstat/sadc bin/x86_64/
 	cp tsc/tsc bin/x86_64/
 	cp linux_turbostat/tools/power/x86/turbostat/turbostat bin/x86_64/
+	-cd bin/x86_64 && strip --strip-unneeded *
 
-compress-x86_64: package-x86_64
-	@echo "=== Compressing x86_64 binaries ==="
-	$(foreach bin,$(X86_64_COMPRESS_BINS),$(call UPX_COMPRESS,bin/x86_64/$(bin));)
-
-strip-x86_64:
-	@echo "=== Stripping x86_64 binaries ==="
-	$(foreach bin,$(X86_64_STRIP_BINS),$(call STRIP_X86_64,bin/x86_64/$(bin));)
-
-tools-aarch64: build-aarch64 package-aarch64 compress-aarch64 strip-aarch64
-
-build-aarch64: $(AARCH64_TARGETS)
-	@echo "=== All aarch64 tools built successfully ==="
-
-package-aarch64: build-aarch64
-	@echo "=== Packaging aarch64 tools ==="
+tools-aarch64: async-profiler-aarch64 dmidecode-aarch64 ethtool-aarch64 fio-aarch64 ipmitool-aarch64 lshw-aarch64 lspci-aarch64 spectre-meltdown-checker sshpass-aarch64 stackcollapse-perf-aarch64 stress-ng-aarch64 sysstat-aarch64 tsc-aarch64
 	mkdir -p bin/aarch64
 	cp -R async-profiler-aarch64 bin/aarch64/async-profiler
 	cp dmidecode-aarch64/dmidecode bin/aarch64/
 	cp ethtool-aarch64/ethtool bin/aarch64/
-	cp fio-aarch64/fio bin/aarch64/
+	cp fio-aarch64/fio bin/aarch64/	
 	cp stackcollapse-perf/stackcollapse-perf-aarch64 bin/aarch64/stackcollapse-perf
 	cp ipmitool-aarch64/src/ipmitool.static bin/aarch64/ipmitool
 	cp lshw-aarch64/src/lshw-static bin/aarch64/lshw
 	cp lspci-aarch64/lspci bin/aarch64/
 	cp lspci-aarch64/pci.ids.gz bin/aarch64/
-	cp perf-archive/perf-archive.sh bin/aarch64/perf-archive
-	chmod +rx bin/aarch64/perf-archive
+	cp perf-archive/perf-archive.sh bin/aarch64/perf-archive && chmod +rx bin/aarch64/perf-archive
 	cp spectre-meltdown-checker/spectre-meltdown-checker.sh bin/aarch64/
 	cp sshpass-aarch64/sshpass bin/aarch64/
 	cp stress-ng-aarch64/stress-ng bin/aarch64/
@@ -98,17 +57,11 @@ package-aarch64: build-aarch64
 	cp sysstat-aarch64/iostat bin/aarch64/
 	cp sysstat-aarch64/sar bin/aarch64/
 	cp sysstat-aarch64/sadc bin/aarch64/
-
-compress-aarch64: package-aarch64
-	@echo "=== Compressing aarch64 binaries ==="
-	$(foreach bin,$(AARCH64_COMPRESS_BINS),$(call UPX_COMPRESS,bin/aarch64/$(bin));)
-
-strip-aarch64:
-	@echo "=== Stripping aarch64 binaries ==="
-	$(foreach bin,$(AARCH64_STRIP_BINS),$(call STRIP_AARCH64,bin/aarch64/$(bin));)
+	cp tsc/tsc-aarch64 bin/aarch64/tsc
+	-cd bin/aarch64 && aarch64-linux-gnu-strip --strip-unneeded * || true
 
 tools: tools-x86_64 tools-aarch64
-	@echo "=== All tools built successfully in bin/x86_64 and bin/aarch64 directories ==="
+	@echo "Tools built successfully in bin/x86_64 and bin/aarch64 directories."
 
 ASYNC_PROFILER_VERSION := "4.0"
 async-profiler:
@@ -126,7 +79,6 @@ ifeq ("$(wildcard async-profiler-$(ASYNC_PROFILER_VERSION)-linux-arm64.tar.gz)",
 endif
 	tar -xf async-profiler-$(ASYNC_PROFILER_VERSION)-linux-arm64.tar.gz && mv async-profiler-$(ASYNC_PROFILER_VERSION)-linux-arm64 async-profiler-aarch64
 endif
-
 
 AVX_TURBO_VERSION := "9cfe8bf"
 avx-turbo:
@@ -324,7 +276,7 @@ perf-x86_64:
 	cd linux_perf/tools/perf && make LLVM_CONFIG="llvm-config --link-static" LDFLAGS="-static --static" BUILD_BPF_SKEL=1 NO_JVMTI=1 BUILD_NONDISTRO=1 LIBUNWIND=1 -j$(NPROC)
 	mkdir -p bin/x86_64
 	cp linux_perf/tools/perf/perf bin/x86_64/
-	strip --strip-unneeded bin/x86_64/perf || true
+	strip --strip-unneeded bin/x86_64/perf
 	upx --best bin/x86_64/perf || true
 
 perf-aarch64:
@@ -335,11 +287,11 @@ endif
 	cd linux_perf-aarch64/tools/perf && make LDFLAGS="-static --static" BUILD_BPF_SKEL=1 NO_JVMTI=1 ARCH=arm64 NO_LIBTRACEEVENT=1 CROSS_COMPILE=aarch64-linux-gnu- -j$(NPROC)
 	mkdir -p bin/aarch64
 	cp linux_perf-aarch64/tools/perf/perf bin/aarch64/
-	aarch64-linux-gnu-strip --strip-unneeded bin/aarch64/perf || true
+	aarch64-linux-gnu-strip --strip-unneeded bin/aarch64/perf
 	upx --best bin/aarch64/perf || true
 
 perf: perf-x86_64 perf-aarch64
-	@echo "=== Perf tools built successfully in bin/x86_64 and bin/aarch64 directories ==="
+	@echo "Perf tools built successfully in bin/x86_64 and bin/aarch64 directories."
 
 PROCESSWATCH_VERSION := "c394065"	
 processwatch:
@@ -350,9 +302,9 @@ else
 endif
 	cd processwatch && git checkout $(PROCESSWATCH_VERSION)
 	cd processwatch && ./build.sh
-	mkdir -p bin/x86_64
+	mkdir -p bin
 	cp processwatch/processwatch bin/x86_64/
-	strip --strip-unneeded bin/x86_64/processwatch || true
+	strip --strip-unneeded bin/x86_64/processwatch
 
 SPECTRE_MELTDOWN_CHECKER_VERSION := "master"
 spectre-meltdown-checker:
@@ -384,7 +336,7 @@ ifeq ("$(wildcard sshpass-aarch64)","")
 endif
 	cd sshpass-aarch64 && make -j$(NPROC)
 
-stackcollapse-perf/stackcollapse-perf:
+stackcollapse-perf:
 	cd stackcollapse-perf && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build
 
 stackcollapse-perf-aarch64:
@@ -434,7 +386,7 @@ ifeq ("$(wildcard sysstat-aarch64/Makefile)","")
 endif
 	cd sysstat-aarch64 && make -j$(NPROC)
 
-tsc/tsc:
+tsc:
 	cd tsc && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build
 
 tsc-aarch64:
@@ -447,8 +399,8 @@ turbostat:
 	sed -i '/_Static_assert/d' linux_turbostat/tools/power/x86/turbostat/turbostat.c
 	cd linux_turbostat/tools/power/x86/turbostat && make
 
-oss-reset:
-	cd avx-turbo && git clean -fdx && git reset --hard
+reset:
+	cd async-profiler
 	cd cpuid && make clean
 	cd dmidecode && git clean -fdx && git reset --hard
 	cd ethtool && git clean -fdx && git reset --hard
@@ -458,9 +410,11 @@ oss-reset:
 	cd lspci && git clean -fdx && git reset --hard
 	cd pcm && git clean -fdx && git reset --hard
 	cd msr-tools && git clean -fdx && git reset --hard
+	cd spectre-meltdown-checker
 	cd sshpass && make clean
 	cd stress-ng && git clean -fdx && git reset --hard
 	cd sysstat && git clean -fdx && git reset --hard
+	cd tsc && rm -f tsc
 	cd linux_turbostat/tools/power/x86/turbostat && make clean
 
 # not used in build but required in oss archive file because some of the tools are statically linked
@@ -470,8 +424,8 @@ zlib.tar.gz:
 	wget https://github.com/madler/zlib/archive/refs/heads/master.tar.gz -O zlib.tar.gz
 libcrypt.tar.gz:
 	wget https://github.com/gpg/libgcrypt/archive/refs/heads/master.tar.gz -O libcrypt.tar.gz
-oss-libs: glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
+libs: glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
 
-oss-source: oss-reset oss-libs
-	tar --exclude-vcs -czf oss_source.tgz async-profiler/ avx-turbo/ cpuid/ dmidecode/ ethtool/ fio/ ipmitool/ lshw/ lspci/ msr-tools/ perf-archive/ pcm/ spectre-meltdown-checker/ sshpass/ stress-ng/ sysstat/ linux_turbostat/tools/power/x86/turbostat glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
+oss-source: reset libs
+	tar --exclude-vcs -czf oss_source.tgz async-profiler/ cpuid/ dmidecode/ ethtool/ fio/ ipmitool/ lshw/ lspci/ msr-tools/ perf-archive/ pcm/ spectre-meltdown-checker/ sshpass/ stress-ng/ sysstat/ linux_turbostat/tools/power/x86/turbostat glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
 	md5sum oss_source.tgz > oss_source.tgz.md5
