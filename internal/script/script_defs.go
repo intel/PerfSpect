@@ -1152,7 +1152,7 @@ duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
 	count=$((duration / interval))
 fi
-mpstat -u -T -I SCPU -P ALL $interval $count &
+LC_TIME=C mpstat -u -T -I SCPU -P ALL $interval $count &
 echo $! > {{.ScriptName}}_cmd.pid
 wait
 `,
@@ -1184,7 +1184,7 @@ duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
 	count=$((duration / interval))
 fi
-sar -r $interval $count &
+LC_TIME=C sar -r $interval $count &
 echo $! > {{.ScriptName}}_cmd.pid
 wait
 `,
@@ -1200,7 +1200,7 @@ duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
 	count=$((duration / interval))
 fi
-sar -n DEV $interval $count &
+LC_TIME=C sar -n DEV $interval $count &
 echo $! > {{.ScriptName}}_cmd.pid
 wait
 `,
