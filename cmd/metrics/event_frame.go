@@ -233,10 +233,18 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 					cpuMap[cpu] = i
 				}
 			} else {
-				numCPUs = metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore
+				numCPUs = len(metadata.CPUSocketMap)
 				cpuMap = make(map[int]int, numCPUs)
-				for i := 0; i < numCPUs; i++ {
-					cpuMap[i] = i
+				var cpuIDs []int
+				for cpuID := range metadata.CPUSocketMap {
+					cpuIDs = append(cpuIDs, cpuID)
+				}
+				slices.Sort(cpuIDs)
+
+				i := 0
+				for _, cpuID := range cpuIDs {
+					cpuMap[cpuID] = i
+					i++
 				}
 			}
 			// note: if some cores have been off-lined, this may cause an issue because 'perf' seems
