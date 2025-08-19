@@ -721,5 +721,6 @@ func createCPUSocketMap(cpuInfo []map[string]string) (cpuSocketMap map[int]int) 
 		physID, _ := strconv.Atoi(cpuInfo[idx]["physical id"])
 		cpuSocketMap[procID] = physID
 	}
+
 	return cpuSocketMap
 }
