@@ -11,8 +11,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"regexp"
-	"slices"
 	"strings"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -75,10 +73,6 @@ func loadMetricDefinitions(metricDefinitionOverridePath string, selectedMetrics 
 	} else {
 		metrics = metricsInFile
 	}
-	// abbreviate event names in metrics to shorten the eventual perf stat command line
-	for i := range metrics {
-		metrics[i].Expression = abbreviateEventName(metrics[i].Expression)
-	}
 	return
 }
 
@@ -118,9 +112,7 @@ func loadEventGroups(eventDefinitionOverridePath string, metadata Metadata) (gro
 		if event, err = parseEventDefinition(line[:len(line)-1]); err != nil {
 			return
 		}
-		// abbreviate the event name to shorten the eventual perf stat command line
-		event.Name = abbreviateEventName(event.Name)
-		event.Raw = abbreviateEventName(event.Raw)
+		// check if the event is collectable
 		if isCollectableEvent(event, metadata) {
 			group = append(group, event)
 		} else {
@@ -140,8 +132,6 @@ func loadEventGroups(eventDefinitionOverridePath string, metadata Metadata) (gro
 		return
 	}
 	uncollectableEvents = uncollectable.ToSlice()
-	// expand uncore groups for all uncore devices
-	groups, err = expandUncoreGroups(groups, metadata)
 
 	if uncollectable.Cardinality() != 0 {
 		slog.Debug("Events not collectable on target", slog.String("events", uncollectable.String()))
@@ -251,94 +241,4 @@ func parseEventDefinition(line string) (eventDef EventDefinition, err error) {
 		return
 	}
 	return
-}
-
-// expandUncoreGroup expands a perf event group into a list of groups where each group is
-// associated with an uncore device
-func expandUncoreGroup(group GroupDefinition, ids []int, re *regexp.Regexp, vendor string) (groups []GroupDefinition, err error) {
-	for _, deviceID := range ids {
-		var newGroup GroupDefinition
-		for _, event := range group {
-			match := re.FindStringSubmatch(event.Raw)
-			if len(match) == 0 {
-				err = fmt.Errorf("unexpected raw event format: %s", event.Raw)
-				return
-			}
-			var newEvent EventDefinition
-			if vendor == "AuthenticAMD" {
-				newEvent.Name = match[4]
-				newEvent.Raw = fmt.Sprintf("amd_%s/event=%s,umask=%s,name='%s'/", match[1], match[2], match[3], newEvent.Name)
-			} else {
-				newEvent.Name = fmt.Sprintf("%s.%d", match[4], deviceID)
-				newEvent.Raw = fmt.Sprintf("uncore_%s_%d/event=%s,umask=%s,name='%s'/", match[1], deviceID, match[2], match[3], newEvent.Name)
-			}
-			newEvent.Device = event.Device
-			newGroup = append(newGroup, newEvent)
-		}
-		groups = append(groups, newGroup)
-	}
-	return
-}
-
-// expandUncoreGroups expands groups with uncore events to include events for all uncore devices
-// assumes that uncore device events are in their own groups, not mixed with other device types
-func expandUncoreGroups(groups []GroupDefinition, metadata Metadata) (expandedGroups []GroupDefinition, err error) {
-	// example 1: cha/event=0x35,umask=0xc80ffe01,name='UNC_CHA_TOR_INSERTS.IA_MISS_CRD'/,
-	// expand to: uncore_cha_0/event=0x35,umask=0xc80ffe01,name='UNC_CHA_TOR_INSERTS.IA_MISS_CRD.0'/,
-	// example 2: cha/event=0x36,umask=0x21,config1=0x4043300000000,name='UNC_CHA_TOR_OCCUPANCY.IA_MISS.0x40433'/
-	// expand to: uncore_cha_0/event=0x36,umask=0x21,config1=0x4043300000000,name='UNC_CHA_TOR_OCCUPANCY.IA_MISS.0x40433'/
-	re := regexp.MustCompile(`(\w+)/event=(0x[0-9,a-f,A-F]+),umask=(0x[0-9,a-f,A-F]+.*),name='(.*)'`)
-	var deviceTypes []string
-	for deviceType := range metadata.UncoreDeviceIDs {
-		deviceTypes = append(deviceTypes, deviceType)
-	}
-	for _, group := range groups {
-		device := group[0].Device
-		if slices.Contains(deviceTypes, device) {
-			var newGroups []GroupDefinition
-			if len(metadata.UncoreDeviceIDs[device]) == 0 {
-				slog.Warn("No uncore devices found", slog.String("type", device))
-				continue
-			}
-			if newGroups, err = expandUncoreGroup(group, metadata.UncoreDeviceIDs[device], re, metadata.Vendor); err != nil {
-				return
-			}
-			expandedGroups = append(expandedGroups, newGroups...)
-		} else {
-			expandedGroups = append(expandedGroups, group)
-		}
-	}
-	return
-}
-
-// abbreviateEventName replaces long event names with abbreviations to reduce the length of the perf command.
-// focus is on uncore events because they are repeated for each uncore device
-func abbreviateEventName(event string) string {
-	// Abbreviations must be unique and in order. And, if replacing UNC_*, the abbreviation must begin with "UNC" because this is how we identify uncore events when collapsing them.
-	var abbreviations = [][]string{
-		{"UNC_CHA_TOR_INSERTS", "UNCCTI"},
-		{"UNC_CHA_TOR_OCCUPANCY", "UNCCTO"},
-		{"UNC_CHA_CLOCKTICKS", "UNCCCT"},
-		{"UNC_M_CAS_COUNT_SCH", "UNCMCC"},
-		{"IA_MISS_DRD_REMOTE", "IMDR"},
-		{"IA_MISS_DRD_LOCAL", "IMDL"},
-		{"IA_MISS_LLCPREFDATA", "IMLP"},
-		{"IA_MISS_LLCPREFRFO", "IMLR"},
-		{"IA_MISS_DRD_PREF_LOCAL", "IMDPL"},
-		{"IA_MISS_DRD_PREF_REMOTE", "IMDRP"},
-		{"IA_MISS_CRD_PREF", "IMCP"},
-		{"IA_MISS_RFO_PREF", "IMRP"},
-		{"IA_MISS_RFO", "IMRF"},
-		{"IA_MISS_CRD", "IMC"},
-		{"IA_MISS_DRD", "IMD"},
-		{"IO_PCIRDCUR", "IPCI"},
-		{"IO_ITOMCACHENEAR", "IITN"},
-		{"IO_ITOM", "IITO"},
-		{"IMD_OPT", "IMDO"},
-	}
-	// if an abbreviation key is found in the event, replace the matching portion of the event with the abbreviation
-	for _, abbr := range abbreviations {
-		event = strings.Replace(event, abbr[0], abbr[1], -1)
-	}
-	return event
 }
