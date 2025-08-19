@@ -151,11 +151,6 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, legacyLoaderEventF
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading metrics from definitions: %w", err)
 	}
-	// Abbreviate uncore event names in metric expressions
-	metricDefs, err = abbreviateUncoreEventNames(metricDefs, uncoreEvents)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error abbreviating uncore event names: %w", err)
-	}
 	// Simplify OCR event names in metric expressions
 	metricDefs, err = customizeOCREventNames(metricDefs)
 	if err != nil {
@@ -181,11 +176,6 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, legacyLoaderEventF
 	coreGroups, uncoreGroups, err = mergeGroups(coreGroups, uncoreGroups, metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error merging groups: %v", err)
-	}
-	// Expand uncore groups for uncore devices
-	uncoreGroups, err = ExpandUncoreGroups(uncoreGroups, metadata.UncoreDeviceIDs)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error expanding uncore groups: %v", err)
 	}
 	slog.Debug("Number of core groups", slog.Int("count", len(coreGroups)))
 	slog.Debug("Number of uncore groups", slog.Int("count", len(uncoreGroups)))
@@ -259,27 +249,6 @@ func loadPerfmonMetrics(reportMetrics []PerfspectMetric, perfmonMetrics []Perfmo
 		perfmonMetricsToReturn = append(perfmonMetricsToReturn, *perfmonMetric)
 	}
 	return perfmonMetricsToReturn, nil
-}
-
-func abbreviateUncoreEventNames(metrics []MetricDefinition, uncoreEvents UncoreEvents) ([]MetricDefinition, error) {
-	for i := range metrics {
-		metric := &metrics[i]
-		for _, uncoreEvent := range uncoreEvents.Events {
-			re, err := regexp.Compile(fmt.Sprintf(`\b%s\b`, uncoreEvent.EventName))
-			if err != nil {
-				return nil, fmt.Errorf("failed to compile regex for uncore event %s: %w", uncoreEvent.EventName, err)
-			}
-			for {
-				index := re.FindStringIndex(metric.Expression)
-				if index == nil {
-					break // no more matches found
-				}
-				// replace this occurrence of the original with the replacement
-				metric.Expression = metric.Expression[:index[0]] + uncoreEvent.UniqueID + metric.Expression[index[1]:]
-			}
-		}
-	}
-	return metrics, nil
 }
 
 func customizeOCREventNames(metrics []MetricDefinition) ([]MetricDefinition, error) {

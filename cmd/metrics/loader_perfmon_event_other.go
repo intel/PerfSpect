@@ -43,6 +43,13 @@ func (event OtherEvent) IsCollectable(metadata Metadata) bool {
 		slog.Debug("Other events not supported in process or cgroup scope", slog.String("event", event.EventName))
 		return false // other events are not supported in process or cgroup scope
 	}
+	// no system-level events when collecting at CPU granularity e.g. power, cstates
+	if (flagGranularity == granularityCPU) &&
+		(strings.Contains(event.EventName, "power/energy") || strings.Contains(event.EventName, "cstate_pkg")) {
+		slog.Debug("System level events not supported in CPU granularity", slog.String("event", event.EventName))
+		return false
+	}
+	// check if the event is supported by perf
 	if !strings.Contains(metadata.PerfSupportedEvents, event.EventName) {
 		slog.Debug("Other event is not supported by perf", slog.String("event", event.EventName))
 		return false // other events are not supported

@@ -239,35 +239,3 @@ func EliminateDuplicateUncoreGroups(uncoreGroups []UncoreGroup) ([]UncoreGroup, 
 	}
 	return uncoreGroups, nil
 }
-
-func ExpandUncoreGroups(uncoreGroups []UncoreGroup, uncoreDeviceIDs map[string][]int) ([]UncoreGroup, error) {
-	var expandedGroups []UncoreGroup
-	for _, group := range uncoreGroups {
-		groupUnit := group.GeneralPurposeCounters[0].Unit // Assume all events in the group have the same unit
-		if groupUnit == "" {
-			return nil, fmt.Errorf("group has no unit defined")
-		}
-		// Create a new group for each uncore device ID
-		for deviceType, deviceIDs := range uncoreDeviceIDs {
-			if !strings.EqualFold(deviceType, groupUnit) {
-				continue // Skip if the device type does not match the group unit
-			}
-			for _, deviceID := range deviceIDs {
-				// Create a new group for this device ID
-				newGroup := group.Copy()
-				for counter, event := range group.GeneralPurposeCounters {
-					if event.IsEmpty() {
-						continue // Skip empty events
-					}
-					// add the device ID to the event's name
-					newName := fmt.Sprintf("%s.%d", event.EventName, deviceID)
-					newEvent := event                                   // Create a copy of the event
-					newEvent.EventName = newName                        // Update the event name with the device ID
-					newGroup.GeneralPurposeCounters[counter] = newEvent // Update the event in the new group
-				}
-				expandedGroups = append(expandedGroups, newGroup)
-			}
-		}
-	}
-	return expandedGroups, nil
-}

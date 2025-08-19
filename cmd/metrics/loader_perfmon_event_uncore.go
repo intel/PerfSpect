@@ -28,7 +28,6 @@ type UncoreEvent struct {
 	Deprecated        string `json:"Deprecated"`
 	FilterValue       string `json:"FILTER_VALUE"`
 	CounterType       string `json:"CounterType"`
-	UniqueID          string // This field is not in the JSON. We set it to a unique value after unmarshaling.
 }
 
 type UncoreEvents struct {
@@ -44,11 +43,6 @@ func NewUncoreEvents(path string) (UncoreEvents, error) {
 	}
 	if err := json.Unmarshal(bytes, &events); err != nil {
 		return events, fmt.Errorf("error unmarshaling JSON from %s: %w", path, err)
-	}
-	for i := range events.Events {
-		// Set the UniqueID for each event. We use this when generating perf strings
-		// instead of the EventName to reduce the length of the perf command line.
-		events.Events[i].UniqueID = fmt.Sprintf("UNC_%03d", i)
 	}
 	return events, nil
 }
@@ -73,11 +67,11 @@ func (event UncoreEvent) IsEmpty() bool {
 
 func (event UncoreEvent) IsCollectable(metadata Metadata) bool {
 	if !metadata.SupportsUncore {
-		slog.Debug("Uncore events not supported", slog.String("event", event.EventName))
+		slog.Debug("Uncore events not supported on target", slog.String("event", event.EventName))
 		return false // uncore events are not supported
 	}
-	if flagScope == scopeProcess || flagScope == scopeCgroup {
-		slog.Debug("Uncore events not supported in process or cgroup scope", slog.String("event", event.EventName))
+	if flagScope == scopeProcess || flagScope == scopeCgroup || flagGranularity == granularityCPU {
+		slog.Debug("Uncore events not supported in process scope, cgroup scope, or cpu granularity", slog.String("event", event.EventName))
 		return false
 	}
 	deviceExists := false
@@ -101,22 +95,9 @@ func (event UncoreEvent) StringForPerf() (string, error) {
 	if event.EventCode == "" {
 		return "", fmt.Errorf("event %s does not have an EventCode", event.EventName)
 	}
-	// name is the uniqueID.deviceID
-	if event.UniqueID == "" {
-		return "", fmt.Errorf("event %s does not have a UniqueID", event.EventName)
-	}
-	// parse the device ID out of the event name
-	eventNameParts := strings.Split(event.EventName, ".")
-	if len(eventNameParts) < 2 {
-		return "", fmt.Errorf("event %s does not have a device ID in its name", event.EventName)
-	}
-	deviceID := eventNameParts[len(eventNameParts)-1]
-	if deviceID == "" {
-		return "", fmt.Errorf("event %s does not have a device ID", event.EventName)
-	}
 	var parts []string
 	// unit/event
-	parts = append(parts, fmt.Sprintf("uncore_%s_%s/event=%s", strings.ToLower(strings.Split(event.Unit, " ")[0]), deviceID, event.EventCode))
+	parts = append(parts, fmt.Sprintf("%s/event=%s", strings.ToLower(strings.Split(event.Unit, " ")[0]), event.EventCode))
 	// umask
 	if event.UMask != "" {
 		umaskVal, err := strconv.ParseInt(event.UMask, 0, 64)
@@ -136,6 +117,6 @@ func (event UncoreEvent) StringForPerf() (string, error) {
 			parts = append(parts, fmt.Sprintf("umask=0x%s%s", umaskExtHex, umaskHex))
 		}
 	}
-	parts = append(parts, fmt.Sprintf("name='%s.%s'/", event.UniqueID, deviceID))
+	parts = append(parts, fmt.Sprintf("name='%s'/", event.EventName))
 	return strings.Join(parts, ","), nil
 }

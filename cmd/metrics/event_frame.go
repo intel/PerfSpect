@@ -14,8 +14,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-
-	"perfspect/internal/util"
 )
 
 // EventGroup represents a group of perf events and their values
@@ -283,68 +281,33 @@ func bucketEvents(allEvents []Event, scope string, granularity string, metadata 
 			bucketedEvents = append(bucketedEvents, newEvents...)
 			return
 		case granularityCPU:
-			// create one list of Events per CPU
-			var numCPUs int
+			// create one list of Events per CPU dynamically as we encounter them
+			cpuEventsMap := make(map[int][]Event)
 
-			// create a mapping of cpu numbers to event indices
-			var cpuMap map[int]int
-
-			// create a list of CPU IDs targeted for profiling
-			var cpuIDs []int
-
-			// if CPU range is specified, use it to determine the number of CPUs
-			// otherwise, use the CPUSocketMap structure to determine the online CPUs
-			// then create a list of CPU IDs for the targeted CPUs
-			if flagCpuRange != "" {
-				var err error
-				cpuIDs, err = util.SelectiveIntRangeToIntList(flagCpuRange)
-				if err != nil {
-					return nil, fmt.Errorf("failed to parse cpu range: %w", err)
-				}
-				numCPUs = len(cpuIDs)
-			} else {
-				numCPUs = len(metadata.CPUSocketMap)
-
-				for cpuID := range metadata.CPUSocketMap {
-					cpuIDs = append(cpuIDs, cpuID)
-				}
-			}
-
-			// create a mapping of the target CPU IDs to their event indices
-			cpuMap = make(map[int]int, numCPUs)
-
-			// sort the CPU IDs
-			slices.Sort(cpuIDs)
-
-			// place the sorted CPU IDs into the mapping
-			for idx, cpuID := range cpuIDs {
-				cpuMap[cpuID] = idx
-			}
-
-			// create a new list of events, one for each CPU
-			newEvents := make([][]Event, numCPUs)
-			for i := range numCPUs {
-				newEvents[i] = make([]Event, 0, len(allEvents)/numCPUs)
-			}
-
-			// iterate over all events and place them into the newEvents list
 			for _, event := range allEvents {
 				var cpu int
 				if cpu, err = strconv.Atoi(event.CPU); err != nil {
-					return
+					return nil, fmt.Errorf("failed to parse cpu number: %s", event.CPU)
 				}
-				// check if the CPU is in the cpuMap
-				if _, ok := cpuMap[cpu]; !ok {
-					slog.Debug("cpu not found in cpu map, skipping event", slog.String("cpu", event.CPU), slog.String("event", event.Event))
-					continue
+
+				// dynamically create CPU bucket if it doesn't exist
+				if _, exists := cpuEventsMap[cpu]; !exists {
+					cpuEventsMap[cpu] = make([]Event, 0)
 				}
-				// place the event for the current CPU into the newEvents list
-				// cpuMap ensures that events are placed in a valid index
-				newEvents[cpuMap[cpu]] = append(newEvents[cpuMap[cpu]], event)
+
+				cpuEventsMap[cpu] = append(cpuEventsMap[cpu], event)
 			}
 
-			// now we have a list of events for each CPU, we need to aggregate them
-			bucketedEvents = append(bucketedEvents, newEvents...)
+			// convert map to slice, maintaining consistent ordering by CPU number
+			cpuNumbers := make([]int, 0, len(cpuEventsMap))
+			for cpu := range cpuEventsMap {
+				cpuNumbers = append(cpuNumbers, cpu)
+			}
+			slices.Sort(cpuNumbers)
+
+			for _, cpu := range cpuNumbers {
+				bucketedEvents = append(bucketedEvents, cpuEventsMap[cpu])
+			}
 		default:
 			err = fmt.Errorf("unsupported granularity: %s", granularity)
 			return
