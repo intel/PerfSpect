@@ -109,8 +109,6 @@ func ConfigureMetrics(loadedMetrics []MetricDefinition, uncollectableEvents []st
 	reConstantInt := regexp.MustCompile(`\[(\d+)\]`)
 	for metricIdx := range loadedMetrics {
 		tmpMetric := loadedMetrics[metricIdx]
-		// abbreviate event names in metric expressions to match abbreviations used in uncollectableEvents
-		tmpMetric.Expression = abbreviateEventName(tmpMetric.Expression)
 		// skip metrics that use uncollectable events
 		foundUncollectable := false
 		for _, uncollectableEvent := range uncollectableEvents {
