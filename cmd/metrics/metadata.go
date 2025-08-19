@@ -85,7 +85,7 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 		metadata.ThreadsPerCore = 1
 	}
 	// CPUSocketMap (from cpuInfo)
-	metadata.CPUSocketMap = createCPUSocketMap(metadata.CoresPerSocket, metadata.SocketCount, metadata.ThreadsPerCore == 2)
+	metadata.CPUSocketMap = createCPUSocketMap(cpuInfo)
 	// Model Name (from cpuInfo)
 	metadata.ModelName = cpuInfo[0]["model name"]
 	// Vendor (from cpuInfo)
@@ -709,29 +709,17 @@ func getKernelVersion(scriptOutputs map[string]script.ScriptOutput) (version str
 }
 
 // createCPUSocketMap creates a mapping of logical CPUs to their corresponding sockets.
-// The function takes the number of cores per socket, the number of sockets, and a boolean indicating whether hyperthreading is enabled.
+// The function traverses the output of /proc/cpuinfo and examines the "processor" and "physical id" fields.
 // It returns a map where the key is the logical CPU index and the value is the socket index.
-func createCPUSocketMap(coresPerSocket int, sockets int, hyperthreading bool) (cpuSocketMap map[int]int) {
+func createCPUSocketMap(cpuInfo []map[string]string) (cpuSocketMap map[int]int) {
 	// Create an empty map
 	cpuSocketMap = make(map[int]int)
 
-	// Calculate the total number of logical CPUs
-	totalCPUs := coresPerSocket * sockets
-	if hyperthreading {
-		totalCPUs *= 2 // hyperthreading doubles the number of logical CPUs
-	}
-	// Assign each CPU to a socket
-	for i := range totalCPUs {
-		// Assume that the CPUs are evenly distributed between the sockets
-		socket := i / coresPerSocket
-		if hyperthreading {
-			// With non-adjacent hyperthreading, the second logical CPU of each core is in the second half
-			if i >= totalCPUs/2 {
-				socket = (i - totalCPUs/2) / coresPerSocket
-			}
-		}
-		// Store the mapping
-		cpuSocketMap[i] = socket
+	// Iterate over the CPU info to create the mapping
+	for idx := range cpuInfo {
+		procID, _ := strconv.Atoi(cpuInfo[idx]["processor"])
+		physID, _ := strconv.Atoi(cpuInfo[idx]["physical id"])
+		cpuSocketMap[procID] = physID
 	}
 	return cpuSocketMap
 }
