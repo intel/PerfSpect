@@ -219,25 +219,36 @@ func coalesceEvents(allEvents []Event, scope string, granularity string, metadat
 			// create a mapping of cpu numbers to event indices
 			var cpuMap map[int]int
 
-			// if cpu range is specified, use it to determine the number of cpus
-			// otherwise, use the number of sockets, cores per socket, and threads per core
-			// to determine the number of cpus
+			// create a list of CPU IDs targeted for profiling
+			var cpuIDs []int
+
+			// if CPU range is specified, use it to determine the number of CPUs
+			// otherwise, use the CPUSocketMap structure to determine the online CPUs
+			// then create a list of CPU IDs for the targeted CPUs
 			if flagCpuRange != "" {
-				cpuList, err := util.SelectiveIntRangeToIntList(flagCpuRange)
+				var err error
+				cpuIDs, err = util.SelectiveIntRangeToIntList(flagCpuRange)
 				if err != nil {
 					return nil, fmt.Errorf("failed to parse cpu range: %w", err)
 				}
-				numCPUs = len(cpuList)
-				cpuMap = make(map[int]int, numCPUs)
-				for i, cpu := range cpuList {
-					cpuMap[cpu] = i
-				}
+				numCPUs = len(cpuIDs)
 			} else {
-				numCPUs = metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore
-				cpuMap = make(map[int]int, numCPUs)
-				for i := 0; i < numCPUs; i++ {
-					cpuMap[i] = i
+				numCPUs = len(metadata.CPUSocketMap)
+
+				for cpuID := range metadata.CPUSocketMap {
+					cpuIDs = append(cpuIDs, cpuID)
 				}
+			}
+
+			// create a mapping of the target CPU IDs to their event indices
+			cpuMap = make(map[int]int, numCPUs)
+
+			// sort the CPU IDs
+			slices.Sort(cpuIDs)
+
+			// place the sorted CPU IDs into the mapping
+			for idx, cpuID := range cpuIDs {
+				cpuMap[cpuID] = idx
 			}
 			// note: if some cores have been off-lined, this may cause an issue because 'perf' seems
 			// to still report events for those cores
