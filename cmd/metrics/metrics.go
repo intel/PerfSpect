@@ -836,6 +836,14 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		cmd.SilenceUsage = true
 		return err
 	}
+	// only one target currently supported for prometheus server
+	if flagPrometheusServer && len(myTargets) > 1 {
+		err := fmt.Errorf("prometheus server is only supported for a single target")
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		slog.Error(err.Error())
+		cmd.SilenceUsage = true
+		return err
+	}
 	// schedule the cleanup of the temporary directory on each target (if not debugging)
 	if cmd.Parent().PersistentFlags().Lookup("debug").Value.String() != "true" {
 		for _, myTarget := range myTargets {
