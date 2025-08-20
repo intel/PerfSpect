@@ -38,7 +38,15 @@ func addPrometheusMetrics(newMetrics map[string]*prometheus.GaugeVec) {
 	for name, gauge := range newMetrics {
 		if _, exists := promMetrics[name]; !exists {
 			promMetrics[name] = gauge
-			prometheus.MustRegister(gauge)
+			if err := prometheus.Register(gauge); err != nil {
+				if are, ok := err.(prometheus.AlreadyRegisteredError); ok {
+					// Use the already registered metric
+					promMetrics[name] = are.ExistingCollector.(*prometheus.GaugeVec)
+				} else {
+					// Log unexpected registration error
+					slog.Error("Failed to register Prometheus metric", slog.String("name", name), slog.String("error", err.Error()))
+				}
+			}
 		}
 	}
 }
