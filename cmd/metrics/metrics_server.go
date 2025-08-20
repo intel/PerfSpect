@@ -4,11 +4,13 @@ package metrics
 // SPDX-License-Identifier: BSD-3-Clause
 
 import (
+	"fmt"
 	"log/slog"
 	"math"
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -26,6 +28,41 @@ var prometheusMetricsGaugeVec = prometheus.NewGaugeVec(
 )
 var rxTrailingChars = regexp.MustCompile(`\)$`)
 var promMetrics = make(map[string]*prometheus.GaugeVec)
+var promMetricsMutex sync.RWMutex
+
+// addPrometheusMetrics safely adds metrics to the global prometheus map
+func addPrometheusMetrics(newMetrics map[string]*prometheus.GaugeVec) {
+	promMetricsMutex.Lock()
+	defer promMetricsMutex.Unlock()
+
+	for name, gauge := range newMetrics {
+		if _, exists := promMetrics[name]; !exists {
+			promMetrics[name] = gauge
+			prometheus.MustRegister(gauge)
+		}
+	}
+}
+
+// createPrometheusMetrics creates Prometheus gauge vectors from metric definitions
+func createPrometheusMetrics(metricDefinitions []MetricDefinition) {
+	localPromMetrics := make(map[string]*prometheus.GaugeVec)
+
+	for _, def := range metricDefinitions {
+		desc := fmt.Sprintf("%s (expr: %s)", def.Name, def.Expression)
+		name := promMetricPrefix + sanitizeMetricName(def.Name)
+		gauge := prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: name,
+				Help: desc,
+			},
+			[]string{"socket", "cpu", "cgroup", "pid", "cmd"},
+		)
+		localPromMetrics[name] = gauge
+	}
+
+	// Add to global map with mutex protection
+	addPrometheusMetrics(localPromMetrics)
+}
 
 func sanitizeMetricName(name string) string {
 	sanitized := rxTrailingChars.ReplaceAllString(name, "")
@@ -51,6 +88,9 @@ func startPrometheusServer(listenAddr string) {
 }
 
 func updatePrometheusMetrics(metricFrames []MetricFrame) {
+	promMetricsMutex.RLock()
+	defer promMetricsMutex.RUnlock()
+
 	for _, frame := range metricFrames {
 		for _, metric := range frame.Metrics {
 			if !math.IsNaN(metric.Value) {
