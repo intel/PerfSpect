@@ -91,6 +91,12 @@ func newSignalManager() *signalManager {
 	return sm
 }
 
+func (sm *signalManager) signalKillChildren() {
+	if err := util.SignalChildren(syscall.SIGKILL); err != nil {
+		slog.Error("failed to send kill signal to children", slog.String("error", err.Error()))
+	}
+}
+
 func (sm *signalManager) handleSignals() {
 	defer signal.Stop(sm.sigChannel)
 
@@ -100,18 +106,12 @@ func (sm *signalManager) handleSignals() {
 			slog.Debug("received signal", slog.String("signal", sig.String()))
 			// Cancel context for graceful shutdown
 			sm.cancel()
-
 			// Kill child processes
-			if err := util.SignalChildren(syscall.SIGKILL); err != nil {
-				slog.Error("failed to send kill signal to children", slog.String("error", err.Error()))
-			}
+			sm.signalKillChildren()
 			return
-
 		case <-sm.ctx.Done():
-			// Context cancelled internally, still kill children
-			if err := util.SignalChildren(syscall.SIGKILL); err != nil {
-				slog.Error("failed to send kill signal to children", slog.String("error", err.Error()))
-			}
+			// Context cancelled internally, kill child processes
+			sm.signalKillChildren()
 			return
 		}
 	}
@@ -821,9 +821,9 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	appContext := cmd.Parent().Context().Value(common.AppContext{}).(common.AppContext)
 	localTempDir := appContext.LocalTempDir
 	localOutputDir := appContext.OutputDir
-
 	// Setup signal manager for coordinated shutdown
 	signalMgr := newSignalManager()
+	// short circuit when --input flag is set
 	if flagInput != "" {
 		// create output directory
 		err := common.CreateOutputDir(localOutputDir)
