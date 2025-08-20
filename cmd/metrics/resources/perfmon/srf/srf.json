@@ -36,7 +36,7 @@
   {
     "MetricName": "kernel_cpi",
     "LegacyName": "metric_kernel_CPI",
-    "Origin": "perfspect" 
+    "Origin": "perfspect"
   },
   {
     "MetricName": "kernel_cycles_per_txn",
@@ -439,7 +439,7 @@
         {
           "Name": "TXN",
           "Alias": "b"
-        }        
+        }
       ],
       "Formula": "a / b",
       "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
@@ -527,7 +527,7 @@
         {
           "Name": "TXN",
           "Alias": "b"
-        }        
+        }
       ],
       "Formula": "a / b",
       "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
@@ -546,7 +546,7 @@
         {
           "Name": "TXN",
           "Alias": "b"
-        }        
+        }
       ],
       "Formula": "a / b",
       "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
@@ -565,7 +565,7 @@
         {
           "Name": "TXN",
           "Alias": "b"
-        }        
+        }
       ],
       "Formula": "a / b",
       "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
@@ -584,7 +584,7 @@
         {
           "Name": "TXN",
           "Alias": "b"
-        }        
+        }
       ],
       "Formula": "a / b",
       "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
@@ -603,7 +603,7 @@
         {
           "Name": "TXN",
           "Alias": "b"
-        }        
+        }
       ],
       "Formula": "a / b",
       "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
@@ -622,7 +622,7 @@
         {
           "Name": "TXN",
           "Alias": "b"
-        }        
+        }
       ],
       "Formula": "a / b",
       "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
@@ -641,7 +641,7 @@
         {
           "Name": "TXN",
           "Alias": "b"
-        }        
+        }
       ],
       "Formula": "a / b",
       "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
@@ -664,7 +664,7 @@
         {
           "Name": "TXN",
           "Alias": "c"
-        }        
+        }
       ],
       "Formula": "(a + b) / c",
       "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
@@ -685,13 +685,13 @@
         {
           "Name": "UNC_CHA_TOR_INSERTS.IA_MISS_LLCPREFDATA",
           "Alias": "c"
-        }      
+        }
       ],
       "Constants": [
         {
           "Name": "TXN",
           "Alias": "d"
-        }        
+        }
       ],
       "Formula": "(a + b + c) / d",
       "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
@@ -738,7 +738,7 @@
         {
           "Name": "TSC",
           "Alias": "b"
-        }      
+        }
       ],
       "Constants": [],
       "Formula": "100 * a / b",
@@ -781,7 +781,7 @@
         {
           "Name": "TXN",
           "Alias": "b"
-        }        
+        }
       ],
       "Formula": "a / b",
       "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
@@ -800,7 +800,7 @@
         {
           "Name": "TXN",
           "Alias": "b"
-        }        
+        }
       ],
       "Formula": "a / b",
       "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
@@ -819,7 +819,7 @@
         {
           "Name": "TXN",
           "Alias": "b"
-        }        
+        }
       ],
       "Formula": "a / b",
       "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
