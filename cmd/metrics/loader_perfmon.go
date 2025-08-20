@@ -152,10 +152,7 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, legacyLoaderEventF
 		return nil, nil, fmt.Errorf("error loading metrics from definitions: %w", err)
 	}
 	// Simplify OCR event names in metric expressions
-	metricDefs, err = customizeOCREventNames(metricDefs)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error simplifying OCR event names: %w", err)
-	}
+	metricDefs = customizeOCREventNames(metricDefs)
 	// Create event groups from the perfspect metrics
 	coreGroups, uncoreGroups, otherGroups, uncollectableEvents, err := loadEventGroupsFromMetrics(
 		perfmonMetrics,
@@ -251,16 +248,18 @@ func loadPerfmonMetrics(reportMetrics []PerfspectMetric, perfmonMetrics []Perfmo
 	return perfmonMetricsToReturn, nil
 }
 
-func customizeOCREventNames(metrics []MetricDefinition) ([]MetricDefinition, error) {
+// customizeOCREventNames scans through a slice of MetricDefinition objects and customizes the names of OCR events
+// in their Expression fields. Specifically, it looks for substrings matching the pattern
+// "[OCR.<event_name>:ocr_msr_val=<msr_value>]" and replaces them with a customized name in the format
+// "<event_name>.<msr_value>". Only expressions containing ":ocr_msr_val=" are processed. The function returns
+// the modified slice of MetricDefinition objects.
+func customizeOCREventNames(metrics []MetricDefinition) []MetricDefinition {
+	re := regexp.MustCompile(`(OCR\.[^\]]+):ocr_msr_val=([0-9a-fx]+)`)
 	for i := range metrics {
 		metric := &metrics[i]
 		// example portion of expression: [OCR.DEMAND_RFO.L3_MISS:ocr_msr_val=0x103b8000]
 		if !strings.Contains(metric.Expression, ":ocr_msr_val=") {
 			continue // only customize OCR events with this format
-		}
-		re, err := regexp.Compile(`(OCR\.[^\]]+):ocr_msr_val=([0-9a-fx]+)`)
-		if err != nil {
-			return nil, fmt.Errorf("failed to compile regex for OCR event: %w", err)
 		}
 		for {
 			index := re.FindStringSubmatchIndex(metric.Expression)
@@ -275,7 +274,7 @@ func customizeOCREventNames(metrics []MetricDefinition) ([]MetricDefinition, err
 			metric.Expression = metric.Expression[:index[0]] + customizedName + metric.Expression[index[1]:]
 		}
 	}
-	return metrics, nil
+	return metrics
 }
 
 // getExpression retrieves the expression for a given PerfmonMetric, replacing variables with their corresponding event or constant names.
