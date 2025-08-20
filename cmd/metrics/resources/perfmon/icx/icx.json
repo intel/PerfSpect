@@ -1723,7 +1723,7 @@
         }
         ],
       "Constants": [],
-      "Formula": "100 * ( ( max( 0 , ( a / ( b ) ) - ( ( ( a / c ) * d / ( b ) ) + ( a / ( b ) ) * ( e - e ) / g ) ) ) * h / ( ( a / ( b ) ) * ( b ) ) )",
+      "Formula": "100 * ( ( max( 0 , ( a / ( b ) ) - ( ( ( a / c ) * d / ( b ) ) + ( a / ( b ) ) * ( e - f ) / g ) ) ) * h / ( ( a / ( b ) ) * ( b ) ) )",
       "BaseFormula": "100 * ( ( max( 0 , ( [UOPS_RETIRED.SLOTS] / ( [TOPDOWN.SLOTS_P] ) ) - ( ( ( [UOPS_RETIRED.SLOTS] / [UOPS_ISSUED.ANY] ) * [IDQ.MS_UOPS] / ( [TOPDOWN.SLOTS_P] ) ) + ( [UOPS_RETIRED.SLOTS] / ( [TOPDOWN.SLOTS_P] ) ) * ( [UOPS_DECODED.DEC0] - [UOPS_DECODED.DEC0:c1] ) / [IDQ.MITE_UOPS] ) ) ) * [BR_INST_RETIRED.ALL_BRANCHES] / ( ( [UOPS_RETIRED.SLOTS] / ( [TOPDOWN.SLOTS_P] ) ) * ( [TOPDOWN.SLOTS_P] ) ) )",
       "Category": "TMA",
       "CountDomain": "Slots",
