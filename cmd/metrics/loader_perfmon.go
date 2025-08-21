@@ -48,18 +48,6 @@ type PerfmonMetrics struct {
 	Metrics []PerfmonMetric      `json:"Metrics"`
 }
 
-func loadPerfmonMetricsFromFile(path string) (PerfmonMetrics, error) {
-	var metrics PerfmonMetrics
-	bytes, err := resources.ReadFile(path)
-	if err != nil {
-		return PerfmonMetrics{}, fmt.Errorf("error reading file %s: %w", path, err)
-	}
-	if err := json.Unmarshal(bytes, &metrics); err != nil {
-		return PerfmonMetrics{}, fmt.Errorf("error unmarshaling JSON from %s: %w", path, err)
-	}
-	return metrics, nil
-}
-
 type MetricsConfigHeader struct {
 	Copyright string `json:"Copyright"`
 	Info      string `json:"Info"`
@@ -75,31 +63,9 @@ type MetricsConfig struct {
 	PerfmonCoreEventsFile    string              `json:"PerfmonCoreEventsFile"`    // Path to the perfmon core events file
 	PerfmonUncoreEventsFile  string              `json:"PerfmonUncoreEventsFile"`  // Path to the perfmon uncore events file
 	PerfmonRetireLatencyFile string              `json:"PerfmonRetireLatencyFile"` // Path to the perfmon retire latency file
-	Metrics                  []PerfmonMetric     `json:"Metrics"`                  // Metrics defined by PerfSpect
-	AlternateTMAMetrics      []PerfmonMetric     `json:"AlternateTMAMetrics"`      // Alternate TMA metrics that can be used in place of the main TMA metrics
+	AlternateTMAMetricsFile  string              `json:"AlternateTMAMetricsFile"`  // Path to the alternate TMA metrics file
+	PerfspectMetricsFile     string              `json:"PerfspectMetricsFile"`     // Path to the Perfspect metrics file
 	ReportMetrics            []PerfspectMetric   `json:"ReportMetrics"`            // Metrics that are reported in the PerfSpect report
-}
-
-func (l *PerfmonLoader) loadMetricsConfig(metricConfigOverridePath string) (MetricsConfig, error) {
-	var config MetricsConfig
-	var bytes []byte
-	if metricConfigOverridePath != "" {
-		var err error
-		bytes, err = os.ReadFile(metricConfigOverridePath)
-		if err != nil {
-			return MetricsConfig{}, fmt.Errorf("error reading metric config override file: %w", err)
-		}
-	} else {
-		var err error
-		bytes, err = resources.ReadFile(filepath.Join("resources", "perfmon", strings.ToLower(l.microarchitecture), strings.ToLower(l.microarchitecture)+".json"))
-		if err != nil {
-			return MetricsConfig{}, fmt.Errorf("error reading metrics config file: %w", err)
-		}
-	}
-	if err := json.Unmarshal(bytes, &config); err != nil {
-		return MetricsConfig{}, fmt.Errorf("error unmarshaling metrics config JSON: %w", err)
-	}
-	return config, nil
 }
 
 func (l *PerfmonLoader) Load(metricConfigOverridePath string, legacyLoaderEventFile string, selectedMetrics []string, metadata Metadata) ([]MetricDefinition, []GroupDefinition, error) {
@@ -116,17 +82,17 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, legacyLoaderEventF
 		return nil, nil, fmt.Errorf("error filtering report metrics: %w", err)
 	}
 	// Load the perfmon metric definitions from the JSON file
-	perfmonMetricDefinitions, err := loadPerfmonMetricsFromFile(filepath.Join("resources", "perfmon", strings.ToLower(l.microarchitecture), config.PerfmonMetricsFile))
+	perfmonMetricDefinitions, err := loadPerfmonMetricsFromFile(config.PerfmonMetricsFile)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading perfmon metrics from file: %w", err)
 	}
 	// Load the perfmon core events from the JSON file
-	coreEvents, err := NewCoreEvents(filepath.Join("resources", "perfmon", strings.ToLower(l.microarchitecture), config.PerfmonCoreEventsFile))
+	coreEvents, err := NewCoreEvents(config.PerfmonCoreEventsFile)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading perfmon core events: %w", err)
 	}
 	// Load the perfmon uncore events from the JSON file
-	uncoreEvents, err := NewUncoreEvents(filepath.Join("resources", "perfmon", strings.ToLower(l.microarchitecture), config.PerfmonUncoreEventsFile))
+	uncoreEvents, err := NewUncoreEvents(config.PerfmonUncoreEventsFile)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading perfmon uncore events: %w", err)
 	}
@@ -135,9 +101,19 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, legacyLoaderEventF
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading other events: %w", err)
 	}
+	// Load the alternate TMA metrics from the JSON file
+	alternateTMAMetrics, err := loadPerfmonMetricsFromFile(config.AlternateTMAMetricsFile)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error loading alternate TMA metrics from file: %w", err)
+	}
+	// Load the Perfspect metrics from the JSON file
+	perfspectMetrics, err := loadPerfmonMetricsFromFile(config.PerfspectMetricsFile)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error loading Perfspect metrics from file: %w", err)
+	}
 	// Combine the PerfSpect-defined metrics with the metric definitions from perfmon and filter based on report metrics
 	// Creates one list of all metrics to be used in the loader
-	perfmonMetrics, err := loadPerfmonMetrics(reportMetrics, perfmonMetricDefinitions.Metrics, config.Metrics, config.AlternateTMAMetrics, metadata)
+	perfmonMetrics, err := loadPerfmonMetrics(reportMetrics, perfmonMetricDefinitions.Metrics, perfspectMetrics.Metrics, alternateTMAMetrics.Metrics, metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading perfmon metrics: %w", err)
 	}
@@ -190,7 +166,7 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, legacyLoaderEventF
 	}
 	// Replace retire latencies variables with their values
 	if config.PerfmonRetireLatencyFile != "" {
-		metricDefs, err = replaceRetireLatencies(metricDefs, filepath.Join("resources", "perfmon", strings.ToLower(l.microarchitecture), config.PerfmonRetireLatencyFile))
+		metricDefs, err = replaceRetireLatencies(metricDefs, config.PerfmonRetireLatencyFile)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to replace retire latencies: %w", err)
 		}
@@ -201,6 +177,53 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, legacyLoaderEventF
 		return nil, nil, fmt.Errorf("failed to configure metrics: %w", err)
 	}
 	return metricDefs, allGroups, nil
+}
+
+func (l *PerfmonLoader) loadMetricsConfig(metricConfigOverridePath string) (MetricsConfig, error) {
+	var config MetricsConfig
+	var bytes []byte
+	if metricConfigOverridePath != "" {
+		var err error
+		bytes, err = os.ReadFile(metricConfigOverridePath)
+		if err != nil {
+			return MetricsConfig{}, fmt.Errorf("error reading metric config override file: %w", err)
+		}
+	} else {
+		var err error
+		bytes, err = resources.ReadFile(filepath.Join("resources", "perfmon", strings.ToLower(l.microarchitecture), strings.ToLower(l.microarchitecture)+".json"))
+		if err != nil {
+			return MetricsConfig{}, fmt.Errorf("error reading metrics config file: %w", err)
+		}
+	}
+	if err := json.Unmarshal(bytes, &config); err != nil {
+		return MetricsConfig{}, fmt.Errorf("error unmarshaling metrics config JSON: %w", err)
+	}
+	return config, nil
+}
+
+func loadPerfmonMetricsFromFile(pathWithSource string) (PerfmonMetrics, error) {
+	var metrics PerfmonMetrics
+	pathParts := strings.Split(pathWithSource, ":")
+	if len(pathParts) != 2 || (pathParts[0] != "resources" && pathParts[0] != "file") {
+		return PerfmonMetrics{}, fmt.Errorf("invalid path format, expected 'resources:<path>' or 'file:<path>' but got '%s'", pathWithSource)
+	}
+	var path string
+	var bytes []byte
+	var err error
+	if pathParts[0] == "resources" {
+		path = filepath.Join("resources", "perfmon", pathParts[1])
+		bytes, err = resources.ReadFile(path)
+	} else { // pathParts[0] == "file"
+		path = pathParts[1]
+		bytes, err = os.ReadFile(path) // #nosec G304
+	}
+	if err != nil {
+		return PerfmonMetrics{}, fmt.Errorf("error reading file %s: %w", path, err)
+	}
+	if err := json.Unmarshal(bytes, &metrics); err != nil {
+		return PerfmonMetrics{}, fmt.Errorf("error unmarshaling JSON from %s: %w", path, err)
+	}
+	return metrics, nil
 }
 
 func filterReportMetrics(reportMetrics []PerfspectMetric, selectedMetricNames []string) ([]PerfspectMetric, error) {
@@ -604,12 +627,24 @@ type RetireLatency struct {
 // loadRetireLatencies loads the retire latencies from a JSON file based on the microarchitecture
 // it returns a map of event names to their retire latencies
 // the retire latency is the mean value of the metric stats
-func loadRetireLatencies(retireLatenciesFile string) (map[string]string, error) {
+func loadRetireLatencies(pathWithSource string) (map[string]string, error) {
+	pathParts := strings.Split(pathWithSource, ":")
+	if len(pathParts) != 2 || (pathParts[0] != "resources" && pathParts[0] != "file") {
+		return nil, fmt.Errorf("invalid path format, expected 'resources:<path>' or 'file:<path>' but got '%s'", pathWithSource)
+	}
 	var bytes []byte
 	var err error
-	if bytes, err = resources.ReadFile(retireLatenciesFile); err != nil {
-		slog.Error("failed to read retire latencies file", slog.String("file", retireLatenciesFile), slog.String("error", err.Error()))
-		return nil, fmt.Errorf("failed to read retire latencies file %s: %w", retireLatenciesFile, err)
+	if pathParts[0] == "resources" {
+		retireLatenciesFile := filepath.Join("resources", "perfmon", pathParts[1])
+		bytes, err = resources.ReadFile(retireLatenciesFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read retire latencies file %s: %w", retireLatenciesFile, err)
+		}
+	} else { // pathParts[0] == "file"
+		bytes, err = os.ReadFile(pathParts[1]) // #nosec G304
+		if err != nil {
+			return nil, fmt.Errorf("failed to read retire latencies file %s: %w", pathParts[1], err)
+		}
 	}
 	var retireLatency RetireLatency
 	if err = json.Unmarshal(bytes, &retireLatency); err != nil {
@@ -627,9 +662,9 @@ func loadRetireLatencies(retireLatenciesFile string) (map[string]string, error) 
 }
 
 // replaceRetireLatencies replaces retire latencies in metrics with their values
-func replaceRetireLatencies(metrics []MetricDefinition, retireLatenciesFile string) ([]MetricDefinition, error) {
+func replaceRetireLatencies(metrics []MetricDefinition, pathWithSource string) ([]MetricDefinition, error) {
 	// load retire latencies
-	retireLatencies, err := loadRetireLatencies(retireLatenciesFile)
+	retireLatencies, err := loadRetireLatencies(pathWithSource)
 	if err != nil {
 		slog.Error("failed to load retire latencies", slog.String("error", err.Error()))
 		return nil, err

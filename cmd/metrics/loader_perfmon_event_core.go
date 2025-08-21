@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -53,9 +55,22 @@ var perfMetricsEvents []CoreEvent = []CoreEvent{
 	{EventName: "PERF_METRICS.MEMORY_BOUND", EventCode: "0x00", UMask: "0x87", SampleAfterValue: "10000003"},
 }
 
-func NewCoreEvents(path string) (CoreEvents, error) {
+func NewCoreEvents(pathWithSource string) (CoreEvents, error) {
 	var events CoreEvents
-	bytes, err := resources.ReadFile(path)
+	pathParts := strings.Split(pathWithSource, ":")
+	if len(pathParts) != 2 || (pathParts[0] != "resources" && pathParts[0] != "file") {
+		return CoreEvents{}, fmt.Errorf("invalid path format, expected 'resources:<path>' or 'file:<path>' but got '%s'", pathWithSource)
+	}
+	var path string
+	var bytes []byte
+	var err error
+	if pathParts[0] == "resources" {
+		path = filepath.Join("resources", "perfmon", pathParts[1])
+		bytes, err = resources.ReadFile(path)
+	} else { // pathParts[0] == "file"
+		path = pathParts[1]
+		bytes, err = os.ReadFile(path) // #nosec G304
+	}
 	if err != nil {
 		return events, fmt.Errorf("error reading file %s: %w", path, err)
 	}

@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -35,9 +37,22 @@ type UncoreEvents struct {
 	Events []UncoreEvent     `json:"Events"`
 }
 
-func NewUncoreEvents(path string) (UncoreEvents, error) {
+func NewUncoreEvents(pathWithSource string) (UncoreEvents, error) {
 	var events UncoreEvents
-	bytes, err := resources.ReadFile(path)
+	pathParts := strings.Split(pathWithSource, ":")
+	if len(pathParts) != 2 || (pathParts[0] != "resources" && pathParts[0] != "file") {
+		return UncoreEvents{}, fmt.Errorf("invalid path format, expected 'resources:<path>' or 'file:<path>' but got '%s'", pathWithSource)
+	}
+	var path string
+	var bytes []byte
+	var err error
+	if pathParts[0] == "resources" {
+		path = filepath.Join("resources", "perfmon", pathParts[1])
+		bytes, err = resources.ReadFile(path)
+	} else { // pathParts[0] == "file"
+		path = pathParts[1]
+		bytes, err = os.ReadFile(path) // #nosec G304
+	}
 	if err != nil {
 		return events, fmt.Errorf("error reading file %s: %w", path, err)
 	}
