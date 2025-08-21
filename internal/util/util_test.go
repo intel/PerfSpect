@@ -785,3 +785,59 @@ func TestUniqueAppendSlice(t *testing.T) {
 		})
 	}
 }
+func TestReplaceWholeWord(t *testing.T) {
+	tests := []struct {
+		str      string
+		old      string
+		new      string
+		expected string
+	}{
+		// Basic replacement
+		{"foo bar baz", "bar", "qux", "foo qux baz"},
+		// Multiple occurrences
+		{"foo bar bar baz", "bar", "qux", "foo qux qux baz"},
+		// Old is at start
+		{"bar foo", "bar", "qux", "qux foo"},
+		// Old is at end
+		{"foo bar", "bar", "qux", "foo qux"},
+		// Old is surrounded by punctuation
+		{"foo,bar!baz", "bar", "qux", "foo,qux!baz"},
+		// Old is part of another word (should not replace)
+		{"foobar barfoo bar", "bar", "qux", "foobar barfoo qux"},
+		// Old is substring of another word
+		{"barbarian bar", "bar", "qux", "barbarian qux"},
+		// Old is empty (should return original)
+		{"foo bar baz", "", "qux", "foo bar baz"},
+		// Old not present
+		{"foo baz", "bar", "qux", "foo baz"},
+		// Replace with empty string
+		{"foo bar baz", "bar", "", "foo  baz"},
+		// Replace with longer string
+		{"foo bar baz", "bar", "longword", "foo longword baz"},
+		// Replace with shorter string
+		{"foo bar baz", "bar", "x", "foo x baz"},
+		// Old is underscore
+		{"foo_bar baz", "bar", "qux", "foo_bar baz"},
+		// Old is digit
+		{"foo 123 bar", "123", "456", "foo 456 bar"},
+		// Old is at boundaries
+		{"bar", "bar", "qux", "qux"},
+		// Old is surrounded by spaces
+		{" bar ", "bar", "qux", " qux "},
+		// Old is at start and end
+		{"bar foo bar", "bar", "qux", "qux foo qux"},
+		// Old is surrounded by non-word chars
+		{"foo-bar,baz", "bar", "qux", "foo-qux,baz"},
+		// Old is surrounded by numbers
+		{"foo1bar2baz", "bar", "qux", "foo1bar2baz"},
+		// Old is surrounded by underscores
+		{"foo_bar_baz", "bar", "qux", "foo_bar_baz"},
+	}
+
+	for _, tt := range tests {
+		got := ReplaceWholeWord(tt.str, tt.old, tt.new)
+		if got != tt.expected {
+			t.Errorf("ReplaceWholeWord(%q, %q, %q) = %q, want %q", tt.str, tt.old, tt.new, got, tt.expected)
+		}
+	}
+}

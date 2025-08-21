@@ -313,20 +313,8 @@ func getExpression(perfmonMetric PerfmonMetric) (string, error) {
 		replacers[constant["Alias"]] = fmt.Sprintf("[%s]", constant["Name"])
 	}
 	for alias, replacement := range replacers {
-		// regex to match alias as a whole word
-		// this prevents replacing substrings that are part of other words
-		re, err := regexp.Compile(fmt.Sprintf(`\b%s\b`, alias))
-		if err != nil {
-			return "", fmt.Errorf("failed to compile regex for alias %s: %w", alias, err)
-		}
-		for {
-			index := re.FindStringIndex(expression)
-			if index == nil {
-				break // no more matches found
-			}
-			// replace the first occurrence of the alias with the replacement
-			expression = expression[:index[0]] + replacement + expression[index[1]:]
-		}
+		// Replace alias as whole words only (not substrings)
+		expression = util.ReplaceWholeWord(expression, alias, replacement)
 	}
 	// replace common constants with their values
 	commonEventReplacements := map[string]string{
@@ -338,20 +326,8 @@ func getExpression(perfmonMetric PerfmonMetric) (string, error) {
 	}
 	// replace fixed counter perfmon event names with their corresponding perf event names
 	for perfmonEventName, perfEventName := range fixedCounterEventNameTranslation {
-		// regex to match event name as a whole word
-		// this prevents replacing substrings that are part of other words
-		re, err := regexp.Compile(fmt.Sprintf(`\b%s\b`, perfmonEventName))
-		if err != nil {
-			return "", fmt.Errorf("failed to compile regex for perfmonEventName %s: %w", perfmonEventName, err)
-		}
-		for {
-			index := re.FindStringIndex(expression)
-			if index == nil {
-				break // no more matches found
-			}
-			// replace the first occurrence of the alias with the replacement
-			expression = expression[:index[0]] + perfEventName + expression[index[1]:]
-		}
+		// Replace event name as whole words only (not substrings)
+		expression = util.ReplaceWholeWord(expression, perfmonEventName, perfEventName)
 	}
 	return expression, nil
 }
