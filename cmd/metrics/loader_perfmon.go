@@ -101,10 +101,13 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, legacyLoaderEventF
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading other events: %w", err)
 	}
-	// Load the alternate TMA metrics from the JSON file
-	alternateTMAMetrics, err := loadPerfmonMetricsFromFile(config.AlternateTMAMetricsFile)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error loading alternate TMA metrics from file: %w", err)
+	// Load the (optional) alternate TMA metrics from the JSON file
+	var alternateTMAMetrics PerfmonMetrics
+	if config.AlternateTMAMetricsFile != "" {
+		alternateTMAMetrics, err = loadPerfmonMetricsFromFile(config.AlternateTMAMetricsFile)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error loading alternate TMA metrics from file: %w", err)
+		}
 	}
 	// Load the Perfspect metrics from the JSON file
 	perfspectMetrics, err := loadPerfmonMetricsFromFile(config.PerfspectMetricsFile)
