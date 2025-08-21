@@ -29,8 +29,6 @@ import (
 	"perfspect/internal/target"
 	"perfspect/internal/util"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"slices"
 
 	"github.com/spf13/cobra"
@@ -338,11 +336,11 @@ func getFlagGroups() []common.FlagGroup {
 		},
 		{
 			Name: flagPrometheusServerName,
-			Help: "enable promtheus metrics server",
+			Help: "enable prometheus metrics server",
 		},
 		{
 			Name: flagPrometheusServerAddrName,
-			Help: "address (e.g., host:port) to start Prometheus metrics server on (implies --promtheus-server true)",
+			Help: "address (e.g., host:port) to start Prometheus metrics server on (implies --prometheus-server true)",
 		},
 	}
 	groups = append(groups, common.FlagGroup{
@@ -561,6 +559,29 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 			return common.FlagValidationError(cmd, fmt.Sprintf("invalid output format: %s, valid options are: %s", format, strings.Join(formatOptions, ", ")))
 		}
 	}
+	// if live is set, output format must be only one of the formats
+	if flagLive {
+		if len(flagOutputFormat) != 1 {
+			return common.FlagValidationError(cmd, fmt.Sprintf("when --%s is set, only one output format can be specified with --%s", flagLiveName, flagOutputFormatName))
+		}
+	}
+	// prometheus server address
+	if cmd.Flags().Changed(flagPrometheusServerAddrName) {
+		flagPrometheusServer = true
+		_, port, err := net.SplitHostPort(flagPrometheusServerAddr)
+		if err != nil {
+			slog.Error(err.Error())
+			err = fmt.Errorf("invalid prometheus server address format: %s, expected host:port", flagPrometheusServerAddr)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
+		if _, err := strconv.Atoi(port); err != nil {
+			slog.Error(err.Error())
+			err = fmt.Errorf("invalid port in prometheus server address: %s, port must be an integer", flagPrometheusServerAddr)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
+	}
 	// advanced options
 	// confirm valid perf print interval
 	if cmd.Flags().Lookup(flagPerfPrintIntervalName).Changed {
@@ -619,23 +640,6 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	// common target flags
 	if err := common.ValidateTargetFlags(cmd); err != nil {
 		return common.FlagValidationError(cmd, err.Error())
-	}
-	// prometheus server address
-	if cmd.Flags().Changed(flagPrometheusServerAddrName) {
-		flagPrometheusServer = true
-		_, port, err := net.SplitHostPort(flagPrometheusServerAddr)
-		if err != nil {
-			slog.Error(err.Error())
-			err = fmt.Errorf("invalid prometheus server address format: %s, expected host:port", flagPrometheusServerAddr)
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
-		}
-		if _, err := strconv.Atoi(port); err != nil {
-			slog.Error(err.Error())
-			err = fmt.Errorf("invalid port in prometheus server address: %s, port must be an integer", flagPrometheusServerAddr)
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
-		}
 	}
 	return nil
 }
@@ -881,6 +885,14 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		cmd.SilenceUsage = true
 		return err
 	}
+	// only one target currently supported for prometheus server
+	if flagPrometheusServer && len(myTargets) > 1 {
+		err := fmt.Errorf("prometheus server is only supported for a single target")
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		slog.Error(err.Error())
+		cmd.SilenceUsage = true
+		return err
+	}
 	// create progress spinner
 	multiSpinner := progress.NewMultiSpinner()
 	for _, myTarget := range myTargets {
@@ -1026,6 +1038,11 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		}
 		return nil
 	}
+	if flagPrometheusServer {
+		for _, targetContext := range targetContexts {
+			createPrometheusMetrics(targetContext.metricDefinitions)
+		}
+	}
 	// create the local output directory
 	if !flagLive && !flagPrometheusServer {
 		err = common.CreateOutputDir(localOutputDir)
@@ -1055,7 +1072,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		multiSpinner.Finish()
 	}
 	// Start Prometheus server if requested
-	if flagPrometheusServer && flagPrometheusServerAddr != "" {
+	if flagPrometheusServer {
 		multiSpinner.Finish()
 		fmt.Printf("starting metrics server on %s\n", flagPrometheusServerAddr)
 		startPrometheusServer(flagPrometheusServerAddr)
@@ -1243,23 +1260,6 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
 		return
-	}
-	if flagPrometheusServer {
-		for _, def := range targetContext.metricDefinitions {
-			desc := fmt.Sprintf("%s (expr: %s)", def.Name, def.Expression)
-			name := promMetricPrefix + sanitizeMetricName(def.Name)
-			gauge := prometheus.NewGaugeVec(
-				prometheus.GaugeOpts{
-					Name: name,
-					Help: desc,
-				},
-				[]string{"socket", "cpu", "cgroup", "pid", "cmd"},
-			)
-			promMetrics[name] = gauge
-		}
-		for _, m := range promMetrics {
-			prometheus.MustRegister(m)
-		}
 	}
 	channelError <- targetError{target: myTarget, err: nil}
 }
