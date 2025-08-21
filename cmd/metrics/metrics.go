@@ -359,7 +359,7 @@ func getFlagGroups() []common.FlagGroup {
 		},
 		{
 			Name: flagEventFilePathName,
-			Help: "perf event definition file. Will override default event definitions.",
+			Help: "perf event definition file. Will override default event definitions. For legacy loader only.",
 		},
 		{
 			Name: flagMetricFilePathName,
@@ -766,6 +766,24 @@ func readNextEventFrame(file *os.File) ([][]byte, error) {
 		lastInterval = string(match[1])
 	}
 }
+
+func getLoaderConfig(loader Loader, selectedMetrics []string, metadata Metadata, metricsOverride string, eventsOverride string) LoaderConfig {
+	loaderConfig := LoaderConfig{
+		SelectedMetrics: selectedMetrics,
+		Metadata:        metadata,
+	}
+	if _, ok := loader.(*PerfmonLoader); ok {
+		loaderConfig.ConfigFileOverride = metricsOverride
+	} else if _, ok := loader.(*LegacyLoader); ok {
+		loaderConfig.EventDefinitionOverride = eventsOverride
+		loaderConfig.MetricDefinitionOverride = metricsOverride
+	} else {
+		err := fmt.Errorf("unknown loader type: %T", loader)
+		panic(err) // this should never happen, but if it does, we want to know
+	}
+	return loaderConfig
+}
+
 func processRawData(localOutputDir string) error {
 	metadata, eventsFile, err := readRawData(flagInput)
 	if err != nil {
@@ -778,7 +796,7 @@ func processRawData(localOutputDir string) error {
 		err = fmt.Errorf("failed to create metric and event loader: %w", err)
 		return err
 	}
-	metricDefinitions, eventGroupDefinitions, err := loader.Load(flagMetricFilePath, flagEventFilePath, flagMetricsList, metadata)
+	metricDefinitions, eventGroupDefinitions, err := loader.Load(getLoaderConfig(loader, flagMetricsList, metadata, flagMetricFilePath, flagEventFilePath))
 	if err != nil {
 		err = fmt.Errorf("failed to load metric and event definitions: %w", err)
 		return err
@@ -1236,7 +1254,7 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 		channelError <- targetError{target: myTarget, err: err}
 		return
 	}
-	targetContext.metricDefinitions, targetContext.groupDefinitions, err = loader.Load(flagMetricFilePath, flagEventFilePath, flagMetricsList, targetContext.metadata)
+	targetContext.metricDefinitions, targetContext.groupDefinitions, err = loader.Load(getLoaderConfig(loader, flagMetricsList, targetContext.metadata, flagMetricFilePath, flagEventFilePath))
 	if err != nil {
 		err = fmt.Errorf("failed to load metric and event definitions: %w", err)
 		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))

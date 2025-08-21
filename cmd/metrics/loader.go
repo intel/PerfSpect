@@ -29,8 +29,19 @@ type EventDefinition struct {
 // GroupDefinition represents a group of perf events
 type GroupDefinition []EventDefinition
 
+// LoaderConfig encapsulates all configuration options for loaders
+type LoaderConfig struct {
+	// Common configuration
+	SelectedMetrics []string
+	Metadata        Metadata
+
+	// Override configurations
+	MetricDefinitionOverride string // For direct metric file override (legacy loader)
+	EventDefinitionOverride  string // For direct event file override  (legacy loader)
+	ConfigFileOverride       string // For config file that points to multiple files (perfmon loader)
+}
 type Loader interface {
-	Load(metricDefinitionOverridePath string, eventDefinitionOverridePath string, selectedMetrics []string, metadata Metadata) (metrics []MetricDefinition, groups []GroupDefinition, err error)
+	Load(config LoaderConfig) (metrics []MetricDefinition, groups []GroupDefinition, err error)
 }
 
 type BaseLoader struct {

@@ -16,16 +16,16 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 )
 
-func (l *LegacyLoader) Load(metricDefinitionOverridePath string, eventDefinitionOverridePath string, selectedMetrics []string, metadata Metadata) ([]MetricDefinition, []GroupDefinition, error) {
-	loadedMetricDefinitions, err := loadMetricDefinitions(metricDefinitionOverridePath, selectedMetrics, metadata)
+func (l *LegacyLoader) Load(loaderConfig LoaderConfig) ([]MetricDefinition, []GroupDefinition, error) {
+	loadedMetricDefinitions, err := loadMetricDefinitions(loaderConfig.MetricDefinitionOverride, loaderConfig.SelectedMetrics, loaderConfig.Metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load metric definitions: %w", err)
 	}
-	loadedEventGroups, uncollectableEvents, err := loadEventGroups(eventDefinitionOverridePath, metadata)
+	loadedEventGroups, uncollectableEvents, err := loadEventGroups(loaderConfig.EventDefinitionOverride, loaderConfig.Metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load event group definitions: %w", err)
 	}
-	configuredMetricDefinitions, err := configureMetrics(loadedMetricDefinitions, uncollectableEvents, metadata)
+	configuredMetricDefinitions, err := configureMetrics(loadedMetricDefinitions, uncollectableEvents, loaderConfig.Metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to configure metrics: %w", err)
 	}

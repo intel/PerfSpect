@@ -68,16 +68,13 @@ type MetricsConfig struct {
 	ReportMetrics            []PerfspectMetric   `json:"ReportMetrics"`            // Metrics that are reported in the PerfSpect report
 }
 
-func (l *PerfmonLoader) Load(metricConfigOverridePath string, legacyLoaderEventFile string, selectedMetrics []string, metadata Metadata) ([]MetricDefinition, []GroupDefinition, error) {
-	if legacyLoaderEventFile != "" {
-		return nil, nil, fmt.Errorf("legacy loader event file is not supported in PerfmonLoader")
-	}
+func (l *PerfmonLoader) Load(loaderConfig LoaderConfig) ([]MetricDefinition, []GroupDefinition, error) {
 	// Load the metrics configuration from the JSON file
-	config, err := l.loadMetricsConfig(metricConfigOverridePath)
+	config, err := l.loadMetricsConfig(loaderConfig.ConfigFileOverride)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load metrics config: %w", err)
 	}
-	reportMetrics, err := filterReportMetrics(config.ReportMetrics, selectedMetrics)
+	reportMetrics, err := filterReportMetrics(config.ReportMetrics, loaderConfig.SelectedMetrics)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error filtering report metrics: %w", err)
 	}
@@ -116,12 +113,12 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, legacyLoaderEventF
 	}
 	// Combine the PerfSpect-defined metrics with the metric definitions from perfmon and filter based on report metrics
 	// Creates one list of all metrics to be used in the loader
-	perfmonMetrics, err := loadPerfmonMetrics(reportMetrics, perfmonMetricDefinitions.Metrics, perfspectMetrics.Metrics, alternateTMAMetrics.Metrics, metadata)
+	perfmonMetrics, err := loadPerfmonMetrics(reportMetrics, perfmonMetricDefinitions.Metrics, perfspectMetrics.Metrics, alternateTMAMetrics.Metrics, loaderConfig.Metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading perfmon metrics: %w", err)
 	}
 	// Remove metrics that use uncollectable events
-	perfmonMetrics, err = removeUncollectableMetrics(perfmonMetrics, coreEvents, uncoreEvents, otherEvents, metadata)
+	perfmonMetrics, err = removeUncollectableMetrics(perfmonMetrics, coreEvents, uncoreEvents, otherEvents, loaderConfig.Metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error removing uncollectable metrics: %w", err)
 	}
@@ -138,7 +135,7 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, legacyLoaderEventF
 		coreEvents,
 		uncoreEvents,
 		otherEvents,
-		metadata,
+		loaderConfig.Metadata,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading event groups from metrics: %v", err)
@@ -149,7 +146,7 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, legacyLoaderEventF
 		return nil, nil, fmt.Errorf("error merging duplicate groups: %v", err)
 	}
 	// Merge groups that can be merged, i.e., if 2nd group's events fit in the first group
-	coreGroups, uncoreGroups, err = mergeGroups(coreGroups, uncoreGroups, metadata)
+	coreGroups, uncoreGroups, err = mergeGroups(coreGroups, uncoreGroups, loaderConfig.Metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error merging groups: %v", err)
 	}
@@ -175,19 +172,19 @@ func (l *PerfmonLoader) Load(metricConfigOverridePath string, legacyLoaderEventF
 		}
 	}
 	// Apply common modifications to metric expressions
-	metricDefs, err = configureMetrics(metricDefs, uncollectableEvents, metadata)
+	metricDefs, err = configureMetrics(metricDefs, uncollectableEvents, loaderConfig.Metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to configure metrics: %w", err)
 	}
 	return metricDefs, allGroups, nil
 }
 
-func (l *PerfmonLoader) loadMetricsConfig(metricConfigOverridePath string) (MetricsConfig, error) {
+func (l *PerfmonLoader) loadMetricsConfig(configFileOverride string) (MetricsConfig, error) {
 	var config MetricsConfig
 	var bytes []byte
-	if metricConfigOverridePath != "" {
+	if configFileOverride != "" {
 		var err error
-		bytes, err = os.ReadFile(metricConfigOverridePath)
+		bytes, err = os.ReadFile(configFileOverride)
 		if err != nil {
 			return MetricsConfig{}, fmt.Errorf("error reading metric config override file: %w", err)
 		}
