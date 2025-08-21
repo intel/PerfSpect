@@ -29,8 +29,6 @@ import (
 	"perfspect/internal/target"
 	"perfspect/internal/util"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"slices"
 
 	"github.com/spf13/cobra"
@@ -65,29 +63,69 @@ var Cmd = &cobra.Command{
 //go:embed resources
 var resources embed.FS
 
-// globals
-var (
-	gSignalMutex    sync.Mutex
-	gSignalReceived bool
-)
-
-func setSignalReceived() {
-	gSignalMutex.Lock()
-	defer gSignalMutex.Unlock()
-	gSignalReceived = true
+// Signal manager for coordinated shutdown
+type signalManager struct {
+	ctx        context.Context
+	cancel     context.CancelFunc
+	sigChannel chan os.Signal
 }
 
-func getSignalReceived() bool {
-	for range 10 {
-		gSignalMutex.Lock()
-		received := gSignalReceived
-		gSignalMutex.Unlock()
-		if received {
-			return true
-		}
-		time.Sleep(10 * time.Millisecond)
+func newSignalManager() *signalManager {
+	ctx, cancel := context.WithCancel(context.Background())
+	sigChannel := make(chan os.Signal, 1)
+
+	sm := &signalManager{
+		ctx:        ctx,
+		cancel:     cancel,
+		sigChannel: sigChannel,
 	}
-	return gSignalReceived
+
+	// Setup signal handling
+	signal.Notify(sigChannel, syscall.SIGINT, syscall.SIGTERM)
+
+	// Start signal handler goroutine
+	go sm.handleSignals()
+
+	return sm
+}
+
+func (sm *signalManager) signalKillChildren() {
+	if err := util.SignalChildren(syscall.SIGKILL); err != nil {
+		slog.Error("failed to send kill signal to children", slog.String("error", err.Error()))
+	}
+}
+
+func (sm *signalManager) handleSignals() {
+	defer signal.Stop(sm.sigChannel)
+
+	for {
+		select {
+		case sig := <-sm.sigChannel:
+			slog.Debug("received signal", slog.String("signal", sig.String()))
+			// Cancel context for graceful shutdown
+			sm.cancel()
+			// Kill child processes
+			sm.signalKillChildren()
+			return
+		case <-sm.ctx.Done():
+			// Context cancelled internally, kill child processes
+			sm.signalKillChildren()
+			return
+		}
+	}
+}
+
+func (sm *signalManager) shouldStop() bool {
+	select {
+	case <-sm.ctx.Done():
+		return true
+	default:
+		return false
+	}
+}
+
+func (sm *signalManager) triggerShutdown() {
+	sm.cancel()
 }
 
 var (
@@ -298,11 +336,11 @@ func getFlagGroups() []common.FlagGroup {
 		},
 		{
 			Name: flagPrometheusServerName,
-			Help: "enable promtheus metrics server",
+			Help: "enable prometheus metrics server",
 		},
 		{
 			Name: flagPrometheusServerAddrName,
-			Help: "address (e.g., host:port) to start Prometheus metrics server on (implies --promtheus-server true)",
+			Help: "address (e.g., host:port) to start Prometheus metrics server on (implies --prometheus-server true)",
 		},
 	}
 	groups = append(groups, common.FlagGroup{
@@ -521,6 +559,29 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 			return common.FlagValidationError(cmd, fmt.Sprintf("invalid output format: %s, valid options are: %s", format, strings.Join(formatOptions, ", ")))
 		}
 	}
+	// if live is set, output format must be only one of the formats
+	if flagLive {
+		if len(flagOutputFormat) != 1 {
+			return common.FlagValidationError(cmd, fmt.Sprintf("when --%s is set, only one output format can be specified with --%s", flagLiveName, flagOutputFormatName))
+		}
+	}
+	// prometheus server address
+	if cmd.Flags().Changed(flagPrometheusServerAddrName) {
+		flagPrometheusServer = true
+		_, port, err := net.SplitHostPort(flagPrometheusServerAddr)
+		if err != nil {
+			slog.Error(err.Error())
+			err = fmt.Errorf("invalid prometheus server address format: %s, expected host:port", flagPrometheusServerAddr)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
+		if _, err := strconv.Atoi(port); err != nil {
+			slog.Error(err.Error())
+			err = fmt.Errorf("invalid port in prometheus server address: %s, port must be an integer", flagPrometheusServerAddr)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
+	}
 	// advanced options
 	// confirm valid perf print interval
 	if cmd.Flags().Lookup(flagPerfPrintIntervalName).Changed {
@@ -579,23 +640,6 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	// common target flags
 	if err := common.ValidateTargetFlags(cmd); err != nil {
 		return common.FlagValidationError(cmd, err.Error())
-	}
-	// prometheus server address
-	if cmd.Flags().Changed(flagPrometheusServerAddrName) {
-		flagPrometheusServer = true
-		_, port, err := net.SplitHostPort(flagPrometheusServerAddr)
-		if err != nil {
-			slog.Error(err.Error())
-			err = fmt.Errorf("invalid prometheus server address format: %s, expected host:port", flagPrometheusServerAddr)
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
-		}
-		if _, err := strconv.Atoi(port); err != nil {
-			slog.Error(err.Error())
-			err = fmt.Errorf("invalid port in prometheus server address: %s, port must be an integer", flagPrometheusServerAddr)
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
-		}
 	}
 	return nil
 }
@@ -773,22 +817,9 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	appContext := cmd.Parent().Context().Value(common.AppContext{}).(common.AppContext)
 	localTempDir := appContext.LocalTempDir
 	localOutputDir := appContext.OutputDir
-	// handle signals
-	sigChannel := make(chan os.Signal, 1)
-	signal.Notify(sigChannel, syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1)
-	go func() {
-		for sig := range sigChannel {
-			slog.Debug("received signal", slog.String("signal", sig.String()))
-			if sig == syscall.SIGINT || sig == syscall.SIGTERM {
-				setSignalReceived()
-			}
-			// send kill signal to children
-			err := util.SignalChildren(syscall.SIGKILL)
-			if err != nil {
-				slog.Error("failed to send kill signal to children", slog.String("error", err.Error()))
-			}
-		}
-	}()
+	// Setup signal manager for coordinated shutdown
+	signalMgr := newSignalManager()
+	// short circuit when --input flag is set
 	if flagInput != "" {
 		// create output directory
 		err := common.CreateOutputDir(localOutputDir)
@@ -841,6 +872,14 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	// check for live mode with multiple targets
 	if flagLive && len(myTargets) > 1 {
 		err := fmt.Errorf("live mode is only supported for a single target")
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		slog.Error(err.Error())
+		cmd.SilenceUsage = true
+		return err
+	}
+	// only one target currently supported for prometheus server
+	if flagPrometheusServer && len(myTargets) > 1 {
+		err := fmt.Errorf("prometheus server is only supported for a single target")
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
 		cmd.SilenceUsage = true
@@ -991,6 +1030,11 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		}
 		return nil
 	}
+	if flagPrometheusServer {
+		for _, targetContext := range targetContexts {
+			createPrometheusMetrics(targetContext.metricDefinitions)
+		}
+	}
 	// create the local output directory
 	if !flagLive && !flagPrometheusServer {
 		err = common.CreateOutputDir(localOutputDir)
@@ -1014,13 +1058,13 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			_ = multiSpinner.Status(targetContexts[i].target.GetName(), finalMessage)
 		}
 		collectOnTargetWG.Add(1)
-		go collectOnTarget(&targetContexts[i], localTempDir, localOutputDir, &collectOnTargetWG, multiSpinner.Status)
+		go collectOnTarget(&targetContexts[i], localTempDir, localOutputDir, &collectOnTargetWG, multiSpinner.Status, signalMgr)
 	}
 	if flagLive {
 		multiSpinner.Finish()
 	}
 	// Start Prometheus server if requested
-	if flagPrometheusServer && flagPrometheusServerAddr != "" {
+	if flagPrometheusServer {
 		multiSpinner.Finish()
 		fmt.Printf("starting metrics server on %s\n", flagPrometheusServerAddr)
 		startPrometheusServer(flagPrometheusServerAddr)
@@ -1200,25 +1244,6 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 		channelError <- targetError{target: myTarget, err: err}
 		return
 	}
-	// configure the prometheus metrics if requested
-	if flagPrometheusServer {
-		for _, def := range targetContext.metricDefinitions {
-			desc := fmt.Sprintf("%s (expr: %s)", def.Name, def.Expression)
-			name := promMetricPrefix + sanitizeMetricName(def.Name)
-			gauge := prometheus.NewGaugeVec(
-				prometheus.GaugeOpts{
-					Name: name,
-					Help: desc,
-				},
-				[]string{"socket", "cpu", "cgroup", "pid", "cmd"},
-			)
-			promMetrics[name] = gauge
-		}
-		for _, m := range promMetrics {
-			prometheus.MustRegister(m)
-		}
-	}
-	// signal exit with no error
 	channelError <- targetError{target: myTarget, err: nil}
 }
 
@@ -1264,7 +1289,7 @@ func getCidsForPerf(myTarget target.Target, cidList []string, count int, filter 
 	return cids, nil
 }
 
-func collectOnTarget(targetContext *targetContext, localTempDir string, localOutputDir string, wg *sync.WaitGroup, statusUpdate progress.MultiSpinnerUpdateFunc) {
+func collectOnTarget(targetContext *targetContext, localTempDir string, localOutputDir string, wg *sync.WaitGroup, statusUpdate progress.MultiSpinnerUpdateFunc, signalMgr *signalManager) {
 	defer wg.Done()
 	myTarget := targetContext.target
 	if targetContext.err != nil {
@@ -1291,7 +1316,7 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 	targetContext.metadata.CollectionStartTime = time.Now() // save the start time in the metadata for use when using the --input option to process raw data
 	go printMetricsAsync(targetContext, localOutputDir, frameChannel, printCompleteChannel)
 	var err error
-	for !getSignalReceived() {
+	for !signalMgr.shouldStop() {
 		var processes []Process
 		var pids []string
 		var cids []string
@@ -1336,11 +1361,11 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 		}
 		// this timestamp is used to determine if we need to exit the loop, i.e., we've run long enough
 		targetContext.perfStartTime = time.Now()
-		go runPerf(myTarget, flagNoRoot, processes, perfCommand, targetContext.groupDefinitions, targetContext.metricDefinitions, targetContext.metadata, localTempDir, localOutputDir, frameChannel, errorChannel)
+		go runPerf(myTarget, flagNoRoot, processes, perfCommand, targetContext.groupDefinitions, targetContext.metricDefinitions, targetContext.metadata, localTempDir, localOutputDir, frameChannel, errorChannel, signalMgr)
 		// wait for runPerf to finish
 		perfErr := <-errorChannel // capture and return all errors
 		if perfErr != nil {
-			if !getSignalReceived() {
+			if !signalMgr.shouldStop() {
 				err = perfErr
 				_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 			}
@@ -1365,7 +1390,7 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 // until perf stops. When collecting for cgroups, perf will be manually terminated if/when the
 // run duration exceeds the collection time or the time when the cgroup list needs
 // to be refreshed.
-func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec.Cmd, eventGroupDefinitions []GroupDefinition, metricDefinitions []MetricDefinition, metadata Metadata, localTempDir string, outputDir string, frameChannel chan []MetricFrame, errorChannel chan error) {
+func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec.Cmd, eventGroupDefinitions []GroupDefinition, metricDefinitions []MetricDefinition, metadata Metadata, localTempDir string, outputDir string, frameChannel chan []MetricFrame, errorChannel chan error, signalMgr *signalManager) {
 	// start perf
 	perfCommand := strings.Join(cmd.Args, " ")
 	stdoutChannel := make(chan []byte)
@@ -1423,6 +1448,7 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec
 		intervalBatchChannel,
 		frameChannel,
 		donePerfProcessingChannel,
+		signalMgr,
 	)
 
 	// receive perf output and batch by interval
@@ -1505,6 +1531,7 @@ func processPerfOutput(
 	intervalBatchChannel chan [][]byte,
 	frameChannel chan []MetricFrame,
 	doneChannel chan struct{},
+	signalMgr *signalManager,
 ) {
 	defer close(doneChannel) // close the done channel when the function returns to signal completion
 	var frameTimestamp float64
@@ -1535,12 +1562,8 @@ func processPerfOutput(
 					slog.Error(err.Error())
 					numConsecutiveProcessEventErrors++
 					if numConsecutiveProcessEventErrors > maxConsecutiveProcessEventErrors {
-						slog.Error("too many consecutive errors processing events, killing perf", slog.Int("max errors", maxConsecutiveProcessEventErrors))
-						// signaling self with SIGUSR1 will signal child processes to exit, which will cancel the context and let this function exit
-						err := util.SignalSelf(syscall.SIGUSR1)
-						if err != nil {
-							slog.Error("failed to signal self", slog.String("error", err.Error()))
-						}
+						slog.Error("too many consecutive errors processing events, triggering shutdown", slog.Int("max errors", maxConsecutiveProcessEventErrors))
+						signalMgr.triggerShutdown()
 					}
 				} else {
 					// send the metrics frames out to be printed
@@ -1559,11 +1582,7 @@ func processPerfOutput(
 		if flagScope == scopeCgroup && cgroupTimeout != 0 {
 			if int(time.Since(startPerfTimestamp).Seconds()) >= cgroupTimeout {
 				slog.Debug("cgroup refresh timeout reached")
-				// signaling self with SIGUSR1 will signal child processes to exit, which will cancel the context and let this function exit
-				err := util.SignalSelf(syscall.SIGUSR1)
-				if err != nil {
-					slog.Error("failed to signal self", slog.String("error", err.Error()))
-				}
+				signalMgr.triggerShutdown()
 			}
 		}
 	}

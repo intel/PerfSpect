@@ -251,14 +251,14 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 			os.Exit(1)
 		}()
 		defer signal.Stop(sigChannel)
-		slog.Info("Checking for updates")
+		slog.Debug("Checking for perfspect updates")
 		updateAvailable, latestManifest, err := checkForUpdates(gVersion)
 		if err != nil {
 			slog.Error(err.Error())
 		} else if updateAvailable {
 			fmt.Fprintf(os.Stderr, "A new version (%s) of %s is available!\nPlease run '%s update' to update to the latest version.\n\n", latestManifest.Version, common.AppName, common.AppName)
 		} else {
-			slog.Info("No updates available")
+			slog.Debug("No updates available")
 		}
 	}
 	return nil
