@@ -14,8 +14,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-
-	"perfspect/internal/util"
 )
 
 // EventGroup represents a group of perf events and their values
@@ -137,6 +135,11 @@ func parseEvents(rawEvents [][]byte) ([]Event, error) {
 			slog.Error(err.Error(), slog.String("event", string(rawEvent)))
 			return nil, err
 		}
+		// sometimes perf will prepend "cpu/" to the topdown event names, e.g., cpu/topdown-retiring/, we clean it up here to match metric formulas
+		if strings.HasPrefix(event.Event, "cpu/") && strings.Contains(event.Event, "topdown") && strings.HasSuffix(event.Event, "/") {
+			event.Event = strings.TrimPrefix(event.Event, "cpu/")
+			event.Event = strings.TrimSuffix(event.Event, "/")
+		}
 		switch event.CounterValue {
 		case "<not counted>":
 			slog.Debug("event not counted", slog.String("event", string(rawEvent)))
@@ -239,107 +242,80 @@ func bucketEvents(allEvents []Event, scope string, granularity string, metadata 
 			bucketedEvents = append(bucketedEvents, allEvents)
 			return
 		case granularitySocket:
-			// create one list of Events per Socket
-			newEvents := make([][]Event, metadata.SocketCount)
-			for i := range metadata.SocketCount {
-				newEvents[i] = make([]Event, 0, len(allEvents)/metadata.SocketCount)
-			}
-			// incoming events are labeled with cpu number
-			// we need to map cpu number to socket number, and accumulate the values from each cpu event into a socket event
-			// we assume that the events are ordered by cpu number and events are present for each cpu
+			// create one list of Events per Socket dynamically as we encounter them
+			socketEventsMap := make(map[int][]Event)
 			var currentEvent string
+
 			for _, event := range allEvents {
 				var eventCPU int
 				if eventCPU, err = strconv.Atoi(event.CPU); err != nil {
-					err = fmt.Errorf("failed to parse cpu number: %s", event.CPU)
-					return
+					return nil, fmt.Errorf("failed to parse cpu number: %s", event.CPU)
 				}
-				// if cpu exists in map, add event to the eventSocket, use the !ok go idiom to check if the key exists
-				if eventSocket, ok := metadata.CPUSocketMap[eventCPU]; ok {
-					if eventSocket > len(newEvents)-1 {
-						err = fmt.Errorf("cpu %d is mapped to socket %d, which is greater than the number of sockets %d", eventCPU, eventSocket, len(newEvents)-1)
-						return
-					}
-					// if first event or the event name changed, add the event to the list of socket events
-					if len(newEvents[eventSocket]) == 0 || newEvents[eventSocket][len(newEvents[eventSocket])-1].Event != currentEvent || event.Event != currentEvent {
-						newEvents[eventSocket] = append(newEvents[eventSocket], event)
-						newEvents[eventSocket][len(newEvents[eventSocket])-1].Socket = fmt.Sprintf("%d", eventSocket)
-						newEvents[eventSocket][len(newEvents[eventSocket])-1].CPU = ""
-						currentEvent = event.Event
-					} else {
-						// if the event name is the same as the last socket event, add the new event's value to the last socket event's value
-						newEvents[eventSocket][len(newEvents[eventSocket])-1].Value += event.Value
-					}
+
+				// look up which socket this CPU belongs to
+				eventSocket, ok := metadata.CPUSocketMap[eventCPU]
+				if !ok {
+					return nil, fmt.Errorf("cpu %d is not mapped to a socket", eventCPU)
+				}
+
+				// dynamically create socket bucket if it doesn't exist
+				if _, exists := socketEventsMap[eventSocket]; !exists {
+					socketEventsMap[eventSocket] = make([]Event, 0)
+				}
+
+				// if first event or the event name changed, add the event to the list of socket events
+				if len(socketEventsMap[eventSocket]) == 0 ||
+					socketEventsMap[eventSocket][len(socketEventsMap[eventSocket])-1].Event != currentEvent ||
+					event.Event != currentEvent {
+					newEvent := event
+					newEvent.Socket = fmt.Sprintf("%d", eventSocket)
+					newEvent.CPU = ""
+					socketEventsMap[eventSocket] = append(socketEventsMap[eventSocket], newEvent)
+					currentEvent = event.Event
 				} else {
-					err = fmt.Errorf("cpu %d is not mapped to a socket", eventCPU)
-					return
+					// if the event name is the same as the last socket event, add the new event's value to the last socket event's value
+					socketEventsMap[eventSocket][len(socketEventsMap[eventSocket])-1].Value += event.Value
 				}
 			}
-			bucketedEvents = append(bucketedEvents, newEvents...)
-			return
+
+			// convert map to slice, maintaining consistent ordering by socket number
+			socketNumbers := make([]int, 0, len(socketEventsMap))
+			for socket := range socketEventsMap {
+				socketNumbers = append(socketNumbers, socket)
+			}
+			slices.Sort(socketNumbers)
+
+			for _, socket := range socketNumbers {
+				bucketedEvents = append(bucketedEvents, socketEventsMap[socket])
+			}
 		case granularityCPU:
-			// create one list of Events per CPU
-			var numCPUs int
+			// create one list of Events per CPU dynamically as we encounter them
+			cpuEventsMap := make(map[int][]Event)
 
-			// create a mapping of cpu numbers to event indices
-			var cpuMap map[int]int
-
-			// create a list of CPU IDs targeted for profiling
-			var cpuIDs []int
-
-			// if CPU range is specified, use it to determine the number of CPUs
-			// otherwise, use the CPUSocketMap structure to determine the online CPUs
-			// then create a list of CPU IDs for the targeted CPUs
-			if flagCpuRange != "" {
-				var err error
-				cpuIDs, err = util.SelectiveIntRangeToIntList(flagCpuRange)
-				if err != nil {
-					return nil, fmt.Errorf("failed to parse cpu range: %w", err)
-				}
-				numCPUs = len(cpuIDs)
-			} else {
-				numCPUs = len(metadata.CPUSocketMap)
-
-				for cpuID := range metadata.CPUSocketMap {
-					cpuIDs = append(cpuIDs, cpuID)
-				}
-			}
-
-			// create a mapping of the target CPU IDs to their event indices
-			cpuMap = make(map[int]int, numCPUs)
-
-			// sort the CPU IDs
-			slices.Sort(cpuIDs)
-
-			// place the sorted CPU IDs into the mapping
-			for idx, cpuID := range cpuIDs {
-				cpuMap[cpuID] = idx
-			}
-
-			// create a new list of events, one for each CPU
-			newEvents := make([][]Event, numCPUs)
-			for i := range numCPUs {
-				newEvents[i] = make([]Event, 0, len(allEvents)/numCPUs)
-			}
-
-			// iterate over all events and place them into the newEvents list
 			for _, event := range allEvents {
 				var cpu int
 				if cpu, err = strconv.Atoi(event.CPU); err != nil {
-					return
+					return nil, fmt.Errorf("failed to parse cpu number: %s", event.CPU)
 				}
-				// check if the CPU is in the cpuMap
-				if _, ok := cpuMap[cpu]; !ok {
-					slog.Debug("cpu not found in cpu map, skipping event", slog.String("cpu", event.CPU), slog.String("event", event.Event))
-					continue
+
+				// dynamically create CPU bucket if it doesn't exist
+				if _, exists := cpuEventsMap[cpu]; !exists {
+					cpuEventsMap[cpu] = make([]Event, 0)
 				}
-				// place the event for the current CPU into the newEvents list
-				// cpuMap ensures that events are placed in a valid index
-				newEvents[cpuMap[cpu]] = append(newEvents[cpuMap[cpu]], event)
+
+				cpuEventsMap[cpu] = append(cpuEventsMap[cpu], event)
 			}
 
-			// now we have a list of events for each CPU, we need to aggregate them
-			bucketedEvents = append(bucketedEvents, newEvents...)
+			// convert map to slice, maintaining consistent ordering by CPU number
+			cpuNumbers := make([]int, 0, len(cpuEventsMap))
+			for cpu := range cpuEventsMap {
+				cpuNumbers = append(cpuNumbers, cpu)
+			}
+			slices.Sort(cpuNumbers)
+
+			for _, cpu := range cpuNumbers {
+				bucketedEvents = append(bucketedEvents, cpuEventsMap[cpu])
+			}
 		default:
 			err = fmt.Errorf("unsupported granularity: %s", granularity)
 			return

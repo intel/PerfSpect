@@ -1,0 +1,458 @@
+{
+  "Header": {
+    "Copyright": "Copyright (c) 2001 - 2025 Intel Corporation. All rights reserved."
+  },
+  "Metrics": [
+    {
+      "MetricName": "cpu_util_kernel",
+      "LegacyName": "metric_CPU utilization % in kernel mode",
+      "BriefDescription": "CPU utilization percentage in kernel mode",
+      "Events": [
+        {
+          "Name": "CPU_CLK_UNHALTED.THREAD_P:SUP",
+          "Alias": "a"
+        },
+        {
+          "Name": "TSC",
+          "Alias": "b"
+        }
+      ],
+      "Constants": [],
+      "Formula": "100 * (a / b)",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "cycles_per_txn",
+      "LegacyName": "metric_cycles per txn",
+      "BriefDescription": "Number of cycles per transaction",
+      "Events": [
+        {
+          "Name": "CPU_CLK_UNHALTED.THREAD",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "kernel_cpi",
+      "LegacyName": "metric_kernel_CPI",
+      "BriefDescription": "Kernel cycles per instruction",
+      "Events": [
+        {
+          "Name": "CPU_CLK_UNHALTED.THREAD_P:SUP",
+          "Alias": "a"
+        },
+        {
+          "Name": "INST_RETIRED.ANY",
+          "Alias": "b"
+        }
+      ],
+      "Constants": [],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "kernel_cycles_per_txn",
+      "LegacyName": "metric_kernel_cycles per txn",
+      "BriefDescription": "Number of kernel cycles per transaction",
+      "Events": [
+        {
+          "Name": "CPU_CLK_UNHALTED.THREAD_P:SUP",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "ipc",
+      "LegacyName": "metric_IPC",
+      "BriefDescription": "Instructions per cycle",
+      "Events": [
+        {
+          "Name": "INST_RETIRED.ANY",
+          "Alias": "a"
+        },
+        {
+          "Name": "CPU_CLK_UNHALTED.THREAD",
+          "Alias": "b"
+        }
+      ],
+      "Constants": [],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "giga_instructions_per_sec",
+      "LegacyName": "metric_giga_instructions_per_sec",
+      "BriefDescription": "Billions of instructions per second",
+      "Events": [
+        {
+          "Name": "INST_RETIRED.ANY",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [],
+      "Formula": "a / 1000000000",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "branch_misprediction_ratio",
+      "LegacyName": "metric_branch misprediction ratio",
+      "BriefDescription": "Ratio of branch mispredictions to the total number of branches retired.",
+      "Events": [
+        {
+          "Name": "BR_MISP_RETIRED.ALL_BRANCHES",
+          "Alias": "a"
+        },
+        {
+          "Name": "BR_INST_RETIRED.ALL_BRANCHES",
+          "Alias": "b"
+        }
+      ],
+      "Constants": [],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "locks_retired_per_instr",
+      "LegacyName": "metric_locks retired per instr",
+      "BriefDescription": "Locks retired per instruction",
+      "Events": [
+        {
+          "Name": "MEM_UOPS_RETIRED.LOCK_LOADS",
+          "Alias": "a"
+        },
+        {
+          "Name": "INST_RETIRED.ANY",
+          "Alias": "b"
+        }
+      ],
+      "Constants": [],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "locks_retired_per_txn",
+      "LegacyName": "metric_locks retired per txn",
+      "BriefDescription": "Locks retired per transaction",
+      "Events": [
+        {
+          "Name": "MEM_UOPS_RETIRED.LOCK_LOADS",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "l1d_misses_per_txn",
+      "LegacyName": "metric_L1D misses per txn (includes data+rfo w/ prefetches)",
+      "BriefDescription": "L1D misses per transaction (includes data+rfo with prefetches)",
+      "Events": [
+        {
+          "Name": "MEM_LOAD_UOPS_RETIRED.L1_MISS",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "l1d_demand_data_read_hits_per_txn",
+      "LegacyName": "metric_L1D demand data read hits per txn",
+      "BriefDescription": "L1D demand data read hits per transaction",
+      "Events": [
+        {
+          "Name": "MEM_LOAD_UOPS_RETIRED.L1_HIT",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "l1i_code_read_misses_per_txn",
+      "LegacyName": "metric_L1I code read misses (includes prefetches) per txn",
+      "BriefDescription": "L1I code read misses (includes prefetches) per transaction",
+      "Events": [
+        {
+          "Name": "ICACHE.MISSES",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "l2_demand_data_read_hits_per_txn",
+      "LegacyName": "metric_L2 demand data read hits per txn",
+      "BriefDescription": "L2 demand data read hits per transaction",
+      "Events": [
+        {
+          "Name": "MEM_LOAD_UOPS_RETIRED.L2_HIT",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "l2_misses_per_txn",
+      "LegacyName": "metric_L2 misses per txn (includes code+data+rfo w/ prefetches)",
+      "BriefDescription": "L2 misses per transaction (includes code+data+rfo with prefetches)",
+      "Events": [
+        {
+          "Name": "LONGEST_LAT_CACHE.REFERENCE",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "l2_demand_data_read_misses_per_txn",
+      "LegacyName": "metric_L2 demand data read misses per txn",
+      "BriefDescription": "L2 demand data read misses per transaction",
+      "Events": [
+        {
+          "Name": "MEM_LOAD_UOPS_RETIRED.L2_MISS",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "llc_code_read_misses_per_txn",
+      "LegacyName": "metric_LLC code read (demand+prefetch) misses per txn",
+      "BriefDescription": "LLC code read (demand+prefetch) misses per transaction",
+      "Events": [
+        {
+          "Name": "UNC_CHA_TOR_INSERTS.IA_MISS_CRD",
+          "Alias": "a"
+        },
+        {
+          "Name": "UNC_CHA_TOR_INSERTS.IA_MISS_CRD_PREF",
+          "Alias": "b"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "c"
+        }
+      ],
+      "Formula": "(a + b) / c",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "llc_data_read_misses_per_txn",
+      "LegacyName": "metric_LLC data read (demand+prefetch) misses per txn",
+      "BriefDescription": "LLC data read (demand+prefetch) misses per transaction",
+      "Events": [
+        {
+          "Name": "UNC_CHA_TOR_INSERTS.IA_MISS_DRD_OPT",
+          "Alias": "a"
+        },
+        {
+          "Name": "UNC_CHA_TOR_INSERTS.IA_MISS_DRD_OPT_PREF",
+          "Alias": "b"
+        },
+        {
+          "Name": "UNC_CHA_TOR_INSERTS.IA_MISS_LLCPREFDATA",
+          "Alias": "c"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "d"
+        }
+      ],
+      "Formula": "(a + b + c) / d",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "package_power",
+      "LegacyName": "metric_package power (watts)",
+      "BriefDescription": "Package power consumption in watts",
+      "Events": [
+        {
+          "Name": "power/energy-pkg/",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [],
+      "Formula": "a",
+      "ResolutionLevels": "SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "dram_power",
+      "LegacyName": "metric_DRAM power (watts)",
+      "BriefDescription": "DRAM power consumption in watts",
+      "Events": [
+        {
+          "Name": "power/energy-ram/",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [],
+      "Formula": "a",
+      "ResolutionLevels": "SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "core_c6_residency",
+      "LegacyName": "metric_core c6 residency %",
+      "BriefDescription": "Core C6 state residency percentage",
+      "Events": [
+        {
+          "Name": "cstate_core/c6-residency/",
+          "Alias": "a"
+        },
+        {
+          "Name": "TSC",
+          "Alias": "b"
+        }
+      ],
+      "Constants": [],
+      "Formula": "100 * a / b",
+      "ResolutionLevels": "CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "package_c6_residency",
+      "LegacyName": "metric_package c6 residency %",
+      "BriefDescription": "Package C6 state residency percentage",
+      "Events": [
+        {
+          "Name": "cstate_pkg/c6-residency/",
+          "Alias": "a"
+        },
+        {
+          "Name": "TSC",
+          "Alias": "b"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "CORES_PER_SOCKET",
+          "Alias": "c"
+        }
+      ],
+      "Formula": "100 * a * c / b",
+      "ResolutionLevels": "SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "itlb_misses_per_txn",
+      "LegacyName": "metric_ITLB (2nd level) misses per txn",
+      "BriefDescription": "ITLB (2nd level) misses per transaction",
+      "Events": [
+        {
+          "Name": "ITLB_MISSES.WALK_COMPLETED",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "dtlb_load_misses_per_txn",
+      "LegacyName": "metric_DTLB (2nd level) load misses per txn",
+      "BriefDescription": "DTLB (2nd level) load misses per transaction",
+      "Events": [
+        {
+          "Name": "DTLB_LOAD_MISSES.WALK_COMPLETED",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    },
+    {
+      "MetricName": "dtlb_store_misses_per_txn",
+      "LegacyName": "metric_DTLB (2nd level) store misses per txn",
+      "BriefDescription": "DTLB (2nd level) store misses per transaction",
+      "Events": [
+        {
+          "Name": "DTLB_STORE_MISSES.WALK_COMPLETED",
+          "Alias": "a"
+        }
+      ],
+      "Constants": [
+        {
+          "Name": "TXN",
+          "Alias": "b"
+        }
+      ],
+      "Formula": "a / b",
+      "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
+    }
+  ]
+}

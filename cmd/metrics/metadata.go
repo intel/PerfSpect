@@ -24,6 +24,7 @@ import (
 
 // Metadata is the representation of the platform's state and capabilities
 type Metadata struct {
+	NumGeneralPurposeCounters int // number of general purpose counters
 	CoresPerSocket            int
 	CPUSocketMap              map[int]int
 	UncoreDeviceIDs           map[string][]int
@@ -36,10 +37,11 @@ type Metadata struct {
 	PerfSupportedEvents       string
 	PMUDriverVersion          string
 	SocketCount               int
-	SupportsInstructions      bool
 	SupportsFixedCycles       bool
 	SupportsFixedInstructions bool
 	SupportsFixedTMA          bool
+	SupportsFixedRefCycles    bool
+	SupportsInstructions      bool
 	SupportsRefCycles         bool
 	SupportsUncore            bool
 	SupportsPEBS              bool
@@ -96,6 +98,12 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 		return
 	}
 	metadata.Microarchitecture = cpu.MicroArchitecture
+	// Number of General Purpose Counters
+	metadata.NumGeneralPurposeCounters, err = getNumGPCounters(metadata.Microarchitecture)
+	if err != nil {
+		err = fmt.Errorf("failed to get number of general purpose counters: %v", err)
+		return
+	}
 	// the rest of the metadata is retrieved by running scripts in parallel
 	metadataScripts, err := getMetadataScripts(noRoot, perfPath, metadata.Microarchitecture, noSystemSummary)
 	if err != nil {
@@ -167,6 +175,15 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 	} else {
 		if !metadata.SupportsFixedCycles {
 			slog.Warn("Fixed-counter 'cpu-cycles' events not supported", slog.String("output", output))
+		}
+	}
+	// Fixed-counter ref-cycles events
+	if metadata.SupportsFixedRefCycles, output, err = getSupportsFixedEvent("ref-cycles", scriptOutputs); err != nil {
+		slog.Warn("failed to determine if fixed-counter 'ref-cycles' is supported, assuming not supported", slog.String("error", err.Error()))
+		err = nil
+	} else {
+		if !metadata.SupportsFixedRefCycles {
+			slog.Warn("Fixed-counter 'ref-cycles' events not supported", slog.String("output", output))
 		}
 	}
 	// Fixed-counter instructions events
@@ -261,17 +278,17 @@ func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSumm
 		},
 		{
 			Name:           "perf stat pebs",
-			ScriptTemplate: perfPath + " stat -a -e cpu/event=0xad,umask=0x40,period=1000003,name='INT_MISC.UNKNOWN_BRANCH_CYCLES'/ sleep 1",
+			ScriptTemplate: perfPath + " stat -a -e INT_MISC.UNKNOWN_BRANCH_CYCLES sleep 1",
 			Superuser:      !noRoot,
 		},
 		{
 			Name:           "perf stat ocr",
-			ScriptTemplate: perfPath + " stat -a -e cpu/event=0x2a,umask=0x01,offcore_rsp=0x104004477,name='OCR.READS_TO_CORE.LOCAL_DRAM'/ sleep 1",
+			ScriptTemplate: perfPath + " stat -a -e OCR.READS_TO_CORE.LOCAL_DRAM sleep 1",
 			Superuser:      !noRoot,
 		},
 		{
 			Name:           "perf stat tma",
-			ScriptTemplate: perfPath + " stat -a -e '{cpu/event=0x00,umask=0x04,period=10000003,name='TOPDOWN.SLOTS'/,cpu/event=0x00,umask=0x81,period=10000003,name='PERF_METRICS.BAD_SPECULATION'/}' sleep 1",
+			ScriptTemplate: perfPath + " stat -a -e '{topdown.slots, topdown-bad-spec}' sleep 1",
 			Superuser:      !noRoot,
 		},
 		{
@@ -282,6 +299,11 @@ func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSumm
 		{
 			Name:           "perf stat fixed cpu-cycles",
 			ScriptTemplate: perfPath + " stat -a -e '{{{.CpuCyclesList}}}' sleep 1",
+			Superuser:      !noRoot,
+		},
+		{
+			Name:           "perf stat fixed ref-cycles",
+			ScriptTemplate: perfPath + " stat -a -e '{{{.RefCyclesList}}}' sleep 1",
 			Superuser:      !noRoot,
 		},
 		{
@@ -321,6 +343,12 @@ func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSumm
 				eventList = append(eventList, "cpu-cycles")
 			}
 			scriptDef.ScriptTemplate = strings.Replace(scriptDef.ScriptTemplate, "{{.CpuCyclesList}}", strings.Join(eventList, ","), -1)
+		case "perf stat fixed ref-cycles":
+			var eventList []string
+			for range numGPCounters + 1 {
+				eventList = append(eventList, "ref-cycles")
+			}
+			scriptDef.ScriptTemplate = strings.Replace(scriptDef.ScriptTemplate, "{{.RefCyclesList}}", strings.Join(eventList, ","), -1)
 		}
 		metadataScripts = append(metadataScripts, scriptDef)
 	}
@@ -575,7 +603,7 @@ func getSupportsOCR(scriptOutputs map[string]script.ScriptOutput) (supported boo
 // getSupportsFixedTMA - checks if the fixed TMA counter events are
 // supported by perf.
 //
-// We check for the TOPDOWN.SLOTS and PERF_METRICS.BAD_SPECULATION events as
+// We check for the topdown.slots and topdown-bad-spec events as
 // an indicator of support for fixed TMA counter support. At the time of
 // writing, these events are not supported on AWS m7i VMs or AWS m6i VMs.  On
 // AWS m7i VMs, we get an error from the perf stat command below. On AWS m6i
@@ -593,8 +621,10 @@ func getSupportsFixedTMA(scriptOutputs map[string]script.ScriptOutput) (supporte
 	// event values being zero or equal to each other is 2nd indication that these events are not (properly) supported
 	vals := make(map[string]float64)
 	lines := strings.Split(output, "\n")
-	// example line: "         784333932      TOPDOWN.SLOTS                                                        (59.75%)"
-	re := regexp.MustCompile(`\s+(\d+)\s+(\w*\.*\w*)\s+.*`)
+	// example lines:
+	// "     1078623236      topdown.slots                                                           (34.40%)"
+	// "        83572327       topdown-bad-spec                                                       (34.40%)"
+	re := regexp.MustCompile(`^\s*([0-9]+)\s+(topdown[\w.\-]+)`)
 	for _, line := range lines {
 		// count may include commas as thousands separators, remove them
 		line = strings.ReplaceAll(line, ",", "")
@@ -607,8 +637,8 @@ func getSupportsFixedTMA(scriptOutputs map[string]script.ScriptOutput) (supporte
 			}
 		}
 	}
-	topDownSlots := vals["TOPDOWN.SLOTS"]
-	badSpeculation := vals["PERF_METRICS.BAD_SPECULATION"]
+	topDownSlots := vals["topdown.slots"]
+	badSpeculation := vals["topdown-bad-spec"]
 	supported = topDownSlots != badSpeculation && topDownSlots != 0 && badSpeculation != 0
 	return
 }
@@ -616,29 +646,11 @@ func getSupportsFixedTMA(scriptOutputs map[string]script.ScriptOutput) (supporte
 func getNumGPCounters(uarch string) (numGPCounters int, err error) {
 	shortUarch := uarch[:3]
 	switch shortUarch {
-	case "BDX":
-		fallthrough
-	case "SKX":
-		fallthrough
-	case "CLX":
+	case "BDX", "SKX", "CLX":
 		numGPCounters = 4
-	case "ICX":
-		fallthrough
-	case "SPR":
-		fallthrough
-	case "EMR":
-		fallthrough
-	case "SRF":
-		fallthrough
-	case "CWF":
-		fallthrough
-	case "GNR":
+	case "ICX", "SPR", "EMR", "SRF", "CWF", "GNR":
 		numGPCounters = 8
-	case "Gen":
-		fallthrough
-	case "Ber":
-		fallthrough
-	case "Tur":
+	case "Gen", "Ber", "Tur":
 		numGPCounters = 5
 	default:
 		err = fmt.Errorf("unsupported uarch: %s", uarch)

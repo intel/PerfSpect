@@ -171,7 +171,7 @@ func TestGetCPU(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cpu.MicroArchitecture != "Neoverse N1" {
+	if cpu.MicroArchitecture != "Neoverse-N1" {
 		t.Fatal(fmt.Errorf("Found the wrong CPU: %s", cpu.MicroArchitecture))
 	}
 }
