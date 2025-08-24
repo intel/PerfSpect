@@ -11,19 +11,29 @@ import (
 	"github.com/Knetic/govaluate"
 )
 
+// MetricDefinition is the common (across loader implementations) representation of a single metric
 type MetricDefinition struct {
-	Name        string                         `json:"name"`
-	Expression  string                         `json:"expression"`
-	Description string                         `json:"description"`
-	Variables   map[string]int                 // parsed from Expression for efficiency, int represents group index
-	Evaluable   *govaluate.EvaluableExpression // parse expression once, store here for use in metric evaluation
+	Name        string `json:"name"`
+	Expression  string `json:"expression"`
+	Description string `json:"description"`
+	// Evaluation fields - used during metric expression evaluation
+	//
+	// Variables - map of variable names found in Expression to the indices of the event
+	// group from which the value will be taken from for metric evaluation. These indices
+	// are set the first time the metric is evaluated.
+	Variables map[string]int
+	// Evaluable - parsed expression from govaluate. These are set once when the metric
+	// definitions are loaded and parsed, so that the expression does not need to be
+	// parsed each time the metric is evaluated.
+	Evaluable *govaluate.EvaluableExpression
 }
 
-// EventDefinition represents a single perf event
+// EventDefinition is the common (across loader implementations) representation of a single perf event
 type EventDefinition struct {
-	Raw    string
-	Name   string
-	Device string
+	Raw         string // the event string in perf format
+	Name        string // the event name
+	Device      string // the event device (e.g., "cpu" from cpu/event=0x3c/,umask=...)
+	Description string // the event description
 }
 
 // GroupDefinition represents a group of perf events
