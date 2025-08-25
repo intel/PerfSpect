@@ -145,6 +145,7 @@ var (
 	flagTransactionRate float64
 	// advanced options
 	flagShowMetricNames      bool
+	flagLegacyNames          bool
 	flagMetricsList          []string
 	flagEventFilePath        string
 	flagMetricFilePath       string
@@ -177,6 +178,7 @@ const (
 	flagTransactionRateName = "txnrate"
 
 	flagShowMetricNamesName      = "list"
+	flagLegacyNamesName          = "legacy-names"
 	flagMetricsListName          = "metrics"
 	flagEventFilePathName        = "eventfile"
 	flagMetricFilePathName       = "metricfile"
@@ -231,6 +233,7 @@ func init() {
 	Cmd.Flags().Float64Var(&flagTransactionRate, flagTransactionRateName, 0, "")
 
 	Cmd.Flags().BoolVar(&flagShowMetricNames, flagShowMetricNamesName, false, "")
+	Cmd.Flags().BoolVar(&flagLegacyNames, flagLegacyNamesName, false, "")
 	Cmd.Flags().StringSliceVar(&flagMetricsList, flagMetricsListName, []string{}, "")
 	Cmd.Flags().StringVar(&flagEventFilePath, flagEventFilePathName, "", "")
 	Cmd.Flags().StringVar(&flagMetricFilePath, flagMetricFilePathName, "", "")
@@ -352,6 +355,10 @@ func getFlagGroups() []common.FlagGroup {
 		{
 			Name: flagShowMetricNamesName,
 			Help: "show metric names available on this platform and exit",
+		},
+		{
+			Name: flagLegacyNamesName,
+			Help: "use legacy metric names where applicable (Deprecated, will be removed in a future release)",
 		},
 		{
 			Name: flagMetricsListName,
@@ -819,10 +826,10 @@ func processRawData(localOutputDir string) error {
 		if err != nil {
 			return err
 		}
-		filesWritten = printMetrics(metricFrames, frameCount, metadata.Hostname, metadata.CollectionStartTime, localOutputDir)
+		filesWritten = printMetrics(metricFrames, frameCount, metricDefinitions, metadata.Hostname, metadata.CollectionStartTime, localOutputDir)
 		frameCount += len(metricFrames)
 	}
-	summaryFiles, err := summarizeMetrics(localOutputDir, metadata.Hostname, metadata)
+	summaryFiles, err := summarizeMetrics(localOutputDir, metadata.Hostname, metadata, metricDefinitions)
 	if err != nil {
 		return err
 	}
@@ -1103,7 +1110,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 					_ = multiSpinner.Status(targetContext.target.GetName(), "no metrics collected")
 				} else {
 					targetContext.metadata.PerfSpectVersion = appContext.Version
-					summaryFiles, err := summarizeMetrics(localOutputDir, targetContext.target.GetName(), targetContext.metadata)
+					summaryFiles, err := summarizeMetrics(localOutputDir, targetContext.target.GetName(), targetContext.metadata, targetContext.metricDefinitions)
 					if err != nil {
 						err = fmt.Errorf("failed to summarize metrics: %w", err)
 						exitErrs = append(exitErrs, err)

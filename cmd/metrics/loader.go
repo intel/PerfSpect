@@ -13,9 +13,12 @@ import (
 
 // MetricDefinition is the common (across loader implementations) representation of a single metric
 type MetricDefinition struct {
-	Name        string `json:"name"`
-	Expression  string `json:"expression"`
-	Description string `json:"description"`
+	Name        string
+	LegacyName  string
+	Expression  string
+	Description string
+	Category    string
+	Level       int
 	// Evaluation fields - used during metric expression evaluation
 	//
 	// Variables - map of variable names found in Expression to the indices of the event
@@ -30,10 +33,9 @@ type MetricDefinition struct {
 
 // EventDefinition is the common (across loader implementations) representation of a single perf event
 type EventDefinition struct {
-	Raw         string // the event string in perf format
-	Name        string // the event name
-	Device      string // the event device (e.g., "cpu" from cpu/event=0x3c/,umask=...)
-	Description string // the event description
+	Raw    string // the event string in perf format
+	Name   string // the event name
+	Device string // the event device (e.g., "cpu" from cpu/event=0x3c/,umask=...), currently used by legacy loader only
 }
 
 // GroupDefinition represents a group of perf events
