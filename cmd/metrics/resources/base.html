@@ -670,7 +670,21 @@
                           }}
                         >
                           <TableCell sx={{ fontFamily: 'Monospace' }} component="th" scope="row" >
-                            <Tooltip title={description.hasOwnProperty(row[0]) ? description[row[0]] : ""}>
+                            <Tooltip 
+                              title={description.hasOwnProperty(row[0]) ? description[row[0]] : ""} 
+                              componentsProps={{
+                                tooltip: {
+                                  sx: {
+                                    fontSize: '1.0rem',  // Increase tooltip font size
+                                    padding: '8px 12px',  // Add some padding for better readability
+                                    bgcolor: 'rgba(97, 97, 97, 0.92)',  // Darker background
+                                    color: '#ffffff',  // White text for contrast
+                                    fontWeight: 400,  // Normal font weight
+                                    boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.2)'  // Add shadow for depth
+                                  }
+                                }
+                              }}
+                            >
                               {description.hasOwnProperty(row[0]) && <IconButton sx={{ padding: "0 8px 0 0" }}>
                                 <Icon>info</Icon>
                               </IconButton>}
@@ -690,7 +704,20 @@
                           >
                             {Number(row[1]).toFixed(4)}
                             {exceedsThreshold && 
-                              <Tooltip title={`Exceeds threshold: ${row[6]}`}>
+                              <Tooltip 
+                                title={`Exceeds threshold: ${row[6]}`}
+                                componentsProps={{
+                                  tooltip: {
+                                    sx: {
+                                      fontSize: '1.0rem',  // Increased tooltip font size
+                                      padding: '8px 12px',  // Add some padding for better readability
+                                      bgcolor: 'rgba(255, 235, 59, 0.9)',  // Slightly yellow background to match warning context
+                                      color: '#222222',  // Grey text for better contrast on yellow
+                                      fontWeight: 400  // Normal font weight
+                                    }
+                                  }
+                                }}
+                              >
                                 <IconButton size="small" sx={{ padding: "0 0 0 4px" }}>
                                   <Icon fontSize="small">warning</Icon>
                                 </IconButton>
