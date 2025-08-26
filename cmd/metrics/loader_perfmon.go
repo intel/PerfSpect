@@ -331,6 +331,25 @@ func getExpression(perfmonMetric PerfmonMetric) (string, error) {
 	return expression, nil
 }
 
+func getThresholdExpression(perfmonMetric PerfmonMetric) (string, error) {
+	if perfmonMetric.Threshold == nil {
+		return "", nil // no threshold defined
+	}
+	expression := perfmonMetric.Threshold.Formula
+	if expression == "" {
+		return "", nil // no threshold defined
+	}
+	replacers := make(map[string]string)
+	for _, thresholdMetric := range perfmonMetric.Threshold.ThresholdMetrics {
+		replacers[thresholdMetric["Alias"]] = fmt.Sprintf("[%s]", thresholdMetric["Value"])
+	}
+	for alias, replacement := range replacers {
+		// Replace alias as whole words only (not substrings)
+		expression = util.ReplaceWholeWord(expression, alias, replacement)
+	}
+	return expression, nil
+}
+
 func perfmonToMetricDefs(perfmonMetrics []PerfmonMetric) ([]MetricDefinition, error) {
 	var metrics []MetricDefinition
 	for _, perfmonMetric := range perfmonMetrics {
@@ -340,14 +359,20 @@ func perfmonToMetricDefs(perfmonMetrics []PerfmonMetric) ([]MetricDefinition, er
 			slog.Warn("Failed getting expression for metric", "metric", perfmonMetric.MetricName, "error", err)
 			continue
 		}
+		thresholdExpression, err := getThresholdExpression(perfmonMetric)
+		if err != nil {
+			slog.Warn("Failed getting threshold expression for metric", "metric", perfmonMetric.MetricName, "error", err)
+			continue
+		}
 		// create a MetricDefinition from the perfmon metric
 		metric := MetricDefinition{
-			Name:        perfmonMetric.MetricName,
-			LegacyName:  perfmonMetric.LegacyName,
-			Description: perfmonMetric.BriefDescription,
-			Category:    perfmonMetric.Category,
-			Level:       perfmonMetric.Level,
-			Expression:  expression,
+			Name:                perfmonMetric.MetricName,
+			LegacyName:          perfmonMetric.LegacyName,
+			Description:         perfmonMetric.BriefDescription,
+			Category:            perfmonMetric.Category,
+			Level:               perfmonMetric.Level,
+			Expression:          expression,
+			ThresholdExpression: thresholdExpression,
 		}
 		// add the metric to the list of metrics
 		metrics = append(metrics, metric)

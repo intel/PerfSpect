@@ -431,13 +431,17 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata, metricDefinit
 	// All Metrics Tab
 	var metricHTMLStats [][]string
 	for _, name := range m.names {
-		metricHTMLStats = append(metricHTMLStats, []string{
-			name,
-			fmt.Sprintf("%f", stats[name].mean),
-			fmt.Sprintf("%f", stats[name].min),
-			fmt.Sprintf("%f", stats[name].max),
-			fmt.Sprintf("%f", stats[name].stddev),
-		})
+		metricVals := []string{
+			name,                                  // column 0
+			fmt.Sprintf("%f", stats[name].mean),   // column 1
+			fmt.Sprintf("%f", stats[name].min),    // column 2
+			fmt.Sprintf("%f", stats[name].max),    // column 3
+			fmt.Sprintf("%f", stats[name].stddev), // column 4
+		}
+		exceeded, thresholdDescription := getThresholdInfo(name, stats, metricDefinitions)
+		metricVals = append(metricVals, exceeded)             // column 5 - "Yes" if threshold exceeded, else "No"
+		metricVals = append(metricVals, thresholdDescription) // column 6 - description of threshold, e.g., a>b>c>5
+		metricHTMLStats = append(metricHTMLStats, metricVals)
 	}
 	var jsonMetricsBytes []byte
 	if jsonMetricsBytes, err = json.Marshal(metricHTMLStats); err != nil {
@@ -457,16 +461,6 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata, metricDefinit
 		return
 	}
 	templateVals["DESCRIPTION"] = string(jsonMetricDescBytes)
-	// Add metric thresholds
-	metricThresholdMap := make(map[string]string, len(metricDefinitions))
-	for _, def := range metricDefinitions {
-		metricThresholdMap[getMetricDisplayName(def)] = "1.0"
-	}
-	var jsonMetricThesholdBytes []byte
-	if jsonMetricThesholdBytes, err = json.Marshal(metricThresholdMap); err != nil {
-		return
-	}
-	templateVals["METRIC_THRESHOLDS"] = string(jsonMetricThesholdBytes)
 
 	// Metadata tab
 	jsonMetadata, err := metadata.JSON()
@@ -487,6 +481,71 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata, metricDefinit
 		return
 	}
 	templateVals["SYSTEMINFO"] = string(jsonSystemInfo)
+	return
+}
+
+func getThresholdInfo(metricName string, stats map[string]metricStats, metricDefinitions []MetricDefinition) (exceeded string, thresholdDescription string) {
+	// find the metric definition by name
+	var def *MetricDefinition
+	for i, d := range metricDefinitions {
+		if getMetricDisplayName(d) == metricName {
+			def = &metricDefinitions[i]
+			break
+		}
+	}
+	if def == nil || def.ThresholdExpression == "" {
+		return "No", ""
+	}
+	variables := make(map[string]any) // map of variable names to values
+	// threshold variable names are legacy metric names, so find the corresponding metric definitions
+	for _, v := range def.ThresholdVariables {
+		var vDef *MetricDefinition
+		for i, d := range metricDefinitions {
+			if d.LegacyName == v {
+				vDef = &metricDefinitions[i]
+				break
+			}
+		}
+		if vDef != nil {
+			if stat, ok := stats[getMetricDisplayName(*vDef)]; ok {
+				variables[v] = stat.mean
+			} else {
+				variables[v] = 0.0
+			}
+		} else {
+			variables[v] = 0.0
+		}
+	}
+	// evaluate the threshold expression
+	result, err := evaluateThresholdExpression(*def, variables)
+	if err != nil {
+		slog.Warn("failed to evaluate threshold expression", slog.String("metric", metricName), slog.String("expression", def.ThresholdExpression), slog.String("error", err.Error()))
+		return "No", ""
+	}
+	boolResult, ok := result.(bool)
+	if !ok {
+		slog.Warn("threshold expression did not evaluate to a boolean", slog.String("metric", metricName), slog.String("expression", def.ThresholdExpression))
+		return "No", ""
+	}
+	if boolResult {
+		exceeded = "Yes"
+	} else {
+		exceeded = "No"
+	}
+	thresholdDescription = def.ThresholdExpression
+	return
+}
+
+// function to call evaluator so that we can catch panics that come from the evaluator
+func evaluateThresholdExpression(metric MetricDefinition, variables map[string]any) (result any, err error) {
+	defer func() {
+		if errx := recover(); errx != nil {
+			err = errx.(error)
+		}
+	}()
+	if result, err = metric.ThresholdEvaluable.Evaluate(variables); err != nil {
+		err = fmt.Errorf("%v : %s : %s", err, metric.Name, metric.ThresholdExpression)
+	}
 	return
 }
 

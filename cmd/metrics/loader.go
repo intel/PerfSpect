@@ -13,12 +13,13 @@ import (
 
 // MetricDefinition is the common (across loader implementations) representation of a single metric
 type MetricDefinition struct {
-	Name        string
-	LegacyName  string
-	Expression  string
-	Description string
-	Category    string
-	Level       int
+	Name                string
+	LegacyName          string
+	Expression          string
+	Description         string
+	Category            string
+	Level               int
+	ThresholdExpression string
 	// Evaluation fields - used during metric expression evaluation
 	//
 	// Variables - map of variable names found in Expression to the indices of the event
@@ -29,6 +30,12 @@ type MetricDefinition struct {
 	// definitions are loaded and parsed, so that the expression does not need to be
 	// parsed each time the metric is evaluated.
 	Evaluable *govaluate.EvaluableExpression
+	// ThresholdVariables - list of variable names found in ThresholdExpression.
+	ThresholdVariables []string
+	// ThresholdEvaluable - parsed threshold expression from govaluate. These are set once when the metric
+	// definitions are loaded and parsed, so that the expression does not need to be
+	// parsed each time the metric is evaluated.
+	ThresholdEvaluable *govaluate.EvaluableExpression
 }
 
 // EventDefinition is the common (across loader implementations) representation of a single perf event

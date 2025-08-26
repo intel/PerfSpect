@@ -6,6 +6,7 @@ package metrics
 import (
 	"fmt"
 	"log/slog"
+	"perfspect/internal/util"
 	"regexp"
 	"strings"
 
@@ -52,6 +53,12 @@ func configureMetrics(metrics []MetricDefinition, uncollectableEvents []string, 
 	metrics, err = initializeMetricVariables(metrics)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize metric variables: %w", err)
+	}
+
+	// initialize threshold variables
+	metrics, err = initializeThresholdVariables(metrics)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize threshold variables: %w", err)
 	}
 
 	// remove "metric_" prefix from metric names
@@ -200,23 +207,37 @@ func removeIfUncollectableEvents(metrics []MetricDefinition, uncollectableEvents
 	return filteredMetrics, nil
 }
 
+func transformExpression(expression string) (string, error) {
+	// transform if/else to ?/:
+	transformed, err := perfmonToPerfspectConditional(expression)
+	if err != nil {
+		return "", fmt.Errorf("failed to transform metric expression: %w", err)
+	}
+	// replace "> =" with ">=" and "< =" with "<="
+	transformed = strings.ReplaceAll(transformed, "> =", ">=")
+	transformed = strings.ReplaceAll(transformed, "< =", "<=")
+	// replace "&" with "&&" and "|" with "||"
+	transformed = strings.ReplaceAll(transformed, " & ", " && ")
+	transformed = strings.ReplaceAll(transformed, " | ", " || ")
+	return transformed, nil
+}
+
 // transformMetricExpressions transforms metric expressions from perfmon format to perfspect format
 // it replaces if/else with ternary conditional, replaces "> =" with ">=", and "< =" with "<="
 func transformMetricExpressions(metrics []MetricDefinition) ([]MetricDefinition, error) {
-	// transform if/else to ?/:
 	var transformedMetrics []MetricDefinition
 	for i := range metrics {
 		metric := &metrics[i]
-		transformed, err := perfmonToPerfspectConditional(metric.Expression)
+		var err error
+		metric.Expression, err = transformExpression(metric.Expression)
 		if err != nil {
 			return nil, fmt.Errorf("failed to transform metric expression: %w", err)
 		}
-		// replace "> =" with ">=" and "< =" with "<="
-		transformed = strings.ReplaceAll(transformed, "> =", ">=")
-		transformed = strings.ReplaceAll(transformed, "< =", "<=")
-		if transformed != metric.Expression {
-			slog.Debug("transformed metric", slog.String("name", metric.Name), slog.String("transformed", transformed))
-			metric.Expression = transformed
+		if metric.ThresholdExpression != "" {
+			metric.ThresholdExpression, err = transformExpression(metric.ThresholdExpression)
+			if err != nil {
+				return nil, fmt.Errorf("failed to transform threshold expression: %w", err)
+			}
 		}
 		// add the transformed metric to the list
 		transformedMetrics = append(transformedMetrics, *metric)
@@ -234,6 +255,12 @@ func setEvaluableExpressions(metrics []MetricDefinition) ([]MetricDefinition, er
 		if metric.Evaluable, err = govaluate.NewEvaluableExpressionWithFunctions(metric.Expression, evaluatorFunctions); err != nil {
 			slog.Error("failed to create evaluable expression for metric", slog.String("error", err.Error()), slog.String("name", metric.Name), slog.String("expression", metric.Expression))
 			return nil, err
+		}
+		if metric.ThresholdExpression != "" {
+			if metric.ThresholdEvaluable, err = govaluate.NewEvaluableExpressionWithFunctions(metric.ThresholdExpression, evaluatorFunctions); err != nil {
+				slog.Error("failed to create threshold evaluable expression for metric", slog.String("error", err.Error()), slog.String("name", metric.Name), slog.String("threshold_expression", metric.ThresholdExpression))
+				return nil, err
+			}
 		}
 	}
 	return metrics, nil
@@ -281,6 +308,30 @@ func initializeMetricVariables(metrics []MetricDefinition) ([]MetricDefinition, 
 			}
 			// add the variable name to the map, set group index to -1 to indicate it has not yet been determined
 			metric.Variables[metric.Expression[expressionIdx:][startVar+1:endVar]] = -1
+			expressionIdx += endVar + 1
+		}
+	}
+	return metrics, nil
+}
+
+func initializeThresholdVariables(metrics []MetricDefinition) ([]MetricDefinition, error) {
+	// get a list of the variables in the threshold expression
+	for i := range metrics {
+		metric := &metrics[i]
+		metric.ThresholdVariables = []string{}
+		expressionIdx := 0
+		for {
+			startVar := strings.IndexRune(metric.ThresholdExpression[expressionIdx:], '[')
+			if startVar == -1 { // no more vars in this expression
+				break
+			}
+			endVar := strings.IndexRune(metric.ThresholdExpression[expressionIdx:], ']')
+			if endVar == -1 {
+				return nil, fmt.Errorf("didn't find end of variable indicator (]) in threshold expression: %s", metric.ThresholdExpression[expressionIdx:])
+			}
+			// add the variable name to the list if it is not already present
+			varName := metric.ThresholdExpression[expressionIdx:][startVar+1 : endVar]
+			metric.ThresholdVariables = util.UniqueAppend(metric.ThresholdVariables, varName)
 			expressionIdx += endVar + 1
 		}
 	}

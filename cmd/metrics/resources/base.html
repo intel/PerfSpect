@@ -154,8 +154,6 @@
       const [openlink, setOpenlink] = React.useState(true);
       const [maxdiff, set_maxdiff] = React.useState(0);
       const [mindiff, set_mindiff] = React.useState(0);
-      // Thresholds are provided at HTML generation time
-      const metric_thresholds = <<.METRIC_THRESHOLDS>>;
       
       const handleChange = (event, newSystemTabs) => {
         setSystemTabs(newSystemTabs);
@@ -659,10 +657,8 @@
                   </TableHead>
                   <TableBody>
                     {current_metrics.map((row) => {
-                      // Check if this metric has a threshold defined
-                      const hasThreshold = metric_thresholds && metric_thresholds.hasOwnProperty(row[0]);
-                      const exceedsThreshold = hasThreshold && Number(row[1]) > metric_thresholds[row[0]];
-                      
+                      // Check if this metric has exceed its threshold
+                      const exceedsThreshold = row[5] == "Yes";
                       return (
                         <TableRow
                           hover={true}
@@ -694,7 +690,7 @@
                           >
                             {Number(row[1]).toFixed(4)}
                             {exceedsThreshold && 
-                              <Tooltip title={`Exceeds threshold of ${metric_thresholds[row[0]]}`}>
+                              <Tooltip title={`Exceeds threshold: ${row[6]}`}>
                                 <IconButton size="small" sx={{ padding: "0 0 0 4px" }}>
                                   <Icon fontSize="small">warning</Icon>
                                 </IconButton>
@@ -723,7 +719,7 @@
                 </Table>
               </TableContainer>
               <Alert severity="info" sx={{ marginBottom: "12px" }}>
-                TMA metrics are a hierarchy where each sub-metric contains more periods "..." to designate its depth in the tree
+                TMA metrics are a hierarchy. More dots in the metric name indicate a deeper level in the hierarchy. For example, "TMA_..Memory_Bound" is a child of "TMA_Backend_Bound". Levels can be inferred by counting pairs of dots in the metric name.
               </Alert>
               <Alert severity="warning" sx={{ marginBottom: "24px" }}>
                 Metrics with values exceeding their specific thresholds are highlighted in yellow. Thresholds are defined based on typical performance characteristics for each metric.
