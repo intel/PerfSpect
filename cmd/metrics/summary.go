@@ -448,13 +448,25 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata, metricDefinit
 	// Add metric descriptions for tooltip info
 	metricDescriptionMap := make(map[string]string, len(metricDefinitions))
 	for _, def := range metricDefinitions {
-		metricDescriptionMap[getMetricDisplayName(def)] = def.Description
+		if def.Description != "" {
+			metricDescriptionMap[getMetricDisplayName(def)] = def.Description
+		}
 	}
 	var jsonMetricDescBytes []byte
 	if jsonMetricDescBytes, err = json.Marshal(metricDescriptionMap); err != nil {
 		return
 	}
 	templateVals["DESCRIPTION"] = string(jsonMetricDescBytes)
+	// Add metric thresholds
+	metricThresholdMap := make(map[string]string, len(metricDefinitions))
+	for _, def := range metricDefinitions {
+		metricThresholdMap[getMetricDisplayName(def)] = "1.0"
+	}
+	var jsonMetricThesholdBytes []byte
+	if jsonMetricThesholdBytes, err = json.Marshal(metricThresholdMap); err != nil {
+		return
+	}
+	templateVals["METRIC_THRESHOLDS"] = string(jsonMetricThesholdBytes)
 
 	// Metadata tab
 	jsonMetadata, err := metadata.JSON()
