@@ -892,6 +892,13 @@ func validateTableValues(tableValues TableValues) error {
 // define the fieldsFunc for each table
 //
 
+// Tables without rows have a fixed set of fields with a single value each.
+// If no data is found for a field, the value is an empty string.
+//
+// Tables with rows have a variable number of fields and values
+// depending on the system configuration. If no data is found for a table with rows,
+// the FieldsFunc should return an empty slice of fields.
+
 func hostTableValues(outputs map[string]script.ScriptOutput) []Field {
 	hostName := strings.TrimSpace(outputs[script.HostnameScriptName].Stdout)
 	time := strings.TrimSpace(outputs[script.DateScriptName].Stdout)
@@ -955,8 +962,12 @@ func biosTableValues(outputs map[string]script.ScriptOutput) []Field {
 		}...,
 	)
 	for i := range fields {
-		for j := range fieldValues {
-			fields[i].Values = append(fields[i].Values, fieldValues[j][i])
+		if len(fieldValues) > 0 {
+			for j := range fieldValues {
+				fields[i].Values = append(fields[i].Values, fieldValues[j][i])
+			}
+		} else {
+			fields[i].Values = append(fields[i].Values, "")
 		}
 	}
 	return fields
@@ -1112,8 +1123,12 @@ func isaTableValues(outputs map[string]script.ScriptOutput) []Field {
 }
 
 func acceleratorTableValues(outputs map[string]script.ScriptOutput) []Field {
+	names := acceleratorNames()
+	if len(names) == 0 {
+		return []Field{}
+	}
 	return []Field{
-		{Name: "Name", Values: acceleratorNames()},
+		{Name: "Name", Values: names},
 		{Name: "Count", Values: acceleratorCountsFromOutput(outputs)},
 		{Name: "Work Queues", Values: acceleratorWorkQueuesFromOutput(outputs)},
 		{Name: "Full Name", Values: acceleratorFullNamesFromYaml()},
@@ -2240,6 +2255,9 @@ func memoryBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field 
 		fields[0].Values = append([]string{latency}, fields[0].Values...)
 		fields[1].Values = append([]string{fmt.Sprintf("%.1f", bandwidth/1000)}, fields[1].Values...)
 	}
+	if len(fields[0].Values) == 0 {
+		return []Field{}
+	}
 	return fields
 }
 
@@ -2276,11 +2294,17 @@ func numaBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
 			fields[i+1].Values = append(fields[i+1].Values, fmt.Sprintf("%.1f", val/1000))
 		}
 	}
+	if len(fields[0].Values) == 0 {
+		return []Field{}
+	}
 	return fields
 }
 
 func storageBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
 	readBW, writeBW := storagePerfFromOutput(outputs)
+	if readBW == "" && writeBW == "" {
+		return []Field{}
+	}
 	return []Field{
 		{Name: "Single-Thread Read Bandwidth", Values: []string{readBW}},
 		{Name: "Single-Thread Write Bandwidth", Values: []string{writeBW}},
@@ -2317,6 +2341,9 @@ func cpuUtilizationTelemetryTableValues(outputs map[string]script.ScriptOutput) 
 			fields[i].Values = append(fields[i].Values, match[i+1])
 		}
 	}
+	if len(fields[0].Values) == 0 {
+		return []Field{}
+	}
 	return fields
 }
 
@@ -2343,6 +2370,9 @@ func utilizationCategoriesTelemetryTableValues(outputs map[string]script.ScriptO
 		for i := range fields {
 			fields[i].Values = append(fields[i].Values, match[i+1])
 		}
+	}
+	if len(fields[0].Values) == 0 {
+		return []Field{}
 	}
 	return fields
 }
@@ -2371,6 +2401,9 @@ func irqRateTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field
 		for i := range fields {
 			fields[i].Values = append(fields[i].Values, match[i+1])
 		}
+	}
+	if len(fields[0].Values) == 0 {
+		return []Field{}
 	}
 	return fields
 }
@@ -2403,6 +2436,9 @@ func driveTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
 			}
 		}
 	}
+	if len(fields[0].Values) == 0 {
+		return []Field{}
+	}
 	return fields
 }
 
@@ -2425,6 +2461,9 @@ func networkTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field
 		for i := range fields {
 			fields[i].Values = append(fields[i].Values, match[i+1])
 		}
+	}
+	if len(fields[0].Values) == 0 {
+		return []Field{}
 	}
 	return fields
 }
@@ -2451,6 +2490,9 @@ func memoryTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field 
 		for i := range fields {
 			fields[i].Values = append(fields[i].Values, match[i+1])
 		}
+	}
+	if len(fields[0].Values) == 0 {
+		return []Field{}
 	}
 	return fields
 }
@@ -2480,6 +2522,9 @@ func powerTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
 			fields[i*numPackages+1].Values = append(fields[i*numPackages+1].Values, row[1]) // Package power
 			fields[i*numPackages+2].Values = append(fields[i*numPackages+2].Values, row[2]) // DRAM power
 		}
+	}
+	if len(fields[0].Values) == 0 {
+		return []Field{}
 	}
 	return fields
 }
@@ -2518,6 +2563,9 @@ func temperatureTelemetryTableValues(outputs map[string]script.ScriptOutput) []F
 			fields[i+2].Values = append(fields[i+2].Values, row[1]) // Package temperature
 		}
 	}
+	if len(fields[0].Values) == 0 {
+		return []Field{}
+	}
 	return fields
 }
 
@@ -2554,6 +2602,9 @@ func frequencyTelemetryTableValues(outputs map[string]script.ScriptOutput) []Fie
 			// append the package frequency to the fields
 			fields[i+2].Values = append(fields[i+2].Values, row[1]) // Package frequency
 		}
+	}
+	if len(fields[0].Values) == 0 {
+		return []Field{}
 	}
 	return fields
 }
