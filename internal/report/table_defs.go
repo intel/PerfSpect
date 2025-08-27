@@ -914,13 +914,6 @@ func hostTableValues(outputs map[string]script.ScriptOutput) []Field {
 }
 
 func pcieSlotsTableValues(outputs map[string]script.ScriptOutput) []Field {
-	fields := []Field{
-		{Name: "Designation"},
-		{Name: "Type"},
-		{Name: "Length"},
-		{Name: "Bus Address"},
-		{Name: "Current Usage"},
-	}
 	fieldValues := valsArrayFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "9",
 		[]string{
 			`^Designation:\s*(.+?)$`,
@@ -930,6 +923,16 @@ func pcieSlotsTableValues(outputs map[string]script.ScriptOutput) []Field {
 			`^Current Usage:\s*(.+?)$`,
 		}...,
 	)
+	if len(fieldValues) == 0 {
+		return []Field{}
+	}
+	fields := []Field{
+		{Name: "Designation"},
+		{Name: "Type"},
+		{Name: "Length"},
+		{Name: "Bus Address"},
+		{Name: "Current Usage"},
+	}
 	for i := range fields {
 		for j := range fieldValues {
 			fields[i].Values = append(fields[i].Values, fieldValues[j][i])
@@ -1188,11 +1191,14 @@ func powerTableInsights(outputs map[string]script.ScriptOutput, tableValues Tabl
 }
 
 func cstateTableValues(outputs map[string]script.ScriptOutput) []Field {
+	cstates := cstatesFromOutput(outputs)
+	if len(cstates) == 0 {
+		return []Field{}
+	}
 	fields := []Field{
 		{Name: "Name"},
 		{Name: "Status"}, // enabled/disabled
 	}
-	cstates := cstatesFromOutput(outputs)
 	for _, cstateInfo := range cstates {
 		fields[0].Values = append(fields[0].Values, cstateInfo.Name)
 		fields[1].Values = append(fields[1].Values, cstateInfo.Status)
@@ -1453,6 +1459,24 @@ func memoryTableInsights(outputs map[string]script.ScriptOutput, tableValues Tab
 }
 
 func dimmTableValues(outputs map[string]script.ScriptOutput) []Field {
+	dimmFieldValues := valsArrayFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "17",
+		[]string{
+			`^Bank Locator:\s*(.+?)$`,
+			`^Locator:\s*(.+?)$`,
+			`^Manufacturer:\s*(.+?)$`,
+			`^Part Number:\s*(.+?)\s*$`,
+			`^Serial Number:\s*(.+?)\s*$`,
+			`^Size:\s*(.+?)$`,
+			`^Type:\s*(.+?)$`,
+			`^Type Detail:\s*(.+?)$`,
+			`^Speed:\s*(.+?)$`,
+			`^Rank:\s*(.+?)$`,
+			`^Configured.*Speed:\s*(.+?)$`,
+		}...,
+	)
+	if len(dimmFieldValues) == 0 {
+		return []Field{}
+	}
 	fields := []Field{
 		{Name: "Bank Locator"},
 		{Name: "Locator"},
@@ -1469,21 +1493,6 @@ func dimmTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Channel"},
 		{Name: "Slot"},
 	}
-	dimmFieldValues := valsArrayFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "17",
-		[]string{
-			`^Bank Locator:\s*(.+?)$`,
-			`^Locator:\s*(.+?)$`,
-			`^Manufacturer:\s*(.+?)$`,
-			`^Part Number:\s*(.+?)\s*$`,
-			`^Serial Number:\s*(.+?)\s*$`,
-			`^Size:\s*(.+?)$`,
-			`^Type:\s*(.+?)$`,
-			`^Type Detail:\s*(.+?)$`,
-			`^Speed:\s*(.+?)$`,
-			`^Rank:\s*(.+?)$`,
-			`^Configured.*Speed:\s*(.+?)$`,
-		}...,
-	)
 	for dimmIndex := range dimmFieldValues {
 		for fieldIndex := 0; fieldIndex <= 10; fieldIndex++ {
 			fields[fieldIndex].Values = append(fields[fieldIndex].Values, dimmFieldValues[dimmIndex][fieldIndex])
@@ -1544,6 +1553,10 @@ func dimmTableInsights(outputs map[string]script.ScriptOutput, tableValues Table
 }
 
 func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
+	allNicsInfo := parseNicInfo(outputs[script.NicInfoScriptName].Stdout)
+	if len(allNicsInfo) == 0 {
+		return []Field{}
+	}
 	fields := []Field{
 		{Name: "Name"},
 		{Name: "Vendor (ID)"},
@@ -1558,7 +1571,6 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "NUMA Node"},
 		{Name: "IRQBalance"},
 	}
-	allNicsInfo := parseNicInfo(outputs[script.NicInfoScriptName].Stdout)
 	for _, nicInfo := range allNicsInfo {
 		fields[0].Values = append(fields[0].Values, nicInfo.Name)
 		fields[1].Values = append(fields[1].Values, nicInfo.Vendor)
@@ -1583,11 +1595,14 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 }
 
 func networkIRQMappingTableValues(outputs map[string]script.ScriptOutput) []Field {
+	nicIRQMappings := nicIRQMappingsFromOutput(outputs)
+	if len(nicIRQMappings) == 0 {
+		return []Field{}
+	}
 	fields := []Field{
 		{Name: "Interface"},
 		{Name: "IRQ:CPU | IRQ:CPU | ..."},
 	}
-	nicIRQMappings := nicIRQMappingsFromOutput(outputs)
 	for _, nicIRQMapping := range nicIRQMappings {
 		fields[0].Values = append(fields[0].Values, nicIRQMapping[0])
 		fields[1].Values = append(fields[1].Values, nicIRQMapping[1])
@@ -1632,6 +1647,10 @@ func networkConfigTableValues(outputs map[string]script.ScriptOutput) []Field {
 }
 
 func diskTableValues(outputs map[string]script.ScriptOutput) []Field {
+	allDisksInfo := diskInfoFromOutput(outputs)
+	if len(allDisksInfo) == 0 {
+		return []Field{}
+	}
 	fields := []Field{
 		{Name: "Name"},
 		{Name: "Model"},
@@ -1648,7 +1667,6 @@ func diskTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Max Link Speed"},
 		{Name: "Max Link Width"},
 	}
-	allDisksInfo := diskInfoFromOutput(outputs)
 	for _, diskInfo := range allDisksInfo {
 		fields[0].Values = append(fields[0].Values, diskInfo.Name)
 		fields[1].Values = append(fields[1].Values, diskInfo.Model)
@@ -1691,12 +1709,15 @@ func filesystemTableInsights(outputs map[string]script.ScriptOutput, tableValues
 }
 
 func gpuTableValues(outputs map[string]script.ScriptOutput) []Field {
+	gpuInfos := gpuInfoFromOutput(outputs)
+	if len(gpuInfos) == 0 {
+		return []Field{}
+	}
 	fields := []Field{
 		{Name: "Manufacturer"},
 		{Name: "Model"},
 		{Name: "PCI ID"},
 	}
-	gpuInfos := gpuInfoFromOutput(outputs)
 	for _, gpuInfo := range gpuInfos {
 		fields[0].Values = append(fields[0].Values, gpuInfo.Manufacturer)
 		fields[1].Values = append(fields[1].Values, gpuInfo.Model)
@@ -1706,6 +1727,10 @@ func gpuTableValues(outputs map[string]script.ScriptOutput) []Field {
 }
 
 func gaudiTableValues(outputs map[string]script.ScriptOutput) []Field {
+	gaudiInfos := gaudiInfoFromOutput(outputs)
+	if len(gaudiInfos) == 0 {
+		return []Field{}
+	}
 	fields := []Field{
 		{Name: "Module ID"},
 		{Name: "Serial Number"},
@@ -1716,7 +1741,6 @@ func gaudiTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "SPI"},
 		{Name: "NUMA"},
 	}
-	gaudiInfos := gaudiInfoFromOutput(outputs)
 	for _, gaudiInfo := range gaudiInfos {
 		fields[0].Values = append(fields[0].Values, gaudiInfo.ModuleID)
 		fields[1].Values = append(fields[1].Values, gaudiInfo.SerialNumber)
@@ -1731,6 +1755,10 @@ func gaudiTableValues(outputs map[string]script.ScriptOutput) []Field {
 }
 
 func cxlTableValues(outputs map[string]script.ScriptOutput) []Field {
+	cxlDevices := getPCIDevices("CXL", outputs)
+	if len(cxlDevices) == 0 {
+		return []Field{}
+	}
 	fields := []Field{
 		{Name: "Slot"},
 		{Name: "Class"},
@@ -1741,7 +1769,6 @@ func cxlTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "NUMANode"},
 		{Name: "IOMMUGroup"},
 	}
-	cxlDevices := getPCIDevices("CXL", outputs)
 	for _, cxlDevice := range cxlDevices {
 		for fieldIdx, field := range fields {
 			if value, ok := cxlDevice[field.Name]; ok {
@@ -1813,6 +1840,9 @@ func sensorTableValues(outputs map[string]script.ScriptOutput) []Field {
 		fields[1].Values = append(fields[1].Values, tokens[1])
 		fields[2].Values = append(fields[2].Values, tokens[2])
 	}
+	if len(fields[0].Values) == 0 {
+		return []Field{}
+	}
 	return fields
 }
 
@@ -1851,6 +1881,9 @@ func systemEventLogTableValues(outputs map[string]script.ScriptOutput) []Field {
 		fields[2].Values = append(fields[2].Values, tokens[2])
 		fields[3].Values = append(fields[3].Values, tokens[3])
 		fields[4].Values = append(fields[4].Values, tokens[4])
+	}
+	if len(fields[0].Values) == 0 {
+		return []Field{}
 	}
 	return fields
 }
