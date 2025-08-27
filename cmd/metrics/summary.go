@@ -20,6 +20,8 @@ import (
 	"strconv"
 	texttemplate "text/template" // nosemgrep
 	"time"
+
+	"github.com/Knetic/govaluate"
 )
 
 func summarizeMetrics(localOutputDir string, targetName string, metadata Metadata, metricDefinitions []MetricDefinition) ([]string, error) {
@@ -438,9 +440,19 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata, metricDefinit
 			fmt.Sprintf("%f", stats[name].max),    // column 3
 			fmt.Sprintf("%f", stats[name].stddev), // column 4
 		}
-		exceeded, thresholdDescription := getThresholdInfo(name, stats, metricDefinitions)
-		metricVals = append(metricVals, exceeded)             // column 5 - "Yes" if threshold exceeded, else "No"
-		metricVals = append(metricVals, thresholdDescription) // column 6 - description of threshold, e.g., a>b>c>5
+		metricDef := findMetricDefinitionByName(name, metricDefinitions)
+		if metricDef != nil {
+			exceeded, thresholdDescription := getThresholdInfo(*metricDef, stats, metricDefinitions)
+			metricVals = append(metricVals, exceeded)                                   // column 5 - "Yes" if threshold exceeded, else "No"
+			metricVals = append(metricVals, thresholdDescription)                       // column 6 - description of threshold, e.g., a>b>c>5
+			metricVals = append(metricVals, fmt.Sprintf("%d", max(metricDef.Level, 1))) // column 7 - metric level (for TMA metrics)
+		} else {
+			// this shouldn't happen, but just in case
+			metricVals = append(metricVals, "No") // 5
+			metricVals = append(metricVals, "")   // 6
+			metricVals = append(metricVals, "")   // 7
+			slog.Error("metric definition not found for metric", slog.String("metric", name))
+		}
 		metricHTMLStats = append(metricHTMLStats, metricVals)
 	}
 	var jsonMetricsBytes []byte
@@ -484,69 +496,70 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata, metricDefinit
 	return
 }
 
-func getThresholdInfo(metricName string, stats map[string]metricStats, metricDefinitions []MetricDefinition) (exceeded string, thresholdDescription string) {
-	// find the metric definition by name
-	var def *MetricDefinition
+func findMetricDefinitionByName(name string, metricDefinitions []MetricDefinition) *MetricDefinition {
 	for i, d := range metricDefinitions {
-		if getMetricDisplayName(d) == metricName {
-			def = &metricDefinitions[i]
-			break
+		if getMetricDisplayName(d) == name {
+			return &metricDefinitions[i]
 		}
 	}
-	if def == nil || def.ThresholdExpression == "" {
-		return "No", ""
+	return nil
+}
+
+func findMetricDefinitionByLegacyName(legacyName string, metricDefinitions []MetricDefinition) *MetricDefinition {
+	for i, d := range metricDefinitions {
+		if d.LegacyName == legacyName {
+			return &metricDefinitions[i]
+		}
 	}
+	return nil
+}
+
+func getThresholdInfo(metricDef MetricDefinition, stats map[string]metricStats, metricDefinitions []MetricDefinition) (string, string) {
 	variables := make(map[string]any) // map of variable names to values
 	// threshold variable names are legacy metric names, so find the corresponding metric definitions
-	for _, v := range def.ThresholdVariables {
-		var vDef *MetricDefinition
-		for i, d := range metricDefinitions {
-			if d.LegacyName == v {
-				vDef = &metricDefinitions[i]
-				break
-			}
+	for _, v := range metricDef.ThresholdVariables {
+		vDef := findMetricDefinitionByLegacyName(v, metricDefinitions)
+		if vDef == nil {
+			slog.Warn("threshold variable not found in metric definitions", slog.String("metric", metricDef.Name), slog.String("variable", v))
+			return "No", ""
 		}
-		if vDef != nil {
-			if stat, ok := stats[getMetricDisplayName(*vDef)]; ok {
-				variables[v] = stat.mean
-			} else {
-				variables[v] = 0.0
-			}
+		if stat, ok := stats[getMetricDisplayName(*vDef)]; ok {
+			variables[v] = stat.mean
 		} else {
-			variables[v] = 0.0
+			slog.Warn("threshold variable not found in stats", slog.String("metric", metricDef.Name), slog.String("variable", v))
+			return "No", ""
 		}
 	}
 	// evaluate the threshold expression
-	result, err := evaluateThresholdExpression(*def, variables)
+	result, err := evaluateThresholdExpression(metricDef.ThresholdEvaluable, variables)
 	if err != nil {
-		slog.Warn("failed to evaluate threshold expression", slog.String("metric", metricName), slog.String("expression", def.ThresholdExpression), slog.String("error", err.Error()))
+		slog.Warn("failed to evaluate threshold expression", slog.String("metric", metricDef.Name), slog.String("expression", metricDef.ThresholdExpression), slog.String("error", err.Error()))
 		return "No", ""
 	}
 	boolResult, ok := result.(bool)
 	if !ok {
-		slog.Warn("threshold expression did not evaluate to a boolean", slog.String("metric", metricName), slog.String("expression", def.ThresholdExpression))
+		slog.Warn("threshold expression did not evaluate to a boolean", slog.String("metric", metricDef.Name), slog.String("expression", metricDef.ThresholdExpression))
 		return "No", ""
 	}
+	var exceeded string
 	if boolResult {
 		exceeded = "Yes"
 	} else {
 		exceeded = "No"
 	}
-	thresholdDescription = def.ThresholdExpression
-	return
+	return exceeded, metricDef.ThresholdExpression
 }
 
 // function to call evaluator so that we can catch panics that come from the evaluator
-func evaluateThresholdExpression(metric MetricDefinition, variables map[string]any) (result any, err error) {
+func evaluateThresholdExpression(evaluable *govaluate.EvaluableExpression, variables map[string]any) (any, error) {
+	var err error
 	defer func() {
 		if errx := recover(); errx != nil {
 			err = errx.(error)
 		}
 	}()
-	if result, err = metric.ThresholdEvaluable.Evaluate(variables); err != nil {
-		err = fmt.Errorf("%v : %s : %s", err, metric.Name, metric.ThresholdExpression)
-	}
-	return
+	result, err := evaluable.Evaluate(variables)
+	return result, err
 }
 
 // getCSV - generate CSV string representing the summary statistics of the metrics

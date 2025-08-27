@@ -692,7 +692,38 @@
                                 <Icon>info</Icon>
                               </IconButton>}
                             </Tooltip>
-                            {row[0]}
+                            {(() => {
+                              // Calculate indendation from the metric level value in column 8 (index 7)
+                              // The lowest level is 1
+                              const level = row[7] ? Number(row[7]) : 1;
+                              const indentationLevel = level > 1 ? level - 1 : 0;
+                              
+                              // Create indentation based on hierarchy level
+                              const indentation = indentationLevel > 0 ? 
+                                <span style={{
+                                  paddingLeft: `${indentationLevel * 16}px`,
+                                  borderLeft: indentationLevel > 0 ? '1px dotted #aaa' : 'none',
+                                  marginLeft: indentationLevel > 0 ? '4px' : '0',
+                                }}>
+                                  {indentationLevel > 0 && <Icon 
+                                    sx={{ 
+                                      fontSize: '0.8rem', 
+                                      verticalAlign: 'middle',
+                                      color: '#666',
+                                      marginRight: '4px'
+                                    }}
+                                  >
+                                    subdirectory_arrow_right
+                                  </Icon>}
+                                </span> : null;
+                              
+                              return (
+                                <React.Fragment>
+                                  {indentation}
+                                  {row[0]}
+                                </React.Fragment>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell 
                             sx={{ 
@@ -745,12 +776,23 @@
                   </TableBody>
                 </Table>
               </TableContainer>
-              <Alert severity="info" sx={{ marginBottom: "12px" }}>
-                TMA metrics are a hierarchy. More dots in the metric name indicate a deeper level in the hierarchy. For example, "TMA_..Memory_Bound" is a child of "TMA_Backend_Bound". Levels can be inferred by counting pairs of dots in the metric name.
+              <Box sx={{ marginTop: "16px" }}>
+                <Alert 
+                  severity="warning" 
+                  sx={{ 
+                    marginBottom: "24px",
+                    backgroundColor: 'rgba(255, 255, 0, 0.2)',
+                    '& .MuiAlert-icon': {
+                      color: 'rgba(0, 0, 0, 0.7)'
+                    },
+                    '& .MuiAlert-message': {
+                      color: 'rgba(0, 0, 0, 0.7)'
+                    }
+                  }}
+              >
+                Metrics with a mean value exceeding their threshold formula are highlighted in yellow, indicating potential performance issues or anomalies that may require further investigation.
               </Alert>
-              <Alert severity="warning" sx={{ marginBottom: "24px" }}>
-                Metrics with values exceeding their specific thresholds are highlighted in yellow. Thresholds are defined based on typical performance characteristics for each metric.
-              </Alert>
+              </Box>
             </TabPanel>
             <TabPanel
               value={systemTabs}
