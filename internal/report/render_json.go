@@ -11,25 +11,15 @@ func createJsonReport(allTableValues []TableValues) (out []byte, err error) {
 	type outReport map[string]outTable
 	oReport := make(outReport)
 	for _, tableValues := range allTableValues {
-		var oTable outTable
-		if len(tableValues.Fields) == 0 {
-			oReport[tableValues.Name] = oTable
+		if len(tableValues.Fields) == 0 || len(tableValues.Fields[0].Values) == 0 {
+			oReport[tableValues.Name] = outTable{}
 			continue
 		}
-		numRecords := len(tableValues.Fields[0].Values)
-		if numRecords > 0 {
-			for recordIdx := range numRecords {
-				oRecord := make(outRecord)
-				for _, field := range tableValues.Fields {
-					oRecord[field.Name] = field.Values[recordIdx]
-				}
-				oTable = append(oTable, oRecord)
-			}
-		} else {
-			// insert an empty record
+		var oTable outTable
+		for recordIdx := range len(tableValues.Fields[0].Values) {
 			oRecord := make(outRecord)
 			for _, field := range tableValues.Fields {
-				oRecord[field.Name] = ""
+				oRecord[field.Name] = field.Values[recordIdx]
 			}
 			oTable = append(oTable, oRecord)
 		}
