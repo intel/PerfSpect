@@ -736,7 +736,7 @@
                             {Number(row[1]).toFixed(4)}
                             {exceedsThreshold && 
                               <Tooltip 
-                                title={`Exceeds threshold: ${row[6]}`}
+                                title={`${row[6]}`}
                                 componentsProps={{
                                   tooltip: {
                                     sx: {
@@ -790,7 +790,7 @@
                     }
                   }}
               >
-                Metrics with a mean value exceeding their threshold formula are highlighted in yellow, indicating potential performance issues or anomalies that may require further investigation.
+                Metrics with a mean value exceeding their threshold formula are highlighted in yellow, indicating potential performance issues or anomalies that may require further investigation. Hover over the warning icon next to the mean value for more information.
               </Alert>
               </Box>
             </TabPanel>

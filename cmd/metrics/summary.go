@@ -306,6 +306,11 @@ func (m *metricsFromCSV) getHTML(metadata Metadata, metricDefinitions []MetricDe
 	return buf.String(), nil
 }
 
+type tmaTip struct {
+	Issue string `json:"issue"`
+	Tip   string `json:"tip"`
+}
+
 func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata, metricDefinitions []MetricDefinition) (templateVals map[string]string, err error) {
 	templateVals = make(map[string]string)
 	var stats map[string]metricStats
@@ -431,6 +436,17 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata, metricDefinit
 	}
 
 	// All Metrics Tab
+	// load the TMA metrics tuning tips from resources
+	var tmaTipsBytes []byte
+	if tmaTipsBytes, err = resources.ReadFile("resources/perfmon/tma_tuning_tips.json"); err != nil {
+		slog.Error("failed to read tma_tips.json", slog.String("error", err.Error()))
+		return
+	}
+	tmaTips := make(map[string]tmaTip)
+	if err = json.Unmarshal(tmaTipsBytes, &tmaTips); err != nil {
+		slog.Error("failed to unmarshal tma_tips.json", slog.String("error", err.Error()))
+		return
+	}
 	var metricHTMLStats [][]string
 	for _, name := range m.names {
 		metricVals := []string{
@@ -442,9 +458,9 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata, metricDefinit
 		}
 		metricDef := findMetricDefinitionByName(name, metricDefinitions)
 		if metricDef != nil {
-			exceeded, thresholdDescription := getThresholdInfo(*metricDef, stats, metricDefinitions)
+			exceeded, thresholdDescription := getThresholdInfo(*metricDef, stats, metricDefinitions, tmaTips)
 			metricVals = append(metricVals, exceeded)                                   // column 5 - "Yes" if threshold exceeded, else "No"
-			metricVals = append(metricVals, thresholdDescription)                       // column 6 - description of threshold, e.g., a>b>c>5
+			metricVals = append(metricVals, thresholdDescription)                       // column 6 - issue/tip or threshold itself
 			metricVals = append(metricVals, fmt.Sprintf("%d", max(metricDef.Level, 1))) // column 7 - metric level (for TMA metrics)
 		} else {
 			// this shouldn't happen, but just in case
@@ -514,7 +530,7 @@ func findMetricDefinitionByLegacyName(legacyName string, metricDefinitions []Met
 	return nil
 }
 
-func getThresholdInfo(metricDef MetricDefinition, stats map[string]metricStats, metricDefinitions []MetricDefinition) (string, string) {
+func getThresholdInfo(metricDef MetricDefinition, stats map[string]metricStats, metricDefinitions []MetricDefinition, tmaTips map[string]tmaTip) (string, string) {
 	variables := make(map[string]any) // map of variable names to values
 	// threshold variable names are legacy metric names, so find the corresponding metric definitions
 	for _, v := range metricDef.ThresholdVariables {
@@ -547,7 +563,23 @@ func getThresholdInfo(metricDef MetricDefinition, stats map[string]metricStats, 
 	} else {
 		exceeded = "No"
 	}
-	return exceeded, metricDef.ThresholdExpression
+	var resultTip string
+	if exceeded == "Yes" {
+		issueTip, ok := tmaTips[metricDef.Name]
+		if ok {
+			if issueTip.Issue != "" {
+				resultTip = fmt.Sprintf("Issue: %s ", issueTip.Issue)
+			}
+			if issueTip.Tip != "" {
+				resultTip += fmt.Sprintf("Tip: %s", issueTip.Tip)
+			}
+		}
+		if resultTip == "" {
+			// fallback if no tip found
+			resultTip = "Value exceeds metric threshold: " + metricDef.ThresholdExpression + "."
+		}
+	}
+	return exceeded, resultTip
 }
 
 // function to call evaluator so that we can catch panics that come from the evaluator
