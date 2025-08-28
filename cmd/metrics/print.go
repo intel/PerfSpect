@@ -93,21 +93,7 @@ func printMetricsAsync(targetContext *targetContext, outputDir string, frameChan
 }
 
 func getMetricDisplayName(metric MetricDefinition) string {
-	var name string
-	switch flagLegacyNames {
-	case false:
-		if metric.Category == "TMA" {
-			name = "TMA_"
-			for range metric.Level - 1 {
-				name += ".."
-			}
-			name += metric.Name
-		} else {
-			name = metric.Name
-		}
-	case true:
-		name, _ = strings.CutPrefix(metric.LegacyName, "metric_")
-	}
+	name, _ := strings.CutPrefix(metric.LegacyName, "metric_")
 	return name
 }
 

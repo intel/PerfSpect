@@ -145,7 +145,6 @@ var (
 	flagTransactionRate float64
 	// advanced options
 	flagShowMetricNames      bool
-	flagLegacyNames          bool
 	flagMetricsList          []string
 	flagEventFilePath        string
 	flagMetricFilePath       string
@@ -178,7 +177,6 @@ const (
 	flagTransactionRateName = "txnrate"
 
 	flagShowMetricNamesName      = "list"
-	flagLegacyNamesName          = "legacy-names"
 	flagMetricsListName          = "metrics"
 	flagEventFilePathName        = "eventfile"
 	flagMetricFilePathName       = "metricfile"
@@ -233,7 +231,6 @@ func init() {
 	Cmd.Flags().Float64Var(&flagTransactionRate, flagTransactionRateName, 0, "")
 
 	Cmd.Flags().BoolVar(&flagShowMetricNames, flagShowMetricNamesName, false, "")
-	Cmd.Flags().BoolVar(&flagLegacyNames, flagLegacyNamesName, false, "")
 	Cmd.Flags().StringSliceVar(&flagMetricsList, flagMetricsListName, []string{}, "")
 	Cmd.Flags().StringVar(&flagEventFilePath, flagEventFilePathName, "", "")
 	Cmd.Flags().StringVar(&flagMetricFilePath, flagMetricFilePathName, "", "")
@@ -355,10 +352,6 @@ func getFlagGroups() []common.FlagGroup {
 		{
 			Name: flagShowMetricNamesName,
 			Help: "show metric names available on this platform and exit",
-		},
-		{
-			Name: flagLegacyNamesName,
-			Help: "use legacy metric names where applicable (Deprecated, will be removed in a future release)",
 		},
 		{
 			Name: flagMetricsListName,
@@ -1050,7 +1043,8 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		for _, targetContext := range targetContexts {
 			fmt.Printf("\nMetrics available on %s:\n", targetContext.target.GetName())
 			for _, metric := range targetContext.metricDefinitions {
-				fmt.Printf("\"%s\"\n", metric.Name)
+				name, _ := strings.CutPrefix(metric.LegacyName, "metric_")
+				fmt.Printf("\"%s\"\n", name)
 			}
 		}
 		return nil

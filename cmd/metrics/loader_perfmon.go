@@ -73,10 +73,6 @@ func (l *PerfmonLoader) Load(loaderConfig LoaderConfig) ([]MetricDefinition, []G
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load metrics config: %w", err)
 	}
-	reportMetrics, err := filterReportMetrics(config.ReportMetrics, loaderConfig.SelectedMetrics)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error filtering report metrics: %w", err)
-	}
 	// Load the perfmon metric definitions from the JSON file
 	perfmonMetricDefinitions, err := loadPerfmonMetricsFromFile(config.PerfmonMetricsFile)
 	if err != nil {
@@ -109,6 +105,11 @@ func (l *PerfmonLoader) Load(loaderConfig LoaderConfig) ([]MetricDefinition, []G
 	perfspectMetrics, err := loadPerfmonMetricsFromFile(config.PerfspectMetricsFile)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading Perfspect metrics from file: %w", err)
+	}
+	// Filter the report metrics based on the selected metrics
+	reportMetrics, err := filterReportMetrics(config.ReportMetrics, loaderConfig.SelectedMetrics, append(perfmonMetricDefinitions.Metrics, perfspectMetrics.Metrics...))
+	if err != nil {
+		return nil, nil, fmt.Errorf("error filtering report metrics: %w", err)
 	}
 	// Combine the PerfSpect-defined metrics with the metric definitions from perfmon and filter based on report metrics
 	// Creates one list of all metrics to be used in the loader
@@ -225,7 +226,7 @@ func loadPerfmonMetricsFromFile(pathWithSource string) (PerfmonMetrics, error) {
 	return metrics, nil
 }
 
-func filterReportMetrics(reportMetrics []PerfspectMetric, selectedMetricNames []string) ([]PerfspectMetric, error) {
+func filterReportMetrics(reportMetrics []PerfspectMetric, selectedMetricNames []string, perfmonMetrics []PerfmonMetric) ([]PerfspectMetric, error) {
 	if len(selectedMetricNames) == 0 {
 		slog.Debug("No selected metrics provided, using all report metrics")
 		return reportMetrics, nil
@@ -233,16 +234,21 @@ func filterReportMetrics(reportMetrics []PerfspectMetric, selectedMetricNames []
 	slog.Debug("Filtering report metrics based on selected metrics", slog.Any("selectedMetrics", selectedMetricNames))
 	var filteredMetrics []PerfspectMetric
 	for _, metricName := range selectedMetricNames {
-		found := false
-		for _, metric := range reportMetrics {
-			if metric.MetricName == metricName {
-				filteredMetrics = append(filteredMetrics, metric)
-				found = true
-				break
+		pm, pmFound := findPerfmonMetricByLegacyName(perfmonMetrics, "metric_"+metricName)
+		if pmFound {
+			found := false
+			for _, metric := range reportMetrics {
+				if pm.MetricName == metric.MetricName {
+					filteredMetrics = append(filteredMetrics, metric)
+					found = true
+					break
+				}
 			}
-		}
-		if !found {
-			return nil, fmt.Errorf("unknown metric: %s", metricName)
+			if !found {
+				return nil, fmt.Errorf("metric not found in perfspect metrics: %s", metricName)
+			}
+		} else {
+			return nil, fmt.Errorf("metric not found in perfmon metrics: %s", metricName)
 		}
 	}
 	return filteredMetrics, nil
@@ -598,6 +604,16 @@ func groupsFromEventNames(metricName string, eventNames []string, coreEvents Cor
 func findPerfmonMetric(metricsList []PerfmonMetric, metricName string) (*PerfmonMetric, bool) {
 	for _, metric := range metricsList {
 		if metric.MetricName == metricName {
+			return &metric, true
+		}
+	}
+	return nil, false
+}
+
+// findPerfmonMetricByLegacyName -- Helper function to find a metric by legacy name
+func findPerfmonMetricByLegacyName(metricsList []PerfmonMetric, legacyName string) (*PerfmonMetric, bool) {
+	for _, metric := range metricsList {
+		if metric.LegacyName == legacyName {
 			return &metric, true
 		}
 	}

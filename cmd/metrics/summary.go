@@ -357,18 +357,18 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata, metricDefinit
 	// templateReplace is a list of template variables to replace with the mean value of
 	// the metric named in the metricNames field for the architecture
 	templateReplace := []tmplReplace{
-		{"FRONTEND", []string{"TMA_Frontend_Bound", "Pipeline Utilization - Frontend Bound (%)"}},
-		{"FETCHLATENCY", []string{"TMA_..Fetch_Latency", "Pipeline Utilization - Frontend Bound - Latency (%)"}},
-		{"FETCHBANDWIDTH", []string{"TMA_..Fetch_Bandwidth", "Pipeline Utilization - Frontend Bound - Bandwidth (%)"}},
-		{"BADSPECULATION", []string{"TMA_Bad_Speculation", "Pipeline Utilization - Bad Speculation (%)"}},
-		{"BRANCHMISPREDICTS", []string{"TMA_..Branch_Mispredicts", "Pipeline Utilization - Bad Speculation - Mispredicts (%)"}},
-		{"MACHINECLEARS", []string{"TMA_..Machine_Clears", "Pipeline Utilization - Bad Speculation - Pipeline Restarts (%)"}},
-		{"BACKEND", []string{"TMA_Backend_Bound", "Pipeline Utilization - Backend Bound (%)"}},
-		{"COREDATA", []string{"TMA_..Core_Bound", "Pipeline Utilization - Backend Bound - CPU (%)"}},
-		{"MEMORY", []string{"TMA_..Memory_Bound", "Pipeline Utilization - Backend Bound - Memory (%)"}},
-		{"RETIRING", []string{"TMA_Retiring", "Pipeline Utilization - Retiring (%)"}},
-		{"LIGHTOPS", []string{"TMA_..Light_Operations", "Pipeline Utilization - Retiring - Fastpath (%)"}},
-		{"HEAVYOPS", []string{"TMA_..Heavy_Operations", "Pipeline Utilization - Retiring - Microcode (%)"}},
+		{"FRONTEND", []string{"TMA_Frontend_Bound(%)", "Pipeline Utilization - Frontend Bound (%)"}},
+		{"FETCHLATENCY", []string{"TMA_..Fetch_Latency(%)", "Pipeline Utilization - Frontend Bound - Latency (%)"}},
+		{"FETCHBANDWIDTH", []string{"TMA_..Fetch_Bandwidth(%)", "Pipeline Utilization - Frontend Bound - Bandwidth (%)"}},
+		{"BADSPECULATION", []string{"TMA_Bad_Speculation(%)", "Pipeline Utilization - Bad Speculation (%)"}},
+		{"BRANCHMISPREDICTS", []string{"TMA_..Branch_Mispredicts(%)", "Pipeline Utilization - Bad Speculation - Mispredicts (%)"}},
+		{"MACHINECLEARS", []string{"TMA_..Machine_Clears(%)", "Pipeline Utilization - Bad Speculation - Pipeline Restarts (%)"}},
+		{"BACKEND", []string{"TMA_Backend_Bound(%)", "Pipeline Utilization - Backend Bound (%)"}},
+		{"COREDATA", []string{"TMA_..Core_Bound(%)", "Pipeline Utilization - Backend Bound - CPU (%)"}},
+		{"MEMORY", []string{"TMA_..Memory_Bound(%)", "Pipeline Utilization - Backend Bound - Memory (%)"}},
+		{"RETIRING", []string{"TMA_Retiring(%)", "Pipeline Utilization - Retiring (%)"}},
+		{"LIGHTOPS", []string{"TMA_..Light_Operations(%)", "Pipeline Utilization - Retiring - Fastpath (%)"}},
+		{"HEAVYOPS", []string{"TMA_..Heavy_Operations(%)", "Pipeline Utilization - Retiring - Microcode (%)"}},
 	}
 	// replace the template variables with the mean value of the metric
 	for _, tmpl := range templateReplace {
@@ -387,25 +387,25 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata, metricDefinit
 	// these get the series data for the graphs
 	templateReplace = []tmplReplace{
 		// TMAM Tab
-		{"TMAFRONTEND", []string{"TMA_Frontend_Bound", "Pipeline Utilization - Frontend Bound (%)"}},
-		{"TMABACKEND", []string{"TMA_Backend_Bound", "Pipeline Utilization - Backend Bound (%)"}},
-		{"TMARETIRING", []string{"TMA_Retiring", "Pipeline Utilization - Retiring (%)"}},
-		{"TMABADSPECULATION", []string{"TMA_Bad_Speculation", "Pipeline Utilization - Bad Speculation (%)"}},
+		{"TMAFRONTEND", []string{"TMA_Frontend_Bound(%)", "Pipeline Utilization - Frontend Bound (%)"}},
+		{"TMABACKEND", []string{"TMA_Backend_Bound(%)", "Pipeline Utilization - Backend Bound (%)"}},
+		{"TMARETIRING", []string{"TMA_Retiring(%)", "Pipeline Utilization - Retiring (%)"}},
+		{"TMABADSPECULATION", []string{"TMA_Bad_Speculation(%)", "Pipeline Utilization - Bad Speculation (%)"}},
 		// CPU Tab
-		{"CPUUTIL", []string{"cpu_utilization", "CPU utilization %"}},
-		{"CPIDATA", []string{"cpi", "CPI"}},
-		{"CPUFREQ", []string{"cpu_operating_frequency", "CPU operating frequency (in GHz)"}},
+		{"CPUUTIL", []string{"CPU utilization %", "CPU utilization %"}},
+		{"CPIDATA", []string{"CPI", "CPI"}},
+		{"CPUFREQ", []string{"CPU operating frequency (in GHz)", "CPU operating frequency (in GHz)"}},
 		// Memory Tab
-		{"L1DATA", []string{"l1d_mpi", ""}},
-		{"L2DATA", []string{"l2_mpi", ""}},
-		{"LLCDATA", []string{"llc_data_read_mpi_demand_plus_prefetch", ""}},
-		{"READDATA", []string{"memory_bandwidth_read", "Read Memory Bandwidth (MB/sec)"}},
-		{"WRITEDATA", []string{"memory_bandwidth_write", "Write Memory Bandwidth (MB/sec)"}},
-		{"TOTALDATA", []string{"memory_bandwidth_total", "Total Memory Bandwidth (MB/sec)"}},
-		{"REMOTENUMA", []string{"numa_reads_addressed_to_remote_dram", "Remote DRAM Reads %"}},
+		{"L1DATA", []string{"L1D MPI (includes data+rfo w/ prefetches)", ""}},
+		{"L2DATA", []string{"L2 MPI (includes code+data+rfo w/ prefetches)", ""}},
+		{"LLCDATA", []string{"LLC data read MPI (demand+prefetch)", ""}},
+		{"READDATA", []string{"memory bandwidth read (MB/sec)", "Read Memory Bandwidth (MB/sec)"}},
+		{"WRITEDATA", []string{"memory bandwidth write (MB/sec)", "Write Memory Bandwidth (MB/sec)"}},
+		{"TOTALDATA", []string{"memory bandwidth total (MB/sec)", "Total Memory Bandwidth (MB/sec)"}},
+		{"REMOTENUMA", []string{"NUMA %_Reads addressed to remote DRAM", "Remote DRAM Reads %"}},
 		// Power Tab
-		{"PKGPOWER", []string{"package_power", "package power (watts)"}},
-		{"DRAMPOWER", []string{"dram_power", ""}},
+		{"PKGPOWER", []string{"package power (watts)", "package power (watts)"}},
+		{"DRAMPOWER", []string{"DRAM power (watts)", ""}},
 	}
 	// replace the template variables with the series data
 	for tIdx, tmpl := range templateReplace {
@@ -531,6 +531,10 @@ func findMetricDefinitionByLegacyName(legacyName string, metricDefinitions []Met
 }
 
 func getThresholdInfo(metricDef MetricDefinition, stats map[string]metricStats, metricDefinitions []MetricDefinition, tmaTips map[string]tmaTip) (string, string) {
+	if metricDef.ThresholdEvaluable == nil {
+		// no threshold defined
+		return "No", ""
+	}
 	variables := make(map[string]any) // map of variable names to values
 	// threshold variable names are legacy metric names, so find the corresponding metric definitions
 	for _, v := range metricDef.ThresholdVariables {
