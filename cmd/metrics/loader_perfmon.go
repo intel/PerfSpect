@@ -335,6 +335,11 @@ func getThresholdExpression(perfmonMetric PerfmonMetric) (string, error) {
 	if perfmonMetric.Threshold == nil {
 		return "", nil // no threshold defined
 	}
+	// SRF metrics are currently defined using an older perfmon format that doesn't
+	// define threshold metrics. We could parse them out manually, but for now we'll just skip them.
+	if perfmonMetric.Threshold.ThresholdMetrics == nil {
+		return "", nil // no threshold defined
+	}
 	expression := perfmonMetric.Threshold.Formula
 	if expression == "" {
 		return "", nil // no threshold defined
