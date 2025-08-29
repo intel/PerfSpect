@@ -420,6 +420,7 @@ var tableDefinitions = map[string]TableDefinition{
 			script.GaudiInfoScriptName,
 			script.GaudiFirmwareScriptName,
 			script.GaudiNumaScriptName,
+			script.GaudiArchitectureScriptName,
 		},
 		FieldsFunc: gaudiTableValues},
 	CXLTableName: {
@@ -1748,6 +1749,7 @@ func gaudiTableValues(outputs map[string]script.ScriptOutput) []Field {
 	}
 	fields := []Field{
 		{Name: "Module ID"},
+		{Name: "Microarchitecture"},
 		{Name: "Serial Number"},
 		{Name: "Bus ID"},
 		{Name: "Driver Version"},
@@ -1758,13 +1760,14 @@ func gaudiTableValues(outputs map[string]script.ScriptOutput) []Field {
 	}
 	for _, gaudiInfo := range gaudiInfos {
 		fields[0].Values = append(fields[0].Values, gaudiInfo.ModuleID)
-		fields[1].Values = append(fields[1].Values, gaudiInfo.SerialNumber)
-		fields[2].Values = append(fields[2].Values, gaudiInfo.BusID)
-		fields[3].Values = append(fields[3].Values, gaudiInfo.DriverVersion)
-		fields[4].Values = append(fields[4].Values, gaudiInfo.EROM)
-		fields[5].Values = append(fields[5].Values, gaudiInfo.CPLD)
-		fields[6].Values = append(fields[6].Values, gaudiInfo.SPI)
-		fields[7].Values = append(fields[7].Values, gaudiInfo.NUMA)
+		fields[1].Values = append(fields[1].Values, gaudiInfo.Microarchitecture)
+		fields[2].Values = append(fields[2].Values, gaudiInfo.SerialNumber)
+		fields[3].Values = append(fields[3].Values, gaudiInfo.BusID)
+		fields[4].Values = append(fields[4].Values, gaudiInfo.DriverVersion)
+		fields[5].Values = append(fields[5].Values, gaudiInfo.EROM)
+		fields[6].Values = append(fields[6].Values, gaudiInfo.CPLD)
+		fields[7].Values = append(fields[7].Values, gaudiInfo.SPI)
+		fields[8].Values = append(fields[8].Values, gaudiInfo.NUMA)
 	}
 	return fields
 }
