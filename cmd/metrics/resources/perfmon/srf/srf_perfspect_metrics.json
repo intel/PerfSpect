@@ -19,6 +19,17 @@
       ],
       "Constants": [],
       "Formula": "100 * (a / b)",
+      "Threshold": {
+        "ThresholdMetrics": [
+          {
+            "Alias": "a",
+            "Value": "metric_CPU utilization % in kernel mode"
+          }
+        ],
+        "Formula": "a > 5",
+        "BaseFormula": "metric_CPU utilization % in kernel mode > 5",
+        "ThresholdIssues": ""
+      },
       "ResolutionLevels": "THREAD, CORE, SOCKET, SYSTEM"
     },
     {
@@ -50,7 +61,7 @@
           "Alias": "a"
         },
         {
-          "Name": "INST_RETIRED.ANY",
+          "Name": "INST_RETIRED.ANY_P:SUP",
           "Alias": "b"
         }
       ],
