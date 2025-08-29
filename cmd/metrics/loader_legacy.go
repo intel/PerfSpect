@@ -55,6 +55,10 @@ func loadMetricDefinitions(metricDefinitionOverridePath string, selectedMetrics 
 	if err = json.Unmarshal(bytes, &metricsInFile); err != nil {
 		return
 	}
+	// set LegacyName to Name for all metrics
+	for i := range metricsInFile {
+		metricsInFile[i].LegacyName = metricsInFile[i].Name
+	}
 	// if a list of metric names provided, reduce list to match
 	if len(selectedMetrics) > 0 {
 		// confirm provided metric names are valid (included in metrics defined in file)
