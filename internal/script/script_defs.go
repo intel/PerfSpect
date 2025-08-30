@@ -98,6 +98,7 @@ const (
 	GaudiInfoScriptName              = "gaudi info"
 	GaudiFirmwareScriptName          = "gaudi firmware"
 	GaudiNumaScriptName              = "gaudi numa"
+	GaudiArchitectureScriptName      = "gaudi architecture"
 	// benchmark scripts
 	MemoryBenchmarkScriptName    = "memory benchmark"
 	NumaBenchmarkScriptName      = "numa benchmark"
@@ -936,6 +937,22 @@ done
 		Name:           GaudiNumaScriptName,
 		ScriptTemplate: `hl-smi topo -N`,
 		Vendors:        []string{"GenuineIntel"},
+	},
+	GaudiArchitectureScriptName: {
+		Name: GaudiArchitectureScriptName,
+		ScriptTemplate: `# Determine the default HL_DEVICE based on PCI ID
+__DEFAULT_HL_DEVICE=
+__pcidev=$(grep PCI_ID /sys/bus/pci/devices/*/uevent | grep -i 1da3: || echo "")
+if echo $__pcidev | grep -qE '1000|1001|1010|1011'; then
+	__DEFAULT_HL_DEVICE="gaudi"
+elif echo $__pcidev | grep -qE '1020|1030'; then
+	__DEFAULT_HL_DEVICE="gaudi2"
+elif echo $__pcidev | grep -qE '106[0-9]'; then
+	__DEFAULT_HL_DEVICE="gaudi3"
+fi
+echo $__DEFAULT_HL_DEVICE
+`,
+		Vendors: []string{"GenuineIntel"},
 	},
 	MemoryBenchmarkScriptName: {
 		Name: MemoryBenchmarkScriptName,

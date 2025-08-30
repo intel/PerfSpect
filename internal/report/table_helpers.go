@@ -1417,14 +1417,15 @@ func gpuInfoFromOutput(outputs map[string]script.ScriptOutput) []GPU {
 }
 
 type Gaudi struct {
-	ModuleID      string
-	SerialNumber  string
-	BusID         string
-	DriverVersion string
-	EROM          string
-	CPLD          string
-	SPI           string
-	NUMA          string
+	ModuleID          string
+	Microarchitecture string
+	SerialNumber      string
+	BusID             string
+	DriverVersion     string
+	EROM              string
+	CPLD              string
+	SPI               string
+	NUMA              string
 }
 
 // output from the GaudiInfo script:
@@ -1504,6 +1505,10 @@ func gaudiInfoFromOutput(outputs map[string]script.ScriptOutput) []Gaudi {
 	sort.Slice(gaudis, func(i, j int) bool {
 		return gaudis[i].ModuleID < gaudis[j].ModuleID
 	})
+	// set microarchitecture (assumes same arch for all gaudi devices)
+	for i := range gaudis {
+		gaudis[i].Microarchitecture = strings.TrimSpace(outputs[script.GaudiArchitectureScriptName].Stdout)
+	}
 	// get NUMA affinity
 	numaAffinities := valsArrayFromRegexSubmatch(outputs[script.GaudiNumaScriptName].Stdout, `^(\d+)\s+(\d+)\s+$`)
 	if len(numaAffinities) != len(gaudis) {
