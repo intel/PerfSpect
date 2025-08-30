@@ -16,9 +16,9 @@ import (
 	"time"
 )
 
-func printMetrics(metricFrames []MetricFrame, frameCount int, targetName string, collectionStartTime time.Time, outputDir string) (printedFiles []string) {
+func printMetrics(metricFrames []MetricFrame, frameCount int, metricDefinitions []MetricDefinition, targetName string, collectionStartTime time.Time, outputDir string) (printedFiles []string) {
 	printToFile := !flagLive && !flagPrometheusServer && slices.Contains(flagOutputFormat, formatTxt)
-	fileName, err := printMetricsTxt(metricFrames, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatTxt, printToFile, outputDir)
+	fileName, err := printMetricsTxt(metricFrames, metricDefinitions, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatTxt, printToFile, outputDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
@@ -26,7 +26,7 @@ func printMetrics(metricFrames []MetricFrame, frameCount int, targetName string,
 		printedFiles = util.UniqueAppend(printedFiles, fileName)
 	}
 	printToFile = !flagLive && !flagPrometheusServer && slices.Contains(flagOutputFormat, formatJSON)
-	fileName, err = printMetricsJSON(metricFrames, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatJSON, printToFile, outputDir)
+	fileName, err = printMetricsJSON(metricFrames, metricDefinitions, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatJSON, printToFile, outputDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
@@ -35,7 +35,7 @@ func printMetrics(metricFrames []MetricFrame, frameCount int, targetName string,
 	}
 	// csv is always written to file unless no files are requested -- we need it to create the summary reports
 	printToFile = !flagLive && !flagPrometheusServer
-	fileName, err = printMetricsCSV(metricFrames, frameCount, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatCSV, printToFile, outputDir)
+	fileName, err = printMetricsCSV(metricFrames, frameCount, metricDefinitions, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatCSV, printToFile, outputDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
@@ -43,7 +43,7 @@ func printMetrics(metricFrames []MetricFrame, frameCount int, targetName string,
 		printedFiles = util.UniqueAppend(printedFiles, fileName)
 	}
 	printToFile = !flagLive && !flagPrometheusServer && slices.Contains(flagOutputFormat, formatWide)
-	fileName, err = printMetricsWide(metricFrames, frameCount, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatWide, printToFile, outputDir)
+	fileName, err = printMetricsWide(metricFrames, frameCount, metricDefinitions, targetName, collectionStartTime, flagLive && flagOutputFormat[0] == formatWide, printToFile, outputDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
@@ -80,7 +80,7 @@ func printMetricsAsync(targetContext *targetContext, outputDir string, frameChan
 	frameCount := 1
 	// block until next set of metric frames arrives, will exit loop when frameChannel is closed
 	for metricFrames := range frameChannel {
-		printedFiles := printMetrics(metricFrames, frameCount, targetContext.target.GetName(), targetContext.perfStartTime, outputDir)
+		printedFiles := printMetrics(metricFrames, frameCount, targetContext.metricDefinitions, targetContext.target.GetName(), targetContext.perfStartTime, outputDir)
 		if flagPrometheusServer {
 			updatePrometheusMetrics(metricFrames)
 		}
@@ -92,17 +92,39 @@ func printMetricsAsync(targetContext *targetContext, outputDir string, frameChan
 	doneChannel <- allPrintedFiles
 }
 
-func printMetricsJSON(metricFrames []MetricFrame, targetName string, collectionStartTime time.Time, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
+func getMetricDisplayName(metric MetricDefinition) string {
+	name, _ := strings.CutPrefix(metric.LegacyName, "metric_")
+	return name
+}
+
+func getMetricDefinitionByName(metricDefinitions []MetricDefinition, name string) (metric MetricDefinition, found bool) {
+	for _, def := range metricDefinitions {
+		if def.Name == name {
+			return def, true
+		}
+	}
+	return MetricDefinition{}, false
+}
+
+func nameFromMetricDefinition(metricDefinitions []MetricDefinition, s string) string {
+	if def, found := getMetricDefinitionByName(metricDefinitions, s); found {
+		return getMetricDisplayName(def)
+	}
+	return s
+}
+
+func printMetricsJSON(metricFrames []MetricFrame, metricDefinitions []MetricDefinition, targetName string, collectionStartTime time.Time, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
 	if !printToStdout && !printToFile {
 		return
 	}
-	filename := outputDir + "/" + targetName + "_" + "metrics.json"
+	filename := outputDir + "/" + targetName + "_" + "metrics.jsonl"
 	for _, metricFrame := range metricFrames {
 		// can't Marshal NaN or Inf values in JSON, so no need to set them to a specific value
 		filteredMetricFrame := metricFrame
 		filteredMetricFrame.Metrics = make([]Metric, 0, len(metricFrame.Metrics))
 		filteredMetricFrame.Timestamp = float64(collectionStartTime.Unix() + int64(metricFrame.Timestamp))
 		for _, metric := range metricFrame.Metrics {
+			metric.Name = nameFromMetricDefinition(metricDefinitions, metric.Name)
 			if math.IsNaN(metric.Value) || math.IsInf(metric.Value, 0) {
 				filteredMetricFrame.Metrics = append(filteredMetricFrame.Metrics, Metric{Name: metric.Name, Value: -1})
 			} else {
@@ -134,7 +156,7 @@ func printMetricsJSON(metricFrames []MetricFrame, targetName string, collectionS
 	return
 }
 
-func printMetricsCSV(metricFrames []MetricFrame, frameCount int, targetName string, collectionStartTime time.Time, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
+func printMetricsCSV(metricFrames []MetricFrame, frameCount int, metricDefinitions []MetricDefinition, targetName string, collectionStartTime time.Time, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
 	if !printToStdout && !printToFile {
 		return
 	}
@@ -162,7 +184,8 @@ func printMetricsCSV(metricFrames []MetricFrame, frameCount int, targetName stri
 			}
 			names := make([]string, 0, len(metricFrame.Metrics))
 			for _, metric := range metricFrame.Metrics {
-				names = append(names, metric.Name)
+				name := nameFromMetricDefinition(metricDefinitions, metric.Name)
+				names = append(names, name)
 			}
 			metricNames := strings.Join(names, ",")
 			if printToStdout {
@@ -195,7 +218,7 @@ func printMetricsCSV(metricFrames []MetricFrame, frameCount int, targetName stri
 	return
 }
 
-func printMetricsWide(metricFrames []MetricFrame, frameCount int, targetName string, collectionStartTime time.Time, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
+func printMetricsWide(metricFrames []MetricFrame, frameCount int, metricDefinitions []MetricDefinition, targetName string, collectionStartTime time.Time, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
 	if !printToStdout && !printToFile {
 		return
 	}
@@ -213,6 +236,7 @@ func printMetricsWide(metricFrames []MetricFrame, frameCount int, targetName str
 		var names []string
 		var values []float64
 		for _, metric := range metricFrame.Metrics {
+			metric.Name = nameFromMetricDefinition(metricDefinitions, metric.Name)
 			names = append(names, metric.Name)
 			values = append(values, metric.Value)
 		}
@@ -294,7 +318,7 @@ func printMetricsWide(metricFrames []MetricFrame, frameCount int, targetName str
 	return
 }
 
-func printMetricsTxt(metricFrames []MetricFrame, targetName string, collectionStartTime time.Time, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
+func printMetricsTxt(metricFrames []MetricFrame, metricDefinitions []MetricDefinition, targetName string, collectionStartTime time.Time, printToStdout bool, printToFile bool, outputDir string) (outputFilename string, err error) {
 	if !printToStdout && !printToFile {
 		return
 	}
@@ -314,7 +338,8 @@ func printMetricsTxt(metricFrames []MetricFrame, targetName string, collectionSt
 		}
 		outputLines = append(outputLines, line)
 		for i := range metricFrames[0].Metrics {
-			line = fmt.Sprintf("%-70s ", metricFrames[0].Metrics[i].Name)
+			name := nameFromMetricDefinition(metricDefinitions, metricFrames[0].Metrics[i].Name)
+			line = fmt.Sprintf("%-70s ", name)
 			for _, metricFrame := range metricFrames {
 				line += fmt.Sprintf("%15s", strconv.FormatFloat(metricFrame.Metrics[i].Value, 'g', 4, 64))
 			}
@@ -339,7 +364,8 @@ func printMetricsTxt(metricFrames []MetricFrame, targetName string, collectionSt
 			outputLines = append(outputLines, fmt.Sprintf("%-70s %15s", "metric", "value"))
 			outputLines = append(outputLines, fmt.Sprintf("%-70s %15s", "------------------------", "----------"))
 			for _, metric := range metricFrame.Metrics {
-				outputLines = append(outputLines, fmt.Sprintf("%-70s %15s", metric.Name, strconv.FormatFloat(metric.Value, 'g', 4, 64)))
+				name := nameFromMetricDefinition(metricDefinitions, metric.Name)
+				outputLines = append(outputLines, fmt.Sprintf("%-70s %15s", name, strconv.FormatFloat(metric.Value, 'g', 4, 64)))
 			}
 		}
 	}

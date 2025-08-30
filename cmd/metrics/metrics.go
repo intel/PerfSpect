@@ -819,10 +819,10 @@ func processRawData(localOutputDir string) error {
 		if err != nil {
 			return err
 		}
-		filesWritten = printMetrics(metricFrames, frameCount, metadata.Hostname, metadata.CollectionStartTime, localOutputDir)
+		filesWritten = printMetrics(metricFrames, frameCount, metricDefinitions, metadata.Hostname, metadata.CollectionStartTime, localOutputDir)
 		frameCount += len(metricFrames)
 	}
-	summaryFiles, err := summarizeMetrics(localOutputDir, metadata.Hostname, metadata)
+	summaryFiles, err := summarizeMetrics(localOutputDir, metadata.Hostname, metadata, metricDefinitions)
 	if err != nil {
 		return err
 	}
@@ -1043,7 +1043,8 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		for _, targetContext := range targetContexts {
 			fmt.Printf("\nMetrics available on %s:\n", targetContext.target.GetName())
 			for _, metric := range targetContext.metricDefinitions {
-				fmt.Printf("\"%s\"\n", metric.Name)
+				name, _ := strings.CutPrefix(metric.LegacyName, "metric_")
+				fmt.Printf("\"%s\"\n", name)
 			}
 		}
 		return nil
@@ -1103,7 +1104,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 					_ = multiSpinner.Status(targetContext.target.GetName(), "no metrics collected")
 				} else {
 					targetContext.metadata.PerfSpectVersion = appContext.Version
-					summaryFiles, err := summarizeMetrics(localOutputDir, targetContext.target.GetName(), targetContext.metadata)
+					summaryFiles, err := summarizeMetrics(localOutputDir, targetContext.target.GetName(), targetContext.metadata, targetContext.metricDefinitions)
 					if err != nil {
 						err = fmt.Errorf("failed to summarize metrics: %w", err)
 						exitErrs = append(exitErrs, err)

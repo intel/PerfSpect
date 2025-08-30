@@ -1,0 +1,250 @@
+{
+  "Frontend_Bound": {
+    "issue": "A significant portion of Pipeline Slots is remaining empty due to issues in the Front-End.",
+    "tip": "Make sure the code working size is not too large, the code layout does not require too many memory accesses per cycle to get enough instructions for filling four pipeline slots, or check for microcode assists."
+  },
+  "Fetch_Latency": {
+    "issue": "",
+    "tip": "See ICache_Misses and ITLB_Misses tips."
+  },
+  "ICache_Misses": {
+    "issue": "A significant portion of instruction fetches is missing in the instruction cache.",
+    "tip": "Using compiler's Profile-Guided Optimization (PGO) can reduce i-cache misses through improved hot code layout."
+  },
+  "ITLB_Misses": {
+    "issue": "A significant portion of cycles is spent handling instruction TLB misses.",
+    "tip": "Consider large 2M pages for code (selectively prefer hot large-size function, due to limited 2M entries). Linux options: standard binaries use libhugetlbfs; Hfsort. https://github.com/libhugetlbfs/libhugetlbfs;https://research.fb.com/publications/optimizing-function-placement-for-large-scale-data-center-applications-2/"
+  },
+  "Branch_Resteers": {
+    "issue": "A significant fraction of cycles was stalled due to Branch Resteers. Branch Resteers estimate the Front-End delay in fetching operations from corrected path, following all sorts of mispredicted branches. For example, branchy code with lots of mispredictions might get categorized as Branch Resteers. Note the value of this node may overlap its siblings.",
+    "tip": ""
+  },
+  "MS_Switches": {
+    "issue": "A significant fraction of cycles was stalled due to switches of uOp delivery to the Microcode Sequencer (MS). Commonly used instructions are optimized for delivery by the DSB or MITE pipelines. Certain operations cannot be handled natively by the execution pipeline, and must be performed by microcode (small programs injected into the execution stream). Switching to the MS too often can negatively impact performance. The MS is designated to deliver long uOp flows required by CISC instructions like CPUID, or uncommon conditions like Floating Point Assists when dealing with Denormals. Note that this metric value may be highlighted due to Microcode Sequencer issue.",
+    "tip": ""
+  },
+  "LCP": {
+    "issue": "A significant fraction of cycles was stalled due to Length Changing Prefixes (LCPs).",
+    "tip": "To avoid this issue, use proper compiler flags. Intel Compiler enables these flags by default. See section 'Length-Changing Prefixes (LCP)' in Optimization Manual: http://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-optimization-manual.html"
+  },
+  "DSB_Switches": {
+    "issue": "A significant portion of cycles is spent switching from the DSB to the MITE. This may happen if a hot code region is too large to fit into the DSB.",
+    "tip": "Consider changing code layout (for example, via profile-guided optimization) to help your hot regions fit into the DSB. See section 'Optimization for Decoded Icache' in Optimization Manual: http://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-optimization-manual.html"
+  },
+  "Fetch_Bandwidth": {
+    "issue": "",
+    "tip": ""
+  },
+  "MITE": {
+    "issue": "A significant portion of cycles is spent in the MITE. Consider code generation of 'small hotspots' that can fit in DSB. See the \"Optimization for Decoded ICache\" section in the Intel 64 and IA-32 Architectures Optimization Reference Manual.",
+    "tip": "Consider tuning codegen of 'small hotspots' that can fit in DSB. Read about 'Decoded ICache' in Optimization Manual: http://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-optimization-manual.html"
+  },
+  "DSB": {
+    "issue": "",
+    "tip": ""
+  },
+  "MS": {
+    "issue": "",
+    "tip": ""
+  },
+  "Bad_Speculation": {
+    "issue": "A significant proportion of pipeline slots containing useful work are being cancelled. This can be caused by mispredicting branches or by machine clears. Note that this metric value may be highlighted due to Branch Resteers issue.",
+    "tip": ""
+  },
+  "Branch_Mispredicts": {
+    "issue": ": A significant proportion of branches are mispredicted, leading to excessive wasted work or Backend stalls due to the machine need to recover its state from a speculative path.",
+    "tip": "Using profile feedback in the compiler may help. Please see the Optimization Manual for general strategies for addressing branch misprediction issues. http://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-optimization-manual.html"
+  },
+  "Cond_NT_Mispredicts": {
+    "issue": "",
+    "tip": ""
+  },
+  "Cond_TK_Mispredicts": {
+    "issue": "",
+    "tip": ""
+  },
+  "Ind_Call_Mispredicts": {
+    "issue": "",
+    "tip": ""
+  },
+  "Ind_Jump_Mispredicts": {
+    "issue": "",
+    "tip": ""
+  },
+  "Ret_Mispredicts": {
+    "issue": "",
+    "tip": ""
+  },
+  "Other_Mispredicts": {
+    "issue": "",
+    "tip": ""
+  },
+  "Machine_Clears": {
+    "issue": "A significant portion of execution time is spent handling machine clears.",
+    "tip": "See the \"Memory Disambiguation\" section in the Intel 64 and IA-32 Architectures Optimization Reference Manual."
+  },
+  "Other_Nukes": {
+    "issue": "",
+    "tip": ""
+  },
+  "Backend_Bound": {
+    "issue": "A significant portion of pipeline slots are remaining empty. When operations take too long in the back-end, they introduce bubbles in the pipeline that ultimately cause fewer pipeline slots containing useful work to be retired per cycle than the machine is capable to support. This opportunity cost results in slower execution. Long-latency operations like divides and memory operations can cause this, as can too many operations being directed to a single execution port (for example, more multiply operations arriving in the back-end per cycle than the execution unit can support).",
+    "tip": ""
+  },
+  "Memory_Bound": {
+    "issue": "The metric value is high. This can indicate that the significant fraction of execution pipeline slots could be stalled due to demand memory load and stores. Use Memory Access analysis to have the metric breakdown by memory hierarchy, memory bandwidth information, correlation by memory objects.",
+    "tip": ""
+  },
+  "L1_Bound": {
+    "issue": "This metric estimates how often the CPU was stalled without loads missing the L1 Data (L1D) cache. The L1D cache typically has the shortest latency. However, in certain cases like loads blocked on older stores, a load might suffer due to high latency even though it is being satisfied by the L1D. Another example is loads who miss in the TLB. These cases are characterized by execution unit stalls, while some non-completed demand load live in the machine without having that demand load missing the L1 cache.",
+    "tip": ""
+  },
+  "DTLB_Load": {
+    "issue": "",
+    "tip": ""
+  },
+  "Store_Fwd_Blk": {
+    "issue": "",
+    "tip": ""
+  },
+  "L1_Latency_Dependency": {
+    "issue": "This metric estimates the fraction of cycles with demand load accesses that hit the L1D cache. The short latency of the L1D cache may be exposed in pointer-chasing memory access patterns as an example.",
+    "tip": ""
+  },
+  "Lock_Latency": {
+    "issue": "A significant fraction of CPU cycles spent handling cache misses due to lock operations. Due to the microarchitecture handling of locks, they are classified as L1 Bound regardless of what memory source satisfied them. Note that this metric value may be highlighted due to Store Latency issue.",
+    "tip": ""
+  },
+  "Split_Loads": {
+    "issue": "A significant portion of cycles is spent handling split loads.",
+    "tip": "Consider aligning your data or hot structure fields to the 64-byte cache line granularity."
+  },
+  "FB_Full": {
+    "issue": "This metric does a rough estimation of how often L1D Fill Buffer unavailability limited additional L1D miss memory access requests to proceed. The higher the metric value, the deeper the memory hierarchy level the misses are satisfied from. Often it hints on approaching bandwidth limits (to L2 cache, L3 cache or external memory). Avoid adding software prefetches if indeed memory BW limited.",
+    "tip": "See $issueBW and $issueSL hints. Avoid software prefetches if indeed memory BW limited."
+  },
+  "L2_Bound": {
+    "issue": "This metric shows how often machine was stalled on L2 cache. Avoiding cache misses (L1 misses/L2 hits) will improve the latency and increase performance.",
+    "tip": ""
+  },
+  "L3_Bound": {
+    "issue": "This metric shows how often CPU was stalled on L3 cache, or contended with a sibling Core. Avoiding cache misses (L2 misses/L3 hits) improves the latency and increases performance.",
+    "tip": ""
+  },
+  "Contested_Accesses": {
+    "issue": "Issues: There is a high number of contested accesses to cachelines modified by another core. Tips: Consider either using techniques suggested for other long latency load events (for example, LLC Miss) or reducing the contested accesses. To reduce contested accesses, first identify the cause. If it is a synchronization, try increasing synchronization granularity. If it is true data sharing, consider data privatization and reduction. If it is false data sharing, restructure the data to place contested variables into distinct cachelines. This may increase the working set due to padding, but false sharing can always be avoided.",
+    "tip": ""
+  },
+  "Data_Sharing": {
+    "issue": "Significant data sharing by different cores is detected.",
+    "tip": ""
+  },
+  "L3_Hit_Latency": {
+    "issue": "This metric shows a fraction of cycles with demand load accesses that hit the L3 cache under unloaded scenarios (possibly L3 latency limited). Avoiding private cache misses (i.e. L2 misses/L3 hits) will improve the latency, reduce contention with sibling physical cores and increase performance. Note the value of this node may overlap with its siblings.",
+    "tip": ""
+  },
+  "SQ_Full": {
+    "issue": "This metric measures fraction of cycles where the Super Queue (SQ) was full taking into account all request-types and both hardware SMT threads. The Super Queue is used for requests to access the L2 cache or to go out to the Uncore.",
+    "tip": ""
+  },
+  "DRAM_Bound": {
+    "issue": "This metric shows how often CPU was stalled on the main memory (DRAM). Caching typically improves the latency and increases performance.",
+    "tip": ""
+  },
+  "MEM_Bandwidth": {
+    "issue": "",
+    "tip": "Improve data accesses to reduce cacheline transfers from/to memory. Examples: 1) Consume all bytes of a each cacheline before it is evicted (e.g. reorder structure elements and split non-hot ones), 2) merge computed-limited with BW-limited loops, 3) NUMA optimizations in multi-socket system. Note: software prefetches will not help BW-limited application."
+  },
+  "MEM_Latency": {
+    "issue": "",
+    "tip": "Improve data accesses or interleave them with compute. Examples: 1) Data layout re-structuring, 2) Software Prefetches (also through the compiler). #Link: Data re-layout; SW prefetching; AoS vs. SoA articles."
+  },
+  "Store_Bound": {
+    "issue": "CPU was stalled on store operations for a significant fraction of cycles.",
+    "tip": "Consider False Sharing analysis as your next step."
+  },
+  "Store_Latency": {
+    "issue": "This metric represents a fraction of cycles the CPU spent handling long-latency store misses (missing the 2nd level cache). Consider avoiding/reducing unnecessary (or easily loadable/computable) memory store. Note that this metric value may be highlighted due to a Lock Latency issue.",
+    "tip": "Consider to avoid/reduce unnecessary (or easily load-able/computable) memory store."
+  },
+  "False_Sharing": {
+    "issue": "For a significant fraction of cycles CPU was stalled on store operations to a shared cache line.",
+    "tip": "Use padding to make logical processors access different cache lines."
+  },
+  "Split_Stores": {
+    "issue": "A significant fraction of cycles was stalled due to split store accesses.",
+    "tip": "Consider aligning your data to the 64-byte cache line granularity."
+  },
+  "Streaming_Stores": {
+    "issue": "",
+    "tip": ""
+  },
+  "DTLB_Store": {
+    "issue": "A significant fraction of cycles is spent on handling first-level data TLB store misses.",
+    "tip": "As with ordinary data caching; focus on improving data locality and reducing working-set size to reduce DTLB overhead.  Additionally; consider using profile-guided optimization (PGO) to collocate frequently-used data on the same page.  Try using larger page sizes for large amounts of frequently-used data."
+  },
+  "Core_Bound": {
+    "issue": "This metric represents how much Core non-memory issues were of a bottleneck. Shortage in hardware compute resources, or dependencies software's instructions are both categorized under Core Bound. Hence it may indicate the machine ran out of an OOO resources, certain execution units are overloaded or dependencies in program's data- or instruction- flow are limiting the performance (e.g. FP-chained long-latency arithmetic operations).",
+    "tip": "Consider Port Saturation analysis as next step."
+  },
+  "Divider": {
+    "issue": "The DIV unit is active for a significant portion of execution time.",
+    "tip": "Locate the hot long-latency operation(s) and try to eliminate them. For example, if dividing by a constant, consider replacing the divide by a product of the inverse of the constant. If dividing an integer, consider using a right-shift instead."
+  },
+  "Serializing_Operation": {
+    "issue": "A significant fraction of cycles was spent handling serializing operations. Instructions like CPUID, WRMSR, or LFENCE serialize the out-of-order execution, which may limit performance.",
+    "tip": ""
+  },
+  "AMX_Busy": {
+    "issue": "AMX Busy",
+    "tip": ""
+  },
+  "Ports_Utilization": {
+    "issue": "A significant fraction of cycles was stalled due to Core non-divider-related issues.",
+    "tip": "Use vectorization to reduce pressure on the execution ports as multiple elements are calculated with same uOp."
+  },
+  "Retiring": {
+    "issue": "A high fraction of pipeline slots was utilized by useful work. While the goal is to make this metric value as big as possible, a high Retiring value for non-vectorized code could prompt you to consider code vectorization. Vectorization enables doing more computations without significantly increasing the number of instructions, thus improving the performance. Note that this metric value may be highlighted due to Microcode Sequencer (MS) issue, so the performance can be improved by avoiding using the MS.",
+    "tip": "A high Retiring value for non-vectorized code may be a good hint for programmer to consider vectorizing his code.  Doing so essentially lets more computations be done without significantly increasing number of instructions thus improving the performance."
+  },
+  "Light_Operations": {
+    "issue": "CPU retired light-weight operations (ones which require no more than one uop) in a significant fraction of cycles. This correlates with total number of instructions used by the program. Focus on techniques that reduce instruction count or result in more efficient instructions generation such as vectorization. Optimum value of uops-per-instruction ratio is 1. While this is the most desirable metric, high values can also provide opportunities for performance optimizations.",
+    "tip": "Focus on techniques that reduce instruction count or result in more efficient instructions generation such as vectorization. #Link: auto-Vectorization options of Intel/other compilers."
+  },
+  "FP_Arith": {
+    "issue": "",
+    "tip": ""
+  },
+  "Int_Operations": {
+    "issue": "",
+    "tip": ""
+  },
+  "Memory_Operations": {
+    "issue": "For a significant fraction of pipeline slots the CPU was retiring memory operations - uops for memory load or store accesses.",
+    "tip": ""
+  },
+  "Fused_Instructions": {
+    "issue": "For a significant fraction of pipeline slots the CPU was retiring fused instructions - where one uop can represent multiple contiguous instructions. The instruction pairs of CMP+JCC or DEC+JCC are commonly used examples. See section 'Optimizing for Macro-fusion' in the Intel 64 and IA-32 Architectures Optimization Reference Manual",
+    "tip": "See section 'Optimizing for Macro-fusion' in Optimization Manual"
+  },
+  "Non_Fused_Branches": {
+    "issue": "For a significant fraction of slots the CPU was retiring branch instructions that were not fused. Non-conditional branches like direct JMP or CALL would count here. Can be used to detect fusable conditional jumps.",
+    "tip": ""
+  },
+  "Other_Light_Ops": {
+    "issue": "",
+    "tip": ""
+  },
+  "Heavy_Operations": {
+    "issue": "",
+    "tip": ""
+  },
+  "Few_Uops_Instructions": {
+    "issue": "",
+    "tip": ""
+  },
+  "Microcode_Sequencer": {
+    "issue": "A significant fraction of cycles was spent retiring uOps fetched by the Microcode Sequencer.",
+    "tip": "The MS is used for CISC instructions not supported by the default decoders (like repeat move strings; or CPUID); or by microcode assists used to address some operation modes (like in Floating Point assists). These cases can often be avoided."
+  }
+}

@@ -152,9 +152,9 @@
     function App() {
       const [systemTabs, setSystemTabs] = React.useState(0);
       const [openlink, setOpenlink] = React.useState(true);
-      const [maxdiff, set_maxdiff] = React.useState(0)
-      const [mindiff, set_mindiff] = React.useState(0)
-
+      const [maxdiff, set_maxdiff] = React.useState(0);
+      const [mindiff, set_mindiff] = React.useState(0);
+      
       const handleChange = (event, newSystemTabs) => {
         setSystemTabs(newSystemTabs);
       };
@@ -165,101 +165,9 @@
 
       const all_metrics = <<.ALLMETRICS>>
       const [current_metrics, setCurrent_metrics] = React.useState(JSON.parse(JSON.stringify(all_metrics)));
-      const description = {
-        "CPU operating frequency (in GHz)": "CPU operating frequency (in GHz)",
-        "CPU utilization %": "Percentage of time spent in the active CPU power state C0",
-        "CPI": "Cycles per instruction retired; indicating how much time each executed instruction took; in units of cycles.",
-        "L1D MPI (includes data+rfo w/ prefetches)": "Ratio of number of requests missing L1 data cache (includes data+rfo w/ prefetches) to the total number of completed instructions",
-        "L1D demand data read hits per instr": "Ratio of number of demand load requests hitting in L1 data cache to the total number of completed instructions ",
-        "L1-I code read misses (w/ prefetches) per instr": "Ratio of number of code read requests missing in L1 instruction cache (includes prefetches) to the total number of completed instructions",
-        "L2 demand data read hits per instr": "Ratio of number of completed demand load requests hitting in L2 cache to the total number of completed instructions ",
-        "L2 MPI (includes code+data+rfo w/ prefetches)": "Ratio of number of requests missing L2 cache (includes code+data+rfo w/ prefetches) to the total number of completed instructions",
-        "L2 demand data read MPI": "Ratio of number of completed data read request missing L2 cache to the total number of completed instructions",
-        "L2 demand code MPI": "Ratio of number of code read request missing L2 cache to the total number of completed instructions",
-        "LLC code read MPI (demand+prefetch)": "Ratio of number of code read requests missing last level core cache (includes demand w/ prefetches) to the total number of completed instructions",
-        "LLC data read MPI (demand+prefetch)": "Ratio of number of data read requests missing last level core cache (includes demand w/ prefetches) to the total number of completed instructions",
-        "cycles per txn": "Cycles per transaction retired; indicating how much time each executed transaction took; in units of cycles.",
-        "L1D misses per txn (includes data+rfo w/ prefetches)": "Ratio of number of requests missing L1 data cache (includes data+rfo w/ prefetches) to the total number of completed transactions",
-        "L1D demand data read hits per txn": "Ratio of number of demand load requests hitting in L1 data cache to the total number of completed transactions",
-        "L1-I code read misses (w/ prefetches) per txn": "Ratio of number of code read requests missing in L1 instruction cache (includes prefetches) to the total number of completed transactions",
-        "L2 demand data read hits per txn": "Ratio of number of completed demand load requests hitting in L2 cache to the total number of completed transactions",
-        "L2 misses per txn (includes code+data+rfo w/ prefetches)": "Ratio of number of requests missing L2 cache (includes code+data+rfo w/ prefetches) to the total number of completed transactions",
-        "L2 demand data read misses per txn": "Ratio of number of completed data read request missing L2 cache to the total number of completed transactions",
-        "L2 demand code misses per txn": "Ratio of number of code read request missing L2 cache to the total number of completed transactions",
-        "LLC code read misses per txn (demand+prefetch)": "Ratio of number of code read requests missing last level core cache (includes demand w/ prefetches) to the total number of completed transactions",
-        "LLC data read misses per txn (demand+prefetch)": "Ratio of number of data read requests missing last level core cache (includes demand w/ prefetches) to the total number of completed transactions",
-        "NUMA %_Reads addressed to local DRAM": "Memory read that miss the last level cache (LLC) addressed to local DRAM as a percentage of total memory read accesses, does not include LLC prefetches.",
-        "NUMA %_Reads addressed to remote DRAM": "Memory reads that miss the last level cache (LLC) addressed to remote DRAM as a percentage of total memory read accesses, does not include LLC prefetches.",
-        "uncore frequency GHz": "Uncore operating frequency in GHz",
-        "% Uops delivered from decoded Icache (DSB)": "Uops delivered from decoded instruction cache (decoded stream buffer or DSB) as a percent of total uops delivered to Instruction Decode Queue",
-        "% Uops delivered from legacy decode pipeline (MITE)": "Uops delivered from legacy decode pipeline (Micro-instruction Translation Engine or MITE) as a percent of total uops delivered to Instruction Decode Queue",
-        "memory bandwidth read (MB/sec)": "DDR memory read bandwidth (MB/sec)",
-        "memory bandwidth write (MB/sec)": "DDR memory write bandwidth (MB/sec)",
-        "memory bandwidth total (MB/sec)": "DDR memory bandwidth (MB/sec)",
-        "TMA_Frontend_Bound(%)": "This category represents fraction of slots where the processor's Frontend undersupplies its Backend. Frontend denotes the first part of the processor core responsible to fetch operations that are executed later on by the Backend part. Within the Frontend; a branch predictor predicts the next address to fetch; cache-lines are fetched from the memory subsystem; parsed into instructions; and lastly decoded into micro-operations (uops). Ideally the Frontend can issue Pipeline_Width uops every cycle to the Backend. Frontend Bound denotes unutilized issue-slots when there is no Backend stall; i.e. bubbles where Frontend delivered no uops while Backend could have accepted them. For example; stalls due to instruction-cache misses would be categorized under Frontend Bound.",
-        "TMA_....ICache_Misses(%)": "This metric represents fraction of cycles the CPU was stalled due to instruction cache misses.",
-        "TMA_....ITLB_Misses(%)": "This metric represents fraction of cycles the CPU was stalled due to Instruction TLB (ITLB) misses.",
-        "TMA_....Branch_Resteers(%)": "This metric represents fraction of cycles the CPU was stalled due to Branch Resteers. Branch Resteers estimates the Frontend delay in fetching operations from corrected path; following all sorts of miss-predicted branches. For example; branchy code with lots of miss-predictions might get categorized under Branch Resteers. Note the value of this node may overlap with its siblings.",
-        "TMA_......Mispredicts_Resteers(%)": "This metric represents fraction of cycles the CPU was stalled due to Branch Resteers as a result of Branch Misprediction at execution stage. ",
-        "TMA_......Clears_Resteers(%)": "This metric represents fraction of cycles the CPU was stalled due to Branch Resteers as a result of Machine Clears. ",
-        "TMA_....MITE(%)": "This metric represents Core fraction of cycles in which CPU was likely limited due to the MITE pipeline (the legacy decode pipeline). This pipeline is used for code that was not pre-cached in the DSB or LSD. For example; inefficiencies due to asymmetric decoders; use of long immediate or LCP can manifest as MITE fetch bandwidth bottleneck.",
-        "TMA_....DSB(%)": "This metric represents Core fraction of cycles in which CPU was likely limited due to DSB (decoded uop cache) fetch pipeline.  For example; inefficient utilization of the DSB cache structure or bank conflict when reading from it; are categorized here.",
-        "TMA_Bad_Speculation(%)": "This category represents fraction of slots wasted due to incorrect speculations. This include slots used to issue uops that do not eventually get retired and slots for which the issue-pipeline was blocked due to recovery from earlier incorrect speculation. For example; wasted work due to miss-predicted branches are categorized under Bad Speculation category. Incorrect data speculation followed by Memory Ordering Nukes is another example.",
-        "TMA_..Branch_Mispredicts(%)": "This metric represents fraction of slots the CPU has wasted due to Branch Misprediction.  These slots are either wasted by uops fetched from an incorrectly speculated program path; or stalls when the out-of-order part of the machine needs to recover its state from a speculative path.",
-        "TMA_..Machine_Clears(%)": "This metric represents fraction of slots the CPU has wasted due to Machine Clears.  These slots are either wasted by uops fetched prior to the clear; or stalls the out-of-order portion of the machine needs to recover its state after the clear. For example; this can happen due to memory ordering Nukes (e.g. Memory Disambiguation) or Self-Modifying-Code (SMC) nukes.",
-        "TMA_Backend_Bound(%)": "This category represents fraction of slots where no uops are being delivered due to a lack of required resources for accepting new uops in the Backend. Backend is the portion of the processor core where the out-of-order scheduler dispatches ready uops into their respective execution units; and once completed these uops get retired according to program order. For example; stalls due to data-cache misses or stalls due to the divider unit being overloaded are both categorized under Backend Bound. Backend Bound is further divided into two main categories: Memory Bound and Core Bound.",
-        "TMA_..Memory_Bound(%)": "This metric represents fraction of slots the Memory subsystem within the Backend was a bottleneck.  Memory Bound estimates fraction of slots where pipeline is likely stalled due to demand load or store instructions. This accounts mainly for (1) non-completed in-flight memory demand loads which coincides with execution units starvation; in addition to (2) cases where stores could impose backpressure on the pipeline when many of them get buffered at the same time (less common out of the two).",
-        "TMA_....L1_Bound(%)": "This metric estimates how often the CPU was stalled without loads missing the L1 data cache.  The L1 data cache typically has the shortest latency.  However; in certain cases like loads blocked on older stores; a load might suffer due to high latency even though it is being satisfied by the L1. Another example is loads who miss in the TLB. These cases are characterized by execution unit stalls; while some non-completed demand load lives in the machine without having that demand load missing the L1 cache.",
-        "TMA_......DTLB_Load(%)": "This metric roughly estimates the fraction of cycles where the Data TLB (DTLB) was missed by load accesses. TLBs (Translation Look-aside Buffers) are processor caches for recently used entries out of the Page Tables that are used to map virtual- to physical-addresses by the operating system. This metric approximates the potential delay of demand loads missing the first-level data TLB (assuming worst case scenario with back to back misses to different pages). This includes hitting in the second-level TLB (STLB) as well as performing a hardware page walk on an STLB miss.",
-        "TMA_....L2_Bound(%)": "This metric estimates how often the CPU was stalled due to L2 cache accesses by loads.  Avoiding cache misses (i.e. L1 misses/L2 hits) can improve the latency and increase performance.",
-        "TMA_....L3_Bound(%)": "This metric estimates how often the CPU was stalled due to loads accesses to L3 cache or contended with a sibling Core.  Avoiding cache misses (i.e. L2 misses/L3 hits) can improve the latency and increase performance.",
-        "TMA_......Data_Sharing(%)": "This metric estimates fraction of cycles while the memory subsystem was handling synchronizations due to data-sharing accesses. Data shared by multiple Logical Processors (even just read shared) may cause increased access latency due to cache coherency. Excessive data sharing can drastically harm multithreaded performance.",
-        "TMA_......MEM_Bandwidth(%)": "This metric estimates fraction of cycles where the core's performance was likely hurt due to approaching bandwidth limits of external memory (DRAM).  The underlying heuristic assumes that a similar off-core traffic is generated by all IA cores. This metric does not aggregate non-data-read requests by this logical processor; requests from other IA Logical Processors/Physical Cores/sockets; or other non-IA devices like GPU; hence the maximum external memory bandwidth limits may or may not be approached when this metric is flagged (see Uncore counters for that).",
-        "TMA_......MEM_Latency(%)": "This metric estimates fraction of cycles where the performance was likely hurt due to latency from external memory (DRAM).  This metric does not aggregate requests from other Logical Processors/Physical Cores/sockets (see Uncore counters for that).",
-        "TMA_....Store_Bound(%)": "This metric estimates how often CPU was stalled  due to RFO store memory accesses; RFO store issue a read-for-ownership request before the write. Even though store accesses do not typically stall out-of-order CPUs; there are few cases where stores can lead to actual stalls. This metric will be flagged should RFO stores be a bottleneck.",
-        "TMA_..Core_Bound(%)": "This metric represents fraction of slots where Core non-memory issues were of a bottleneck.  Shortage in hardware compute resources; or dependencies in software's instructions are both categorized under Core Bound. Hence it may indicate the machine ran out of an out-of-order resource; certain execution units are overloaded or dependencies in program's data- or instruction-flow are limiting the performance (e.g. FP-chained long-latency arithmetic operations).",
-        "TMA_....Ports_Utilization(%)": "This metric estimates fraction of cycles the CPU performance was potentially limited due to Core computation issues (non divider-related).  Two distinct categories can be attributed into this metric: (1) heavy data-dependency among contiguous instructions would manifest in this metric - such cases are often referred to as low Instruction Level Parallelism (ILP). (2) Contention on some hardware execution unit other than Divider. For example; when there are too many multiply operations.",
-        "TMA_Retiring(%)": "This category represents fraction of slots utilized by useful work i.e. issued uops that eventually get retired. Ideally; all pipeline slots would be attributed to the Retiring category.  Retiring of 100% would indicate the maximum Pipeline_Width throughput was achieved.  Maximizing Retiring typically increases the Instructions-per-cycle (see IPC metric). Note that a high Retiring value does not necessary mean there is no room for more performance.  For example; Heavy-operations or Microcode Assists are categorized under Retiring. They often indicate suboptimal performance and can often be optimized or avoided. ",
-        "TMA_..Light_Operations(%)": "This metric represents fraction of slots where the CPU was retiring light-weight operations -- instructions that require no more than one uop (micro-operation). This correlates with total number of instructions used by the program. A uops-per-instruction (see UopPI metric) ratio of 1 or less should be expected for decently optimized software running on Intel Core/Xeon products. While this often indicates efficient X86 instructions were executed; high value does not necessarily mean better performance cannot be achieved.",
-        "TMA_....FP_Arith(%)": "This metric represents overall arithmetic floating-point (FP) operations fraction the CPU has executed (retired). Note this metric's value may exceed its parent due to use of \"Uops\" CountDomain and FMA double-counting.",
-        "TMA_..Heavy_Operations(%)": "This metric represents fraction of slots where the CPU was retiring heavy-weight operations -- instructions that require two or more uops or micro-coded sequences. This highly-correlates with the uop length of these instructions/sequences.",
-        "IO_bandwidth_disk_or_network_writes (MB/sec)": "Bandwidth of IO reads that are initiated by end device controllers that are requesting memory from the CPU.",
-        "IO_bandwidth_disk_or_network_reads (MB/sec)": "Bandwidth of IO writes that are initiated by end device controllers that are writing memory to the CPU.",
-        "TMA_..Fetch_Latency(%)": "This metric represents fraction of slots the CPU was stalled due to Frontend latency issues.  For example; instruction-cache misses; iTLB misses or fetch stalls after a branch misprediction are categorized under Frontend Latency. In such cases; the Frontend eventually delivers no uops for some period.",
-        "TMA_......Unknown_Branches(%)": "This metric represents fraction of cycles the CPU was stalled due to new branch address clears. These are fetched branches the Branch Prediction Unit was unable to recognize (e.g. first time the branch is fetched or hitting BTB capacity limit).",
-        "TMA_..Fetch_Bandwidth(%)": "This metric represents fraction of slots the CPU was stalled due to Frontend bandwidth issues.  For example; inefficiencies at the instruction decoders; or restrictions for caching in the DSB (decoded uops cache) are categorized under Fetch Bandwidth. In such cases; the Frontend typically delivers suboptimal amount of uops to the Backend.",
-        "TMA_......FP_Scalar(%)": "This metric approximates arithmetic floating-point (FP) scalar uops fraction the CPU has retired. May overcount due to FMA double counting.",
-        "TMA_......FP_Vector(%)": "This metric approximates arithmetic floating-point (FP) vector uops fraction the CPU has retired aggregated across all vector widths. May overcount due to FMA double counting.",
-        "UPI Data transmit BW (MB/sec) (only data)": "Intel(R) Ultra Path Interconnect (UPI) data transmit bandwidth (MB/sec)",
-        "TMA_......Lock_Latency(%)": "This metric represents fraction of cycles the CPU spent handling cache misses due to lock operations. Due to the microarchitecture handling of locks; they are classified as L1_Bound regardless of what memory source satisfied them.",
-        "TMA_......False_Sharing(%)": "This metric roughly estimates how often CPU was handling synchronizations due to False Sharing. False Sharing is a multithreading hiccup; where multiple Logical Processors contend on different data-elements mapped into the same cache line. ",
-        "Average LLC data read miss latency (in ns)": "Average latency of a last level cache (LLC) demand and prefetch data read miss (read memory access) in nano seconds",
-        "Average LLC data read miss latency for LOCAL requests (in ns)": "Average latency of a last level cache (LLC) demand and prefetch data read miss (read memory access) addressed to local memory in nano seconds",
-        "Average LLC data read miss latency for REMOTE requests (in ns)": "Average latency of a last level cache (LLC) demand and prefetch data read miss (read memory access) addressed to remote memory in nano seconds",
-        "ITLB MPI": "Ratio of number of completed page walks (for all page sizes) caused by a code fetch to the total number of completed instructions. This implies it missed in the ITLB (Instruction TLB) and further levels of TLB.",
-        "ITLB large page MPI": "Ratio of number of completed page walks (for 2 megabyte and 4 megabyte page sizes) caused by a code fetch to the total number of completed instructions. This implies it missed in the Instruction Translation Lookaside Buffer (ITLB) and further levels of TLB.",
-        "DTLB load MPI": "Ratio of number of completed page walks (for all page sizes) caused by demand data loads to the total number of completed instructions. This implies it missed in the DTLB and further levels of TLB.",
-        "DTLB 2MB large page load MPI": "Ratio of number of completed page walks (for 2 megabyte page sizes) caused by demand data loads to the total number of completed instructions. This implies it missed in the Data Translation Lookaside Buffer (DTLB) and further levels of TLB.",
-        "DTLB store MPI": "Ratio of number of completed page walks (for all page sizes) caused by demand data stores to the total number of completed instructions. This implies it missed in the DTLB and further levels of TLB.",
-        "Average LLC demand data read miss latency (in ns)": "Average latency of a last level cache (LLC) demand data read miss (read memory access) in nano seconds",
-        "Average LLC demand data read miss latency for LOCAL requests (in ns)": "Average latency of a last level cache (LLC) demand data read miss (read memory access) addressed to local memory in nano seconds",
-        "Average LLC demand data read miss latency for REMOTE requests (in ns)": "Average latency of a last level cache (LLC) demand data read miss (read memory access) addressed to remote memory in nano seconds",
-        "ITLB (2nd level) MPI": "Ratio of number of completed page walks (for all page sizes) caused by a code fetch to the total number of completed instructions. This implies it missed in the ITLB (Instruction TLB) and further levels of TLB.",
-        "DTLB (2nd level) load MPI": "Ratio of number of completed page walks (for all page sizes) caused by demand data loads to the total number of completed instructions. This implies it missed in the DTLB and further levels of TLB.",
-        "DTLB (2nd level) 2MB large page load MPI": "Ratio of number of completed page walks (for 2 megabyte page sizes) caused by demand data loads to the total number of completed instructions. This implies it missed in the Data Translation Lookaside Buffer (DTLB) and further levels of TLB.",
-        "DTLB (2nd level) store MPI": "Ratio of number of completed page walks (for all page sizes) caused by demand data stores to the total number of completed instructions. This implies it missed in the DTLB and further levels of TLB.",
-        "TMA_....DRAM_Bound(%)": "This metric estimates how often the CPU was stalled on accesses to external memory (DRAM) by loads. Better caching can improve the latency and increase performance.",
-        "TMA_......Ports_Utilized_0(%)": "This metric represents fraction of cycles CPU executed no uops on any execution port (Logical Processor cycles since ICL, Physical Core cycles otherwise). Long-latency instructions like divides may contribute to this metric.",
-        "TMA_......Ports_Utilized_1(%)": "This metric represents fraction of cycles where the CPU executed total of 1 uop per cycle on all execution ports (Logical Processor cycles since ICL, Physical Core cycles otherwise). This can be due to heavy data-dependency among software instructions; or over oversubscribing a particular hardware resource. In some other cases with high 1_Port_Utilized and L1_Bound; this metric can point to L1 data-cache latency bottleneck that may not necessarily manifest with complete execution starvation (due to the short L1 latency e.g. walking a linked list) - looking at the assembly can be helpful.",
-        "TMA_......Ports_Utilized_2(%)": "This metric represents fraction of cycles CPU executed total of 2 uops per cycle on all execution ports (Logical Processor cycles since ICL, Physical Core cycles otherwise).  Loop Vectorization -most compilers feature auto-Vectorization options today- reduces pressure on the execution ports as multiple elements are calculated with same uop.",
-        "TMA_......Ports_Utilized_3m(%)": "This metric represents fraction of cycles CPU executed total of 3 or more uops per cycle on all execution ports (Logical Processor cycles since ICL, Physical Core cycles otherwise).",
-        "TMA_....Microcode_Sequencer(%)": "This metric represents fraction of slots the CPU was retiring uops fetched by the Microcode Sequencer (MS) unit.  The MS is used for CISC instructions not supported by the default decoders (like repeat move strings; or CPUID); or by microcode assists used to address some operation modes (like in Floating Point assists). These cases can often be avoided.",
-        "TMA_Info_System_SMT_2T_Utilization": "Fraction of cycles where both hardware Logical Processors were active",
-      }
-
+      const description = <<.DESCRIPTION>>
       const metadata = <<.METADATA>>
       const system_info = <<.SYSTEMINFO>>
-      const transactions = <<.TRANSACTIONS>>
       const base_line = {
         xAxis: {
           type: "category",
@@ -482,7 +390,7 @@
                     </li>
                     <li>
                       <Typography variant="body1">
-                        The Back-end is responsible for monitoring when uOp’s data
+                        The Back-end is responsible for monitoring when uOp's data
                         operands are available and executing the uOp in an
                         available execution unit.
                       </Typography>
@@ -522,57 +430,57 @@
                       },
                       data: [
                       {
-			  name: "<<.TMA_FRONTEND>>",
+			  name: "<<.FRONTEND_LABEL>>",
 			  value: Math.round(<<.FRONTEND>> * 10) / 10,
                           children:[
                             {
-			      name: "<<.TMA_FETCHBANDWIDTH>>",
+			      name: "<<.FETCHBANDWIDTH_LABEL>>",
 			      value: Math.round(<<.FETCHBANDWIDTH>> * 10) / 10,
                             },
                             {
-			      name: "<<.TMA_FETCHLATENCY>>",
+			      name: "<<.FETCHLATENCY_LABEL>>",
 			      value: Math.round(<<.FETCHLATENCY>> * 10) / 10,
                             },
                           ]
                         },
                         {
-			  name: "<<.TMA_BADSPECULATION>>",
+			  name: "<<.BADSPECULATION_LABEL>>",
 			  value: Math.round(<<.BADSPECULATION>> * 10) / 10,
                           children: [
                             {
-			      name: "<<.TMA_BRANCHMISPREDICTS>>",
+			      name: "<<.BRANCHMISPREDICTS_LABEL>>",
 			      value: Math.round(<<.BRANCHMISPREDICTS>> * 10) / 10,
                             },
                             {
-			      name: "<<.TMA_MACHINECLEARS>>",
+			      name: "<<.MACHINECLEARS_LABEL>>",
 			      value: Math.round(<<.MACHINECLEARS>> * 10) / 10,
                             },
                           ]
                         },
                         {
-			  name: "<<.TMA_BACKEND>>",
+			  name: "<<.BACKEND_LABEL>>",
 			  value: Math.round(<<.BACKEND>> * 10) / 10,
                           children: [
                             {
-			      name: "<<.TMA_CORE>>",
+			      name: "<<.CORE_LABEL>>",
 			      value: Math.round(<<.COREDATA>> * 10) / 10,
                             },
                             {
-			      name: "<<.TMA_MEMORY>>",
+			      name: "<<.MEMORY_LABEL>>",
 			      value: Math.round(<<.MEMORY>> * 10) / 10,
                             },
                           ],
                         },
                         {
-			  name: "<<.TMA_RETIRING>>",
+			  name: "<<.RETIRING_LABEL>>",
 			  value: Math.round(<<.RETIRING>> * 10) / 10,
                           children: [
                             {
-			      name: "<<.TMA_LIGHTOPS>>",
+			      name: "<<.LIGHTOPS_LABEL>>",
 			      value: Math.round(<<.LIGHTOPS>> * 10) / 10,
                             },
                             {
-			      name: "<<.TMA_HEAVYOPS>>",
+			      name: "<<.HEAVYOPS_LABEL>>",
 			      value: Math.round(<<.HEAVYOPS>> * 10) / 10,
                             },
                           ]
@@ -620,10 +528,10 @@
               <Grid container>
                 <Grid item xs={5}>
                   <Typography variant="h2">
-                    {transactions ? "Cycles per transaction" : "CPI"}
+                    CPI
                   </Typography>
                   <Typography variant="body1">
-                    {transactions ? "Cycles per transaction retired; indicating how much time each executed transaction took; in units of cycles. Often this metric shows how efficiently applications are using the underlying hardware. A lower \"Cycles per TXN\" could indicate that transactions are not hitting bottlenecks and retiring quickly." : "Cycles per instruction retired; indicating how much time each executed instruction took; in units of cycles. Often this metric shows how efficiently applications are using the underlying hardware. A lower CPI could indicate that instructions are not hitting bottlenecks and retiring quickly."}
+                    Cycles per instruction retired; indicating how much time each executed instruction took; in units of cycles. Often this metric shows how efficiently applications are using the underlying hardware. A lower CPI could indicate that instructions are not hitting bottlenecks and retiring quickly.
                   </Typography>
                 </Grid>
                 <Grid item xs={7}>
@@ -677,10 +585,10 @@
               <Grid container>
                 <Grid item xs={5}>
                   <Typography variant="h2">
-                    {transactions ? "Cache misses per transaction" : "Cache MPI (misses per instruction)"}
+                    Cache MPI (misses per instruction)
                   </Typography>
                   <Typography variant="body1">
-                    {transactions ? "The ratio of the number of requests missing cache to the total number of completed transactions, at each level of cache (L1, L2 and LLC)" : "The ratio of the number of requests missing cache to the total number of completed instructions, at each level of cache (L1, L2 and LLC)"}
+                    The ratio of the number of requests missing cache to the total number of completed instructions, at each level of cache (L1, L2 and LLC)
                   </Typography>
                 </Grid>
                 <Grid item xs={7}>
@@ -723,10 +631,17 @@
               value={systemTabs}
               index={4}
             >
-              <TextField id="outlined-basic" onChange={diffreport} inputProps={{ accept: '.html' }} fullWidth label="Compare with other *_metrics_summary.html" InputLabelProps={{ shrink: true }} sx={{ paddingBottom: "24px" }} type="file" variant="outlined" />
-              <Alert severity="info" sx={{ marginBottom: "24px" }}>
-                TMA metrics are a hierarchy where each sub-metric contains more periods "..." to designate its depth in the tree
-              </Alert>
+              <TextField 
+                id="outlined-basic" 
+                onChange={diffreport} 
+                inputProps={{ accept: '.html' }} 
+                fullWidth 
+                label="Compare with other *_metrics_summary.html" 
+                InputLabelProps={{ shrink: true }} 
+                sx={{ paddingBottom: "24px" }} 
+                type="file" 
+                variant="outlined" 
+              />
               <TableContainer component={Paper} sx={{ width: "fit-content" }}>
                 <Table size="small" style={{ tableLayout: 'auto' }}>
                   <TableHead>
@@ -741,46 +656,143 @@
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {current_metrics.map((row) => (
-                      <TableRow
-                        hover={true}
-                        key={row[0]}
-                        sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-                      >
-                        <TableCell sx={{ fontFamily: 'Monospace' }} component="th" scope="row" >
-                          <Tooltip title={description.hasOwnProperty(row[0]) ? description[row[0]] : ""}>
-                            {description.hasOwnProperty(row[0]) && <IconButton sx={{ padding: "0 8px 0 0" }}>
-                              <Icon>help</Icon>
-                            </IconButton>}
-                            {!description.hasOwnProperty(row[0]) && <IconButton sx={{ padding: "0 8px 0 0" }} disabled>
-                              <Icon>help</Icon>
-                            </IconButton>}
-                          </Tooltip>
-                          {row[0]}
-                        </TableCell>
-                        <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
-                          {Number(row[1]).toFixed(4)}
-                        </TableCell>
-                        <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
-                          {Number(row[2]).toFixed(4)}
-                        </TableCell>
-                        <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
-                          {Number(row[3]).toFixed(4)}
-                        </TableCell>
-                        <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
-                          {Number(row[4]).toFixed(4)}
-                        </TableCell>
-                        {row.hasOwnProperty("other") && <TableCell sx={{ fontFamily: 'Monospace', fontStyle: 'italic' }} align="right">
-                          {Number(row["other"]).toFixed(4)}
-                        </TableCell>}
-                        {row.hasOwnProperty("other") && <TableCell align="right" sx={{ fontFamily: 'Monospace', backgroundColor: (row.diff > 0 ? "rgba(255,0,0," + (row.diff / maxdiff * .5) + ")" : "rgba(0,0,255," + (row.diff / mindiff * .5) + ")") }}>
-                          {Math.round(Number(row["diff"]))}%
-                        </TableCell>}
-                      </TableRow>
-                    ))}
+                    {current_metrics.map((row) => {
+                      // Check if this metric has exceed its threshold
+                      const exceedsThreshold = row[5] == "Yes";
+                      return (
+                        <TableRow
+                          hover={true}
+                          key={row[0]}
+                          sx={{ 
+                            '&:last-child td, &:last-child th': { border: 0 },
+                            // Highlight the entire row if mean value exceeds its specific threshold
+                            backgroundColor: exceedsThreshold ? 'rgba(255, 255, 0, 0.2)' : 'inherit'
+                          }}
+                        >
+                          <TableCell sx={{ fontFamily: 'Monospace' }} component="th" scope="row" >
+                            <Tooltip 
+                              title={description.hasOwnProperty(row[0]) ? description[row[0]] : ""} 
+                              componentsProps={{
+                                tooltip: {
+                                  sx: {
+                                    fontSize: '1.0rem',  // Increase tooltip font size
+                                    padding: '8px 12px',  // Add some padding for better readability
+                                    bgcolor: 'rgba(97, 97, 97, 0.92)',  // Darker background
+                                    color: '#ffffff',  // White text for contrast
+                                    fontWeight: 400,  // Normal font weight
+                                    boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.2)'  // Add shadow for depth
+                                  }
+                                }
+                              }}
+                            >
+                              {description.hasOwnProperty(row[0]) && <IconButton sx={{ padding: "0 8px 0 0" }}>
+                                <Icon>info</Icon>
+                              </IconButton>}
+                              {!description.hasOwnProperty(row[0]) && <IconButton sx={{ padding: "0 8px 0 0" }} disabled>
+                                <Icon>info</Icon>
+                              </IconButton>}
+                            </Tooltip>
+                            {(() => {
+                              // Calculate indendation from the metric level value in column 8 (index 7)
+                              // The lowest level is 1
+                              const level = row[7] ? Number(row[7]) : 1;
+                              const indentationLevel = level > 1 ? level - 1 : 0;
+                              
+                              // Create indentation based on hierarchy level
+                              const indentation = indentationLevel > 0 ? 
+                                <span style={{
+                                  paddingLeft: `${indentationLevel * 16}px`,
+                                  borderLeft: indentationLevel > 0 ? '1px dotted #aaa' : 'none',
+                                  marginLeft: indentationLevel > 0 ? '4px' : '0',
+                                }}>
+                                  {indentationLevel > 0 && <Icon 
+                                    sx={{ 
+                                      fontSize: '0.8rem', 
+                                      verticalAlign: 'middle',
+                                      color: '#666',
+                                      marginRight: '4px'
+                                    }}
+                                  >
+                                    subdirectory_arrow_right
+                                  </Icon>}
+                                </span> : null;
+                              
+                              return (
+                                <React.Fragment>
+                                  {indentation}
+                                  {row[0]}
+                                </React.Fragment>
+                              );
+                            })()}
+                          </TableCell>
+                          <TableCell 
+                            sx={{ 
+                              fontFamily: 'Monospace', 
+                              fontWeight: exceedsThreshold ? 'bold' : 'normal',
+                              backgroundColor: exceedsThreshold ? 'rgba(255, 235, 59, 0.4)' : 'inherit'
+                            }} 
+                            align="right"
+                          >
+                            {Number(row[1]).toFixed(4)}
+                            {exceedsThreshold && 
+                              <Tooltip 
+                                title={`${row[6]}`}
+                                componentsProps={{
+                                  tooltip: {
+                                    sx: {
+                                      fontSize: '1.0rem',  // Increased tooltip font size
+                                      padding: '8px 12px',  // Add some padding for better readability
+                                      bgcolor: 'rgba(255, 235, 59, 0.9)',  // Slightly yellow background to match warning context
+                                      color: '#222222',  // Grey text for better contrast on yellow
+                                      fontWeight: 400  // Normal font weight
+                                    }
+                                  }
+                                }}
+                              >
+                                <IconButton size="small" sx={{ padding: "0 0 0 4px" }}>
+                                  <Icon fontSize="small">warning</Icon>
+                                </IconButton>
+                              </Tooltip>
+                            }
+                          </TableCell>
+                          <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
+                            {Number(row[2]).toFixed(4)}
+                          </TableCell>
+                          <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
+                            {Number(row[3]).toFixed(4)}
+                          </TableCell>
+                          <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
+                            {Number(row[4]).toFixed(4)}
+                          </TableCell>
+                          {row.hasOwnProperty("other") && <TableCell sx={{ fontFamily: 'Monospace', fontStyle: 'italic' }} align="right">
+                            {Number(row["other"]).toFixed(4)}
+                          </TableCell>}
+                          {row.hasOwnProperty("other") && <TableCell align="right" sx={{ fontFamily: 'Monospace', backgroundColor: (row.diff > 0 ? "rgba(255,0,0," + (row.diff / maxdiff * .5) + ")" : "rgba(0,0,255," + (row.diff / mindiff * .5) + ")") }}>
+                            {Math.round(Number(row["diff"]))}%
+                          </TableCell>}
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </TableContainer>
+              <Box sx={{ marginTop: "16px" }}>
+                <Alert 
+                  severity="warning" 
+                  sx={{ 
+                    marginBottom: "24px",
+                    backgroundColor: 'rgba(255, 255, 0, 0.2)',
+                    '& .MuiAlert-icon': {
+                      color: 'rgba(0, 0, 0, 0.7)'
+                    },
+                    '& .MuiAlert-message': {
+                      color: 'rgba(0, 0, 0, 0.7)'
+                    }
+                  }}
+              >
+                Metrics with a mean value exceeding their threshold formula are highlighted in yellow, indicating potential performance issues or anomalies that may require further investigation. Hover over the warning icon next to the mean value for more information.
+              </Alert>
+              </Box>
             </TabPanel>
             <TabPanel
               value={systemTabs}

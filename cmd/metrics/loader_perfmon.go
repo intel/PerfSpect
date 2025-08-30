@@ -54,7 +54,6 @@ type MetricsConfigHeader struct {
 }
 type PerfspectMetric struct {
 	MetricName string `json:"MetricName"`
-	LegacyName string `json:"LegacyName"`
 	Origin     string `json:"Origin"`
 }
 type MetricsConfig struct {
@@ -73,10 +72,6 @@ func (l *PerfmonLoader) Load(loaderConfig LoaderConfig) ([]MetricDefinition, []G
 	config, err := l.loadMetricsConfig(loaderConfig.ConfigFileOverride)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load metrics config: %w", err)
-	}
-	reportMetrics, err := filterReportMetrics(config.ReportMetrics, loaderConfig.SelectedMetrics)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error filtering report metrics: %w", err)
 	}
 	// Load the perfmon metric definitions from the JSON file
 	perfmonMetricDefinitions, err := loadPerfmonMetricsFromFile(config.PerfmonMetricsFile)
@@ -110,6 +105,11 @@ func (l *PerfmonLoader) Load(loaderConfig LoaderConfig) ([]MetricDefinition, []G
 	perfspectMetrics, err := loadPerfmonMetricsFromFile(config.PerfspectMetricsFile)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading Perfspect metrics from file: %w", err)
+	}
+	// Filter the report metrics based on the selected metrics
+	reportMetrics, err := filterReportMetrics(config.ReportMetrics, loaderConfig.SelectedMetrics, append(perfmonMetricDefinitions.Metrics, perfspectMetrics.Metrics...))
+	if err != nil {
+		return nil, nil, fmt.Errorf("error filtering report metrics: %w", err)
 	}
 	// Combine the PerfSpect-defined metrics with the metric definitions from perfmon and filter based on report metrics
 	// Creates one list of all metrics to be used in the loader
@@ -226,7 +226,7 @@ func loadPerfmonMetricsFromFile(pathWithSource string) (PerfmonMetrics, error) {
 	return metrics, nil
 }
 
-func filterReportMetrics(reportMetrics []PerfspectMetric, selectedMetricNames []string) ([]PerfspectMetric, error) {
+func filterReportMetrics(reportMetrics []PerfspectMetric, selectedMetricNames []string, perfmonMetrics []PerfmonMetric) ([]PerfspectMetric, error) {
 	if len(selectedMetricNames) == 0 {
 		slog.Debug("No selected metrics provided, using all report metrics")
 		return reportMetrics, nil
@@ -234,16 +234,21 @@ func filterReportMetrics(reportMetrics []PerfspectMetric, selectedMetricNames []
 	slog.Debug("Filtering report metrics based on selected metrics", slog.Any("selectedMetrics", selectedMetricNames))
 	var filteredMetrics []PerfspectMetric
 	for _, metricName := range selectedMetricNames {
-		found := false
-		for _, metric := range reportMetrics {
-			if metric.LegacyName == "metric_"+metricName {
-				filteredMetrics = append(filteredMetrics, metric)
-				found = true
-				break
+		pm, pmFound := findPerfmonMetricByLegacyName(perfmonMetrics, "metric_"+metricName)
+		if pmFound {
+			found := false
+			for _, metric := range reportMetrics {
+				if pm.MetricName == metric.MetricName {
+					filteredMetrics = append(filteredMetrics, metric)
+					found = true
+					break
+				}
 			}
-		}
-		if !found {
-			return nil, fmt.Errorf("unknown metric: %s", metricName)
+			if !found {
+				return nil, fmt.Errorf("metric not found in perfspect metrics: %s", metricName)
+			}
+		} else {
+			return nil, fmt.Errorf("metric not found in perfmon metrics: %s", metricName)
 		}
 	}
 	return filteredMetrics, nil
@@ -256,13 +261,13 @@ func loadPerfmonMetrics(reportMetrics []PerfspectMetric, perfmonMetrics []Perfmo
 		var perfmonMetric *PerfmonMetric
 		var found bool
 		if !metadata.SupportsFixedTMA {
-			perfmonMetric, found = findPerfmonMetric(alternateTMAMetrics, metric.LegacyName)
+			perfmonMetric, found = findPerfmonMetric(alternateTMAMetrics, metric.MetricName)
 		}
 		if !found {
-			perfmonMetric, found = findPerfmonMetric(allPerfmonMetrics, metric.LegacyName)
+			perfmonMetric, found = findPerfmonMetric(allPerfmonMetrics, metric.MetricName)
 		}
 		if !found {
-			slog.Warn("Metric not found in metric definitions", "metric", metric.LegacyName, "origin", metric.Origin)
+			slog.Warn("Metric not found in metric definitions", "metric", metric.MetricName, "origin", metric.Origin)
 			continue
 		}
 		// Add the metric to the list of metrics to return
@@ -332,20 +337,53 @@ func getExpression(perfmonMetric PerfmonMetric) (string, error) {
 	return expression, nil
 }
 
+func getThresholdExpression(perfmonMetric PerfmonMetric) (string, error) {
+	if perfmonMetric.Threshold == nil {
+		return "", nil // no threshold defined
+	}
+	// SRF metrics are currently defined using an older perfmon format that doesn't
+	// define threshold metrics. We could parse them out manually, but for now we'll just skip them.
+	if perfmonMetric.Threshold.ThresholdMetrics == nil {
+		return "", nil // no threshold defined
+	}
+	expression := perfmonMetric.Threshold.Formula
+	if expression == "" {
+		return "", nil // no threshold defined
+	}
+	replacers := make(map[string]string)
+	for _, thresholdMetric := range perfmonMetric.Threshold.ThresholdMetrics {
+		replacers[thresholdMetric["Alias"]] = fmt.Sprintf("[%s]", thresholdMetric["Value"])
+	}
+	for alias, replacement := range replacers {
+		// Replace alias as whole words only (not substrings)
+		expression = util.ReplaceWholeWord(expression, alias, replacement)
+	}
+	return expression, nil
+}
+
 func perfmonToMetricDefs(perfmonMetrics []PerfmonMetric) ([]MetricDefinition, error) {
 	var metrics []MetricDefinition
 	for _, perfmonMetric := range perfmonMetrics {
 		// get the expression for the metric
 		expression, err := getExpression(perfmonMetric)
 		if err != nil {
-			slog.Warn("Failed getting expression for metric", "metric", perfmonMetric.LegacyName, "error", err)
+			slog.Warn("Failed getting expression for metric", "metric", perfmonMetric.MetricName, "error", err)
+			continue
+		}
+		thresholdExpression, err := getThresholdExpression(perfmonMetric)
+		if err != nil {
+			slog.Warn("Failed getting threshold expression for metric", "metric", perfmonMetric.MetricName, "error", err)
 			continue
 		}
 		// create a MetricDefinition from the perfmon metric
 		metric := MetricDefinition{
-			Name:        perfmonMetric.LegacyName,
-			Description: perfmonMetric.BriefDescription,
-			Expression:  expression,
+			Name:                perfmonMetric.MetricName,
+			LegacyName:          perfmonMetric.LegacyName,
+			Description:         perfmonMetric.BriefDescription,
+			Category:            perfmonMetric.Category,
+			Level:               perfmonMetric.Level,
+			Expression:          expression,
+			ThresholdExpression: thresholdExpression,
 		}
 		// add the metric to the list of metrics
 		metrics = append(metrics, metric)
@@ -363,7 +401,7 @@ func removeUncollectableMetrics(perfmonMetrics []PerfmonMetric, coreEvents CoreE
 		}
 		uncollectableEvents := getUncollectableEvents(eventNames, coreEvents, uncoreEvents, otherEvents, metadata)
 		if len(uncollectableEvents) > 0 {
-			slog.Warn("Metric contains uncollectable events", "metric", perfmonMetric.LegacyName, "uncollectableEvents", uncollectableEvents)
+			slog.Warn("Metric contains uncollectable events", "metric", perfmonMetric.MetricName, "uncollectableEvents", uncollectableEvents)
 			continue
 		}
 		// if the metric is collectable, add it to the list of collectable metrics
@@ -389,11 +427,11 @@ func loadEventGroupsFromMetrics(perfmonMetrics []PerfmonMetric, coreEvents CoreE
 		uncollectableEvents = util.UniqueAppend(uncollectableEvents, uncollectableMetricEvents...)
 		// skip metrics that have uncollectable events
 		if len(uncollectableMetricEvents) > 0 {
-			slog.Warn("Metric contains uncollectable events", "metric", perfmonMetric.LegacyName, "uncollectableEvents", uncollectableMetricEvents)
+			slog.Warn("Metric contains uncollectable events", "metric", perfmonMetric.MetricName, "uncollectableEvents", uncollectableMetricEvents)
 			continue
 		}
 		metricCoreGroups, metricUncoreGroups, metricOtherGroups, err := groupsFromEventNames(
-			perfmonMetric.LegacyName,
+			perfmonMetric.MetricName,
 			metricEventNames,
 			coreEvents,
 			uncoreEvents,
@@ -401,7 +439,7 @@ func loadEventGroupsFromMetrics(perfmonMetrics []PerfmonMetric, coreEvents CoreE
 			metadata,
 		)
 		if err != nil {
-			slog.Error("Error creating groups from event names", "metric", perfmonMetric.LegacyName, "error", err)
+			slog.Error("Error creating groups from event names", "metric", perfmonMetric.MetricName, "error", err)
 			continue
 		}
 		// Add the groups to the main lists
@@ -565,7 +603,17 @@ func groupsFromEventNames(metricName string, eventNames []string, coreEvents Cor
 // findPerfmonMetric -- Helper function to find a metric by name
 func findPerfmonMetric(metricsList []PerfmonMetric, metricName string) (*PerfmonMetric, bool) {
 	for _, metric := range metricsList {
-		if metric.LegacyName == metricName {
+		if metric.MetricName == metricName {
+			return &metric, true
+		}
+	}
+	return nil, false
+}
+
+// findPerfmonMetricByLegacyName -- Helper function to find a metric by legacy name
+func findPerfmonMetricByLegacyName(metricsList []PerfmonMetric, legacyName string) (*PerfmonMetric, bool) {
+	for _, metric := range metricsList {
+		if metric.LegacyName == legacyName {
 			return &metric, true
 		}
 	}

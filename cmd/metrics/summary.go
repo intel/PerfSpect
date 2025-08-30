@@ -20,13 +20,15 @@ import (
 	"strconv"
 	texttemplate "text/template" // nosemgrep
 	"time"
+
+	"github.com/Knetic/govaluate"
 )
 
-func summarizeMetrics(localOutputDir string, targetName string, metadata Metadata) ([]string, error) {
+func summarizeMetrics(localOutputDir string, targetName string, metadata Metadata, metricDefinitions []MetricDefinition) ([]string, error) {
 	filesCreated := []string{}
 	csvMetricsFile := filepath.Join(localOutputDir, targetName+"_metrics.csv")
 	// csv summary
-	out, err := summarize(csvMetricsFile, false, metadata)
+	out, err := summarize(csvMetricsFile, false, metadata, metricDefinitions)
 	if err != nil {
 		err = fmt.Errorf("failed to summarize output: %w", err)
 		return filesCreated, err
@@ -41,7 +43,7 @@ func summarizeMetrics(localOutputDir string, targetName string, metadata Metadat
 	// html summary
 	htmlSummary := (flagScope == scopeSystem || flagScope == scopeProcess) && flagGranularity == granularitySystem
 	if htmlSummary {
-		out, err = summarize(csvMetricsFile, true, metadata)
+		out, err = summarize(csvMetricsFile, true, metadata, metricDefinitions)
 		if err != nil {
 			err = fmt.Errorf("failed to summarize output as HTML: %w", err)
 			return filesCreated, err
@@ -59,7 +61,7 @@ func summarizeMetrics(localOutputDir string, targetName string, metadata Metadat
 
 // summarize - generates formatted output from a CSV file containing metric values.
 // The output can be in CSV or HTML format. Set html to true to generate HTML output otherwise CSV is generated.
-func summarize(csvInputPath string, html bool, metadata Metadata) (out string, err error) {
+func summarize(csvInputPath string, html bool, metadata Metadata, metricDefinitions []MetricDefinition) (out string, err error) {
 	var metrics []metricsFromCSV
 	if metrics, err = newMetricsFromCSV(csvInputPath); err != nil {
 		return
@@ -73,7 +75,7 @@ func summarize(csvInputPath string, html bool, metadata Metadata) (out string, e
 			err = fmt.Errorf("html format is supported only when data's scope is '%s' or '%s' and granularity is '%s'", scopeSystem, scopeProcess, granularitySystem)
 			return
 		}
-		out, err = metrics[0].getHTML(metadata)
+		out, err = metrics[0].getHTML(metadata, metricDefinitions)
 	} else {
 		if len(metrics) == 1 {
 			// if there is only one metricsFromCSV, then it is system scope and granularity
@@ -284,13 +286,13 @@ func (m *metricsFromCSV) getStats() (stats map[string]metricStats, err error) {
 }
 
 // getHTML - generate a string containing HTML representing the metrics
-func (m *metricsFromCSV) getHTML(metadata Metadata) (out string, err error) {
+func (m *metricsFromCSV) getHTML(metadata Metadata, metricDefinitions []MetricDefinition) (out string, err error) {
 	var htmlTemplateBytes []byte
 	if htmlTemplateBytes, err = resources.ReadFile("resources/base.html"); err != nil {
 		slog.Error("failed to read base.html template", slog.String("error", err.Error()))
 		return
 	}
-	templateVals, err := m.loadHTMLTemplateValues(metadata)
+	templateVals, err := m.loadHTMLTemplateValues(metadata, metricDefinitions)
 	if err != nil {
 		slog.Error("failed to load template values", slog.String("error", err.Error()))
 		return
@@ -304,7 +306,12 @@ func (m *metricsFromCSV) getHTML(metadata Metadata) (out string, err error) {
 	return buf.String(), nil
 }
 
-func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata) (templateVals map[string]string, err error) {
+type tmaTip struct {
+	Issue string `json:"issue"`
+	Tip   string `json:"tip"`
+}
+
+func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata, metricDefinitions []MetricDefinition) (templateVals map[string]string, err error) {
 	templateVals = make(map[string]string)
 	var stats map[string]metricStats
 	if stats, err = m.getStats(); err != nil {
@@ -321,34 +328,34 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata) (templateVals
 		metricNames []string // names per architecture, 0=Intel, 1=AMD
 	}
 
-	templateVals["TRANSACTIONS"] = "false" // no transactions for now
-
-	// TMA Tab's pie chart
-	// these are intended to be replaced with pie headers in html report
-	templateNameReplace := []tmplReplace{
-		{"TMA_FRONTEND", []string{"Frontend", "Frontend"}},
-		{"TMA_FETCHLATENCY", []string{"Fetch Latency", "Latency"}},
-		{"TMA_FETCHBANDWIDTH", []string{"Fetch Bandwidth", "Bandwidth"}},
-		{"TMA_BADSPECULATION", []string{"Bad Speculation", "Bad Speculation"}},
-		{"TMA_BRANCHMISPREDICTS", []string{"Branch Mispredicts", "Mispredicts"}},
-		{"TMA_MACHINECLEARS", []string{"Machine Clears", "Pipeline Restarts"}},
-		{"TMA_BACKEND", []string{"Backend", "Backend"}},
-		{"TMA_CORE", []string{"Core", "CPU"}},
-		{"TMA_MEMORY", []string{"Memory", "Memory"}},
-		{"TMA_RETIRING", []string{"Retiring", "Retiring"}},
-		{"TMA_LIGHTOPS", []string{"Light Operations", "Fastpath"}},
-		{"TMA_HEAVYOPS", []string{"Heavy Operations", "Microcode"}},
+	// TMA Tab's pie chart (labels)
+	// templateLabelReplace is a list of template variables that are used as labels for the TMA pie chart
+	// The template variable is replaced with the label appropriate for the architecture
+	templateLabelReplace := []tmplReplace{
+		{"FRONTEND_LABEL", []string{"Frontend", "Frontend"}},                     // level 1
+		{"FETCHLATENCY_LABEL", []string{"Fetch Latency", "Latency"}},             // level 2
+		{"FETCHBANDWIDTH_LABEL", []string{"Fetch BW", "Bandwidth"}},              // level 2
+		{"BADSPECULATION_LABEL", []string{"Bad Speculation", "Bad Speculation"}}, // level 1
+		{"BRANCHMISPREDICTS_LABEL", []string{"Mispredicts", "Mispredicts"}},      // level 2
+		{"MACHINECLEARS_LABEL", []string{"Machine Clears", "Pipeline Restarts"}}, // level 2
+		{"BACKEND_LABEL", []string{"Backend", "Backend"}},                        // level 1
+		{"MEMORY_LABEL", []string{"Memory", "Memory"}},                           // level 2
+		{"CORE_LABEL", []string{"Core", "CPU"}},                                  // level 2
+		{"RETIRING_LABEL", []string{"Retiring", "Retiring"}},                     // level 1
+		{"LIGHTOPS_LABEL", []string{"Light Ops", "Fastpath"}},                    // level 2
+		{"HEAVYOPS_LABEL", []string{"Heavy Ops", "Microcode"}},                   // level 2
 	}
-	// replace the template variables with the name header of the metric
-	for _, tmpl := range templateNameReplace {
-		var headerName string
+	// replace the template variables with the label of the metric for the pie chart
+	for _, tmpl := range templateLabelReplace {
+		var label string
 		if len(tmpl.metricNames) > archIndex {
-			headerName = tmpl.metricNames[archIndex]
+			label = tmpl.metricNames[archIndex]
 		}
-		templateVals[tmpl.tmplVar] = headerName
+		templateVals[tmpl.tmplVar] = label
 	}
-	// TMA Tab's pie chart
-	// these are intended to be replaced with the mean value of the metric
+	// TMA Tab's pie chart (values)
+	// templateReplace is a list of template variables to replace with the mean value of
+	// the metric named in the metricNames field for the architecture
 	templateReplace := []tmplReplace{
 		{"FRONTEND", []string{"TMA_Frontend_Bound(%)", "Pipeline Utilization - Frontend Bound (%)"}},
 		{"FETCHLATENCY", []string{"TMA_..Fetch_Latency(%)", "Pipeline Utilization - Frontend Bound - Latency (%)"}},
@@ -427,16 +434,42 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata) (templateVals
 			templateVals["TIMESTAMPS"] = string(timeStampsBytes)
 		}
 	}
+
 	// All Metrics Tab
+	// load the TMA metrics tuning tips from resources
+	var tmaTipsBytes []byte
+	if tmaTipsBytes, err = resources.ReadFile("resources/perfmon/tma_tuning_tips.json"); err != nil {
+		slog.Error("failed to read tma_tips.json", slog.String("error", err.Error()))
+		return
+	}
+	tmaTips := make(map[string]tmaTip)
+	if err = json.Unmarshal(tmaTipsBytes, &tmaTips); err != nil {
+		slog.Error("failed to unmarshal tma_tips.json", slog.String("error", err.Error()))
+		return
+	}
 	var metricHTMLStats [][]string
 	for _, name := range m.names {
-		metricHTMLStats = append(metricHTMLStats, []string{
-			name,
-			fmt.Sprintf("%f", stats[name].mean),
-			fmt.Sprintf("%f", stats[name].min),
-			fmt.Sprintf("%f", stats[name].max),
-			fmt.Sprintf("%f", stats[name].stddev),
-		})
+		metricVals := []string{
+			name,                                  // column 0
+			fmt.Sprintf("%f", stats[name].mean),   // column 1
+			fmt.Sprintf("%f", stats[name].min),    // column 2
+			fmt.Sprintf("%f", stats[name].max),    // column 3
+			fmt.Sprintf("%f", stats[name].stddev), // column 4
+		}
+		metricDef := findMetricDefinitionByName(name, metricDefinitions)
+		if metricDef != nil {
+			exceeded, thresholdDescription := getThresholdInfo(*metricDef, stats, metricDefinitions, tmaTips)
+			metricVals = append(metricVals, exceeded)                                   // column 5 - "Yes" if threshold exceeded, else "No"
+			metricVals = append(metricVals, thresholdDescription)                       // column 6 - issue/tip or threshold itself
+			metricVals = append(metricVals, fmt.Sprintf("%d", max(metricDef.Level, 1))) // column 7 - metric level (for TMA metrics)
+		} else {
+			// this shouldn't happen, but just in case
+			metricVals = append(metricVals, "No") // 5
+			metricVals = append(metricVals, "")   // 6
+			metricVals = append(metricVals, "")   // 7
+			slog.Error("metric definition not found for metric", slog.String("metric", name))
+		}
+		metricHTMLStats = append(metricHTMLStats, metricVals)
 	}
 	var jsonMetricsBytes []byte
 	if jsonMetricsBytes, err = json.Marshal(metricHTMLStats); err != nil {
@@ -444,6 +477,19 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata) (templateVals
 	}
 	jsonMetrics := string(jsonMetricsBytes)
 	templateVals["ALLMETRICS"] = jsonMetrics
+	// Add metric descriptions for tooltip info
+	metricDescriptionMap := make(map[string]string, len(metricDefinitions))
+	for _, def := range metricDefinitions {
+		if def.Description != "" {
+			metricDescriptionMap[getMetricDisplayName(def)] = def.Description
+		}
+	}
+	var jsonMetricDescBytes []byte
+	if jsonMetricDescBytes, err = json.Marshal(metricDescriptionMap); err != nil {
+		return
+	}
+	templateVals["DESCRIPTION"] = string(jsonMetricDescBytes)
+
 	// Metadata tab
 	jsonMetadata, err := metadata.JSON()
 	if err != nil {
@@ -456,6 +502,7 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata) (templateVals
 	re = regexp.MustCompile(`,"SystemSummaryFields":\[\[.*?\]\]`)
 	jsonMetadataPurged = re.ReplaceAll(jsonMetadataPurged, []byte(""))
 	templateVals["METADATA"] = string(jsonMetadataPurged)
+
 	// system info tab
 	jsonSystemInfo, err := json.Marshal(metadata.SystemSummaryFields)
 	if err != nil {
@@ -463,6 +510,92 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata) (templateVals
 	}
 	templateVals["SYSTEMINFO"] = string(jsonSystemInfo)
 	return
+}
+
+func findMetricDefinitionByName(name string, metricDefinitions []MetricDefinition) *MetricDefinition {
+	for i, d := range metricDefinitions {
+		if getMetricDisplayName(d) == name {
+			return &metricDefinitions[i]
+		}
+	}
+	return nil
+}
+
+func findMetricDefinitionByLegacyName(legacyName string, metricDefinitions []MetricDefinition) *MetricDefinition {
+	for i, d := range metricDefinitions {
+		if d.LegacyName == legacyName {
+			return &metricDefinitions[i]
+		}
+	}
+	return nil
+}
+
+func getThresholdInfo(metricDef MetricDefinition, stats map[string]metricStats, metricDefinitions []MetricDefinition, tmaTips map[string]tmaTip) (string, string) {
+	if metricDef.ThresholdEvaluable == nil {
+		// no threshold defined
+		return "No", ""
+	}
+	variables := make(map[string]any) // map of variable names to values
+	// threshold variable names are legacy metric names, so find the corresponding metric definitions
+	for _, v := range metricDef.ThresholdVariables {
+		vDef := findMetricDefinitionByLegacyName(v, metricDefinitions)
+		if vDef == nil {
+			slog.Warn("threshold variable not found in metric definitions", slog.String("metric", metricDef.Name), slog.String("variable", v))
+			return "No", ""
+		}
+		if stat, ok := stats[getMetricDisplayName(*vDef)]; ok {
+			variables[v] = stat.mean
+		} else {
+			slog.Warn("threshold variable not found in stats", slog.String("metric", metricDef.Name), slog.String("variable", v))
+			return "No", ""
+		}
+	}
+	// evaluate the threshold expression
+	result, err := evaluateThresholdExpression(metricDef.ThresholdEvaluable, variables)
+	if err != nil {
+		slog.Warn("failed to evaluate threshold expression", slog.String("metric", metricDef.Name), slog.String("expression", metricDef.ThresholdExpression), slog.String("error", err.Error()))
+		return "No", ""
+	}
+	boolResult, ok := result.(bool)
+	if !ok {
+		slog.Warn("threshold expression did not evaluate to a boolean", slog.String("metric", metricDef.Name), slog.String("expression", metricDef.ThresholdExpression))
+		return "No", ""
+	}
+	var exceeded string
+	if boolResult {
+		exceeded = "Yes"
+	} else {
+		exceeded = "No"
+	}
+	var resultTip string
+	if exceeded == "Yes" {
+		issueTip, ok := tmaTips[metricDef.Name]
+		if ok {
+			if issueTip.Issue != "" {
+				resultTip = fmt.Sprintf("Issue: %s ", issueTip.Issue)
+			}
+			if issueTip.Tip != "" {
+				resultTip += fmt.Sprintf("Tip: %s", issueTip.Tip)
+			}
+		}
+		if resultTip == "" {
+			// fallback if no tip found
+			resultTip = "Value exceeds metric threshold: " + metricDef.ThresholdExpression + "."
+		}
+	}
+	return exceeded, resultTip
+}
+
+// function to call evaluator so that we can catch panics that come from the evaluator
+func evaluateThresholdExpression(evaluable *govaluate.EvaluableExpression, variables map[string]any) (any, error) {
+	var err error
+	defer func() {
+		if errx := recover(); errx != nil {
+			err = errx.(error)
+		}
+	}()
+	result, err := evaluable.Evaluate(variables)
+	return result, err
 }
 
 // getCSV - generate CSV string representing the summary statistics of the metrics
