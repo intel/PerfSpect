@@ -144,7 +144,6 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 	var output string
 	if metadata.SupportsInstructions, output, err = getSupportsEvent("instructions", scriptOutputs); err != nil {
 		slog.Warn("failed to determine if instructions event is supported, assuming not supported", slog.String("error", err.Error()))
-		err = nil
 	} else {
 		if !metadata.SupportsInstructions {
 			slog.Warn("instructions event not supported", slog.String("output", output))
@@ -153,7 +152,6 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 	// ref_cycles
 	if metadata.SupportsRefCycles, output, err = getSupportsEvent("ref-cycles", scriptOutputs); err != nil {
 		slog.Warn("failed to determine if ref_cycles is supported, assuming not supported", slog.String("error", err.Error()))
-		err = nil
 	} else {
 		if !metadata.SupportsRefCycles {
 			slog.Warn("ref-cycles not supported", slog.String("output", output))
@@ -162,7 +160,6 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 	// Fixed-counter TMA events
 	if metadata.SupportsFixedTMA, output, err = getSupportsFixedTMA(scriptOutputs); err != nil {
 		slog.Warn("failed to determine if fixed-counter TMA is supported, assuming not supported", slog.String("error", err.Error()))
-		err = nil
 	} else {
 		if !metadata.SupportsFixedTMA {
 			slog.Warn("Fixed-counter TMA events not supported", slog.String("output", output))
@@ -171,7 +168,6 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 	// Fixed-counter cycles events
 	if metadata.SupportsFixedCycles, output, err = getSupportsFixedEvent("cpu-cycles", scriptOutputs); err != nil {
 		slog.Warn("failed to determine if fixed-counter 'cpu-cycles' is supported, assuming not supported", slog.String("error", err.Error()))
-		err = nil
 	} else {
 		if !metadata.SupportsFixedCycles {
 			slog.Warn("Fixed-counter 'cpu-cycles' events not supported", slog.String("output", output))
@@ -180,7 +176,6 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 	// Fixed-counter ref-cycles events
 	if metadata.SupportsFixedRefCycles, output, err = getSupportsFixedEvent("ref-cycles", scriptOutputs); err != nil {
 		slog.Warn("failed to determine if fixed-counter 'ref-cycles' is supported, assuming not supported", slog.String("error", err.Error()))
-		err = nil
 	} else {
 		if !metadata.SupportsFixedRefCycles {
 			slog.Warn("Fixed-counter 'ref-cycles' events not supported", slog.String("output", output))
@@ -189,7 +184,6 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 	// Fixed-counter instructions events
 	if metadata.SupportsFixedInstructions, output, err = getSupportsFixedEvent("instructions", scriptOutputs); err != nil {
 		slog.Warn("failed to determine if fixed-counter 'instructions' is supported, assuming not supported", slog.String("error", err.Error()))
-		err = nil
 	} else {
 		if !metadata.SupportsFixedInstructions {
 			slog.Warn("Fixed-counter 'instructions' events not supported", slog.String("output", output))
@@ -198,7 +192,6 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 	// PEBS
 	if metadata.SupportsPEBS, output, err = getSupportsPEBS(scriptOutputs); err != nil {
 		slog.Warn("failed to determine if 'PEBS' is supported, assuming not supported", slog.String("error", err.Error()))
-		err = nil
 	} else {
 		if !metadata.SupportsPEBS {
 			slog.Warn("'PEBS' events not supported", slog.String("output", output))
@@ -207,7 +200,6 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 	// Offcore response
 	if metadata.SupportsOCR, output, err = getSupportsOCR(scriptOutputs); err != nil {
 		slog.Warn("failed to determine if 'OCR' is supported, assuming not supported", slog.String("error", err.Error()))
-		err = nil
 	} else {
 		if !metadata.SupportsOCR {
 			slog.Warn("'OCR' events not supported", slog.String("output", output))
@@ -244,7 +236,6 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 			slog.Warn("Uncore devices not supported")
 		}
 	}
-	err = nil
 	return
 }
 
