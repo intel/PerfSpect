@@ -383,27 +383,20 @@ func updateApp(latestManifest manifest, localTempDir string) error {
 	if !util.IsValidSemver(latestManifest.Version) {
 		return fmt.Errorf("invalid version format in manifest: %s", latestManifest.Version)
 	}
-	versionedFileName := "perfspect" + "_" + latestManifest.Version + ".tgz"
-	unVersionedfileName := "perfspect.tgz"
-	fileNames := []string{unVersionedfileName, versionedFileName}
-	var err error
-	var resp *http.Response
-	for _, fileName := range fileNames {
-		url := artifactoryUrl + fileName
-		resp, err = http.Get(url) // #nosec G107
-		if err == nil && resp.StatusCode == http.StatusOK {
-			slog.Info("Downloaded latest release", slog.String("url", url))
-			break
-		} else if err != nil {
-			slog.Warn("Failed to download latest release", slog.String("url", url), slog.String("error", err.Error()))
-		} else {
-			slog.Warn("Failed to download latest release", slog.String("url", url), slog.String("status", resp.Status))
-		}
-	}
+	fileName := "perfspect.tgz"
+	url := artifactoryUrl + fileName
+	resp, err := http.Get(url) // #nosec G107
 	if err != nil {
-		return err
+		slog.Warn("Failed to download latest release", slog.String("url", url), slog.String("error", err.Error()))
+		return fmt.Errorf("failed to download latest release: %v", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		slog.Warn("Failed to download latest release", slog.String("url", url), slog.String("status", resp.Status))
+		return fmt.Errorf("failed to download latest release, status: %s", resp.Status)
+	}
+	// success
+	slog.Info("Downloaded latest release", slog.String("url", url))
 	// write the tarball to a temp file
 	tarballFile, err := os.CreateTemp(localTempDir, "perfspect*.tgz")
 	if err != nil {
