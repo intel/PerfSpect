@@ -36,7 +36,13 @@ func RunScript(myTarget target.Target, script ScriptDefinition, localTempDir str
 		return ScriptOutput{}, err
 	}
 	scriptOutputs, err := RunScripts(myTarget, []ScriptDefinition{script}, false, localTempDir)
-	scriptOutput := scriptOutputs[script.Name]
+	if scriptOutputs == nil {
+		return ScriptOutput{}, err
+	}
+	scriptOutput, exists := scriptOutputs[script.Name]
+	if !exists {
+		return ScriptOutput{}, fmt.Errorf("script output not found for script: %s", script.Name)
+	}
 	return scriptOutput, err
 }
 
