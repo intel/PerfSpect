@@ -26,11 +26,16 @@ import (
 
 func summarizeMetrics(localOutputDir string, targetName string, metadata Metadata, metricDefinitions []MetricDefinition) ([]string, error) {
 	filesCreated := []string{}
+	// read the metrics from CSV
 	csvMetricsFile := filepath.Join(localOutputDir, targetName+"_metrics.csv")
-	// csv summary
-	out, err := summarize(csvMetricsFile, false, metadata, metricDefinitions)
+	metrics, err := newMetricCollection(csvMetricsFile)
 	if err != nil {
-		err = fmt.Errorf("failed to summarize output: %w", err)
+		return filesCreated, fmt.Errorf("failed to read metrics from %s: %w", csvMetricsFile, err)
+	}
+	// csv summary
+	out, err := metrics.getCSV()
+	if err != nil {
+		err = fmt.Errorf("failed to summarize output as CSV: %w", err)
 		return filesCreated, err
 	}
 	csvSummaryFile := filepath.Join(localOutputDir, targetName+"_metrics_summary.csv")
@@ -41,52 +46,19 @@ func summarizeMetrics(localOutputDir string, targetName string, metadata Metadat
 	}
 	filesCreated = append(filesCreated, csvSummaryFile)
 	// html summary
-	htmlSummary := (flagScope == scopeSystem || flagScope == scopeProcess) && flagGranularity == granularitySystem
-	if htmlSummary {
-		out, err = summarize(csvMetricsFile, true, metadata, metricDefinitions)
-		if err != nil {
-			err = fmt.Errorf("failed to summarize output as HTML: %w", err)
-			return filesCreated, err
-		}
-		htmlSummaryFile := filepath.Join(localOutputDir, targetName+"_metrics_summary.html")
-		err = os.WriteFile(htmlSummaryFile, []byte(out), 0644) // #nosec G306
-		if err != nil {
-			err = fmt.Errorf("failed to write HTML summary to file: %w", err)
-			return filesCreated, err
-		}
-		filesCreated = append(filesCreated, htmlSummaryFile)
+	out, err = metrics.getHTML(metadata, metricDefinitions)
+	if err != nil {
+		err = fmt.Errorf("failed to summarize output as HTML: %w", err)
+		return filesCreated, err
 	}
+	htmlSummaryFile := filepath.Join(localOutputDir, targetName+"_metrics_summary.html")
+	err = os.WriteFile(htmlSummaryFile, []byte(out), 0644) // #nosec G306
+	if err != nil {
+		err = fmt.Errorf("failed to write HTML summary to file: %w", err)
+		return filesCreated, err
+	}
+	filesCreated = append(filesCreated, htmlSummaryFile)
 	return filesCreated, nil
-}
-
-// summarize - generates formatted output from a CSV file containing metric values.
-// The output can be in CSV or HTML format. Set html to true to generate HTML output otherwise CSV is generated.
-func summarize(csvInputPath string, html bool, metadata Metadata, metricDefinitions []MetricDefinition) (out string, err error) {
-	var metrics []metricsFromCSV
-	if metrics, err = newMetricsFromCSV(csvInputPath); err != nil {
-		return
-	}
-	if len(metrics) == 0 {
-		err = fmt.Errorf("no metrics found in %s", csvInputPath)
-		return
-	}
-	if html {
-		if len(metrics) > 1 {
-			err = fmt.Errorf("html format is supported only when data's scope is '%s' or '%s' and granularity is '%s'", scopeSystem, scopeProcess, granularitySystem)
-			return
-		}
-		out, err = metrics[0].getHTML(metadata, metricDefinitions)
-	} else {
-		if len(metrics) == 1 {
-			// if there is only one metricsFromCSV, then it is system scope and granularity
-			// so we can just use the first one
-			out, err = metrics[0].getCSV(true)
-		} else {
-			// if there are multiple metricsFromCSV, then it is per-scope unit or granularity unit
-			out, err = getCSVMultiple(metrics)
-		}
-	}
-	return
 }
 
 type metricStats struct {
@@ -137,6 +109,7 @@ func newRow(fields []string, names []string) (r row, err error) {
 	return
 }
 
+// indexes of known fields in CSV
 const (
 	idxTimestamp int = iota
 	idxSocket
@@ -145,16 +118,21 @@ const (
 	idxFirstMetric
 )
 
-type metricsFromCSV struct {
+// MetricGroup - holds a group of metrics, e.g., one per socket, cpu, or cgroup
+type MetricGroup struct {
 	names        []string
 	rows         []row
 	groupByField string
 	groupByValue string
 }
 
-// newMetricsFromCSV - loads data from CSV. Returns a list of metrics, one per
-// scope unit or granularity unit, e.g., one per socket, or one per PID
-func newMetricsFromCSV(csvPath string) (metrics []metricsFromCSV, err error) {
+// MetricCollection - a collection of MetricGroup, one per scope unit or granularity unit
+type MetricCollection []MetricGroup
+
+// newMetricCollection - loads data from CSV. Returns a list of metrics, one per
+// scope unit or granularity unit, i.e., one per socket, one per CPU, one per cgroup,
+// or one for the entire system if no disaggregation is present.
+func newMetricCollection(csvPath string) (metrics MetricCollection, err error) {
 	file, err := os.Open(csvPath) // #nosec G304
 	if err != nil {
 		return
@@ -207,7 +185,7 @@ func newMetricsFromCSV(csvPath string) (metrics []metricsFromCSV, err error) {
 		// put the row into the associated list based on groupByField
 		if groupByField == -1 { // system scope/granularity
 			if len(metrics) == 0 {
-				metrics = append(metrics, metricsFromCSV{})
+				metrics = append(metrics, MetricGroup{})
 				metrics[0].names = metricNames
 			}
 			metrics[0].rows = append(metrics[0].rows, r)
@@ -216,7 +194,7 @@ func newMetricsFromCSV(csvPath string) (metrics []metricsFromCSV, err error) {
 			var listIdx int
 			if listIdx = slices.Index(groupByValues, groupByValue); listIdx == -1 {
 				groupByValues = append(groupByValues, groupByValue)
-				metrics = append(metrics, metricsFromCSV{})
+				metrics = append(metrics, MetricGroup{})
 				listIdx = len(metrics) - 1
 				metrics[listIdx].names = metricNames
 				switch groupByField {
@@ -236,16 +214,16 @@ func newMetricsFromCSV(csvPath string) (metrics []metricsFromCSV, err error) {
 }
 
 // getStats - calculate summary stats (min, max, mean, stddev) for each metric
-func (m *metricsFromCSV) getStats() (stats map[string]metricStats, err error) {
+func (mg *MetricGroup) getStats() (stats map[string]metricStats, err error) {
 	stats = make(map[string]metricStats)
-	for _, metricName := range m.names {
+	for _, metricName := range mg.names {
 		min := math.NaN()
 		max := math.NaN()
 		mean := math.NaN()
 		stddev := math.NaN()
 		count := 0
 		sum := 0.0
-		for _, row := range m.rows {
+		for _, row := range mg.rows {
 			val := row.metrics[metricName]
 			if math.IsNaN(val) || math.IsInf(val, 0) {
 				continue
@@ -269,7 +247,7 @@ func (m *metricsFromCSV) getStats() (stats map[string]metricStats, err error) {
 		if count > 0 {
 			mean = sum / float64(count)
 			distanceSquaredSum := 0.0
-			for _, row := range m.rows {
+			for _, row := range mg.rows {
 				val := row.metrics[metricName]
 				if math.IsNaN(val) || math.IsInf(val, 0) {
 					continue
@@ -285,14 +263,84 @@ func (m *metricsFromCSV) getStats() (stats map[string]metricStats, err error) {
 	return
 }
 
+// aggregate - combine multiple metricsFromCSV into a single one by averaging the metrics
+// This is used when there are multiple metricsFromCSV objects, e.g., one per socket, cpu, or cgroup.
+// The output metricsFromCSV will have groupByField and groupByValue set to empty strings.
+func (mc MetricCollection) aggregate() (m *MetricGroup, err error) {
+	if len(mc) == 0 {
+		err = fmt.Errorf("no metrics to aggregate")
+		return
+	}
+	if len(mc) == 1 {
+		// if there is only one metricsFromCSV, then it is system scope and granularity
+		// so we can just use the first one
+		return &mc[0], nil
+	}
+	// Validate groupByField for all metrics
+	validGroupByFields := []string{"SKT", "CPU", "CID"}
+	for i, m := range mc {
+		if !slices.Contains(validGroupByFields, m.groupByField) {
+			return nil, fmt.Errorf("invalid groupByField in metrics[%d]: %s", i, m.groupByField)
+		}
+	}
+	// first, get the names of the metrics
+	metricNames := mc[0].names
+	for idx, m := range mc[1:] {
+		if !slices.Equal(m.names, metricNames) {
+			return nil, fmt.Errorf("metricsFromCSV objects have different metric names or order at index %d: %v vs %v", idx+1, m.names, metricNames)
+		}
+	}
+	// create the output metricsFromCSV
+	m = &MetricGroup{
+		names:        metricNames,
+		groupByField: "",
+		groupByValue: "",
+	}
+	// aggregate the rows by timestamp
+	timestampMap := make(map[float64][]map[string]float64) // map of timestamp to list of metric maps
+	var timestamps []float64                               // list of timestamps in order
+	for _, metrics := range mc {
+		for _, row := range metrics.rows {
+			if _, ok := timestampMap[row.timestamp]; !ok {
+				timestamps = append(timestamps, row.timestamp)
+			}
+			timestampMap[row.timestamp] = append(timestampMap[row.timestamp], row.metrics)
+		}
+	}
+	// for each timestamp, average the metrics
+	for _, ts := range timestamps {
+		metricList := timestampMap[ts]
+		avgMetrics := make(map[string]float64)
+		for _, metricName := range metricNames {
+			sum := 0.0
+			count := 0
+			for _, metrics := range metricList {
+				val := metrics[metricName]
+				if math.IsNaN(val) || math.IsInf(val, 0) {
+					continue
+				}
+				sum += val
+				count++
+			}
+			if count > 0 {
+				avgMetrics[metricName] = sum / float64(count)
+			} else {
+				avgMetrics[metricName] = math.NaN()
+			}
+		}
+		m.rows = append(m.rows, row{timestamp: ts, metrics: avgMetrics})
+	}
+	return
+}
+
 // getHTML - generate a string containing HTML representing the metrics
-func (m *metricsFromCSV) getHTML(metadata Metadata, metricDefinitions []MetricDefinition) (out string, err error) {
+func (mg *MetricGroup) getHTML(metadata Metadata, metricDefinitions []MetricDefinition) (out string, err error) {
 	var htmlTemplateBytes []byte
 	if htmlTemplateBytes, err = resources.ReadFile("resources/base.html"); err != nil {
 		slog.Error("failed to read base.html template", slog.String("error", err.Error()))
 		return
 	}
-	templateVals, err := m.loadHTMLTemplateValues(metadata, metricDefinitions)
+	templateVals, err := mg.loadHTMLTemplateValues(metadata, metricDefinitions)
 	if err != nil {
 		slog.Error("failed to load template values", slog.String("error", err.Error()))
 		return
@@ -306,15 +354,31 @@ func (m *metricsFromCSV) getHTML(metadata Metadata, metricDefinitions []MetricDe
 	return buf.String(), nil
 }
 
+func (mc MetricCollection) getHTML(metadata Metadata, metricDefinitions []MetricDefinition) (out string, err error) {
+	if len(mc) == 0 {
+		err = fmt.Errorf("no metrics to summarize")
+		return
+	}
+	if len(mc) == 1 {
+		return mc[0].getHTML(metadata, metricDefinitions)
+	}
+	metrics, err := mc.aggregate()
+	if err != nil {
+		return
+	}
+	out, err = metrics.getHTML(metadata, metricDefinitions)
+	return
+}
+
 type tmaTip struct {
 	Issue string `json:"issue"`
 	Tip   string `json:"tip"`
 }
 
-func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata, metricDefinitions []MetricDefinition) (templateVals map[string]string, err error) {
+func (mg *MetricGroup) loadHTMLTemplateValues(metadata Metadata, metricDefinitions []MetricDefinition) (templateVals map[string]string, err error) {
 	templateVals = make(map[string]string)
 	var stats map[string]metricStats
-	if stats, err = m.getStats(); err != nil {
+	if stats, err = mg.getStats(); err != nil {
 		return
 	}
 	//0 -> Intel, 1 -> AMD
@@ -411,7 +475,7 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata, metricDefinit
 	for tIdx, tmpl := range templateReplace {
 		var timeStamps []string
 		var series [][]float64
-		for rIdx, row := range m.rows {
+		for rIdx, row := range mg.rows {
 			metricRowVal := row.metrics[tmpl.metricNames[archIndex]]
 			if math.IsNaN(metricRowVal) || math.IsInf(metricRowVal, 0) || metricRowVal < 0 {
 				metricRowVal = 0
@@ -448,7 +512,7 @@ func (m *metricsFromCSV) loadHTMLTemplateValues(metadata Metadata, metricDefinit
 		return
 	}
 	var metricHTMLStats [][]string
-	for _, name := range m.names {
+	for _, name := range mg.names {
 		metricVals := []string{
 			name,                                  // column 0
 			fmt.Sprintf("%f", stats[name].mean),   // column 1
@@ -599,28 +663,26 @@ func evaluateThresholdExpression(evaluable *govaluate.EvaluableExpression, varia
 }
 
 // getCSV - generate CSV string representing the summary statistics of the metrics
-func (m *metricsFromCSV) getCSV(includeFieldNames bool) (out string, err error) {
+func (mg *MetricGroup) getCSV() (out string, err error) {
 	var stats map[string]metricStats
-	if stats, err = m.getStats(); err != nil {
+	if stats, err = mg.getStats(); err != nil {
 		return
 	}
-	if includeFieldNames {
-		out = "metric,mean,min,max,stddev\n"
-		if m.groupByField != "" {
-			out = m.groupByField + "," + out
-		}
+	out = "metric,mean,min,max,stddev\n"
+	if mg.groupByField != "" {
+		out = mg.groupByField + "," + out
 	}
-	for _, name := range m.names {
-		if m.groupByValue == "" {
+	for _, name := range mg.names {
+		if mg.groupByValue == "" {
 			out += fmt.Sprintf("%s,%f,%f,%f,%f\n", name, stats[name].mean, stats[name].min, stats[name].max, stats[name].stddev)
 		} else {
-			out += fmt.Sprintf("%s,%s,%f,%f,%f,%f\n", m.groupByValue, name, stats[name].mean, stats[name].min, stats[name].max, stats[name].stddev)
+			out += fmt.Sprintf("%s,%s,%f,%f,%f,%f\n", mg.groupByValue, name, stats[name].mean, stats[name].min, stats[name].max, stats[name].stddev)
 		}
 	}
 	return
 }
 
-// getCSVMultiple - generate CSV string representing the summary statistics of multiple metricsFromCSV
+// getCSV - generate CSV string representing the summary statistics of multiple metricsFromCSV
 // This is used when there are multiple metricsFromCSV objects, e.g., one per socket, cpu, or cgroup.
 // Output format is:
 //
@@ -628,20 +690,25 @@ func (m *metricsFromCSV) getCSV(includeFieldNames bool) (out string, err error) 
 //	metric,val0,val1,val2,val3
 //
 // where metric is the name of the metric, and val0, val1, etc. are the values for each CPU/socket/cgroup.
-func getCSVMultiple(metrics []metricsFromCSV) (out string, err error) {
-	if len(metrics) == 0 {
+func (mc MetricCollection) getCSV() (out string, err error) {
+	if len(mc) == 0 {
 		return "", fmt.Errorf("no metrics to summarize")
+	}
+	if len(mc) == 1 {
+		// if there is only one metricsFromCSV, then it is system scope and granularity
+		// so we can just use the first one
+		return mc[0].getCSV()
 	}
 	// Validate groupByField for all metrics
 	validGroupByFields := []string{"SKT", "CPU", "CID"}
-	for i, m := range metrics {
+	for i, m := range mc {
 		if !slices.Contains(validGroupByFields, m.groupByField) {
 			return "", fmt.Errorf("invalid groupByField in metrics[%d]: %s", i, m.groupByField)
 		}
 	}
 	// first, get the names of the metrics
-	metricNames := metrics[0].names
-	for idx, m := range metrics[1:] {
+	metricNames := mc[0].names
+	for idx, m := range mc[1:] {
 		if !slices.Equal(m.names, metricNames) {
 			return "", fmt.Errorf("metricsFromCSV objects have different metric names or order at index %d: %v vs %v", idx+1, m.names, metricNames)
 		}
@@ -649,7 +716,7 @@ func getCSVMultiple(metrics []metricsFromCSV) (out string, err error) {
 	// write the header
 	out = "metric"
 	var fieldPrefix string
-	switch metrics[0].groupByField {
+	switch mc[0].groupByField {
 	case validGroupByFields[0]: // SKT
 		fieldPrefix = validGroupByFields[0] // "SKT"
 	case validGroupByFields[1]: // CPU
@@ -658,9 +725,9 @@ func getCSVMultiple(metrics []metricsFromCSV) (out string, err error) {
 		fieldPrefix = "" // leave empty for CID
 	default:
 		// shouldn't happen due to earlier validation
-		return "", fmt.Errorf("invalid groupByField: %s", metrics[0].groupByField)
+		return "", fmt.Errorf("invalid groupByField: %s", mc[0].groupByField)
 	}
-	for _, m := range metrics {
+	for _, m := range mc {
 		if m.groupByValue == "" {
 			return "", fmt.Errorf("groupByValue is empty for metricsFromCSV with groupByField %s", m.groupByField)
 		}
@@ -671,8 +738,8 @@ func getCSVMultiple(metrics []metricsFromCSV) (out string, err error) {
 	}
 	out += "\n"
 	// get the stats for each metricsFromCSV
-	allStats := make([]map[string]float64, len(metrics))
-	for i, m := range metrics {
+	allStats := make([]map[string]float64, len(mc))
+	for i, m := range mc {
 		allStats[i] = make(map[string]float64)
 		stats, err := m.getStats()
 		if err != nil {
@@ -685,7 +752,7 @@ func getCSVMultiple(metrics []metricsFromCSV) (out string, err error) {
 	// write the metric names and values
 	for _, name := range metricNames {
 		out += name
-		for j := range metrics {
+		for j := range mc {
 			out += fmt.Sprintf(",%f", allStats[j][name])
 		}
 		out += "\n"
