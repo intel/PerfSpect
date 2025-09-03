@@ -28,7 +28,7 @@ func (l *ComponentLoader) Load(loaderConfig LoaderConfig) ([]MetricDefinition, [
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to filter uncollectable metrics: %w", err)
 	}
-	groupDefinitions, err := l.formEventGroups(metricDefinitions, eventDefinitions)
+	groupDefinitions, err := l.formEventGroups(metricDefinitions, eventDefinitions, loaderConfig.Metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to form event groups: %w", err)
 	}
@@ -155,7 +155,7 @@ func (l *ComponentLoader) identifyUncollectableEvents(events []ComponentEvent, m
 	return uncollectableEvents, nil
 }
 
-func (l *ComponentLoader) formEventGroups(metrics []MetricDefinition, events []ComponentEvent) (groups []GroupDefinition, err error) {
+func (l *ComponentLoader) formEventGroups(metrics []MetricDefinition, events []ComponentEvent, metadata Metadata) (groups []GroupDefinition, err error) {
 	return groups, nil
 }
 
