@@ -17,11 +17,11 @@ import (
 )
 
 func (l *LegacyLoader) Load(loaderConfig LoaderConfig) ([]MetricDefinition, []GroupDefinition, error) {
-	loadedMetricDefinitions, err := loadMetricDefinitions(loaderConfig.MetricDefinitionOverride, loaderConfig.SelectedMetrics, loaderConfig.Metadata)
+	loadedMetricDefinitions, err := l.loadMetricDefinitions(loaderConfig.MetricDefinitionOverride, loaderConfig.SelectedMetrics, loaderConfig.Metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load metric definitions: %w", err)
 	}
-	loadedEventGroups, uncollectableEvents, err := loadEventGroups(loaderConfig.EventDefinitionOverride, loaderConfig.Metadata)
+	loadedEventGroups, uncollectableEvents, err := l.loadEventGroups(loaderConfig.EventDefinitionOverride, loaderConfig.Metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load event group definitions: %w", err)
 	}
@@ -36,7 +36,7 @@ func (l *LegacyLoader) Load(loaderConfig LoaderConfig) ([]MetricDefinition, []Gr
 // definition file. When the override path argument is empty, the function will load metrics from
 // the file associated with the platform's architecture found in the provided metadata. When
 // a list of metric names is provided, only those metric definitions will be loaded.
-func loadMetricDefinitions(metricDefinitionOverridePath string, selectedMetrics []string, metadata Metadata) (metrics []MetricDefinition, err error) {
+func (l *LegacyLoader) loadMetricDefinitions(metricDefinitionOverridePath string, selectedMetrics []string, metadata Metadata) (metrics []MetricDefinition, err error) {
 	var bytes []byte
 	if metricDefinitionOverridePath != "" {
 		bytes, err = os.ReadFile(metricDefinitionOverridePath) // #nosec G304
@@ -82,7 +82,7 @@ func loadMetricDefinitions(metricDefinitionOverridePath string, selectedMetrics 
 
 // loadEventGroups reads the events defined in the architecture specific event definition file, then
 // expands them to include the per-device uncore events
-func loadEventGroups(eventDefinitionOverridePath string, metadata Metadata) (groups []GroupDefinition, uncollectableEvents []string, err error) {
+func (l *LegacyLoader) loadEventGroups(eventDefinitionOverridePath string, metadata Metadata) (groups []GroupDefinition, uncollectableEvents []string, err error) {
 	var file fs.File
 	if eventDefinitionOverridePath != "" {
 		file, err = os.Open(eventDefinitionOverridePath) // #nosec G304
