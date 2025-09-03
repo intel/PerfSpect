@@ -22,12 +22,13 @@ import (
 	"perfspect/internal/target"
 )
 
-// Metadata is the representation of the platform's state and capabilities
-type Metadata struct {
-	NumGeneralPurposeCounters int // number of general purpose counters
+// CommonMetadata -- common to all architectures
+type CommonMetadata struct {
+	NumGeneralPurposeCounters int
+	SocketCount               int
 	CoresPerSocket            int
+	ThreadsPerCore            int
 	CPUSocketMap              map[int]int
-	UncoreDeviceIDs           map[string][]int
 	KernelVersion             string
 	Architecture              string
 	Vendor                    string
@@ -35,8 +36,13 @@ type Metadata struct {
 	Hostname                  string
 	ModelName                 string
 	PerfSupportedEvents       string
+	SystemSummaryFields       [][]string // slice of key-value pairs
+}
+
+// X86Metadata -- x86_64 specific
+type X86Metadata struct {
 	PMUDriverVersion          string
-	SocketCount               int
+	UncoreDeviceIDs           map[string][]int
 	SupportsFixedCycles       bool
 	SupportsFixedInstructions bool
 	SupportsFixedTMA          bool
@@ -46,38 +52,82 @@ type Metadata struct {
 	SupportsUncore            bool
 	SupportsPEBS              bool
 	SupportsOCR               bool
-	ThreadsPerCore            int
 	TSC                       int
 	TSCFrequencyHz            int
-	SystemSummaryFields       [][]string // slice of key-value pairs
-	// below are not loaded by LoadMetadata, but are set by the caller
+}
+
+// ARMMetadata -- aarch64 specific
+type ARMMetadata struct {
+	ARMSlots int
+}
+
+// Metadata -- representation of the platform's state and capabilities
+type Metadata struct {
+	CommonMetadata
+	X86Metadata
+	ARMMetadata
+	// below are not loaded by LoadMetadata, but are set by the caller (should these be here at all?)
 	CollectionStartTime time.Time
 	PerfSpectVersion    string
 }
 
 // LoadMetadata - populates and returns a Metadata structure containing state of the
 // system.
-func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, perfPath string, localTempDir string) (metadata Metadata, err error) {
+func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, perfPath string, localTempDir string) (Metadata, error) {
+	uarch, err := myTarget.GetArchitecture()
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to get target architecture: %v", err)
+	}
+	collector, err := NewMetadataCollector(uarch)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to create metadata collector: %v", err)
+	}
+	return collector.CollectMetadata(myTarget, noRoot, noSystemSummary, perfPath, localTempDir)
+}
+
+type MetadataCollector interface {
+	CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, perfPath string, localTempDir string) (Metadata, error)
+}
+
+func NewMetadataCollector(architecture string) (MetadataCollector, error) {
+	switch architecture {
+	case "x86_64":
+		return &X86MetadataCollector{}, nil
+	case "aarch64":
+		return &ARMMetadataCollector{}, nil
+	default:
+		return nil, fmt.Errorf("unsupported architecture: %s", architecture)
+	}
+}
+
+// X86MetadataCollector handles Intel/AMD x86_64 metadata collection
+type X86MetadataCollector struct {
+}
+
+// ARMMetadataCollector handles ARM metadata collection
+type ARMMetadataCollector struct {
+}
+
+func (c *X86MetadataCollector) CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, perfPath string, localTempDir string) (Metadata, error) {
+	var metadata Metadata
+	var err error
 	// Hostname
 	metadata.Hostname = myTarget.GetName()
 	// CPU Info (from /proc/cpuinfo)
 	var cpuInfo []map[string]string
 	cpuInfo, err = getCPUInfo(myTarget)
 	if err != nil || len(cpuInfo) < 1 {
-		err = fmt.Errorf("failed to read cpu info: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to read cpu info: %v", err)
 	}
 	// Core Count (per socket) (from cpuInfo)
 	metadata.CoresPerSocket, err = strconv.Atoi(cpuInfo[0]["cpu cores"])
 	if err != nil || metadata.CoresPerSocket == 0 {
-		err = fmt.Errorf("failed to retrieve cores per socket: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to retrieve cores per socket: %v", err)
 	}
 	// Socket Count (from cpuInfo)
 	var maxPhysicalID int
 	if maxPhysicalID, err = strconv.Atoi(cpuInfo[len(cpuInfo)-1]["physical id"]); err != nil {
-		err = fmt.Errorf("failed to retrieve max physical id: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to retrieve max physical id: %v", err)
 	}
 	metadata.SocketCount = maxPhysicalID + 1
 	// Hyperthreading - threads per core (from cpuInfo)
@@ -95,50 +145,43 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 	// CPU microarchitecture (from cpuInfo)
 	cpu, err := report.GetCPU(cpuInfo[0]["cpu family"], cpuInfo[0]["model"], cpuInfo[0]["stepping"])
 	if err != nil {
-		return
+		return Metadata{}, err
 	}
 	metadata.Microarchitecture = cpu.MicroArchitecture
 	// Number of General Purpose Counters
 	metadata.NumGeneralPurposeCounters, err = getNumGPCounters(metadata.Microarchitecture)
 	if err != nil {
-		err = fmt.Errorf("failed to get number of general purpose counters: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to get number of general purpose counters: %v", err)
 	}
 	// the rest of the metadata is retrieved by running scripts in parallel
 	metadataScripts, err := getMetadataScripts(noRoot, perfPath, metadata.Microarchitecture, noSystemSummary)
 	if err != nil {
-		err = fmt.Errorf("failed to get metadata scripts: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to get metadata scripts: %v", err)
 	}
 	// run the scripts
 	scriptOutputs, err := script.RunScripts(myTarget, metadataScripts, true, localTempDir) // nosemgrep
 	if err != nil {
-		err = fmt.Errorf("failed to run metadata scripts: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to run metadata scripts: %v", err)
 	}
 	// System Summary Values
 	if !noSystemSummary {
 		if metadata.SystemSummaryFields, err = getSystemSummary(scriptOutputs); err != nil {
-			err = fmt.Errorf("failed to get system summary: %w", err)
-			return
+			return Metadata{}, fmt.Errorf("failed to get system summary: %w", err)
 		}
 	} else {
 		metadata.SystemSummaryFields = [][]string{{"", "System Info Not Available"}}
 	}
 	// Architecture
 	if metadata.Architecture, err = getArchitecture(scriptOutputs); err != nil {
-		err = fmt.Errorf("failed to retrieve architecture: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to retrieve architecture: %v", err)
 	}
 	// PMU Driver Version
 	if metadata.PMUDriverVersion, err = getPMUDriverVersion(scriptOutputs); err != nil {
-		err = fmt.Errorf("failed to retrieve PMU driver version: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to retrieve PMU driver version: %v", err)
 	}
 	// perf list
 	if metadata.PerfSupportedEvents, err = getPerfSupportedEvents(scriptOutputs); err != nil {
-		err = fmt.Errorf("failed to load perf list: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to load perf list: %v", err)
 	}
 	// instructions
 	var output string
@@ -207,21 +250,18 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 	}
 	// Kernel Version
 	if metadata.KernelVersion, err = getKernelVersion(scriptOutputs); err != nil {
-		err = fmt.Errorf("failed to retrieve kernel version: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to retrieve kernel version: %v", err)
 	}
 	// System TSC Frequency
 	if metadata.TSCFrequencyHz, err = getTSCFreqHz(scriptOutputs); err != nil {
-		err = fmt.Errorf("failed to retrieve TSC frequency: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to retrieve TSC frequency: %v", err)
 	} else {
 		metadata.TSC = metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore * metadata.TSCFrequencyHz
 	}
 	// uncore device IDs and uncore support
 	isAMDArchitecture := metadata.Vendor == "AuthenticAMD"
 	if metadata.UncoreDeviceIDs, err = getUncoreDeviceIDs(isAMDArchitecture, scriptOutputs); err != nil {
-		err = fmt.Errorf("failed to retrieve uncore device IDs: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to retrieve uncore device IDs: %v", err)
 	} else {
 		for uncoreDeviceName := range metadata.UncoreDeviceIDs {
 			if !isAMDArchitecture && uncoreDeviceName == "cha" { // could be any uncore device
@@ -236,7 +276,10 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 			slog.Warn("Uncore devices not supported")
 		}
 	}
-	return
+	return metadata, nil
+}
+func (c *ARMMetadataCollector) CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, perfPath string, localTempDir string) (Metadata, error) {
+	return Metadata{}, nil
 }
 
 func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSummary bool) (metadataScripts []script.ScriptDefinition, err error) {
