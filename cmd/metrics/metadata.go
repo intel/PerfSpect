@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"os/exec"
 	"regexp"
@@ -889,11 +890,15 @@ func getARMSlots(scriptOutputs map[string]script.ScriptOutput) (slots int, err e
 		slog.Warn("Failed to parse ARM slots value", slog.String("value", hexString), slog.Any("error", err))
 		err = fmt.Errorf("failed to parse ARM slots value (%s): %w", hexString, err)
 		return
-	} else {
-		slots = int(parsedValue)
-		slog.Debug("Successfully read ARM slots value", slog.Int("slots", slots))
+	}
+	if parsedValue <= math.MinInt32 || parsedValue > math.MaxInt32 {
+		slog.Warn("Parsed ARM slots value out of range", slog.Int64("value", parsedValue))
+		err = fmt.Errorf("parsed ARM slots value out of range: %d", parsedValue)
 		return
 	}
+	slots = int(parsedValue)
+	slog.Debug("Successfully read ARM slots value", slog.Int("slots", slots))
+	return
 }
 
 func getSupportsFixedEvent(event string, scriptOutputs map[string]script.ScriptOutput) (supported bool, output string, err error) {
