@@ -287,22 +287,27 @@ func (c *ARMMetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to get lscpu output: %v", err)
 	}
+	// Vendor
 	metadata.Vendor, err = parseLscpuStringField(lscpu, `^Vendor ID:\s*(.+)$`)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to parse vendor ID: %v", err)
 	}
+	// Model Name
 	metadata.ModelName, err = parseLscpuStringField(lscpu, `^Model name:\s*(.+)$`)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to parse model name: %v", err)
 	}
+	// Sockets
 	metadata.SocketCount, err = parseLscpuIntField(lscpu, `^Socket\(s\):\s*(.+)$`)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to parse socket count: %v", err)
 	}
+	// Cores per socket
 	metadata.CoresPerSocket, err = parseLscpuIntField(lscpu, `^Core\(s\) per socket:\s*(.+)$`)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to parse cores per socket: %v", err)
 	}
+	// Threads per core
 	metadata.ThreadsPerCore, err = parseLscpuIntField(lscpu, `^Thread\(s\) per core:\s*(.+)$`)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to parse threads per core: %v", err)
@@ -342,6 +347,7 @@ func (c *ARMMetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to run metadata scripts: %v", err)
 	}
+	// System Summary Values
 	if !noSystemSummary {
 		if metadata.SystemSummaryFields, err = getSystemSummary(scriptOutputs); err != nil {
 			return Metadata{}, fmt.Errorf("failed to get system summary: %w", err)
@@ -349,17 +355,30 @@ func (c *ARMMetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 	} else {
 		metadata.SystemSummaryFields = [][]string{{"", "System Info Not Available"}}
 	}
+	// Architecture
 	if metadata.Architecture, err = getArchitecture(scriptOutputs); err != nil {
 		return Metadata{}, fmt.Errorf("failed to retrieve architecture: %v", err)
 	}
+	// perf list
 	if metadata.PerfSupportedEvents, err = getPerfSupportedEvents(scriptOutputs); err != nil {
 		return Metadata{}, fmt.Errorf("failed to load perf list: %v", err)
 	}
+	// Kernel Version
 	if metadata.KernelVersion, err = getKernelVersion(scriptOutputs); err != nil {
 		return Metadata{}, fmt.Errorf("failed to retrieve kernel version: %v", err)
 	}
+	// ARM slots
 	if metadata.ARMSlots, err = getARMSlots(scriptOutputs); err != nil {
 		return Metadata{}, fmt.Errorf("failed to retrieve ARM slots: %v", err)
+	}
+	// instructions
+	var output string
+	if metadata.SupportsInstructions, output, err = getSupportsEvent("instructions", scriptOutputs); err != nil {
+		slog.Warn("failed to determine if instructions event is supported, assuming not supported", slog.String("error", err.Error()))
+	} else {
+		if !metadata.SupportsInstructions {
+			slog.Warn("instructions event not supported", slog.String("output", output))
+		}
 	}
 	return metadata, nil
 }
