@@ -836,14 +836,64 @@ func getNumGPCounters(uarch string) (numGPCounters int, err error) {
 	return
 }
 
-func getNumGPCountersARM(myTarget target.Target) (numGPCounters int, err error) {
-	// TODO: implement
-	return 4, nil
+// getNumGPCountersARM - returns the number of general purpose counters on ARM systems
+// Copyright 2025 Google LLC.
+// SPDX-License-Identifier: BSD-3-Clause
+// Contributed by Edwin Chiu
+func getNumGPCountersARM(target target.Target) (numGPCounters int, err error) {
+	numGPCounters = 0
+	var cmd *exec.Cmd
+	if target.CanElevatePrivileges() {
+		cmd = exec.Command("sudo", "bash", "-c", "dmesg | grep -i \"PMU Driver\"")
+	} else {
+		cmd = exec.Command("bash", "-c", "dmesg | grep -i \"PMU Driver\"")
+	}
+	stdout, stderr, exitcode, err := target.RunCommand(cmd, 0, true)
+	if err != nil {
+		err = fmt.Errorf("failed to get PMU Driver line: %s, %d, %v", stderr, exitcode, err)
+		return
+	}
+	// example [    1.339550] hw perfevents: enabled with armv8_pmuv3_0 PMU driver, 5 counters available
+	counterRegex := regexp.MustCompile(`(\d+) counters available`)
+	matches := counterRegex.FindStringSubmatch(stdout)
+	if len(matches) > 1 {
+		numberStr := matches[1]
+		numGPCounters, err = strconv.Atoi(numberStr)
+		if err != nil {
+			err = fmt.Errorf("error converting string to int: %v", err)
+			return
+		}
+		numGPCounters-- // for ARM, there is a fixed counter for cycles and the driver includes it
+		slog.Debug("getNumGPCountersArm", slog.Int("numGPCounters", numGPCounters))
+	} else {
+		err = fmt.Errorf("no match for number of counters on line: %s", stdout)
+		return
+	}
+	return
 }
 
+// getARMSlots - returns the number of ARM slots available
+// Copyright 2025 Google LLC.
+// SPDX-License-Identifier: BSD-3-Clause
+// Contributed by Edwin Chiu
 func getARMSlots(scriptOutputs map[string]script.ScriptOutput) (slots int, err error) {
-	// TODO: parse the output of the 'arm slots' script
-	return 4, nil
+	if scriptOutputs["arm slots"].Exitcode != 0 {
+		slog.Warn("failed to retrieve ARM slots", slog.Any("script", scriptOutputs["arm slots"]))
+		err = fmt.Errorf("failed to retrieve ARM slots: %s", scriptOutputs["arm slots"].Stderr)
+		return
+	}
+	hexString := strings.TrimSpace(string(scriptOutputs["arm slots"].Stdout))
+	hexString = strings.TrimPrefix(hexString, "0x")
+	parsedValue, err := strconv.ParseInt(hexString, 16, 64)
+	if err != nil {
+		slog.Warn("Failed to parse ARM slots value", slog.String("value", hexString), slog.Any("error", err))
+		err = fmt.Errorf("failed to parse ARM slots value (%s): %w", hexString, err)
+		return
+	} else {
+		slots = int(parsedValue)
+		slog.Debug("Successfully read ARM slots value", slog.Int("slots", slots))
+		return
+	}
 }
 
 func getSupportsFixedEvent(event string, scriptOutputs map[string]script.ScriptOutput) (supported bool, output string, err error) {
