@@ -94,7 +94,9 @@ func (l *ComponentLoader) loadMetricDefinitions(metricDefinitionOverridePath str
 			m.Category = componentMetricsInFile[i].MetricGroup
 			m.Variables = initializeComponentMetricVariables(m.Expression)
 			m.Evaluable = initializeComponentMetricEvaluable(m.Expression, m.Variables)
-			metrics = append(metrics, m)
+			if m.Evaluable != nil {
+				metrics = append(metrics, m)
+			}
 		}
 	}
 	return metrics, nil
@@ -150,12 +152,14 @@ func (l *ComponentLoader) filterUncollectableMetrics(metrics []MetricDefinition,
 }
 
 func (l *ComponentLoader) identifyUncollectableEvents(events []ComponentEvent, metadata Metadata) (uncollectableEvents []string, err error) {
+	// TODO:
 	// For now, assume all events are collectable
 	// In the future, we may want to check for specific events that are not collectable on certain platforms
 	return uncollectableEvents, nil
 }
 
 func (l *ComponentLoader) formEventGroups(metrics []MetricDefinition, events []ComponentEvent, metadata Metadata) (groups []GroupDefinition, err error) {
+	// TODO:
 	return groups, nil
 }
 
@@ -206,7 +210,7 @@ func isInteger(s string) bool {
 }
 
 func initializeComponentMetricEvaluable(expression string, variables map[string]int) *govaluate.EvaluableExpression {
-	// re-form expression into govaluate format
+	// TODO: re-form expression into govaluate format
 
 	// create govaluate expression
 	expr, err := govaluate.NewEvaluableExpression(expression)
