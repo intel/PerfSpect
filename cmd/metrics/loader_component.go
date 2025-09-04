@@ -219,6 +219,10 @@ func (l *ComponentLoader) formEventGroups(metrics []MetricDefinition, events []C
 		// add metricGroups to groups to be returned
 		groups = append(groups, metricGroups...)
 	}
+
+	// eliminate duplicate and overlapping groups
+	groups = deduplicateGroups(groups)
+
 	return groups, nil
 }
 
@@ -323,5 +327,90 @@ func getArchDir(uarch string) (string, error) {
 	} else {
 		return "", fmt.Errorf("unsupported component loader architecture")
 	}
+}
 
+// deduplicateGroups eliminates duplicate and overlapping groups
+// Two groups are considered duplicates if they contain exactly the same events (regardless of order)
+// A group is considered overlapping with another if one is a subset of the other
+func deduplicateGroups(groups []GroupDefinition) []GroupDefinition {
+	if len(groups) <= 1 {
+		return groups
+	}
+
+	// Create a map to detect duplicates
+	// The key is a sorted string representation of event names in the group
+	seen := make(map[string]int) // Map from event set signature to index in dedupGroups
+	var dedupGroups []GroupDefinition
+
+	// For each group
+	for _, group := range groups {
+		// Create a sorted signature of the events in this group
+		var eventNames []string
+		for _, event := range group {
+			eventNames = append(eventNames, event.Name)
+		}
+		slices.Sort(eventNames)
+		signature := strings.Join(eventNames, ",")
+
+		// If we've seen this exact group before, skip it
+		if _, exists := seen[signature]; exists {
+			continue
+		}
+
+		// Check for overlapping groups (is this group a subset of an existing group?)
+		isSubset := false
+		for i, existingGroup := range dedupGroups {
+			// Create a set of events from the existing group
+			existingEvents := make(map[string]bool)
+			for _, event := range existingGroup {
+				existingEvents[event.Name] = true
+			}
+
+			// Check if current group is a subset of the existing group
+			allEventsInExisting := true
+			for _, event := range group {
+				if !existingEvents[event.Name] {
+					allEventsInExisting = false
+					break
+				}
+			}
+
+			if allEventsInExisting && len(group) < len(existingGroup) {
+				isSubset = true
+				break
+			}
+
+			// Check if existing group is a subset of current group
+			if len(existingGroup) < len(group) {
+				allEventsInCurrent := true
+				currentEvents := make(map[string]bool)
+				for _, event := range group {
+					currentEvents[event.Name] = true
+				}
+
+				for _, event := range existingGroup {
+					if !currentEvents[event.Name] {
+						allEventsInCurrent = false
+						break
+					}
+				}
+
+				// If existing group is a subset of current group, replace it
+				if allEventsInCurrent {
+					dedupGroups[i] = group
+					seen[signature] = i
+					isSubset = true
+					break
+				}
+			}
+		}
+
+		// If this group is not a subset and doesn't contain a subset, add it
+		if !isSubset {
+			seen[signature] = len(dedupGroups)
+			dedupGroups = append(dedupGroups, group)
+		}
+	}
+
+	return dedupGroups
 }
