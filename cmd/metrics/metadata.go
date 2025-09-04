@@ -154,7 +154,7 @@ func (c *X86MetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 		return Metadata{}, fmt.Errorf("failed to get number of general purpose counters: %v", err)
 	}
 	// the rest of the metadata is retrieved by running scripts in parallel
-	metadataScripts, err := getMetadataScripts(noRoot, perfPath, metadata.Microarchitecture, noSystemSummary)
+	metadataScripts, err := getMetadataScripts(noRoot, perfPath, noSystemSummary, metadata.NumGeneralPurposeCounters)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to get metadata scripts: %v", err)
 	}
@@ -279,10 +279,94 @@ func (c *X86MetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 	return metadata, nil
 }
 func (c *ARMMetadataCollector) CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, perfPath string, localTempDir string) (Metadata, error) {
-	return Metadata{}, nil
+	var metadata Metadata
+	// Hostname
+	metadata.Hostname = myTarget.GetName()
+	// lscpu output will be used for several metadata fields
+	lscpu, err := getLscpu(myTarget)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to get lscpu output: %v", err)
+	}
+	metadata.ModelName, err = parseLscpuStringField(lscpu, `^Model name:\s*(.+)$`)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to parse model name: %v", err)
+	}
+	metadata.SocketCount, err = parseLscpuIntField(lscpu, `^Socket\(s\):\s*(.+)$`)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to parse socket count: %v", err)
+	}
+	metadata.CoresPerSocket, err = parseLscpuIntField(lscpu, `^Core\(s\) per socket:\s*(.+)$`)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to parse cores per socket: %v", err)
+	}
+	metadata.ThreadsPerCore, err = parseLscpuIntField(lscpu, `^Thread\(s\) per core:\s*(.+)$`)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to parse threads per core: %v", err)
+	}
+	// family, model, stepping used to get microarchitecture
+	family, err := parseLscpuStringField(lscpu, `^CPU family:\s*(.+)$`)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to parse cpu family: %v", err)
+	}
+	model, err := parseLscpuStringField(lscpu, `^Model:\s*(.+)$`)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to parse model: %v", err)
+	}
+	stepping, err := parseLscpuStringField(lscpu, `^Stepping:\s*(.+)$`)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to parse stepping: %v", err)
+	}
+	cpu, err := report.GetCPU(family, model, stepping)
+	if err != nil {
+		return Metadata{}, err
+	}
+	metadata.Microarchitecture = cpu.MicroArchitecture
+	metadata.NumGeneralPurposeCounters, err = getNumGPCountersARM(myTarget)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to get number of general purpose counters: %v", err)
+	}
+	// the rest of the metadata is retrieved by running scripts in parallel
+	metadataScripts, err := getMetadataScripts(noRoot, perfPath, noSystemSummary, metadata.NumGeneralPurposeCounters)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to get metadata scripts: %v", err)
+	}
+	// run the scripts
+	scriptOutputs, err := script.RunScripts(myTarget, metadataScripts, true, localTempDir) // nosemgrep
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to run metadata scripts: %v", err)
+	}
+	// System Summary Values
+	if !noSystemSummary {
+		if metadata.SystemSummaryFields, err = getSystemSummary(scriptOutputs); err != nil {
+			return Metadata{}, fmt.Errorf("failed to get system summary: %w", err)
+		}
+	} else {
+		metadata.SystemSummaryFields = [][]string{{"", "System Info Not Available"}}
+	}
+	// Architecture
+	if metadata.Architecture, err = getArchitecture(scriptOutputs); err != nil {
+		return Metadata{}, fmt.Errorf("failed to retrieve architecture: %v", err)
+	}
+	// PMU Driver Version
+	if metadata.PMUDriverVersion, err = getPMUDriverVersion(scriptOutputs); err != nil {
+		return Metadata{}, fmt.Errorf("failed to retrieve PMU driver version: %v", err)
+	}
+	// perf list
+	if metadata.PerfSupportedEvents, err = getPerfSupportedEvents(scriptOutputs); err != nil {
+		return Metadata{}, fmt.Errorf("failed to load perf list: %v", err)
+	}
+	// Kernel Version
+	if metadata.KernelVersion, err = getKernelVersion(scriptOutputs); err != nil {
+		return Metadata{}, fmt.Errorf("failed to retrieve kernel version: %v", err)
+	}
+	// ARM Slots
+	if metadata.ARMSlots, err = getARMSlots(scriptOutputs); err != nil {
+		return Metadata{}, fmt.Errorf("failed to retrieve ARM slots: %v", err)
+	}
+	return metadata, nil
 }
 
-func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSummary bool) (metadataScripts []script.ScriptDefinition, err error) {
+func getMetadataScripts(noRoot bool, perfPath string, noSystemSummary bool, numGPCounters int) (metadataScripts []script.ScriptDefinition, err error) {
 	// reduce startup time by running the metadata scripts in parallel
 	metadataScriptDefs := []script.ScriptDefinition{
 		{
@@ -299,6 +383,7 @@ func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSumm
 			Name:           "list uncore devices",
 			ScriptTemplate: "find /sys/bus/event_source/devices/ \\( -name uncore_* -o -name amd_* \\)",
 			Superuser:      !noRoot,
+			Architectures:  []string{"x86_64"},
 		},
 		{
 			Name:           "perf stat instructions",
@@ -314,16 +399,19 @@ func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSumm
 			Name:           "perf stat pebs",
 			ScriptTemplate: perfPath + " stat -a -e INT_MISC.UNKNOWN_BRANCH_CYCLES sleep 1",
 			Superuser:      !noRoot,
+			Architectures:  []string{"x86_64"},
 		},
 		{
 			Name:           "perf stat ocr",
 			ScriptTemplate: perfPath + " stat -a -e OCR.READS_TO_CORE.LOCAL_DRAM sleep 1",
 			Superuser:      !noRoot,
+			Architectures:  []string{"x86_64"},
 		},
 		{
 			Name:           "perf stat tma",
 			ScriptTemplate: perfPath + " stat -a -e '{topdown.slots, topdown-bad-spec}' sleep 1",
 			Superuser:      !noRoot,
+			Architectures:  []string{"x86_64"},
 		},
 		{
 			Name:           "perf stat fixed instructions",
@@ -350,19 +438,21 @@ func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSumm
 			ScriptTemplate: "tsc && echo",
 			Depends:        []string{"tsc"},
 			Superuser:      !noRoot,
+			Architectures:  []string{"x86_64"},
 		},
 		{
 			Name:           "kernel version",
 			ScriptTemplate: "uname -r",
 			Superuser:      !noRoot,
 		},
+		{
+			Name:           "arm slots",
+			ScriptTemplate: "cat /sys/bus/event_source/devices/armv8_pmuv3_0/caps/slots",
+			Superuser:      !noRoot,
+			Architectures:  []string{"aarch64"},
+		},
 	}
 	// replace script template vars
-	numGPCounters, err := getNumGPCounters(uarch)
-	if err != nil {
-		err = fmt.Errorf("failed to get number of GP counters: %v", err)
-		return
-	}
 	for _, scriptDef := range metadataScriptDefs {
 		switch scriptDef.Name {
 		case "perf stat fixed instructions":
@@ -585,6 +675,42 @@ func getCPUInfo(myTarget target.Target) (cpuInfo []map[string]string, err error)
 	return
 }
 
+// getLscpu - runs lscpu on the target and returns the output
+func getLscpu(myTarget target.Target) (output string, err error) {
+	cmd := exec.Command("lscpu")
+	output, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, true)
+	if err != nil || exitcode != 0 {
+		err = fmt.Errorf("failed to run lscpu: %s, %d, %v", stderr, exitcode, err)
+		return
+	}
+	return
+}
+
+func parseLscpuIntField(lscpu string, pattern string) (int, error) {
+	re := regexp.MustCompile(pattern)
+	for line := range strings.SplitSeq(lscpu, "\n") {
+		match := re.FindStringSubmatch(line)
+		if match != nil {
+			value, err := strconv.Atoi(strings.TrimSpace(match[1]))
+			if err != nil {
+				return 0, fmt.Errorf("failed to parse integer from lscpu field: %v", err)
+			}
+			return value, nil
+		}
+	}
+	return 0, fmt.Errorf("lscpu field not found")
+}
+func parseLscpuStringField(lscpu string, pattern string) (string, error) {
+	re := regexp.MustCompile(pattern)
+	for line := range strings.SplitSeq(lscpu, "\n") {
+		match := re.FindStringSubmatch(line)
+		if match != nil {
+			return strings.TrimSpace(match[1]), nil
+		}
+	}
+	return "", fmt.Errorf("lscpu field not found")
+}
+
 // getPerfSupportedEvents - returns a string containing the output from
 // 'perf list'
 func getPerfSupportedEvents(scriptOutputs map[string]script.ScriptOutput) (supportedEvents string, err error) {
@@ -691,6 +817,16 @@ func getNumGPCounters(uarch string) (numGPCounters int, err error) {
 		return
 	}
 	return
+}
+
+func getNumGPCountersARM(myTarget target.Target) (numGPCounters int, err error) {
+	// TODO: implement
+	return 4, nil
+}
+
+func getARMSlots(scriptOutputs map[string]script.ScriptOutput) (slots int, err error) {
+	// TODO: parse the output of the 'arm slots' script
+	return 0, nil
 }
 
 func getSupportsFixedEvent(event string, scriptOutputs map[string]script.ScriptOutput) (supported bool, output string, err error) {
