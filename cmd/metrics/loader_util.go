@@ -70,14 +70,14 @@ func configureMetrics(metrics []MetricDefinition, uncollectableEvents []string, 
 	return metrics, nil
 }
 
-// perfmonToPerfspectConditional transforms if/else to ternary conditional (? :) so expression evaluator can handle it
+// transformIfElseToTernary transforms if/else to ternary conditional (? :) so expression evaluator can handle it
 // simple:
 // from: <expression 1> if <condition> else <expression 2>
 // to:   <condition> ? <expression 1> : <expression 2>
 // less simple:
 // from: <expression 0> ((<expression 1>) if <condition> else (<expression 2>)) <expression 3>
 // to:   <expression 0> (<condition> ? (<expression 1>) : <expression 2) <expression 3>
-func perfmonToPerfspectConditional(origIn string) (out string, err error) {
+func transformIfElseToTernary(origIn string) (out string, err error) {
 	numIfs := strings.Count(origIn, "if")
 	if numIfs == 0 {
 		out = origIn
@@ -207,9 +207,10 @@ func removeIfUncollectableEvents(metrics []MetricDefinition, uncollectableEvents
 	return filteredMetrics, nil
 }
 
+// trransformExpression transforms a single expression by replacing if/else with ?/: and fixing other syntax issues
 func transformExpression(expression string) (string, error) {
 	// transform if/else to ?/:
-	transformed, err := perfmonToPerfspectConditional(expression)
+	transformed, err := transformIfElseToTernary(expression)
 	if err != nil {
 		return "", fmt.Errorf("failed to transform metric expression: %w", err)
 	}

@@ -93,7 +93,7 @@ func (l *ComponentLoader) loadMetricDefinitions(metricDefinitionOverridePath str
 			m.Description = componentMetricsInFile[i].BriefDescription
 			m.Category = componentMetricsInFile[i].MetricGroup
 			m.Variables = initializeComponentMetricVariables(m.Expression)
-			m.Evaluable = initializeComponentMetricEvaluable(m.Expression, m.Variables)
+			m.Evaluable = initializeComponentMetricEvaluable(m.Expression, m.Variables, metadata)
 			if m.Evaluable != nil {
 				metrics = append(metrics, m)
 			}
@@ -209,8 +209,15 @@ func isInteger(s string) bool {
 	return len(s) > 0
 }
 
-func initializeComponentMetricEvaluable(expression string, variables map[string]int) *govaluate.EvaluableExpression {
-	// TODO: re-form expression into govaluate format
+func initializeComponentMetricEvaluable(expression string, variables map[string]int, metadata Metadata) *govaluate.EvaluableExpression {
+	// replace #slots with metadata.ARMSlots
+	expression = strings.ReplaceAll(expression, "#slots", fmt.Sprintf("%d", metadata.ARMSlots))
+	// replace if else with ?:
+	expression, err := transformExpression(expression)
+	if err != nil {
+		slog.Error("Failed to transform expression", slog.String("expression", expression), slog.String("error", err.Error()))
+		return nil
+	}
 
 	// create govaluate expression
 	expr, err := govaluate.NewEvaluableExpression(expression)
