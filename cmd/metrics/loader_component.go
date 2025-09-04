@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -84,6 +85,8 @@ func (l *ComponentLoader) loadMetricDefinitions(metricDefinitionOverridePath str
 	for i := range componentMetricsInFile {
 		allMetricNames = append(allMetricNames, componentMetricsInFile[i].getName())
 	}
+	evaluatorFunctions := getARMEvaluatorFunctions()
+
 	for i := range componentMetricsInFile {
 		if len(selectedMetrics) == 0 || slices.Contains(allMetricNames, componentMetricsInFile[i].getName()) {
 			var m MetricDefinition
@@ -93,13 +96,25 @@ func (l *ComponentLoader) loadMetricDefinitions(metricDefinitionOverridePath str
 			m.Description = componentMetricsInFile[i].BriefDescription
 			m.Category = componentMetricsInFile[i].MetricGroup
 			m.Variables = initializeComponentMetricVariables(m.Expression)
-			m.Evaluable = initializeComponentMetricEvaluable(m.Expression, m.Variables, metadata)
+			m.Evaluable = initializeComponentMetricEvaluable(m.Expression, evaluatorFunctions, metadata)
 			if m.Evaluable != nil {
 				metrics = append(metrics, m)
 			}
 		}
 	}
 	return metrics, nil
+}
+
+// TODO:
+func getARMEvaluatorFunctions() map[string]govaluate.ExpressionFunction {
+	functions := make(map[string]govaluate.ExpressionFunction)
+	functions["strcmp_cpuid_str"] = func(args ...any) (any, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("strcmp_cpuid_str requires one argument")
+		}
+		return true, nil // Placeholder: always return true for now
+	}
+	return functions
 }
 
 // loadEventDefinitions -- load all event files in resources/component/<arch>/
@@ -217,6 +232,14 @@ func initializeComponentMetricVariables(expression string) map[string]int {
 		"else": true,
 	}
 
+	constants := map[string]bool{
+		"#slots": true,
+	}
+
+	functions := map[string]bool{
+		"strcmp_cpuid_str": true,
+	}
+
 	// Split by common delimiters
 	delimiters := []rune{
 		' ', '+', '-', '*', '/', '(', ')', ',', ';', '^', '|', '=', '<', '>', '!', '?', ':',
@@ -230,13 +253,8 @@ func initializeComponentMetricVariables(expression string) map[string]int {
 			continue
 		}
 
-		// Skip tokens that are integer values or operators
-		if isInteger(token) || operators[token] {
-			continue
-		}
-
-		// skip constant tokens
-		if token == "#slots" {
+		// Skip some tokens
+		if isInteger(token) || isHex(token) || operators[token] || constants[token] || functions[token] {
 			continue
 		}
 
@@ -245,6 +263,20 @@ func initializeComponentMetricVariables(expression string) map[string]int {
 		}
 	}
 	return variables
+}
+
+func isHex(s string) bool {
+	// Check if the string starts with "0x" or "0X"
+	if len(s) < 3 || !(strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X")) {
+		return false
+	}
+	// Check if the rest of the string is a valid hexadecimal number
+	for _, c := range s[2:] {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
+			return false
+		}
+	}
+	return true
 }
 
 // isInteger checks if a string is a valid integer
@@ -258,7 +290,7 @@ func isInteger(s string) bool {
 	return len(s) > 0
 }
 
-func initializeComponentMetricEvaluable(expression string, variables map[string]int, metadata Metadata) *govaluate.EvaluableExpression {
+func initializeComponentMetricEvaluable(expression string, evaluatorFunctions map[string]govaluate.ExpressionFunction, metadata Metadata) *govaluate.EvaluableExpression {
 	// replace #slots with metadata.ARMSlots
 	expression = strings.ReplaceAll(expression, "#slots", fmt.Sprintf("%d", metadata.ARMSlots))
 	// replace if else with ?:
@@ -267,9 +299,17 @@ func initializeComponentMetricEvaluable(expression string, variables map[string]
 		slog.Error("Failed to transform expression", slog.String("expression", expression), slog.String("error", err.Error()))
 		return nil
 	}
+	// govaluate doesn't like: strcmp_cpuid_str(0x410fd493)
+	// "Cannot transition token types from NUMERIC [0] to VARIABLE [x410fd493]"
+	// quote the hex number
+	// look for (0x....) and replace with ("0x....")
+	rxHex := regexp.MustCompile(`\((0x[0-9a-fA-F]+)\)`)
+	expression = rxHex.ReplaceAllStringFunc(expression, func(s string) string {
+		return "(" + `"` + rxTrailingChars.ReplaceAllString(s, "") + `"` + ")"
+	})
 
 	// create govaluate expression
-	expr, err := govaluate.NewEvaluableExpression(expression)
+	expr, err := govaluate.NewEvaluableExpressionWithFunctions(expression, evaluatorFunctions)
 	if err != nil {
 		slog.Error("Failed to parse metric expression", slog.String("expression", expression), slog.String("error", err.Error()))
 		return nil
