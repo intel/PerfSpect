@@ -154,12 +154,56 @@ func (l *ComponentLoader) filterUncollectableMetrics(metrics []MetricDefinition,
 func (l *ComponentLoader) identifyUncollectableEvents(events []ComponentEvent, metadata Metadata) (uncollectableEvents []string, err error) {
 	// TODO:
 	// For now, assume all events are collectable
-	// In the future, we may want to check for specific events that are not collectable on certain platforms
 	return uncollectableEvents, nil
 }
 
 func (l *ComponentLoader) formEventGroups(metrics []MetricDefinition, events []ComponentEvent, metadata Metadata) (groups []GroupDefinition, err error) {
-	// TODO:
+	numGPCounters := metadata.NumGeneralPurposeCounters // groups can have at most this many events (plus fixed counters)
+	eventNames := make(map[string]bool)
+	for _, event := range events {
+		eventNames[event.ArchStdEvent] = true
+	}
+
+	for _, metric := range metrics {
+		var metricGroups []GroupDefinition
+		if len(metric.Variables) == 0 {
+			// no variables, skip it
+			continue
+		}
+		// metric has variables. Each variable is an event that will be added to a group
+		// only numGPCounters events can be added to a group, so if there are more variables than that,
+		// multiple groups will be created for the metric
+		// CPU_CYCLES is a fixed counter, so it does not count against the numGPCounters limit
+		var currentGroup GroupDefinition
+		var currentGPCount int // Track the current number of GP counters used
+
+		for variable := range metric.Variables {
+			// confirm variable is a valid event
+			if _, exists := eventNames[variable]; !exists {
+				slog.Error("Metric variable does not correspond to a known event, skipping variable", slog.String("metric", metric.Name), slog.String("variable", variable))
+				continue
+			}
+			// Add the event to the current group
+			currentGroup = append(currentGroup, EventDefinition{Name: variable, Raw: variable, Device: "cpu"})
+
+			// Only increment the GP counter count if this isn't a fixed counter
+			if variable != "CPU_CYCLES" {
+				currentGPCount++
+			}
+
+			// If we've reached the max number of GP counters, finalize this group
+			if currentGPCount >= numGPCounters {
+				metricGroups = append(metricGroups, currentGroup)
+				currentGroup = nil
+				currentGPCount = 0
+			}
+		}
+		if len(currentGroup) > 0 {
+			metricGroups = append(metricGroups, currentGroup)
+		}
+		// add metricGroups to groups to be returned
+		groups = append(groups, metricGroups...)
+	}
 	return groups, nil
 }
 
@@ -188,6 +232,11 @@ func initializeComponentMetricVariables(expression string) map[string]int {
 
 		// Skip tokens that are integer values or operators
 		if isInteger(token) || operators[token] {
+			continue
+		}
+
+		// skip constant tokens
+		if token == "#slots" {
 			continue
 		}
 
