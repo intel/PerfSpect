@@ -81,14 +81,10 @@ func (l *ComponentLoader) loadMetricDefinitions(metricDefinitionOverridePath str
 	if err = json.Unmarshal(bytes, &componentMetricsInFile); err != nil {
 		return
 	}
-	var allMetricNames []string
-	for i := range componentMetricsInFile {
-		allMetricNames = append(allMetricNames, componentMetricsInFile[i].getName())
-	}
-	evaluatorFunctions := getARMEvaluatorFunctions()
 
+	evaluatorFunctions := getARMEvaluatorFunctions()
 	for i := range componentMetricsInFile {
-		if len(selectedMetrics) == 0 || slices.Contains(allMetricNames, componentMetricsInFile[i].getName()) {
+		if len(selectedMetrics) == 0 || slices.Contains(selectedMetrics, componentMetricsInFile[i].getName()) {
 			var m MetricDefinition
 			m.Name = componentMetricsInFile[i].getName()
 			m.LegacyName = componentMetricsInFile[i].getLegacyName()
