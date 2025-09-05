@@ -65,14 +65,14 @@ func (l *LegacyLoader) loadMetricDefinitions(metricDefinitionOverridePath string
 		// and build list of metrics based on provided list of metric names
 		metricMap := make(map[string]MetricDefinition)
 		for _, metric := range metricsInFile {
-			metricMap[metric.Name] = metric
+			metricMap[strings.ToLower(metric.Name)] = metric
 		}
 		for _, selectedMetricName := range selectedMetrics {
-			if _, ok := metricMap[selectedMetricName]; !ok {
+			if _, ok := metricMap[strings.ToLower(selectedMetricName)]; !ok {
 				err = fmt.Errorf("provided metric name not found: %s", selectedMetricName)
 				return
 			}
-			metrics = append(metrics, metricMap[selectedMetricName])
+			metrics = append(metrics, metricMap[strings.ToLower(selectedMetricName)])
 		}
 	} else {
 		metrics = metricsInFile

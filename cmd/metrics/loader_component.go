@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"perfspect/internal/util"
 	"regexp"
 	"slices"
 	"strings"
@@ -84,7 +85,7 @@ func (l *ComponentLoader) loadMetricDefinitions(metricDefinitionOverridePath str
 
 	evaluatorFunctions := getARMEvaluatorFunctions()
 	for i := range componentMetricsInFile {
-		if len(selectedMetrics) == 0 || slices.Contains(selectedMetrics, componentMetricsInFile[i].getName()) {
+		if len(selectedMetrics) == 0 || util.ContainsIgnoreCase(selectedMetrics, componentMetricsInFile[i].getName()) {
 			var m MetricDefinition
 			m.Name = componentMetricsInFile[i].getName()
 			m.LegacyName = componentMetricsInFile[i].getLegacyName()
