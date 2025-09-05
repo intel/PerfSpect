@@ -319,6 +319,10 @@ func initializeComponentMetricEvaluable(expression string, evaluatorFunctions ma
 func getArchDir(uarch string) (string, error) {
 	if strings.ToLower(uarch) == "neoverse-n2" || strings.ToLower(uarch) == "neoverse-v2" {
 		return "neoverse-n2-v2", nil
+	} else if strings.ToLower(uarch) == "neoverse-n1" {
+		return "neoverse-n1", nil
+	} else if strings.ToLower(uarch) == "neoverse-v1" {
+		return "neoverse-v1", nil
 	} else {
 		return "", fmt.Errorf("unsupported component loader architecture")
 	}

@@ -911,6 +911,8 @@ func getARMSlotsByArchitecture(uarch string) (slots int, err error) {
 	switch uarch {
 	case "Neoverse-N2", "Neoverse-V2":
 		slots = 8
+	case "Neoverse-N1", "Neoverse-V1":
+		slots = 6 // TODO: confirm
 	default:
 		err = fmt.Errorf("unsupported ARM uarch: %s", uarch)
 		return

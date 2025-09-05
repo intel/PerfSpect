@@ -87,7 +87,7 @@ func NewLoader(uarch string) (Loader, error) {
 	case "gnr", "srf", "emr", "spr", "icx":
 		slog.Debug("Using perfmon loader for microarchitecture", slog.String("uarch", uarch))
 		return newPerfmonLoader(strings.ToLower(uarch)), nil
-	case "neoverse-n2", "neoverse-v2":
+	case "neoverse-n2", "neoverse-v2", "neoverse-n1", "neoverse-v1":
 		slog.Debug("Using component loader for microarchitecture", slog.String("uarch", uarch))
 		return newComponentLoader(strings.ToLower(uarch)), nil
 	default:
