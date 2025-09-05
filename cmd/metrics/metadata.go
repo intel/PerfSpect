@@ -372,6 +372,12 @@ func (c *ARMMetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 	if metadata.ARMSlots, err = getARMSlots(scriptOutputs); err != nil {
 		return Metadata{}, fmt.Errorf("failed to retrieve ARM slots: %v", err)
 	}
+	if metadata.ARMSlots == 0 { // can't retrieve slots on EC2 VMs
+		metadata.ARMSlots, err = getARMSlotsByArchitecture(metadata.Microarchitecture)
+		if err != nil {
+			return Metadata{}, fmt.Errorf("failed to determine ARM slots by architecture: %v", err)
+		}
+	}
 	// instructions
 	var output string
 	if metadata.SupportsInstructions, output, err = getSupportsEvent("instructions", scriptOutputs); err != nil {
@@ -898,6 +904,17 @@ func getARMSlots(scriptOutputs map[string]script.ScriptOutput) (slots int, err e
 	}
 	slots = int(parsedValue)
 	slog.Debug("Successfully read ARM slots value", slog.Int("slots", slots))
+	return
+}
+
+func getARMSlotsByArchitecture(uarch string) (slots int, err error) {
+	switch uarch {
+	case "Neoverse-N2", "Neoverse-V2":
+		slots = 8
+	default:
+		err = fmt.Errorf("unsupported ARM uarch: %s", uarch)
+		return
+	}
 	return
 }
 
