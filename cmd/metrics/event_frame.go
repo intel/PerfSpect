@@ -135,10 +135,11 @@ func parseEvents(rawEvents [][]byte) ([]Event, error) {
 			slog.Error(err.Error(), slog.String("event", string(rawEvent)))
 			return nil, err
 		}
-		// sometimes perf will prepend "cpu/" to the topdown event names, e.g., cpu/topdown-retiring/, we clean it up here to match metric formulas
-		if strings.HasPrefix(event.Event, "cpu/") && strings.Contains(event.Event, "topdown") && strings.HasSuffix(event.Event, "/") {
-			event.Event = strings.TrimPrefix(event.Event, "cpu/")
-			event.Event = strings.TrimSuffix(event.Event, "/")
+		// sometimes perf will prepend "cpu/" to the topdown event names, e.g., cpu/topdown-retiring/ to x86 events, and
+		// sometimes perf will prepend armv8_pmuv*/ to the arm events, we clean them up here to match metric formulas
+		eventNameParts := strings.SplitN(event.Event, "/", 3)
+		if len(eventNameParts) == 3 {
+			event.Event = eventNameParts[1]
 		}
 		switch event.CounterValue {
 		case "<not counted>":

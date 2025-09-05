@@ -238,7 +238,7 @@ func filterReportMetrics(reportMetrics []PerfspectMetric, selectedMetricNames []
 		if pmFound {
 			found := false
 			for _, metric := range reportMetrics {
-				if pm.MetricName == metric.MetricName {
+				if strings.EqualFold(pm.MetricName, metric.MetricName) {
 					filteredMetrics = append(filteredMetrics, metric)
 					found = true
 					break
@@ -613,7 +613,7 @@ func findPerfmonMetric(metricsList []PerfmonMetric, metricName string) (*Perfmon
 // findPerfmonMetricByLegacyName -- Helper function to find a metric by legacy name
 func findPerfmonMetricByLegacyName(metricsList []PerfmonMetric, legacyName string) (*PerfmonMetric, bool) {
 	for _, metric := range metricsList {
-		if metric.LegacyName == legacyName {
+		if strings.EqualFold(metric.LegacyName, legacyName) {
 			return &metric, true
 		}
 	}

@@ -818,3 +818,13 @@ func ReplaceWholeWord(str, old, new string) string {
 
 	return result.String()
 }
+
+// ContainsIgnoreCase checks if a slice of strings contains a given string, ignoring case.
+func ContainsIgnoreCase(slice []string, str string) bool {
+	for _, item := range slice {
+		if strings.EqualFold(item, str) {
+			return true
+		}
+	}
+	return false
+}

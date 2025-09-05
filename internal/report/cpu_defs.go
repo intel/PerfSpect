@@ -74,9 +74,9 @@ var cpuDefinitions = []CPUDefinition{
 	{MicroArchitecture: "Turin (Zen 5c)", Family: "26", Model: "17", Stepping: "", Architecture: "x86_64", MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 0},           // Turin (Zen 5c)
 
 	// ARM CPUs
-	{MicroArchitecture: "Neoverse-N1", Family: "", Model: "1", Stepping: "r3p1", Architecture: "aarch64", MemoryChannelCount: 8, LogicalThreadCount: 1, CacheWayCount: 0}, // AWS Graviton 2
-	{MicroArchitecture: "Neoverse-V1", Family: "", Model: "1", Stepping: "r1p1", Architecture: "aarch64", MemoryChannelCount: 8, LogicalThreadCount: 1, CacheWayCount: 0}, // AWS Graviton 3
-	{MicroArchitecture: "Neoverse-V2", Family: "", Model: "1", Stepping: "r0p1", Architecture: "aarch64", MemoryChannelCount: 8, LogicalThreadCount: 1, CacheWayCount: 0}, // AWS Graviton 4
+	{MicroArchitecture: "Neoverse-N1", Family: "", Model: "1", Stepping: "r3p1", Architecture: "aarch64", MemoryChannelCount: 8, LogicalThreadCount: 1, CacheWayCount: 0}, // AWS Graviton 2 ([m|c|r]6g)
+	{MicroArchitecture: "Neoverse-V1", Family: "", Model: "1", Stepping: "r1p1", Architecture: "aarch64", MemoryChannelCount: 8, LogicalThreadCount: 1, CacheWayCount: 0}, // AWS Graviton 3 ([m|c|r]7g)
+	{MicroArchitecture: "Neoverse-V2", Family: "", Model: "1", Stepping: "r0p1", Architecture: "aarch64", MemoryChannelCount: 8, LogicalThreadCount: 1, CacheWayCount: 0}, // AWS Graviton 4 ([m|c|r]8g), GCP Axion (c4a)
 }
 
 // getCPUExtended retrieves the CPU structure that matches the provided args

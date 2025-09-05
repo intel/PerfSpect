@@ -777,6 +777,8 @@ func getLoaderConfig(loader Loader, selectedMetrics []string, metadata Metadata,
 	} else if _, ok := loader.(*LegacyLoader); ok {
 		loaderConfig.EventDefinitionOverride = eventsOverride
 		loaderConfig.MetricDefinitionOverride = metricsOverride
+	} else if _, ok := loader.(*ComponentLoader); ok {
+		loaderConfig.MetricDefinitionOverride = metricsOverride
 	} else {
 		err := fmt.Errorf("unknown loader type: %T", loader)
 		panic(err) // this should never happen, but if it does, we want to know

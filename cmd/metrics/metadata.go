@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"os/exec"
 	"regexp"
@@ -22,12 +23,13 @@ import (
 	"perfspect/internal/target"
 )
 
-// Metadata is the representation of the platform's state and capabilities
-type Metadata struct {
-	NumGeneralPurposeCounters int // number of general purpose counters
+// CommonMetadata -- common to all architectures
+type CommonMetadata struct {
+	NumGeneralPurposeCounters int
+	SocketCount               int
 	CoresPerSocket            int
+	ThreadsPerCore            int
 	CPUSocketMap              map[int]int
-	UncoreDeviceIDs           map[string][]int
 	KernelVersion             string
 	Architecture              string
 	Vendor                    string
@@ -35,49 +37,98 @@ type Metadata struct {
 	Hostname                  string
 	ModelName                 string
 	PerfSupportedEvents       string
+	SystemSummaryFields       [][]string // slice of key-value pairs
+	SupportsInstructions      bool
+}
+
+// X86Metadata -- x86_64 specific
+type X86Metadata struct {
 	PMUDriverVersion          string
-	SocketCount               int
+	UncoreDeviceIDs           map[string][]int
 	SupportsFixedCycles       bool
 	SupportsFixedInstructions bool
 	SupportsFixedTMA          bool
 	SupportsFixedRefCycles    bool
-	SupportsInstructions      bool
 	SupportsRefCycles         bool
 	SupportsUncore            bool
 	SupportsPEBS              bool
 	SupportsOCR               bool
-	ThreadsPerCore            int
 	TSC                       int
 	TSCFrequencyHz            int
-	SystemSummaryFields       [][]string // slice of key-value pairs
-	// below are not loaded by LoadMetadata, but are set by the caller
+}
+
+// ARMMetadata -- aarch64 specific
+type ARMMetadata struct {
+	ARMSlots int
+}
+
+// Metadata -- representation of the platform's state and capabilities
+type Metadata struct {
+	CommonMetadata
+	X86Metadata
+	ARMMetadata
+	// below are not loaded by LoadMetadata, but are set by the caller (should these be here at all?)
 	CollectionStartTime time.Time
 	PerfSpectVersion    string
 }
 
 // LoadMetadata - populates and returns a Metadata structure containing state of the
 // system.
-func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, perfPath string, localTempDir string) (metadata Metadata, err error) {
+func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, perfPath string, localTempDir string) (Metadata, error) {
+	uarch, err := myTarget.GetArchitecture()
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to get target architecture: %v", err)
+	}
+	collector, err := NewMetadataCollector(uarch)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to create metadata collector: %v", err)
+	}
+	return collector.CollectMetadata(myTarget, noRoot, noSystemSummary, perfPath, localTempDir)
+}
+
+type MetadataCollector interface {
+	CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, perfPath string, localTempDir string) (Metadata, error)
+}
+
+func NewMetadataCollector(architecture string) (MetadataCollector, error) {
+	switch architecture {
+	case "x86_64":
+		return &X86MetadataCollector{}, nil
+	case "aarch64":
+		return &ARMMetadataCollector{}, nil
+	default:
+		return nil, fmt.Errorf("unsupported architecture: %s", architecture)
+	}
+}
+
+// X86MetadataCollector handles Intel/AMD x86_64 metadata collection
+type X86MetadataCollector struct {
+}
+
+// ARMMetadataCollector handles ARM metadata collection
+type ARMMetadataCollector struct {
+}
+
+func (c *X86MetadataCollector) CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, perfPath string, localTempDir string) (Metadata, error) {
+	var metadata Metadata
+	var err error
 	// Hostname
 	metadata.Hostname = myTarget.GetName()
 	// CPU Info (from /proc/cpuinfo)
 	var cpuInfo []map[string]string
 	cpuInfo, err = getCPUInfo(myTarget)
 	if err != nil || len(cpuInfo) < 1 {
-		err = fmt.Errorf("failed to read cpu info: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to read cpu info: %v", err)
 	}
 	// Core Count (per socket) (from cpuInfo)
 	metadata.CoresPerSocket, err = strconv.Atoi(cpuInfo[0]["cpu cores"])
 	if err != nil || metadata.CoresPerSocket == 0 {
-		err = fmt.Errorf("failed to retrieve cores per socket: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to retrieve cores per socket: %v", err)
 	}
 	// Socket Count (from cpuInfo)
 	var maxPhysicalID int
 	if maxPhysicalID, err = strconv.Atoi(cpuInfo[len(cpuInfo)-1]["physical id"]); err != nil {
-		err = fmt.Errorf("failed to retrieve max physical id: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to retrieve max physical id: %v", err)
 	}
 	metadata.SocketCount = maxPhysicalID + 1
 	// Hyperthreading - threads per core (from cpuInfo)
@@ -95,50 +146,43 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 	// CPU microarchitecture (from cpuInfo)
 	cpu, err := report.GetCPU(cpuInfo[0]["cpu family"], cpuInfo[0]["model"], cpuInfo[0]["stepping"])
 	if err != nil {
-		return
+		return Metadata{}, err
 	}
 	metadata.Microarchitecture = cpu.MicroArchitecture
 	// Number of General Purpose Counters
 	metadata.NumGeneralPurposeCounters, err = getNumGPCounters(metadata.Microarchitecture)
 	if err != nil {
-		err = fmt.Errorf("failed to get number of general purpose counters: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to get number of general purpose counters: %v", err)
 	}
 	// the rest of the metadata is retrieved by running scripts in parallel
-	metadataScripts, err := getMetadataScripts(noRoot, perfPath, metadata.Microarchitecture, noSystemSummary)
+	metadataScripts, err := getMetadataScripts(noRoot, perfPath, noSystemSummary, metadata.NumGeneralPurposeCounters)
 	if err != nil {
-		err = fmt.Errorf("failed to get metadata scripts: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to get metadata scripts: %v", err)
 	}
 	// run the scripts
 	scriptOutputs, err := script.RunScripts(myTarget, metadataScripts, true, localTempDir) // nosemgrep
 	if err != nil {
-		err = fmt.Errorf("failed to run metadata scripts: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to run metadata scripts: %v", err)
 	}
 	// System Summary Values
 	if !noSystemSummary {
 		if metadata.SystemSummaryFields, err = getSystemSummary(scriptOutputs); err != nil {
-			err = fmt.Errorf("failed to get system summary: %w", err)
-			return
+			return Metadata{}, fmt.Errorf("failed to get system summary: %w", err)
 		}
 	} else {
 		metadata.SystemSummaryFields = [][]string{{"", "System Info Not Available"}}
 	}
 	// Architecture
 	if metadata.Architecture, err = getArchitecture(scriptOutputs); err != nil {
-		err = fmt.Errorf("failed to retrieve architecture: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to retrieve architecture: %v", err)
 	}
 	// PMU Driver Version
 	if metadata.PMUDriverVersion, err = getPMUDriverVersion(scriptOutputs); err != nil {
-		err = fmt.Errorf("failed to retrieve PMU driver version: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to retrieve PMU driver version: %v", err)
 	}
 	// perf list
 	if metadata.PerfSupportedEvents, err = getPerfSupportedEvents(scriptOutputs); err != nil {
-		err = fmt.Errorf("failed to load perf list: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to load perf list: %v", err)
 	}
 	// instructions
 	var output string
@@ -207,21 +251,18 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 	}
 	// Kernel Version
 	if metadata.KernelVersion, err = getKernelVersion(scriptOutputs); err != nil {
-		err = fmt.Errorf("failed to retrieve kernel version: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to retrieve kernel version: %v", err)
 	}
 	// System TSC Frequency
 	if metadata.TSCFrequencyHz, err = getTSCFreqHz(scriptOutputs); err != nil {
-		err = fmt.Errorf("failed to retrieve TSC frequency: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to retrieve TSC frequency: %v", err)
 	} else {
 		metadata.TSC = metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore * metadata.TSCFrequencyHz
 	}
 	// uncore device IDs and uncore support
 	isAMDArchitecture := metadata.Vendor == "AuthenticAMD"
 	if metadata.UncoreDeviceIDs, err = getUncoreDeviceIDs(isAMDArchitecture, scriptOutputs); err != nil {
-		err = fmt.Errorf("failed to retrieve uncore device IDs: %v", err)
-		return
+		return Metadata{}, fmt.Errorf("failed to retrieve uncore device IDs: %v", err)
 	} else {
 		for uncoreDeviceName := range metadata.UncoreDeviceIDs {
 			if !isAMDArchitecture && uncoreDeviceName == "cha" { // could be any uncore device
@@ -236,10 +277,120 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 			slog.Warn("Uncore devices not supported")
 		}
 	}
-	return
+	return metadata, nil
+}
+func (c *ARMMetadataCollector) CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, perfPath string, localTempDir string) (Metadata, error) {
+	var metadata Metadata
+	// Hostname
+	metadata.Hostname = myTarget.GetName()
+	// lscpu output will be used for several metadata fields
+	lscpu, err := getLscpu(myTarget)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to get lscpu output: %v", err)
+	}
+	// Vendor
+	metadata.Vendor, err = parseLscpuStringField(lscpu, `^Vendor ID:\s*(.+)$`)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to parse vendor ID: %v", err)
+	}
+	// Model Name
+	metadata.ModelName, err = parseLscpuStringField(lscpu, `^Model name:\s*(.+)$`)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to parse model name: %v", err)
+	}
+	// Sockets
+	metadata.SocketCount, err = parseLscpuIntField(lscpu, `^Socket\(s\):\s*(.+)$`)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to parse socket count: %v", err)
+	}
+	// Cores per socket
+	metadata.CoresPerSocket, err = parseLscpuIntField(lscpu, `^Core\(s\) per socket:\s*(.+)$`)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to parse cores per socket: %v", err)
+	}
+	// Threads per core
+	metadata.ThreadsPerCore, err = parseLscpuIntField(lscpu, `^Thread\(s\) per core:\s*(.+)$`)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to parse threads per core: %v", err)
+	}
+	// CPUSocketMap - create a map of CPU to socket ID
+	// TODO: this currently assumes one socket
+	metadata.CPUSocketMap = make(map[int]int)
+	for i := range metadata.CoresPerSocket {
+		metadata.CPUSocketMap[i] = 0
+	}
+	// family, model, stepping used to get microarchitecture
+	family := "" // not used for ARM
+	model, err := parseLscpuStringField(lscpu, `^Model:\s*(.+)$`)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to parse model: %v", err)
+	}
+	stepping, err := parseLscpuStringField(lscpu, `^Stepping:\s*(.+)$`)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to parse stepping: %v", err)
+	}
+	cpu, err := report.GetCPU(family, model, stepping)
+	if err != nil {
+		return Metadata{}, err
+	}
+	metadata.Microarchitecture = cpu.MicroArchitecture
+	metadata.NumGeneralPurposeCounters, err = getNumGPCountersARM(myTarget)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to get number of general purpose counters: %v", err)
+	}
+	// the rest of the metadata is retrieved by running scripts in parallel and then parsing the output
+	metadataScripts, err := getMetadataScripts(noRoot, perfPath, noSystemSummary, metadata.NumGeneralPurposeCounters)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to get metadata scripts: %v", err)
+	}
+	// run the scripts
+	scriptOutputs, err := script.RunScripts(myTarget, metadataScripts, true, localTempDir) // nosemgrep
+	if err != nil {
+		return Metadata{}, fmt.Errorf("failed to run metadata scripts: %v", err)
+	}
+	// System Summary Values
+	if !noSystemSummary {
+		if metadata.SystemSummaryFields, err = getSystemSummary(scriptOutputs); err != nil {
+			return Metadata{}, fmt.Errorf("failed to get system summary: %w", err)
+		}
+	} else {
+		metadata.SystemSummaryFields = [][]string{{"", "System Info Not Available"}}
+	}
+	// Architecture
+	if metadata.Architecture, err = getArchitecture(scriptOutputs); err != nil {
+		return Metadata{}, fmt.Errorf("failed to retrieve architecture: %v", err)
+	}
+	// perf list
+	if metadata.PerfSupportedEvents, err = getPerfSupportedEvents(scriptOutputs); err != nil {
+		return Metadata{}, fmt.Errorf("failed to load perf list: %v", err)
+	}
+	// Kernel Version
+	if metadata.KernelVersion, err = getKernelVersion(scriptOutputs); err != nil {
+		return Metadata{}, fmt.Errorf("failed to retrieve kernel version: %v", err)
+	}
+	// ARM slots
+	if metadata.ARMSlots, err = getARMSlots(scriptOutputs); err != nil {
+		return Metadata{}, fmt.Errorf("failed to retrieve ARM slots: %v", err)
+	}
+	if metadata.ARMSlots == 0 { // can't retrieve slots on EC2 VMs
+		metadata.ARMSlots, err = getARMSlotsByArchitecture(metadata.Microarchitecture)
+		if err != nil {
+			return Metadata{}, fmt.Errorf("failed to determine ARM slots by architecture: %v", err)
+		}
+	}
+	// instructions
+	var output string
+	if metadata.SupportsInstructions, output, err = getSupportsEvent("instructions", scriptOutputs); err != nil {
+		slog.Warn("failed to determine if instructions event is supported, assuming not supported", slog.String("error", err.Error()))
+	} else {
+		if !metadata.SupportsInstructions {
+			slog.Warn("instructions event not supported", slog.String("output", output))
+		}
+	}
+	return metadata, nil
 }
 
-func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSummary bool) (metadataScripts []script.ScriptDefinition, err error) {
+func getMetadataScripts(noRoot bool, perfPath string, noSystemSummary bool, numGPCounters int) (metadataScripts []script.ScriptDefinition, err error) {
 	// reduce startup time by running the metadata scripts in parallel
 	metadataScriptDefs := []script.ScriptDefinition{
 		{
@@ -256,6 +407,7 @@ func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSumm
 			Name:           "list uncore devices",
 			ScriptTemplate: "find /sys/bus/event_source/devices/ \\( -name uncore_* -o -name amd_* \\)",
 			Superuser:      !noRoot,
+			Architectures:  []string{"x86_64"},
 		},
 		{
 			Name:           "perf stat instructions",
@@ -271,16 +423,19 @@ func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSumm
 			Name:           "perf stat pebs",
 			ScriptTemplate: perfPath + " stat -a -e INT_MISC.UNKNOWN_BRANCH_CYCLES sleep 1",
 			Superuser:      !noRoot,
+			Architectures:  []string{"x86_64"},
 		},
 		{
 			Name:           "perf stat ocr",
 			ScriptTemplate: perfPath + " stat -a -e OCR.READS_TO_CORE.LOCAL_DRAM sleep 1",
 			Superuser:      !noRoot,
+			Architectures:  []string{"x86_64"},
 		},
 		{
 			Name:           "perf stat tma",
 			ScriptTemplate: perfPath + " stat -a -e '{topdown.slots, topdown-bad-spec}' sleep 1",
 			Superuser:      !noRoot,
+			Architectures:  []string{"x86_64"},
 		},
 		{
 			Name:           "perf stat fixed instructions",
@@ -307,19 +462,21 @@ func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSumm
 			ScriptTemplate: "tsc && echo",
 			Depends:        []string{"tsc"},
 			Superuser:      !noRoot,
+			Architectures:  []string{"x86_64"},
 		},
 		{
 			Name:           "kernel version",
 			ScriptTemplate: "uname -r",
 			Superuser:      !noRoot,
 		},
+		{
+			Name:           "arm slots",
+			ScriptTemplate: "cat /sys/bus/event_source/devices/armv8_pmuv3_0/caps/slots",
+			Superuser:      !noRoot,
+			Architectures:  []string{"aarch64"},
+		},
 	}
 	// replace script template vars
-	numGPCounters, err := getNumGPCounters(uarch)
-	if err != nil {
-		err = fmt.Errorf("failed to get number of GP counters: %v", err)
-		return
-	}
 	for _, scriptDef := range metadataScriptDefs {
 		switch scriptDef.Name {
 		case "perf stat fixed instructions":
@@ -356,60 +513,17 @@ func getMetadataScripts(noRoot bool, perfPath string, uarch string, noSystemSumm
 
 // String - provides a string representation of the Metadata structure
 func (md Metadata) String() string {
-	out := fmt.Sprintf(""+
-		"Host Name: %s, "+
-		"Model Name: %s, "+
-		"Architecture: %s, "+
-		"Vendor: %s, "+
-		"Microarchitecture: %s, "+
-		"Socket Count: %d, "+
-		"Cores Per Socket: %d, "+
-		"Threads per Core: %d, "+
-		"TSC Frequency (Hz): %d, "+
-		"TSC: %d, "+
-		"Instructions event supported: %t, "+
-		"Fixed cycles slot supported: %t, "+
-		"Fixed instructions slot supported: %t, "+
-		"Fixed TMA slot supported: %t, "+
-		"ref-cycles supported: %t, "+
-		"Uncore supported: %t, "+
-		"PEBS supported: %t, "+
-		"OCR supported: %t, "+
-		"PMU Driver version: %s, "+
-		"Kernel version: %s, "+
-		"Collection Start Time: %s, "+
-		"PerfSpect Version: %s\n",
-		md.Hostname,
-		md.ModelName,
-		md.Architecture,
-		md.Vendor,
-		md.Microarchitecture,
-		md.SocketCount,
-		md.CoresPerSocket,
-		md.ThreadsPerCore,
-		md.TSCFrequencyHz,
-		md.TSC,
-		md.SupportsInstructions,
-		md.SupportsFixedCycles,
-		md.SupportsFixedInstructions,
-		md.SupportsFixedTMA,
-		md.SupportsRefCycles,
-		md.SupportsUncore,
-		md.SupportsPEBS,
-		md.SupportsOCR,
-		md.PMUDriverVersion,
-		md.KernelVersion,
-		md.CollectionStartTime.Format(time.RFC3339),
-		md.PerfSpectVersion,
-	)
-	for deviceName, deviceIds := range md.UncoreDeviceIDs {
-		var ids []string
-		for _, id := range deviceIds {
-			ids = append(ids, fmt.Sprintf("%d", id))
-		}
-		out += fmt.Sprintf("%s: [%s] ", deviceName, strings.Join(ids, ","))
+	// Create a copy of the metadata without the PerfSupportedEvents field
+	mdCopy := md
+	mdCopy.PerfSupportedEvents = "" // Set to empty to reduce log size
+
+	// Marshal the copy to JSON (no indentation)
+	jsonData, err := json.Marshal(mdCopy)
+	if err != nil {
+		return fmt.Sprintf("Error marshaling metadata to JSON: %v", err)
 	}
-	return out
+
+	return string(jsonData)
 }
 
 // JSON converts the Metadata struct to a JSON-encoded byte slice.
@@ -425,7 +539,7 @@ func (md Metadata) JSON() (out []byte, err error) {
 	return
 }
 
-// WriteJSONToFile writes the metadata structure (minus perf's supported events) to the filename provided
+// WriteJSONToFile writes the metadata structure to the filename provided
 // Note that the file will be truncated.
 func (md Metadata) WriteJSONToFile(path string) (err error) {
 	rawFile, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644) // #nosec G304 G302
@@ -542,6 +656,42 @@ func getCPUInfo(myTarget target.Target) (cpuInfo []map[string]string, err error)
 	return
 }
 
+// getLscpu - runs lscpu on the target and returns the output
+func getLscpu(myTarget target.Target) (output string, err error) {
+	cmd := exec.Command("lscpu")
+	output, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, true)
+	if err != nil || exitcode != 0 {
+		err = fmt.Errorf("failed to run lscpu: %s, %d, %v", stderr, exitcode, err)
+		return
+	}
+	return
+}
+
+func parseLscpuIntField(lscpu string, pattern string) (int, error) {
+	re := regexp.MustCompile(pattern)
+	for line := range strings.SplitSeq(lscpu, "\n") {
+		match := re.FindStringSubmatch(line)
+		if match != nil {
+			value, err := strconv.Atoi(strings.TrimSpace(match[1]))
+			if err != nil {
+				return 0, fmt.Errorf("failed to parse integer from lscpu field: %v", err)
+			}
+			return value, nil
+		}
+	}
+	return 0, fmt.Errorf("lscpu field not found")
+}
+func parseLscpuStringField(lscpu string, pattern string) (string, error) {
+	re := regexp.MustCompile(pattern)
+	for line := range strings.SplitSeq(lscpu, "\n") {
+		match := re.FindStringSubmatch(line)
+		if match != nil {
+			return strings.TrimSpace(match[1]), nil
+		}
+	}
+	return "", fmt.Errorf("lscpu field not found")
+}
+
 // getPerfSupportedEvents - returns a string containing the output from
 // 'perf list'
 func getPerfSupportedEvents(scriptOutputs map[string]script.ScriptOutput) (supportedEvents string, err error) {
@@ -645,6 +795,83 @@ func getNumGPCounters(uarch string) (numGPCounters int, err error) {
 		numGPCounters = 5
 	default:
 		err = fmt.Errorf("unsupported uarch: %s", uarch)
+		return
+	}
+	return
+}
+
+// getNumGPCountersARM - returns the number of general purpose counters on ARM systems
+// Copyright 2025 Google LLC.
+// SPDX-License-Identifier: BSD-3-Clause
+// Contributed by Edwin Chiu
+func getNumGPCountersARM(target target.Target) (numGPCounters int, err error) {
+	numGPCounters = 0
+	var cmd *exec.Cmd
+	if target.CanElevatePrivileges() {
+		cmd = exec.Command("sudo", "bash", "-c", "dmesg | grep -i \"PMU Driver\"")
+	} else {
+		cmd = exec.Command("bash", "-c", "dmesg | grep -i \"PMU Driver\"")
+	}
+	stdout, stderr, exitcode, err := target.RunCommand(cmd, 0, true)
+	if err != nil {
+		err = fmt.Errorf("failed to get PMU Driver line: %s, %d, %v", stderr, exitcode, err)
+		return
+	}
+	// example [    1.339550] hw perfevents: enabled with armv8_pmuv3_0 PMU driver, 5 counters available
+	counterRegex := regexp.MustCompile(`(\d+) counters available`)
+	matches := counterRegex.FindStringSubmatch(stdout)
+	if len(matches) > 1 {
+		numberStr := matches[1]
+		numGPCounters, err = strconv.Atoi(numberStr)
+		if err != nil {
+			err = fmt.Errorf("error converting string to int: %v", err)
+			return
+		}
+		numGPCounters-- // for ARM, there is a fixed counter for cycles and the driver includes it
+		slog.Debug("getNumGPCountersArm", slog.Int("numGPCounters", numGPCounters))
+	} else {
+		err = fmt.Errorf("no match for number of counters on line: %s", stdout)
+		return
+	}
+	return
+}
+
+// getARMSlots - returns the number of ARM slots available
+// Copyright 2025 Google LLC.
+// SPDX-License-Identifier: BSD-3-Clause
+// Contributed by Edwin Chiu
+func getARMSlots(scriptOutputs map[string]script.ScriptOutput) (slots int, err error) {
+	if scriptOutputs["arm slots"].Exitcode != 0 {
+		slog.Warn("failed to retrieve ARM slots", slog.Any("script", scriptOutputs["arm slots"]))
+		err = fmt.Errorf("failed to retrieve ARM slots: %s", scriptOutputs["arm slots"].Stderr)
+		return
+	}
+	hexString := strings.TrimSpace(string(scriptOutputs["arm slots"].Stdout))
+	hexString = strings.TrimPrefix(hexString, "0x")
+	parsedValue, err := strconv.ParseInt(hexString, 16, 64)
+	if err != nil {
+		slog.Warn("Failed to parse ARM slots value", slog.String("value", hexString), slog.Any("error", err))
+		err = fmt.Errorf("failed to parse ARM slots value (%s): %w", hexString, err)
+		return
+	}
+	if parsedValue <= math.MinInt32 || parsedValue > math.MaxInt32 {
+		slog.Warn("Parsed ARM slots value out of range", slog.Int64("value", parsedValue))
+		err = fmt.Errorf("parsed ARM slots value out of range: %d", parsedValue)
+		return
+	}
+	slots = int(parsedValue)
+	slog.Debug("Successfully read ARM slots value", slog.Int("slots", slots))
+	return
+}
+
+func getARMSlotsByArchitecture(uarch string) (slots int, err error) {
+	switch uarch {
+	case "Neoverse-N2", "Neoverse-V2":
+		slots = 8
+	case "Neoverse-N1", "Neoverse-V1":
+		slots = 6 // TODO: confirm
+	default:
+		err = fmt.Errorf("unsupported ARM uarch: %s", uarch)
 		return
 	}
 	return
