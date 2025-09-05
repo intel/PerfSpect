@@ -308,9 +308,7 @@ func initializeComponentMetricEvaluable(expression string, evaluatorFunctions ma
 	// quote the hex number
 	// look for (0x....) and replace with ("0x....")
 	rxHex := regexp.MustCompile(`\((0x[0-9a-fA-F]+)\)`)
-	expression = rxHex.ReplaceAllStringFunc(expression, func(s string) string {
-		return "(" + `"` + rxTrailingChars.ReplaceAllString(s, "") + `"` + ")"
-	})
+	expression = rxHex.ReplaceAllString(expression, `("$1")`)
 
 	// create govaluate expression
 	expr, err := govaluate.NewEvaluableExpressionWithFunctions(expression, evaluatorFunctions)
