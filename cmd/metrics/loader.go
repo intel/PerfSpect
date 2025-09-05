@@ -75,6 +75,10 @@ type PerfmonLoader struct {
 	BaseLoader
 }
 
+type ComponentLoader struct {
+	BaseLoader
+}
+
 func NewLoader(uarch string) (Loader, error) {
 	switch strings.ToLower(uarch) {
 	case "clx", "skx", "bdx", "bergamo", "genoa", "turin":
@@ -83,6 +87,9 @@ func NewLoader(uarch string) (Loader, error) {
 	case "gnr", "srf", "emr", "spr", "icx":
 		slog.Debug("Using perfmon loader for microarchitecture", slog.String("uarch", uarch))
 		return newPerfmonLoader(strings.ToLower(uarch)), nil
+	case "neoverse-n2", "neoverse-v2", "neoverse-n1", "neoverse-v1":
+		slog.Debug("Using component loader for microarchitecture", slog.String("uarch", uarch))
+		return newComponentLoader(strings.ToLower(uarch)), nil
 	default:
 		return nil, fmt.Errorf("unsupported microarchitecture: %s", uarch)
 	}
@@ -98,6 +105,14 @@ func newLegacyLoader(uarch string) *LegacyLoader {
 
 func newPerfmonLoader(uarch string) *PerfmonLoader {
 	return &PerfmonLoader{
+		BaseLoader: BaseLoader{
+			microarchitecture: uarch,
+		},
+	}
+}
+
+func newComponentLoader(uarch string) *ComponentLoader {
+	return &ComponentLoader{
 		BaseLoader: BaseLoader{
 			microarchitecture: uarch,
 		},
