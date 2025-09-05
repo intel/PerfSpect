@@ -38,6 +38,7 @@ type CommonMetadata struct {
 	ModelName                 string
 	PerfSupportedEvents       string
 	SystemSummaryFields       [][]string // slice of key-value pairs
+	SupportsInstructions      bool
 }
 
 // X86Metadata -- x86_64 specific
@@ -48,7 +49,6 @@ type X86Metadata struct {
 	SupportsFixedInstructions bool
 	SupportsFixedTMA          bool
 	SupportsFixedRefCycles    bool
-	SupportsInstructions      bool
 	SupportsRefCycles         bool
 	SupportsUncore            bool
 	SupportsPEBS              bool
@@ -513,60 +513,17 @@ func getMetadataScripts(noRoot bool, perfPath string, noSystemSummary bool, numG
 
 // String - provides a string representation of the Metadata structure
 func (md Metadata) String() string {
-	out := fmt.Sprintf(""+
-		"Host Name: %s, "+
-		"Model Name: %s, "+
-		"Architecture: %s, "+
-		"Vendor: %s, "+
-		"Microarchitecture: %s, "+
-		"Socket Count: %d, "+
-		"Cores Per Socket: %d, "+
-		"Threads per Core: %d, "+
-		"TSC Frequency (Hz): %d, "+
-		"TSC: %d, "+
-		"Instructions event supported: %t, "+
-		"Fixed cycles slot supported: %t, "+
-		"Fixed instructions slot supported: %t, "+
-		"Fixed TMA slot supported: %t, "+
-		"ref-cycles supported: %t, "+
-		"Uncore supported: %t, "+
-		"PEBS supported: %t, "+
-		"OCR supported: %t, "+
-		"PMU Driver version: %s, "+
-		"Kernel version: %s, "+
-		"Collection Start Time: %s, "+
-		"PerfSpect Version: %s\n",
-		md.Hostname,
-		md.ModelName,
-		md.Architecture,
-		md.Vendor,
-		md.Microarchitecture,
-		md.SocketCount,
-		md.CoresPerSocket,
-		md.ThreadsPerCore,
-		md.TSCFrequencyHz,
-		md.TSC,
-		md.SupportsInstructions,
-		md.SupportsFixedCycles,
-		md.SupportsFixedInstructions,
-		md.SupportsFixedTMA,
-		md.SupportsRefCycles,
-		md.SupportsUncore,
-		md.SupportsPEBS,
-		md.SupportsOCR,
-		md.PMUDriverVersion,
-		md.KernelVersion,
-		md.CollectionStartTime.Format(time.RFC3339),
-		md.PerfSpectVersion,
-	)
-	for deviceName, deviceIds := range md.UncoreDeviceIDs {
-		var ids []string
-		for _, id := range deviceIds {
-			ids = append(ids, fmt.Sprintf("%d", id))
-		}
-		out += fmt.Sprintf("%s: [%s] ", deviceName, strings.Join(ids, ","))
+	// Create a copy of the metadata without the PerfSupportedEvents field
+	mdCopy := md
+	mdCopy.PerfSupportedEvents = "" // Set to empty to reduce log size
+
+	// Marshal the copy to JSON (no indentation)
+	jsonData, err := json.Marshal(mdCopy)
+	if err != nil {
+		return fmt.Sprintf("Error marshaling metadata to JSON: %v", err)
 	}
-	return out
+
+	return string(jsonData)
 }
 
 // JSON converts the Metadata struct to a JSON-encoded byte slice.
@@ -582,7 +539,7 @@ func (md Metadata) JSON() (out []byte, err error) {
 	return
 }
 
-// WriteJSONToFile writes the metadata structure (minus perf's supported events) to the filename provided
+// WriteJSONToFile writes the metadata structure to the filename provided
 // Note that the file will be truncated.
 func (md Metadata) WriteJSONToFile(path string) (err error) {
 	rawFile, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644) // #nosec G304 G302
