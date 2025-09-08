@@ -415,15 +415,16 @@ reset:
 	cd tsc && rm -f tsc
 	cd linux_turbostat/tools/power/x86/turbostat && make clean
 
-# not used in build but required in oss archive file because some of the tools are statically linked
-glibc-2.19.tar.bz2:
-	wget http://ftp.gnu.org/gnu/glibc/glibc-2.19.tar.bz2
+# libs are not directly used in the build but are required in the oss archive file because some of the tools are statically linked
+# glibc 2.27 was the version used in Ubuntu 18.04 which is the base docker image we used to build the tools
+glibc.tar.gz:
+	wget https://github.com/bminor/glibc/archive/refs/tags/glibc-2.27.tar.gz -O glibc.tar.gz
 zlib.tar.gz:
 	wget https://github.com/madler/zlib/archive/refs/heads/master.tar.gz -O zlib.tar.gz
 libcrypt.tar.gz:
 	wget https://github.com/gpg/libgcrypt/archive/refs/heads/master.tar.gz -O libcrypt.tar.gz
-libs: glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
+libs: glibc.tar.gz zlib.tar.gz libcrypt.tar.gz
 
 oss-source: reset libs
-	tar --exclude-vcs -czf oss_source.tgz async-profiler/ cpuid/ dmidecode/ ethtool/ fio/ ipmitool/ lshw/ lspci/ msr-tools/ perf-archive/ pcm/ spectre-meltdown-checker/ sshpass/ stress-ng/ sysstat/ linux_turbostat/tools/power/x86/turbostat glibc-2.19.tar.bz2 zlib.tar.gz libcrypt.tar.gz
+	tar --exclude-vcs -czf oss_source.tgz async-profiler/ cpuid/ dmidecode/ ethtool/ fio/ ipmitool/ lshw/ lspci/ msr-tools/ perf-archive/ pcm/ spectre-meltdown-checker/ sshpass/ stress-ng/ sysstat/ linux_turbostat/tools/power/x86/turbostat glibc.tar.gz zlib.tar.gz libcrypt.tar.gz
 	md5sum oss_source.tgz > oss_source.tgz.md5
