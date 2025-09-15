@@ -36,9 +36,9 @@ tools-x86_64: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw
 	cp sysstat/sadc bin/x86_64/
 	cp tsc/tsc bin/x86_64/
 	cp linux_turbostat/tools/power/x86/turbostat/turbostat bin/x86_64/
-	-cd bin/x86_64 && strip --strip-unneeded *
+	cd bin/x86_64 && strip --strip-unneeded * || true
 
-tools-aarch64: async-profiler-aarch64 dmidecode-aarch64 ethtool-aarch64 fio-aarch64 ipmitool-aarch64 lshw-aarch64 lspci-aarch64 spectre-meltdown-checker sshpass-aarch64 stackcollapse-perf-aarch64 stress-ng-aarch64 sysstat-aarch64 tsc-aarch64
+tools-aarch64: async-profiler-aarch64 dmidecode-aarch64 ethtool-aarch64 fio-aarch64 ipmitool-aarch64 lshw-aarch64 lspci-aarch64 spectre-meltdown-checker sshpass-aarch64 stackcollapse-perf-aarch64 stress-ng-aarch64 sysstat-aarch64
 	mkdir -p bin/aarch64
 	cp -R async-profiler-aarch64 bin/aarch64/async-profiler
 	cp dmidecode-aarch64/dmidecode bin/aarch64/
@@ -57,8 +57,7 @@ tools-aarch64: async-profiler-aarch64 dmidecode-aarch64 ethtool-aarch64 fio-aarc
 	cp sysstat-aarch64/iostat bin/aarch64/
 	cp sysstat-aarch64/sar bin/aarch64/
 	cp sysstat-aarch64/sadc bin/aarch64/
-	cp tsc/tsc-aarch64 bin/aarch64/tsc
-	-cd bin/aarch64 && aarch64-linux-gnu-strip --strip-unneeded * || true
+	cd bin/aarch64 && aarch64-linux-gnu-strip --strip-unneeded * || true
 
 tools: tools-x86_64 tools-aarch64
 	@echo "Tools built successfully in bin/x86_64 and bin/aarch64 directories."
@@ -386,9 +385,6 @@ endif
 
 tsc:
 	cd tsc && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build
-
-tsc-aarch64:
-	cd tsc && CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o tsc-aarch64
 
 TURBOSTAT_VERSION := "6.9.12"
 turbostat:
