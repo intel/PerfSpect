@@ -381,11 +381,12 @@ func (mg *MetricGroup) loadHTMLTemplateValues(metadata Metadata, metricDefinitio
 	if stats, err = mg.getStats(); err != nil {
 		return
 	}
-	//0 -> Intel, 1 -> AMD
+	//0 -> Intel, 1 -> AMD, 2 -> ARM
 	archIndex := 0
-	if metadata.Vendor == "AuthenticAMD" {
+	switch metadata.Vendor {
+	case "AuthenticAMD":
 		archIndex = 1
-	} else if metadata.Vendor == "ARM" {
+	case "ARM":
 		archIndex = 2
 	}
 
@@ -478,10 +479,10 @@ func (mg *MetricGroup) loadHTMLTemplateValues(metadata Metadata, metricDefinitio
 		var timeStamps []string
 		var series [][]float64
 		for rIdx, row := range mg.rows {
-			if _, ok := row.metrics[tmpl.metricNames[archIndex]]; !ok {
-				continue
+			metricRowVal, ok := row.metrics[tmpl.metricNames[archIndex]]
+			if !ok {
+				continue // metric value not present in this row
 			}
-			metricRowVal := row.metrics[tmpl.metricNames[archIndex]]
 			if math.IsNaN(metricRowVal) || math.IsInf(metricRowVal, 0) || metricRowVal < 0 {
 				metricRowVal = 0
 			}
