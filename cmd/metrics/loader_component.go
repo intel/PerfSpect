@@ -220,7 +220,102 @@ func (l *ComponentLoader) formEventGroups(metrics []MetricDefinition, events []C
 	// eliminate duplicate and overlapping groups
 	groups = deduplicateGroups(groups)
 
+	// merge small groups
+	groups = mergeSmallGroups(groups, numGPCounters)
+
 	return groups, nil
+}
+
+// mergeSmallGroups merges groups that have few events, ensuring that the merged group does not exceed numGPCounters
+// CPU_CYCLES is a fixed counter and does not count against the numGPCounters limit
+// events in a group are unique (no duplicates)
+// all events in a group must be merged together
+func mergeSmallGroups(groups []GroupDefinition, numGPCounters int) []GroupDefinition {
+	// If there are 1 or 0 groups, no merging is needed
+	if len(groups) <= 1 {
+		return groups
+	}
+
+	// Sort groups by size for efficient merging (smallest first)
+	slices.SortFunc(groups, func(a, b GroupDefinition) int {
+		aGPCount := countGPEvents(a)
+		bGPCount := countGPEvents(b)
+		return aGPCount - bGPCount
+	})
+
+	var mergedGroups []GroupDefinition
+	processed := make([]bool, len(groups))
+
+	// Process groups in increasing order of size
+	for i := range groups {
+		if processed[i] {
+			continue
+		}
+
+		currentGroup := groups[i]
+		currentGPCount := countGPEvents(currentGroup)
+		processed[i] = true
+
+		// Try to merge with other unprocessed groups
+		for j := i + 1; j < len(groups); j++ {
+			if processed[j] {
+				continue
+			}
+
+			candidateGroup := groups[j]
+			candidateGPCount := countGPEvents(candidateGroup)
+
+			// Check if merging would exceed the GP counter limit
+			if currentGPCount+candidateGPCount > numGPCounters {
+				continue
+			}
+
+			// Merge the groups
+			mergedGroup := mergeGroupsWithoutDuplicates(currentGroup, candidateGroup)
+			if len(mergedGroup) == len(currentGroup)+len(candidateGroup) { // No duplicates
+				currentGroup = mergedGroup
+				currentGPCount = countGPEvents(currentGroup)
+				processed[j] = true
+			}
+		}
+
+		mergedGroups = append(mergedGroups, currentGroup)
+	}
+
+	return mergedGroups
+}
+
+// countGPEvents counts the number of general purpose events (excluding CPU_CYCLES)
+func countGPEvents(group GroupDefinition) int {
+	count := 0
+	for _, event := range group {
+		if event.Name != "CPU_CYCLES" {
+			count++
+		}
+	}
+	return count
+}
+
+// mergeGroupsWithoutDuplicates merges two groups into one, avoiding duplicates
+func mergeGroupsWithoutDuplicates(a, b GroupDefinition) GroupDefinition {
+	merged := make(GroupDefinition, len(a))
+	copy(merged, a)
+
+	// Track existing event names
+	existing := make(map[string]bool)
+	for _, event := range merged {
+		existing[event.Name] = true
+	}
+
+	// Add non-duplicate events from group b
+	for _, event := range b {
+		if !existing[event.Name] {
+			merged = append(merged, event)
+			existing[event.Name] = true
+		}
+	}
+
+	return merged
 }
 
 func initializeComponentMetricVariables(expression string) map[string]int {

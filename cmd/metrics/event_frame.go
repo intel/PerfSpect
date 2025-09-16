@@ -214,6 +214,14 @@ func assignEventsToGroups(events []Event, eventGroupDefinitions []GroupDefinitio
 	if len(eventGroupDefinitions) == 0 {
 		return fmt.Errorf("no event group definitions provided")
 	}
+	// get total number of events in all groups
+	totalEventsInGroups := 0
+	for _, groupDef := range eventGroupDefinitions {
+		totalEventsInGroups += len(groupDef)
+	}
+	if totalEventsInGroups != len(events) {
+		return fmt.Errorf("number of events (%d) does not match number of events in group definitions (%d)", len(events), totalEventsInGroups)
+	}
 	groupIdx := 0
 	eventIdx := -1
 	previousEvent := ""
