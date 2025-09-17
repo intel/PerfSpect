@@ -83,9 +83,13 @@ func (l *ComponentLoader) loadMetricDefinitions(metricDefinitionOverridePath str
 		return
 	}
 
-	evaluatorFunctions := getARMEvaluatorFunctions()
+	evaluatorFunctions := getARMEvaluatorFunctions(metadata.ARMCPUID)
 	for i := range componentMetricsInFile {
-		if len(selectedMetrics) == 0 || util.ContainsIgnoreCase(selectedMetrics, componentMetricsInFile[i].getName()) {
+		// a couple ARM metrics don't have MetricExpr, skip those
+		// if selectedMetrics is empty, include all metrics
+		// otherwise, include only those in selectedMetrics
+		// comparison is case insensitive
+		if componentMetricsInFile[i].MetricExpr != "" && (len(selectedMetrics) == 0 || util.ContainsIgnoreCase(selectedMetrics, componentMetricsInFile[i].getName())) {
 			var m MetricDefinition
 			m.Name = componentMetricsInFile[i].getName()
 			m.LegacyName = componentMetricsInFile[i].getLegacyName()
@@ -102,14 +106,20 @@ func (l *ComponentLoader) loadMetricDefinitions(metricDefinitionOverridePath str
 	return metrics, nil
 }
 
-// TODO:
-func getARMEvaluatorFunctions() map[string]govaluate.ExpressionFunction {
+func getARMEvaluatorFunctions(CPUID string) map[string]govaluate.ExpressionFunction {
 	functions := make(map[string]govaluate.ExpressionFunction)
 	functions["strcmp_cpuid_str"] = func(args ...any) (any, error) {
 		if len(args) != 1 {
 			return nil, fmt.Errorf("strcmp_cpuid_str requires one argument")
 		}
-		return true, nil // Placeholder: always return true for now
+		argStr, ok := args[0].(string)
+		if !ok {
+			return nil, fmt.Errorf("strcmp_cpuid_str argument must be a string")
+		}
+		if strings.EqualFold(argStr, CPUID) {
+			return true, nil
+		}
+		return false, nil
 	}
 	return functions
 }
@@ -192,7 +202,7 @@ func (l *ComponentLoader) formEventGroups(metrics []MetricDefinition, events []C
 		for variable := range metric.Variables {
 			// confirm variable is a valid event
 			if _, exists := eventNames[variable]; !exists {
-				slog.Error("Metric variable does not correspond to a known event, skipping variable", slog.String("metric", metric.Name), slog.String("variable", variable))
+				slog.Warn("Metric variable does not correspond to a known event, skipping variable", slog.String("metric", metric.Name), slog.String("variable", variable))
 				continue
 			}
 			// Add the event to the current group
@@ -408,11 +418,11 @@ func isInteger(s string) bool {
 
 func initializeComponentMetricEvaluable(expression string, evaluatorFunctions map[string]govaluate.ExpressionFunction, metadata Metadata) *govaluate.EvaluableExpression {
 	// replace #slots with metadata.ARMSlots
-	expression = strings.ReplaceAll(expression, "#slots", fmt.Sprintf("%d", metadata.ARMSlots))
+	transformedExpression := strings.ReplaceAll(expression, "#slots", fmt.Sprintf("%d", metadata.ARMSlots))
 	// replace if else with ?:
-	expression, err := transformExpression(expression)
+	transformedExpression, err := transformExpression(transformedExpression)
 	if err != nil {
-		slog.Error("Failed to transform expression", slog.String("expression", expression), slog.String("error", err.Error()))
+		slog.Error("Failed to transform expression", slog.String("expression", transformedExpression), slog.String("error", err.Error()))
 		return nil
 	}
 	// govaluate doesn't like: strcmp_cpuid_str(0x410fd493)
@@ -420,12 +430,28 @@ func initializeComponentMetricEvaluable(expression string, evaluatorFunctions ma
 	// quote the hex number
 	// look for (0x....) and replace with ("0x....")
 	rxHex := regexp.MustCompile(`\((0x[0-9a-fA-F]+)\)`)
-	expression = rxHex.ReplaceAllString(expression, `("$1")`)
+	transformedExpression = rxHex.ReplaceAllString(transformedExpression, `("$1")`)
+	// govaluate doesn't like: strcmp_cpuid_str(0x410fd490) ^ 1
+	// so we replace it with !strcmp_cpuid_str(0x410fd490)
+	rxInvertedStrcmp := regexp.MustCompile(`strcmp_cpuid_str\("0x[0-9a-fA-F]+"\)\s*\^\s*1`)
+	transformedExpression = rxInvertedStrcmp.ReplaceAllStringFunc(transformedExpression, func(match string) string {
+		// Extract the argument inside strcmp_cpuid_str(...)
+		rxArg := regexp.MustCompile(`strcmp_cpuid_str\("0x[0-9a-fA-F]+"\)`)
+		argMatch := rxArg.FindString(match)
+		if argMatch != "" {
+			return "!" + argMatch
+		}
+		return match // Should not happen, but return the original match if extraction fails
+	})
+
+	if transformedExpression != expression {
+		slog.Debug("Transformed metric expression", slog.String("original", expression), slog.String("transformed", transformedExpression))
+	}
 
 	// create govaluate expression
-	expr, err := govaluate.NewEvaluableExpressionWithFunctions(expression, evaluatorFunctions)
+	expr, err := govaluate.NewEvaluableExpressionWithFunctions(transformedExpression, evaluatorFunctions)
 	if err != nil {
-		slog.Error("Failed to parse metric expression", slog.String("expression", expression), slog.String("error", err.Error()))
+		slog.Error("Failed to parse metric expression", slog.String("expression", transformedExpression), slog.String("error", err.Error()))
 		return nil
 	}
 	return expr

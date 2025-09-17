@@ -60,6 +60,7 @@ type X86Metadata struct {
 // ARMMetadata -- aarch64 specific
 type ARMMetadata struct {
 	ARMSlots int
+	ARMCPUID string
 }
 
 // Metadata -- representation of the platform's state and capabilities
@@ -378,6 +379,10 @@ func (c *ARMMetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 			return Metadata{}, fmt.Errorf("failed to determine ARM slots by architecture: %v", err)
 		}
 	}
+	// ARM CPUID
+	if metadata.ARMCPUID, err = getARMCPUID(scriptOutputs); err != nil {
+		return Metadata{}, fmt.Errorf("failed to retrieve ARM CPUID: %v", err)
+	}
 	// instructions
 	var output string
 	if metadata.SupportsInstructions, output, err = getSupportsEvent("instructions", scriptOutputs); err != nil {
@@ -472,6 +477,12 @@ func getMetadataScripts(noRoot bool, perfPath string, noSystemSummary bool, numG
 		{
 			Name:           "arm slots",
 			ScriptTemplate: "cat /sys/bus/event_source/devices/armv8_pmuv3_0/caps/slots",
+			Superuser:      !noRoot,
+			Architectures:  []string{"aarch64"},
+		},
+		{
+			Name:           "arm cpuid",
+			ScriptTemplate: "cat /sys/devices/system/cpu/cpu0/regs/identification/midr_el1",
 			Superuser:      !noRoot,
 			Architectures:  []string{"aarch64"},
 		},
@@ -864,6 +875,8 @@ func getARMSlots(scriptOutputs map[string]script.ScriptOutput) (slots int, err e
 	return
 }
 
+// getARMSlotsByArchitecture - returns the number of ARM slots based on the microarchitecture
+// Used as a fallback when we cannot read the slots from sysfs
 func getARMSlotsByArchitecture(uarch string) (slots int, err error) {
 	switch uarch {
 	case "Neoverse-N2", "Neoverse-V2":
@@ -874,6 +887,22 @@ func getARMSlotsByArchitecture(uarch string) (slots int, err error) {
 		err = fmt.Errorf("unsupported ARM uarch: %s", uarch)
 		return
 	}
+	return
+}
+
+// getARMCPUID retrieves the ARM CPUID from the script outputs.
+// script output will have a hex value like 0x00000000410fd4f1
+// we strip the leading zeros and return as "0x410fd4f1"
+func getARMCPUID(scriptOutputs map[string]script.ScriptOutput) (cpuid string, err error) {
+	output, ok := scriptOutputs["arm cpuid"]
+	if !ok || output.Exitcode != 0 {
+		err = fmt.Errorf("failed to retrieve ARM CPUID: %s", output.Stderr)
+		return
+	}
+	cpuid = strings.TrimSpace(output.Stdout)
+	cpuid = strings.TrimPrefix(cpuid, "0x")
+	cpuid = strings.TrimLeft(cpuid, "0")
+	cpuid = "0x" + cpuid
 	return
 }
 
