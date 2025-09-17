@@ -892,7 +892,6 @@ func getARMSlotsByArchitecture(uarch string) (slots int, err error) {
 
 // getARMCPUID retrieves the ARM CPUID from the script outputs.
 // script output will have a hex value like 0x00000000410fd4f1
-// we strip the leading zeros and return as "0x410fd4f1"
 func getARMCPUID(scriptOutputs map[string]script.ScriptOutput) (cpuid string, err error) {
 	output, ok := scriptOutputs["arm cpuid"]
 	if !ok || output.Exitcode != 0 {
@@ -900,9 +899,6 @@ func getARMCPUID(scriptOutputs map[string]script.ScriptOutput) (cpuid string, er
 		return
 	}
 	cpuid = strings.TrimSpace(output.Stdout)
-	cpuid = strings.TrimPrefix(cpuid, "0x")
-	cpuid = strings.TrimLeft(cpuid, "0")
-	cpuid = "0x" + cpuid
 	return
 }
 

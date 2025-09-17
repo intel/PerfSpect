@@ -616,6 +616,23 @@ func SignalSelf(sig os.Signal) error {
 	return nil
 }
 
+// ParseHex parses a hex string and returns its uint64 value
+// The hex string can, optionally, be prefixed with "0x" or "0X".
+func ParseHex(hexStr string) (uint64, error) {
+	if !IsValidHex(hexStr) {
+		return 0, fmt.Errorf("invalid hex string: %s", hexStr)
+	}
+	// Remove the "0x" or "0X" prefix if present
+	if strings.HasPrefix(hexStr, "0x") || strings.HasPrefix(hexStr, "0X") {
+		hexStr = hexStr[2:]
+	}
+	val, err := strconv.ParseUint(hexStr, 16, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse hex string: %s", err)
+	}
+	return val, nil
+}
+
 // IsValidHex checks if a string is a valid hex string
 // Valid hex strings are non-empty, optionally prefixed with "0x" or "0X",
 // and contain only valid hex characters (0-9, a-f, A-F).

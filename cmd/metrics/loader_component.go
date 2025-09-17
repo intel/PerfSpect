@@ -108,20 +108,63 @@ func (l *ComponentLoader) loadMetricDefinitions(metricDefinitionOverridePath str
 
 func getARMEvaluatorFunctions(CPUID string) map[string]govaluate.ExpressionFunction {
 	functions := make(map[string]govaluate.ExpressionFunction)
-	functions["strcmp_cpuid_str"] = func(args ...any) (any, error) {
-		if len(args) != 1 {
-			return nil, fmt.Errorf("strcmp_cpuid_str requires one argument")
-		}
-		argStr, ok := args[0].(string)
-		if !ok {
-			return nil, fmt.Errorf("strcmp_cpuid_str argument must be a string")
-		}
-		if strings.EqualFold(argStr, CPUID) {
+	functions["strcmp_cpuid_str"] =
+		// adapted from: https://elixir.bootlin.com/linux/v6.17-rc4/source/tools/perf/util/expr.c#L468
+		func(args ...any) (any, error) {
+			if len(args) != 1 {
+				return nil, fmt.Errorf("strcmp_cpuid_str requires one argument")
+			}
+			argStr, ok := args[0].(string)
+			if !ok {
+				return nil, fmt.Errorf("strcmp_cpuid_str argument must be a string")
+			}
+			res, err := compareCPUID(argStr, CPUID)
+			if err != nil {
+				return nil, err
+			}
+			// reverse the result to match the expected logic
+			if res == 0 {
+				return false, nil
+			}
 			return true, nil
 		}
-		return false, nil
-	}
 	return functions
+}
+
+// compareCPUID compares the argument string to the CPUID
+// adapted from: https://elixir.bootlin.com/linux/v6.17-rc4/source/tools/perf/arch/arm64/util/header.c#L91
+//
+//	Return 0 if idstr is a higher or equal to version of the same part as
+//	mapcpuid. Therefore, if mapcpuid has 0 for revision and variant then any
+//	version of idstr will match as long as it's the same CPU type.
+//
+//	Return 1 if the CPU type is different or the version of idstr is lower.
+func compareCPUID(mapCpuId string, idStr string) (int, error) {
+	mapId, err := util.ParseHex(mapCpuId)
+	if err != nil {
+		return 0, fmt.Errorf("strcmp_cpuid_str argument must be a valid hex string")
+	}
+	mapIdVariant := mapId & (0xF << 20)
+	mapIdRevision := mapId & 0xF
+	id, err := util.ParseHex(idStr)
+	if err != nil {
+		return 0, fmt.Errorf("strcmp_cpuid_str argument must be a valid hex string")
+	}
+	idVariant := id & (0xF << 20)
+	idRevision := id & 0xF
+	// compare without version first
+	idFields := ^uint64(0xF | (0xF << 20))
+	if mapId&idFields != id&idFields {
+		return 1, nil // CPU type is different
+	}
+	// id matches, now compare version
+	if mapIdVariant > idVariant {
+		return 0, nil
+	}
+	if mapIdVariant == idVariant && mapIdRevision >= idRevision {
+		return 0, nil
+	}
+	return 1, nil
 }
 
 // loadEventDefinitions -- load all event files in resources/component/<arch>/
