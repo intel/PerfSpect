@@ -381,10 +381,13 @@ func (mg *MetricGroup) loadHTMLTemplateValues(metadata Metadata, metricDefinitio
 	if stats, err = mg.getStats(); err != nil {
 		return
 	}
-	//0 -> Intel, 1 -> AMD
+	//0 -> Intel, 1 -> AMD, 2 -> ARM
 	archIndex := 0
-	if metadata.Vendor == "AuthenticAMD" {
+	switch metadata.Vendor {
+	case "AuthenticAMD":
 		archIndex = 1
+	case "ARM":
+		archIndex = 2
 	}
 
 	type tmplReplace struct {
@@ -396,18 +399,18 @@ func (mg *MetricGroup) loadHTMLTemplateValues(metadata Metadata, metricDefinitio
 	// templateLabelReplace is a list of template variables that are used as labels for the TMA pie chart
 	// The template variable is replaced with the label appropriate for the architecture
 	templateLabelReplace := []tmplReplace{
-		{"FRONTEND_LABEL", []string{"Frontend", "Frontend"}},                     // level 1
-		{"FETCHLATENCY_LABEL", []string{"Fetch Latency", "Latency"}},             // level 2
-		{"FETCHBANDWIDTH_LABEL", []string{"Fetch BW", "Bandwidth"}},              // level 2
-		{"BADSPECULATION_LABEL", []string{"Bad Speculation", "Bad Speculation"}}, // level 1
-		{"BRANCHMISPREDICTS_LABEL", []string{"Mispredicts", "Mispredicts"}},      // level 2
-		{"MACHINECLEARS_LABEL", []string{"Machine Clears", "Pipeline Restarts"}}, // level 2
-		{"BACKEND_LABEL", []string{"Backend", "Backend"}},                        // level 1
-		{"MEMORY_LABEL", []string{"Memory", "Memory"}},                           // level 2
-		{"CORE_LABEL", []string{"Core", "CPU"}},                                  // level 2
-		{"RETIRING_LABEL", []string{"Retiring", "Retiring"}},                     // level 1
-		{"LIGHTOPS_LABEL", []string{"Light Ops", "Fastpath"}},                    // level 2
-		{"HEAVYOPS_LABEL", []string{"Heavy Ops", "Microcode"}},                   // level 2
+		{"FRONTEND_LABEL", []string{"Frontend", "Frontend", "Frontend"}},                            // level 1
+		{"FETCHLATENCY_LABEL", []string{"Fetch Latency", "Latency", ""}},                            // level 2
+		{"FETCHBANDWIDTH_LABEL", []string{"Fetch BW", "Bandwidth", ""}},                             // level 2
+		{"BADSPECULATION_LABEL", []string{"Bad Speculation", "Bad Speculation", "Bad Speculation"}}, // level 1
+		{"BRANCHMISPREDICTS_LABEL", []string{"Mispredicts", "Mispredicts", ""}},                     // level 2
+		{"MACHINECLEARS_LABEL", []string{"Machine Clears", "Pipeline Restarts", ""}},                // level 2
+		{"BACKEND_LABEL", []string{"Backend", "Backend", "Backend"}},                                // level 1
+		{"MEMORY_LABEL", []string{"Memory", "Memory", ""}},                                          // level 2
+		{"CORE_LABEL", []string{"Core", "CPU", ""}},                                                 // level 2
+		{"RETIRING_LABEL", []string{"Retiring", "Retiring", "Retiring"}},                            // level 1
+		{"LIGHTOPS_LABEL", []string{"Light Ops", "Fastpath", ""}},                                   // level 2
+		{"HEAVYOPS_LABEL", []string{"Heavy Ops", "Microcode", ""}},                                  // level 2
 	}
 	// replace the template variables with the label of the metric for the pie chart
 	for _, tmpl := range templateLabelReplace {
@@ -421,18 +424,18 @@ func (mg *MetricGroup) loadHTMLTemplateValues(metadata Metadata, metricDefinitio
 	// templateReplace is a list of template variables to replace with the mean value of
 	// the metric named in the metricNames field for the architecture
 	templateReplace := []tmplReplace{
-		{"FRONTEND", []string{"TMA_Frontend_Bound(%)", "Pipeline Utilization - Frontend Bound (%)"}},
-		{"FETCHLATENCY", []string{"TMA_..Fetch_Latency(%)", "Pipeline Utilization - Frontend Bound - Latency (%)"}},
-		{"FETCHBANDWIDTH", []string{"TMA_..Fetch_Bandwidth(%)", "Pipeline Utilization - Frontend Bound - Bandwidth (%)"}},
-		{"BADSPECULATION", []string{"TMA_Bad_Speculation(%)", "Pipeline Utilization - Bad Speculation (%)"}},
-		{"BRANCHMISPREDICTS", []string{"TMA_..Branch_Mispredicts(%)", "Pipeline Utilization - Bad Speculation - Mispredicts (%)"}},
-		{"MACHINECLEARS", []string{"TMA_..Machine_Clears(%)", "Pipeline Utilization - Bad Speculation - Pipeline Restarts (%)"}},
-		{"BACKEND", []string{"TMA_Backend_Bound(%)", "Pipeline Utilization - Backend Bound (%)"}},
-		{"COREDATA", []string{"TMA_..Core_Bound(%)", "Pipeline Utilization - Backend Bound - CPU (%)"}},
-		{"MEMORY", []string{"TMA_..Memory_Bound(%)", "Pipeline Utilization - Backend Bound - Memory (%)"}},
-		{"RETIRING", []string{"TMA_Retiring(%)", "Pipeline Utilization - Retiring (%)"}},
-		{"LIGHTOPS", []string{"TMA_..Light_Operations(%)", "Pipeline Utilization - Retiring - Fastpath (%)"}},
-		{"HEAVYOPS", []string{"TMA_..Heavy_Operations(%)", "Pipeline Utilization - Retiring - Microcode (%)"}},
+		{"FRONTEND", []string{"TMA_Frontend_Bound(%)", "Pipeline Utilization - Frontend Bound (%)", "frontend_bound"}},
+		{"FETCHLATENCY", []string{"TMA_..Fetch_Latency(%)", "Pipeline Utilization - Frontend Bound - Latency (%)", ""}},
+		{"FETCHBANDWIDTH", []string{"TMA_..Fetch_Bandwidth(%)", "Pipeline Utilization - Frontend Bound - Bandwidth (%)", ""}},
+		{"BADSPECULATION", []string{"TMA_Bad_Speculation(%)", "Pipeline Utilization - Bad Speculation (%)", "bad_speculation"}},
+		{"BRANCHMISPREDICTS", []string{"TMA_..Branch_Mispredicts(%)", "Pipeline Utilization - Bad Speculation - Mispredicts (%)", ""}},
+		{"MACHINECLEARS", []string{"TMA_..Machine_Clears(%)", "Pipeline Utilization - Bad Speculation - Pipeline Restarts (%)", ""}},
+		{"BACKEND", []string{"TMA_Backend_Bound(%)", "Pipeline Utilization - Backend Bound (%)", "backend_bound"}},
+		{"COREDATA", []string{"TMA_..Core_Bound(%)", "Pipeline Utilization - Backend Bound - CPU (%)", ""}},
+		{"MEMORY", []string{"TMA_..Memory_Bound(%)", "Pipeline Utilization - Backend Bound - Memory (%)", ""}},
+		{"RETIRING", []string{"TMA_Retiring(%)", "Pipeline Utilization - Retiring (%)", "retiring"}},
+		{"LIGHTOPS", []string{"TMA_..Light_Operations(%)", "Pipeline Utilization - Retiring - Fastpath (%)", ""}},
+		{"HEAVYOPS", []string{"TMA_..Heavy_Operations(%)", "Pipeline Utilization - Retiring - Microcode (%)", ""}},
 	}
 	// replace the template variables with the mean value of the metric
 	for _, tmpl := range templateReplace {
@@ -451,32 +454,35 @@ func (mg *MetricGroup) loadHTMLTemplateValues(metadata Metadata, metricDefinitio
 	// these get the series data for the graphs
 	templateReplace = []tmplReplace{
 		// TMAM Tab
-		{"TMAFRONTEND", []string{"TMA_Frontend_Bound(%)", "Pipeline Utilization - Frontend Bound (%)"}},
-		{"TMABACKEND", []string{"TMA_Backend_Bound(%)", "Pipeline Utilization - Backend Bound (%)"}},
-		{"TMARETIRING", []string{"TMA_Retiring(%)", "Pipeline Utilization - Retiring (%)"}},
-		{"TMABADSPECULATION", []string{"TMA_Bad_Speculation(%)", "Pipeline Utilization - Bad Speculation (%)"}},
+		{"TMAFRONTEND", []string{"TMA_Frontend_Bound(%)", "Pipeline Utilization - Frontend Bound (%)", "frontend_bound"}},
+		{"TMABACKEND", []string{"TMA_Backend_Bound(%)", "Pipeline Utilization - Backend Bound (%)", "backend_bound"}},
+		{"TMARETIRING", []string{"TMA_Retiring(%)", "Pipeline Utilization - Retiring (%)", "retiring"}},
+		{"TMABADSPECULATION", []string{"TMA_Bad_Speculation(%)", "Pipeline Utilization - Bad Speculation (%)", "bad_speculation"}},
 		// CPU Tab
-		{"CPUUTIL", []string{"CPU utilization %", "CPU utilization %"}},
-		{"CPIDATA", []string{"CPI", "CPI"}},
-		{"CPUFREQ", []string{"CPU operating frequency (in GHz)", "CPU operating frequency (in GHz)"}},
+		{"CPUUTIL", []string{"CPU utilization %", "CPU utilization %", ""}},
+		{"CPIDATA", []string{"CPI", "CPI", ""}},
+		{"CPUFREQ", []string{"CPU operating frequency (in GHz)", "CPU operating frequency (in GHz)", ""}},
 		// Memory Tab
-		{"L1DATA", []string{"L1D MPI (includes data+rfo w/ prefetches)", ""}},
-		{"L2DATA", []string{"L2 MPI (includes code+data+rfo w/ prefetches)", ""}},
-		{"LLCDATA", []string{"LLC data read MPI (demand+prefetch)", ""}},
-		{"READDATA", []string{"memory bandwidth read (MB/sec)", "Read Memory Bandwidth (MB/sec)"}},
-		{"WRITEDATA", []string{"memory bandwidth write (MB/sec)", "Write Memory Bandwidth (MB/sec)"}},
-		{"TOTALDATA", []string{"memory bandwidth total (MB/sec)", "Total Memory Bandwidth (MB/sec)"}},
-		{"REMOTENUMA", []string{"NUMA %_Reads addressed to remote DRAM", "Remote DRAM Reads %"}},
+		{"L1DATA", []string{"L1D MPI (includes data+rfo w/ prefetches)", "", "l1d_cache_mpki"}},
+		{"L2DATA", []string{"L2 MPI (includes code+data+rfo w/ prefetches)", "", "l2_cache_mpki"}},
+		{"LLCDATA", []string{"LLC data read MPI (demand+prefetch)", "", "ll_cache_read_mpki"}},
+		{"READDATA", []string{"memory bandwidth read (MB/sec)", "Read Memory Bandwidth (MB/sec)", ""}},
+		{"WRITEDATA", []string{"memory bandwidth write (MB/sec)", "Write Memory Bandwidth (MB/sec)", ""}},
+		{"TOTALDATA", []string{"memory bandwidth total (MB/sec)", "Total Memory Bandwidth (MB/sec)", ""}},
+		{"REMOTENUMA", []string{"NUMA %_Reads addressed to remote DRAM", "Remote DRAM Reads %", ""}},
 		// Power Tab
-		{"PKGPOWER", []string{"package power (watts)", "package power (watts)"}},
-		{"DRAMPOWER", []string{"DRAM power (watts)", ""}},
+		{"PKGPOWER", []string{"package power (watts)", "package power (watts)", ""}},
+		{"DRAMPOWER", []string{"DRAM power (watts)", "", ""}},
 	}
 	// replace the template variables with the series data
 	for tIdx, tmpl := range templateReplace {
 		var timeStamps []string
 		var series [][]float64
 		for rIdx, row := range mg.rows {
-			metricRowVal := row.metrics[tmpl.metricNames[archIndex]]
+			metricRowVal, ok := row.metrics[tmpl.metricNames[archIndex]]
+			if !ok {
+				continue // metric value not present in this row
+			}
 			if math.IsNaN(metricRowVal) || math.IsInf(metricRowVal, 0) || metricRowVal < 0 {
 				metricRowVal = 0
 			}
@@ -503,12 +509,12 @@ func (mg *MetricGroup) loadHTMLTemplateValues(metadata Metadata, metricDefinitio
 	// load the TMA metrics tuning tips from resources
 	var tmaTipsBytes []byte
 	if tmaTipsBytes, err = resources.ReadFile("resources/perfmon/tma_tuning_tips.json"); err != nil {
-		slog.Error("failed to read tma_tips.json", slog.String("error", err.Error()))
+		slog.Error("failed to read tma_tuning_tips.json", slog.String("error", err.Error()))
 		return
 	}
 	tmaTips := make(map[string]tmaTip)
 	if err = json.Unmarshal(tmaTipsBytes, &tmaTips); err != nil {
-		slog.Error("failed to unmarshal tma_tips.json", slog.String("error", err.Error()))
+		slog.Error("failed to unmarshal tma_tuning_tips.json", slog.String("error", err.Error()))
 		return
 	}
 	var metricHTMLStats [][]string
