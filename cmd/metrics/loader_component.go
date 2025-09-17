@@ -263,20 +263,21 @@ func mergeSmallGroups(groups []GroupDefinition, numGPCounters int) []GroupDefini
 			}
 
 			candidateGroup := groups[j]
-			candidateGPCount := countGPEvents(candidateGroup)
+
+			// Calculate how many new unique GP events would be added by this merge
+			uniqueGPEventsToAdd := countUniqueGPEventsToAdd(currentGroup, candidateGroup)
 
 			// Check if merging would exceed the GP counter limit
-			if currentGPCount+candidateGPCount > numGPCounters {
+			if currentGPCount+uniqueGPEventsToAdd > numGPCounters {
 				continue
 			}
 
 			// Merge the groups
 			mergedGroup := mergeGroupsWithoutDuplicates(currentGroup, candidateGroup)
-			if len(mergedGroup) == len(currentGroup)+len(candidateGroup) { // No duplicates
-				currentGroup = mergedGroup
-				currentGPCount = countGPEvents(currentGroup)
-				processed[j] = true
-			}
+			// Continue with the merge if we successfully added events
+			currentGroup = mergedGroup
+			currentGPCount = countGPEvents(currentGroup)
+			processed[j] = true
 		}
 
 		mergedGroups = append(mergedGroups, currentGroup)
@@ -290,6 +291,25 @@ func countGPEvents(group GroupDefinition) int {
 	count := 0
 	for _, event := range group {
 		if event.Name != "CPU_CYCLES" {
+			count++
+		}
+	}
+	return count
+}
+
+// countUniqueGPEventsToAdd counts how many new unique GP events would be added
+// when merging target into source (excluding CPU_CYCLES and already existing events)
+func countUniqueGPEventsToAdd(source, target GroupDefinition) int {
+	// Create a map of events that already exist in source
+	existing := make(map[string]bool)
+	for _, event := range source {
+		existing[event.Name] = true
+	}
+
+	// Count unique GP events in target that don't exist in source
+	count := 0
+	for _, event := range target {
+		if !existing[event.Name] && event.Name != "CPU_CYCLES" {
 			count++
 		}
 	}
