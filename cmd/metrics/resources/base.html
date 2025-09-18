@@ -168,6 +168,81 @@
       const description = <<.DESCRIPTION>>
       const metadata = <<.METADATA>>
       const system_info = <<.SYSTEMINFO>>
+      let tmasunburst = {
+          tooltip: {},
+          series: {
+            nodeClick: false,
+            type: "sunburst",
+            radius: [60, "90%"],
+            itemStyle: {
+              borderRadius: 7,
+              borderWidth: 2,
+            },
+            data: [
+              {
+                name: "<<.FRONTEND_LABEL>>",
+                value: Math.round(<<.FRONTEND >> * 10) / 10,
+                children: [
+                  {
+                    name: "<<.FETCHBANDWIDTH_LABEL>>",
+                    value: Math.round(<<.FETCHBANDWIDTH >> * 10) / 10,
+                  },
+                  {
+                    name: "<<.FETCHLATENCY_LABEL>>",
+                    value: Math.round(<<.FETCHLATENCY >> * 10) / 10,
+                  },
+                ]
+              },
+              {
+                name: "<<.BADSPECULATION_LABEL>>",
+                value: Math.round(<<.BADSPECULATION >> * 10) / 10,
+                children: [
+                  {
+                    name: "<<.BRANCHMISPREDICTS_LABEL>>",
+                    value: Math.round(<<.BRANCHMISPREDICTS >> * 10) / 10,
+                  },
+                  {
+                    name: "<<.MACHINECLEARS_LABEL>>",
+                    value: Math.round(<<.MACHINECLEARS >> * 10) / 10,
+                  },
+                ]
+              },
+              {
+                name: "<<.BACKEND_LABEL>>",
+                value: Math.round(<<.BACKEND >> * 10) / 10,
+                children: [
+                  {
+                    name: "<<.CORE_LABEL>>",
+                    value: Math.round(<<.COREDATA >> * 10) / 10,
+                  },
+                  {
+                    name: "<<.MEMORY_LABEL>>",
+                    value: Math.round(<<.MEMORY >> * 10) / 10,
+                  },
+                ],
+              },
+              {
+                name: "<<.RETIRING_LABEL>>",
+                value: Math.round(<<.RETIRING >> * 10) / 10,
+                children: [
+                  {
+                    name: "<<.LIGHTOPS_LABEL>>",
+                    value: Math.round(<<.LIGHTOPS >> * 10) / 10,
+                  },
+                  {
+                    name: "<<.HEAVYOPS_LABEL>>",
+                    value: Math.round(<<.HEAVYOPS >> * 10) / 10,
+                  },
+                ]
+              },
+            ],
+            radius: [20, "100%"],
+            label: {
+              rotate: "radial",
+            },
+          },
+        }
+      // the common config for all line charts
       const base_line = {
         xAxis: {
           type: "category",
@@ -185,7 +260,13 @@
           trigger: 'axis',
           valueFormatter: (value) => value.toFixed(2),
         },
-        legend: {},
+        legend: {
+          orient: 'horizontal',
+          bottom: 0,
+          left: 'center',
+          show: true,
+          selectedMode: false, // Prevents toggling series visibility by clicking on legend
+        },
       }
 
       let level1tma = {
@@ -218,6 +299,7 @@
         ...base_line,
         series: [
           {
+            name: "CPU Utilization",
             type: 'line',
             data: <<.CPUUTIL>>,
           }
@@ -228,6 +310,7 @@
         ...base_line,
         series: [
           {
+            name: "CPI",
             type: 'line',
             data: <<.CPIDATA>>,
           }
@@ -238,6 +321,7 @@
         ...base_line,
         series: [
           {
+            name: "CPU Frequency",
             type: 'line',
             data: <<.CPUFREQ>>,
           }
@@ -248,6 +332,7 @@
         ...base_line,
         series: [
           {
+            name: "Remote NUMA Access",
             type: 'line',
             data: <<.REMOTENUMA>>,
           }
@@ -300,6 +385,7 @@
         ...base_line,
         series: [
           {
+            name: "Package Power",
             type: 'line',
             data: <<.PKGPOWER>>,
           }
@@ -310,6 +396,7 @@
         ...base_line,
         series: [
           {
+            name: "DRAM Power",
             type: 'line',
             data: <<.DRAMPOWER>>,
           }
@@ -418,80 +505,7 @@
                   </ul>
                 </Grid>
                 <Grid item xs={7}>
-                  <ReactECharts style={{ minHeight: "400px" }} option={{
-                    tooltip: {},
-                    series: {
-                      nodeClick: false,
-                      type: "sunburst",
-                      radius: [60, "90%"],
-                      itemStyle: {
-                        borderRadius: 7,
-                        borderWidth: 2,
-                      },
-                      data: [
-                      {
-			  name: "<<.FRONTEND_LABEL>>",
-			  value: Math.round(<<.FRONTEND>> * 10) / 10,
-                          children:[
-                            {
-			      name: "<<.FETCHBANDWIDTH_LABEL>>",
-			      value: Math.round(<<.FETCHBANDWIDTH>> * 10) / 10,
-                            },
-                            {
-			      name: "<<.FETCHLATENCY_LABEL>>",
-			      value: Math.round(<<.FETCHLATENCY>> * 10) / 10,
-                            },
-                          ]
-                        },
-                        {
-			  name: "<<.BADSPECULATION_LABEL>>",
-			  value: Math.round(<<.BADSPECULATION>> * 10) / 10,
-                          children: [
-                            {
-			      name: "<<.BRANCHMISPREDICTS_LABEL>>",
-			      value: Math.round(<<.BRANCHMISPREDICTS>> * 10) / 10,
-                            },
-                            {
-			      name: "<<.MACHINECLEARS_LABEL>>",
-			      value: Math.round(<<.MACHINECLEARS>> * 10) / 10,
-                            },
-                          ]
-                        },
-                        {
-			  name: "<<.BACKEND_LABEL>>",
-			  value: Math.round(<<.BACKEND>> * 10) / 10,
-                          children: [
-                            {
-			      name: "<<.CORE_LABEL>>",
-			      value: Math.round(<<.COREDATA>> * 10) / 10,
-                            },
-                            {
-			      name: "<<.MEMORY_LABEL>>",
-			      value: Math.round(<<.MEMORY>> * 10) / 10,
-                            },
-                          ],
-                        },
-                        {
-			  name: "<<.RETIRING_LABEL>>",
-			  value: Math.round(<<.RETIRING>> * 10) / 10,
-                          children: [
-                            {
-			      name: "<<.LIGHTOPS_LABEL>>",
-			      value: Math.round(<<.LIGHTOPS>> * 10) / 10,
-                            },
-                            {
-			      name: "<<.HEAVYOPS_LABEL>>",
-			      value: Math.round(<<.HEAVYOPS>> * 10) / 10,
-                            },
-                          ]
-                        },
-                      ],
-                      radius: [20, "100%"],
-                      label: {
-                        rotate: "radial",
-                      },
-                    },
-                  }} />
+                  <ReactECharts style={{ minHeight: "400px" }} option={tmasunburst} />
                 </Grid>
               </Grid>
               <Grid container>
