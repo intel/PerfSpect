@@ -168,8 +168,28 @@
       const description = <<.DESCRIPTION>>
       const metadata = <<.METADATA>>
       const system_info = <<.SYSTEMINFO>>
+      // Define consistent colors for TMA categories with child variations
+      const tmaColors = {
+        // Blue family for Frontend
+        'Frontend': '#5470c6',
+        'FrontendChild': '#7a90d3',  // Lighter blue for all Frontend children
+        
+        // Green family for Backend
+        'Backend': '#91cc75',
+        'BackendChild': '#b3e0a0',   // Lighter green for all Backend children
+        
+        // Yellow/Orange family for BadSpeculation
+        'BadSpeculation': '#fac858',
+        'BadSpeculationChild': '#ffda8a', // Lighter yellow for all BadSpeculation children
+        
+        // Red family for Retiring
+        'Retiring': '#ee6666',
+        'RetiringChild': '#f38989'    // Lighter red for all Retiring children
+      };
+      
       let tmasunburst = {
           tooltip: {},
+          color: [tmaColors.Frontend, tmaColors.BadSpeculation, tmaColors.Backend, tmaColors.Retiring],
           series: {
             nodeClick: false,
             type: "sunburst",
@@ -182,56 +202,68 @@
               {
                 name: "<<.FRONTEND_LABEL>>",
                 value: Math.round(<<.FRONTEND >> * 10) / 10,
+                itemStyle: { color: tmaColors.Frontend },
                 children: [
                   {
                     name: "<<.FETCHBANDWIDTH_LABEL>>",
                     value: Math.round(<<.FETCHBANDWIDTH >> * 10) / 10,
+                    itemStyle: { color: tmaColors.FrontendChild }
                   },
                   {
                     name: "<<.FETCHLATENCY_LABEL>>",
                     value: Math.round(<<.FETCHLATENCY >> * 10) / 10,
+                    itemStyle: { color: tmaColors.FrontendChild }
                   },
                 ]
               },
               {
                 name: "<<.BADSPECULATION_LABEL>>",
                 value: Math.round(<<.BADSPECULATION >> * 10) / 10,
+                itemStyle: { color: tmaColors.BadSpeculation },
                 children: [
                   {
                     name: "<<.BRANCHMISPREDICTS_LABEL>>",
                     value: Math.round(<<.BRANCHMISPREDICTS >> * 10) / 10,
+                    itemStyle: { color: tmaColors.BadSpeculationChild }
                   },
                   {
                     name: "<<.MACHINECLEARS_LABEL>>",
                     value: Math.round(<<.MACHINECLEARS >> * 10) / 10,
+                    itemStyle: { color: tmaColors.BadSpeculationChild }
                   },
                 ]
               },
               {
                 name: "<<.BACKEND_LABEL>>",
                 value: Math.round(<<.BACKEND >> * 10) / 10,
+                itemStyle: { color: tmaColors.Backend },
                 children: [
                   {
                     name: "<<.CORE_LABEL>>",
                     value: Math.round(<<.COREDATA >> * 10) / 10,
+                    itemStyle: { color: tmaColors.BackendChild }
                   },
                   {
                     name: "<<.MEMORY_LABEL>>",
                     value: Math.round(<<.MEMORY >> * 10) / 10,
+                    itemStyle: { color: tmaColors.BackendChild }
                   },
                 ],
               },
               {
                 name: "<<.RETIRING_LABEL>>",
                 value: Math.round(<<.RETIRING >> * 10) / 10,
+                itemStyle: { color: tmaColors.Retiring },
                 children: [
                   {
                     name: "<<.LIGHTOPS_LABEL>>",
                     value: Math.round(<<.LIGHTOPS >> * 10) / 10,
+                    itemStyle: { color: tmaColors.RetiringChild }
                   },
                   {
                     name: "<<.HEAVYOPS_LABEL>>",
                     value: Math.round(<<.HEAVYOPS >> * 10) / 10,
+                    itemStyle: { color: tmaColors.RetiringChild }
                   },
                 ]
               },
@@ -271,6 +303,7 @@
 
       let level1tma = {
         ...base_line,
+        color: [tmaColors.Frontend, tmaColors.Backend, tmaColors.Retiring, tmaColors.BadSpeculation],
         series: [
           {
             name: "Front-end",
