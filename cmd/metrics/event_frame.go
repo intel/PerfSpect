@@ -137,8 +137,10 @@ func parseEvents(rawEvents [][]byte) ([]Event, error) {
 		}
 		// sometimes perf will prepend "cpu/" to the topdown event names, e.g., cpu/topdown-retiring/ to x86 events, and
 		// sometimes perf will prepend armv8_pmuv*/ to the arm events, we clean them up here to match metric formulas
+		// We don't want to change power/energy-pkg, power/energy-ram, cstate_core/c6-residency, cstate_pkg/c6-residency
+		// because those are the actual event names used in the metric formulas
 		eventNameParts := strings.SplitN(event.Event, "/", 3)
-		if len(eventNameParts) == 3 {
+		if len(eventNameParts) == 3 && eventNameParts[0] != "power" && eventNameParts[0] != "cstate_core" && eventNameParts[0] != "cstate_pkg" {
 			event.Event = eventNameParts[1]
 		}
 		switch event.CounterValue {
