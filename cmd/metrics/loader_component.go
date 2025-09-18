@@ -83,9 +83,13 @@ func (l *ComponentLoader) loadMetricDefinitions(metricDefinitionOverridePath str
 		return
 	}
 
-	evaluatorFunctions := getARMEvaluatorFunctions()
+	evaluatorFunctions := getARMEvaluatorFunctions(metadata.ARMCPUID)
 	for i := range componentMetricsInFile {
-		if len(selectedMetrics) == 0 || util.ContainsIgnoreCase(selectedMetrics, componentMetricsInFile[i].getName()) {
+		// a couple ARM metrics don't have MetricExpr, skip those
+		// if selectedMetrics is empty, include all metrics
+		// otherwise, include only those in selectedMetrics
+		// comparison is case insensitive
+		if componentMetricsInFile[i].MetricExpr != "" && (len(selectedMetrics) == 0 || util.ContainsIgnoreCase(selectedMetrics, componentMetricsInFile[i].getName())) {
 			var m MetricDefinition
 			m.Name = componentMetricsInFile[i].getName()
 			m.LegacyName = componentMetricsInFile[i].getLegacyName()
@@ -102,16 +106,65 @@ func (l *ComponentLoader) loadMetricDefinitions(metricDefinitionOverridePath str
 	return metrics, nil
 }
 
-// TODO:
-func getARMEvaluatorFunctions() map[string]govaluate.ExpressionFunction {
+func getARMEvaluatorFunctions(CPUID string) map[string]govaluate.ExpressionFunction {
 	functions := make(map[string]govaluate.ExpressionFunction)
-	functions["strcmp_cpuid_str"] = func(args ...any) (any, error) {
-		if len(args) != 1 {
-			return nil, fmt.Errorf("strcmp_cpuid_str requires one argument")
+	functions["strcmp_cpuid_str"] =
+		// adapted from: https://elixir.bootlin.com/linux/v6.17-rc4/source/tools/perf/util/expr.c#L468
+		func(args ...any) (any, error) {
+			if len(args) != 1 {
+				return nil, fmt.Errorf("strcmp_cpuid_str requires one argument")
+			}
+			argStr, ok := args[0].(string)
+			if !ok {
+				return nil, fmt.Errorf("strcmp_cpuid_str argument must be a string")
+			}
+			res, err := compareCPUID(argStr, CPUID)
+			if err != nil {
+				return nil, err
+			}
+			// reverse the result to match the expected logic
+			if res == 0 {
+				return false, nil
+			}
+			return true, nil
 		}
-		return true, nil // Placeholder: always return true for now
-	}
 	return functions
+}
+
+// compareCPUID compares the argument string to the CPUID
+// adapted from: https://elixir.bootlin.com/linux/v6.17-rc4/source/tools/perf/arch/arm64/util/header.c#L91
+//
+//	Return 0 if idstr is a higher or equal to version of the same part as
+//	mapcpuid. Therefore, if mapcpuid has 0 for revision and variant then any
+//	version of idstr will match as long as it's the same CPU type.
+//
+//	Return 1 if the CPU type is different or the version of idstr is lower.
+func compareCPUID(mapCpuId string, idStr string) (int, error) {
+	mapId, err := util.ParseHex(mapCpuId)
+	if err != nil {
+		return 0, fmt.Errorf("strcmp_cpuid_str argument must be a valid hex string")
+	}
+	mapIdVariant := mapId & (0xF << 20)
+	mapIdRevision := mapId & 0xF
+	id, err := util.ParseHex(idStr)
+	if err != nil {
+		return 0, fmt.Errorf("strcmp_cpuid_str argument must be a valid hex string")
+	}
+	idVariant := id & (0xF << 20)
+	idRevision := id & 0xF
+	// compare without version first
+	idFields := ^uint64(0xF | (0xF << 20))
+	if mapId&idFields != id&idFields {
+		return 1, nil // CPU type is different
+	}
+	// id matches, now compare version
+	if mapIdVariant > idVariant {
+		return 0, nil
+	}
+	if mapIdVariant == idVariant && mapIdRevision >= idRevision {
+		return 0, nil
+	}
+	return 1, nil
 }
 
 // loadEventDefinitions -- load all event files in resources/component/<arch>/
@@ -192,7 +245,7 @@ func (l *ComponentLoader) formEventGroups(metrics []MetricDefinition, events []C
 		for variable := range metric.Variables {
 			// confirm variable is a valid event
 			if _, exists := eventNames[variable]; !exists {
-				slog.Error("Metric variable does not correspond to a known event, skipping variable", slog.String("metric", metric.Name), slog.String("variable", variable))
+				slog.Warn("Metric variable does not correspond to a known event, skipping variable", slog.String("metric", metric.Name), slog.String("variable", variable))
 				continue
 			}
 			// Add the event to the current group
@@ -220,7 +273,122 @@ func (l *ComponentLoader) formEventGroups(metrics []MetricDefinition, events []C
 	// eliminate duplicate and overlapping groups
 	groups = deduplicateGroups(groups)
 
+	// merge small groups
+	groups = mergeSmallGroups(groups, numGPCounters)
+
 	return groups, nil
+}
+
+// mergeSmallGroups merges groups that have few events, ensuring that the merged group does not exceed numGPCounters
+// CPU_CYCLES is a fixed counter and does not count against the numGPCounters limit
+// events in a group are unique (no duplicates)
+// all events in a group must be merged together
+func mergeSmallGroups(groups []GroupDefinition, numGPCounters int) []GroupDefinition {
+	// If there are 1 or 0 groups, no merging is needed
+	if len(groups) <= 1 {
+		return groups
+	}
+
+	// Sort groups by size for efficient merging (smallest first)
+	slices.SortFunc(groups, func(a, b GroupDefinition) int {
+		aGPCount := countGPEvents(a)
+		bGPCount := countGPEvents(b)
+		return aGPCount - bGPCount
+	})
+
+	var mergedGroups []GroupDefinition
+	processed := make([]bool, len(groups))
+
+	// Process groups in increasing order of size
+	for i := range groups {
+		if processed[i] {
+			continue
+		}
+
+		currentGroup := groups[i]
+		currentGPCount := countGPEvents(currentGroup)
+		processed[i] = true
+
+		// Try to merge with other unprocessed groups
+		for j := i + 1; j < len(groups); j++ {
+			if processed[j] {
+				continue
+			}
+
+			candidateGroup := groups[j]
+
+			// Calculate how many new unique GP events would be added by this merge
+			uniqueGPEventsToAdd := countUniqueGPEventsToAdd(currentGroup, candidateGroup)
+
+			// Check if merging would exceed the GP counter limit
+			if currentGPCount+uniqueGPEventsToAdd > numGPCounters {
+				continue
+			}
+
+			// Merge the groups
+			mergedGroup := mergeGroupsWithoutDuplicates(currentGroup, candidateGroup)
+			// Continue with the merge if we successfully added events
+			currentGroup = mergedGroup
+			currentGPCount = countGPEvents(currentGroup)
+			processed[j] = true
+		}
+
+		mergedGroups = append(mergedGroups, currentGroup)
+	}
+
+	return mergedGroups
+}
+
+// countGPEvents counts the number of general purpose events (excluding CPU_CYCLES)
+func countGPEvents(group GroupDefinition) int {
+	count := 0
+	for _, event := range group {
+		if event.Name != "CPU_CYCLES" {
+			count++
+		}
+	}
+	return count
+}
+
+// countUniqueGPEventsToAdd counts how many new unique GP events would be added
+// when merging target into source (excluding CPU_CYCLES and already existing events)
+func countUniqueGPEventsToAdd(source, target GroupDefinition) int {
+	// Create a map of events that already exist in source
+	existing := make(map[string]bool)
+	for _, event := range source {
+		existing[event.Name] = true
+	}
+
+	// Count unique GP events in target that don't exist in source
+	count := 0
+	for _, event := range target {
+		if !existing[event.Name] && event.Name != "CPU_CYCLES" {
+			count++
+		}
+	}
+	return count
+}
+
+// mergeGroupsWithoutDuplicates merges two groups into one, avoiding duplicates
+func mergeGroupsWithoutDuplicates(a, b GroupDefinition) GroupDefinition {
+	merged := make(GroupDefinition, len(a))
+	copy(merged, a)
+
+	// Track existing event names
+	existing := make(map[string]bool)
+	for _, event := range merged {
+		existing[event.Name] = true
+	}
+
+	// Add non-duplicate events from group b
+	for _, event := range b {
+		if !existing[event.Name] {
+			merged = append(merged, event)
+			existing[event.Name] = true
+		}
+	}
+
+	return merged
 }
 
 func initializeComponentMetricVariables(expression string) map[string]int {
@@ -293,11 +461,11 @@ func isInteger(s string) bool {
 
 func initializeComponentMetricEvaluable(expression string, evaluatorFunctions map[string]govaluate.ExpressionFunction, metadata Metadata) *govaluate.EvaluableExpression {
 	// replace #slots with metadata.ARMSlots
-	expression = strings.ReplaceAll(expression, "#slots", fmt.Sprintf("%d", metadata.ARMSlots))
+	transformedExpression := strings.ReplaceAll(expression, "#slots", fmt.Sprintf("%d", metadata.ARMSlots))
 	// replace if else with ?:
-	expression, err := transformExpression(expression)
+	transformedExpression, err := transformExpression(transformedExpression)
 	if err != nil {
-		slog.Error("Failed to transform expression", slog.String("expression", expression), slog.String("error", err.Error()))
+		slog.Error("Failed to transform expression", slog.String("expression", transformedExpression), slog.String("error", err.Error()))
 		return nil
 	}
 	// govaluate doesn't like: strcmp_cpuid_str(0x410fd493)
@@ -305,12 +473,28 @@ func initializeComponentMetricEvaluable(expression string, evaluatorFunctions ma
 	// quote the hex number
 	// look for (0x....) and replace with ("0x....")
 	rxHex := regexp.MustCompile(`\((0x[0-9a-fA-F]+)\)`)
-	expression = rxHex.ReplaceAllString(expression, `("$1")`)
+	transformedExpression = rxHex.ReplaceAllString(transformedExpression, `("$1")`)
+	// govaluate doesn't like: strcmp_cpuid_str(0x410fd490) ^ 1
+	// so we replace it with !strcmp_cpuid_str(0x410fd490)
+	rxInvertedStrcmp := regexp.MustCompile(`strcmp_cpuid_str\("0x[0-9a-fA-F]+"\)\s*\^\s*1`)
+	transformedExpression = rxInvertedStrcmp.ReplaceAllStringFunc(transformedExpression, func(match string) string {
+		// Extract the argument inside strcmp_cpuid_str(...)
+		rxArg := regexp.MustCompile(`strcmp_cpuid_str\("0x[0-9a-fA-F]+"\)`)
+		argMatch := rxArg.FindString(match)
+		if argMatch != "" {
+			return "!" + argMatch
+		}
+		return match // Should not happen, but return the original match if extraction fails
+	})
+
+	if transformedExpression != expression {
+		slog.Debug("Transformed metric expression", slog.String("original", expression), slog.String("transformed", transformedExpression))
+	}
 
 	// create govaluate expression
-	expr, err := govaluate.NewEvaluableExpressionWithFunctions(expression, evaluatorFunctions)
+	expr, err := govaluate.NewEvaluableExpressionWithFunctions(transformedExpression, evaluatorFunctions)
 	if err != nil {
-		slog.Error("Failed to parse metric expression", slog.String("expression", expression), slog.String("error", err.Error()))
+		slog.Error("Failed to parse metric expression", slog.String("expression", transformedExpression), slog.String("error", err.Error()))
 		return nil
 	}
 	return expr
