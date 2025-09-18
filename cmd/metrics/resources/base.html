@@ -332,7 +332,7 @@
         ...base_line,
         series: [
           {
-            name: "CPU Utilization",
+            name: "CPU Utilization %",
             type: 'line',
             data: <<.CPUUTIL>>,
           }
@@ -354,7 +354,7 @@
         ...base_line,
         series: [
           {
-            name: "CPU Frequency",
+            name: "CPU Frequency (GHz)",
             type: 'line',
             data: <<.CPUFREQ>>,
           }
@@ -365,7 +365,7 @@
         ...base_line,
         series: [
           {
-            name: "Remote NUMA Access",
+            name: "Remote DRAM Reads %",
             type: 'line',
             data: <<.REMOTENUMA>>,
           }
@@ -418,7 +418,7 @@
         ...base_line,
         series: [
           {
-            name: "Package Power",
+            name: "Package Power (Watts)",
             type: 'line',
             data: <<.PKGPOWER>>,
           }
@@ -429,7 +429,7 @@
         ...base_line,
         series: [
           {
-            name: "DRAM Power",
+            name: "DRAM Power (Watts)",
             type: 'line',
             data: <<.DRAMPOWER>>,
           }
@@ -622,7 +622,7 @@
                     Remote DRAM reads %
                   </Typography>
                   <Typography variant="body1">
-                    The memory reads that miss the last level cache (LLC) and are addressed to another socket's DRAM (remote DRAM) as a percentage of total memory read accesses. This does not include LLC prefetches.
+                    The memory reads that miss the last level cache (LLC) and are addressed to remote DRAM as a percentage of total memory read accesses. This does not include LLC prefetches.
                   </Typography>
                 </Grid>
                 <Grid item xs={7}>
@@ -635,7 +635,7 @@
                     Cache MPI (misses per instruction)
                   </Typography>
                   <Typography variant="body1">
-                    The ratio of the number of requests missing cache to the total number of completed instructions, at each level of cache (L1, L2 and LLC)
+                    The ratio of the number of requests missing cache to the total number of completed instructions, at each level of cache (L1d, L2 and LLC)
                   </Typography>
                 </Grid>
                 <Grid item xs={7}>
