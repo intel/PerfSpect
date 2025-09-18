@@ -21,7 +21,7 @@ import (
 	texttemplate "text/template" // nosemgrep
 	"time"
 
-	"github.com/Knetic/govaluate"
+	"github.com/casbin/govaluate"
 )
 
 func summarizeMetrics(localOutputDir string, targetName string, metadata Metadata, metricDefinitions []MetricDefinition) ([]string, error) {

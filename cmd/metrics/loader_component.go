@@ -14,7 +14,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/Knetic/govaluate"
+	"github.com/casbin/govaluate"
 )
 
 func (l *ComponentLoader) Load(loaderConfig LoaderConfig) ([]MetricDefinition, []GroupDefinition, error) {
