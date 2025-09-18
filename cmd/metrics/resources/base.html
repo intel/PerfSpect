@@ -165,9 +165,17 @@
 
       const all_metrics = <<.ALLMETRICS>>
       const [current_metrics, setCurrent_metrics] = React.useState(JSON.parse(JSON.stringify(all_metrics)));
+      const [hasHighlightedMetrics, setHasHighlightedMetrics] = React.useState(false);
       const description = <<.DESCRIPTION>>
       const metadata = <<.METADATA>>
       const system_info = <<.SYSTEMINFO>>
+      
+      // Check for highlighted metrics whenever current_metrics changes
+      React.useEffect(() => {
+        // Look for any metrics that exceed their thresholds
+        const hasHighlighted = current_metrics.some(row => row[5] === "Yes");
+        setHasHighlightedMetrics(hasHighlighted);
+      }, [current_metrics]);
       // Define consistent colors for TMA categories with child variations
       const tmaColors = {
         // Blue family for Frontend
@@ -704,7 +712,7 @@
                   </TableHead>
                   <TableBody>
                     {current_metrics.map((row) => {
-                      // Check if this metric has exceed its threshold
+                      // Check if this metric has exceeded its threshold
                       const exceedsThreshold = row[5] == "Yes";
                       return (
                         <TableRow
@@ -823,23 +831,25 @@
                   </TableBody>
                 </Table>
               </TableContainer>
-              <Box sx={{ marginTop: "16px" }}>
-                <Alert 
-                  severity="warning" 
-                  sx={{ 
-                    marginBottom: "24px",
-                    backgroundColor: 'rgba(255, 255, 0, 0.2)',
-                    '& .MuiAlert-icon': {
-                      color: 'rgba(0, 0, 0, 0.7)'
-                    },
-                    '& .MuiAlert-message': {
-                      color: 'rgba(0, 0, 0, 0.7)'
-                    }
-                  }}
-              >
-                Metrics with a mean value exceeding their threshold formula are highlighted in yellow, indicating potential performance issues or anomalies that may require further investigation. Hover over the warning icon next to the mean value for more information.
-              </Alert>
-              </Box>
+              {hasHighlightedMetrics && (
+                <Box sx={{ marginTop: "16px" }}>
+                  <Alert 
+                    severity="warning" 
+                    sx={{ 
+                      marginBottom: "24px",
+                      backgroundColor: 'rgba(255, 255, 0, 0.2)',
+                      '& .MuiAlert-icon': {
+                        color: 'rgba(0, 0, 0, 0.7)'
+                      },
+                      '& .MuiAlert-message': {
+                        color: 'rgba(0, 0, 0, 0.7)'
+                      }
+                    }}
+                >
+                  Metrics with a mean value exceeding their threshold formula are highlighted in yellow, indicating potential performance issues or anomalies that may require further investigation. Hover over the warning icon next to the mean value for more information.
+                </Alert>
+                </Box>
+              )}
             </TabPanel>
             <TabPanel
               value={systemTabs}
