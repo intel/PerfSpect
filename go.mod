@@ -13,7 +13,7 @@ replace (
 )
 
 require (
-	github.com/Knetic/govaluate v3.0.0+incompatible
+	github.com/casbin/govaluate v1.10.0
 	github.com/deckarep/golang-set/v2 v2.8.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.2
