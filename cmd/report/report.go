@@ -135,6 +135,7 @@ var benchmarkOptions = []string{
 	"frequency",
 	"memory",
 	"numa",
+	"stream",
 	"storage",
 }
 
@@ -147,6 +148,7 @@ var benchmarkTableNames = map[string][]string{
 	"frequency":   {report.FrequencyBenchmarkTableName},
 	"memory":      {report.MemoryBenchmarkTableName},
 	"numa":        {report.NUMABenchmarkTableName},
+	"stream":      {report.StreamBenchmarkTableName},
 	"storage":     {report.StorageBenchmarkTableName},
 }
 

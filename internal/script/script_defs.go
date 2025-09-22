@@ -102,6 +102,7 @@ const (
 	// benchmark scripts
 	MemoryBenchmarkScriptName    = "memory benchmark"
 	NumaBenchmarkScriptName      = "numa benchmark"
+	StreamBenchmarkScriptName    = "stream benchmark"
 	SpeedBenchmarkScriptName     = "speed benchmark"
 	FrequencyBenchmarkScriptName = "frequency benchmark"
 	PowerBenchmarkScriptName     = "power benchmark"
@@ -995,6 +996,119 @@ echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages
 		Lkms:          []string{"msr"},
 		Depends:       []string{"mlc"},
 		Sequential:    true,
+	},
+	StreamBenchmarkScriptName: {
+		Name: StreamBenchmarkScriptName,
+		ScriptTemplate: `
+# The general rule for STREAM is that each array must be at least 4x the size of the sum of all 
+# the last-level caches used in the run, or 1 Million elements -- whichever is larger.
+#
+# Get the total LLC (Last Level Cache) size from lscpu
+# Example: "L3 cache:                             672 MiB (2 instances)"
+llc_info=$(lscpu | grep "L3 cache")
+llc_detected=true
+
+if [[ -z "$llc_info" ]]; then
+    echo "Error: L3 cache information not found. Cannot proceed with STREAM benchmark."
+    llc_detected=false
+    llc_size_bytes=0
+else
+    # Extract cache size value and unit
+    llc_size=$(echo "$llc_info" | awk '{print $3}')
+    llc_unit=$(echo "$llc_info" | awk '{print $4}')
+    
+    # Extract number of instances, default to 1 if not found
+    if [[ "$llc_info" =~ \(([0-9]+)[[:space:]]*instance ]]; then
+        instances=${BASH_REMATCH[1]}
+    else
+        instances=1
+        echo "Warning: Could not determine number of cache instances. Assuming 1 instance."
+    fi
+    
+    # Convert to bytes based on unit
+    case "$llc_unit" in
+        "KiB")
+            llc_size_bytes=$((llc_size * 1024 * instances))
+            ;;
+        "MiB")
+            llc_size_bytes=$((llc_size * 1024 * 1024 * instances))
+            ;;
+        "GiB")
+            llc_size_bytes=$((llc_size * 1024 * 1024 * 1024 * instances))
+            ;;
+        *)
+            echo "Warning: Unknown cache size unit: $llc_unit. Defaulting to KiB."
+            llc_size_bytes=$((llc_size * 1024 * instances))
+            ;;
+    esac
+fi
+
+# Check if we have a valid LLC size
+if [[ $llc_size_bytes -le 0 ]]; then
+    echo "Warning: Invalid L3 cache size detected: $llc_size_bytes bytes"
+    llc_detected=false
+    # Set a reasonable default - 1 million elements
+    min_array_elements=1000000
+else
+    echo "Total L3 cache size: $((llc_size_bytes / 1024 / 1024)) MiB across $instances instance(s)"
+    min_array_size=$((4 * llc_size_bytes))
+    min_array_elements=$((min_array_size / 8)) # Assuming double precision (8 bytes per element)
+fi
+# Ensure we meet the minimum requirement of 1 million elements
+if [[ $min_array_elements -lt 1000000 ]]; then
+    echo "Minimum array size (1 million elements) exceeds 4x L3 cache size"
+    min_array_elements=1000000
+else
+    echo "Using array size of $min_array_elements elements (4x L3 cache size)"
+    echo "This equals $((min_array_elements * 8 / 1024 / 1024)) MiB per array, $((3 * min_array_elements * 8 / 1024 / 1024)) MiB total"
+fi
+
+# Log cache detection status for clarity
+if [[ "$llc_detected" == "true" ]]; then
+    echo "LLC detection: Successful"
+else
+    echo "LLC detection: Failed"
+fi
+
+# Set array size based on the detected LLC size
+array_size=$min_array_elements
+
+# Exit if LLC wasn't detected
+if [[ "$llc_detected" == "false" ]]; then
+    echo "Cannot run STREAM benchmark without LLC information."
+    exit 1
+fi
+thp_enabled=$( cat /sys/kernel/mm/transparent_hugepage/enabled | grep -o '\[.*\]' | tr -d '[]' )
+if [ "$thp_enabled" != "always" ]; then
+	echo "Transparent Hugepages (THP) are not enabled. Enabling THP for the benchmark."
+	echo always > /sys/kernel/mm/transparent_hugepage/enabled
+fi
+thp_defrag=$( cat /sys/kernel/mm/transparent_hugepage/defrag | grep -o '\[.*\]' | tr -d '[]' )
+if [ "$thp_defrag" != "always" ]; then
+	echo "Transparent Hugepages (THP) defrag is not set to 'always'. Setting it to 'always' for the benchmark."
+	echo always > /sys/kernel/mm/transparent_hugepage/defrag
+fi
+# Clear caches and compact memory before running the benchmark
+echo 3 > /proc/sys/vm/drop_caches
+echo 1 > /proc/sys/vm/compact_memory
+
+echo "Running STREAM benchmark with array size of $array_size elements"
+echo "($(($array_size * 8 / 1024 / 1024)) MiB per array, $((3 * $array_size * 8 / 1024 / 1024)) MiB total)"
+
+# Run the STREAM benchmark with the calculated optimal array size
+./stream -s $array_size -n 100
+
+# Restore original THP settings
+if [ "$thp_enabled" != "always" ]; then
+	echo "$thp_enabled" > /sys/kernel/mm/transparent_hugepage/enabled
+fi
+if [ "$thp_defrag" != "always" ]; then
+	echo "$thp_defrag" > /sys/kernel/mm/transparent_hugepage/defrag
+fi
+`,
+		Superuser:  true,
+		Depends:    []string{"stream"},
+		Sequential: true,
 	},
 	SpeedBenchmarkScriptName: {
 		Name: SpeedBenchmarkScriptName,

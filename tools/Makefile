@@ -7,9 +7,9 @@
 NPROC := $(shell nproc)
 
 default: tools-x86_64
-.PHONY: default tools tools-aarch64 tools-x86_64 async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm perf-x86_64 processwatch spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc turbostat
+.PHONY: default tools tools-aarch64 tools-x86_64 async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm perf-x86_64 processwatch spectre-meltdown-checker sshpass stackcollapse-perf stream stress-ng sysstat tsc turbostat
 
-tools-x86_64: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc turbostat
+tools-x86_64: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm spectre-meltdown-checker sshpass stackcollapse-perf stream stress-ng sysstat tsc turbostat
 	mkdir -p bin/x86_64
 	cp -R async-profiler bin/x86_64/
 	cp avx-turbo/avx-turbo bin/x86_64/
@@ -29,6 +29,7 @@ tools-x86_64: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw
 	cp perf-archive/perf-archive.sh bin/x86_64/perf-archive && chmod +rx bin/x86_64/perf-archive
 	cp spectre-meltdown-checker/spectre-meltdown-checker.sh bin/x86_64/
 	cp sshpass/sshpass bin/x86_64/
+	cp stream/stream bin/x86_64/
 	cp stress-ng/stress-ng bin/x86_64/
 	cp sysstat/mpstat bin/x86_64/
 	cp sysstat/iostat bin/x86_64/
@@ -38,7 +39,7 @@ tools-x86_64: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw
 	cp linux_turbostat/tools/power/x86/turbostat/turbostat bin/x86_64/
 	cd bin/x86_64 && strip --strip-unneeded * || true
 
-tools-aarch64: async-profiler-aarch64 dmidecode-aarch64 ethtool-aarch64 fio-aarch64 ipmitool-aarch64 lshw-aarch64 lspci-aarch64 spectre-meltdown-checker sshpass-aarch64 stackcollapse-perf-aarch64 stress-ng-aarch64 sysstat-aarch64
+tools-aarch64: async-profiler-aarch64 dmidecode-aarch64 ethtool-aarch64 fio-aarch64 ipmitool-aarch64 lshw-aarch64 lspci-aarch64 spectre-meltdown-checker sshpass-aarch64 stackcollapse-perf-aarch64 stream-aarch64 stress-ng-aarch64 sysstat-aarch64
 	mkdir -p bin/aarch64
 	cp -R async-profiler-aarch64 bin/aarch64/async-profiler
 	cp dmidecode-aarch64/dmidecode bin/aarch64/
@@ -53,6 +54,7 @@ tools-aarch64: async-profiler-aarch64 dmidecode-aarch64 ethtool-aarch64 fio-aarc
 	cp spectre-meltdown-checker/spectre-meltdown-checker.sh bin/aarch64/
 	cp sshpass-aarch64/sshpass bin/aarch64/
 	cp stress-ng-aarch64/stress-ng bin/aarch64/
+	cp stream/stream-aarch64 bin/aarch64/stream
 	cp sysstat-aarch64/mpstat bin/aarch64/
 	cp sysstat-aarch64/iostat bin/aarch64/
 	cp sysstat-aarch64/sar bin/aarch64/
@@ -338,6 +340,12 @@ stackcollapse-perf:
 
 stackcollapse-perf-aarch64:
 	cd stackcollapse-perf && CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o $@
+
+stream:
+	cd stream && gcc -O -fopenmp stream.c -o $@
+
+stream-aarch64:
+	cd stream && gcc -O -fopenmp stream.c -o $@
 
 STRESS_NG_VERSION := "V0.13.08"
 stress-ng:

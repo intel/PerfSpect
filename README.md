@@ -86,6 +86,7 @@ To assist in evaluating the health of target systems, the `report` command can r
 | frequency | runs [avx-turbo](https://github.com/travisdowns/avx-turbo) to measure scalar and AVX frequencies across processor's cores. **Note:** Runtime increases with core count.  |
 | memory | runs [Intel(r) Memory Latency Checker](https://www.intel.com/content/www/us/en/download/736633/intel-memory-latency-checker-intel-mlc.html) (MLC) to measure memory bandwidth and latency across a load range. **Note: MLC is not included with PerfSpect.** It can be downloaded from [here](https://www.intel.com/content/www/us/en/download/736633/intel-memory-latency-checker-intel-mlc.html). Once downloaded, extract the Linux executable and place it in the perfspect/tools/x86_64 directory. |
 | numa | runs Intel(r) Memory Latency Checker(MLC) to measure bandwidth between NUMA nodes. See Note above about downloading MLC. |
+| stream | runs the [stream](https://www.cs.virginia.edu/stream/) benchmark to measure sustainable memory bandwidth and the corresponding computation rate for simple vector kernels. | **Note:** The array size is set to 4X the last level cache size or 1M elements, whichever is larger. |
 | storage | runs [fio](https://github.com/axboe/fio) for 2 minutes in read/write mode with a single worker to measure single-thread read and write bandwidth. Use the --storage-dir flag to override the default location. Minimum 5GB disk space required to run test. |
 
 #### Telemetry Command

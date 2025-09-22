@@ -1924,3 +1924,92 @@ func maxRenderDepthFromOutput(outputs map[string]script.ScriptOutput) string {
 	}
 	return ""
 }
+
+// streamFromOutput parses the output from the STREAM memory bandwidth benchmark.
+// It extracts the "Best Rate MB/s" values for the Copy, Scale, Add, and Triad operations.
+// Returns empty strings if the benchmark output is missing or invalid.
+func streamFromOutput(outputs map[string]script.ScriptOutput) (copy, scale, add, triad string) {
+	// example stream output:
+	// -------------------------------------------------------------
+	// STREAM version $Revision: 5.10 $
+	// -------------------------------------------------------------
+	// This system uses 8 bytes per array element.
+	// -------------------------------------------------------------
+	// Array size = 100000000 (elements), Offset = 56 (elements)
+	// Memory per array = 762.9 MiB (= 0.7 GiB).
+	// Total memory required = 2288.8 MiB (= 2.2 GiB).
+	// Each kernel will be executed 10 times.
+	//  The *best* time for each kernel (excluding the first iteration)
+	//  will be used to compute the reported bandwidth.
+	// -------------------------------------------------------------
+	// Number of Threads requested = 4
+	// Number of Threads counted = 4
+	// -------------------------------------------------------------
+	// Your clock granularity/precision appears to be 1 microseconds.
+	// Each test below will take on the order of 49865 microseconds.
+	//    (= 49865 clock ticks)
+	// Increase the size of the arrays if this shows that
+	// you are not getting at least 20 clock ticks per test.
+	// -------------------------------------------------------------
+	// WARNING -- The above is only a rough guideline.
+	// For best results, please be sure you know the
+	// precision of your system timer.
+	// -------------------------------------------------------------
+	// Function    Best Rate MB/s  Avg time     Min time     Max time
+	// Copy:           30121.6     0.058569     0.053118     0.061632
+	// Scale:          31178.2     0.060676     0.051318     0.072578
+	// Add:            33726.8     0.076236     0.071160     0.081630
+	// Triad:          32308.4     0.078381     0.074284     0.089322
+	// -------------------------------------------------------------
+	// Solution Validates: avg error less than 1.000000e-13 on all three arrays
+	// -------------------------------------------------------------
+
+	// parse Best Rate for copy, scale, add and triad from stream output
+	streamOutput := outputs[script.StreamBenchmarkScriptName]
+
+	if streamOutput.Stdout == "" || streamOutput.Exitcode != 0 {
+		slog.Warn("Stream benchmark output is empty or exited with error",
+			"exitcode", streamOutput.Exitcode,
+			"stdout", streamOutput.Stdout,
+			"stderr", streamOutput.Stderr)
+		return "", "", "", ""
+	}
+
+	// Regular expressions to extract Best Rate MB/s values for each function
+	// The pattern matches the line format from STREAM benchmark output:
+	// Function    Best Rate MB/s  Avg time     Min time     Max time
+	// Copy:           30121.6     0.058569     0.053118     0.061632
+	copyRe := regexp.MustCompile(`Copy:\s+(\d+\.\d+)`)
+	scaleRe := regexp.MustCompile(`Scale:\s+(\d+\.\d+)`)
+	addRe := regexp.MustCompile(`Add:\s+(\d+\.\d+)`)
+	triadRe := regexp.MustCompile(`Triad:\s+(\d+\.\d+)`)
+
+	// Extract the values
+	copyMatch := copyRe.FindStringSubmatch(streamOutput.Stdout)
+	scaleMatch := scaleRe.FindStringSubmatch(streamOutput.Stdout)
+	addMatch := addRe.FindStringSubmatch(streamOutput.Stdout)
+	triadMatch := triadRe.FindStringSubmatch(streamOutput.Stdout)
+
+	// Check matches and assign values
+	if len(copyMatch) > 1 {
+		copy = copyMatch[1]
+	}
+	if len(scaleMatch) > 1 {
+		scale = scaleMatch[1]
+	}
+	if len(addMatch) > 1 {
+		add = addMatch[1]
+	}
+	if len(triadMatch) > 1 {
+		triad = triadMatch[1]
+	}
+
+	// Log the results
+	slog.Debug("Stream benchmark results parsed",
+		"copy", copy,
+		"scale", scale,
+		"add", add,
+		"triad", triad)
+
+	return copy, scale, add, triad
+}

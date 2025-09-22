@@ -114,6 +114,7 @@ const (
 	FrequencyBenchmarkTableName   = "Frequency Benchmark"
 	MemoryBenchmarkTableName      = "Memory Benchmark"
 	NUMABenchmarkTableName        = "NUMA Benchmark"
+	StreamBenchmarkTableName      = "STREAM-like Benchmark"
 	StorageBenchmarkTableName     = "Storage Benchmark"
 	// telemetry table names
 	CPUUtilizationTelemetryTableName        = "CPU Utilization Telemetry"
@@ -652,6 +653,14 @@ var tableDefinitions = map[string]TableDefinition{
 		},
 		NoDataFound: "No NUMA benchmark data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
 		FieldsFunc:  numaBenchmarkTableValues},
+	StreamBenchmarkTableName: {
+		Name:      StreamBenchmarkTableName,
+		MenuLabel: StreamBenchmarkTableName,
+		HasRows:   false,
+		ScriptNames: []string{
+			script.StreamBenchmarkScriptName,
+		},
+		FieldsFunc: streamBenchmarkTableValues},
 	StorageBenchmarkTableName: {
 		Name:      StorageBenchmarkTableName,
 		MenuLabel: StorageBenchmarkTableName,
@@ -2301,6 +2310,16 @@ func numaBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
 		return []Field{}
 	}
 	return fields
+}
+
+func streamBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
+	copy, scale, add, triad := streamFromOutput(outputs)
+	return []Field{
+		{Name: "Copy (MB/s)", Values: []string{copy}},
+		{Name: "Scale (MB/s)", Values: []string{scale}},
+		{Name: "Add (MB/s)", Values: []string{add}},
+		{Name: "Triad (MB/s)", Values: []string{triad}},
+	}
 }
 
 func storageBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
