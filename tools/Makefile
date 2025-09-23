@@ -342,10 +342,10 @@ stackcollapse-perf-aarch64:
 	cd stackcollapse-perf && CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o $@
 
 stream:
-	cd stream && gcc -O -fopenmp stream.c -o $@
+	cd stream && gcc -O3 -fopenmp -DSTREAM_TYPE=double stream.c -o $@
 
 stream-aarch64:
-	cd stream && gcc -O -fopenmp stream.c -o $@
+	cd stream && aarch64-linux-gnu-gcc -O3 -fopenmp -DSTREAM_TYPE=double stream.c -o $@
 
 STRESS_NG_VERSION := "V0.13.08"
 stress-ng:
