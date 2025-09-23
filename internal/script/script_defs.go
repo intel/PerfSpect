@@ -1092,6 +1092,49 @@ fi
 echo 3 > /proc/sys/vm/drop_caches
 echo 1 > /proc/sys/vm/compact_memory
 
+# Get the number of physical cores from lscpu
+cores_per_socket=$(lscpu | grep "Core(s) per socket" | awk '{print $4}')
+if [[ -z "$cores_per_socket" ]]; then
+    echo "Error: Failed to determine cores per socket from lscpu output."
+    exit 1
+fi
+
+sockets=$(lscpu | grep "Socket(s)" | awk '{print $2}')
+if [[ -z "$sockets" ]]; then
+    echo "Error: Failed to determine number of sockets from lscpu output."
+    exit 1
+fi
+
+echo "Detected $cores_per_socket cores per socket across $sockets socket(s)"
+num_physical_cores=$((cores_per_socket * sockets))
+
+# Exit with error if we couldn't determine the core count
+if [[ -z "$num_physical_cores" || "$num_physical_cores" -le 0 ]]; then
+    echo "Error: Could not determine the number of physical cores."
+    echo "STREAM benchmark requires knowing the number of physical cores for proper thread configuration."
+    exit 1
+fi
+
+echo "Using $num_physical_cores physical cores for STREAM benchmark"
+export OMP_NUM_THREADS=$num_physical_cores
+
+# Set KMP settings for optimal performance based on SMT enabled/disabled
+# https://www.intel.com/content/www/us/en/developer/articles/technical/optimizing-memory-bandwidth-on-stream-triad.html
+# If SMT is enabled, use 'granularity=fine,compact,1,0'
+# If SMT is disabled, use 'compact'
+smt_enabled=$(lscpu | grep "Thread(s) per core" | awk '{print $4}')
+if [[ -z "$smt_enabled" ]]; then
+	echo "Error: Failed to determine if SMT is enabled from lscpu output."
+	exit 1
+fi
+if [[ "$smt_enabled" -gt 1 ]]; then
+	echo "SMT is enabled with $smt_enabled threads per core. Setting KMP_AFFINITY to 'granularity=fine,compact,1,0'"
+	export KMP_AFFINITY=granularity=fine,compact,1,0
+else
+	echo "SMT is disabled. Setting KMP_AFFINITY to 'compact'"
+	export KMP_AFFINITY=compact
+fi
+
 echo "Running STREAM benchmark with array size of $array_size elements"
 echo "($(($array_size * 8 / 1024 / 1024)) MiB per array, $((3 * $array_size * 8 / 1024 / 1024)) MiB total)"
 
