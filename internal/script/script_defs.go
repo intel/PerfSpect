@@ -655,7 +655,7 @@ do
 	# 5 isa frequencies per bucket (AVX, AVX2, AVX-512, AVX-512 heavy, AMX)
 	for((j=0; j<5; j++))
 	do
-		offset=$((j*8 + 264)) // 264 is 0x108 (SST_TF_INFO_2) AVX
+		offset=$((j*8 + 264)) # 264 is 0x108 (SST_TF_INFO_2) AVX
 		if ! freq=$(pcm-tpmi 5 $offset -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}'); then
 			echo "Error: Failed to get frequency for instruction set $j in bucket $i" >&2
 			exit 1
