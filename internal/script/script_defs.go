@@ -604,13 +604,27 @@ done
 	SSTTFHPScriptName: {
 		Name: SSTTFHPScriptName,
 		ScriptTemplate: `# Is SST-TF supported?
-supported=$(pcm-tpmi 5 0xF8 -d -b 12:12 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
+if ! supported=$(pcm-tpmi 5 0xF8 -d -b 12:12 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}'); then
+    echo "Error: Failed to check if SST-TF is supported" >&2
+    exit 1
+fi
+if [[ ! "$supported" =~ ^[0-9]+$ ]]; then
+	echo "Error: Invalid output from pcm-tpmi when checking support" >&2
+	exit 1
+fi
 if [ "$supported" -eq 0 ]; then
 	echo "SST-TF is not supported"
 	exit 0
 fi
 # Is SST-TF enabled?
-enabled=$(pcm-tpmi 5 0x78 -d -b 9:9 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
+if ! enabled=$(pcm-tpmi 5 0x78 -d -b 9:9 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}'); then
+    echo "Error: Failed to check if SST-TF is enabled" >&2
+    exit 1
+fi
+if [[ ! "$enabled" =~ ^[0-9]+$ ]]; then
+	echo "Error: Invalid output from pcm-tpmi when checking enabled status" >&2
+	exit 1
+fi
 if [ "$enabled" -eq 0 ]; then
 	echo "SST-TF is not enabled"
 	exit 0
@@ -622,7 +636,14 @@ do
 	# Get the # of cores in this bucket
 	bithigh=$((i*8+7))
 	bitlow=$((i*8))
-	numcores=$(pcm-tpmi 5 0x100 -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
+	if ! numcores=$(pcm-tpmi 5 0x100 -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}'); then
+		echo "Error: Failed to get number of cores for bucket $i" >&2
+		exit 1
+	fi
+	if [[ ! "$numcores" =~ ^[0-9]+$ ]]; then
+		echo "Error: Invalid output from pcm-tpmi when getting number of cores for bucket $i" >&2
+		exit 1
+	fi
 	# if the number of cores is 0, skip this bucket
 	if [ "$numcores" -eq 0 ]; then
 		continue
@@ -635,7 +656,14 @@ do
 	for((j=0; j<5; j++))
 	do
 		offset=$((j*8 + 264)) // 264 is 0x108 (SST_TF_INFO_2) AVX
-		freq=$(pcm-tpmi 5 $offset -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
+		if ! freq=$(pcm-tpmi 5 $offset -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}'); then
+			echo "Error: Failed to get frequency for instruction set $j in bucket $i" >&2
+			exit 1
+		fi
+		if [[ ! "$freq" =~ ^[0-9]+$ ]]; then
+			echo "Error: Invalid frequency value for instruction set $j in bucket $i" >&2
+			exit 1
+		fi
 		echo -n "$freq"
 		if [ $j -lt 4 ]; then
 			echo -n ","
@@ -653,13 +681,29 @@ done
 	SSTTFLPScriptName: {
 		Name: SSTTFLPScriptName,
 		ScriptTemplate: `# Is SST-TF supported?
-supported=$(pcm-tpmi 5 0xF8 -d -b 12:12 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
+if ! supported=$(pcm-tpmi 5 0xF8 -d -b 12:12 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}'); then
+    echo "Error: Failed to check if SST-TF is supported" >&2
+    exit 1
+fi
+if [[ ! "$supported" =~ ^[0-9]+$ ]]; then
+	echo "Error: Invalid output from pcm-tpmi when checking support" >&2
+	exit 1
+fi
+
 if [ "$supported" -eq 0 ]; then
 	echo "SST-TF is not supported"
 	exit 0
 fi
 # Is SST-TF enabled?
-enabled=$(pcm-tpmi 5 0x78 -d -b 9:9 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
+if ! enabled=$(pcm-tpmi 5 0x78 -d -b 9:9 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}'); then
+    echo "Error: Failed to check if SST-TF is enabled" >&2
+    exit 1
+fi
+if [[ ! "$enabled" =~ ^[0-9]+$ ]]; then
+	echo "Error: Invalid output from pcm-tpmi when checking enabled status" >&2
+	exit 1
+fi
+
 if [ "$enabled" -eq 0 ]; then
 	echo "SST-TF is not enabled"
 	exit 0
@@ -670,7 +714,14 @@ for((j=0; j<5; j++))
 do
 	bithigh=$((j*8+23))
 	bitlow=$((j*8+16))
-	freq=$(pcm-tpmi 5 0xF8 -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}')
+	if ! freq=$(pcm-tpmi 5 0xF8 -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}'); then
+		echo "Error: Failed to get frequency for instruction set $j" >&2
+		exit 1
+	fi
+	if [[ ! "$freq" =~ ^[0-9]+$ ]]; then
+		echo "Error: Invalid frequency value for instruction set $j" >&2
+		exit 1
+	fi
 	echo -n "$freq"
 	if [ $j -ne 4 ]; then
 		echo -n ","
