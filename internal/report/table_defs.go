@@ -1355,6 +1355,11 @@ func sstTFHPTableValues(outputs map[string]script.ScriptOutput) []Field {
 			continue
 		}
 		for j, value := range values {
+			// confirm value is a number
+			if _, err := strconv.Atoi(value); err != nil {
+				slog.Warn("unexpected non-numeric value in line", slog.String("line", line), slog.String("value", value))
+				return []Field{}
+			}
 			if j > 1 {
 				value = value + "00"
 			}
@@ -1393,6 +1398,11 @@ func sstTFLPTableValues(outputs map[string]script.ScriptOutput) []Field {
 			continue
 		}
 		for j, value := range values {
+			// confirm value is a number
+			if _, err := strconv.Atoi(value); err != nil {
+				slog.Warn("unexpected non-numeric value in line", slog.String("line", line), slog.String("value", value))
+				return []Field{}
+			}
 			fields[j].Values = append(fields[j].Values, value+"00")
 		}
 	}
