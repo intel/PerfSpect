@@ -16,6 +16,7 @@ import (
 // Each map represents a row, with column names as keys and values as strings.
 // Adds a "timestamp" key to each row, if TIME and INTERVAL are included in
 // the output by the collection script.
+// Only the Summary and Packages rows are returned, i.e., rows for individual cores/CPUs are ignored.
 func parseTurbostatOutput(output string) ([]map[string]string, error) {
 	var (
 		headers    []string
@@ -85,7 +86,9 @@ func parseTurbostatOutput(output string) ([]map[string]string, error) {
 	return rows, nil
 }
 
-// turbostatPlatformRows parses the output of the turbostat script and returns a slice of rows with the specified field names.
+// turbostatPlatformRows parses the output of the turbostat script and returns the rows
+// for the platform (summary) only, for the specified field names.
+// The "platform" rows are those where Package, Die, Core, and CPU are all "-".
 // The first column is the sample time, and the rest are the values for the specified fields.
 func turbostatPlatformRows(turboStatScriptOutput string, fieldNames []string) ([][]string, error) {
 	if len(fieldNames) == 0 {
@@ -105,9 +108,7 @@ func turbostatPlatformRows(turboStatScriptOutput string, fieldNames []string) ([
 	// filter the rows to the summary rows only
 	var fieldValues [][]string
 	for _, row := range rows {
-		if (row["Package"] != "-" && row["Package"] != "") ||
-			(row["Core"] != "-" && row["Core"] != "") ||
-			(row["CPU"] != "-" && row["CPU"] != "") {
+		if !isPlatformRow(row) {
 			continue
 		}
 		// this is a summary row, extract the values for the specified fields
@@ -129,8 +130,21 @@ func turbostatPlatformRows(turboStatScriptOutput string, fieldNames []string) ([
 	return fieldValues, nil
 }
 
+// isPlatformRow returns true if the row represents a platform (summary) row.
+// only consider rows where Package, Die, Node, Core, and CPU are "-" (or don't exist), these rows contain the sum of all packages
+func isPlatformRow(row map[string]string) bool {
+	for _, header := range []string{"Package", "Die", "Node", "Core", "CPU"} {
+		if val, ok := row[header]; ok && val != "-" {
+			return false
+		}
+	}
+	return true
+}
+
 // turbostatPackageRows
-// packages -> rows
+// parses the output of the turbostat script and returns the rows
+// for each package, for the specified field names.
+// The first column is the sample time, and the rest are the values for the specified fields.
 func turbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([][][]string, error) {
 	if len(fieldNames) == 0 {
 		err := fmt.Errorf("no field names provided")
@@ -146,16 +160,19 @@ func turbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([]
 		return nil, err
 	}
 	var packageRows [][][]string
-	prevPackage := ""
 	for _, row := range rows {
-		// the first row with a new package number is the package row
-		if row["Package"] == "" || row["Package"] == "-" {
-			continue // skip rows that are not package rows
+		// not all instances of turbostat output include a Package column
+		// if it is missing assume 1 package, set it to 0 for rows where CPU is 0
+		if _, ok := row["Package"]; !ok {
+			if row["CPU"] == "0" {
+				row["Package"] = "0"
+			} else {
+				continue // skip rows that are not package rows
+			}
 		}
-		if row["Package"] == prevPackage {
-			continue // skip rows that are not the first row for this package
+		if !isPackageRow(row) {
+			continue
 		}
-		prevPackage = row["Package"]
 		// this is a package row, extract the values for the specified fields
 		rowValues := make([]string, len(fieldNames)+1) // +1 for the sample time
 		rowValues[0] = row["timestamp"]                // first column is the sample time
@@ -183,6 +200,15 @@ func turbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([]
 		return nil, err
 	}
 	return packageRows, nil
+}
+
+// isPackageRow returns true if the row represents a package row.
+// only consider rows where Package is not "-" or empty
+func isPackageRow(row map[string]string) bool {
+	if val, ok := row["Package"]; ok && val != "-" {
+		return true
+	}
+	return false
 }
 
 // maxTotalPackagePowerFromOutput calculates the maximum total package power from the turbostat output.
