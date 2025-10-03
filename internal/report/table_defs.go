@@ -2033,7 +2033,7 @@ func briefSummaryTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Scaling Governor", Values: []string{strings.TrimSpace(outputs[script.ScalingGovernorScriptName].Stdout)}},                                        // ScalingGovernor
 		{Name: "C-states", Values: []string{cstatesSummaryFromOutput(outputs)}},                                                                                  // Cstates
 		{Name: "Maximum Frequency", Values: []string{maxFrequencyFromOutput(outputs)}, Description: "The maximum frequency one core can reach."},                 // MaximumFrequency, SpecCoreFrequencies,
-		{Name: "All-core Maximum Frequency", Values: []string{allCoreMaxFrequencyFromOutput(outputs)}, Description: "The maximum frequency one core can reach."}, // Lscpu, LspciBits, LspciDevices, SpecCoreFrequencies
+		{Name: "All-core Maximum Frequency", Values: []string{allCoreMaxFrequencyFromOutput(outputs)}, Description: "The maximum frequency that all cores can reach simultaneously."}, // Lscpu, LspciBits, LspciDevices, SpecCoreFrequencies
 		{Name: "Energy Performance Bias", Values: []string{epbFromOutput(outputs)}},                                                                              // EpbSource, EpbBIOS, EpbOS
 		{Name: "Efficiency Latency Control", Values: []string{elcSummaryFromOutput(outputs)}},                                                                    // Elc
 		{Name: "MemTotal", Values: []string{valFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^MemTotal:\s*(.+?)$`)}},                              // Meminfo
