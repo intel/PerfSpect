@@ -456,11 +456,11 @@ func TestTurbostatPackageRows(t *testing.T) {
 			turbostatOutput: `
 TIME: 12:00:00
 INTERVAL: 1
-Package Core    CPU     Avg_MHz Busy%
--       -       -       1000    10
-0       0       0       1000    10
+Package Core    CPU     Avg_MHz Busy% FooBar
+-       -       -       1000    10    999
+0       0       0       1000    10    999
 0       1       1       1100    11
-1       0       2       2000    20
+1       0       2       2000    20    999
 1       1       3       2100    21
 `,
 			fieldNames: []string{"Avg_MHz"},
@@ -475,11 +475,11 @@ Package Core    CPU     Avg_MHz Busy%
 			turbostatOutput: `
 TIME: 12:00:00
 INTERVAL: 1
-Package Core    CPU     Avg_MHz Busy%
--       -       -       1000    10
-0       0       0       1000    10
+Package Core    CPU     Avg_MHz Busy% FooBar
+-       -       -       1000    10    999
+0       0       0       1000    10    999
 0       1       1       1100    11
-1       0       2       2000    20
+1       0       2       2000    20    999
 1       1       3       2100    21
 `,
 			fieldNames: []string{"Avg_MHz", "Busy%"},

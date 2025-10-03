@@ -49,8 +49,7 @@ func TestInitializeComponentMetricVariables(t *testing.T) {
 		{
 			expression: "(100 * ((STALL_SLOT_BACKEND / (CPU_CYCLES * #slots)) - ((BR_MIS_PRED * 3) / CPU_CYCLES)))",
 			want: map[string]int{
-				"STALL_SLOT_BACKEND": -1, "CPU_CYCLES": -1, "#slots": -1,
-				"BR_MIS_PRED": -1,
+				"STALL_SLOT_BACKEND": -1, "CPU_CYCLES": -1, "BR_MIS_PRED": -1,
 			},
 		},
 		{
@@ -61,8 +60,7 @@ func TestInitializeComponentMetricVariables(t *testing.T) {
 			expression: "(100 * (((1 - (OP_RETIRED / OP_SPEC)) * (1 - (((STALL_SLOT) if (strcmp_cpuid_str(0x410fd493) | strcmp_cpuid_str(0x410fd490) ^ 1) else (STALL_SLOT - CPU_CYCLES)) / (CPU_CYCLES * #slots)))) + ((BR_MIS_PRED * 4) / CPU_CYCLES)))",
 			want: map[string]int{
 				"OP_RETIRED": -1, "OP_SPEC": -1, "STALL_SLOT": -1,
-				"strcmp_cpuid_str": -1, "0x410fd493": -1, "0x410fd490": -1, "CPU_CYCLES": -1,
-				"#slots": -1, "BR_MIS_PRED": -1,
+				"CPU_CYCLES": -1, "BR_MIS_PRED": -1,
 			},
 		},
 		{
@@ -94,8 +92,7 @@ func TestInitializeComponentMetricVariables(t *testing.T) {
 		{
 			expression: "(100 * ((((STALL_SLOT_FRONTEND) if (strcmp_cpuid_str(0x410fd493) | strcmp_cpuid_str(0x410fd490) ^ 1) else (STALL_SLOT_FRONTEND - CPU_CYCLES)) / (CPU_CYCLES * #slots)) - (BR_MIS_PRED / CPU_CYCLES)))",
 			want: map[string]int{
-				"STALL_SLOT_FRONTEND": -1, "strcmp_cpuid_str": -1, "0x410fd493": -1,
-				"0x410fd490": -1, "CPU_CYCLES": -1, "#slots": -1, "BR_MIS_PRED": -1,
+				"STALL_SLOT_FRONTEND": -1, "CPU_CYCLES": -1, "BR_MIS_PRED": -1,
 			},
 		},
 		{
@@ -130,8 +127,7 @@ func TestInitializeComponentMetricVariables(t *testing.T) {
 			expression: "(100 * ((OP_RETIRED / OP_SPEC) * (1 - (((STALL_SLOT) if (strcmp_cpuid_str(0x410fd493) | strcmp_cpuid_str(0x410fd490) ^ 1) else (STALL_SLOT - CPU_CYCLES)) / (CPU_CYCLES * #slots)))))",
 			want: map[string]int{
 				"OP_RETIRED": -1, "OP_SPEC": -1, "STALL_SLOT": -1,
-				"strcmp_cpuid_str": -1, "0x410fd493": -1, "0x410fd490": -1,
-				"CPU_CYCLES": -1, "#slots": -1,
+				"CPU_CYCLES": -1,
 			},
 		},
 		{
