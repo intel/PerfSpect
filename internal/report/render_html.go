@@ -119,6 +119,60 @@ func getHtmlReportBegin() string {
         .sidebar .togglebtn:hover {
             color: #666;
         }
+		.field-description {
+			position: relative;
+			display: inline-block;
+			margin-left: 5px;
+			cursor: help;
+		}
+		.field-description .tooltip-icon {
+			color: #fff;
+			font-size: 12px;
+			border: 1px solid #2196F3;
+			border-radius: 50%;
+			width: 16px;
+			height: 16px;
+			text-align: center;
+			line-height: 14px;
+			background-color: #2196F3;
+			transition: background-color 0.2s, border-color 0.2s;
+		}
+		.field-description:hover .tooltip-icon {
+			background-color: #1976D2;
+			border-color: #1976D2;
+		}
+		.field-description .tooltip-text {
+			visibility: hidden;
+			width: 250px;
+			background-color: #333;
+			color: #fff;
+			text-align: left;
+			border-radius: 6px;
+			padding: 8px;
+			position: absolute;
+			z-index: 1000;
+			bottom: 125%;
+			left: 50%;
+			margin-left: -125px;
+			opacity: 0;
+			transition: opacity 0.3s;
+			font-size: 12px;
+			box-shadow: 0px 0px 6px rgba(0,0,0,0.2);
+		}
+		.field-description .tooltip-text::after {
+			content: "";
+			position: absolute;
+			top: 100%;
+			left: 50%;
+			margin-left: -5px;
+			border-width: 5px;
+			border-style: solid;
+			border-color: #333 transparent transparent transparent;
+		}
+		.field-description:hover .tooltip-text {
+			visibility: visible;
+			opacity: 1;
+		}
 	</style>
 	`)
 	sb.WriteString("</head>\n")
@@ -448,14 +502,31 @@ type chartTemplateStruct struct {
 	SuggestedMax  string
 }
 
+// CreateFieldNameWithDescription creates HTML for a field name with optional description tooltip
+func CreateFieldNameWithDescription(fieldName, description string) string {
+	if description == "" {
+		return htmltemplate.HTMLEscapeString(fieldName)
+	}
+	return htmltemplate.HTMLEscapeString(fieldName) + `<span class="field-description"><span class="tooltip-icon">?</span><span class="tooltip-text">` + htmltemplate.HTMLEscapeString(description) + `</span></span>`
+}
+
 func renderHTMLTable(tableHeaders []string, tableValues [][]string, class string, valuesStyle [][]string) string {
+	return renderHTMLTableWithDescriptions(tableHeaders, nil, tableValues, class, valuesStyle)
+}
+
+// renderHTMLTableWithDescriptions renders an HTML table with optional header descriptions
+func renderHTMLTableWithDescriptions(tableHeaders []string, headerDescriptions []string, tableValues [][]string, class string, valuesStyle [][]string) string {
 	var sb strings.Builder
 	sb.WriteString(`<table class="` + class + `">`)
 	if len(tableHeaders) > 0 {
 		sb.WriteString(`<thead>`)
 		sb.WriteString(`<tr>`)
-		for _, label := range tableHeaders {
-			sb.WriteString(`<th>` + label + `</th>`)
+		for i, label := range tableHeaders {
+			var description string
+			if headerDescriptions != nil && i < len(headerDescriptions) {
+				description = headerDescriptions[i]
+			}
+			sb.WriteString(`<th>` + CreateFieldNameWithDescription(label, description) + `</th>`)
 		}
 		sb.WriteString(`</tr>`)
 		sb.WriteString(`</thead>`)
@@ -480,8 +551,10 @@ func renderHTMLTable(tableHeaders []string, tableValues [][]string, class string
 func DefaultHTMLTableRendererFunc(tableValues TableValues) string {
 	if tableValues.HasRows { // print the field names as column headings across the top of the table
 		headers := []string{}
+		headerDescriptions := []string{}
 		for _, field := range tableValues.Fields {
 			headers = append(headers, field.Name)
+			headerDescriptions = append(headerDescriptions, field.Description)
 		}
 		values := [][]string{}
 		for row := range tableValues.Fields[0].Values {
@@ -491,13 +564,13 @@ func DefaultHTMLTableRendererFunc(tableValues TableValues) string {
 			}
 			values = append(values, rowValues)
 		}
-		return renderHTMLTable(headers, values, "pure-table pure-table-striped", [][]string{})
+		return renderHTMLTableWithDescriptions(headers, headerDescriptions, values, "pure-table pure-table-striped", [][]string{})
 	} else { // print the field name followed by its value
 		values := [][]string{}
 		var tableValueStyles [][]string
 		for _, field := range tableValues.Fields {
 			rowValues := []string{}
-			rowValues = append(rowValues, field.Name)
+			rowValues = append(rowValues, CreateFieldNameWithDescription(field.Name, field.Description))
 			rowValues = append(rowValues, htmltemplate.HTMLEscapeString(field.Values[0]))
 			values = append(values, rowValues)
 			tableValueStyles = append(tableValueStyles, []string{"font-weight:bold"})
@@ -513,7 +586,7 @@ func RenderMultiTargetTableValuesAsHTML(tableValues []TableValues, targetNames [
 	var tableValueStyles [][]string
 	for fieldIndex, field := range tableValues[0].Fields {
 		rowValues := []string{}
-		rowValues = append(rowValues, field.Name)
+		rowValues = append(rowValues, CreateFieldNameWithDescription(field.Name, field.Description))
 		for _, targetTableValues := range tableValues {
 			if len(targetTableValues.Fields) > fieldIndex && len(targetTableValues.Fields[fieldIndex].Values) > 0 {
 				rowValues = append(rowValues, htmltemplate.HTMLEscapeString(targetTableValues.Fields[fieldIndex].Values[0]))
@@ -731,7 +804,7 @@ func renderFrequencyTable(tableValues TableValues) (out string) {
 		headers = append(headers, fmt.Sprintf("%d", i+1))
 	}
 	for _, field := range tableValues.Fields[1:] {
-		row := append([]string{field.Name}, field.Values...)
+		row := append([]string{CreateFieldNameWithDescription(field.Name, field.Description)}, field.Values...)
 		rows = append(rows, row)
 		valuesStyles = append(valuesStyles, []string{"font-weight:bold"})
 	}

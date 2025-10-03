@@ -89,6 +89,8 @@ func renderXlsxTableMultiTarget(targetTableValues []TableValues, targetNames []s
 			col = 2
 			_ = f.SetCellValue(sheetName, cellName(col, *row), field.Name)
 			_ = f.SetCellStyle(sheetName, cellName(col, *row), cellName(col, *row), fieldNameStyle)
+			// Add cell comment if field has a description
+			addCellCommentIfNeeded(f, sheetName, cellName(col, *row), field.Description)
 			col++
 			for targetIdx := range targetNames {
 				var fieldValue string
@@ -161,6 +163,8 @@ func DefaultXlsxTableRendererFunc(tableValues TableValues, f *excelize.File, she
 		for _, field := range tableValues.Fields {
 			_ = f.SetCellValue(sheetName, cellName(col, *row), field.Name)
 			_ = f.SetCellStyle(sheetName, cellName(col, *row), cellName(col, *row), headerStyle)
+			// Add cell comment if field has a description
+			addCellCommentIfNeeded(f, sheetName, cellName(col, *row), field.Description)
 			col++
 		}
 		col = 2
@@ -186,6 +190,8 @@ func DefaultXlsxTableRendererFunc(tableValues TableValues, f *excelize.File, she
 				fieldValue = field.Values[0]
 			}
 			_ = f.SetCellValue(sheetName, cellName(col, *row), field.Name)
+			// Add cell comment if field has a description
+			addCellCommentIfNeeded(f, sheetName, cellName(col, *row), field.Description)
 			col++
 			value := getValueForCell(fieldValue)
 			_ = f.SetCellValue(sheetName, cellName(col, *row), value)
@@ -287,4 +293,22 @@ func getValueForCell(value string) (val any) {
 	}
 	val = value
 	return
+}
+
+const (
+	CommentWidth  = 300
+	CommentHeight = 200
+)
+
+// addCellCommentIfNeeded adds a cell comment if the description is not empty.
+func addCellCommentIfNeeded(f *excelize.File, sheetName, cell, description string) {
+	if description != "" {
+		_ = f.AddComment(sheetName, excelize.Comment{
+			Cell:   cell,
+			Author: "PerfSpect",
+			Text:   description,
+			Width:  CommentWidth,
+			Height: CommentHeight,
+		})
+	}
 }
