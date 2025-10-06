@@ -1004,9 +1004,9 @@ func cpuTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Family", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU family:\s*(.+)$`)}},
 		{Name: "Model", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Model:\s*(.+)$`)}},
 		{Name: "Stepping", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Stepping:\s*(.+)$`)}},
-		{Name: "Base Frequency", Values: []string{baseFrequencyFromOutput(outputs)}, Description: "The guaranteed minimum frequency one core can run at."},
-		{Name: "Maximum Frequency", Values: []string{maxFrequencyFromOutput(outputs)}, Description: "The maximum frequency one core can reach."},
-		{Name: "All-core Maximum Frequency", Values: []string{allCoreMaxFrequencyFromOutput(outputs)}, Description: "The maximum frequency all cores can reach simultaneously."},
+		{Name: "Base Frequency", Values: []string{baseFrequencyFromOutput(outputs)}, Description: "The minimum guaranteed speed of a single core under standard conditions."},
+		{Name: "Maximum Frequency", Values: []string{maxFrequencyFromOutput(outputs)}, Description: "The highest speed a single core can reach with Turbo Boost."},
+		{Name: "All-core Maximum Frequency", Values: []string{allCoreMaxFrequencyFromOutput(outputs)}, Description: "The highest speed all cores can reach simultaneously with Turbo Boost."},
 		{Name: "CPUs", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU\(s\):\s*(.+)$`)}},
 		{Name: "On-line CPU List", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^On-line CPU\(s\) list:\s*(.+)$`)}},
 		{Name: "Hyperthreading", Values: []string{hyperthreadingFromOutput(outputs)}},
@@ -1989,9 +1989,9 @@ func systemSummaryTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Hyperthreading", Values: []string{hyperthreadingFromOutput(outputs)}},
 		{Name: "CPUs", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU\(s\):\s*(.+)$`)}},
 		{Name: "Intel Turbo Boost", Values: []string{turboEnabledFromOutput(outputs)}},
-		{Name: "Base Frequency", Values: []string{baseFrequencyFromOutput(outputs)}, Description: "The guaranteed minimum frequency one core can run at."},
-		{Name: "All-core Maximum Frequency", Values: []string{allCoreMaxFrequencyFromOutput(outputs)}, Description: "The maximum frequency all cores can reach simultaneously."},
-		{Name: "Maximum Frequency", Values: []string{maxFrequencyFromOutput(outputs)}, Description: "The maximum frequency one core can reach."},
+		{Name: "Base Frequency", Values: []string{baseFrequencyFromOutput(outputs)}, Description: "The minimum guaranteed speed of a single core under standard conditions."},
+		{Name: "Maximum Frequency", Values: []string{maxFrequencyFromOutput(outputs)}, Description: "The highest speed a single core can reach with Turbo Boost."},
+		{Name: "All-core Maximum Frequency", Values: []string{allCoreMaxFrequencyFromOutput(outputs)}, Description: "The highest speed all cores can reach simultaneously with Turbo Boost."},
 		{Name: "NUMA Nodes", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^NUMA node\(s\):\s*(.+)$`)}},
 		{Name: "Prefetchers", Values: []string{prefetchersSummaryFromOutput(outputs)}},
 		{Name: "PPINs", Values: []string{ppinsFromOutput(outputs)}},
@@ -2019,28 +2019,28 @@ func systemSummaryTableValues(outputs map[string]script.ScriptOutput) []Field {
 
 func briefSummaryTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return []Field{
-		{Name: "Host Name", Values: []string{strings.TrimSpace(outputs[script.HostnameScriptName].Stdout)}},                                                      // Hostname
-		{Name: "Time", Values: []string{strings.TrimSpace(outputs[script.DateScriptName].Stdout)}},                                                               // Date
-		{Name: "CPU Model", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^[Mm]odel name:\s*(.+)$`)}},                           // Lscpu
-		{Name: "Microarchitecture", Values: []string{UarchFromOutput(outputs)}},                                                                                  // Lscpu, LspciBits, LspciDevices
-		{Name: "TDP", Values: []string{tdpFromOutput(outputs)}},                                                                                                  // PackagePowerLimit
-		{Name: "Sockets", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)}},                               // Lscpu
-		{Name: "Cores per Socket", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)}},             // Lscpu
-		{Name: "Hyperthreading", Values: []string{hyperthreadingFromOutput(outputs)}},                                                                            // Lscpu, LspciBits, LspciDevices
-		{Name: "CPUs", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU\(s\):\s*(.+)$`)}},                                     // Lscpu
-		{Name: "NUMA Nodes", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^NUMA node\(s\):\s*(.+)$`)}},                         // Lscpu
-		{Name: "Scaling Driver", Values: []string{strings.TrimSpace(outputs[script.ScalingDriverScriptName].Stdout)}},                                            // ScalingDriver
-		{Name: "Scaling Governor", Values: []string{strings.TrimSpace(outputs[script.ScalingGovernorScriptName].Stdout)}},                                        // ScalingGovernor
-		{Name: "C-states", Values: []string{cstatesSummaryFromOutput(outputs)}},                                                                                  // Cstates
-		{Name: "Maximum Frequency", Values: []string{maxFrequencyFromOutput(outputs)}, Description: "The maximum frequency one core can reach."},                 // MaximumFrequency, SpecCoreFrequencies,
-		{Name: "All-core Maximum Frequency", Values: []string{allCoreMaxFrequencyFromOutput(outputs)}, Description: "The maximum frequency that all cores can reach simultaneously."}, // Lscpu, LspciBits, LspciDevices, SpecCoreFrequencies
-		{Name: "Energy Performance Bias", Values: []string{epbFromOutput(outputs)}},                                                                              // EpbSource, EpbBIOS, EpbOS
-		{Name: "Efficiency Latency Control", Values: []string{elcSummaryFromOutput(outputs)}},                                                                    // Elc
-		{Name: "MemTotal", Values: []string{valFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^MemTotal:\s*(.+?)$`)}},                              // Meminfo
-		{Name: "NIC", Values: []string{nicSummaryFromOutput(outputs)}},                                                                                           // Lshw, NicInfo
-		{Name: "Disk", Values: []string{diskSummaryFromOutput(outputs)}},                                                                                         // DiskInfo, Hdparm
-		{Name: "OS", Values: []string{operatingSystemFromOutput(outputs)}},                                                                                       // EtcRelease
-		{Name: "Kernel", Values: []string{valFromRegexSubmatch(outputs[script.UnameScriptName].Stdout, `^Linux \S+ (\S+)`)}},                                     // Uname
+		{Name: "Host Name", Values: []string{strings.TrimSpace(outputs[script.HostnameScriptName].Stdout)}},                                                                                   // Hostname
+		{Name: "Time", Values: []string{strings.TrimSpace(outputs[script.DateScriptName].Stdout)}},                                                                                            // Date
+		{Name: "CPU Model", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^[Mm]odel name:\s*(.+)$`)}},                                                        // Lscpu
+		{Name: "Microarchitecture", Values: []string{UarchFromOutput(outputs)}},                                                                                                               // Lscpu, LspciBits, LspciDevices
+		{Name: "TDP", Values: []string{tdpFromOutput(outputs)}},                                                                                                                               // PackagePowerLimit
+		{Name: "Sockets", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)}},                                                            // Lscpu
+		{Name: "Cores per Socket", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)}},                                          // Lscpu
+		{Name: "Hyperthreading", Values: []string{hyperthreadingFromOutput(outputs)}},                                                                                                         // Lscpu, LspciBits, LspciDevices
+		{Name: "CPUs", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU\(s\):\s*(.+)$`)}},                                                                  // Lscpu
+		{Name: "NUMA Nodes", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^NUMA node\(s\):\s*(.+)$`)}},                                                      // Lscpu
+		{Name: "Scaling Driver", Values: []string{strings.TrimSpace(outputs[script.ScalingDriverScriptName].Stdout)}},                                                                         // ScalingDriver
+		{Name: "Scaling Governor", Values: []string{strings.TrimSpace(outputs[script.ScalingGovernorScriptName].Stdout)}},                                                                     // ScalingGovernor
+		{Name: "C-states", Values: []string{cstatesSummaryFromOutput(outputs)}},                                                                                                               // Cstates
+		{Name: "Maximum Frequency", Values: []string{maxFrequencyFromOutput(outputs)}, Description: "The highest speed a single core can reach with Turbo Boost."},                            // MaximumFrequency, SpecCoreFrequencies,
+		{Name: "All-core Maximum Frequency", Values: []string{allCoreMaxFrequencyFromOutput(outputs)}, Description: "The highest speed all cores can reach simultaneously with Turbo Boost."}, // Lscpu, LspciBits, LspciDevices, SpecCoreFrequencies
+		{Name: "Energy Performance Bias", Values: []string{epbFromOutput(outputs)}},                                                                                                           // EpbSource, EpbBIOS, EpbOS
+		{Name: "Efficiency Latency Control", Values: []string{elcSummaryFromOutput(outputs)}},                                                                                                 // Elc
+		{Name: "MemTotal", Values: []string{valFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^MemTotal:\s*(.+?)$`)}},                                                           // Meminfo
+		{Name: "NIC", Values: []string{nicSummaryFromOutput(outputs)}},                                                                                                                        // Lshw, NicInfo
+		{Name: "Disk", Values: []string{diskSummaryFromOutput(outputs)}},                                                                                                                      // DiskInfo, Hdparm
+		{Name: "OS", Values: []string{operatingSystemFromOutput(outputs)}},                                                                                                                    // EtcRelease
+		{Name: "Kernel", Values: []string{valFromRegexSubmatch(outputs[script.UnameScriptName].Stdout, `^Linux \S+ (\S+)`)}},                                                                  // Uname
 	}
 }
 
