@@ -81,7 +81,13 @@ update-deps:
 .PHONY: check_format
 check_format:
 	@echo "Running gofmt to check for code formatting issues..."
-	@test -z "$(shell gofmt -l -s ./)" || { echo "[WARN] Formatting issues detected. Resolve with 'make format'"; exit 1; }
+	@files=$$(gofmt -l -s ./); \
+	if [ -n "$$files" ]; then \
+		echo "[WARN] Formatting issues detected in the following files:"; \
+		echo "$$files"; \
+		echo "Resolve with 'make format'"; \
+		exit 1; \
+	fi
 	@echo "gofmt detected no issues"
 
 # Format code
