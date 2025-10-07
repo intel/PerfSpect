@@ -2002,7 +2002,7 @@ func systemSummaryTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "CPU Model", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^[Mm]odel name:\s*(.+)$`)}},
 		{Name: "Architecture", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Architecture:\s*(.+)$`)}},
 		{Name: "Microarchitecture", Values: []string{UarchFromOutput(outputs)}},
-		{Name: "L3 Cache", Values: []string{l3FromOutput(outputs)}, Description: "The total L3 cache size for one CPU socket."},
+		{Name: "L3 Cache (instance/total)", Values: []string{l3FromOutput(outputs)}, Description: "The size of one L3 cache instance and the total L3 cache size for the system."},
 		{Name: "Cores per Socket", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)}},
 		{Name: "Sockets", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)}},
 		{Name: "Hyperthreading", Values: []string{hyperthreadingFromOutput(outputs)}},

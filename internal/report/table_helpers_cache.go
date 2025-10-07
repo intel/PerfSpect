@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-// GetL3MSRMB returns the L3 cache size per processor and total in MB from MSR.
+// GetL3MSRMB returns the L3 cache size per cache instance (per socket on Intel) and total in MB from MSR.
 // We read from the MSR to handle the case where some cache ways are disabled, i.e.,
 // when testing different cache sizes. The lscpu output always shows the maximum possible
 // cache size, even if some ways are disabled.
@@ -90,20 +90,19 @@ func GetL3LscpuMB(outputs map[string]script.ScriptOutput) (instance float64, tot
 
 // l3FromOutput attempts to retrieve the L3 cache size in megabytes from the provided
 // script outputs. It first tries to obtain the value using GetL3MSRMB. If that fails,
-// it falls back to using GetL3LscpuMB. If both methods fail, it logs the errors and
+// it falls back to using lscpu cache output. If both methods fail, it logs the errors and
 // returns an empty string. On success, it returns the formatted cache size as a string.
 func l3FromOutput(outputs map[string]script.ScriptOutput) string {
-	l3MB, l3TotalMB, err := GetL3MSRMB(outputs)
+	l3InstanceMB, l3TotalMB, err := GetL3MSRMB(outputs)
 	if err != nil {
 		slog.Info("Could not get L3 size from MSR, falling back to lscpu", slog.String("error", err.Error()))
-		lscpuCache, err := parseLscpuCacheOutput(outputs[script.LscpuCacheScriptName].Stdout)
+		l3InstanceMB, l3TotalMB, err = GetL3LscpuMB(outputs)
 		if err != nil {
-			slog.Error("Could not parse lscpu cache output", slog.String("error", err.Error()))
+			slog.Error("Could not get L3 size from lscpu", slog.String("error", err.Error()))
 			return ""
 		}
-		return l3CacheSizeFromLscpuCache(lscpuCache["L3"])
 	}
-	return fmt.Sprintf("%s/%s", formatCacheSizeMB(l3MB), formatCacheSizeMB(l3TotalMB))
+	return fmt.Sprintf("%s/%s", formatCacheSizeMB(l3InstanceMB), formatCacheSizeMB(l3TotalMB))
 }
 
 // l3PerCoreFromOutput calculates the amount of L3 cache (in MiB) available per core
@@ -243,16 +242,6 @@ func parseLscpuCacheOutput(LscpuCacheOutput string) (map[string]lscpuCacheEntry,
 // l1l2CacheSizeFromLscpuCache extracts the data cache size from the provided lscpuCacheEntry.
 func l1l2CacheSizeFromLscpuCache(entry lscpuCacheEntry) string {
 	return entry.OneSize
-}
-
-// l3CacheSizeFromLscpuCache extracts the L3 cache size from the provided lscpuCacheEntry.
-// If the entry is empty or the size is not available, it returns an empty string.
-// Otherwise, it returns a formatted string showing both "one-size" and "all-size".
-func l3CacheSizeFromLscpuCache(entry lscpuCacheEntry) string {
-	if entry.OneSize == "" || entry.AllSize == "" {
-		return ""
-	}
-	return fmt.Sprintf("%s/%s", entry.OneSize, entry.AllSize)
 }
 
 // parseCacheSizeToMB parses a cache size string (e.g., "32K", "2M", "1G") and converts it to megabytes.
