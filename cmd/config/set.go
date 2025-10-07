@@ -145,7 +145,7 @@ func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir str
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get maximum LLC size: %w", err)}
 		return
 	}
-	currentLlcSize, err := report.GetL3MSRMB(outputs)
+	currentLlcSize, _, err := report.GetL3MSRMB(outputs)
 	if err != nil {
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get current LLC size: %w", err)}
 		return
