@@ -1001,7 +1001,7 @@ func softwareVersionTableValues(outputs map[string]script.ScriptOutput) []Field 
 }
 
 func cpuTableValues(outputs map[string]script.ScriptOutput) []Field {
-	lscpuCache := parseLscpuCacheOutput(outputs[script.LscpuCacheScriptName].Stdout)
+	lscpuCache, _ := parseLscpuCacheOutput(outputs[script.LscpuCacheScriptName].Stdout)
 	return []Field{
 		{Name: "CPU Model", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^[Mm]odel name:\s*(.+)$`)}},
 		{Name: "Architecture", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Architecture:\s*(.+)$`)}},
