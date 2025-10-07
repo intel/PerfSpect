@@ -17,7 +17,6 @@ import (
 // We read from the MSR to handle the case where some cache ways are disabled, i.e.,
 // when testing different cache sizes. The lscpu output always shows the maximum possible
 // cache size, even if some ways are disabled.
-// We calculate the current L3 size based on the number of enabled ways and the
 func GetL3MSRMB(outputs map[string]script.ScriptOutput) (instance float64, total float64, err error) {
 	uarch := UarchFromOutput(outputs)
 	cpu, err := GetCPUByMicroArchitecture(uarch)
@@ -28,7 +27,7 @@ func GetL3MSRMB(outputs map[string]script.ScriptOutput) (instance float64, total
 		err = fmt.Errorf("L3 cache way count is zero")
 		return 0, 0, err
 	}
-	sockets := valFromRegexSubmatch(outputs["lscpu"].Stdout, `^Socket\(s\):\s*(.+)$`)
+	sockets := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)
 	if sockets == "" {
 		return 0, 0, fmt.Errorf("failed to parse sockets from lscpu output")
 	}
@@ -152,9 +151,8 @@ func l3PerCoreFromOutput(outputs map[string]script.ScriptOutput) string {
 	return formatCacheSizeMB(l3TotalMB / (float64(coresPerSocket) * float64(sockets)))
 }
 
-// formatCacheSizeMB formats a floating-point cache size value (in MiB) as a string
-// with the "M" unit suffix. The size is formatted using decimal notation
-// with no fixed precision.
+// formatCacheSizeMB formats a floating-point cache size value (in MB) as a string
+// with the "M" unit suffix.
 func formatCacheSizeMB(size float64) string {
 	val := strconv.FormatFloat(size, 'f', 1, 64)
 	val = strings.TrimRight(val, "0") // trim trailing zeros
@@ -229,13 +227,13 @@ func parseLscpuCacheOutput(LscpuCacheOutput string) (map[string]lscpuCacheEntry,
 		slog.Warn("lscpu cache output is empty")
 		return nil, fmt.Errorf("lscpu cache output is empty")
 	}
+	output := make(map[string]lscpuCacheEntry)
 	parsed := make(map[string][]lscpuCacheEntry)
 	err := json.Unmarshal([]byte(LscpuCacheOutput), &parsed)
 	if err != nil {
 		slog.Error("Failed to parse lscpu cache JSON output", slog.String("error", err.Error()))
 		return nil, err
 	}
-	output := make(map[string]lscpuCacheEntry)
 	for _, entry := range parsed["caches"] {
 		output[entry.Name] = entry
 	}
@@ -296,5 +294,3 @@ func l3CacheTotalSizeFromLscpuCacheMB(entry lscpuCacheEntry) (float64, error) {
 func l3CacheInstanceSizeFromLscpuCacheMB(entry lscpuCacheEntry) (float64, error) {
 	return parseCacheSizeToMB(entry.OneSize, "L3 cache one-size")
 }
-
-// GetL3Lscpu

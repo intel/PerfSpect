@@ -1001,7 +1001,21 @@ func softwareVersionTableValues(outputs map[string]script.ScriptOutput) []Field 
 }
 
 func cpuTableValues(outputs map[string]script.ScriptOutput) []Field {
-	lscpuCache, _ := parseLscpuCacheOutput(outputs[script.LscpuCacheScriptName].Stdout)
+	var l1d, l1i, l2 string
+	lscpuCache, err := parseLscpuCacheOutput(outputs[script.LscpuCacheScriptName].Stdout)
+	if err != nil {
+		slog.Warn("failed to parse lscpu cache output", "error", err)
+	} else {
+		if _, ok := lscpuCache["L1d"]; ok {
+			l1d = l1l2CacheSizeFromLscpuCache(lscpuCache["L1d"])
+		}
+		if _, ok := lscpuCache["L1i"]; ok {
+			l1i = l1l2CacheSizeFromLscpuCache(lscpuCache["L1i"])
+		}
+		if _, ok := lscpuCache["L2"]; ok {
+			l2 = l1l2CacheSizeFromLscpuCache(lscpuCache["L2"])
+		}
+	}
 	return []Field{
 		{Name: "CPU Model", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^[Mm]odel name:\s*(.+)$`)}},
 		{Name: "Architecture", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Architecture:\s*(.+)$`)}},
@@ -1019,9 +1033,9 @@ func cpuTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Sockets", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)}},
 		{Name: "NUMA Nodes", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^NUMA node\(s\):\s*(.+)$`)}},
 		{Name: "NUMA CPU List", Values: []string{numaCPUListFromOutput(outputs)}},
-		{Name: "L1d Cache", Values: []string{l1l2CacheSizeFromLscpuCache(lscpuCache["L1d"])}, Description: "The size of the L1 data cache for one core."},
-		{Name: "L1i Cache", Values: []string{l1l2CacheSizeFromLscpuCache(lscpuCache["L1i"])}, Description: "The size of the L1 instruction cache for one core."},
-		{Name: "L2 Cache", Values: []string{l1l2CacheSizeFromLscpuCache(lscpuCache["L2"])}, Description: "The size of the L2 cache for one core."},
+		{Name: "L1d Cache", Values: []string{l1d}, Description: "The size of the L1 data cache for one core."},
+		{Name: "L1i Cache", Values: []string{l1i}, Description: "The size of the L1 instruction cache for one core."},
+		{Name: "L2 Cache", Values: []string{l2}, Description: "The size of the L2 cache for one core."},
 		{Name: "L3 Cache (instance/total)", Values: []string{l3FromOutput(outputs)}, Description: "The size of one L3 cache instance and the total L3 cache size for the system."},
 		{Name: "L3 per Core", Values: []string{l3PerCoreFromOutput(outputs)}, Description: "The L3 cache size per core."},
 		{Name: "Memory Channels", Values: []string{channelsFromOutput(outputs)}},
