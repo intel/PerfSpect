@@ -31,6 +31,7 @@ const (
 	DateScriptName                   = "date"
 	DmidecodeScriptName              = "dmidecode"
 	LscpuScriptName                  = "lscpu"
+	LscpuCacheScriptName             = "lscpu cache"
 	LspciBitsScriptName              = "lspci bits"
 	LspciDevicesScriptName           = "lspci devices"
 	LspciVmmScriptName               = "lspci vmm"
@@ -173,6 +174,10 @@ var scriptDefinitions = map[string]ScriptDefinition{
 	LscpuScriptName: {
 		Name:           LscpuScriptName,
 		ScriptTemplate: "lscpu",
+	},
+	LscpuCacheScriptName: {
+		Name:           LscpuCacheScriptName,
+		ScriptTemplate: `lscpu -C -J`,
 	},
 	LspciBitsScriptName: {
 		Name:           LspciBitsScriptName,
