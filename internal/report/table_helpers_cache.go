@@ -153,7 +153,7 @@ func l3PerCoreFromOutput(outputs map[string]script.ScriptOutput) string {
 // formatCacheSizeMB formats a floating-point cache size value (in MB) as a string
 // with the "M" unit suffix.
 func formatCacheSizeMB(size float64) string {
-	val := strconv.FormatFloat(size, 'f', 1, 64)
+	val := strconv.FormatFloat(size, 'f', 3, 64)
 	val = strings.TrimRight(val, "0") // trim trailing zeros
 	val = strings.TrimRight(val, ".") // trim decimal point if trailing
 	return fmt.Sprintf("%sM", val)
