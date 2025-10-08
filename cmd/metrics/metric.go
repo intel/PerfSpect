@@ -62,7 +62,7 @@ func ProcessEvents(perfEvents [][]byte, eventGroupDefinitions []GroupDefinition,
 			metric := Metric{Name: metricDef.Name, Value: math.NaN()}
 			var variables map[string]any
 			if variables, err = getExpressionVariableValues(metricDef, eventFrame, previousTimestamp, metadata); err != nil {
-				slog.Debug("failed to get expression variable values", slog.String("error", err.Error()))
+				slog.Debug("failed to get expression variable values", slog.String("metric", metricDef.Name), slog.String("error", err.Error()))
 				err = nil
 			} else {
 				var result any
