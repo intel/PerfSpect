@@ -121,6 +121,7 @@ func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir str
 	// get the data we need to set the LLC size
 	scripts := []script.ScriptDefinition{}
 	scripts = append(scripts, script.GetScriptByName(script.LscpuScriptName))
+	scripts = append(scripts, script.GetScriptByName(script.LscpuCacheScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.LspciBitsScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.LspciDevicesScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.L3CacheWayEnabledName))
@@ -140,12 +141,12 @@ func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir str
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("cache way count is zero")}
 		return
 	}
-	maximumLlcSize, err := report.GetL3LscpuMB(outputs)
+	maximumLlcSize, _, err := report.GetL3LscpuMB(outputs)
 	if err != nil {
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get maximum LLC size: %w", err)}
 		return
 	}
-	currentLlcSize, err := report.GetL3MSRMB(outputs)
+	currentLlcSize, _, err := report.GetL3MSRMB(outputs)
 	if err != nil {
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get current LLC size: %w", err)}
 		return

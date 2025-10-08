@@ -222,6 +222,7 @@ var tableDefinitions = map[string]TableDefinition{
 		MenuLabel: CPUMenuLabel,
 		ScriptNames: []string{
 			script.LscpuScriptName,
+			script.LscpuCacheScriptName,
 			script.LspciBitsScriptName,
 			script.LspciDevicesScriptName,
 			script.CpuidScriptName,
@@ -502,6 +503,7 @@ var tableDefinitions = map[string]TableDefinition{
 			script.DateScriptName,
 			script.DmidecodeScriptName,
 			script.LscpuScriptName,
+			script.LscpuCacheScriptName,
 			script.LspciBitsScriptName,
 			script.LspciDevicesScriptName,
 			script.L3CacheWayEnabledName,
@@ -537,6 +539,7 @@ var tableDefinitions = map[string]TableDefinition{
 			script.HostnameScriptName,
 			script.DateScriptName,
 			script.LscpuScriptName,
+			script.LscpuCacheScriptName,
 			script.LspciBitsScriptName,
 			script.LspciDevicesScriptName,
 			script.MaximumFrequencyScriptName,
@@ -563,6 +566,7 @@ var tableDefinitions = map[string]TableDefinition{
 		HasRows: false,
 		ScriptNames: []string{
 			script.LscpuScriptName,
+			script.LscpuCacheScriptName,
 			script.LspciBitsScriptName,
 			script.LspciDevicesScriptName,
 			script.L3CacheWayEnabledName,
@@ -997,6 +1001,21 @@ func softwareVersionTableValues(outputs map[string]script.ScriptOutput) []Field 
 }
 
 func cpuTableValues(outputs map[string]script.ScriptOutput) []Field {
+	var l1d, l1i, l2 string
+	lscpuCache, err := parseLscpuCacheOutput(outputs[script.LscpuCacheScriptName].Stdout)
+	if err != nil {
+		slog.Warn("failed to parse lscpu cache output", "error", err)
+	} else {
+		if _, ok := lscpuCache["L1d"]; ok {
+			l1d = l1l2CacheSizeFromLscpuCache(lscpuCache["L1d"])
+		}
+		if _, ok := lscpuCache["L1i"]; ok {
+			l1i = l1l2CacheSizeFromLscpuCache(lscpuCache["L1i"])
+		}
+		if _, ok := lscpuCache["L2"]; ok {
+			l2 = l1l2CacheSizeFromLscpuCache(lscpuCache["L2"])
+		}
+	}
 	return []Field{
 		{Name: "CPU Model", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^[Mm]odel name:\s*(.+)$`)}},
 		{Name: "Architecture", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Architecture:\s*(.+)$`)}},
@@ -1014,11 +1033,11 @@ func cpuTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Sockets", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)}},
 		{Name: "NUMA Nodes", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^NUMA node\(s\):\s*(.+)$`)}},
 		{Name: "NUMA CPU List", Values: []string{numaCPUListFromOutput(outputs)}},
-		{Name: "L1d Cache", Values: []string{l1dFromOutput(outputs)}, Description: "The sum of all L1 data cache sizes for one CPU socket."},
-		{Name: "L1i Cache", Values: []string{l1iFromOutput(outputs)}, Description: "The sum of all L1 instruction cache sizes for one CPU socket."},
-		{Name: "L2 Cache", Values: []string{l2FromOutput(outputs)}, Description: "The sum of all L2 cache sizes for one CPU socket."},
-		{Name: "L3 Cache", Values: []string{l3FromOutput(outputs)}, Description: "The total L3 cache size for one CPU socket."},
-		{Name: "L3 per Core", Values: []string{l3PerCoreFromOutput(outputs)}, Description: "The L3 cache size per CPU core."},
+		{Name: "L1d Cache", Values: []string{l1d}, Description: "The size of the L1 data cache for one core."},
+		{Name: "L1i Cache", Values: []string{l1i}, Description: "The size of the L1 instruction cache for one core."},
+		{Name: "L2 Cache", Values: []string{l2}, Description: "The size of the L2 cache for one core."},
+		{Name: "L3 Cache (instance/total)", Values: []string{l3FromOutput(outputs)}, Description: "The size of one L3 cache instance and the total L3 cache size for the system."},
+		{Name: "L3 per Core", Values: []string{l3PerCoreFromOutput(outputs)}, Description: "The L3 cache size per core."},
 		{Name: "Memory Channels", Values: []string{channelsFromOutput(outputs)}},
 		{Name: "Intel Turbo Boost", Values: []string{turboEnabledFromOutput(outputs)}},
 		{Name: "Virtualization", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Virtualization:\s*(.+)$`)}},
@@ -1983,7 +2002,7 @@ func systemSummaryTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "CPU Model", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^[Mm]odel name:\s*(.+)$`)}},
 		{Name: "Architecture", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Architecture:\s*(.+)$`)}},
 		{Name: "Microarchitecture", Values: []string{UarchFromOutput(outputs)}},
-		{Name: "L3 Cache", Values: []string{l3FromOutput(outputs)}, Description: "The total L3 cache size for one CPU socket."},
+		{Name: "L3 Cache (instance/total)", Values: []string{l3FromOutput(outputs)}, Description: "The size of one L3 cache instance and the total L3 cache size for the system."},
 		{Name: "Cores per Socket", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)}},
 		{Name: "Sockets", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)}},
 		{Name: "Hyperthreading", Values: []string{hyperthreadingFromOutput(outputs)}},
@@ -2053,7 +2072,7 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []Field {
 
 	fields := []Field{
 		{Name: "Cores per Socket", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)}},
-		{Name: "L3 Cache", Values: []string{l3FromOutput(outputs)}},
+		{Name: "L3 Cache", Values: []string{l3InstanceFromOutput(outputs)}},
 		{Name: "Package Power / TDP", Values: []string{tdpFromOutput(outputs)}},
 		{Name: "All-Core Max Frequency", Values: []string{allCoreMaxFrequencyFromOutput(outputs)}},
 	}
