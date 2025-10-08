@@ -105,6 +105,20 @@ func l3FromOutput(outputs map[string]script.ScriptOutput) string {
 	return fmt.Sprintf("%s/%s", formatCacheSizeMB(l3InstanceMB), formatCacheSizeMB(l3TotalMB))
 }
 
+// l3InstanceFromOutput retrieves the L3 cache size per instance (per socket on Intel) in megabytes
+func l3InstanceFromOutput(outputs map[string]script.ScriptOutput) string {
+	l3InstanceMB, _, err := GetL3MSRMB(outputs)
+	if err != nil {
+		slog.Info("Could not get L3 size from MSR, falling back to lscpu", slog.String("error", err.Error()))
+		l3InstanceMB, _, err = GetL3LscpuMB(outputs)
+		if err != nil {
+			slog.Error("Could not get L3 size from lscpu", slog.String("error", err.Error()))
+			return ""
+		}
+	}
+	return formatCacheSizeMB(l3InstanceMB)
+}
+
 // l3PerCoreFromOutput calculates the amount of L3 cache (in MiB) available per core
 // based on the provided script outputs. It first checks if the host is virtualized,
 // in which case it returns an empty string since the calculation is not applicable.

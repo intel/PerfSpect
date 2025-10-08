@@ -2072,7 +2072,7 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []Field {
 
 	fields := []Field{
 		{Name: "Cores per Socket", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)}},
-		{Name: "L3 Cache", Values: []string{l3FromOutput(outputs)}},
+		{Name: "L3 Cache", Values: []string{l3InstanceFromOutput(outputs)}},
 		{Name: "Package Power / TDP", Values: []string{tdpFromOutput(outputs)}},
 		{Name: "All-Core Max Frequency", Values: []string{allCoreMaxFrequencyFromOutput(outputs)}},
 	}
