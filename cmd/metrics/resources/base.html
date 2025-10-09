@@ -179,20 +179,20 @@
       // Define consistent colors for TMA categories with child variations
       const tmaColors = {
         // Blue family for Frontend
-        'Frontend': '#5470c6',
-        'FrontendChild': '#7a90d3',  // Lighter blue for all Frontend children
+        'Frontend': '#4472c4',
+        'FrontendChild': '#7293d3',  // Lighter blue for all Frontend children
         
-        // Green family for Backend
-        'Backend': '#91cc75',
-        'BackendChild': '#b3e0a0',   // Lighter green for all Backend children
+        // Green family for Retiring
+        'Retiring': '#70ad47',
+        'RetiringChild': '#9bc56e',   // Lighter green for all Retiring children
         
-        // Yellow/Orange family for BadSpeculation
-        'BadSpeculation': '#fac858',
-        'BadSpeculationChild': '#ffda8a', // Lighter yellow for all BadSpeculation children
+        // Orange family for BadSpeculation
+        'BadSpeculation': '#ff8c42',
+        'BadSpeculationChild': '#ffab73', // Lighter orange for all BadSpeculation children
         
-        // Red family for Retiring
-        'Retiring': '#ee6666',
-        'RetiringChild': '#f38989'    // Lighter red for all Retiring children
+        // Teal family for Backend
+        'Backend': '#2e8b8b',
+        'BackendChild': '#5ba3a3'    // Lighter teal for all Backend children
       };
       
       let tmasunburst = {
@@ -287,7 +287,6 @@
         xAxis: {
           type: "category",
           data: <<.TIMESTAMPS>>,
-          name: "time (s)",
           min: "dataMin",
           max: "dataMax",
           boundaryGap: false, // ensure the chart starts at the first data point
@@ -302,7 +301,7 @@
         },
         legend: {
           orient: 'horizontal',
-          bottom: 0,
+          top: 20,
           left: 'center',
           show: true,
           selectedMode: false, // Prevents toggling series visibility by clicking on legend
@@ -311,15 +310,18 @@
 
       let level1tma = {
         ...base_line,
+        grid: {
+          left: 50,  // Reduce left margin
+        },
         color: [tmaColors.Frontend, tmaColors.Backend, tmaColors.Retiring, tmaColors.BadSpeculation],
         series: [
           {
-            name: "Front-end",
+            name: "Frontend",
             type: 'line',
             data: <<.TMAFRONTEND>>,
           },
           {
-            name: "Back-end",
+            name: "Backend",
             type: 'line',
             data: <<.TMABACKEND>>,
           },
@@ -510,7 +512,7 @@
                   <ul>
                     <li>
                       <Typography variant="body1">
-                        The Front-end is responsible for fetching the program code
+                        The Frontend is responsible for fetching the program code
                         represented in architectural instructions and decoding
                         them into one or more low-level hardware operations called
                         micro-ops (uOps).
@@ -518,7 +520,7 @@
                     </li>
                     <li>
                       <Typography variant="body1">
-                        The Back-end is responsible for monitoring when uOp's data
+                        The Backend is responsible for monitoring when uOp's data
                         operands are available and executing the uOp in an
                         available execution unit.
                       </Typography>
@@ -552,14 +554,173 @@
               <Grid container>
                 <Grid item xs={5}>
                   <Typography variant="h2">
-                    TMA Level 1
+                    Top Level Metrics Over Time
                   </Typography>
                   <Typography variant="body1">
-                    Here, we show the TMA Front-end, Back-end, Retiring and Bad Speculation percentages over the collection period.
+                    Here, we show the TMA Frontend, Backend, Retiring and Bad Speculation percentages over the collection period.
                   </Typography>
                 </Grid>
                 <Grid item xs={7}>
                   <ReactECharts style={{ minHeight: "250px" }} option={level1tma} />
+                </Grid>
+              </Grid>
+              <Grid container style={{ padding: "24px 0px 0px 0px" }}>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    Metric Details
+                  </Typography>
+                  <Typography variant="body1">
+                    Detailed view of all Top-down Microarchitecture Analysis metrics.
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <div style={{ height: "400px", overflow: "auto", width: "fit-content", marginLeft: "50px" }}>
+                    <TableContainer component={Paper} sx={{ width: "fit-content" }}>
+                      <Table size="small" style={{ tableLayout: 'auto' }}>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Metric</TableCell>
+                            <TableCell>Mean</TableCell>
+                            <TableCell>Min</TableCell>
+                            <TableCell>Max</TableCell>
+                            <TableCell>Stddev</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {current_metrics.filter((row) => row[0].startsWith("TMA")).map((row) => {
+                            // Check if this metric has exceeded its threshold
+                            const exceedsThreshold = row[5] == "Yes";
+                            return (
+                              <TableRow
+                                hover={true}
+                                key={row[0]}
+                                sx={{ 
+                                  '&:last-child td, &:last-child th': { border: 0 },
+                                  // Highlight the entire row if mean value exceeds its specific threshold
+                                  backgroundColor: exceedsThreshold ? 'rgba(255, 255, 0, 0.2)' : 'inherit'
+                                }}
+                              >
+                                <TableCell sx={{ fontFamily: 'Monospace' }} component="th" scope="row" >
+                                  <Tooltip 
+                                    title={description.hasOwnProperty(row[0]) ? description[row[0]] : ""} 
+                                    componentsProps={{
+                                      tooltip: {
+                                        sx: {
+                                          fontSize: '1.0rem',  // Increase tooltip font size
+                                          padding: '8px 12px',  // Add some padding for better readability
+                                          bgcolor: 'rgba(97, 97, 97, 0.92)',  // Darker background
+                                          color: '#ffffff',  // White text for contrast
+                                          fontWeight: 400,  // Normal font weight
+                                          boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.2)'  // Add shadow for depth
+                                        }
+                                      }
+                                    }}
+                                  >
+                                    {description.hasOwnProperty(row[0]) && <IconButton sx={{ padding: "0 8px 0 0" }}>
+                                      <Icon>info</Icon>
+                                    </IconButton>}
+                                    {!description.hasOwnProperty(row[0]) && <IconButton sx={{ padding: "0 8px 0 0" }} disabled>
+                                      <Icon>info</Icon>
+                                    </IconButton>}
+                                  </Tooltip>
+                                  {(() => {
+                                    // Calculate indendation from the metric level value in column 8 (index 7)
+                                    // The lowest level is 1
+                                    const level = row[7] ? Number(row[7]) : 1;
+                                    const indentationLevel = level > 1 ? level - 1 : 0;
+                                    
+                                    // Create indentation based on hierarchy level
+                                    const indentation = indentationLevel > 0 ? 
+                                      <span style={{
+                                        paddingLeft: `${indentationLevel * 16}px`,
+                                        borderLeft: indentationLevel > 0 ? '1px dotted #aaa' : 'none',
+                                        marginLeft: indentationLevel > 0 ? '4px' : '0',
+                                      }}>
+                                        {indentationLevel > 0 && <Icon 
+                                          sx={{ 
+                                            fontSize: '0.8rem', 
+                                            verticalAlign: 'middle',
+                                            color: '#666',
+                                            marginRight: '4px'
+                                          }}
+                                        >
+                                          subdirectory_arrow_right
+                                        </Icon>}
+                                      </span> : null;
+                                    
+                                    return (
+                                      <React.Fragment>
+                                        {indentation}
+                                        {row[0]}
+                                      </React.Fragment>
+                                    );
+                                  })()}
+                                </TableCell>
+                                <TableCell 
+                                  sx={{ 
+                                    fontFamily: 'Monospace', 
+                                    fontWeight: exceedsThreshold ? 'bold' : 'normal',
+                                    backgroundColor: exceedsThreshold ? 'rgba(255, 235, 59, 0.4)' : 'inherit'
+                                  }} 
+                                  align="right"
+                                >
+                                  {Number(row[1]).toFixed(4)}
+                                  {exceedsThreshold && 
+                                    <Tooltip 
+                                      title={`${row[6]}`}
+                                      componentsProps={{
+                                        tooltip: {
+                                          sx: {
+                                            fontSize: '1.0rem',  // Increased tooltip font size
+                                            padding: '8px 12px',  // Add some padding for better readability
+                                            bgcolor: 'rgba(255, 235, 59, 0.9)',  // Slightly yellow background to match warning context
+                                            color: '#222222',  // Grey text for better contrast on yellow
+                                            fontWeight: 400  // Normal font weight
+                                          }
+                                        }
+                                      }}
+                                    >
+                                      <IconButton size="small" sx={{ padding: "0 0 0 4px" }}>
+                                        <Icon fontSize="small">warning</Icon>
+                                      </IconButton>
+                                    </Tooltip>
+                                  }
+                                </TableCell>
+                                <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
+                                  {Number(row[2]).toFixed(4)}
+                                </TableCell>
+                                <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
+                                  {Number(row[3]).toFixed(4)}
+                                </TableCell>
+                                <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
+                                  {Number(row[4]).toFixed(4)}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </div>
+                  {current_metrics.filter((row) => row[0].startsWith("TMA")).some(row => row[5] === "Yes") && (
+                    <Box sx={{ marginTop: "16px", marginLeft: "50px", marginRight: "100px" }}>
+                      <Alert 
+                        severity="warning" 
+                        sx={{ 
+                          marginBottom: "24px",
+                          backgroundColor: 'rgba(255, 255, 0, 0.2)',
+                          '& .MuiAlert-icon': {
+                            color: 'rgba(0, 0, 0, 0.7)'
+                          },
+                          '& .MuiAlert-message': {
+                            color: 'rgba(0, 0, 0, 0.7)'
+                          }
+                        }}
+                      >
+                        TMA metrics with a mean value exceeding their threshold formula are highlighted in yellow, indicating potential performance issues or anomalies that may require further investigation. Hover over the warning icon next to the mean value for more information.
+                      </Alert>
+                    </Box>
+                  )}
                 </Grid>
               </Grid>
             </TabPanel>
