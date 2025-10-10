@@ -80,16 +80,18 @@ type ComponentLoader struct {
 }
 
 func NewLoader(uarch string) (Loader, error) {
-	switch strings.ToLower(uarch) {
+	uarch = strings.ToLower(uarch)
+	uarch = strings.Split(uarch, " ")[0] // Handle "Turin (Zen 5)" case
+	switch uarch {
 	case "clx", "skx", "bdx", "bergamo", "genoa", "turin":
 		slog.Debug("Using legacy loader for microarchitecture", slog.String("uarch", uarch))
-		return newLegacyLoader(strings.ToLower(uarch)), nil
+		return newLegacyLoader(uarch), nil
 	case "gnr", "srf", "emr", "spr", "icx":
 		slog.Debug("Using perfmon loader for microarchitecture", slog.String("uarch", uarch))
-		return newPerfmonLoader(strings.ToLower(uarch)), nil
+		return newPerfmonLoader(uarch), nil
 	case "neoverse-n2", "neoverse-v2", "neoverse-n1", "neoverse-v1":
 		slog.Debug("Using component loader for microarchitecture", slog.String("uarch", uarch))
-		return newComponentLoader(strings.ToLower(uarch)), nil
+		return newComponentLoader(uarch), nil
 	default:
 		return nil, fmt.Errorf("unsupported microarchitecture: %s", uarch)
 	}
