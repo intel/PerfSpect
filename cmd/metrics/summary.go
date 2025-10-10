@@ -460,6 +460,7 @@ func (mg *MetricGroup) loadHTMLTemplateValues(metadata Metadata, metricDefinitio
 		{"TMABADSPECULATION", []string{"TMA_Bad_Speculation(%)", "Pipeline Utilization - Bad Speculation (%)", "bad_speculation"}},
 		// CPU Tab
 		{"CPUUTIL", []string{"CPU utilization %", "CPU utilization %", ""}},
+		{"KERNELUTIL", []string{"CPU utilization % in kernel mode", "CPU utilization% in kernel mode", ""}},
 		{"CPIDATA", []string{"CPI", "CPI", ""}},
 		{"CPUFREQ", []string{"CPU operating frequency (in GHz)", "CPU operating frequency (in GHz)", ""}},
 		// Memory Tab
@@ -473,6 +474,7 @@ func (mg *MetricGroup) loadHTMLTemplateValues(metadata Metadata, metricDefinitio
 		// Power Tab
 		{"PKGPOWER", []string{"package power (watts)", "package power (watts)", ""}},
 		{"DRAMPOWER", []string{"DRAM power (watts)", "", ""}},
+		{"C6CORE", []string{"core c6 residency %", "", ""}},
 	}
 	// replace the template variables with the series data
 	for tIdx, tmpl := range templateReplace {

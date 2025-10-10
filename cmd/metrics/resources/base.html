@@ -520,6 +520,17 @@
         ]
       }
 
+      let kernel_util = {
+        ...base_line,
+        series: [
+          {
+            name: "Kernel Utilization %",
+            type: 'line',
+            data: <<.KERNELUTIL>>,
+          }
+        ]
+      }
+
       let cpi = {
         ...base_line,
         series: [
@@ -617,6 +628,16 @@
         ]
       }
 
+      let c6_core = {
+        ...base_line,
+        series: [
+          {
+            name: "Core C6 Residency %",
+            type: 'line',
+            data: <<.C6CORE>>,
+          }
+        ]
+      }
 
       const diffreport = (e) => {
         let reader = new FileReader();
@@ -760,14 +781,27 @@
               <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
                 <Grid item xs={5}>
                   <Typography variant="h2">
-                    CPU utilization
+                    CPU Utilization
                   </Typography>
                   <Typography variant="body1">
-                    Percentage of time spent in the active CPU power state C0. When a core is not being utilized it can go into lower power states to reduce idle energy consumption.
+                    Percentage of time spent in the active CPU power state C0. When a core is not being utilized it can go into lower power states to reduce idle energy consumption. Higher CPU utilization generally indicates that the system is being effectively used, but very high utilization (e.g., consistently above 80-90%) may lead to performance bottlenecks if the CPU becomes a limiting factor for application performance.
                   </Typography>
                 </Grid>
                 <Grid item xs={7}>
                   <ReactECharts style={{ minHeight: "250px" }} option={cpu_util} />
+                </Grid>
+              </Grid>
+              <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    CPU Utilization in Kernel Mode
+                  </Typography>
+                  <Typography variant="body1">
+                    The percentage of CPU time spent executing system-level operations, such as handling hardware interrupts and running operating system kernel code, rather than user-level applications. This metric helps identify if high CPU usage is due to system overhead or application demands.
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={kernel_util} />
                 </Grid>
               </Grid>
               <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
@@ -786,7 +820,7 @@
               <Grid container>
                 <Grid item xs={5}>
                   <Typography variant="h2">
-                    CPU operating frequency (in GHz)
+                    CPU Operating Frequency (in GHz)
                   </Typography>
                   <Typography variant="body1">
                     This is the speed of the CPU clock. Higher frequencies allow faster execution. Usually servers are able to change their frequency based on utilization to conserve energy or turbo for short periods of time to boost performance.
@@ -858,7 +892,7 @@
                   <ReactECharts style={{ minHeight: "250px" }} option={package_power} />
                 </Grid>
               </Grid>
-              <Grid container>
+              <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
                 <Grid item xs={5}>
                   <Typography variant="h2">
                     DRAM Power
@@ -869,6 +903,19 @@
                 </Grid>
                 <Grid item xs={7}>
                   <ReactECharts style={{ minHeight: "250px" }} option={dram_power} />
+                </Grid>
+              </Grid>
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    Core C6 State Residency Percentage
+                  </Typography>
+                  <Typography variant="body1">
+                    The average percentage of time the cores spent in the C6 low power state. C6 is a deep core idle state where the core's internal clocks are stopped and the core voltage is reduced. This state saves more power than lighter C-states, but it takes longer to enter and exit, which can impact performance if the core needs to become active again quickly.
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={c6_core} />
                 </Grid>
               </Grid>
             </TabPanel>
