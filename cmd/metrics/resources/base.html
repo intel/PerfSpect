@@ -176,6 +176,177 @@
         const hasHighlighted = current_metrics.some(row => row[5] === "Yes");
         setHasHighlightedMetrics(hasHighlighted);
       }, [current_metrics]);
+
+      // MetricsTable component
+      const MetricsTable = ({ 
+        data, 
+        filterPrefix = null, 
+        showComparison = false, 
+        containerStyle = {}
+      }) => {
+        const filteredData = filterPrefix 
+          ? data.filter((row) => row[0].startsWith(filterPrefix))
+          : data;
+
+        const hasOtherComparison = data.length > 0 && data[0].hasOwnProperty("other");
+
+        return (
+          <div style={containerStyle}>
+            {hasHighlightedMetrics && (
+              <Box sx={{ marginTop: "0px" }}>
+                <Alert 
+                  severity="warning" 
+                  sx={{ 
+                    marginBottom: "0px",
+                    backgroundColor: 'rgba(255, 255, 0, 0.2)',
+                    '& .MuiAlert-icon': {
+                      color: 'rgba(0, 0, 0, 0.7)'
+                    },
+                    '& .MuiAlert-message': {
+                      color: 'rgba(0, 0, 0, 0.7)'
+                    }
+                  }}
+                >
+                  {"Metrics with a mean value exceeding their threshold formula are highlighted in yellow, indicating potential performance issues or anomalies that may require further investigation. Hover over the warning icon next to the mean value for more information."}
+                </Alert>
+              </Box>
+            )}
+            <TableContainer component={Paper} sx={{ width: "fit-content" }}>
+              <Table size="small" style={{ tableLayout: 'auto' }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Metric</TableCell>
+                    <TableCell>Mean</TableCell>
+                    <TableCell>Min</TableCell>
+                    <TableCell>Max</TableCell>
+                    <TableCell>Stddev</TableCell>
+                    {showComparison && hasOtherComparison && <TableCell sx={{ fontStyle: 'italic' }}>Other Mean</TableCell>}
+                    {showComparison && hasOtherComparison && <TableCell>Diff</TableCell>}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredData.map((row) => {
+                    const exceedsThreshold = row[5] == "Yes";
+                    return (
+                      <TableRow
+                        hover={true}
+                        key={row[0]}
+                        sx={{ 
+                          '&:last-child td, &:last-child th': { border: 0 },
+                          backgroundColor: exceedsThreshold ? 'rgba(255, 255, 0, 0.2)' : 'inherit'
+                        }}
+                      >
+                        <TableCell sx={{ fontFamily: 'Monospace' }} component="th" scope="row">
+                          <Tooltip 
+                            title={description.hasOwnProperty(row[0]) ? description[row[0]] : ""} 
+                            componentsProps={{
+                              tooltip: {
+                                sx: {
+                                  fontSize: '1.0rem',
+                                  padding: '8px 12px',
+                                  bgcolor: 'rgba(97, 97, 97, 0.92)',
+                                  color: '#ffffff',
+                                  fontWeight: 400,
+                                  boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.2)'
+                                }
+                              }
+                            }}
+                          >
+                            <IconButton sx={{ padding: "0 8px 0 0" }} disabled={!description.hasOwnProperty(row[0])}>
+                              <Icon>info</Icon>
+                            </IconButton>
+                          </Tooltip>
+                          {(() => {
+                            const level = row[7] ? Number(row[7]) : 1;
+                            const indentationLevel = level > 1 ? level - 1 : 0;
+                            
+                            const indentation = indentationLevel > 0 ? 
+                              <span style={{
+                                paddingLeft: `${indentationLevel * 16}px`,
+                                borderLeft: indentationLevel > 0 ? '1px dotted #aaa' : 'none',
+                                marginLeft: indentationLevel > 0 ? '4px' : '0',
+                              }}>
+                                {indentationLevel > 0 && <Icon 
+                                  sx={{ 
+                                    fontSize: '0.8rem', 
+                                    verticalAlign: 'middle',
+                                    color: '#666',
+                                    marginRight: '4px'
+                                  }}
+                                >
+                                  subdirectory_arrow_right
+                                </Icon>}
+                              </span> : null;
+                            
+                            return (
+                              <React.Fragment>
+                                {indentation}
+                                {row[0]}
+                              </React.Fragment>
+                            );
+                          })()}
+                        </TableCell>
+                        <TableCell 
+                          sx={{ 
+                            fontFamily: 'Monospace', 
+                            fontWeight: exceedsThreshold ? 'bold' : 'normal',
+                            backgroundColor: exceedsThreshold ? 'rgba(255, 235, 59, 0.4)' : 'inherit'
+                          }} 
+                          align="right"
+                        >
+                          {Number(row[1]).toFixed(4)}
+                          {exceedsThreshold && 
+                            <Tooltip 
+                              title={`${row[6]}`}
+                              componentsProps={{
+                                tooltip: {
+                                  sx: {
+                                    fontSize: '1.0rem',
+                                    padding: '8px 12px',
+                                    bgcolor: 'rgba(255, 235, 59, 0.9)',
+                                    color: '#222222',
+                                    fontWeight: 400
+                                  }
+                                }
+                              }}
+                            >
+                              <IconButton size="small" sx={{ padding: "0 0 0 4px" }}>
+                                <Icon fontSize="small">warning</Icon>
+                              </IconButton>
+                            </Tooltip>
+                          }
+                        </TableCell>
+                        <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
+                          {Number(row[2]).toFixed(4)}
+                        </TableCell>
+                        <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
+                          {Number(row[3]).toFixed(4)}
+                        </TableCell>
+                        <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
+                          {Number(row[4]).toFixed(4)}
+                        </TableCell>
+                        {showComparison && hasOtherComparison && row.hasOwnProperty("other") && (
+                          <TableCell sx={{ fontFamily: 'Monospace', fontStyle: 'italic' }} align="right">
+                            {Number(row["other"]).toFixed(4)}
+                          </TableCell>
+                        )}
+                        {showComparison && hasOtherComparison && row.hasOwnProperty("other") && (
+                          <TableCell align="right" sx={{ 
+                            fontFamily: 'Monospace', 
+                            backgroundColor: (row.diff > 0 ? "rgba(255,0,0," + (row.diff / maxdiff * .5) + ")" : "rgba(0,0,255," + (row.diff / mindiff * .5) + ")") 
+                          }}>
+                            {Math.round(Number(row["diff"]))}%
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </div>
+        );
+      };
       // Define consistent colors for TMA categories with child variations
       const tmaColors = {
         // Blue family for Frontend
@@ -554,7 +725,7 @@
               <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
                 <Grid item xs={5}>
                   <Typography variant="h2">
-                    Top Level Metrics Over Time
+                    Level 1 TMA Metrics Over Time
                   </Typography>
                   <Typography variant="body1">
                     Here, we show the TMA Frontend, Backend, Retiring and Bad Speculation percentages over the collection period.
@@ -574,152 +745,11 @@
                   </Typography>
                 </Grid>
                 <Grid item xs={7} sx={{ display: 'flex', justifyContent: 'center' }}>
-                  <div style={{ height: "500px", overflow: "auto", width: "fit-content" }}>
-                    {current_metrics.filter((row) => row[0].startsWith("TMA")).some(row => row[5] === "Yes") && (
-                      <Alert 
-                        severity="warning" 
-                        sx={{ 
-                          marginBottom: "0px",
-                          width: "800px", // Fixed width to match typical table width
-                          backgroundColor: 'rgba(255, 255, 0, 0.2)',
-                          '& .MuiAlert-icon': {
-                            color: 'rgba(0, 0, 0, 0.7)'
-                          },
-                          '& .MuiAlert-message': {
-                            color: 'rgba(0, 0, 0, 0.7)'
-                          }
-                        }}
-                      >
-                        TMA metrics with a mean value exceeding their threshold formula are highlighted in yellow, indicating potential performance issues or anomalies that may require further investigation. Hover over the warning icon next to the mean value for more information.
-                      </Alert>
-                    )}
-                    <TableContainer component={Paper} sx={{ width: "fit-content" }}>
-                      <Table size="small" style={{ tableLayout: 'auto' }}>
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Metric</TableCell>
-                            <TableCell>Mean</TableCell>
-                            <TableCell>Min</TableCell>
-                            <TableCell>Max</TableCell>
-                            <TableCell>Stddev</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {current_metrics.filter((row) => row[0].startsWith("TMA")).map((row) => {
-                            // Check if this metric has exceeded its threshold
-                            const exceedsThreshold = row[5] == "Yes";
-                            return (
-                              <TableRow
-                                hover={true}
-                                key={row[0]}
-                                sx={{ 
-                                  '&:last-child td, &:last-child th': { border: 0 },
-                                  // Highlight the entire row if mean value exceeds its specific threshold
-                                  backgroundColor: exceedsThreshold ? 'rgba(255, 255, 0, 0.2)' : 'inherit'
-                                }}
-                              >
-                                <TableCell sx={{ fontFamily: 'Monospace' }} component="th" scope="row" >
-                                  <Tooltip 
-                                    title={description.hasOwnProperty(row[0]) ? description[row[0]] : ""} 
-                                    componentsProps={{
-                                      tooltip: {
-                                        sx: {
-                                          fontSize: '1.0rem',  // Increase tooltip font size
-                                          padding: '8px 12px',  // Add some padding for better readability
-                                          bgcolor: 'rgba(97, 97, 97, 0.92)',  // Darker background
-                                          color: '#ffffff',  // White text for contrast
-                                          fontWeight: 400,  // Normal font weight
-                                          boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.2)'  // Add shadow for depth
-                                        }
-                                      }
-                                    }}
-                                  >
-                                    {description.hasOwnProperty(row[0]) && <IconButton sx={{ padding: "0 8px 0 0" }}>
-                                      <Icon>info</Icon>
-                                    </IconButton>}
-                                    {!description.hasOwnProperty(row[0]) && <IconButton sx={{ padding: "0 8px 0 0" }} disabled>
-                                      <Icon>info</Icon>
-                                    </IconButton>}
-                                  </Tooltip>
-                                  {(() => {
-                                    // Calculate indendation from the metric level value in column 8 (index 7)
-                                    // The lowest level is 1
-                                    const level = row[7] ? Number(row[7]) : 1;
-                                    const indentationLevel = level > 1 ? level - 1 : 0;
-                                    
-                                    // Create indentation based on hierarchy level
-                                    const indentation = indentationLevel > 0 ? 
-                                      <span style={{
-                                        paddingLeft: `${indentationLevel * 16}px`,
-                                        borderLeft: indentationLevel > 0 ? '1px dotted #aaa' : 'none',
-                                        marginLeft: indentationLevel > 0 ? '4px' : '0',
-                                      }}>
-                                        {indentationLevel > 0 && <Icon 
-                                          sx={{ 
-                                            fontSize: '0.8rem', 
-                                            verticalAlign: 'middle',
-                                            color: '#666',
-                                            marginRight: '4px'
-                                          }}
-                                        >
-                                          subdirectory_arrow_right
-                                        </Icon>}
-                                      </span> : null;
-                                    
-                                    return (
-                                      <React.Fragment>
-                                        {indentation}
-                                        {row[0]}
-                                      </React.Fragment>
-                                    );
-                                  })()}
-                                </TableCell>
-                                <TableCell 
-                                  sx={{ 
-                                    fontFamily: 'Monospace', 
-                                    fontWeight: exceedsThreshold ? 'bold' : 'normal',
-                                    backgroundColor: exceedsThreshold ? 'rgba(255, 235, 59, 0.4)' : 'inherit'
-                                  }} 
-                                  align="right"
-                                >
-                                  {Number(row[1]).toFixed(4)}
-                                  {exceedsThreshold && 
-                                    <Tooltip 
-                                      title={`${row[6]}`}
-                                      componentsProps={{
-                                        tooltip: {
-                                          sx: {
-                                            fontSize: '1.0rem',  // Increased tooltip font size
-                                            padding: '8px 12px',  // Add some padding for better readability
-                                            bgcolor: 'rgba(255, 235, 59, 0.9)',  // Slightly yellow background to match warning context
-                                            color: '#222222',  // Grey text for better contrast on yellow
-                                            fontWeight: 400  // Normal font weight
-                                          }
-                                        }
-                                      }}
-                                    >
-                                      <IconButton size="small" sx={{ padding: "0 0 0 4px" }}>
-                                        <Icon fontSize="small">warning</Icon>
-                                      </IconButton>
-                                    </Tooltip>
-                                  }
-                                </TableCell>
-                                <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
-                                  {Number(row[2]).toFixed(4)}
-                                </TableCell>
-                                <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
-                                  {Number(row[3]).toFixed(4)}
-                                </TableCell>
-                                <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
-                                  {Number(row[4]).toFixed(4)}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </div>
+                  <MetricsTable 
+                    data={current_metrics}
+                    filterPrefix="TMA"
+                    containerStyle={{ height: "500px", overflow: "auto", width: "fit-content" }}
+                  />
                 </Grid>
               </Grid>
             </TabPanel>
@@ -857,159 +887,11 @@
                 type="file" 
                 variant="outlined" 
               />
-              {hasHighlightedMetrics && (
-                <Box sx={{ marginTop: "16px" }}>
-                  <Alert 
-                    severity="warning" 
-                    sx={{ 
-                      marginBottom: "24px",
-                      backgroundColor: 'rgba(255, 255, 0, 0.2)',
-                      '& .MuiAlert-icon': {
-                        color: 'rgba(0, 0, 0, 0.7)'
-                      },
-                      '& .MuiAlert-message': {
-                        color: 'rgba(0, 0, 0, 0.7)'
-                      }
-                    }}
-                >
-                  Metrics with a mean value exceeding their threshold formula are highlighted in yellow, indicating potential performance issues or anomalies that may require further investigation. Hover over the warning icon next to the mean value for more information.
-                </Alert>
-                </Box>
-              )}
-              <TableContainer component={Paper} sx={{ width: "fit-content" }}>
-                <Table size="small" style={{ tableLayout: 'auto' }}>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Metric</TableCell>
-                      <TableCell>Mean</TableCell>
-                      <TableCell>Min</TableCell>
-                      <TableCell>Max</TableCell>
-                      <TableCell>Stddev</TableCell>
-                      {current_metrics[0].hasOwnProperty("other") && <TableCell sx={{ fontStyle: 'italic' }}>Other Mean</TableCell>}
-                      {current_metrics[0].hasOwnProperty("other") && <TableCell>Diff</TableCell>}
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {current_metrics.map((row) => {
-                      // Check if this metric has exceeded its threshold
-                      const exceedsThreshold = row[5] == "Yes";
-                      return (
-                        <TableRow
-                          hover={true}
-                          key={row[0]}
-                          sx={{ 
-                            '&:last-child td, &:last-child th': { border: 0 },
-                            // Highlight the entire row if mean value exceeds its specific threshold
-                            backgroundColor: exceedsThreshold ? 'rgba(255, 255, 0, 0.2)' : 'inherit'
-                          }}
-                        >
-                          <TableCell sx={{ fontFamily: 'Monospace' }} component="th" scope="row" >
-                            <Tooltip 
-                              title={description.hasOwnProperty(row[0]) ? description[row[0]] : ""} 
-                              componentsProps={{
-                                tooltip: {
-                                  sx: {
-                                    fontSize: '1.0rem',  // Increase tooltip font size
-                                    padding: '8px 12px',  // Add some padding for better readability
-                                    bgcolor: 'rgba(97, 97, 97, 0.92)',  // Darker background
-                                    color: '#ffffff',  // White text for contrast
-                                    fontWeight: 400,  // Normal font weight
-                                    boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.2)'  // Add shadow for depth
-                                  }
-                                }
-                              }}
-                            >
-                              {description.hasOwnProperty(row[0]) && <IconButton sx={{ padding: "0 8px 0 0" }}>
-                                <Icon>info</Icon>
-                              </IconButton>}
-                              {!description.hasOwnProperty(row[0]) && <IconButton sx={{ padding: "0 8px 0 0" }} disabled>
-                                <Icon>info</Icon>
-                              </IconButton>}
-                            </Tooltip>
-                            {(() => {
-                              // Calculate indendation from the metric level value in column 8 (index 7)
-                              // The lowest level is 1
-                              const level = row[7] ? Number(row[7]) : 1;
-                              const indentationLevel = level > 1 ? level - 1 : 0;
-                              
-                              // Create indentation based on hierarchy level
-                              const indentation = indentationLevel > 0 ? 
-                                <span style={{
-                                  paddingLeft: `${indentationLevel * 16}px`,
-                                  borderLeft: indentationLevel > 0 ? '1px dotted #aaa' : 'none',
-                                  marginLeft: indentationLevel > 0 ? '4px' : '0',
-                                }}>
-                                  {indentationLevel > 0 && <Icon 
-                                    sx={{ 
-                                      fontSize: '0.8rem', 
-                                      verticalAlign: 'middle',
-                                      color: '#666',
-                                      marginRight: '4px'
-                                    }}
-                                  >
-                                    subdirectory_arrow_right
-                                  </Icon>}
-                                </span> : null;
-                              
-                              return (
-                                <React.Fragment>
-                                  {indentation}
-                                  {row[0]}
-                                </React.Fragment>
-                              );
-                            })()}
-                          </TableCell>
-                          <TableCell 
-                            sx={{ 
-                              fontFamily: 'Monospace', 
-                              fontWeight: exceedsThreshold ? 'bold' : 'normal',
-                              backgroundColor: exceedsThreshold ? 'rgba(255, 235, 59, 0.4)' : 'inherit'
-                            }} 
-                            align="right"
-                          >
-                            {Number(row[1]).toFixed(4)}
-                            {exceedsThreshold && 
-                              <Tooltip 
-                                title={`${row[6]}`}
-                                componentsProps={{
-                                  tooltip: {
-                                    sx: {
-                                      fontSize: '1.0rem',  // Increased tooltip font size
-                                      padding: '8px 12px',  // Add some padding for better readability
-                                      bgcolor: 'rgba(255, 235, 59, 0.9)',  // Slightly yellow background to match warning context
-                                      color: '#222222',  // Grey text for better contrast on yellow
-                                      fontWeight: 400  // Normal font weight
-                                    }
-                                  }
-                                }}
-                              >
-                                <IconButton size="small" sx={{ padding: "0 0 0 4px" }}>
-                                  <Icon fontSize="small">warning</Icon>
-                                </IconButton>
-                              </Tooltip>
-                            }
-                          </TableCell>
-                          <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
-                            {Number(row[2]).toFixed(4)}
-                          </TableCell>
-                          <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
-                            {Number(row[3]).toFixed(4)}
-                          </TableCell>
-                          <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
-                            {Number(row[4]).toFixed(4)}
-                          </TableCell>
-                          {row.hasOwnProperty("other") && <TableCell sx={{ fontFamily: 'Monospace', fontStyle: 'italic' }} align="right">
-                            {Number(row["other"]).toFixed(4)}
-                          </TableCell>}
-                          {row.hasOwnProperty("other") && <TableCell align="right" sx={{ fontFamily: 'Monospace', backgroundColor: (row.diff > 0 ? "rgba(255,0,0," + (row.diff / maxdiff * .5) + ")" : "rgba(0,0,255," + (row.diff / mindiff * .5) + ")") }}>
-                            {Math.round(Number(row["diff"]))}%
-                          </TableCell>}
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+              <MetricsTable 
+                data={current_metrics}
+                showComparison={true}
+                containerStyle={{ width: "fit-content" }}
+              />
             </TabPanel>
             <TabPanel
               value={systemTabs}
