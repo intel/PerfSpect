@@ -504,7 +504,7 @@
               value={systemTabs}
               index={0}
             >
-              <Grid container style={{ padding: "0px 0px 24px 0px" }}>
+              <Grid container style={{ padding: "0px 0px 24px 0px", borderBottom: "1px solid rgba(0, 0, 0, 0.1)" }}>
                 <Grid item xs={5}>
                   <Typography variant="h2">
                     Top-down Microarchitecture Analysis Method (TMAM)
@@ -551,7 +551,7 @@
                   <ReactECharts style={{ minHeight: "400px" }} option={tmasunburst} />
                 </Grid>
               </Grid>
-              <Grid container>
+              <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
                 <Grid item xs={5}>
                   <Typography variant="h2">
                     Top Level Metrics Over Time
@@ -564,7 +564,7 @@
                   <ReactECharts style={{ minHeight: "250px" }} option={level1tma} />
                 </Grid>
               </Grid>
-              <Grid container style={{ padding: "24px 0px 0px 0px" }}>
+              <Grid container style={{ paddingTop: "24px" }}>
                 <Grid item xs={5}>
                   <Typography variant="h2">
                     All TMA Metrics
@@ -573,8 +573,26 @@
                     List of all collected Top-down Microarchitecture Analysis metrics.
                   </Typography>
                 </Grid>
-                <Grid item xs={7}>
-                  <div style={{ height: "400px", overflow: "auto", width: "fit-content", marginLeft: "50px" }}>
+                <Grid item xs={7} sx={{ display: 'flex', justifyContent: 'center' }}>
+                  <div style={{ height: "500px", overflow: "auto", width: "fit-content" }}>
+                    {current_metrics.filter((row) => row[0].startsWith("TMA")).some(row => row[5] === "Yes") && (
+                      <Alert 
+                        severity="warning" 
+                        sx={{ 
+                          marginBottom: "0px",
+                          width: "800px", // Fixed width to match typical table width
+                          backgroundColor: 'rgba(255, 255, 0, 0.2)',
+                          '& .MuiAlert-icon': {
+                            color: 'rgba(0, 0, 0, 0.7)'
+                          },
+                          '& .MuiAlert-message': {
+                            color: 'rgba(0, 0, 0, 0.7)'
+                          }
+                        }}
+                      >
+                        TMA metrics with a mean value exceeding their threshold formula are highlighted in yellow, indicating potential performance issues or anomalies that may require further investigation. Hover over the warning icon next to the mean value for more information.
+                      </Alert>
+                    )}
                     <TableContainer component={Paper} sx={{ width: "fit-content" }}>
                       <Table size="small" style={{ tableLayout: 'auto' }}>
                         <TableHead>
@@ -702,25 +720,6 @@
                       </Table>
                     </TableContainer>
                   </div>
-                  {current_metrics.filter((row) => row[0].startsWith("TMA")).some(row => row[5] === "Yes") && (
-                    <Box sx={{ marginTop: "16px", marginLeft: "50px", marginRight: "100px" }}>
-                      <Alert 
-                        severity="warning" 
-                        sx={{ 
-                          marginBottom: "24px",
-                          backgroundColor: 'rgba(255, 255, 0, 0.2)',
-                          '& .MuiAlert-icon': {
-                            color: 'rgba(0, 0, 0, 0.7)'
-                          },
-                          '& .MuiAlert-message': {
-                            color: 'rgba(0, 0, 0, 0.7)'
-                          }
-                        }}
-                      >
-                        TMA metrics with a mean value exceeding their threshold formula are highlighted in yellow, indicating potential performance issues or anomalies that may require further investigation. Hover over the warning icon next to the mean value for more information.
-                      </Alert>
-                    </Box>
-                  )}
                 </Grid>
               </Grid>
             </TabPanel>
@@ -728,7 +727,7 @@
               value={systemTabs}
               index={1}
             >
-              <Grid container>
+              <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
                 <Grid item xs={5}>
                   <Typography variant="h2">
                     CPU utilization
@@ -741,7 +740,7 @@
                   <ReactECharts style={{ minHeight: "250px" }} option={cpu_util} />
                 </Grid>
               </Grid>
-              <Grid container>
+              <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
                 <Grid item xs={5}>
                   <Typography variant="h2">
                     CPI
@@ -772,7 +771,7 @@
               value={systemTabs}
               index={2}
             >
-              <Grid container>
+              <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
                 <Grid item xs={5}>
                   <Typography variant="h2">
                     Memory Bandwidth
@@ -785,7 +784,7 @@
                   <ReactECharts style={{ minHeight: "250px" }} option={memory} />
                 </Grid>
               </Grid>
-              <Grid container>
+              <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
                 <Grid item xs={5}>
                   <Typography variant="h2">
                     Remote DRAM reads %
@@ -816,7 +815,7 @@
               value={systemTabs}
               index={3}
             >
-              <Grid container>
+              <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
                 <Grid item xs={5}>
                   <Typography variant="h2">
                     Package Power
@@ -858,6 +857,25 @@
                 type="file" 
                 variant="outlined" 
               />
+              {hasHighlightedMetrics && (
+                <Box sx={{ marginTop: "16px" }}>
+                  <Alert 
+                    severity="warning" 
+                    sx={{ 
+                      marginBottom: "24px",
+                      backgroundColor: 'rgba(255, 255, 0, 0.2)',
+                      '& .MuiAlert-icon': {
+                        color: 'rgba(0, 0, 0, 0.7)'
+                      },
+                      '& .MuiAlert-message': {
+                        color: 'rgba(0, 0, 0, 0.7)'
+                      }
+                    }}
+                >
+                  Metrics with a mean value exceeding their threshold formula are highlighted in yellow, indicating potential performance issues or anomalies that may require further investigation. Hover over the warning icon next to the mean value for more information.
+                </Alert>
+                </Box>
+              )}
               <TableContainer component={Paper} sx={{ width: "fit-content" }}>
                 <Table size="small" style={{ tableLayout: 'auto' }}>
                   <TableHead>
@@ -992,25 +1010,6 @@
                   </TableBody>
                 </Table>
               </TableContainer>
-              {hasHighlightedMetrics && (
-                <Box sx={{ marginTop: "16px" }}>
-                  <Alert 
-                    severity="warning" 
-                    sx={{ 
-                      marginBottom: "24px",
-                      backgroundColor: 'rgba(255, 255, 0, 0.2)',
-                      '& .MuiAlert-icon': {
-                        color: 'rgba(0, 0, 0, 0.7)'
-                      },
-                      '& .MuiAlert-message': {
-                        color: 'rgba(0, 0, 0, 0.7)'
-                      }
-                    }}
-                >
-                  Metrics with a mean value exceeding their threshold formula are highlighted in yellow, indicating potential performance issues or anomalies that may require further investigation. Hover over the warning icon next to the mean value for more information.
-                </Alert>
-                </Box>
-              )}
             </TabPanel>
             <TabPanel
               value={systemTabs}
