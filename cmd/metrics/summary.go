@@ -451,6 +451,9 @@ func (mg *MetricGroup) loadHTMLTemplateValues(metadata Metadata, metricDefinitio
 		}
 		templateVals[tmpl.tmplVar] = fmt.Sprintf("%f", metricMean)
 	}
+	// TMA Tab's metrics table requires a filter string to limit the metrics displayed in the table
+	templateVals["TMAPREFIX"] = []string{"TMA", "Pipeline Utilization", ""}[archIndex]
+
 	// these get the series data for the graphs
 	templateReplace = []tmplReplace{
 		// TMAM Tab

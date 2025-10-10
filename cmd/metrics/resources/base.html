@@ -190,6 +190,17 @@
 
         const hasOtherComparison = data.length > 0 && data[0].hasOwnProperty("other");
 
+        // If filtering results in no data, show a message
+        if (filterPrefix && filteredData.length === 0) {
+          return (
+            <div style={containerStyle}>
+              <Typography variant="body1" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
+                No additional TMA metrics collected.
+              </Typography>
+            </div>
+          );
+        }
+        // Create the table
         return (
           <div style={containerStyle}>
             {hasHighlightedMetrics && (
@@ -768,7 +779,7 @@
                 <Grid item xs={7} sx={{ display: 'flex', justifyContent: 'center' }}>
                   <MetricsTable 
                     data={current_metrics}
-                    filterPrefix="TMA"
+                    filterPrefix="<<.TMAPREFIX>>"
                     containerStyle={{ height: "500px", overflow: "auto", width: "fit-content" }}
                   />
                 </Grid>
