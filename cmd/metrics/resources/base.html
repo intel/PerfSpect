@@ -185,7 +185,10 @@
         containerStyle = {}
       }) => {
         const filteredData = filterPrefix 
-          ? data.filter((row) => row[0].startsWith(filterPrefix))
+          ? data.filter((row) => {
+              // filterPrefix is either null or an array of strings
+              return filterPrefix.some(prefix => row[0].startsWith(prefix));
+            })
           : data;
 
         const hasOtherComparison = data.length > 0 && data[0].hasOwnProperty("other");
@@ -779,7 +782,7 @@
                 <Grid item xs={7} sx={{ display: 'flex', justifyContent: 'center' }}>
                   <MetricsTable 
                     data={current_metrics}
-                    filterPrefix="<<.TMAPREFIX>>"
+                    filterPrefix={<<.TMAFILTER>>}
                     containerStyle={{ height: "500px", overflow: "auto", width: "fit-content" }}
                   />
                 </Grid>

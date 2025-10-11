@@ -451,8 +451,15 @@ func (mg *MetricGroup) loadHTMLTemplateValues(metadata Metadata, metricDefinitio
 		}
 		templateVals[tmpl.tmplVar] = fmt.Sprintf("%f", metricMean)
 	}
-	// TMA Tab's metrics table requires a filter string to limit the metrics displayed in the table
-	templateVals["TMAPREFIX"] = []string{"TMA", "Pipeline Utilization", ""}[archIndex]
+	// TMA Tab's metrics table requires an array of filter strings to limit the metrics displayed in the table.
+	// Metrics that start with any of the filter strings (for the arch) match and will be included in the table.
+	tmaArchFilters := [][]string{{"TMA"}, {"Pipeline Utilization"}, {"backend_", "frontend_", "bad_speculation", "retiring"}}
+	tmaFilters := tmaArchFilters[archIndex]
+	var tmaFilterBytes []byte
+	if tmaFilterBytes, err = json.Marshal(tmaFilters); err != nil {
+		return
+	}
+	templateVals["TMAFILTER"] = string(tmaFilterBytes)
 
 	// these get the series data for the graphs
 	templateReplace = []tmplReplace{
