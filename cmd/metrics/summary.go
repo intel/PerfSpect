@@ -451,6 +451,16 @@ func (mg *MetricGroup) loadHTMLTemplateValues(metadata Metadata, metricDefinitio
 		}
 		templateVals[tmpl.tmplVar] = fmt.Sprintf("%f", metricMean)
 	}
+	// TMA Tab's metrics table requires an array of filter strings to limit the metrics displayed in the table.
+	// Metrics that start with any of the filter strings (for the arch) match and will be included in the table.
+	tmaArchFilters := [][]string{{"TMA"}, {"Pipeline Utilization"}, {"backend_", "frontend_", "bad_speculation", "retiring"}}
+	tmaFilters := tmaArchFilters[archIndex]
+	var tmaFilterBytes []byte
+	if tmaFilterBytes, err = json.Marshal(tmaFilters); err != nil {
+		return
+	}
+	templateVals["TMAFILTER"] = string(tmaFilterBytes)
+
 	// these get the series data for the graphs
 	templateReplace = []tmplReplace{
 		// TMAM Tab
@@ -460,6 +470,7 @@ func (mg *MetricGroup) loadHTMLTemplateValues(metadata Metadata, metricDefinitio
 		{"TMABADSPECULATION", []string{"TMA_Bad_Speculation(%)", "Pipeline Utilization - Bad Speculation (%)", "bad_speculation"}},
 		// CPU Tab
 		{"CPUUTIL", []string{"CPU utilization %", "CPU utilization %", ""}},
+		{"KERNELUTIL", []string{"CPU utilization % in kernel mode", "CPU utilization% in kernel mode", ""}},
 		{"CPIDATA", []string{"CPI", "CPI", ""}},
 		{"CPUFREQ", []string{"CPU operating frequency (in GHz)", "CPU operating frequency (in GHz)", ""}},
 		// Memory Tab
@@ -473,6 +484,7 @@ func (mg *MetricGroup) loadHTMLTemplateValues(metadata Metadata, metricDefinitio
 		// Power Tab
 		{"PKGPOWER", []string{"package power (watts)", "package power (watts)", ""}},
 		{"DRAMPOWER", []string{"DRAM power (watts)", "", ""}},
+		{"C6CORE", []string{"core c6 residency %", "", ""}},
 	}
 	// replace the template variables with the series data
 	for tIdx, tmpl := range templateReplace {

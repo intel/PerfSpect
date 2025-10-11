@@ -176,23 +176,208 @@
         const hasHighlighted = current_metrics.some(row => row[5] === "Yes");
         setHasHighlightedMetrics(hasHighlighted);
       }, [current_metrics]);
+
+      // MetricsTable component
+      const MetricsTable = ({ 
+        data, 
+        filterPrefix = null, 
+        showComparison = false, 
+        containerStyle = {}
+      }) => {
+        const filteredData = filterPrefix 
+          ? data.filter((row) => {
+              // filterPrefix is either null or an array of strings
+              return filterPrefix.some(prefix => row[0].startsWith(prefix));
+            })
+          : data;
+
+        const hasOtherComparison = data.length > 0 && data[0].hasOwnProperty("other");
+
+        // If filtering results in no data, show a message
+        if (filterPrefix && filteredData.length === 0) {
+          return (
+            <div style={containerStyle}>
+              <Typography variant="body1" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
+                No additional TMA metrics collected.
+              </Typography>
+            </div>
+          );
+        }
+        // Create the table
+        return (
+          <div style={containerStyle}>
+            {hasHighlightedMetrics && (
+              <Box sx={{ marginTop: "0px" }}>
+                <Alert 
+                  severity="warning" 
+                  sx={{ 
+                    marginBottom: "0px",
+                    backgroundColor: 'rgba(255, 255, 0, 0.2)',
+                    '& .MuiAlert-icon': {
+                      color: 'rgba(0, 0, 0, 0.7)'
+                    },
+                    '& .MuiAlert-message': {
+                      color: 'rgba(0, 0, 0, 0.7)'
+                    }
+                  }}
+                >
+                  {"Metrics with a mean value exceeding their threshold formula are highlighted in yellow, indicating potential performance issues or anomalies that may require further investigation. Hover over the warning icon next to the mean value for more information."}
+                </Alert>
+              </Box>
+            )}
+            <TableContainer component={Paper} sx={{ width: "fit-content" }}>
+              <Table size="small" style={{ tableLayout: 'auto' }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Metric</TableCell>
+                    <TableCell>Mean</TableCell>
+                    <TableCell>Min</TableCell>
+                    <TableCell>Max</TableCell>
+                    <TableCell>Stddev</TableCell>
+                    {showComparison && hasOtherComparison && <TableCell sx={{ fontStyle: 'italic' }}>Other Mean</TableCell>}
+                    {showComparison && hasOtherComparison && <TableCell>Diff</TableCell>}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredData.map((row) => {
+                    const exceedsThreshold = row[5] == "Yes";
+                    return (
+                      <TableRow
+                        hover={true}
+                        key={row[0]}
+                        sx={{ 
+                          '&:last-child td, &:last-child th': { border: 0 },
+                          backgroundColor: exceedsThreshold ? 'rgba(255, 255, 0, 0.2)' : 'inherit'
+                        }}
+                      >
+                        <TableCell sx={{ fontFamily: 'Monospace' }} component="th" scope="row">
+                          <Tooltip 
+                            title={description.hasOwnProperty(row[0]) ? description[row[0]] : ""} 
+                            componentsProps={{
+                              tooltip: {
+                                sx: {
+                                  fontSize: '1.0rem',
+                                  padding: '8px 12px',
+                                  bgcolor: 'rgba(97, 97, 97, 0.92)',
+                                  color: '#ffffff',
+                                  fontWeight: 400,
+                                  boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.2)'
+                                }
+                              }
+                            }}
+                          >
+                            <IconButton sx={{ padding: "0 8px 0 0" }} disabled={!description.hasOwnProperty(row[0])}>
+                              <Icon>info</Icon>
+                            </IconButton>
+                          </Tooltip>
+                          {(() => {
+                            const level = row[7] ? Number(row[7]) : 1;
+                            const indentationLevel = level > 1 ? level - 1 : 0;
+                            
+                            const indentation = indentationLevel > 0 ? 
+                              <span style={{
+                                paddingLeft: `${indentationLevel * 16}px`,
+                                borderLeft: indentationLevel > 0 ? '1px dotted #aaa' : 'none',
+                                marginLeft: indentationLevel > 0 ? '4px' : '0',
+                              }}>
+                                {indentationLevel > 0 && <Icon 
+                                  sx={{ 
+                                    fontSize: '0.8rem', 
+                                    verticalAlign: 'middle',
+                                    color: '#666',
+                                    marginRight: '4px'
+                                  }}
+                                >
+                                  subdirectory_arrow_right
+                                </Icon>}
+                              </span> : null;
+                            
+                            return (
+                              <React.Fragment>
+                                {indentation}
+                                {row[0]}
+                              </React.Fragment>
+                            );
+                          })()}
+                        </TableCell>
+                        <TableCell 
+                          sx={{ 
+                            fontFamily: 'Monospace', 
+                            fontWeight: exceedsThreshold ? 'bold' : 'normal',
+                            backgroundColor: exceedsThreshold ? 'rgba(255, 235, 59, 0.4)' : 'inherit'
+                          }} 
+                          align="right"
+                        >
+                          {Number(row[1]).toFixed(4)}
+                          {exceedsThreshold && 
+                            <Tooltip 
+                              title={`${row[6]}`}
+                              componentsProps={{
+                                tooltip: {
+                                  sx: {
+                                    fontSize: '1.0rem',
+                                    padding: '8px 12px',
+                                    bgcolor: 'rgba(255, 235, 59, 0.9)',
+                                    color: '#222222',
+                                    fontWeight: 400
+                                  }
+                                }
+                              }}
+                            >
+                              <IconButton size="small" sx={{ padding: "0 0 0 4px" }}>
+                                <Icon fontSize="small">warning</Icon>
+                              </IconButton>
+                            </Tooltip>
+                          }
+                        </TableCell>
+                        <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
+                          {Number(row[2]).toFixed(4)}
+                        </TableCell>
+                        <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
+                          {Number(row[3]).toFixed(4)}
+                        </TableCell>
+                        <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
+                          {Number(row[4]).toFixed(4)}
+                        </TableCell>
+                        {showComparison && hasOtherComparison && row.hasOwnProperty("other") && (
+                          <TableCell sx={{ fontFamily: 'Monospace', fontStyle: 'italic' }} align="right">
+                            {Number(row["other"]).toFixed(4)}
+                          </TableCell>
+                        )}
+                        {showComparison && hasOtherComparison && row.hasOwnProperty("other") && (
+                          <TableCell align="right" sx={{ 
+                            fontFamily: 'Monospace', 
+                            backgroundColor: (row.diff > 0 ? "rgba(255,0,0," + (row.diff / maxdiff * .5) + ")" : "rgba(0,0,255," + (row.diff / mindiff * .5) + ")") 
+                          }}>
+                            {Math.round(Number(row["diff"]))}%
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </div>
+        );
+      };
       // Define consistent colors for TMA categories with child variations
       const tmaColors = {
         // Blue family for Frontend
-        'Frontend': '#5470c6',
-        'FrontendChild': '#7a90d3',  // Lighter blue for all Frontend children
+        'Frontend': '#4472c4',
+        'FrontendChild': '#7293d3',  // Lighter blue for all Frontend children
         
-        // Green family for Backend
-        'Backend': '#91cc75',
-        'BackendChild': '#b3e0a0',   // Lighter green for all Backend children
+        // Green family for Retiring
+        'Retiring': '#70ad47',
+        'RetiringChild': '#9bc56e',   // Lighter green for all Retiring children
         
-        // Yellow/Orange family for BadSpeculation
-        'BadSpeculation': '#fac858',
-        'BadSpeculationChild': '#ffda8a', // Lighter yellow for all BadSpeculation children
+        // Orange family for BadSpeculation
+        'BadSpeculation': '#ff8c42',
+        'BadSpeculationChild': '#ffab73', // Lighter orange for all BadSpeculation children
         
-        // Red family for Retiring
-        'Retiring': '#ee6666',
-        'RetiringChild': '#f38989'    // Lighter red for all Retiring children
+        // Teal family for Backend
+        'Backend': '#2e8b8b',
+        'BackendChild': '#5ba3a3'    // Lighter teal for all Backend children
       };
       
       let tmasunburst = {
@@ -287,7 +472,6 @@
         xAxis: {
           type: "category",
           data: <<.TIMESTAMPS>>,
-          name: "time (s)",
           min: "dataMin",
           max: "dataMax",
           boundaryGap: false, // ensure the chart starts at the first data point
@@ -302,7 +486,7 @@
         },
         legend: {
           orient: 'horizontal',
-          bottom: 0,
+          top: 20,
           left: 'center',
           show: true,
           selectedMode: false, // Prevents toggling series visibility by clicking on legend
@@ -311,15 +495,18 @@
 
       let level1tma = {
         ...base_line,
+        grid: {
+          left: 50,  // Reduce left margin
+        },
         color: [tmaColors.Frontend, tmaColors.Backend, tmaColors.Retiring, tmaColors.BadSpeculation],
         series: [
           {
-            name: "Front-end",
+            name: "Frontend",
             type: 'line',
             data: <<.TMAFRONTEND>>,
           },
           {
-            name: "Back-end",
+            name: "Backend",
             type: 'line',
             data: <<.TMABACKEND>>,
           },
@@ -343,6 +530,17 @@
             name: "CPU Utilization %",
             type: 'line',
             data: <<.CPUUTIL>>,
+          }
+        ]
+      }
+
+      let kernel_util = {
+        ...base_line,
+        series: [
+          {
+            name: "Kernel Utilization %",
+            type: 'line',
+            data: <<.KERNELUTIL>>,
           }
         ]
       }
@@ -444,6 +642,16 @@
         ]
       }
 
+      let c6_core = {
+        ...base_line,
+        series: [
+          {
+            name: "Core C6 Residency %",
+            type: 'line',
+            data: <<.C6CORE>>,
+          }
+        ]
+      }
 
       const diffreport = (e) => {
         let reader = new FileReader();
@@ -502,7 +710,7 @@
               value={systemTabs}
               index={0}
             >
-              <Grid container style={{ padding: "0px 0px 24px 0px" }}>
+              <Grid container style={{ padding: "0px 0px 24px 0px", borderBottom: "1px solid rgba(0, 0, 0, 0.1)" }}>
                 <Grid item xs={5}>
                   <Typography variant="h2">
                     Top-down Microarchitecture Analysis Method (TMAM)
@@ -510,7 +718,7 @@
                   <ul>
                     <li>
                       <Typography variant="body1">
-                        The Front-end is responsible for fetching the program code
+                        The Frontend is responsible for fetching the program code
                         represented in architectural instructions and decoding
                         them into one or more low-level hardware operations called
                         micro-ops (uOps).
@@ -518,7 +726,7 @@
                     </li>
                     <li>
                       <Typography variant="body1">
-                        The Back-end is responsible for monitoring when uOp's data
+                        The Backend is responsible for monitoring when uOp's data
                         operands are available and executing the uOp in an
                         available execution unit.
                       </Typography>
@@ -549,17 +757,34 @@
                   <ReactECharts style={{ minHeight: "400px" }} option={tmasunburst} />
                 </Grid>
               </Grid>
-              <Grid container>
+              <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
                 <Grid item xs={5}>
                   <Typography variant="h2">
-                    TMA Level 1
+                    Level 1 TMA Metrics Over Time
                   </Typography>
                   <Typography variant="body1">
-                    Here, we show the TMA Front-end, Back-end, Retiring and Bad Speculation percentages over the collection period.
+                    Here, we show the TMA Frontend, Backend, Retiring and Bad Speculation percentages over the collection period.
                   </Typography>
                 </Grid>
                 <Grid item xs={7}>
                   <ReactECharts style={{ minHeight: "250px" }} option={level1tma} />
+                </Grid>
+              </Grid>
+              <Grid container style={{ paddingTop: "24px" }}>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    All TMA Metrics
+                  </Typography>
+                  <Typography variant="body1">
+                    List of all collected Top-down Microarchitecture Analysis metrics.
+                  </Typography>
+                </Grid>
+                <Grid item xs={7} sx={{ display: 'flex', justifyContent: 'center' }}>
+                  <MetricsTable 
+                    data={current_metrics}
+                    filterPrefix={<<.TMAFILTER>>}
+                    containerStyle={{ height: "500px", overflow: "auto", width: "fit-content" }}
+                  />
                 </Grid>
               </Grid>
             </TabPanel>
@@ -567,20 +792,33 @@
               value={systemTabs}
               index={1}
             >
-              <Grid container>
+              <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
                 <Grid item xs={5}>
                   <Typography variant="h2">
-                    CPU utilization
+                    CPU Utilization
                   </Typography>
                   <Typography variant="body1">
-                    Percentage of time spent in the active CPU power state C0. When a core is not being utilized it can go into lower power states to reduce idle energy consumption.
+                    Percentage of time spent in the active CPU power state C0. When a core is not being utilized it can go into lower power states to reduce idle energy consumption. Higher CPU utilization generally indicates that the system is being effectively used, but very high utilization (e.g., consistently above 80-90%) may lead to performance bottlenecks if the CPU becomes a limiting factor for application performance.
                   </Typography>
                 </Grid>
                 <Grid item xs={7}>
                   <ReactECharts style={{ minHeight: "250px" }} option={cpu_util} />
                 </Grid>
               </Grid>
-              <Grid container>
+              <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    CPU Utilization in Kernel Mode
+                  </Typography>
+                  <Typography variant="body1">
+                    The percentage of CPU time spent executing system-level operations, such as handling hardware interrupts and running operating system kernel code, rather than user-level applications. This metric helps identify if high CPU usage is due to system overhead or application demands.
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={kernel_util} />
+                </Grid>
+              </Grid>
+              <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
                 <Grid item xs={5}>
                   <Typography variant="h2">
                     CPI
@@ -596,7 +834,7 @@
               <Grid container>
                 <Grid item xs={5}>
                   <Typography variant="h2">
-                    CPU operating frequency (in GHz)
+                    CPU Operating Frequency (in GHz)
                   </Typography>
                   <Typography variant="body1">
                     This is the speed of the CPU clock. Higher frequencies allow faster execution. Usually servers are able to change their frequency based on utilization to conserve energy or turbo for short periods of time to boost performance.
@@ -611,7 +849,7 @@
               value={systemTabs}
               index={2}
             >
-              <Grid container>
+              <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
                 <Grid item xs={5}>
                   <Typography variant="h2">
                     Memory Bandwidth
@@ -624,7 +862,7 @@
                   <ReactECharts style={{ minHeight: "250px" }} option={memory} />
                 </Grid>
               </Grid>
-              <Grid container>
+              <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
                 <Grid item xs={5}>
                   <Typography variant="h2">
                     Remote DRAM reads %
@@ -655,7 +893,7 @@
               value={systemTabs}
               index={3}
             >
-              <Grid container>
+              <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
                 <Grid item xs={5}>
                   <Typography variant="h2">
                     Package Power
@@ -668,7 +906,7 @@
                   <ReactECharts style={{ minHeight: "250px" }} option={package_power} />
                 </Grid>
               </Grid>
-              <Grid container>
+              <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
                 <Grid item xs={5}>
                   <Typography variant="h2">
                     DRAM Power
@@ -679,6 +917,19 @@
                 </Grid>
                 <Grid item xs={7}>
                   <ReactECharts style={{ minHeight: "250px" }} option={dram_power} />
+                </Grid>
+              </Grid>
+              <Grid container>
+                <Grid item xs={5}>
+                  <Typography variant="h2">
+                    Core C6 State Residency Percentage
+                  </Typography>
+                  <Typography variant="body1">
+                    The average percentage of time the cores spent in the C6 low power state. C6 is a deep core idle state where the core's internal clocks are stopped and the core voltage is reduced. This state saves more power than lighter C-states, but it takes longer to enter and exit, which can impact performance if the core needs to become active again quickly.
+                  </Typography>
+                </Grid>
+                <Grid item xs={7}>
+                  <ReactECharts style={{ minHeight: "250px" }} option={c6_core} />
                 </Grid>
               </Grid>
             </TabPanel>
@@ -697,159 +948,11 @@
                 type="file" 
                 variant="outlined" 
               />
-              <TableContainer component={Paper} sx={{ width: "fit-content" }}>
-                <Table size="small" style={{ tableLayout: 'auto' }}>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Metric</TableCell>
-                      <TableCell>Mean</TableCell>
-                      <TableCell>Min</TableCell>
-                      <TableCell>Max</TableCell>
-                      <TableCell>Stddev</TableCell>
-                      {current_metrics[0].hasOwnProperty("other") && <TableCell sx={{ fontStyle: 'italic' }}>Other Mean</TableCell>}
-                      {current_metrics[0].hasOwnProperty("other") && <TableCell>Diff</TableCell>}
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {current_metrics.map((row) => {
-                      // Check if this metric has exceeded its threshold
-                      const exceedsThreshold = row[5] == "Yes";
-                      return (
-                        <TableRow
-                          hover={true}
-                          key={row[0]}
-                          sx={{ 
-                            '&:last-child td, &:last-child th': { border: 0 },
-                            // Highlight the entire row if mean value exceeds its specific threshold
-                            backgroundColor: exceedsThreshold ? 'rgba(255, 255, 0, 0.2)' : 'inherit'
-                          }}
-                        >
-                          <TableCell sx={{ fontFamily: 'Monospace' }} component="th" scope="row" >
-                            <Tooltip 
-                              title={description.hasOwnProperty(row[0]) ? description[row[0]] : ""} 
-                              componentsProps={{
-                                tooltip: {
-                                  sx: {
-                                    fontSize: '1.0rem',  // Increase tooltip font size
-                                    padding: '8px 12px',  // Add some padding for better readability
-                                    bgcolor: 'rgba(97, 97, 97, 0.92)',  // Darker background
-                                    color: '#ffffff',  // White text for contrast
-                                    fontWeight: 400,  // Normal font weight
-                                    boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.2)'  // Add shadow for depth
-                                  }
-                                }
-                              }}
-                            >
-                              {description.hasOwnProperty(row[0]) && <IconButton sx={{ padding: "0 8px 0 0" }}>
-                                <Icon>info</Icon>
-                              </IconButton>}
-                              {!description.hasOwnProperty(row[0]) && <IconButton sx={{ padding: "0 8px 0 0" }} disabled>
-                                <Icon>info</Icon>
-                              </IconButton>}
-                            </Tooltip>
-                            {(() => {
-                              // Calculate indendation from the metric level value in column 8 (index 7)
-                              // The lowest level is 1
-                              const level = row[7] ? Number(row[7]) : 1;
-                              const indentationLevel = level > 1 ? level - 1 : 0;
-                              
-                              // Create indentation based on hierarchy level
-                              const indentation = indentationLevel > 0 ? 
-                                <span style={{
-                                  paddingLeft: `${indentationLevel * 16}px`,
-                                  borderLeft: indentationLevel > 0 ? '1px dotted #aaa' : 'none',
-                                  marginLeft: indentationLevel > 0 ? '4px' : '0',
-                                }}>
-                                  {indentationLevel > 0 && <Icon 
-                                    sx={{ 
-                                      fontSize: '0.8rem', 
-                                      verticalAlign: 'middle',
-                                      color: '#666',
-                                      marginRight: '4px'
-                                    }}
-                                  >
-                                    subdirectory_arrow_right
-                                  </Icon>}
-                                </span> : null;
-                              
-                              return (
-                                <React.Fragment>
-                                  {indentation}
-                                  {row[0]}
-                                </React.Fragment>
-                              );
-                            })()}
-                          </TableCell>
-                          <TableCell 
-                            sx={{ 
-                              fontFamily: 'Monospace', 
-                              fontWeight: exceedsThreshold ? 'bold' : 'normal',
-                              backgroundColor: exceedsThreshold ? 'rgba(255, 235, 59, 0.4)' : 'inherit'
-                            }} 
-                            align="right"
-                          >
-                            {Number(row[1]).toFixed(4)}
-                            {exceedsThreshold && 
-                              <Tooltip 
-                                title={`${row[6]}`}
-                                componentsProps={{
-                                  tooltip: {
-                                    sx: {
-                                      fontSize: '1.0rem',  // Increased tooltip font size
-                                      padding: '8px 12px',  // Add some padding for better readability
-                                      bgcolor: 'rgba(255, 235, 59, 0.9)',  // Slightly yellow background to match warning context
-                                      color: '#222222',  // Grey text for better contrast on yellow
-                                      fontWeight: 400  // Normal font weight
-                                    }
-                                  }
-                                }}
-                              >
-                                <IconButton size="small" sx={{ padding: "0 0 0 4px" }}>
-                                  <Icon fontSize="small">warning</Icon>
-                                </IconButton>
-                              </Tooltip>
-                            }
-                          </TableCell>
-                          <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
-                            {Number(row[2]).toFixed(4)}
-                          </TableCell>
-                          <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
-                            {Number(row[3]).toFixed(4)}
-                          </TableCell>
-                          <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
-                            {Number(row[4]).toFixed(4)}
-                          </TableCell>
-                          {row.hasOwnProperty("other") && <TableCell sx={{ fontFamily: 'Monospace', fontStyle: 'italic' }} align="right">
-                            {Number(row["other"]).toFixed(4)}
-                          </TableCell>}
-                          {row.hasOwnProperty("other") && <TableCell align="right" sx={{ fontFamily: 'Monospace', backgroundColor: (row.diff > 0 ? "rgba(255,0,0," + (row.diff / maxdiff * .5) + ")" : "rgba(0,0,255," + (row.diff / mindiff * .5) + ")") }}>
-                            {Math.round(Number(row["diff"]))}%
-                          </TableCell>}
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-              {hasHighlightedMetrics && (
-                <Box sx={{ marginTop: "16px" }}>
-                  <Alert 
-                    severity="warning" 
-                    sx={{ 
-                      marginBottom: "24px",
-                      backgroundColor: 'rgba(255, 255, 0, 0.2)',
-                      '& .MuiAlert-icon': {
-                        color: 'rgba(0, 0, 0, 0.7)'
-                      },
-                      '& .MuiAlert-message': {
-                        color: 'rgba(0, 0, 0, 0.7)'
-                      }
-                    }}
-                >
-                  Metrics with a mean value exceeding their threshold formula are highlighted in yellow, indicating potential performance issues or anomalies that may require further investigation. Hover over the warning icon next to the mean value for more information.
-                </Alert>
-                </Box>
-              )}
+              <MetricsTable 
+                data={current_metrics}
+                showComparison={true}
+                containerStyle={{ width: "fit-content" }}
+              />
             </TabPanel>
             <TabPanel
               value={systemTabs}
