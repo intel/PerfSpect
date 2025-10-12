@@ -9,7 +9,7 @@
       "BriefDescription": "CPU utilization percentage in kernel mode",
       "Events": [
         {
-          "Name": "CPU_CLK_UNHALTED.THREAD_P:SUP",
+          "Name": "CPU_CLK_UNHALTED.REF_TSC_P:SUP",
           "Alias": "a"
         },
         {
