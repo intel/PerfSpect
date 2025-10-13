@@ -241,6 +241,17 @@ func (group *CoreGroup) AddEvent(event CoreEvent, reorder bool, metadata Metadat
 			validCounters += fmt.Sprintf("%d,", i)
 		}
 	}
+	// When the fixed ref cycles counter is not supported, we cannot put CPU_CLK_UNHALTED.REF_TSC (ref-cycles) and
+	// CPU_CLK_UNHALTED.REF_TSC_P:SUP (ref-cycles:k) in the same group.
+	// Note: this was discovered through testing on AWS m7i.8xlarge instances with Amazon Linux 2023 w/ kernel
+	// 6.1.  The same platform but with kernel 6.12 supports the fixed ref cycles counter and doesn't have this limitation.
+	if !metadata.SupportsFixedRefCycles && strings.HasPrefix(event.EventName, "CPU_CLK_UNHALTED.REF_TSC") {
+		for _, existingEvent := range group.GeneralPurposeCounters {
+			if strings.HasPrefix(existingEvent.EventName, "CPU_CLK_UNHALTED.REF_TSC") {
+				return fmt.Errorf("cannot add %s to group as it contains %s and fixed reference cycles are not supported", event.EventName, existingEvent.EventName)
+			}
+		}
+	}
 	// otherwise, it is a general purpose event, check if we can place it in one of the general purpose counters
 	for i := range group.GeneralPurposeCounters {
 		if counter := group.GeneralPurposeCounters[i]; counter.IsEmpty() {
