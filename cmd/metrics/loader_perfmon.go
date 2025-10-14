@@ -330,9 +330,17 @@ func getExpression(perfmonMetric PerfmonMetric) (string, error) {
 		expression = strings.ReplaceAll(expression, commonEvent, alias)
 	}
 	// replace fixed counter perfmon event names with their corresponding perf event names
-	for perfmonEventName, perfEventName := range fixedCounterEventNameTranslation {
-		// Replace event name as whole words only (not substrings)
-		expression = util.ReplaceWholeWord(expression, perfmonEventName, perfEventName)
+	// example: "100 * ([ref-cycles:k] / [TSC])"
+	// parse out the list of events/variables from the expression
+	expressionVars := regexp.MustCompile(`\[[^\]]+\]`)
+	// for each event/variable, check if it is in the fixedCounterEventNameTranslation map
+	for _, match := range expressionVars.FindAllString(expression, -1) {
+		for perfmonEventName, perfEventName := range fixedCounterEventNameTranslation {
+			if match == "["+perfmonEventName+"]" {
+				expression = util.ReplaceWholeWord(expression, perfmonEventName, perfEventName)
+				break
+			}
+		}
 	}
 	return expression, nil
 }
