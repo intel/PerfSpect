@@ -309,6 +309,9 @@ func customizeOCREventNames(metrics []MetricDefinition) []MetricDefinition {
 // example formula: "( 1000000000 * (a / b) / (c / (d * socket_count) ) ) * DURATIONTIMEINSECONDS"
 // desired output: "( 1000000000 * ([event1] / [event2]) / ([constant1] / ([constant2] * socket_count) ) ) * 1"
 func getExpression(perfmonMetric PerfmonMetric) (string, error) {
+	if perfmonMetric.Formula == "" {
+		return "", fmt.Errorf("metric '%s' has no formula defined", perfmonMetric.MetricName)
+	}
 	expression := perfmonMetric.Formula
 	replacers := make(map[string]string)
 	for _, event := range perfmonMetric.Events {
@@ -329,17 +332,17 @@ func getExpression(perfmonMetric PerfmonMetric) (string, error) {
 	for commonEvent, alias := range commonEventReplacements {
 		expression = strings.ReplaceAll(expression, commonEvent, alias)
 	}
-	// replace fixed counter perfmon event names with their corresponding perf event names
-	// example: "100 * ([ref-cycles:k] / [TSC])"
-	// parse out the list of events/variables from the expression
-	expressionVars := regexp.MustCompile(`\[[^\]]+\]`)
-	// for each event/variable, check if it is in the fixedCounterEventNameTranslation map
-	for _, match := range expressionVars.FindAllString(expression, -1) {
-		for perfmonEventName, perfEventName := range fixedCounterEventNameTranslation {
-			if match == "["+perfmonEventName+"]" {
-				expression = util.ReplaceWholeWord(expression, perfmonEventName, perfEventName)
-				break
-			}
+	// replace fixed counter perfmon event names with their corresponding perf
+	// event names found in the fixedCounterEventNameTranslation map
+	// example: "100 * ([CPU_CLK_UNHALTED.REF_TSC:k] / [TSC])"
+	// becomes  "100 * ([ref-cycles:k] / [TSC])"
+	expressionVarPattern := regexp.MustCompile(`\[[^\]]+\]`)
+	for _, match := range expressionVarPattern.FindAllString(expression, -1) {
+		// strip the brackets
+		match = strings.Trim(match, "[]")
+		// check if the match is in the translation map
+		if perfEventName, ok := fixedCounterEventNameTranslation[match]; ok {
+			expression = strings.ReplaceAll(expression, match, perfEventName)
 		}
 	}
 	return expression, nil
