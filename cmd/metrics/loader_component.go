@@ -277,7 +277,7 @@ func mergeSmallGroups(groups []GroupDefinition, numGPCounters int) []GroupDefini
 	// Important that this is a deterministic sort
 	slices.SortFunc(groups, func(a, b GroupDefinition) int {
 		if len(a) == 0 || len(b) == 0 {
-			panic("empty group encountered during event group sorting in formEventGroups")
+			panic("empty group encountered during sorting in mergeSmallGroups")
 		}
 		aGPCount := countGPEvents(a)
 		bGPCount := countGPEvents(b)
