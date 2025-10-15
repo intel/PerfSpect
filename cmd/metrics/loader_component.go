@@ -6,6 +6,7 @@ package metrics
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -25,10 +26,6 @@ func (l *ComponentLoader) Load(loaderConfig LoaderConfig) ([]MetricDefinition, [
 	eventDefinitions, err := l.loadEventDefinitions(loaderConfig.Metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load event definitions: %w", err)
-	}
-	metricDefinitions, err = l.filterUncollectableMetrics(metricDefinitions, eventDefinitions, loaderConfig.Metadata)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to filter uncollectable metrics: %w", err)
 	}
 	groupDefinitions, err := l.formEventGroups(metricDefinitions, eventDefinitions, loaderConfig.Metadata)
 	if err != nil {
@@ -180,6 +177,10 @@ func (l *ComponentLoader) loadEventDefinitions(metadata Metadata) (events []Comp
 	if err != nil {
 		return
 	}
+	// sort for deterministic processing order
+	slices.SortFunc(dirEntries, func(a, b fs.DirEntry) int {
+		return strings.Compare(a.Name(), b.Name())
+	})
 	for _, entry := range dirEntries {
 		if entry.IsDir() || entry.Name() == "metrics.json" {
 			continue
@@ -196,30 +197,6 @@ func (l *ComponentLoader) loadEventDefinitions(metadata Metadata) (events []Comp
 		events = append(events, fileEvents...)
 	}
 	return events, nil
-}
-
-func (l *ComponentLoader) filterUncollectableMetrics(metrics []MetricDefinition, events []ComponentEvent, metadata Metadata) (filteredMetrics []MetricDefinition, err error) {
-	uncollectableEvents, err := l.identifyUncollectableEvents(events, metadata)
-	if err != nil {
-		return
-	}
-	for _, metric := range metrics {
-		for variable := range metric.Variables {
-			if slices.Contains(uncollectableEvents, variable) {
-				slog.Info("Excluding metric due to uncollectable event", slog.String("metric", metric.Name), slog.String("event", variable))
-				goto nextMetric
-			}
-		}
-		filteredMetrics = append(filteredMetrics, metric)
-	nextMetric:
-	}
-	return filteredMetrics, nil
-}
-
-func (l *ComponentLoader) identifyUncollectableEvents(events []ComponentEvent, metadata Metadata) (uncollectableEvents []string, err error) {
-	// TODO:
-	// For now, assume all events are collectable
-	return uncollectableEvents, nil
 }
 
 func (l *ComponentLoader) formEventGroups(metrics []MetricDefinition, events []ComponentEvent, metadata Metadata) (groups []GroupDefinition, err error) {
@@ -242,7 +219,14 @@ func (l *ComponentLoader) formEventGroups(metrics []MetricDefinition, events []C
 		var currentGroup GroupDefinition
 		var currentGPCount int // Track the current number of GP counters used
 
+		// Get variable names and sort them for deterministic order
+		var variables []string
 		for variable := range metric.Variables {
+			variables = append(variables, variable)
+		}
+		slices.Sort(variables)
+
+		for _, variable := range variables {
 			// confirm variable is a valid event
 			if _, exists := eventNames[variable]; !exists {
 				slog.Warn("Metric variable does not correspond to a known event, skipping variable", slog.String("metric", metric.Name), slog.String("variable", variable))
@@ -290,12 +274,18 @@ func mergeSmallGroups(groups []GroupDefinition, numGPCounters int) []GroupDefini
 	}
 
 	// Sort groups by size for efficient merging (smallest first)
+	// Important that this is a deterministic sort
 	slices.SortFunc(groups, func(a, b GroupDefinition) int {
+		if len(a) == 0 || len(b) == 0 {
+			panic("empty group encountered during sorting in mergeSmallGroups")
+		}
 		aGPCount := countGPEvents(a)
 		bGPCount := countGPEvents(b)
-		return aGPCount - bGPCount
+		if aGPCount != bGPCount {
+			return aGPCount - bGPCount
+		}
+		return 1 // arbitrary but consistent
 	})
-
 	var mergedGroups []GroupDefinition
 	processed := make([]bool, len(groups))
 
