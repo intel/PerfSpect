@@ -1616,6 +1616,10 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "MAC Address"},
 		{Name: "NUMA Node"},
 		{Name: "IRQBalance"},
+		{Name: "Adaptive RX"},
+		{Name: "Adaptive TX"},
+		{Name: "rx-usecs"},
+		{Name: "tx-usecs"},
 	}
 	for _, nicInfo := range allNicsInfo {
 		fields[0].Values = append(fields[0].Values, nicInfo.Name)
@@ -1636,6 +1640,10 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 		fields[9].Values = append(fields[9].Values, nicInfo.MACAddress)
 		fields[10].Values = append(fields[10].Values, nicInfo.NUMANode)
 		fields[11].Values = append(fields[11].Values, nicInfo.IRQBalance)
+		fields[12].Values = append(fields[12].Values, nicInfo.AdaptiveRX)
+		fields[13].Values = append(fields[13].Values, nicInfo.AdaptiveTX)
+		fields[14].Values = append(fields[14].Values, nicInfo.RxUsecs)
+		fields[15].Values = append(fields[15].Values, nicInfo.TxUsecs)
 	}
 	return fields
 }
