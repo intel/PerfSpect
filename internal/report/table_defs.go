@@ -1610,6 +1610,7 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Speed"},
 		{Name: "Link"},
 		{Name: "Bus"},
+		{Name: "Card / Port"},
 		{Name: "Driver"},
 		{Name: "Driver Version"},
 		{Name: "Firmware Version"},
@@ -1634,16 +1635,22 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 		fields[3].Values = append(fields[3].Values, nicInfo.Speed)
 		fields[4].Values = append(fields[4].Values, nicInfo.Link)
 		fields[5].Values = append(fields[5].Values, nicInfo.Bus)
-		fields[6].Values = append(fields[6].Values, nicInfo.Driver)
-		fields[7].Values = append(fields[7].Values, nicInfo.DriverVersion)
-		fields[8].Values = append(fields[8].Values, nicInfo.FirmwareVersion)
-		fields[9].Values = append(fields[9].Values, nicInfo.MACAddress)
-		fields[10].Values = append(fields[10].Values, nicInfo.NUMANode)
-		fields[11].Values = append(fields[11].Values, nicInfo.IRQBalance)
-		fields[12].Values = append(fields[12].Values, nicInfo.AdaptiveRX)
-		fields[13].Values = append(fields[13].Values, nicInfo.AdaptiveTX)
-		fields[14].Values = append(fields[14].Values, nicInfo.RxUsecs)
-		fields[15].Values = append(fields[15].Values, nicInfo.TxUsecs)
+		// Add Card / Port column
+		cardPort := ""
+		if nicInfo.Card != "" && nicInfo.Port != "" {
+			cardPort = nicInfo.Card + " / " + nicInfo.Port
+		}
+		fields[6].Values = append(fields[6].Values, cardPort)
+		fields[7].Values = append(fields[7].Values, nicInfo.Driver)
+		fields[8].Values = append(fields[8].Values, nicInfo.DriverVersion)
+		fields[9].Values = append(fields[9].Values, nicInfo.FirmwareVersion)
+		fields[10].Values = append(fields[10].Values, nicInfo.MACAddress)
+		fields[11].Values = append(fields[11].Values, nicInfo.NUMANode)
+		fields[12].Values = append(fields[12].Values, nicInfo.IRQBalance)
+		fields[13].Values = append(fields[13].Values, nicInfo.AdaptiveRX)
+		fields[14].Values = append(fields[14].Values, nicInfo.AdaptiveTX)
+		fields[15].Values = append(fields[15].Values, nicInfo.RxUsecs)
+		fields[16].Values = append(fields[16].Values, nicInfo.TxUsecs)
 	}
 	return fields
 }
