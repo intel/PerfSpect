@@ -1229,6 +1229,10 @@ type nicInfo struct {
 	NUMANode        string
 	CPUAffinity     string
 	IRQBalance      string
+	AdaptiveRX      string
+	AdaptiveTX      string
+	RxUsecs         string
+	TxUsecs         string
 }
 
 func parseNicInfo(scriptOutput string) []nicInfo {
@@ -1255,9 +1259,20 @@ func parseNicInfo(scriptOutput string) []nicInfo {
 			"NUMA Node: ":        &nic.NUMANode,
 			"CPU Affinity: ":     &nic.CPUAffinity,
 			"IRQ Balance: ":      &nic.IRQBalance,
+			"rx-usecs: ":         &nic.RxUsecs,
+			"tx-usecs: ":         &nic.TxUsecs,
 		}
 		for line := range strings.SplitSeq(nicOutput, "\n") {
 			line = strings.TrimSpace(line)
+			// Special parsing for "Adaptive RX: off  TX: off" format
+			if strings.HasPrefix(line, "Adaptive RX: ") {
+				parts := strings.Split(line, "TX: ")
+				if len(parts) == 2 {
+					nic.AdaptiveRX = strings.TrimSpace(strings.TrimPrefix(parts[0], "Adaptive RX: "))
+					nic.AdaptiveTX = strings.TrimSpace(parts[1])
+				}
+				continue
+			}
 			for prefix, fieldPtr := range fieldMap {
 				if after, ok := strings.CutPrefix(line, prefix); ok {
 					*fieldPtr = after

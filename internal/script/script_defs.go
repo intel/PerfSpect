@@ -799,6 +799,9 @@ rdmsr 0x2FFE
 	echo "Model: $(echo "$udevadm_out" | grep ID_MODEL_FROM_DATABASE= | cut -d'=' -f2)"
 	echo "$ethtool_out"
 	echo "$ethtool_i_out"
+	if ethtool_c_out=$(ethtool -c "$ifc" 2>/dev/null); then
+		echo "$ethtool_c_out"
+	fi
 	echo "MAC Address: $(cat /sys/class/net/"$ifc"/address 2>/dev/null)"
 	echo "NUMA Node: $(cat /sys/class/net/"$ifc"/device/numa_node 2>/dev/null)"
 	echo -n "CPU Affinity: "
