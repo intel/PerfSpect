@@ -1615,11 +1615,11 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Firmware Version"},
 		{Name: "MAC Address"},
 		{Name: "NUMA Node"},
-		{Name: "IRQBalance"},
-		{Name: "Adaptive RX"},
-		{Name: "Adaptive TX"},
-		{Name: "rx-usecs"},
-		{Name: "tx-usecs"},
+		{Name: "IRQBalance", Description: "System level setting. Dynamically monitors system activity and spreads IRQs across available cores, aiming to balance CPU load, improve throughput, and reduce latency for interrupt-heavy workloads."},
+		{Name: "Adaptive RX", Description: "Enables dynamic adjustment of receive interrupt coalescing based on traffic patterns."},
+		{Name: "Adaptive TX", Description: "Enables dynamic adjustment of transmit interrupt coalescing based on traffic patterns."},
+		{Name: "rx-usecs", Description: "Sets the delay, in microseconds, before an interrupt is generated after receiving a packet. Higher values reduce CPU usage (by batching packets), but increase latency. Lower values reduce latency, but increase interrupt rate and CPU load."},
+		{Name: "tx-usecs", Description: "Sets the delay, in microseconds, before an interrupt is generated after transmitting a packet. Higher values reduce CPU usage (by batching packets), but increase latency. Lower values reduce latency, but increase interrupt rate and CPU load."},
 	}
 	for _, nicInfo := range allNicsInfo {
 		fields[0].Values = append(fields[0].Values, nicInfo.Name)
