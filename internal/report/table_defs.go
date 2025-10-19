@@ -1607,15 +1607,15 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Name"},
 		{Name: "Vendor (ID)"},
 		{Name: "Model (ID)"},
+		{Name: "MAC Address"},
 		{Name: "Speed"},
 		{Name: "Link"},
 		{Name: "Bus"},
 		{Name: "Card / Port"},
+		{Name: "NUMA Node"},
 		{Name: "Driver"},
 		{Name: "Driver Version"},
 		{Name: "Firmware Version"},
-		{Name: "MAC Address"},
-		{Name: "NUMA Node"},
 		{Name: "IRQBalance", Description: "System level setting. Dynamically monitors system activity and spreads IRQs across available cores, aiming to balance CPU load, improve throughput, and reduce latency for interrupt-heavy workloads."},
 		{Name: "Adaptive RX", Description: "Enables dynamic adjustment of receive interrupt coalescing based on traffic patterns."},
 		{Name: "Adaptive TX", Description: "Enables dynamic adjustment of transmit interrupt coalescing based on traffic patterns."},
@@ -1632,20 +1632,20 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 		if nicInfo.ModelID != "" {
 			fields[2].Values[len(fields[2].Values)-1] += fmt.Sprintf(" (%s)", nicInfo.ModelID)
 		}
-		fields[3].Values = append(fields[3].Values, nicInfo.Speed)
-		fields[4].Values = append(fields[4].Values, nicInfo.Link)
-		fields[5].Values = append(fields[5].Values, nicInfo.Bus)
+		fields[3].Values = append(fields[3].Values, nicInfo.MACAddress)
+		fields[4].Values = append(fields[4].Values, nicInfo.Speed)
+		fields[5].Values = append(fields[5].Values, nicInfo.Link)
+		fields[6].Values = append(fields[6].Values, nicInfo.Bus)
 		// Add Card / Port column
 		cardPort := ""
 		if nicInfo.Card != "" && nicInfo.Port != "" {
 			cardPort = nicInfo.Card + " / " + nicInfo.Port
 		}
-		fields[6].Values = append(fields[6].Values, cardPort)
-		fields[7].Values = append(fields[7].Values, nicInfo.Driver)
-		fields[8].Values = append(fields[8].Values, nicInfo.DriverVersion)
-		fields[9].Values = append(fields[9].Values, nicInfo.FirmwareVersion)
-		fields[10].Values = append(fields[10].Values, nicInfo.MACAddress)
-		fields[11].Values = append(fields[11].Values, nicInfo.NUMANode)
+		fields[7].Values = append(fields[7].Values, cardPort)
+		fields[8].Values = append(fields[8].Values, nicInfo.NUMANode)
+		fields[9].Values = append(fields[9].Values, nicInfo.Driver)
+		fields[10].Values = append(fields[10].Values, nicInfo.DriverVersion)
+		fields[11].Values = append(fields[11].Values, nicInfo.FirmwareVersion)
 		fields[12].Values = append(fields[12].Values, nicInfo.IRQBalance)
 		fields[13].Values = append(fields[13].Values, nicInfo.AdaptiveRX)
 		fields[14].Values = append(fields[14].Values, nicInfo.AdaptiveTX)
