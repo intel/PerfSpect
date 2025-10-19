@@ -780,6 +780,81 @@ tx-usecs: 50
 	}
 }
 
+func TestNicTableValuesWithVirtualFunction(t *testing.T) {
+	nicinfoWithVF := `
+Interface: eth0
+Vendor: Intel Corporation
+Vendor ID: 8086
+Model: Ethernet Adaptive Virtual Function
+Model ID: 1889
+Speed: 10000Mb/s
+Link detected: yes
+driver: iavf
+version: 6.13.7-061307-generic
+firmware-version: N/A
+bus-info: 0000:c0:11.0
+MAC Address: 00:11:22:33:44:55
+NUMA Node: 1
+Virtual Function: yes
+CPU Affinity: 100:0-63;
+IRQ Balance: Enabled
+Adaptive RX: on  TX: on
+rx-usecs: 100
+tx-usecs: 100
+----------------------------------------
+Interface: eth1
+Vendor: Intel Corporation
+Vendor ID: 8086
+Model: Ethernet Controller E810-C
+Model ID: 1592
+Speed: 25000Mb/s
+Link detected: yes
+driver: ice
+version: 6.13.7-061307-generic
+firmware-version: 4.20
+bus-info: 0000:c0:00.0
+MAC Address: aa:bb:cc:dd:ee:ff
+NUMA Node: 1
+Virtual Function: no
+CPU Affinity: 200:0-63;
+IRQ Balance: Enabled
+Adaptive RX: off  TX: off
+rx-usecs: 50
+tx-usecs: 50
+----------------------------------------
+`
+
+	outputs := map[string]script.ScriptOutput{
+		script.NicInfoScriptName: {Stdout: nicinfoWithVF},
+	}
+
+	fields := nicTableValues(outputs)
+
+	if len(fields) == 0 {
+		t.Fatal("Expected fields, got empty slice")
+	}
+
+	// Find the Name field
+	nameField := fields[0]
+	if nameField.Name != "Name" {
+		t.Fatalf("Expected first field to be 'Name', got '%s'", nameField.Name)
+	}
+
+	if len(nameField.Values) != 2 {
+		t.Fatalf("Expected 2 NIC names, got %d", len(nameField.Values))
+	}
+
+	// Check that the virtual function has "(virtual)" annotation
+	if nameField.Values[0] != "eth0 (virtual)" {
+		t.Errorf("Expected 'eth0 (virtual)', got '%s'", nameField.Values[0])
+	}
+
+	// Check that the physical function does not have "(virtual)" annotation
+	if nameField.Values[1] != "eth1" {
+		t.Errorf("Expected 'eth1', got '%s'", nameField.Values[1])
+	}
+}
+
 var nicinfo = `
 Interface: ens7f0np0
 Vendor: Broadcom Inc. and subsidiaries
