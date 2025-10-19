@@ -1,0 +1,2 @@
+# Resources Folder
+This folder contains generated resources for the scripts used in PerfSpect. These resources are architecture-specific binaries that are compiled and embedded into the Go code to ensure compatibility across different systems.
