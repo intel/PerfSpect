@@ -1233,6 +1233,8 @@ type nicInfo struct {
 	AdaptiveTX      string
 	RxUsecs         string
 	TxUsecs         string
+	Card            string
+	Port            string
 }
 
 func parseNicInfo(scriptOutput string) []nicInfo {
@@ -1284,7 +1286,80 @@ func parseNicInfo(scriptOutput string) []nicInfo {
 		nic.Model = strings.TrimSpace(strings.Split(nic.Model, "(")[0])
 		nics = append(nics, nic)
 	}
+	// Assign card and port information
+	assignCardAndPort(nics)
 	return nics
+}
+
+// assignCardAndPort assigns card and port numbers to NICs based on their PCI addresses
+func assignCardAndPort(nics []nicInfo) {
+	if len(nics) == 0 {
+		return
+	}
+
+	// Map to store card identifiers (domain:bus:device) to card numbers
+	cardMap := make(map[string]int)
+	// Map to track ports within each card
+	portMap := make(map[string][]int) // card identifier -> list of indices in nics slice
+	cardCounter := 1
+
+	// First pass: identify cards and group NICs by card
+	for i := range nics {
+		if nics[i].Bus == "" {
+			continue
+		}
+		// PCI address format: domain:bus:device.function (e.g., 0000:32:00.0)
+		// Extract domain:bus:device as the card identifier
+		parts := strings.Split(nics[i].Bus, ":")
+		if len(parts) != 3 {
+			continue
+		}
+		// Further split the last part to separate device from function
+		deviceFunc := strings.Split(parts[2], ".")
+		if len(deviceFunc) != 2 {
+			continue
+		}
+		// Card identifier is domain:bus:device
+		cardID := parts[0] + ":" + parts[1] + ":" + deviceFunc[0]
+
+		// Assign card number if not already assigned
+		if _, exists := cardMap[cardID]; !exists {
+			cardMap[cardID] = cardCounter
+			cardCounter++
+		}
+		// Add this NIC index to the card's port list
+		portMap[cardID] = append(portMap[cardID], i)
+	}
+
+	// Second pass: assign card and port numbers
+	for cardID, nicIndices := range portMap {
+		cardNum := cardMap[cardID]
+		// Sort NICs within a card by their function number
+		sort.Slice(nicIndices, func(i, j int) bool {
+			// Extract function numbers
+			funcI := extractFunction(nics[nicIndices[i]].Bus)
+			funcJ := extractFunction(nics[nicIndices[j]].Bus)
+			return funcI < funcJ
+		})
+		// Assign port numbers
+		for portNum, nicIdx := range nicIndices {
+			nics[nicIdx].Card = fmt.Sprintf("%d", cardNum)
+			nics[nicIdx].Port = fmt.Sprintf("%d", portNum+1)
+		}
+	}
+}
+
+// extractFunction extracts the function number from a PCI address
+func extractFunction(busAddr string) int {
+	parts := strings.Split(busAddr, ".")
+	if len(parts) != 2 {
+		return 0
+	}
+	funcNum, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return 0
+	}
+	return funcNum
 }
 
 type diskInfo struct {
