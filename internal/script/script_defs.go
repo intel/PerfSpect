@@ -804,6 +804,12 @@ rdmsr 0x2FFE
 	fi
 	echo "MAC Address: $(cat /sys/class/net/"$ifc"/address 2>/dev/null)"
 	echo "NUMA Node: $(cat /sys/class/net/"$ifc"/device/numa_node 2>/dev/null)"
+	# Check if this is a virtual function
+	if [ -L /sys/class/net/"$ifc"/device/physfn ]; then
+		echo "Virtual Function: yes"
+	else
+		echo "Virtual Function: no"
+	fi
 	echo -n "CPU Affinity: "
 	intlist=$( grep -e "$ifc" /proc/interrupts | cut -d':' -f1 | sed -e 's/^[[:space:]]*//' )
 	for int in $intlist; do

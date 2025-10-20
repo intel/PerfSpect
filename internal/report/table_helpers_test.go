@@ -669,6 +669,9 @@ func TestParseNicInfo(t *testing.T) {
 	if first.TxUsecs != "150" {
 		t.Errorf("expected TxUsecs '150', got '%s'", first.TxUsecs)
 	}
+	if first.IsVirtual {
+		t.Errorf("expected IsVirtual to be false for first NIC")
+	}
 
 	// Spot check second NIC
 	second := nics[1]
@@ -701,6 +704,154 @@ func TestParseNicInfo(t *testing.T) {
 	}
 	if third.Vendor != "Netchip Technology, Inc." {
 		t.Errorf("expected Vendor 'Netchip Technology, Inc.', got '%s'", third.Vendor)
+	}
+}
+
+func TestParseNicInfoWithVirtualFunction(t *testing.T) {
+	nicinfoWithVF := `
+Interface: eth0
+Vendor: Intel Corporation
+Vendor ID: 8086
+Model: Ethernet Adaptive Virtual Function
+Model ID: 1889
+Speed: 10000Mb/s
+Link detected: yes
+driver: iavf
+version: 6.13.7-061307-generic
+firmware-version: N/A
+bus-info: 0000:c0:11.0
+MAC Address: 00:11:22:33:44:55
+NUMA Node: 1
+Virtual Function: yes
+CPU Affinity: 100:0-63;
+IRQ Balance: Enabled
+Adaptive RX: on  TX: on
+rx-usecs: 100
+tx-usecs: 100
+----------------------------------------
+Interface: eth1
+Vendor: Intel Corporation
+Vendor ID: 8086
+Model: Ethernet Controller E810-C
+Model ID: 1592
+Speed: 25000Mb/s
+Link detected: yes
+driver: ice
+version: 6.13.7-061307-generic
+firmware-version: 4.20
+bus-info: 0000:c0:00.0
+MAC Address: aa:bb:cc:dd:ee:ff
+NUMA Node: 1
+Virtual Function: no
+CPU Affinity: 200:0-63;
+IRQ Balance: Enabled
+Adaptive RX: off  TX: off
+rx-usecs: 50
+tx-usecs: 50
+----------------------------------------
+`
+	nics := parseNicInfo(nicinfoWithVF)
+	if len(nics) != 2 {
+		t.Fatalf("expected 2 NICs, got %d", len(nics))
+	}
+
+	// Test virtual function
+	vf := nics[0]
+	if vf.Name != "eth0" {
+		t.Errorf("expected Name 'eth0', got '%s'", vf.Name)
+	}
+	if !vf.IsVirtual {
+		t.Errorf("expected IsVirtual to be true for eth0")
+	}
+	if vf.Model != "Ethernet Adaptive Virtual Function" {
+		t.Errorf("expected Model 'Ethernet Adaptive Virtual Function', got '%s'", vf.Model)
+	}
+
+	// Test physical function
+	pf := nics[1]
+	if pf.Name != "eth1" {
+		t.Errorf("expected Name 'eth1', got '%s'", pf.Name)
+	}
+	if pf.IsVirtual {
+		t.Errorf("expected IsVirtual to be false for eth1")
+	}
+	if pf.Model != "Ethernet Controller E810-C" {
+		t.Errorf("expected Model 'Ethernet Controller E810-C', got '%s'", pf.Model)
+	}
+}
+
+func TestNicTableValuesWithVirtualFunction(t *testing.T) {
+	nicinfoWithVF := `
+Interface: eth0
+Vendor: Intel Corporation
+Vendor ID: 8086
+Model: Ethernet Adaptive Virtual Function
+Model ID: 1889
+Speed: 10000Mb/s
+Link detected: yes
+driver: iavf
+version: 6.13.7-061307-generic
+firmware-version: N/A
+bus-info: 0000:c0:11.0
+MAC Address: 00:11:22:33:44:55
+NUMA Node: 1
+Virtual Function: yes
+CPU Affinity: 100:0-63;
+IRQ Balance: Enabled
+Adaptive RX: on  TX: on
+rx-usecs: 100
+tx-usecs: 100
+----------------------------------------
+Interface: eth1
+Vendor: Intel Corporation
+Vendor ID: 8086
+Model: Ethernet Controller E810-C
+Model ID: 1592
+Speed: 25000Mb/s
+Link detected: yes
+driver: ice
+version: 6.13.7-061307-generic
+firmware-version: 4.20
+bus-info: 0000:c0:00.0
+MAC Address: aa:bb:cc:dd:ee:ff
+NUMA Node: 1
+Virtual Function: no
+CPU Affinity: 200:0-63;
+IRQ Balance: Enabled
+Adaptive RX: off  TX: off
+rx-usecs: 50
+tx-usecs: 50
+----------------------------------------
+`
+
+	outputs := map[string]script.ScriptOutput{
+		script.NicInfoScriptName: {Stdout: nicinfoWithVF},
+	}
+
+	fields := nicTableValues(outputs)
+
+	if len(fields) == 0 {
+		t.Fatal("Expected fields, got empty slice")
+	}
+
+	// Find the Name field
+	nameField := fields[0]
+	if nameField.Name != "Name" {
+		t.Fatalf("Expected first field to be 'Name', got '%s'", nameField.Name)
+	}
+
+	if len(nameField.Values) != 2 {
+		t.Fatalf("Expected 2 NIC names, got %d", len(nameField.Values))
+	}
+
+	// Check that the virtual function has "(virtual)" annotation
+	if nameField.Values[0] != "eth0 (virtual)" {
+		t.Errorf("Expected 'eth0 (virtual)', got '%s'", nameField.Values[0])
+	}
+
+	// Check that the physical function does not have "(virtual)" annotation
+	if nameField.Values[1] != "eth1" {
+		t.Errorf("Expected 'eth1', got '%s'", nameField.Values[1])
 	}
 }
 
@@ -761,6 +912,7 @@ tx-usecs-irq: 0
 tx-frames-irq: 0
 MAC Address: 04:32:01:f3:e1:a4
 NUMA Node: 0
+Virtual Function: no
 CPU Affinity: 124:0-143;125:0-143;126:0-143;127:0-143;128:0-143;129:0-143;130:0-143;131:0-143;132:0-143;133:0-143;134:0-143;135:0-143;136:0-143;137:0-143;138:0-143;139:0-143;140:0-143;141:0-143;142:0-143;143:0-143;144:0-143;145:0-143;146:0-143;147:0-143;148:0-143;149:0-143;150:0-143;151:0-143;152:0-143;153:0-143;154:0-143;155:0-143;156:0-143;157:0-143;158:0-143;159:0-143;160:0-143;161:0-143;162:0-143;163:0-143;164:0-143;165:0-143;166:0-143;167:0-143;168:0-143;169:0-143;170:0-143;171:0-143;172:0-143;173:0-143;174:0-143;175:0-143;176:0-143;177:0-143;178:0-143;179:0-143;180:0-143;181:0-143;182:0-143;184:0-143;185:0-143;186:0-143;187:0-143;188:0-143;189:0-143;190:0-143;191:0-143;192:0-143;193:0-143;194:0-143;195:0-143;196:0-143;197:0-143;198:0-143;
 IRQ Balance: Disabled
 ----------------------------------------
@@ -819,6 +971,7 @@ tx-usecs-irq: 0
 tx-frames-irq: 0
 MAC Address: 04:32:01:f3:e1:a5
 NUMA Node: 0
+Virtual Function: no
 CPU Affinity: 454:0-143;455:0-143;456:0-143;457:0-143;458:0-143;459:0-143;460:0-143;461:0-143;462:0-143;463:0-143;464:0-143;465:0-143;466:0-143;467:0-143;468:0-143;469:0-143;470:0-143;471:0-143;472:0-143;473:0-143;474:0-143;475:0-143;476:0-143;477:0-143;478:0-143;479:0-143;480:0-143;481:0-143;482:0-143;483:0-143;484:0-143;485:0-143;486:0-143;487:0-143;488:0-143;489:0-143;490:0-143;491:0-143;492:0-143;493:0-143;494:0-143;495:0-143;496:0-143;497:0-143;498:0-143;499:0-143;500:0-143;501:0-143;502:0-143;503:0-143;504:0-143;505:0-143;506:0-143;507:0-143;508:0-143;509:0-143;510:0-143;511:0-143;512:0-143;513:0-143;514:0-143;515:0-143;516:0-143;517:0-143;518:0-143;519:0-143;520:0-143;521:0-143;522:0-143;523:0-143;524:0-143;525:0-143;526:0-143;527:0-143;
 IRQ Balance: Disabled
 ----------------------------------------
@@ -857,6 +1010,7 @@ supports-register-dump: no
 supports-priv-flags: no
 MAC Address: 2a:ec:f9:27:02:ac
 NUMA Node:
+Virtual Function: no
 CPU Affinity:
 IRQ Balance: Disabled
 ----------------------------------------

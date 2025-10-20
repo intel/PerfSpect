@@ -1623,7 +1623,12 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "tx-usecs", Description: "Sets the delay, in microseconds, before an interrupt is generated after transmitting a packet. Higher values reduce CPU usage (by batching packets), but increase latency. Lower values reduce latency, but increase interrupt rate and CPU load."},
 	}
 	for _, nicInfo := range allNicsInfo {
-		fields[0].Values = append(fields[0].Values, nicInfo.Name)
+		// Annotate interface name with (virtual) if it's a virtual function
+		nicName := nicInfo.Name
+		if nicInfo.IsVirtual {
+			nicName += " (virtual)"
+		}
+		fields[0].Values = append(fields[0].Values, nicName)
 		fields[1].Values = append(fields[1].Values, nicInfo.Vendor)
 		if nicInfo.VendorID != "" {
 			fields[1].Values[len(fields[1].Values)-1] += fmt.Sprintf(" (%s)", nicInfo.VendorID)

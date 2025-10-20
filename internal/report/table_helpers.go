@@ -1235,6 +1235,7 @@ type nicInfo struct {
 	TxUsecs         string
 	Card            string
 	Port            string
+	IsVirtual       bool
 }
 
 func parseNicInfo(scriptOutput string) []nicInfo {
@@ -1273,6 +1274,11 @@ func parseNicInfo(scriptOutput string) []nicInfo {
 					nic.AdaptiveRX = strings.TrimSpace(strings.TrimPrefix(parts[0], "Adaptive RX: "))
 					nic.AdaptiveTX = strings.TrimSpace(parts[1])
 				}
+				continue
+			}
+			// Check if this is a virtual function
+			if value, ok := strings.CutPrefix(line, "Virtual Function: "); ok {
+				nic.IsVirtual = (strings.TrimSpace(value) == "yes")
 				continue
 			}
 			for prefix, fieldPtr := range fieldMap {
