@@ -1277,9 +1277,8 @@ func parseNicInfo(scriptOutput string) []nicInfo {
 				continue
 			}
 			// Check if this is a virtual function
-			if strings.HasPrefix(line, "Virtual Function: ") {
-				value := strings.TrimSpace(strings.TrimPrefix(line, "Virtual Function: "))
-				nic.IsVirtual = (value == "yes")
+			if value, ok := strings.CutPrefix(line, "Virtual Function: "); ok {
+				nic.IsVirtual = (strings.TrimSpace(value) == "yes")
 				continue
 			}
 			for prefix, fieldPtr := range fieldMap {
