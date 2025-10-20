@@ -77,6 +77,7 @@ Run these before submitting PRs:
 - `make check_lint` - Run golangci-lint
 - `make check_vuln` - Check for vulnerabilities
 - `make check_license` - Verify license headers
+- `make check_modernize` - Check for modern Go idioms
 - `make check` - Run all checks plus tests
 
 ### Error Handling
