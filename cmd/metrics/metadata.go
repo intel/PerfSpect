@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"perfspect/internal/cpus"
 	"perfspect/internal/report"
 	"perfspect/internal/script"
 	"perfspect/internal/target"
@@ -93,9 +94,9 @@ type MetadataCollector interface {
 
 func NewMetadataCollector(architecture string) (MetadataCollector, error) {
 	switch architecture {
-	case "x86_64":
+	case cpus.X86Architecture:
 		return &X86MetadataCollector{}, nil
-	case "aarch64":
+	case cpus.ARMArchitecture:
 		return &ARMMetadataCollector{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported architecture: %s", architecture)
@@ -145,7 +146,7 @@ func (c *X86MetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 	// Vendor (from cpuInfo)
 	metadata.Vendor = cpuInfo[0]["vendor_id"]
 	// CPU microarchitecture (from cpuInfo)
-	cpu, err := report.GetCPU(cpuInfo[0]["cpu family"], cpuInfo[0]["model"], cpuInfo[0]["stepping"])
+	cpu, err := cpus.GetCPU(cpuInfo[0]["cpu family"], cpuInfo[0]["model"], cpuInfo[0]["stepping"])
 	if err != nil {
 		return Metadata{}, err
 	}
@@ -261,7 +262,7 @@ func (c *X86MetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 		metadata.TSC = metadata.SocketCount * metadata.CoresPerSocket * metadata.ThreadsPerCore * metadata.TSCFrequencyHz
 	}
 	// uncore device IDs and uncore support
-	isAMDArchitecture := metadata.Vendor == "AuthenticAMD"
+	isAMDArchitecture := metadata.Vendor == cpus.AMDVendor
 	if metadata.UncoreDeviceIDs, err = getUncoreDeviceIDs(isAMDArchitecture, scriptOutputs); err != nil {
 		return Metadata{}, fmt.Errorf("failed to retrieve uncore device IDs: %v", err)
 	} else {
@@ -330,7 +331,7 @@ func (c *ARMMetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to parse stepping: %v", err)
 	}
-	cpu, err := report.GetCPU(family, model, stepping)
+	cpu, err := cpus.GetCPU(family, model, stepping)
 	if err != nil {
 		return Metadata{}, err
 	}
@@ -412,7 +413,7 @@ func getMetadataScripts(noRoot bool, perfPath string, noSystemSummary bool, numG
 			Name:           "list uncore devices",
 			ScriptTemplate: "find /sys/bus/event_source/devices/ \\( -name uncore_* -o -name amd_* \\)",
 			Superuser:      !noRoot,
-			Architectures:  []string{"x86_64"},
+			Architectures:  []string{cpus.X86Architecture},
 		},
 		{
 			Name:           "perf stat instructions",
@@ -428,19 +429,19 @@ func getMetadataScripts(noRoot bool, perfPath string, noSystemSummary bool, numG
 			Name:           "perf stat pebs",
 			ScriptTemplate: perfPath + " stat -a -e INT_MISC.UNKNOWN_BRANCH_CYCLES sleep 1",
 			Superuser:      !noRoot,
-			Architectures:  []string{"x86_64"},
+			Architectures:  []string{cpus.X86Architecture},
 		},
 		{
 			Name:           "perf stat ocr",
 			ScriptTemplate: perfPath + " stat -a -e OCR.READS_TO_CORE.LOCAL_DRAM sleep 1",
 			Superuser:      !noRoot,
-			Architectures:  []string{"x86_64"},
+			Architectures:  []string{cpus.X86Architecture},
 		},
 		{
 			Name:           "perf stat tma",
 			ScriptTemplate: perfPath + " stat -a -e '{topdown.slots, topdown-bad-spec}' sleep 1",
 			Superuser:      !noRoot,
-			Architectures:  []string{"x86_64"},
+			Architectures:  []string{cpus.X86Architecture},
 		},
 		{
 			Name:           "perf stat fixed instructions",
@@ -467,7 +468,7 @@ func getMetadataScripts(noRoot bool, perfPath string, noSystemSummary bool, numG
 			ScriptTemplate: "tsc && echo",
 			Depends:        []string{"tsc"},
 			Superuser:      !noRoot,
-			Architectures:  []string{"x86_64"},
+			Architectures:  []string{cpus.X86Architecture},
 		},
 		{
 			Name:           "kernel version",
@@ -478,13 +479,13 @@ func getMetadataScripts(noRoot bool, perfPath string, noSystemSummary bool, numG
 			Name:           "arm slots",
 			ScriptTemplate: "cat /sys/bus/event_source/devices/armv8_pmuv3_0/caps/slots",
 			Superuser:      !noRoot,
-			Architectures:  []string{"aarch64"},
+			Architectures:  []string{cpus.ARMArchitecture},
 		},
 		{
 			Name:           "arm cpuid",
 			ScriptTemplate: "cat /sys/devices/system/cpu/cpu0/regs/identification/midr_el1",
 			Superuser:      !noRoot,
-			Architectures:  []string{"aarch64"},
+			Architectures:  []string{cpus.ARMArchitecture},
 		},
 	}
 	// replace script template vars

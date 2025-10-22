@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"perfspect/internal/cpus"
 	"perfspect/internal/script"
 	"perfspect/internal/util"
 	"slices"
@@ -144,7 +145,7 @@ func UarchFromOutput(outputs map[string]script.ScriptOutput) string {
 	stepping := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Stepping:\s*(.+)$`)
 	capid4 := valFromRegexSubmatch(outputs[script.LspciBitsScriptName].Stdout, `^([0-9a-fA-F]+)`)
 	devices := valFromRegexSubmatch(outputs[script.LspciDevicesScriptName].Stdout, `^([0-9]+)`)
-	cpu, err := getCPUExtended(family, model, stepping, capid4, devices)
+	cpu, err := cpus.GetCPUExtended(family, model, stepping, capid4, devices)
 	if err == nil {
 		return cpu.MicroArchitecture
 	}
@@ -453,11 +454,11 @@ func hyperthreadingFromOutput(outputs map[string]script.ScriptOutput) string {
 	stepping := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Stepping:\s*(.+)$`)
 	sockets := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)
 	coresPerSocket := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)
-	cpus := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU\(.*:\s*(.+?)$`)
+	cpuCount := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU\(.*:\s*(.+?)$`)
 	onlineCpus := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^On-line CPU\(s\) list:\s*(.+)$`)
 	threadsPerCore := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Thread\(s\) per core:\s*(.+)$`)
 
-	numCPUs, err := strconv.Atoi(cpus) // logical CPUs
+	numCPUs, err := strconv.Atoi(cpuCount) // logical CPUs
 	if err != nil {
 		slog.Error("error parsing cpus from lscpu")
 		return ""
@@ -483,7 +484,7 @@ func hyperthreadingFromOutput(outputs map[string]script.ScriptOutput) string {
 		slog.Error("error parsing cores per sockets from lscpu")
 		return ""
 	}
-	cpu, err := getCPUExtended(family, model, stepping, "", "")
+	cpu, err := cpus.GetCPUExtended(family, model, stepping, "", "")
 	if err != nil {
 		return ""
 	}
@@ -542,7 +543,7 @@ func channelsFromOutput(outputs map[string]script.ScriptOutput) string {
 	stepping := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Stepping:\s*(.+)$`)
 	capid4 := valFromRegexSubmatch(outputs[script.LspciBitsScriptName].Stdout, `^([0-9a-fA-F]+)`)
 	devices := valFromRegexSubmatch(outputs[script.LspciDevicesScriptName].Stdout, `^([0-9]+)`)
-	cpu, err := getCPUExtended(family, model, stepping, capid4, devices)
+	cpu, err := cpus.GetCPUExtended(family, model, stepping, capid4, devices)
 	if err != nil {
 		slog.Error("error getting CPU from CPUdb", slog.String("error", err.Error()))
 		return ""
@@ -553,7 +554,7 @@ func channelsFromOutput(outputs map[string]script.ScriptOutput) string {
 func turboEnabledFromOutput(outputs map[string]script.ScriptOutput) string {
 	vendor := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Vendor ID:\s*(.+)$`)
 	switch vendor {
-	case "GenuineIntel":
+	case cpus.IntelVendor:
 		val := valFromRegexSubmatch(outputs[script.CpuidScriptName].Stdout, `^Intel Turbo Boost Technology\s*= (.+?)$`)
 		if val == "true" {
 			return "Enabled"
@@ -562,7 +563,7 @@ func turboEnabledFromOutput(outputs map[string]script.ScriptOutput) string {
 			return "Disabled"
 		}
 		return "" // unknown value
-	case "AuthenticAMD":
+	case cpus.AMDVendor:
 		val := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Frequency boost.*:\s*(.+?)$`)
 		if val != "" {
 			return val + " (AMD Frequency Boost)"
@@ -1832,7 +1833,7 @@ func systemSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 	vendor := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Vendor ID:\s*(.+)$`)
 	// hyperthreading
 	htLabel = "HT"
-	if vendor == "AuthenticAMD" {
+	if vendor == cpus.AMDVendor {
 		htLabel = "SMT"
 	}
 	htOnOff = hyperthreadingFromOutput(outputs)
@@ -1848,7 +1849,7 @@ func systemSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 	}
 	// turbo
 	turboLabel = "Turbo"
-	if vendor == "AuthenticAMD" {
+	if vendor == cpus.AMDVendor {
 		turboLabel = "Boost"
 	}
 	turboOnOff = turboEnabledFromOutput(outputs)

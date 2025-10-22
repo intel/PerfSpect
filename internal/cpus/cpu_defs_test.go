@@ -1,4 +1,4 @@
-package report
+package cpus
 
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
@@ -55,7 +55,7 @@ func TestGetCPU(t *testing.T) {
 		t.Fatal(fmt.Errorf("Found the wrong CPU: %s", cpu.MicroArchitecture))
 	}
 
-	cpu, err = getCPUExtended("6", "173", "", "", "10") // GNR_X3
+	cpu, err = GetCPUExtended("6", "173", "", "", "10") // GNR_X3
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestGetCPU(t *testing.T) {
 		t.Fatal(fmt.Errorf("Incorrect channel count: %d", cpu.MemoryChannelCount))
 	}
 
-	cpu, err = getCPUExtended("6", "173", "", "", "8") // GNR_X2
+	cpu, err = GetCPUExtended("6", "173", "", "", "8") // GNR_X2
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestGetCPU(t *testing.T) {
 		t.Fatal(fmt.Errorf("Incorrect channel count: %d", cpu.MemoryChannelCount))
 	}
 
-	cpu, err = getCPUExtended("6", "173", "", "", "6") // GNR_X1
+	cpu, err = GetCPUExtended("6", "173", "", "", "6") // GNR_X1
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestGetCPU(t *testing.T) {
 		t.Fatal(fmt.Errorf("Found the wrong CPU: %s", cpu.MicroArchitecture))
 	}
 
-	cpu, err = getCPUExtended("6", "207", "", "c0", "") // EMR XCC
+	cpu, err = GetCPUExtended("6", "207", "", "c0", "") // EMR XCC
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestGetCPU(t *testing.T) {
 		t.Fatal(fmt.Errorf("Incorrect channel count: %d", cpu.MemoryChannelCount))
 	}
 
-	cpu, err = getCPUExtended("6", "207", "", "40", "") // EMR MCC
+	cpu, err = GetCPUExtended("6", "207", "", "40", "") // EMR MCC
 	if err != nil {
 		t.Fatal(err)
 	}

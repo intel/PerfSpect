@@ -15,6 +15,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"perfspect/internal/cpus"
 	"regexp"
 	"slices"
 	"strconv"
@@ -384,7 +385,7 @@ func (mg *MetricGroup) loadHTMLTemplateValues(metadata Metadata, metricDefinitio
 	//0 -> Intel, 1 -> AMD, 2 -> ARM
 	archIndex := 0
 	switch metadata.Vendor {
-	case "AuthenticAMD":
+	case cpus.AMDVendor:
 		archIndex = 1
 	case "ARM":
 		archIndex = 2

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"perfspect/internal/cpus"
 	"perfspect/internal/script"
 
 	"github.com/xuri/excelize/v2"
@@ -49,12 +50,11 @@ type XlsxTableRenderer func(TableValues, *excelize.File, string, *int)
 
 // TableDefinition defines the structure of a table in the report
 type TableDefinition struct {
-	Name          string
-	ScriptNames   []string
-	Architectures []string // architectures, i.e., x86_64, aarch64. If empty, it will be present for all architectures.
-	Vendors       []string // vendors, e.g., GenuineIntel, AuthenticAMD. If empty, it will be present for all vendors.
-	Families      []string // families, e.g., 6, 7. If empty, it will be present for all families.
-	Models        []string // models, e.g., 62, 63. If empty, it will be present for all models.
+	Name               string
+	ScriptNames        []string
+	Architectures      []string // architectures, i.e., x86_64, aarch64. If empty, it will be present for all architectures.
+	Vendors            []string // vendors, e.g., GenuineIntel, AuthenticAMD. If empty, it will be present for all vendors.
+	MicroArchitectures []string // microarchitectures, e.g., EMR, ICX. If empty, it will be present for all microarchitectures.
 	// Fields function is called to retrieve field values from the script outputs
 	FieldsFunc  FieldsRetriever
 	MenuLabel   string // add to tables that will be displayed in the menu
@@ -236,7 +236,7 @@ var tableDefinitions = map[string]TableDefinition{
 	PrefetcherTableName: {
 		Name:    PrefetcherTableName,
 		HasRows: true,
-		Vendors: []string{"GenuineIntel"},
+		Vendors: []string{cpus.IntelVendor},
 		ScriptNames: []string{
 			script.LscpuScriptName,
 			script.LspciBitsScriptName,
@@ -248,14 +248,14 @@ var tableDefinitions = map[string]TableDefinition{
 		FieldsFunc: prefetcherTableValues},
 	ISATableName: {
 		Name:          ISATableName,
-		Architectures: []string{"x86_64"},
+		Architectures: []string{cpus.X86Architecture},
 		ScriptNames:   []string{script.CpuidScriptName},
 		FieldsFunc:    isaTableValues},
 	AcceleratorTableName: {
-		Name:    AcceleratorTableName,
-		Vendors: []string{"GenuineIntel"},
-		Models:  []string{"143", "207", "173", "174", "175", "221"}, // Sapphire Rapids, Emerald Rapids, Granite Rapids, Granite Rapids D, Sierra Forest, Clearwater Forest
-		HasRows: true,
+		Name:               AcceleratorTableName,
+		Vendors:            []string{cpus.IntelVendor},
+		MicroArchitectures: []string{"SPR", "EMR", "GNR", "SRF", "CWF", "DMR"},
+		HasRows:            true,
 		ScriptNames: []string{
 			script.LshwScriptName,
 			script.IaaDevicesScriptName,
@@ -264,7 +264,7 @@ var tableDefinitions = map[string]TableDefinition{
 		InsightsFunc: acceleratorTableInsights},
 	PowerTableName: {
 		Name:      PowerTableName,
-		Vendors:   []string{"GenuineIntel"},
+		Vendors:   []string{cpus.IntelVendor},
 		HasRows:   false,
 		MenuLabel: PowerMenuLabel,
 		ScriptNames: []string{
@@ -287,7 +287,7 @@ var tableDefinitions = map[string]TableDefinition{
 		FieldsFunc: cstateTableValues},
 	MaximumFrequencyTableName: {
 		Name:    MaximumFrequencyTableName,
-		Vendors: []string{"GenuineIntel"},
+		Vendors: []string{cpus.IntelVendor},
 		HasRows: true,
 		ScriptNames: []string{
 			script.SpecCoreFrequenciesScriptName,
@@ -298,7 +298,7 @@ var tableDefinitions = map[string]TableDefinition{
 		FieldsFunc: maximumFrequencyTableValues},
 	UncoreTableName: {
 		Name:    UncoreTableName,
-		Vendors: []string{"GenuineIntel"},
+		Vendors: []string{cpus.IntelVendor},
 		HasRows: false,
 		ScriptNames: []string{
 			script.UncoreMaxFromMSRScriptName,
@@ -312,29 +312,26 @@ var tableDefinitions = map[string]TableDefinition{
 			script.LspciDevicesScriptName},
 		FieldsFunc: uncoreTableValues},
 	ElcTableName: {
-		Name:     ElcTableName,
-		Families: []string{"6"},                        // Intel CPUs only
-		Models:   []string{"173", "174", "175", "221"}, // Granite Rapids, Granite Rapids D, Sierra Forest, Clearwater Forest
-		HasRows:  true,
+		Name:               ElcTableName,
+		MicroArchitectures: []string{"GNR", "SRF", "CWF", "DMR"},
+		HasRows:            true,
 		ScriptNames: []string{
 			script.ElcScriptName,
 		},
 		FieldsFunc:   elcTableValues,
 		InsightsFunc: elcTableInsights},
 	SSTTFHPTableName: {
-		Name:     SSTTFHPTableName,
-		Families: []string{"6"},                        // Intel CPUs only
-		Models:   []string{"173", "174", "175", "221"}, // Granite Rapids, Granite Rapids D, Sierra Forest, Clearwater Forest
-		HasRows:  true,
+		Name:               SSTTFHPTableName,
+		MicroArchitectures: []string{"GNR", "SRF", "CWF", "DMR"},
+		HasRows:            true,
 		ScriptNames: []string{
 			script.SSTTFHPScriptName,
 		},
 		FieldsFunc: sstTFHPTableValues},
 	SSTTFLPTableName: {
-		Name:     SSTTFLPTableName,
-		Families: []string{"6"},                        // Intel CPUs only
-		Models:   []string{"173", "174", "175", "221"}, // Granite Rapids, Granite Rapids D, Sierra Forest, Clearwater Forest
-		HasRows:  true,
+		Name:               SSTTFLPTableName,
+		MicroArchitectures: []string{"GNR", "SRF", "CWF", "DMR"},
+		HasRows:            true,
 		ScriptNames: []string{
 			script.SSTTFLPScriptName,
 		},
@@ -416,7 +413,7 @@ var tableDefinitions = map[string]TableDefinition{
 		FieldsFunc: gpuTableValues},
 	GaudiTableName: {
 		Name:          GaudiTableName,
-		Architectures: []string{"x86_64"},
+		Architectures: []string{cpus.X86Architecture},
 		HasRows:       true,
 		ScriptNames: []string{
 			script.GaudiInfoScriptName,
@@ -471,7 +468,7 @@ var tableDefinitions = map[string]TableDefinition{
 		FieldsFunc: chassisStatusTableValues},
 	PMUTableName: {
 		Name:    PMUTableName,
-		Vendors: []string{"GenuineIntel"},
+		Vendors: []string{cpus.IntelVendor},
 		HasRows: false,
 		ScriptNames: []string{
 			script.PMUBusyScriptName,
@@ -562,7 +559,7 @@ var tableDefinitions = map[string]TableDefinition{
 	//
 	ConfigurationTableName: {
 		Name:    ConfigurationTableName,
-		Vendors: []string{"GenuineIntel"},
+		Vendors: []string{cpus.IntelVendor},
 		HasRows: false,
 		ScriptNames: []string{
 			script.LscpuScriptName,
@@ -605,7 +602,7 @@ var tableDefinitions = map[string]TableDefinition{
 	PowerBenchmarkTableName: {
 		Name:          PowerBenchmarkTableName,
 		MenuLabel:     PowerBenchmarkTableName,
-		Architectures: []string{"x86_64"},
+		Architectures: []string{cpus.X86Architecture},
 		HasRows:       false,
 		ScriptNames: []string{
 			script.IdlePowerBenchmarkScriptName,
@@ -615,7 +612,7 @@ var tableDefinitions = map[string]TableDefinition{
 	TemperatureBenchmarkTableName: {
 		Name:          TemperatureBenchmarkTableName,
 		MenuLabel:     TemperatureBenchmarkTableName,
-		Architectures: []string{"x86_64"},
+		Architectures: []string{cpus.X86Architecture},
 		HasRows:       false,
 		ScriptNames: []string{
 			script.PowerBenchmarkScriptName,
@@ -624,7 +621,7 @@ var tableDefinitions = map[string]TableDefinition{
 	FrequencyBenchmarkTableName: {
 		Name:          FrequencyBenchmarkTableName,
 		MenuLabel:     FrequencyBenchmarkTableName,
-		Architectures: []string{"x86_64"},
+		Architectures: []string{cpus.X86Architecture},
 		HasRows:       true,
 		ScriptNames: []string{
 			script.SpecCoreFrequenciesScriptName,
@@ -638,7 +635,7 @@ var tableDefinitions = map[string]TableDefinition{
 	MemoryBenchmarkTableName: {
 		Name:          MemoryBenchmarkTableName,
 		MenuLabel:     MemoryBenchmarkTableName,
-		Architectures: []string{"x86_64"},
+		Architectures: []string{cpus.X86Architecture},
 		HasRows:       true,
 		ScriptNames: []string{
 			script.MemoryBenchmarkScriptName,
@@ -650,7 +647,7 @@ var tableDefinitions = map[string]TableDefinition{
 	NUMABenchmarkTableName: {
 		Name:          NUMABenchmarkTableName,
 		MenuLabel:     NUMABenchmarkTableName,
-		Architectures: []string{"x86_64"},
+		Architectures: []string{cpus.X86Architecture},
 		HasRows:       true,
 		ScriptNames: []string{
 			script.NumaBenchmarkScriptName,
@@ -689,7 +686,7 @@ var tableDefinitions = map[string]TableDefinition{
 	IPCTelemetryTableName: {
 		Name:          IPCTelemetryTableName,
 		MenuLabel:     IPCTelemetryMenuLabel,
-		Architectures: []string{"x86_64"},
+		Architectures: []string{cpus.X86Architecture},
 		HasRows:       true,
 		ScriptNames: []string{
 			script.TurbostatTelemetryScriptName,
@@ -699,7 +696,7 @@ var tableDefinitions = map[string]TableDefinition{
 	C6TelemetryTableName: {
 		Name:          C6TelemetryTableName,
 		MenuLabel:     C6TelemetryMenuLabel,
-		Architectures: []string{"x86_64"},
+		Architectures: []string{cpus.X86Architecture},
 		HasRows:       true,
 		ScriptNames: []string{
 			script.TurbostatTelemetryScriptName,
@@ -709,7 +706,7 @@ var tableDefinitions = map[string]TableDefinition{
 	FrequencyTelemetryTableName: {
 		Name:          FrequencyTelemetryTableName,
 		MenuLabel:     FrequencyTelemetryMenuLabel,
-		Architectures: []string{"x86_64"},
+		Architectures: []string{cpus.X86Architecture},
 		HasRows:       true,
 		ScriptNames: []string{
 			script.TurbostatTelemetryScriptName,
@@ -755,7 +752,7 @@ var tableDefinitions = map[string]TableDefinition{
 	PowerTelemetryTableName: {
 		Name:          PowerTelemetryTableName,
 		MenuLabel:     PowerTelemetryMenuLabel,
-		Architectures: []string{"x86_64"},
+		Architectures: []string{cpus.X86Architecture},
 		HasRows:       true,
 		ScriptNames: []string{
 			script.TurbostatTelemetryScriptName,
@@ -765,7 +762,7 @@ var tableDefinitions = map[string]TableDefinition{
 	TemperatureTelemetryTableName: {
 		Name:          TemperatureTelemetryTableName,
 		MenuLabel:     TemperatureTelemetryMenuLabel,
-		Architectures: []string{"x86_64"},
+		Architectures: []string{cpus.X86Architecture},
 		HasRows:       true,
 		ScriptNames: []string{
 			script.TurbostatTelemetryScriptName,
@@ -775,7 +772,7 @@ var tableDefinitions = map[string]TableDefinition{
 	InstructionTelemetryTableName: {
 		Name:          InstructionTelemetryTableName,
 		MenuLabel:     InstructionTelemetryMenuLabel,
-		Architectures: []string{"x86_64"},
+		Architectures: []string{cpus.X86Architecture},
 		HasRows:       true,
 		ScriptNames: []string{
 			script.InstructionTelemetryScriptName,
@@ -785,7 +782,7 @@ var tableDefinitions = map[string]TableDefinition{
 	GaudiTelemetryTableName: {
 		Name:          GaudiTelemetryTableName,
 		MenuLabel:     GaudiTelemetryMenuLabel,
-		Architectures: []string{"x86_64"},
+		Architectures: []string{cpus.X86Architecture},
 		HasRows:       true,
 		ScriptNames: []string{
 			script.GaudiTelemetryScriptName,
@@ -1091,7 +1088,7 @@ func cpuTableInsights(outputs map[string]script.ScriptOutput, tableValues TableV
 		slog.Warn(err.Error())
 	} else {
 		family := tableValues.Fields[familyIndex].Values[0]
-		if family == "6" { // Intel
+		if cpus.IsIntelCPUFamilyStr(family) { // Intel
 			uarchIndex, err := getFieldIndex("Microarchitecture", tableValues)
 			if err != nil {
 				slog.Warn(err.Error())
@@ -1107,6 +1104,7 @@ func cpuTableInsights(outputs map[string]script.ScriptOutput, tableValues TableV
 					"SRF": 8,
 					"CWF": 8,
 					"GNR": 8,
+					"DMR": 9,
 				}
 				uarch := tableValues.Fields[uarchIndex].Values[0]
 				if len(uarch) >= 3 {
@@ -1458,7 +1456,7 @@ func memoryTableInsights(outputs map[string]script.ScriptOutput, tableValues Tab
 		if populatedChannels != "" {
 			uarch := UarchFromOutput(outputs)
 			if uarch != "" {
-				cpu, err := GetCPUByMicroArchitecture(uarch)
+				cpu, err := cpus.GetCPUByMicroArchitecture(uarch)
 				if err != nil {
 					slog.Warn(err.Error())
 				} else {
