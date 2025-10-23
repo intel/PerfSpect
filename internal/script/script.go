@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 
+	"perfspect/internal/cpus"
 	"perfspect/internal/target"
 	"perfspect/internal/util"
 )
@@ -223,23 +224,28 @@ func scriptForTarget(script ScriptDefinition, myTarget target.Target) bool {
 			return false
 		}
 	}
-	if len(script.Families) > 0 {
+	if len(script.MicroArchitectures) > 0 {
 		family, err := myTarget.GetFamily()
 		if err != nil {
 			slog.Error("failed to get family for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
 			return false
 		}
-		if !slices.Contains(script.Families, family) {
-			return false
-		}
-	}
-	if len(script.Models) > 0 {
 		model, err := myTarget.GetModel()
 		if err != nil {
 			slog.Error("failed to get model for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
 			return false
 		}
-		if !slices.Contains(script.Models, model) {
+		stepping, err := myTarget.GetStepping()
+		if err != nil {
+			slog.Error("failed to get stepping for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+			return false
+		}
+		cpu, err := cpus.GetCPU(family, model, stepping)
+		if err != nil {
+			slog.Error("failed to get CPU for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+			return false
+		}
+		if !slices.Contains(script.MicroArchitectures, cpu.GetMicroArchitecture()) && !slices.Contains(script.MicroArchitectures, cpu.GetShortMicroArchitecture()) {
 			return false
 		}
 	}

@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path"
+	"perfspect/internal/cpus"
 	"perfspect/internal/script"
 	"perfspect/internal/target"
 	"perfspect/internal/util"
@@ -403,9 +404,9 @@ func getPassword(prompt string) (string, error) {
 func getHostArchitecture() (string, error) {
 	switch runtime.GOARCH {
 	case "amd64":
-		return "x86_64", nil
+		return cpus.X86Architecture, nil
 	case "arm64":
-		return "aarch64", nil
+		return cpus.ARMArchitecture, nil
 	default:
 		slog.Error("unsupported architecture", slog.String("architecture", runtime.GOARCH))
 		err := fmt.Errorf("unsupported architecture: %s", runtime.GOARCH)

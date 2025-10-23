@@ -2,6 +2,7 @@ package script
 
 import (
 	"bytes"
+	"perfspect/internal/cpus"
 	texttemplate "text/template" // nosemgrep
 )
 
@@ -11,17 +12,16 @@ import (
 // script_defs.go defines the bash scripts that are used to collect information from target systems
 
 type ScriptDefinition struct {
-	Name           string   // just a name
-	ScriptTemplate string   // the bash script that will be run
-	Architectures  []string // architectures, i.e., x86_64, aarch64. If empty, it will run on all architectures.
-	Vendors        []string // vendors, i.e., GenuineIntel, AuthenticAMD. If empty, it will run on all vendors.
-	Families       []string // families, e.g., 6, 7. If empty, it will run on all families.
-	Models         []string // models, e.g., 62, 63. If empty, it will run on all models.
-	Lkms           []string // loadable kernel modules
-	Depends        []string // binary dependencies that must be available for the script to run
-	Superuser      bool     // requires sudo or root
-	Sequential     bool     // run script sequentially (not at the same time as others)
-	NeedsKill      bool     // process/script needs to be killed after run without a duration specified, i.e., it doesn't stop through SIGINT
+	Name               string   // just a name
+	ScriptTemplate     string   // the bash script that will be run
+	Architectures      []string // architectures, i.e., x86_64, aarch64. If empty, it will run on all architectures.
+	Vendors            []string // vendors, i.e., GenuineIntel, AuthenticAMD. If empty, it will run on all vendors.
+	MicroArchitectures []string // microarchitectures, e.g., SPR, EMR. If empty, it will run on all microarchitectures.
+	Lkms               []string // loadable kernel modules
+	Depends            []string // binary dependencies that must be available for the script to run
+	Superuser          bool     // requires sudo or root
+	Sequential         bool     // run script sequentially (not at the same time as others)
+	NeedsKill          bool     // process/script needs to be killed after run without a duration specified, i.e., it doesn't stop through SIGINT
 }
 
 // script names, these must be unique
@@ -122,10 +122,6 @@ const (
 	ProfileKernelLockScriptName = "profile kernel lock"
 )
 
-const (
-	x86_64 = "x86_64"
-)
-
 // GetScriptByName returns the script definition with the given name. It will panic if the script is not found.
 func GetScriptByName(name string) ScriptDefinition {
 	return GetParameterizedScriptByName(name, nil)
@@ -180,19 +176,17 @@ var scriptDefinitions = map[string]ScriptDefinition{
 		ScriptTemplate: `lscpu -C -J`,
 	},
 	LspciBitsScriptName: {
-		Name:           LspciBitsScriptName,
-		ScriptTemplate: `lspci -s $(lspci | grep 325b | awk 'NR==1{{"{"}}print $1{{"}"}}') -xxx |  awk '$1 ~ /^90/{{"{"}}print $9 $8 $7 $6; exit{{"}"}}'`,
-		Families:       []string{"6"},          // Intel
-		Models:         []string{"143", "207"}, // SPR, EMR
-		Superuser:      true,
-		Depends:        []string{"lspci"},
+		Name:               LspciBitsScriptName,
+		ScriptTemplate:     `lspci -s $(lspci | grep 325b | awk 'NR==1{{"{"}}print $1{{"}"}}') -xxx |  awk '$1 ~ /^90/{{"{"}}print $9 $8 $7 $6; exit{{"}"}}'`,
+		MicroArchitectures: []string{"SPR", "EMR"},
+		Superuser:          true,
+		Depends:            []string{"lspci"},
 	},
 	LspciDevicesScriptName: {
-		Name:           LspciDevicesScriptName,
-		ScriptTemplate: "lspci -d 8086:3258 | wc -l",
-		Families:       []string{"6"},                        // Intel
-		Models:         []string{"173", "174", "175", "221"}, // GNR, GNR-D, SRF, CWF
-		Depends:        []string{"lspci"},
+		Name:               LspciDevicesScriptName,
+		ScriptTemplate:     "lspci -d 8086:3258 | wc -l",
+		MicroArchitectures: []string{"GNR", "GNR-D", "SRF", "CWF", "DMR"},
+		Depends:            []string{"lspci"},
 	},
 	LspciVmmScriptName: {
 		Name:           LspciVmmScriptName,
@@ -305,24 +299,18 @@ else
     exit 1
 fi
 `,
-		Architectures: []string{x86_64},
-		Vendors:       []string{"GenuineIntel"},
-		Lkms:          []string{"msr"},
-		Depends:       []string{"rdmsr"},
-		Superuser:     true,
+		Vendors:   []string{cpus.IntelVendor},
+		Lkms:      []string{"msr"},
+		Depends:   []string{"rdmsr"},
+		Superuser: true,
 	},
 	SpecCoreFrequenciesScriptName: {
 		Name: SpecCoreFrequenciesScriptName,
 		ScriptTemplate: `lscpu=$(lscpu)
 family=$(echo "$lscpu" | grep -E "^CPU family:" | awk '{print $3}')
 model=$(echo "$lscpu" | grep -E "^Model:" | awk '{print $2}')
-vendor=$(echo "$lscpu" | grep -E "^Vendor ID:" | awk '{print $3}')
-# if vendor isn't Intel
-if [ "$vendor" != "GenuineIntel" ]; then
-	exit 1
-fi
-# if cpu is GNR get the frequencies from tpmi
-if [ "$family" -eq 6 ] && [ "$model" -eq 173 ]; then  # GNR
+# if cpu is GNR, GNR-D, or DMR get the frequencies from tpmi
+if ( [ "$family" -eq 6 ] && [ "$model" -eq 173 ] ) || ( [ "$family" -eq 6 ] && [ "$model" -eq 174 ] ) || ( [ "$family" -eq 19 ] && [ "$model" -eq 1 ] ); then  # GNR, GNR-D, DMR
 	cores=$(pcm-tpmi 0x5 0xD8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_10
 	# this works unless the TRL is overridden on MSR 0x1AD --> sse=$(pcm-tpmi 0x5 0xA8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_4
 	sse=$(rdmsr 0x1ad) # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
@@ -353,17 +341,15 @@ else # not SRF, CWF or GNR
 fi
 echo "cores sse avx2 avx512 avx512h amx"
 echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
-		Architectures: []string{x86_64},
-		Vendors:       []string{"GenuineIntel"},
-		Lkms:          []string{"msr"},
-		Depends:       []string{"rdmsr", "pcm-tpmi"},
-		Superuser:     true,
+		Vendors:   []string{cpus.IntelVendor},
+		Lkms:      []string{"msr"},
+		Depends:   []string{"rdmsr", "pcm-tpmi"},
+		Superuser: true,
 	},
 	PPINName: {
 		Name:           PPINName,
 		ScriptTemplate: "rdmsr -a 0x4f", // MSR_PPIN: Protected Processor Inventory Number
-		Architectures:  []string{x86_64},
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -371,8 +357,7 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 	PrefetchControlName: {
 		Name:           PrefetchControlName,
 		ScriptTemplate: "rdmsr -f 7:0 0x1a4", // MSR_PREFETCH_CONTROL: L2, DCU, and AMP Prefetchers enabled/disabled
-		Architectures:  []string{x86_64},
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -380,27 +365,24 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 	PrefetchersName: {
 		Name:           PrefetchersName,
 		ScriptTemplate: "rdmsr 0x6d", // TODO: get name, used to read prefetchers
-		Architectures:  []string{x86_64},
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
 	},
 	PrefetchersAtomName: {
-		Name:           PrefetchersAtomName,
-		ScriptTemplate: "rdmsr 0x1320", // Atom Pref_tuning1
-		Architectures:  []string{x86_64},
-		Vendors:        []string{"GenuineIntel"},
-		Models:         []string{"175", "221"}, // SRF, CWF
-		Lkms:           []string{"msr"},
-		Depends:        []string{"rdmsr"},
-		Superuser:      true,
+		Name:               PrefetchersAtomName,
+		ScriptTemplate:     "rdmsr 0x1320", // Atom Pref_tuning1
+		Vendors:            []string{cpus.IntelVendor},
+		MicroArchitectures: []string{"SRF", "CWF"}, // SRF, CWF
+		Lkms:               []string{"msr"},
+		Depends:            []string{"rdmsr"},
+		Superuser:          true,
 	},
 	L3CacheWayEnabledName: {
 		Name:           L3CacheWayEnabledName,
 		ScriptTemplate: "rdmsr 0xc90", // TODO: get name, used to read l3 size
-		Architectures:  []string{x86_64},
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -408,8 +390,7 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 	PackagePowerLimitName: {
 		Name:           PackagePowerLimitName,
 		ScriptTemplate: "rdmsr -f 14:0 0x610", // MSR_PKG_POWER_LIMIT: Package limit in bits 14:0
-		Architectures:  []string{x86_64},
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -417,8 +398,7 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 	EpbSourceScriptName: {
 		Name:           EpbSourceScriptName,
 		ScriptTemplate: "rdmsr -f 34:34 0x1FC", // MSR_POWER_CTL, PWR_PERF_TUNING_ALT_EPB: Energy Performance Bias Hint Source (1 is from BIOS, 0 is from OS)
-		Architectures:  []string{x86_64},
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -446,17 +426,15 @@ else
     fi
 fi
 echo "$epb"`,
-		Architectures: []string{x86_64},
-		Vendors:       []string{"GenuineIntel"},
-		Lkms:          []string{"msr"},
-		Depends:       []string{"rdmsr"},
-		Superuser:     true,
+		Vendors:   []string{cpus.IntelVendor},
+		Lkms:      []string{"msr"},
+		Depends:   []string{"rdmsr"},
+		Superuser: true,
 	},
 	EppValidScriptName: {
 		Name:           EppValidScriptName,
 		ScriptTemplate: "rdmsr -a -f 60:60 0x774", // IA32_HWP_REQUEST: Energy Performance Preference, bit 60 indicates if per-cpu EPP is valid
-		Architectures:  []string{x86_64},
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -464,8 +442,7 @@ echo "$epb"`,
 	EppPackageControlScriptName: {
 		Name:           EppPackageControlScriptName,
 		ScriptTemplate: "rdmsr -a -f 42:42 0x774", // IA32_HWP_REQUEST: Energy Performance Preference, bit 42 indicates if package control is enabled
-		Architectures:  []string{x86_64},
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -473,8 +450,7 @@ echo "$epb"`,
 	EppScriptName: {
 		Name:           EppScriptName,
 		ScriptTemplate: "rdmsr -a -f 31:24 0x774", // IA32_HWP_REQUEST: Energy Performance Preference, bits 24-31 (0 is highest perf, 255 is highest energy saving)
-		Architectures:  []string{x86_64},
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -482,8 +458,7 @@ echo "$epb"`,
 	EppPackageScriptName: {
 		Name:           EppPackageScriptName,
 		ScriptTemplate: "rdmsr -f 31:24 0x772", // IA32_HWP_REQUEST_PKG: Energy Performance Preference, bits 24-31 (0 is highest perf, 255 is highest energy saving)
-		Architectures:  []string{x86_64},
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -491,8 +466,7 @@ echo "$epb"`,
 	UncoreMaxFromMSRScriptName: {
 		Name:           UncoreMaxFromMSRScriptName,
 		ScriptTemplate: "rdmsr -f 6:0 0x620", // MSR_UNCORE_RATIO_LIMIT: MAX_RATIO in bits 6:0
-		Architectures:  []string{x86_64},
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
@@ -500,38 +474,31 @@ echo "$epb"`,
 	UncoreMinFromMSRScriptName: {
 		Name:           UncoreMinFromMSRScriptName,
 		ScriptTemplate: "rdmsr -f 14:8 0x620", // MSR_UNCORE_RATIO_LIMIT: MAX_RATIO in bits 14:8
-		Architectures:  []string{x86_64},
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		Lkms:           []string{"msr"},
 		Depends:        []string{"rdmsr"},
 		Superuser:      true,
 	},
 	UncoreMaxFromTPMIScriptName: {
-		Name:           UncoreMaxFromTPMIScriptName,
-		ScriptTemplate: "pcm-tpmi 2 0x18 -d -b 8:14",
-		Architectures:  []string{x86_64},
-		Families:       []string{"6"},                        // Intel
-		Models:         []string{"173", "174", "175", "221"}, // GNR, GNR-D, SRF, CWF
-		Depends:        []string{"pcm-tpmi"},
-		Superuser:      true,
+		Name:               UncoreMaxFromTPMIScriptName,
+		ScriptTemplate:     "pcm-tpmi 2 0x18 -d -b 8:14",
+		MicroArchitectures: []string{"GNR", "GNR-D", "SRF", "CWF", "DMR"},
+		Depends:            []string{"pcm-tpmi"},
+		Superuser:          true,
 	},
 	UncoreMinFromTPMIScriptName: {
-		Name:           UncoreMinFromTPMIScriptName,
-		ScriptTemplate: "pcm-tpmi 2 0x18 -d -b 15:21",
-		Architectures:  []string{x86_64},
-		Families:       []string{"6"},                        // Intel
-		Models:         []string{"173", "174", "175", "221"}, // GNR, GNR-D, SRF, CWF
-		Depends:        []string{"pcm-tpmi"},
-		Superuser:      true,
+		Name:               UncoreMinFromTPMIScriptName,
+		ScriptTemplate:     "pcm-tpmi 2 0x18 -d -b 15:21",
+		MicroArchitectures: []string{"GNR", "GNR-D", "SRF", "CWF", "DMR"},
+		Depends:            []string{"pcm-tpmi"},
+		Superuser:          true,
 	},
 	UncoreDieTypesFromTPMIScriptName: {
-		Name:           UncoreDieTypesFromTPMIScriptName,
-		ScriptTemplate: "pcm-tpmi 2 0x10 -d -b 26:26",
-		Architectures:  []string{x86_64},
-		Families:       []string{"6"},                        // Intel
-		Models:         []string{"173", "174", "175", "221"}, // GNR, GNR-D, SRF, CWF
-		Depends:        []string{"pcm-tpmi"},
-		Superuser:      true,
+		Name:               UncoreDieTypesFromTPMIScriptName,
+		ScriptTemplate:     "pcm-tpmi 2 0x10 -d -b 26:26",
+		MicroArchitectures: []string{"GNR", "GNR-D", "SRF", "CWF", "DMR"},
+		Depends:            []string{"pcm-tpmi"},
+		Superuser:          true,
 	},
 	ElcScriptName: {
 		Name: ElcScriptName,
@@ -600,11 +567,9 @@ for die in "${!die_types[@]}"; do
 	done <<< "$output"
 done
 `,
-		Architectures: []string{x86_64},
-		Families:      []string{"6"},                        // Intel
-		Models:        []string{"173", "174", "175", "221"}, // GNR, GNR-D, SRF, CWF
-		Depends:       []string{"pcm-tpmi"},
-		Superuser:     true,
+		MicroArchitectures: []string{"GNR", "GNR-D", "SRF", "CWF", "DMR"},
+		Depends:            []string{"pcm-tpmi"},
+		Superuser:          true,
 	},
 	SSTTFHPScriptName: {
 		Name: SSTTFHPScriptName,
@@ -677,11 +642,9 @@ do
 	echo "" # finish the line
 done
 `,
-		Architectures: []string{x86_64},
-		Families:      []string{"6"},          // Intel
-		Models:        []string{"173", "174"}, // GNR, GNR-D
-		Depends:       []string{"pcm-tpmi"},
-		Superuser:     true,
+		MicroArchitectures: []string{"GNR", "GNR-D", "DMR"},
+		Depends:            []string{"pcm-tpmi"},
+		Superuser:          true,
 	},
 	SSTTFLPScriptName: {
 		Name: SSTTFLPScriptName,
@@ -734,11 +697,9 @@ do
 done
 echo "" # finish the line
 `,
-		Architectures: []string{x86_64},
-		Families:      []string{"6"},          // Intel
-		Models:        []string{"173", "174"}, // GNR, GNR-D
-		Depends:       []string{"pcm-tpmi"},
-		Superuser:     true,
+		MicroArchitectures: []string{"GNR", "GNR-D", "DMR"},
+		Depends:            []string{"pcm-tpmi"},
+		Superuser:          true,
 	},
 	ChaCountScriptName: {
 		Name: ChaCountScriptName,
@@ -746,11 +707,10 @@ echo "" # finish the line
 rdmsr 0x702
 rdmsr 0x2FFE
 `, // uncore client cha count, uncore cha count, uncore cha count spr
-		Architectures: []string{x86_64},
-		Vendors:       []string{"GenuineIntel"},
-		Lkms:          []string{"msr"},
-		Depends:       []string{"rdmsr"},
-		Superuser:     true,
+		Vendors:   []string{cpus.IntelVendor},
+		Lkms:      []string{"msr"},
+		Depends:   []string{"rdmsr"},
+		Superuser: true,
 	},
 	IaaDevicesScriptName: {
 		Name:           IaaDevicesScriptName,
@@ -941,8 +901,7 @@ fi`,
 		Name:           PMUDriverVersionScriptName,
 		ScriptTemplate: `dmesg | grep -A 1 "Intel PMU driver" | tail -1 | awk '{print $NF}'`,
 		Superuser:      true,
-		Architectures:  []string{x86_64},
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 	},
 	PMUBusyScriptName: {
 		Name: PMUBusyScriptName,
@@ -982,26 +941,25 @@ for i in "${pmu_counters[@]}"; do
     echo "Values: ${pmu_values[$i]}"
 done
 `,
-		Superuser:     true,
-		Architectures: []string{x86_64},
-		Vendors:       []string{"GenuineIntel"},
-		Lkms:          []string{"msr"},
-		Depends:       []string{"rdmsr"},
+		Superuser: true,
+		Vendors:   []string{cpus.IntelVendor},
+		Lkms:      []string{"msr"},
+		Depends:   []string{"rdmsr"},
 	},
 	GaudiInfoScriptName: {
 		Name:           GaudiInfoScriptName,
 		ScriptTemplate: `hl-smi -Q module_id,serial,bus_id,driver_version -f csv`,
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 	},
 	GaudiFirmwareScriptName: {
 		Name:           GaudiFirmwareScriptName,
 		ScriptTemplate: `hl-smi --fw-version`,
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 	},
 	GaudiNumaScriptName: {
 		Name:           GaudiNumaScriptName,
 		ScriptTemplate: `hl-smi topo -N`,
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 	},
 	GaudiArchitectureScriptName: {
 		Name: GaudiArchitectureScriptName,
@@ -1017,7 +975,7 @@ elif echo $__pcidev | grep -qE '106[0-9]'; then
 fi
 echo $__DEFAULT_HL_DEVICE
 `,
-		Vendors: []string{"GenuineIntel"},
+		Vendors: []string{cpus.IntelVendor},
 	},
 	MemoryBenchmarkScriptName: {
 		Name: MemoryBenchmarkScriptName,
@@ -1034,11 +992,10 @@ fi
 mlc --loaded_latency -b500m -X
 echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages
 `,
-		Architectures: []string{x86_64},
-		Superuser:     true,
-		Lkms:          []string{"msr"},
-		Depends:       []string{"mlc"},
-		Sequential:    true,
+		Superuser:  true,
+		Lkms:       []string{"msr"},
+		Depends:    []string{"mlc"},
+		Sequential: true,
 	},
 	NumaBenchmarkScriptName: {
 		Name: NumaBenchmarkScriptName,
@@ -1055,11 +1012,10 @@ fi
 mlc --bandwidth_matrix -b500m -X
 echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages
 `,
-		Architectures: []string{x86_64},
-		Superuser:     true,
-		Lkms:          []string{"msr"},
-		Depends:       []string{"mlc"},
-		Sequential:    true,
+		Superuser:  true,
+		Lkms:       []string{"msr"},
+		Depends:    []string{"mlc"},
+		Sequential: true,
 	},
 	SpeedBenchmarkScriptName: {
 		Name: SpeedBenchmarkScriptName,
@@ -1075,7 +1031,7 @@ done
 	},
 	FrequencyBenchmarkScriptName: {
 		Name:          FrequencyBenchmarkScriptName,
-		Architectures: []string{x86_64},
+		Architectures: []string{cpus.X86Architecture},
 		ScriptTemplate: `# Function to expand a range of numbers, e.g. "0-24", into an array of numbers
 expand_range() {
 	local range=$1
@@ -1166,7 +1122,7 @@ avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd
 	},
 	PowerBenchmarkScriptName: {
 		Name:           PowerBenchmarkScriptName,
-		Architectures:  []string{x86_64},
+		Architectures:  []string{cpus.X86Architecture},
 		ScriptTemplate: `((turbostat -i 2 2>/dev/null &) ; stress-ng --cpu 0 --bsearch 0 -t 60s >/dev/null 2>&1 ; pkill -9 -f turbostat)`,
 		Superuser:      true,
 		Lkms:           []string{"msr"},
@@ -1175,7 +1131,7 @@ avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd
 	},
 	IdlePowerBenchmarkScriptName: {
 		Name:           IdlePowerBenchmarkScriptName,
-		Architectures:  []string{x86_64},
+		Architectures:  []string{cpus.X86Architecture},
 		ScriptTemplate: `turbostat -i 2 -n 2 2>/dev/null`,
 		Superuser:      true,
 		Lkms:           []string{"msr"},
@@ -1293,7 +1249,7 @@ wait
 	},
 	TurbostatTelemetryScriptName: {
 		Name:          TurbostatTelemetryScriptName,
-		Architectures: []string{x86_64},
+		Architectures: []string{cpus.X86Architecture},
 		ScriptTemplate: `interval={{.Interval}}
 duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then

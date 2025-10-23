@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"perfspect/internal/common"
+	"perfspect/internal/cpus"
 	"perfspect/internal/progress"
 	"perfspect/internal/script"
 	"perfspect/internal/target"
@@ -1146,7 +1147,7 @@ func prepareTarget(targetContext *targetContext, localTempDir string, localPerfP
 	var err error
 	_ = statusUpdate(myTarget.GetName(), "configuring target")
 	// are PMUs being used on target?
-	if family, err := myTarget.GetFamily(); err == nil && family == "6" {
+	if family, err := myTarget.GetFamily(); err == nil && cpus.IsIntelCPUFamilyStr(family) {
 		output, err := script.RunScript(myTarget, script.GetScriptByName(script.PMUBusyScriptName), localTempDir)
 		if err != nil {
 			err = fmt.Errorf("failed to check if PMUs are in use: %w", err)
@@ -1197,7 +1198,7 @@ func prepareTarget(targetContext *targetContext, localTempDir string, localPerfP
 		if useDefaultMuxInterval {
 			// set the default mux interval to 16ms for AMD architecture
 			vendor, err := myTarget.GetVendor()
-			if err == nil && vendor == "AuthenticAMD" {
+			if err == nil && vendor == cpus.AMDVendor {
 				perfMuxInterval = 16
 			}
 		}

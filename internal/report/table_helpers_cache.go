@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"perfspect/internal/cpus"
 	"perfspect/internal/script"
 	"perfspect/internal/util"
 	"strconv"
@@ -19,7 +20,7 @@ import (
 // cache size, even if some ways are disabled.
 func GetL3MSRMB(outputs map[string]script.ScriptOutput) (instance float64, total float64, err error) {
 	uarch := UarchFromOutput(outputs)
-	cpu, err := GetCPUByMicroArchitecture(uarch)
+	cpu, err := cpus.GetCPUByMicroArchitecture(uarch)
 	if err != nil {
 		return 0, 0, err
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"perfspect/internal/cpus"
 	"perfspect/internal/report"
 	"perfspect/internal/script"
 	"perfspect/internal/target"
@@ -132,7 +133,7 @@ func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir str
 	}
 
 	uarch := report.UarchFromOutput(outputs)
-	cpu, err := report.GetCPUByMicroArchitecture(uarch)
+	cpu, err := cpus.GetCPUByMicroArchitecture(uarch)
 	if err != nil {
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get CPU by microarchitecture: %w", err)}
 		return
@@ -176,7 +177,7 @@ func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir str
 		Name:           "set LLC size",
 		ScriptTemplate: fmt.Sprintf("wrmsr -a 0xC90 %d", msrVal),
 		Superuser:      true,
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		// Depends:        []string{"wrmsr"},
 		// Lkms:           []string{"msr"},
 	}
@@ -203,7 +204,7 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get target vendor: %w", err)}
 		return
 	}
-	if targetVendor != "GenuineIntel" {
+	if targetVendor != cpus.IntelVendor {
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("core frequency setting not supported on %s due to vendor mismatch", myTarget.GetName())}
 		return
 	}
@@ -214,7 +215,7 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 		getScript := script.ScriptDefinition{
 			Name:           "get pstate driver",
 			ScriptTemplate: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver",
-			Vendors:        []string{"GenuineIntel"},
+			Vendors:        []string{cpus.IntelVendor},
 		}
 		output, err := runScript(myTarget, getScript, localTempDir)
 		if err != nil {
@@ -231,7 +232,7 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 				Name:           "set frequency bins",
 				ScriptTemplate: fmt.Sprintf("wrmsr 0x774 %d", value),
 				Superuser:      true,
-				Vendors:        []string{"GenuineIntel"},
+				Vendors:        []string{cpus.IntelVendor},
 				// Depends:        []string{"wrmsr"},
 				// Lkms:           []string{"msr"},
 			}
@@ -241,7 +242,7 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 				Name:           "set frequency bins",
 				ScriptTemplate: fmt.Sprintf("wrmsr 0x199 %d", value),
 				Superuser:      true,
-				Vendors:        []string{"GenuineIntel"},
+				Vendors:        []string{cpus.IntelVendor},
 				// Depends:        []string{"wrmsr"},
 				// Lkms:           []string{"msr"},
 			}
@@ -256,7 +257,7 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 			Name:           "set frequency bins",
 			ScriptTemplate: fmt.Sprintf("wrmsr -a 0x1AD %d", value),
 			Superuser:      true,
-			Vendors:        []string{"GenuineIntel"},
+			Vendors:        []string{cpus.IntelVendor},
 			// Depends:        []string{"wrmsr"},
 			// Lkms:           []string{"msr"},
 		}
@@ -326,7 +327,7 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 		setScript := script.ScriptDefinition{
 			Name:           "write max and min uncore frequency TPMI",
 			ScriptTemplate: fmt.Sprintf("pcm-tpmi 2 0x18 -d -b %s -w %d -i %s -e %s", bits, value, die.instance, die.entry),
-			Vendors:        []string{"GenuineIntel"},
+			Vendors:        []string{cpus.IntelVendor},
 			Depends:        []string{"pcm-tpmi"},
 			Superuser:      true,
 		}
@@ -348,7 +349,7 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 	scripts = append(scripts, script.ScriptDefinition{
 		Name:           "get uncore frequency MSR",
 		ScriptTemplate: "rdmsr 0x620",
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		Superuser:      true,
 		// Depends:        []string{"rdmsr"},
 		// Lkms:           []string{"msr"},
@@ -394,7 +395,7 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 		Name:           "set uncore frequency MSR",
 		ScriptTemplate: fmt.Sprintf("wrmsr -a 0x620 %d", newVal),
 		Superuser:      true,
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		// Depends:        []string{"wrmsr"},
 		// Lkms:           []string{"msr"},
 	}
@@ -410,7 +411,7 @@ func setTDP(power int, myTarget target.Target, localTempDir string, completeChan
 		Name:           "get power MSR",
 		ScriptTemplate: "rdmsr 0x610",
 		Superuser:      true,
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		// Lkms:           []string{"msr"},
 		// Depends:        []string{"rdmsr"},
 	}
@@ -433,7 +434,7 @@ func setTDP(power int, myTarget target.Target, localTempDir string, completeChan
 				Name:           "set tdp",
 				ScriptTemplate: fmt.Sprintf("wrmsr -a 0x610 %d", newVal),
 				Superuser:      true,
-				Vendors:        []string{"GenuineIntel"},
+				Vendors:        []string{cpus.IntelVendor},
 				// Depends:        []string{"wrmsr"},
 				// Lkms:           []string{"msr"},
 			}
@@ -472,7 +473,7 @@ func setEPB(epb int, myTarget target.Target, localTempDir string, completeChanne
 	readScript := script.ScriptDefinition{
 		Name:           "read " + msr,
 		ScriptTemplate: "rdmsr " + msr,
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		Superuser:      true,
 		// Lkms:           []string{"msr"},
 		// Depends:        []string{"rdmsr"},
@@ -496,7 +497,7 @@ func setEPB(epb int, myTarget target.Target, localTempDir string, completeChanne
 		Name:           "set epb",
 		ScriptTemplate: fmt.Sprintf("wrmsr -a %s %d", msr, msrValue),
 		Superuser:      true,
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		// Depends:        []string{"wrmsr"},
 		// Lkms:           []string{"msr"},
 	}
@@ -515,7 +516,7 @@ func setEPP(epp int, myTarget target.Target, localTempDir string, completeChanne
 	getScript := script.ScriptDefinition{
 		Name:           "get epp msr",
 		ScriptTemplate: "rdmsr 0x774", // IA32_HWP_REQUEST
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		Superuser:      true,
 		// Lkms:           []string{"msr"},
 		// Depends:        []string{"rdmsr"},
@@ -539,7 +540,7 @@ func setEPP(epp int, myTarget target.Target, localTempDir string, completeChanne
 		Name:           "set epp",
 		ScriptTemplate: fmt.Sprintf("wrmsr -a 0x774 %d", eppValue),
 		Superuser:      true,
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		// Depends:        []string{"wrmsr"},
 		// Lkms:           []string{"msr"},
 	}
@@ -552,7 +553,7 @@ func setEPP(epp int, myTarget target.Target, localTempDir string, completeChanne
 	getScript = script.ScriptDefinition{
 		Name:           "get epp pkg msr",
 		ScriptTemplate: "rdmsr 0x772", // IA32_HWP_REQUEST_PKG
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		Superuser:      true,
 		// Lkms:           []string{"msr"},
 		// Depends:        []string{"rdmsr"},
@@ -576,7 +577,7 @@ func setEPP(epp int, myTarget target.Target, localTempDir string, completeChanne
 		Name:           "set epp",
 		ScriptTemplate: fmt.Sprintf("wrmsr -a 0x772 %d", eppValue),
 		Superuser:      true,
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		// Depends:        []string{"wrmsr"},
 		// Lkms:           []string{"msr"},
 	}
@@ -612,12 +613,12 @@ func setELC(elc string, myTarget target.Target, localTempDir string, completeCha
 		return
 	}
 	setScript := script.ScriptDefinition{
-		Name:           "set elc",
-		ScriptTemplate: fmt.Sprintf("bhs-power-mode.sh --%s", mode),
-		Superuser:      true,
-		Vendors:        []string{"GenuineIntel"},
-		Models:         []string{"173", "174", "175", "221"}, // GNR, GNR-D, SRF, CWF
-		Depends:        []string{"bhs-power-mode.sh", "pcm-tpmi"},
+		Name:               "set elc",
+		ScriptTemplate:     fmt.Sprintf("bhs-power-mode.sh --%s", mode),
+		Superuser:          true,
+		Vendors:            []string{cpus.IntelVendor},
+		MicroArchitectures: []string{"GNR", "GNR-D", "SRF", "CWF"},
+		Depends:            []string{"bhs-power-mode.sh", "pcm-tpmi"},
 	}
 	_, err := runScript(myTarget, setScript, localTempDir)
 	if err != nil {
@@ -657,7 +658,7 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 	getScript := script.ScriptDefinition{
 		Name:           "get prefetcher msr",
 		ScriptTemplate: fmt.Sprintf("rdmsr %d", pf.Msr),
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		Superuser:      true,
 		// Lkms:           []string{"msr"},
 		// Depends:        []string{"rdmsr"},
@@ -692,7 +693,7 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 		Name:           "set prefetcher" + prefetcherType,
 		ScriptTemplate: fmt.Sprintf("wrmsr -a %d %d", pf.Msr, newVal),
 		Superuser:      true,
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		// Depends:        []string{"wrmsr"},
 		// Lkms:           []string{"msr"},
 	}
@@ -762,7 +763,7 @@ func setC1Demotion(enableDisable string, myTarget target.Target, localTempDir st
 	getScript := script.ScriptDefinition{
 		Name:           "get C1 demotion",
 		ScriptTemplate: "rdmsr 0xe2",
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		Superuser:      true,
 		// Lkms:           []string{"msr"},
 		// Depends:        []string{"rdmsr"},
@@ -797,7 +798,7 @@ func setC1Demotion(enableDisable string, myTarget target.Target, localTempDir st
 	setScript := script.ScriptDefinition{
 		Name:           "set C1 demotion",
 		ScriptTemplate: fmt.Sprintf("wrmsr -a %d %d", 0xe2, newVal),
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		Superuser:      true,
 		// Depends:        []string{"wrmsr"},
 		// Lkms:           []string{"msr"},

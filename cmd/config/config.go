@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"perfspect/internal/common"
+	"perfspect/internal/cpus"
 	"perfspect/internal/progress"
 	"perfspect/internal/report"
 	"perfspect/internal/script"
@@ -158,7 +159,7 @@ func prepareTarget(myTarget target.Target, localTempDir string) (err error) {
 		Name:           "prepare-target",
 		ScriptTemplate: "exit 0",
 		Superuser:      true,
-		Vendors:        []string{"GenuineIntel"},
+		Vendors:        []string{cpus.IntelVendor},
 		Depends:        []string{"wrmsr", "rdmsr"},
 		Lkms:           []string{"msr"},
 	}
