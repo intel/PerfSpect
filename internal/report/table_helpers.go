@@ -1492,7 +1492,7 @@ type GPU struct {
 func gpuInfoFromOutput(outputs map[string]script.ScriptOutput) []GPU {
 	gpus := []GPU{}
 
-	// Parse the lshw -class display output
+	// Parse the lshw -class display -numeric output
 	lshwGPUOutput := outputs[script.LshwGPUScriptName].Stdout
 	if lshwGPUOutput == "" {
 		return gpus
@@ -1502,8 +1502,8 @@ func gpuInfoFromOutput(outputs map[string]script.ScriptOutput) []GPU {
 	// The output is in a format like:
 	// *-display
 	//    description: VGA compatible controller
-	//    product: ...
-	//    vendor: ...
+	//    product: Hyper-V virtual VGA [1414:5353]
+	//    vendor: Microsoft Corporation [1414]
 	//    ...
 
 	lines := strings.Split(lshwGPUOutput, "\n")
@@ -1528,20 +1528,27 @@ func gpuInfoFromOutput(outputs map[string]script.ScriptOutput) []GPU {
 		// Parse the fields
 		if strings.HasPrefix(trimmedLine, "product:") {
 			product := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "product:"))
-			// Try to find a matching model from GPU definitions
-			// Extract vendor and device IDs if present in bus info
+			// Extract device ID from brackets if present (e.g., "Product Name [vendor:device]")
+			if idx := strings.Index(product, "["); idx != -1 {
+				if endIdx := strings.Index(product, "]"); endIdx != -1 {
+					ids := product[idx+1 : endIdx]
+					if strings.Contains(ids, ":") {
+						currentGPU.PCIID = ids
+					}
+					product = strings.TrimSpace(product[:idx])
+				}
+			}
 			currentGPU.Model = product
 		} else if strings.HasPrefix(trimmedLine, "vendor:") {
-			currentGPU.Manufacturer = strings.TrimSpace(strings.TrimPrefix(trimmedLine, "vendor:"))
+			vendor := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "vendor:"))
+			// Remove vendor ID from brackets if present
+			if idx := strings.Index(vendor, "["); idx != -1 {
+				vendor = strings.TrimSpace(vendor[:idx])
+			}
+			currentGPU.Manufacturer = vendor
 		} else if strings.HasPrefix(trimmedLine, "bus info:") {
 			busInfo := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "bus info:"))
 			currentGPU.BusInfo = busInfo
-
-			// Extract PCI ID from bus info (e.g., pci@0000:00:02.0)
-			if strings.HasPrefix(busInfo, "pci@") {
-				pciAddr := strings.TrimPrefix(busInfo, "pci@")
-				currentGPU.PCIID = pciAddr
-			}
 		} else if strings.HasPrefix(trimmedLine, "logical name:") {
 			currentGPU.LogicalName = strings.TrimSpace(strings.TrimPrefix(trimmedLine, "logical name:"))
 		} else if strings.HasPrefix(trimmedLine, "version:") {

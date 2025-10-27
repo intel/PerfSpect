@@ -729,7 +729,7 @@ rdmsr 0x2FFE
 	},
 	LshwGPUScriptName: {
 		Name:           LshwGPUScriptName,
-		ScriptTemplate: "timeout 30 lshw -class display",
+		ScriptTemplate: "timeout 30 lshw -class display -numeric",
 		Depends:        []string{"lshw"},
 		Superuser:      true,
 	},
