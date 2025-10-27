@@ -1493,8 +1493,9 @@ type GPU struct {
 // Example: "Product Name [1414:5353]" returns "1414:5353"
 func extractPCIIDFromBrackets(text string) string {
 	if idx := strings.Index(text, "["); idx != -1 {
-		if endIdx := strings.Index(text, "]"); endIdx != -1 {
-			ids := text[idx+1 : endIdx]
+		// Search for closing bracket after the opening bracket
+		if endIdx := strings.Index(text[idx+1:], "]"); endIdx != -1 {
+			ids := text[idx+1 : idx+1+endIdx]
 			if strings.Contains(ids, ":") {
 				return ids
 			}
