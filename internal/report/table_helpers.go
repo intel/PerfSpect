@@ -1516,32 +1516,59 @@ func removeBracketedSuffix(text string) string {
 func gpuInfoFromOutput(outputs map[string]script.ScriptOutput) []GPU {
 	gpus := []GPU{}
 
-	// Parse the lshw -class display -numeric output
-	lshwGPUOutput := outputs[script.LshwGPUScriptName].Stdout
-	if lshwGPUOutput == "" {
+	// First, get all GPUs from lspci
+	// This ensures we find all GPUs, not just those used for display
+	lspciOutput := outputs[script.LspciGPUScriptName].Stdout
+	if lspciOutput == "" {
 		return gpus
 	}
 
-	// Parse each GPU device from the lshw output
-	// The output is in a format like:
-	// *-display
-	//    description: VGA compatible controller
-	//    product: Hyper-V virtual VGA [1414:5353]
-	//    vendor: Microsoft Corporation [1414]
-	//    ...
+	// Parse lspci output to get basic GPU info
+	// Format: 00:08.0 0300: 1414:5353 (prog-if 00 [VGA controller])
+	lines := strings.Split(lspciOutput, "\n")
+	for _, line := range lines {
+		trimmedLine := strings.TrimSpace(line)
+		// Look for lines with PCI address and vendor:device ID
+		// Example: "00:08.0 0300: 1414:5353 (prog-if 00 [VGA controller])"
+		re := regexp.MustCompile(`^([0-9a-f]{2}:[0-9a-f]{2}\.[0-9a-f])\s+[0-9a-f]{4}:\s+([0-9a-f]{4}):([0-9a-f]{4})`)
+		match := re.FindStringSubmatch(trimmedLine)
+		if len(match) >= 4 {
+			gpu := GPU{
+				BusInfo: "pci@0000:" + match[1],
+				PCIID:   match[2] + ":" + match[3],
+			}
+			gpus = append(gpus, gpu)
+		}
+	}
 
-	lines := strings.Split(lshwGPUOutput, "\n")
+	// If no GPUs found from lspci, return empty
+	if len(gpus) == 0 {
+		return gpus
+	}
+
+	// Now parse lshw output to enrich GPU details
+	lshwGPUOutput := outputs[script.LshwGPUScriptName].Stdout
+	if lshwGPUOutput == "" {
+		// Return GPUs with only lspci info
+		return gpus
+	}
+
+	// Parse lshw output into a map keyed by bus info
+	lshwGPUs := make(map[string]GPU)
+	lines = strings.Split(lshwGPUOutput, "\n")
 	var currentGPU *GPU
+	var currentBusInfo string
 
 	for _, line := range lines {
 		trimmedLine := strings.TrimSpace(line)
 
 		// Start of a new GPU device
 		if strings.HasPrefix(trimmedLine, "*-") {
-			if currentGPU != nil {
-				gpus = append(gpus, *currentGPU)
+			if currentGPU != nil && currentBusInfo != "" {
+				lshwGPUs[currentBusInfo] = *currentGPU
 			}
 			currentGPU = &GPU{}
+			currentBusInfo = ""
 			continue
 		}
 
@@ -1563,6 +1590,7 @@ func gpuInfoFromOutput(outputs map[string]script.ScriptOutput) []GPU {
 		} else if strings.HasPrefix(trimmedLine, "bus info:") {
 			busInfo := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "bus info:"))
 			currentGPU.BusInfo = busInfo
+			currentBusInfo = busInfo
 		} else if strings.HasPrefix(trimmedLine, "logical name:") {
 			currentGPU.LogicalName = strings.TrimSpace(strings.TrimPrefix(trimmedLine, "logical name:"))
 		} else if strings.HasPrefix(trimmedLine, "version:") {
@@ -1580,9 +1608,25 @@ func gpuInfoFromOutput(outputs map[string]script.ScriptOutput) []GPU {
 		}
 	}
 
-	// Don't forget the last GPU
-	if currentGPU != nil {
-		gpus = append(gpus, *currentGPU)
+	// Don't forget the last GPU from lshw
+	if currentGPU != nil && currentBusInfo != "" {
+		lshwGPUs[currentBusInfo] = *currentGPU
+	}
+
+	// Merge lshw details into lspci GPUs
+	for i := range gpus {
+		if lshwGPU, found := lshwGPUs[gpus[i].BusInfo]; found {
+			// Merge all fields from lshw, but keep PCIID and BusInfo from lspci
+			// as they are more reliable
+			pciID := gpus[i].PCIID
+			busInfo := gpus[i].BusInfo
+			gpus[i] = lshwGPU
+			if gpus[i].PCIID == "" {
+				gpus[i].PCIID = pciID
+			}
+			gpus[i].BusInfo = busInfo
+		}
+		// If no match found in lshw, the GPU will have only lspci info (PCIID and BusInfo)
 	}
 
 	return gpus

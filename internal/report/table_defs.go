@@ -408,6 +408,7 @@ var tableDefinitions = map[string]TableDefinition{
 		HasRows:   true,
 		MenuLabel: DevicesMenuLabel,
 		ScriptNames: []string{
+			script.LspciGPUScriptName,
 			script.LshwGPUScriptName,
 		},
 		FieldsFunc: gpuTableValues},

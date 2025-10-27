@@ -71,6 +71,7 @@ const (
 	DsaDevicesScriptName             = "dsa devices"
 	LshwScriptName                   = "lshw"
 	LshwGPUScriptName                = "lshw gpu"
+	LspciGPUScriptName               = "lspci gpu"
 	UncoreMaxFromMSRScriptName       = "uncore max from msr"
 	UncoreMinFromMSRScriptName       = "uncore min from msr"
 	UncoreMaxFromTPMIScriptName      = "uncore max from tpmi"
@@ -732,6 +733,11 @@ rdmsr 0x2FFE
 		ScriptTemplate: "timeout 30 lshw -class display -numeric",
 		Depends:        []string{"lshw"},
 		Superuser:      true,
+	},
+	LspciGPUScriptName: {
+		Name:           LspciGPUScriptName,
+		ScriptTemplate: "lspci -nv | grep -A 5 -iE 'vga|3d|display'",
+		Depends:        []string{"lspci"},
 	},
 	MeminfoScriptName: {
 		Name:           MeminfoScriptName,
