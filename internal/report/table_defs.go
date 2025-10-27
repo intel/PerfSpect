@@ -408,7 +408,7 @@ var tableDefinitions = map[string]TableDefinition{
 		HasRows:   true,
 		MenuLabel: DevicesMenuLabel,
 		ScriptNames: []string{
-			script.LshwScriptName,
+			script.LshwGPUScriptName,
 		},
 		FieldsFunc: gpuTableValues},
 	GaudiTableName: {
@@ -1781,11 +1781,27 @@ func gpuTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Manufacturer"},
 		{Name: "Model"},
 		{Name: "PCI ID"},
+		{Name: "Logical Name"},
+		{Name: "Bus Info"},
+		{Name: "Version"},
+		{Name: "Width"},
+		{Name: "Clock"},
+		{Name: "Capabilities"},
+		{Name: "Configuration"},
+		{Name: "Resources"},
 	}
 	for _, gpuInfo := range gpuInfos {
 		fields[0].Values = append(fields[0].Values, gpuInfo.Manufacturer)
 		fields[1].Values = append(fields[1].Values, gpuInfo.Model)
 		fields[2].Values = append(fields[2].Values, gpuInfo.PCIID)
+		fields[3].Values = append(fields[3].Values, gpuInfo.LogicalName)
+		fields[4].Values = append(fields[4].Values, gpuInfo.BusInfo)
+		fields[5].Values = append(fields[5].Values, gpuInfo.Version)
+		fields[6].Values = append(fields[6].Values, gpuInfo.Width)
+		fields[7].Values = append(fields[7].Values, gpuInfo.Clock)
+		fields[8].Values = append(fields[8].Values, gpuInfo.Capabilities)
+		fields[9].Values = append(fields[9].Values, gpuInfo.Configuration)
+		fields[10].Values = append(fields[10].Values, gpuInfo.Resources)
 	}
 	return fields
 }

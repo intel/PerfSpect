@@ -1476,40 +1476,94 @@ func filesystemFieldValuesFromOutput(outputs map[string]script.ScriptOutput) []F
 }
 
 type GPU struct {
-	Manufacturer string
-	Model        string
-	PCIID        string
+	Manufacturer  string
+	Model         string
+	PCIID         string
+	LogicalName   string
+	BusInfo       string
+	Version       string
+	Width         string
+	Clock         string
+	Capabilities  string
+	Configuration string
+	Resources     string
 }
 
 func gpuInfoFromOutput(outputs map[string]script.ScriptOutput) []GPU {
 	gpus := []GPU{}
-	gpusLshw := valsArrayFromRegexSubmatch(outputs[script.LshwScriptName].Stdout, `^pci.*?\s+display\s+(\w+).*?\s+\[(\w+):(\w+)]$`)
-	idxMfgName := 0
-	idxMfgID := 1
-	idxDevID := 2
-	for _, gpu := range gpusLshw {
-		// Find GPU in GPU defs, note the model
-		var model string
-		for _, intelGPU := range gpuDefinitions {
-			if gpu[idxMfgID] == intelGPU.MfgID {
-				model = intelGPU.Model
-				break
-			}
-			re := regexp.MustCompile(intelGPU.DevID)
-			if re.FindString(gpu[idxDevID]) != "" {
-				model = intelGPU.Model
-				break
-			}
-		}
-		if model == "" {
-			if gpu[idxMfgID] == "8086" {
-				model = "Unknown Intel"
-			} else {
-				model = "Unknown"
-			}
-		}
-		gpus = append(gpus, GPU{Manufacturer: gpu[idxMfgName], Model: model, PCIID: gpu[idxMfgID] + ":" + gpu[idxDevID]})
+
+	// Parse the lshw -class display output
+	lshwGPUOutput := outputs[script.LshwGPUScriptName].Stdout
+	if lshwGPUOutput == "" {
+		return gpus
 	}
+
+	// Parse each GPU device from the lshw output
+	// The output is in a format like:
+	// *-display
+	//    description: VGA compatible controller
+	//    product: ...
+	//    vendor: ...
+	//    ...
+
+	lines := strings.Split(lshwGPUOutput, "\n")
+	var currentGPU *GPU
+
+	for _, line := range lines {
+		trimmedLine := strings.TrimSpace(line)
+
+		// Start of a new GPU device
+		if strings.HasPrefix(trimmedLine, "*-") {
+			if currentGPU != nil {
+				gpus = append(gpus, *currentGPU)
+			}
+			currentGPU = &GPU{}
+			continue
+		}
+
+		if currentGPU == nil {
+			continue
+		}
+
+		// Parse the fields
+		if strings.HasPrefix(trimmedLine, "product:") {
+			product := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "product:"))
+			// Try to find a matching model from GPU definitions
+			// Extract vendor and device IDs if present in bus info
+			currentGPU.Model = product
+		} else if strings.HasPrefix(trimmedLine, "vendor:") {
+			currentGPU.Manufacturer = strings.TrimSpace(strings.TrimPrefix(trimmedLine, "vendor:"))
+		} else if strings.HasPrefix(trimmedLine, "bus info:") {
+			busInfo := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "bus info:"))
+			currentGPU.BusInfo = busInfo
+
+			// Extract PCI ID from bus info (e.g., pci@0000:00:02.0)
+			if strings.HasPrefix(busInfo, "pci@") {
+				pciAddr := strings.TrimPrefix(busInfo, "pci@")
+				currentGPU.PCIID = pciAddr
+			}
+		} else if strings.HasPrefix(trimmedLine, "logical name:") {
+			currentGPU.LogicalName = strings.TrimSpace(strings.TrimPrefix(trimmedLine, "logical name:"))
+		} else if strings.HasPrefix(trimmedLine, "version:") {
+			currentGPU.Version = strings.TrimSpace(strings.TrimPrefix(trimmedLine, "version:"))
+		} else if strings.HasPrefix(trimmedLine, "width:") {
+			currentGPU.Width = strings.TrimSpace(strings.TrimPrefix(trimmedLine, "width:"))
+		} else if strings.HasPrefix(trimmedLine, "clock:") {
+			currentGPU.Clock = strings.TrimSpace(strings.TrimPrefix(trimmedLine, "clock:"))
+		} else if strings.HasPrefix(trimmedLine, "capabilities:") {
+			currentGPU.Capabilities = strings.TrimSpace(strings.TrimPrefix(trimmedLine, "capabilities:"))
+		} else if strings.HasPrefix(trimmedLine, "configuration:") {
+			currentGPU.Configuration = strings.TrimSpace(strings.TrimPrefix(trimmedLine, "configuration:"))
+		} else if strings.HasPrefix(trimmedLine, "resources:") {
+			currentGPU.Resources = strings.TrimSpace(strings.TrimPrefix(trimmedLine, "resources:"))
+		}
+	}
+
+	// Don't forget the last GPU
+	if currentGPU != nil {
+		gpus = append(gpus, *currentGPU)
+	}
+
 	return gpus
 }
 

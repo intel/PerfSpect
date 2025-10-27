@@ -70,6 +70,7 @@ const (
 	IaaDevicesScriptName             = "iaa devices"
 	DsaDevicesScriptName             = "dsa devices"
 	LshwScriptName                   = "lshw"
+	LshwGPUScriptName                = "lshw gpu"
 	UncoreMaxFromMSRScriptName       = "uncore max from msr"
 	UncoreMinFromMSRScriptName       = "uncore min from msr"
 	UncoreMaxFromTPMIScriptName      = "uncore max from tpmi"
@@ -723,6 +724,12 @@ rdmsr 0x2FFE
 	LshwScriptName: {
 		Name:           LshwScriptName,
 		ScriptTemplate: "timeout 30 lshw -businfo -numeric",
+		Depends:        []string{"lshw"},
+		Superuser:      true,
+	},
+	LshwGPUScriptName: {
+		Name:           LshwGPUScriptName,
+		ScriptTemplate: "timeout 30 lshw -class display",
 		Depends:        []string{"lshw"},
 		Superuser:      true,
 	},
