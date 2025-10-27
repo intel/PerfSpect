@@ -1489,6 +1489,29 @@ type GPU struct {
 	Resources     string
 }
 
+// extractPCIIDFromBrackets extracts the PCI vendor:device ID from bracketed text
+// Example: "Product Name [1414:5353]" returns "1414:5353"
+func extractPCIIDFromBrackets(text string) string {
+	if idx := strings.Index(text, "["); idx != -1 {
+		if endIdx := strings.Index(text, "]"); endIdx != -1 {
+			ids := text[idx+1 : endIdx]
+			if strings.Contains(ids, ":") {
+				return ids
+			}
+		}
+	}
+	return ""
+}
+
+// removeBracketedSuffix removes bracketed suffix from text
+// Example: "Microsoft Corporation [1414]" returns "Microsoft Corporation"
+func removeBracketedSuffix(text string) string {
+	if idx := strings.Index(text, "["); idx != -1 {
+		return strings.TrimSpace(text[:idx])
+	}
+	return text
+}
+
 func gpuInfoFromOutput(outputs map[string]script.ScriptOutput) []GPU {
 	gpus := []GPU{}
 
@@ -1528,24 +1551,14 @@ func gpuInfoFromOutput(outputs map[string]script.ScriptOutput) []GPU {
 		// Parse the fields
 		if strings.HasPrefix(trimmedLine, "product:") {
 			product := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "product:"))
-			// Extract device ID from brackets if present (e.g., "Product Name [vendor:device]")
-			if idx := strings.Index(product, "["); idx != -1 {
-				if endIdx := strings.Index(product, "]"); endIdx != -1 {
-					ids := product[idx+1 : endIdx]
-					if strings.Contains(ids, ":") {
-						currentGPU.PCIID = ids
-					}
-					product = strings.TrimSpace(product[:idx])
-				}
+			// Extract PCI ID from brackets if present (e.g., "Product Name [vendor:device]")
+			if pciID := extractPCIIDFromBrackets(product); pciID != "" {
+				currentGPU.PCIID = pciID
 			}
-			currentGPU.Model = product
+			currentGPU.Model = removeBracketedSuffix(product)
 		} else if strings.HasPrefix(trimmedLine, "vendor:") {
 			vendor := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "vendor:"))
-			// Remove vendor ID from brackets if present
-			if idx := strings.Index(vendor, "["); idx != -1 {
-				vendor = strings.TrimSpace(vendor[:idx])
-			}
-			currentGPU.Manufacturer = vendor
+			currentGPU.Manufacturer = removeBracketedSuffix(vendor)
 		} else if strings.HasPrefix(trimmedLine, "bus info:") {
 			busInfo := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "bus info:"))
 			currentGPU.BusInfo = busInfo
