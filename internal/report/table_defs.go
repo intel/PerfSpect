@@ -1778,8 +1778,8 @@ func gpuTableValues(outputs map[string]script.ScriptOutput) []Field {
 		return []Field{}
 	}
 	fields := []Field{
-		{Name: "Manufacturer"},
-		{Name: "Model"},
+		{Name: "Vendor"},
+		{Name: "Product"},
 		{Name: "PCI ID"},
 		{Name: "Logical Name"},
 		{Name: "Bus Info"},
@@ -1791,8 +1791,8 @@ func gpuTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Resources"},
 	}
 	for _, gpuInfo := range gpuInfos {
-		fields[0].Values = append(fields[0].Values, gpuInfo.Manufacturer)
-		fields[1].Values = append(fields[1].Values, gpuInfo.Model)
+		fields[0].Values = append(fields[0].Values, gpuInfo.Vendor)
+		fields[1].Values = append(fields[1].Values, gpuInfo.Product)
 		fields[2].Values = append(fields[2].Values, gpuInfo.PCIID)
 		fields[3].Values = append(fields[3].Values, gpuInfo.LogicalName)
 		fields[4].Values = append(fields[4].Values, gpuInfo.BusInfo)

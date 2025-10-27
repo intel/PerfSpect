@@ -1476,8 +1476,8 @@ func filesystemFieldValuesFromOutput(outputs map[string]script.ScriptOutput) []F
 }
 
 type GPU struct {
-	Manufacturer  string
-	Model         string
+	Vendor        string
+	Product       string
 	PCIID         string
 	LogicalName   string
 	BusInfo       string
@@ -1556,10 +1556,10 @@ func gpuInfoFromOutput(outputs map[string]script.ScriptOutput) []GPU {
 			if pciID := extractPCIIDFromBrackets(product); pciID != "" {
 				currentGPU.PCIID = pciID
 			}
-			currentGPU.Model = removeBracketedSuffix(product)
+			currentGPU.Product = removeBracketedSuffix(product)
 		} else if strings.HasPrefix(trimmedLine, "vendor:") {
 			vendor := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "vendor:"))
-			currentGPU.Manufacturer = removeBracketedSuffix(vendor)
+			currentGPU.Vendor = removeBracketedSuffix(vendor)
 		} else if strings.HasPrefix(trimmedLine, "bus info:") {
 			busInfo := strings.TrimSpace(strings.TrimPrefix(trimmedLine, "bus info:"))
 			currentGPU.BusInfo = busInfo
