@@ -272,6 +272,9 @@ func getSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 		archMultiplier = 1
 	}
 	for _, count := range bucketCoreCounts {
+		if startRange > count {
+			break
+		}
 		if archMultiplier > 1 {
 			totalCoreCount := count * archMultiplier
 			if totalCoreStartRange > int(totalCoreCount) {
