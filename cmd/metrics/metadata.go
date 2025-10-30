@@ -829,8 +829,11 @@ func getNumGPCountersARM(target target.Target) (numGPCounters int, err error) {
 		err = fmt.Errorf("failed to get PMU Driver line: %s, %d, %v", stderr, exitcode, err)
 		return
 	}
-	// example [    1.339550] hw perfevents: enabled with armv8_pmuv3_0 PMU driver, 5 counters available
-	counterRegex := regexp.MustCompile(`(\d+) counters available`)
+	// examples:
+	//   [    1.339550] hw perfevents: enabled with armv8_pmuv3_0 PMU driver, 5 counters available
+	//   [    3.663956] hw perfevents: enabled with armv8_pmuv3_0 PMU driver, 6 (0,8000001f) counters available
+	// regex to match both "5 counters available" and "6 (0,8000001f) counters available"
+	counterRegex := regexp.MustCompile(`(\d+)\s*(?:\([^)]+\))?\s+counters available`)
 	matches := counterRegex.FindStringSubmatch(stdout)
 	if len(matches) > 1 {
 		numberStr := matches[1]
