@@ -14,7 +14,7 @@ ARG TAG=
 FROM ${REGISTRY}${PREFIX}perfspect-tools:${TAG} AS tools
 
 # STAGE 2 - image contains perfspect's Go components build environment
-FROM golang:1.25.1@sha256:a5e935dbd8bc3a5ea24388e376388c9a69b40628b6788a81658a801abbec8f2e
+FROM golang:1.25.3@sha256:6bac879c5b77e0fc9c556a5ed8920e89dab1709bd510a854903509c828f67f96
 # copy the tools binaries and source from the previous stage
 RUN mkdir /prebuilt
 RUN mkdir /prebuilt/tools
