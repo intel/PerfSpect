@@ -186,6 +186,19 @@ type lscpuCacheEntry struct {
 	CoherencySize int    `json:"coherency-size"`
 }
 
+// for older lscpu versions that return numbers as strings
+type lscpuCacheEntryLegacy struct {
+	Name          string `json:"name"`
+	OneSize       string `json:"one-size"`
+	AllSize       string `json:"all-size"`
+	Ways          string `json:"ways"`
+	Type          string `json:"type"`
+	Level         string `json:"level"`
+	Sets          string `json:"sets"`
+	PhyLine       string `json:"phy-line"`
+	CoherencySize string `json:"coherency-size"`
+}
+
 // parseLscpuCacheOutput parses the output of the `lscpu -C -J` command to extract cache information.
 // lscpu returns JSON output with cache details, which this function processes to create a map.
 // Example:
@@ -242,13 +255,63 @@ func parseLscpuCacheOutput(LscpuCacheOutput string) (map[string]lscpuCacheEntry,
 		return nil, fmt.Errorf("lscpu cache output is empty")
 	}
 	output := make(map[string]lscpuCacheEntry)
+
+	// Try modern format first (numbers as integers)
 	parsed := make(map[string][]lscpuCacheEntry)
 	err := json.Unmarshal([]byte(LscpuCacheOutput), &parsed)
+	if err == nil {
+		// Modern format worked
+		for _, entry := range parsed["caches"] {
+			output[entry.Name] = entry
+		}
+		return output, nil
+	}
+
+	// Fall back to legacy format (numbers as strings)
+	slog.Debug("Failed to parse lscpu cache output with modern format, trying legacy format", slog.String("error", err.Error()))
+	parsedLegacy := make(map[string][]lscpuCacheEntryLegacy)
+	err = json.Unmarshal([]byte(LscpuCacheOutput), &parsedLegacy)
 	if err != nil {
-		slog.Error("Failed to parse lscpu cache JSON output", slog.String("error", err.Error()))
+		slog.Error("Failed to parse lscpu cache JSON output with both modern and legacy formats", slog.String("error", err.Error()))
 		return nil, err
 	}
-	for _, entry := range parsed["caches"] {
+
+	// Convert legacy entries to modern format
+	for _, legacyEntry := range parsedLegacy["caches"] {
+		entry := lscpuCacheEntry{
+			Name:    legacyEntry.Name,
+			OneSize: legacyEntry.OneSize,
+			AllSize: legacyEntry.AllSize,
+			Type:    legacyEntry.Type,
+		}
+
+		// Convert string fields to integers
+		if legacyEntry.Ways != "" {
+			if ways, err := strconv.Atoi(legacyEntry.Ways); err == nil {
+				entry.Ways = ways
+			}
+		}
+		if legacyEntry.Level != "" {
+			if level, err := strconv.Atoi(legacyEntry.Level); err == nil {
+				entry.Level = level
+			}
+		}
+		if legacyEntry.Sets != "" {
+			if sets, err := strconv.Atoi(legacyEntry.Sets); err == nil {
+				entry.Sets = sets
+			}
+		}
+		if legacyEntry.PhyLine != "" {
+			if phyLine, err := strconv.Atoi(legacyEntry.PhyLine); err == nil {
+				entry.PhyLine = phyLine
+			}
+		}
+		if legacyEntry.CoherencySize != "" {
+			if coherencySize, err := strconv.Atoi(legacyEntry.CoherencySize); err == nil {
+				entry.CoherencySize = coherencySize
+			}
+		}
+
 		output[entry.Name] = entry
 	}
 	return output, nil
