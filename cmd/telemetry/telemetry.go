@@ -248,17 +248,8 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	if flagDuration < 0 {
 		return common.FlagValidationError(cmd, "duration must be 0 or greater")
 	}
-	target, err := cmd.Flags().GetString("target")
-	if err != nil {
-		panic("failed to get target flag")
-	}
-	targets, err := cmd.Flags().GetString("targets")
-	if err != nil {
-		panic("failed to get targets flag")
-	}
-	if flagDuration == 0 && (target != "" || targets != "") {
-		return common.FlagValidationError(cmd, "duration must be greater than 0 when collecting from a remote target")
-	}
+	// duration validation removed to allow unlimited duration (0) for remote targets
+	// when duration is 0, telemetry runs indefinitely until receiving SIGINT
 	if cmd.Flags().Lookup(flagInstrMixFilterName).Changed {
 		re := regexp.MustCompile("^[A-Z0-9_]+$")
 		for _, filter := range flagInstrMixFilter {
