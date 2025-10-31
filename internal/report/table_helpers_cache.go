@@ -4,7 +4,6 @@ package report
 // SPDX-License-Identifier: BSD-3-Clause
 
 import (
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"perfspect/internal/cpus"
@@ -175,146 +174,88 @@ func formatCacheSizeMB(size float64) string {
 }
 
 type lscpuCacheEntry struct {
-	Name          string `json:"name"`
-	OneSize       string `json:"one-size"`
-	AllSize       string `json:"all-size"`
-	Ways          int    `json:"ways"`
-	Type          string `json:"type"`
-	Level         int    `json:"level"`
-	Sets          int    `json:"sets"`
-	PhyLine       int    `json:"phy-line"`
-	CoherencySize int    `json:"coherency-size"`
+	Name          string
+	OneSize       string
+	AllSize       string
+	Ways          string
+	Type          string
+	Level         string
+	Sets          string
+	PhyLine       string
+	CoherencySize string
 }
 
-// for older lscpu versions that return numbers as strings
-type lscpuCacheEntryLegacy struct {
-	Name          string `json:"name"`
-	OneSize       string `json:"one-size"`
-	AllSize       string `json:"all-size"`
-	Ways          string `json:"ways"`
-	Type          string `json:"type"`
-	Level         string `json:"level"`
-	Sets          string `json:"sets"`
-	PhyLine       string `json:"phy-line"`
-	CoherencySize string `json:"coherency-size"`
-}
-
-// parseLscpuCacheOutput parses the output of the `lscpu -C -J` command to extract cache information.
-// lscpu returns JSON output with cache details, which this function processes to create a map.
-// Example:
-// $ lscpu -C -J
-//
-//	{
-//	   "caches": [
-//	      {
-//	         "name": "L1d",
-//	         "one-size": "48K",
-//	         "all-size": "6M",
-//	         "ways": 12,
-//	         "type": "Data",
-//	         "level": 1,
-//	         "sets": 64,
-//	         "phy-line": 1,
-//	         "coherency-size": 64
-//	      },{
-//	         "name": "L1i",
-//	         "one-size": "32K",
-//	         "all-size": "4M",
-//	         "ways": 8,
-//	         "type": "Instruction",
-//	         "level": 1,
-//	         "sets": 64,
-//	         "phy-line": 1,
-//	         "coherency-size": 64
-//	      },{
-//	         "name": "L2",
-//	         "one-size": "2M",
-//	         "all-size": "256M",
-//	         "ways": 16,
-//	         "type": "Unified",
-//	         "level": 2,
-//	         "sets": 2048,
-//	         "phy-line": 1,
-//	         "coherency-size": 64
-//	      },{
-//	         "name": "L3",
-//	         "one-size": "320M",
-//	         "all-size": "640M",
-//	         "ways": 20,
-//	         "type": "Unified",
-//	         "level": 3,
-//	         "sets": 262144,
-//	         "phy-line": 1,
-//	         "coherency-size": 64
-//	      }
-//	   ]
-//	}
+// parseLscpuCacheOutput parses the output of `lscpu -C` (text/tabular)
+// Example output:
+// NAME ONE-SIZE ALL-SIZE WAYS TYPE        LEVEL   SETS PHY-LINE COHERENCY-SIZE
+// L1d       48K     8.1M   12 Data            1     64        1             64
+// L1i       64K    10.8M   16 Instruction     1     64        1             64
+// L2         2M     344M   16 Unified         2   2048        1             64
+// L3       336M     672M   16 Unified         3 344064        1             64
 func parseLscpuCacheOutput(LscpuCacheOutput string) (map[string]lscpuCacheEntry, error) {
-	if LscpuCacheOutput == "" {
+	trimmed := strings.TrimSpace(LscpuCacheOutput)
+	if trimmed == "" {
 		slog.Warn("lscpu cache output is empty")
 		return nil, fmt.Errorf("lscpu cache output is empty")
 	}
-	output := make(map[string]lscpuCacheEntry)
-
-	// Try modern format first (numbers as integers)
-	parsed := make(map[string][]lscpuCacheEntry)
-	err := json.Unmarshal([]byte(LscpuCacheOutput), &parsed)
-	if err == nil {
-		// Modern format worked
-		for _, entry := range parsed["caches"] {
-			output[entry.Name] = entry
-		}
-		return output, nil
+	lines := strings.Split(trimmed, "\n")
+	// header-only is not valid; require at least one data line
+	if len(lines) < 2 {
+		return nil, fmt.Errorf("unexpected lscpu cache output format: header only")
 	}
-
-	// Fall back to legacy format (numbers as strings)
-	slog.Debug("Failed to parse lscpu cache output with modern format, trying legacy format", slog.String("error", err.Error()))
-	parsedLegacy := make(map[string][]lscpuCacheEntryLegacy)
-	err = json.Unmarshal([]byte(LscpuCacheOutput), &parsedLegacy)
-	if err != nil {
-		slog.Error("Failed to parse lscpu cache JSON output with both modern and legacy formats", slog.String("error", err.Error()))
-		return nil, err
+	headerCols := strings.Fields(strings.TrimSpace(lines[0]))
+	if len(headerCols) == 0 || strings.ToLower(headerCols[0]) != "name" {
+		return nil, fmt.Errorf("invalid lscpu cache header")
 	}
-
-	// Convert legacy entries to modern format
-	for _, legacyEntry := range parsedLegacy["caches"] {
-		entry := lscpuCacheEntry{
-			Name:    legacyEntry.Name,
-			OneSize: legacyEntry.OneSize,
-			AllSize: legacyEntry.AllSize,
-			Type:    legacyEntry.Type,
-		}
-
-		// Convert string fields to integers
-		if legacyEntry.Ways != "" {
-			if ways, err := strconv.Atoi(legacyEntry.Ways); err == nil {
-				entry.Ways = ways
-			}
-		}
-		if legacyEntry.Level != "" {
-			if level, err := strconv.Atoi(legacyEntry.Level); err == nil {
-				entry.Level = level
-			}
-		}
-		if legacyEntry.Sets != "" {
-			if sets, err := strconv.Atoi(legacyEntry.Sets); err == nil {
-				entry.Sets = sets
-			}
-		}
-		if legacyEntry.PhyLine != "" {
-			if phyLine, err := strconv.Atoi(legacyEntry.PhyLine); err == nil {
-				entry.PhyLine = phyLine
-			}
-		}
-		if legacyEntry.CoherencySize != "" {
-			if coherencySize, err := strconv.Atoi(legacyEntry.CoherencySize); err == nil {
-				entry.CoherencySize = coherencySize
-			}
-		}
-
-		output[entry.Name] = entry
+	// map header name (normalized) -> index
+	idx := map[string]int{}
+	for i, h := range headerCols {
+		idx[strings.ToLower(strings.TrimSpace(h))] = i
 	}
-	return output, nil
+	out := map[string]lscpuCacheEntry{}
+	for _, line := range lines[1:] {
+		l := strings.TrimSpace(line)
+		if l == "" {
+			continue
+		}
+		cols := strings.Fields(l)
+		if len(cols) < 4 {
+			continue
+		}
+		entry := lscpuCacheEntry{}
+		if i, ok := idx["name"]; ok && i < len(cols) {
+			entry.Name = cols[i]
+		}
+		if i, ok := idx["one-size"]; ok && i < len(cols) {
+			entry.OneSize = cols[i]
+		}
+		if i, ok := idx["all-size"]; ok && i < len(cols) {
+			entry.AllSize = cols[i]
+		}
+		if i, ok := idx["ways"]; ok && i < len(cols) {
+			entry.Ways = cols[i]
+		}
+		if i, ok := idx["type"]; ok && i < len(cols) {
+			entry.Type = cols[i]
+		}
+		if i, ok := idx["level"]; ok && i < len(cols) {
+			entry.Level = cols[i]
+		}
+		if i, ok := idx["sets"]; ok && i < len(cols) {
+			entry.Sets = cols[i]
+		}
+		if i, ok := idx["phy-line"]; ok && i < len(cols) {
+			entry.PhyLine = cols[i]
+		}
+		if i, ok := idx["coherency-size"]; ok && i < len(cols) {
+			entry.CoherencySize = cols[i]
+		}
+		if entry.Name == "" {
+			continue
+		}
+		out[entry.Name] = entry
+	}
+	return out, nil
 }
 
 // l1l2CacheSizeFromLscpuCache extracts the data cache size from the provided lscpuCacheEntry.
