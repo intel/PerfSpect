@@ -248,8 +248,9 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	if flagDuration < 0 {
 		return common.FlagValidationError(cmd, "duration must be 0 or greater")
 	}
-	// duration validation removed to allow unlimited duration (0) for remote targets
-	// when duration is 0, telemetry runs indefinitely until receiving SIGINT
+	// Telemetry supports duration=0 (unlimited) for both local and remote targets,
+	// which allows continuous monitoring until SIGINT is received. This differs from
+	// flame and lock commands which require a specific duration to collect useful data.
 	if cmd.Flags().Lookup(flagInstrMixFilterName).Changed {
 		re := regexp.MustCompile("^[A-Z0-9_]+$")
 		for _, filter := range flagInstrMixFilter {
