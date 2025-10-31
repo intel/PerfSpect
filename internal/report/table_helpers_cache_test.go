@@ -55,149 +55,34 @@ func TestParseLscpuCacheOutput(t *testing.T) {
 		expectedL3     lscpuCacheEntry
 	}{
 		{
-			name: "Modern format with integer fields",
-			input: `{
-   "caches": [
-      {
-         "name": "L1d",
-         "one-size": "48K",
-         "all-size": "6M",
-         "ways": 12,
-         "type": "Data",
-         "level": 1,
-         "sets": 64,
-         "phy-line": 1,
-         "coherency-size": 64
-      },
-      {
-         "name": "L3",
-         "one-size": "320M",
-         "all-size": "640M",
-         "ways": 20,
-         "type": "Unified",
-         "level": 3,
-         "sets": 262144,
-         "phy-line": 1,
-         "coherency-size": 64
-      }
-   ]
-}`,
+			name:           "Typical table output",
+			input:          "NAME ONE-SIZE ALL-SIZE WAYS TYPE LEVEL SETS PHY-LINE COHERENCY-SIZE\nL1d 48K 8.1M 12 Data 1 64 1 64\nL1i 64K 10.8M 16 Instruction 1 64 1 64\nL2 2M 344M 16 Unified 2 2048 1 64\nL3 336M 672M 16 Unified 3 344064 1 64",
 			expectedError:  false,
-			expectedLength: 2,
+			expectedLength: 4,
 			expectedL3: lscpuCacheEntry{
 				Name:          "L3",
-				OneSize:       "320M",
-				AllSize:       "640M",
-				Ways:          20,
+				OneSize:       "336M",
+				AllSize:       "672M",
+				Ways:          "16",
 				Type:          "Unified",
-				Level:         3,
-				Sets:          262144,
-				PhyLine:       1,
-				CoherencySize: 64,
+				Level:         "3",
+				Sets:          "344064",
+				PhyLine:       "1",
+				CoherencySize: "64",
 			},
 		},
 		{
-			name: "Legacy format with string fields",
-			input: `{
-   "caches": [
-      {
-         "name": "L1d",
-         "one-size": "48K",
-         "all-size": "6M",
-         "ways": "12",
-         "type": "Data",
-         "level": "1",
-         "sets": "64",
-         "phy-line": "1",
-         "coherency-size": "64"
-      },
-      {
-         "name": "L3",
-         "one-size": "320M",
-         "all-size": "640M",
-         "ways": "20",
-         "type": "Unified",
-         "level": "3",
-         "sets": "262144",
-         "phy-line": "1",
-         "coherency-size": "64"
-      }
-   ]
-}`,
-			expectedError:  false,
-			expectedLength: 2,
-			expectedL3: lscpuCacheEntry{
-				Name:          "L3",
-				OneSize:       "320M",
-				AllSize:       "640M",
-				Ways:          20,
-				Type:          "Unified",
-				Level:         3,
-				Sets:          262144,
-				PhyLine:       1,
-				CoherencySize: 64,
-			},
-		},
-		{
-			name: "Legacy format with some empty string fields",
-			input: `{
-   "caches": [
-      {
-         "name": "L3",
-         "one-size": "320M",
-         "all-size": "640M",
-         "ways": "20",
-         "type": "Unified",
-         "level": "3",
-         "sets": "",
-         "phy-line": "",
-         "coherency-size": "64"
-      }
-   ]
-}`,
+			name:           "Missing optional numeric columns",
+			input:          "NAME ONE-SIZE ALL-SIZE WAYS TYPE LEVEL\nL3 320M 640M 20 Unified 3",
 			expectedError:  false,
 			expectedLength: 1,
 			expectedL3: lscpuCacheEntry{
-				Name:          "L3",
-				OneSize:       "320M",
-				AllSize:       "640M",
-				Ways:          20,
-				Type:          "Unified",
-				Level:         3,
-				Sets:          0, // empty string converts to 0
-				PhyLine:       0, // empty string converts to 0
-				CoherencySize: 64,
-			},
-		},
-		{
-			name: "Legacy format with invalid number strings",
-			input: `{
-   "caches": [
-      {
-         "name": "L3",
-         "one-size": "320M",
-         "all-size": "640M",
-         "ways": "invalid",
-         "type": "Unified",
-         "level": "3",
-         "sets": "not_a_number",
-         "phy-line": "1",
-         "coherency-size": "64"
-      }
-   ]
-}`,
-			expectedError:  false,
-			expectedLength: 1,
-			expectedL3: lscpuCacheEntry{
-				Name:          "L3",
-				OneSize:       "320M",
-				AllSize:       "640M",
-				Ways:          0, // invalid string converts to 0
-				Type:          "Unified",
-				Level:         3,
-				Sets:          0, // invalid string converts to 0
-				PhyLine:       1,
-				CoherencySize: 64,
+				Name:    "L3",
+				OneSize: "320M",
+				AllSize: "640M",
+				Ways:    "20",
+				Type:    "Unified",
+				Level:   "3",
 			},
 		},
 		{
@@ -206,29 +91,20 @@ func TestParseLscpuCacheOutput(t *testing.T) {
 			expectedError: true,
 		},
 		{
-			name:          "Invalid JSON",
-			input:         `{"caches": [invalid json}`,
+			name:          "Header only",
+			input:         "Name  One Size  All Size  Ways  Type  Level  Sets  Phys-Line  Coherency-Size",
 			expectedError: true,
 		},
-		{
-			name:           "Empty caches array",
-			input:          `{"caches": []}`,
-			expectedError:  false,
-			expectedLength: 0,
-		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := parseLscpuCacheOutput(tt.input)
-
 			if tt.expectedError {
 				require.Error(t, err)
 				assert.Nil(t, result)
 			} else {
 				require.NoError(t, err)
 				assert.Len(t, result, tt.expectedLength)
-
 				if tt.expectedLength > 0 && tt.expectedL3.Name != "" {
 					l3Cache, exists := result["L3"]
 					require.True(t, exists, "L3 cache should exist in result")

@@ -173,7 +173,7 @@ var scriptDefinitions = map[string]ScriptDefinition{
 	},
 	LscpuCacheScriptName: {
 		Name:           LscpuCacheScriptName,
-		ScriptTemplate: `lscpu -C -J`,
+		ScriptTemplate: `lscpu -C`,
 	},
 	LspciBitsScriptName: {
 		Name:               LspciBitsScriptName,
