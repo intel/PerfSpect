@@ -28,6 +28,7 @@ var examples = []string{
 	fmt.Sprintf("  Telemetry from local host:       $ %s %s", common.AppName, cmdName),
 	fmt.Sprintf("  Telemetry from remote target:    $ %s %s --target 192.168.1.1 --user fred --key fred_key", common.AppName, cmdName),
 	fmt.Sprintf("  Memory telemetry for 60 seconds: $ %s %s --memory --duration 60", common.AppName, cmdName),
+	fmt.Sprintf("  Unlimited telemetry (Ctrl+c stops): $ %s %s --target 192.168.1.1 --user fred --key fred_key --duration 0", common.AppName, cmdName),
 	fmt.Sprintf("  Telemetry from multiple targets: $ %s %s --targets targets.yaml", common.AppName, cmdName),
 }
 
