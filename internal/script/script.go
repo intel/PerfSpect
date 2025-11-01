@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"text/template"
 
 	"perfspect/internal/cpus"
 	"perfspect/internal/target"
@@ -93,7 +94,11 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 	if len(parallelScripts) > 0 {
 		// form one master script that calls all the parallel scripts in the background
 		masterScriptName := "parallel_master.sh"
-		masterScript, needsElevatedPrivileges := formMasterScript(myTarget.GetTempDirectory(), parallelScripts)
+		masterScript, needsElevatedPrivileges, err := formMasterScript(myTarget.GetTempDirectory(), parallelScripts)
+		if err != nil {
+			err = fmt.Errorf("error forming master script: %v", err)
+			return nil, err
+		}
 		// write master script to local file
 		masterScriptPath := path.Join(localTempDir, myTarget.GetName(), masterScriptName)
 		err = os.WriteFile(masterScriptPath, []byte(masterScript), 0600)
@@ -277,97 +282,126 @@ func scriptNameToFilename(name string) string {
 
 // formMasterScript forms a master script that runs all parallel scripts in the background, waits for them to finish, then prints the output of each script.
 // Return values are the master script and a boolean indicating whether the master script requires elevated privileges.
-func formMasterScript(targetTempDirectory string, parallelScripts []ScriptDefinition) (string, bool) {
-	// we write the stdout and stderr from each command to temporary files and save the PID of each command
-	// in a variable named after the script
-	var masterScript strings.Builder
-
-	masterScript.WriteString("#!/bin/bash\n")
-
-	// set dir var and change working directory to dir in case any of the scripts write out temporary files
-	masterScript.WriteString(fmt.Sprintf("script_dir=%s\n", targetTempDirectory))
-	masterScript.WriteString("cd $script_dir\n")
-
-	// function to print the output of each script
-	masterScript.WriteString("\nprint_output() {\n")
-	for _, script := range parallelScripts {
-		masterScript.WriteString("\techo \"<---------------------->\"\n")
-		masterScript.WriteString(fmt.Sprintf("\techo SCRIPT NAME: %s\n", script.Name))
-		masterScript.WriteString(fmt.Sprintf("\techo STDOUT:\n\tcat %s\n", path.Join("$script_dir", sanitizeScriptName(script.Name)+".stdout")))
-		masterScript.WriteString(fmt.Sprintf("\techo STDERR:\n\tcat %s\n", path.Join("$script_dir", sanitizeScriptName(script.Name)+".stderr")))
-		masterScript.WriteString(fmt.Sprintf("\techo EXIT CODE: $%s_exitcode\n", sanitizeScriptName(script.Name)))
+func formMasterScript(targetTempDirectory string, parallelScripts []ScriptDefinition) (string, bool, error) {
+	// data model for template
+	type tplScript struct {
+		Name      string
+		Sanitized string
+		NeedsKill bool
+		Superuser bool
 	}
-	masterScript.WriteString("}\n")
-
-	// function to handle SIGINT
-	masterScript.WriteString("\nhandle_sigint() {\n")
-	for _, script := range parallelScripts {
-		// send SIGINT to the child script, if it is still running
-		masterScript.WriteString(fmt.Sprintf("\tif ps -p \"$%s_pid\" > /dev/null; then\n", sanitizeScriptName(script.Name)))
-		masterScript.WriteString(fmt.Sprintf("\t\tkill -SIGINT $%s_pid\n", sanitizeScriptName(script.Name)))
-		masterScript.WriteString("\tfi\n")
-		if script.NeedsKill { // this is primarily used for scripts that start commands in the background, some of which (processwatch) doesn't respond to SIGINT as expected
-			// if the *cmd.pid file exists, check if the process is still running
-			masterScript.WriteString(fmt.Sprintf("\tif [ -f %s_cmd.pid ]; then\n", sanitizeScriptName(script.Name)))
-			masterScript.WriteString(fmt.Sprintf("\t\tif ps -p $(cat %s_cmd.pid) > /dev/null; then\n", sanitizeScriptName(script.Name)))
-			// send SIGINT to the background process first, then SIGKILL if it doesn't respond to SIGINT
-			masterScript.WriteString(fmt.Sprintf("\t\t\tkill -SIGINT $(cat %s_cmd.pid)\n", sanitizeScriptName(script.Name)))
-			// give the process a chance to respond to SIGINT
-			masterScript.WriteString("\t\t\tsleep 0.5\n")
-			// if the background process is still running, send SIGKILL
-			masterScript.WriteString(fmt.Sprintf("\t\t\tif ps -p $(cat %s_cmd.pid) > /dev/null; then\n", sanitizeScriptName(script.Name)))
-			masterScript.WriteString(fmt.Sprintf("\t\t\t\tkill -SIGKILL $(cat %s_cmd.pid)\n", sanitizeScriptName(script.Name)))
-			masterScript.WriteString(fmt.Sprintf("\t\t\t\t%s_exitcode=137\n", sanitizeScriptName(script.Name))) // 137 is the exit code for SIGKILL
-			masterScript.WriteString("\t\t\telse\n")
-			// if the background process has exited, set the exit code to 0
-			masterScript.WriteString(fmt.Sprintf("\t\t\t\t%s_exitcode=0\n", sanitizeScriptName(script.Name)))
-			masterScript.WriteString("\t\t\tfi\n")
-			masterScript.WriteString("\t\telse\n")
-			// if the script itself has exited, set the exit code to 0
-			masterScript.WriteString(fmt.Sprintf("\t\t\t%s_exitcode=0\n", sanitizeScriptName(script.Name)))
-			masterScript.WriteString("\t\tfi\n")
-			masterScript.WriteString("\telse\n")
-			// if the *cmd.pid file doesn't exist, set the exit code to 1
-			masterScript.WriteString(fmt.Sprintf("\t\t%s_exitcode=0\n", sanitizeScriptName(script.Name)))
-			masterScript.WriteString("\tfi\n")
-		} else {
-			masterScript.WriteString(fmt.Sprintf("\twait \"$%s_pid\"\n", sanitizeScriptName(script.Name)))
-			masterScript.WriteString(fmt.Sprintf("\t%s_exitcode=$?\n", sanitizeScriptName(script.Name)))
+	data := struct {
+		TargetTempDir string
+		Scripts       []tplScript
+	}{}
+	data.TargetTempDir = targetTempDirectory
+	needsElevated := false
+	for _, s := range parallelScripts {
+		if s.Superuser {
+			needsElevated = true
 		}
+		data.Scripts = append(data.Scripts, tplScript{
+			Name: s.Name, Sanitized: sanitizeScriptName(s.Name), NeedsKill: s.NeedsKill, Superuser: s.Superuser,
+		})
 	}
-	masterScript.WriteString("\tprint_output\n")
-	masterScript.WriteString("\texit 0\n")
-	masterScript.WriteString("}\n")
+	const masterScriptTemplate = `#!/usr/bin/env bash
+set -o errexit
+set -o pipefail
 
-	// call handle_sigint func when SIGINT is received
-	masterScript.WriteString("\ntrap handle_sigint SIGINT\n")
+script_dir={{.TargetTempDir}}
+cd "$script_dir"
 
-	// run all parallel scripts in the background
-	masterScript.WriteString("\n")
-	needsElevatedPrivileges := false
-	for _, script := range parallelScripts {
-		if script.Superuser {
-			needsElevatedPrivileges = true
-		}
-		masterScript.WriteString(
-			fmt.Sprintf("bash %s > %s 2>%s &\n",
-				path.Join("$script_dir", scriptNameToFilename(script.Name)),
-				path.Join("$script_dir", sanitizeScriptName(script.Name)+".stdout"),
-				path.Join("$script_dir", sanitizeScriptName(script.Name)+".stderr"),
-			),
-		)
-		masterScript.WriteString(fmt.Sprintf("%s_pid=$!\n", sanitizeScriptName(script.Name)))
+declare -a scripts=()
+declare -A needs_kill=()
+declare -A pids=()
+declare -A exitcodes=()
+declare -A orig_names=()
+
+{{- range .Scripts}}
+scripts+=({{ .Sanitized }})
+needs_kill[{{ .Sanitized }}]={{ if .NeedsKill }}1{{ else }}0{{ end }}
+orig_names[{{ .Sanitized }}]="{{ .Name }}"
+{{ end }}
+
+start_scripts() {
+  for s in "${scripts[@]}"; do
+    bash "$script_dir/${s}.sh" > "$script_dir/${s}.stdout" 2> "$script_dir/${s}.stderr" &
+    pids[$s]=$!
+  done
+}
+
+kill_script() {
+  local s="$1"
+  local pid="${pids[$s]:-}"
+  [[ -z "$pid" ]] && return 0
+  if ! ps -p "$pid" > /dev/null 2>&1; then return 0; fi
+  if [[ "${needs_kill[$s]}" == "1" && -f "${s}_cmd.pid" ]]; then
+    local bgpid
+    bgpid="$(cat "${s}_cmd.pid" 2>/dev/null || true)"
+    if [[ -n "$bgpid" && $(ps -p "$bgpid" -o pid= 2>/dev/null) ]]; then
+      kill -SIGINT "$bgpid" 2>/dev/null || true
+      sleep 0.5
+      if ps -p "$bgpid" > /dev/null 2>&1; then
+        kill -SIGKILL "$bgpid" 2>/dev/null || true
+        exitcodes[$s]=137
+      else
+        exitcodes[$s]=0
+      fi
+    fi
+  else
+    kill -SIGINT "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    if [[ -z "${exitcodes[$s]:-}" ]]; then exitcodes[$s]=130; fi
+  fi
+}
+
+wait_for_scripts() {
+  for s in "${scripts[@]}"; do
+    if wait "${pids[$s]}"; then
+      exitcodes[$s]=0
+    else
+      ec=$?
+      exitcodes[$s]=$ec
+    fi
+  done
+}
+
+print_summary() {
+  for s in "${scripts[@]}"; do
+    echo "<---------------------->"
+    echo "SCRIPT NAME: ${orig_names[$s]}"
+    echo "STDOUT:"; cat "$script_dir/${s}.stdout" || true
+    echo "STDERR:"; cat "$script_dir/${s}.stderr" || true
+    echo "EXIT CODE: ${exitcodes[$s]:-1}"
+  done
+}
+
+handle_sigint() {
+  echo "Received SIGINT; attempting graceful shutdown" >&2
+  for s in "${scripts[@]}"; do
+    kill_script "$s"
+  done
+  print_summary
+  exit 0
+}
+
+trap handle_sigint SIGINT
+
+start_scripts
+wait_for_scripts
+print_summary
+`
+	tmpl, err := template.New("master").Parse(masterScriptTemplate)
+	if err != nil {
+		slog.Error("failed to parse master script template", slog.String("error", err.Error()))
+		return "", needsElevated, err
 	}
-
-	// wait for all parallel scripts to finish then print their output
-	masterScript.WriteString("\n")
-	for _, script := range parallelScripts {
-		masterScript.WriteString(fmt.Sprintf("wait \"$%s_pid\"\n", sanitizeScriptName(script.Name)))
-		masterScript.WriteString(fmt.Sprintf("%s_exitcode=$?\n", sanitizeScriptName(script.Name)))
+	var out strings.Builder
+	if err = tmpl.Execute(&out, data); err != nil {
+		slog.Error("failed to execute master script template", slog.String("error", err.Error()))
+		return "", needsElevated, err
 	}
-	masterScript.WriteString("\nprint_output\n")
-
-	return masterScript.String(), needsElevatedPrivileges
+	return out.String(), needsElevated, nil
 }
 
 // parseMasterScriptOutput parses the output of the master script that runs all parallel scripts in the background.
