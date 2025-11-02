@@ -7,6 +7,7 @@ package telemetry
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -60,7 +61,6 @@ var (
 	flagPower       bool
 	flagTemperature bool
 	flagInstrMix    bool
-	flagGaudi       bool
 
 	flagNoSystemSummary bool
 
@@ -85,7 +85,6 @@ const (
 	flagPowerName       = "power"
 	flagTemperatureName = "temperature"
 	flagInstrMixName    = "instrmix"
-	flagGaudiName       = "gaudi"
 
 	flagNoSystemSummaryName = "no-summary"
 
@@ -107,7 +106,6 @@ var categories = []common.Category{
 	{FlagName: flagStorageName, FlagVar: &flagStorage, DefaultValue: false, Help: "monitor storage", TableNames: []string{report.DriveTelemetryTableName}},
 	{FlagName: flagIRQRateName, FlagVar: &flagIRQRate, DefaultValue: false, Help: "monitor IRQ rate", TableNames: []string{report.IRQRateTelemetryTableName}},
 	{FlagName: flagInstrMixName, FlagVar: &flagInstrMix, DefaultValue: false, Help: "monitor instruction mix", TableNames: []string{report.InstructionTelemetryTableName}},
-	{FlagName: flagGaudiName, FlagVar: &flagGaudi, DefaultValue: false, Help: "monitor gaudi", TableNames: []string{report.GaudiTelemetryTableName}},
 }
 
 const (
@@ -289,6 +287,12 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			flagInstrMixFrequency = instrmixFrequencyDefaultPerPID
 		}
 	}
+	// hidden feature - Gaudi telemetry, only enabled when PERFSPECT_GAUDI_HLSMI_PATH is set
+	gaudiHlsmiPath := os.Getenv("PERFSPECT_GAUDI_HLSMI_PATH") // must be full path to hlsmi binary
+	if gaudiHlsmiPath != "" {
+		slog.Info("Gaudi telemetry enabled", slog.String("hlsmi_path", gaudiHlsmiPath))
+		tableNames = append(tableNames, report.GaudiTelemetryTableName)
+	}
 	// hidden feature - PDU telemetry, only enabled when four environment variables are set
 	// PERFSPECT_PDU_HOST, PERFSPECT_PDU_USER, PERFSPECT_PDU_PASSWORD, PERFSPECT_PDU_OUTLET
 	// pduHost := os.Getenv("PERFSPECT_PDU_HOST")
@@ -317,6 +321,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			"Duration":          strconv.Itoa(flagDuration),
 			"InstrMixPID":       strconv.Itoa(flagInstrMixPid),
 			"InstrMixFrequency": strconv.Itoa(flagInstrMixFrequency),
+			"GaudiHlsmiPath":    gaudiHlsmiPath,
 			// "PDUHost":           pduHost,
 			// "PDUUser":           pduUser,
 			// "PDUPassword":       pduPassword,

@@ -1307,19 +1307,18 @@ wait
 	GaudiTelemetryScriptName: {
 		Name: GaudiTelemetryScriptName,
 		ScriptTemplate: `
-# if the hl-smi program is in the path
-if command -v hl-smi &> /dev/null; then
-	hl-smi --query-aip=timestamp,name,temperature.aip,module_id,utilization.aip,memory.total,memory.free,memory.used,power.draw --format=csv,nounits -l {{.Interval}} &
-	echo $! > {{.ScriptName}}_cmd.pid
-	# if duration is set, sleep for the duration then kill the process
-	if [ {{.Duration}} -ne 0 ]; then
-		sleep {{.Duration}}
-		kill -SIGINT $(cat {{.ScriptName}}_cmd.pid)
-	fi
-	wait
+if command -v {{.GaudiHlsmiPath}} &> /dev/null; then
+    {{.GaudiHlsmiPath}} --query-aip=timestamp,name,temperature.aip,module_id,utilization.aip,memory.total,memory.free,memory.used,power.draw --format=csv,nounits -l {{.Interval}} &
+    echo $! > {{.ScriptName}}_cmd.pid
+    # if duration is set, sleep for the duration then kill the process
+    if [ {{.Duration}} -ne 0 ]; then
+        sleep {{.Duration}}
+        kill -SIGINT $(cat {{.ScriptName}}_cmd.pid)
+    fi
+    wait
 else
-	echo "hl-smi not found in the path" >&2
-	exit 1
+    echo "hl-smi not found at {{.GaudiHlsmiPath}}" >&2
+    exit 1
 fi
 `,
 		Superuser: true,
