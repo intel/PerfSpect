@@ -1369,9 +1369,11 @@ func c6TelemetryTableHTMLRenderer(tableValues TableValues, targetName string) st
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
 }
 
-// instructionTelemetryTableHTMLRenderer renders instruction set usage statistics
+// instructionTelemetryTableHTMLRenderer renders instruction set usage statistics.
 // Each category is a separate dataset within the chart.
 // Categories with zero total usage are hidden by default.
+// Categories are sorted in two tiers: first, all non-zero categories are sorted alphabetically;
+// then, all zero-sum categories are sorted alphabetically and placed after the non-zero categories.
 func instructionTelemetryTableHTMLRenderer(tableValues TableValues, targetname string) string {
 	// Collect entries with their sums so we can sort per requirements
 	type instrEntry struct {
