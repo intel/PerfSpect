@@ -1288,13 +1288,14 @@ if [ {{.InstrMixPID}} -eq 0 ]; then
 else
     arg_pid="-p {{.InstrMixPID}}"
 fi
-# .InstrMixFilter is a space separated list of ISA categories
-# for each category in the list, add -f <category> to the command line
-for category in {{.InstrMixFilter}}; do
-    arg_filter="$arg_filter -f $category"
-done
-
-processwatch -c $arg_sampling_rate $arg_pid $arg_interval $arg_count $arg_filter &
+# -c: CSV output, -a: all categories, -p: PID, -s: sampling rate,-i: interval, -n: count
+# example output:
+# interval,pid,name,INVALID,ADOX_ADCX,AES
+# 0,ALL,ALL,0.000000,0.000000,0.000000,0.000000
+# 0,2038501,stress-ng-cpu,0.000000,0.000000,0.000000,0.000000
+# We only need the header line and the subsequent "ALL" lines (for each interval)
+# Filter output: keep header (NR==1) and lines where 2nd and 3rd columns are ALL
+processwatch -c -a $arg_pid $arg_sampling_rate $arg_interval $arg_count | awk -F',' 'NR==1 || ($2=="ALL" && $3=="ALL")' &
 echo $! > {{.ScriptName}}_cmd.pid
 wait
 `,

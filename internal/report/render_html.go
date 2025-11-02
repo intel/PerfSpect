@@ -377,7 +377,8 @@ const datasetTemplate = `
 	backgroundColor: '{{.Color}}',
 	borderColor: '{{.Color}}',
 	borderWidth: 1,
-	showLine: true
+	showLine: true,
+	hidden: {{.Hidden}}
 }
 `
 const lineChartTemplate = `<div class="chart-container" style="max-width: 900px">
@@ -715,20 +716,27 @@ func dimmTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	return renderHTMLTable(socketTableHeaders, socketTableValues, "pure-table pure-table-bordered", [][]string{})
 }
 
-func renderChart(chartType string, allFormattedPoints []string, datasetNames []string, xAxisLabels []string, config chartTemplateStruct) string {
+func renderChart(chartType string, allFormattedPoints []string, datasetNames []string, xAxisLabels []string, config chartTemplateStruct, datasetHiddenFlags []bool) string {
 	datasets := []string{}
 	for dataIdx, formattedPoints := range allFormattedPoints {
 		specValues := formattedPoints
 		dst := texttemplate.Must(texttemplate.New("datasetTemplate").Parse(datasetTemplate))
 		buf := new(bytes.Buffer)
+		// determine hidden flag for this dataset
+		hidden := "false"
+		if datasetHiddenFlags != nil && dataIdx < len(datasetHiddenFlags) && datasetHiddenFlags[dataIdx] {
+			hidden = "true"
+		}
 		err := dst.Execute(buf, struct {
-			Label string
-			Data  string
-			Color string
+			Label  string
+			Data   string
+			Color  string
+			Hidden string
 		}{
-			Label: datasetNames[dataIdx],
-			Data:  specValues,
-			Color: getColor(dataIdx),
+			Label:  datasetNames[dataIdx],
+			Data:   specValues,
+			Color:  getColor(dataIdx),
+			Hidden: hidden,
 		})
 		if err != nil {
 			slog.Error("error executing template", slog.String("error", err.Error()))
@@ -781,10 +789,10 @@ func renderScatterChart(data [][]scatterPoint, datasetNames []string, config cha
 		}
 		allFormattedPoints = append(allFormattedPoints, strings.Join(formattedPoints, ","))
 	}
-	return renderChart("scatter", allFormattedPoints, datasetNames, nil, config)
+	return renderChart("scatter", allFormattedPoints, datasetNames, nil, config, nil)
 }
 
-func renderLineChart(xAxisLabels []string, data [][]float64, datasetNames []string, config chartTemplateStruct) string {
+func renderLineChart(xAxisLabels []string, data [][]float64, datasetNames []string, config chartTemplateStruct, datasetHiddenFlags []bool) string {
 	allFormattedPoints := []string{}
 	for dataIdx := range data {
 		formattedPoints := []string{}
@@ -793,7 +801,7 @@ func renderLineChart(xAxisLabels []string, data [][]float64, datasetNames []stri
 		}
 		allFormattedPoints = append(allFormattedPoints, strings.Join(formattedPoints, ","))
 	}
-	return renderChart("line", allFormattedPoints, datasetNames, xAxisLabels, config)
+	return renderChart("line", allFormattedPoints, datasetNames, xAxisLabels, config, datasetHiddenFlags)
 }
 
 func renderFrequencyTable(tableValues TableValues) (out string) {
@@ -908,7 +916,7 @@ func telemetryTableHTMLRenderer(tableValues TableValues, data [][]float64, datas
 			timestamps = append(timestamps, timestamp)
 		}
 	}
-	return renderLineChart(timestamps, data, datasetNames, chartConfig)
+	return renderLineChart(timestamps, data, datasetNames, chartConfig, nil)
 }
 
 func cpuUtilizationTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
@@ -1361,11 +1369,23 @@ func c6TelemetryTableHTMLRenderer(tableValues TableValues, targetName string) st
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
 }
 
+// instructionTelemetryTableHTMLRenderer renders instruction set usage statistics
+// These categories are included even if all values are zero:
+//
+//	"SSE", "AVX", "AVX2", "AVX512", "AMX_TILE"
+//
+// Other categories are only included if they have non-zero values.
+// Other categories are hidden by default.
+//
+// Each category is a separate dataset within the chart.
 func instructionTelemetryTableHTMLRenderer(tableValues TableValues, targetname string) string {
+	//alwaysIncludeCategories := []string{"SSE", "AVX", "AVX2", "AVX512", "AMX_TILE"}
 	data := [][]float64{}
 	datasetNames := []string{}
+	var hiddenFlags []bool
 	for _, field := range tableValues.Fields[1:] {
 		points := []float64{}
+		sum := 0.0
 		for _, val := range field.Values {
 			if val == "" {
 				break
@@ -1376,10 +1396,18 @@ func instructionTelemetryTableHTMLRenderer(tableValues TableValues, targetname s
 				return ""
 			}
 			points = append(points, stat)
+			sum += stat
 		}
 		if len(points) > 0 {
-			data = append(data, points)
-			datasetNames = append(datasetNames, field.Name)
+			//include := sum > 0 || slices.Contains(alwaysIncludeCategories, field.Name)
+			include := true
+			if include {
+				data = append(data, points)
+				datasetNames = append(datasetNames, field.Name)
+				// hidden if sum == 0 (which can only happen for 'always include' categories)
+				hidden := sum == 0
+				hiddenFlags = append(hiddenFlags, hidden)
+			}
 		}
 	}
 	chartConfig := chartTemplateStruct{
@@ -1393,7 +1421,16 @@ func instructionTelemetryTableHTMLRenderer(tableValues TableValues, targetname s
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	// render directly using renderLineChart to supply hidden flags
+	tsFieldIdx := 0
+	var timestamps []string
+	for i := range tableValues.Fields[0].Values {
+		timestamp := tableValues.Fields[tsFieldIdx].Values[i]
+		if !slices.Contains(timestamps, timestamp) {
+			timestamps = append(timestamps, timestamp)
+		}
+	}
+	return renderLineChart(timestamps, data, datasetNames, chartConfig, hiddenFlags)
 }
 
 func renderGaudiStatsChart(tableValues TableValues, chartStatFieldName string, titleText string, yAxisText string, suggestedMax string) string {
