@@ -130,6 +130,7 @@ const (
 	PowerTelemetryTableName                 = "Power Telemetry"
 	TemperatureTelemetryTableName           = "Temperature Telemetry"
 	GaudiTelemetryTableName                 = "Gaudi Telemetry"
+	PDUTelemetryTableName                   = "PDU Telemetry"
 	// config  table names
 	ConfigurationTableName = "Configuration"
 	// flamegraph table names
@@ -156,6 +157,7 @@ const (
 	PowerTelemetryMenuLabel                 = "Power"
 	TemperatureTelemetryMenuLabel           = "Temperature"
 	GaudiTelemetryMenuLabel                 = "Gaudi"
+	PDUTelemetryMenuLabel                   = "PDU"
 )
 
 const (
@@ -790,6 +792,15 @@ var tableDefinitions = map[string]TableDefinition{
 		NoDataFound:           "No Gaudi telemetry found. Gaudi devices and the hl-smi tool must be installed on the target system to collect Gaudi stats.",
 		FieldsFunc:            gaudiTelemetryTableValues,
 		HTMLTableRendererFunc: gaudiTelemetryTableHTMLRenderer},
+	PDUTelemetryTableName: {
+		Name:      PDUTelemetryTableName,
+		MenuLabel: PDUTelemetryMenuLabel,
+		HasRows:   true,
+		ScriptNames: []string{
+			script.PDUTelemetryScriptName,
+		},
+		FieldsFunc:            pduTelemetryTableValues,
+		HTMLTableRendererFunc: pduTelemetryTableHTMLRenderer},
 	//
 	// flamegraph tables
 	//
@@ -2754,6 +2765,10 @@ func gaudiTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
 		}
 	}
 	return fields
+}
+
+func pduTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
+	return []Field{}
 }
 
 func callStackFrequencyTableValues(outputs map[string]script.ScriptOutput) []Field {

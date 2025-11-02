@@ -1511,6 +1511,23 @@ func gaudiTelemetryTableHTMLRenderer(tableValues TableValues, targetName string)
 	return out
 }
 
+func pduTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
+	data := [][]float64{}
+	datasetNames := []string{}
+	chartConfig := chartTemplateStruct{
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
+		XaxisText:     "Time",
+		YaxisText:     "Value",
+		TitleText:     "",
+		DisplayTitle:  "false",
+		DisplayLegend: "true",
+		AspectRatio:   "2",
+		SuggestedMin:  "0",
+		SuggestedMax:  "0",
+	}
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+}
+
 func callStackFrequencyTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	out := `<style>
 

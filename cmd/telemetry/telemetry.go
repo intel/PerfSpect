@@ -294,15 +294,14 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		tableNames = append(tableNames, report.GaudiTelemetryTableName)
 	}
 	// hidden feature - PDU telemetry, only enabled when four environment variables are set
-	// PERFSPECT_PDU_HOST, PERFSPECT_PDU_USER, PERFSPECT_PDU_PASSWORD, PERFSPECT_PDU_OUTLET
-	// pduHost := os.Getenv("PERFSPECT_PDU_HOST")
-	// pduUser := os.Getenv("PERFSPECT_PDU_USER")
-	// pduPassword := os.Getenv("PERFSPECT_PDU_PASSWORD")
-	// pduOutlet := os.Getenv("PERFSPECT_PDU_OUTLET")
-	// if pduHost != "" && pduUser != "" && pduPassword != "" && pduOutlet != "" {
-	// 	slog.Info("PDU telemetry enabled", slog.String("host", pduHost), slog.String("outlet", pduOutlet))
-	// 	tableNames = append(tableNames, report.PDUTelemetryTableName)
-	// }
+	pduHost := os.Getenv("PERFSPECT_PDU_HOST")
+	pduUser := os.Getenv("PERFSPECT_PDU_USER")
+	pduPassword := os.Getenv("PERFSPECT_PDU_PASSWORD")
+	pduOutlet := os.Getenv("PERFSPECT_PDU_OUTLET")
+	if pduHost != "" && pduUser != "" && pduPassword != "" && pduOutlet != "" {
+		slog.Info("PDU telemetry enabled", slog.String("host", pduHost), slog.String("outlet", pduOutlet))
+		tableNames = append(tableNames, report.PDUTelemetryTableName)
+	}
 	// include telemetry summary table if all telemetry options are selected
 	var summaryFunc common.SummaryFunc
 	if flagAll {
@@ -322,10 +321,10 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			"InstrMixPID":       strconv.Itoa(flagInstrMixPid),
 			"InstrMixFrequency": strconv.Itoa(flagInstrMixFrequency),
 			"GaudiHlsmiPath":    gaudiHlsmiPath,
-			// "PDUHost":           pduHost,
-			// "PDUUser":           pduUser,
-			// "PDUPassword":       pduPassword,
-			// "PDUOutlet":         pduOutlet,
+			"PDUHost":           pduHost,
+			"PDUUser":           pduUser,
+			"PDUPassword":       pduPassword,
+			"PDUOutlet":         pduOutlet,
 		},
 		TableNames:             tableNames,
 		SummaryFunc:            summaryFunc,

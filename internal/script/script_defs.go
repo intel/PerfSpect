@@ -116,6 +116,7 @@ const (
 	TurbostatTelemetryScriptName   = "turbostat telemetry"
 	InstructionTelemetryScriptName = "instruction telemetry"
 	GaudiTelemetryScriptName       = "gaudi telemetry"
+	PDUTelemetryScriptName         = "pdu telemetry"
 	// flamegraph scripts
 	CollapsedCallStacksScriptName = "collapsed call stacks"
 	// lock scripts
@@ -1323,6 +1324,12 @@ fi
 `,
 		Superuser: true,
 		NeedsKill: true,
+	},
+	PDUTelemetryScriptName: {
+		Name:           PDUTelemetryScriptName,
+		ScriptTemplate: ``,
+		Superuser:      false,
+		NeedsKill:      false,
 	},
 	// flamegraph scripts
 	CollapsedCallStacksScriptName: {
