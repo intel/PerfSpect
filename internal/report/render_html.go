@@ -716,6 +716,18 @@ func dimmTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	return renderHTMLTable(socketTableHeaders, socketTableValues, "pure-table pure-table-bordered", [][]string{})
 }
 
+// renderChart generates an HTML/JavaScript representation of a chart using the provided data and configuration.
+// It supports different chart types (e.g., "line", "scatter") and uses Go templates to format the datasets and chart.
+// Parameters:
+//   - chartType: the type of chart to render ("line", "scatter").
+//   - allFormattedPoints: a slice of strings, each representing formatted data points for a dataset.
+//   - datasetNames: a slice of dataset names corresponding to each dataset.
+//   - xAxisLabels: a slice of labels for the x-axis (used for line charts).
+//   - config: a chartTemplateStruct containing chart configuration and template variables.
+//   - datasetHiddenFlags: a slice of booleans indicating whether each dataset should be hidden initially.
+//
+// Returns:
+//   - A string containing the rendered chart HTML/JavaScript, or an error message if rendering fails.
 func renderChart(chartType string, allFormattedPoints []string, datasetNames []string, xAxisLabels []string, config chartTemplateStruct, datasetHiddenFlags []bool) string {
 	datasets := []string{}
 	for dataIdx, formattedPoints := range allFormattedPoints {
@@ -780,6 +792,17 @@ type scatterPoint struct {
 	y float64
 }
 
+// renderScatterChart generates an HTML string for a scatter chart using the provided data and configuration.
+//
+// Parameters:
+//
+//	data   - 2D slice of scatterPoint values, where each inner slice represents a dataset's data points.
+//	datasetNames - Slice of strings representing the names of each dataset.
+//	config - chartTemplateStruct containing chart configuration options.
+//
+// Returns:
+//
+//	A string containing the rendered HTML for the scatter chart.
 func renderScatterChart(data [][]scatterPoint, datasetNames []string, config chartTemplateStruct) string {
 	allFormattedPoints := []string{}
 	for dataIdx := range data {
@@ -792,6 +815,19 @@ func renderScatterChart(data [][]scatterPoint, datasetNames []string, config cha
 	return renderChart("scatter", allFormattedPoints, datasetNames, nil, config, nil)
 }
 
+// renderLineChart generates an HTML string for a line chart using the provided data and configuration.
+//
+// Parameters:
+//
+//	xAxisLabels        - Slice of strings representing the labels for the X axis.
+//	data               - 2D slice of float64 values, where each inner slice represents a dataset's data points.
+//	datasetNames       - Slice of strings representing the names of each dataset.
+//	config             - chartTemplateStruct containing chart configuration options.
+//	datasetHiddenFlags - Slice of booleans indicating whether each dataset should be hidden initially.
+//
+// Returns:
+//
+//	A string containing the rendered HTML for the line chart.
 func renderLineChart(xAxisLabels []string, data [][]float64, datasetNames []string, config chartTemplateStruct, datasetHiddenFlags []bool) string {
 	allFormattedPoints := []string{}
 	for dataIdx := range data {
@@ -907,7 +943,7 @@ func getColor(idx int) string {
 	return colors[idx%len(colors)]
 }
 
-func telemetryTableHTMLRenderer(tableValues TableValues, data [][]float64, datasetNames []string, chartConfig chartTemplateStruct) string {
+func telemetryTableHTMLRenderer(tableValues TableValues, data [][]float64, datasetNames []string, chartConfig chartTemplateStruct, datasetHiddenFlags []bool) string {
 	tsFieldIdx := 0
 	var timestamps []string
 	for i := range tableValues.Fields[0].Values {
@@ -916,7 +952,7 @@ func telemetryTableHTMLRenderer(tableValues TableValues, data [][]float64, datas
 			timestamps = append(timestamps, timestamp)
 		}
 	}
-	return renderLineChart(timestamps, data, datasetNames, chartConfig, nil)
+	return renderLineChart(timestamps, data, datasetNames, chartConfig, datasetHiddenFlags)
 }
 
 func cpuUtilizationTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
@@ -965,7 +1001,7 @@ func cpuUtilizationTelemetryTableHTMLRenderer(tableValues TableValues, targetNam
 		SuggestedMin:  "0",
 		SuggestedMax:  "100",
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
 func utilizationCategoriesTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
@@ -1000,7 +1036,7 @@ func utilizationCategoriesTelemetryTableHTMLRenderer(tableValues TableValues, ta
 		SuggestedMin:  "0",
 		SuggestedMax:  "100",
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
 func irqRateTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
@@ -1040,7 +1076,7 @@ func irqRateTelemetryTableHTMLRenderer(tableValues TableValues, targetName strin
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
 // driveTelemetryTableHTMLRenderer renders charts of drive statistics
@@ -1096,7 +1132,7 @@ func driveTelemetryTableHTMLRenderer(tableValues TableValues, targetName string)
 			SuggestedMin:  "0",
 			SuggestedMax:  "0",
 		}
-		out += telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+		out += telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 	}
 	return out
 }
@@ -1154,7 +1190,7 @@ func networkTelemetryTableHTMLRenderer(tableValues TableValues, targetName strin
 			SuggestedMin:  "0",
 			SuggestedMax:  "0",
 		}
-		out += telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+		out += telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 	}
 	return out
 }
@@ -1191,7 +1227,7 @@ func memoryTelemetryTableHTMLRenderer(tableValues TableValues, targetName string
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
 func averageFrequencyTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
@@ -1226,7 +1262,7 @@ func averageFrequencyTelemetryTableHTMLRenderer(tableValues TableValues, targetN
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
 func powerTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
@@ -1261,7 +1297,7 @@ func powerTelemetryTableHTMLRenderer(tableValues TableValues, targetName string)
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
 func temperatureTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
@@ -1296,7 +1332,7 @@ func temperatureTelemetryTableHTMLRenderer(tableValues TableValues, targetName s
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
 func ipcTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
@@ -1331,7 +1367,7 @@ func ipcTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) s
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
 func c6TelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
@@ -1366,7 +1402,7 @@ func c6TelemetryTableHTMLRenderer(tableValues TableValues, targetName string) st
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
 // instructionTelemetryTableHTMLRenderer renders instruction set usage statistics.
@@ -1434,16 +1470,7 @@ func instructionTelemetryTableHTMLRenderer(tableValues TableValues, targetname s
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	// render directly using renderLineChart to supply hidden flags
-	tsFieldIdx := 0
-	var timestamps []string
-	for i := range tableValues.Fields[0].Values {
-		timestamp := tableValues.Fields[tsFieldIdx].Values[i]
-		if !slices.Contains(timestamps, timestamp) {
-			timestamps = append(timestamps, timestamp)
-		}
-	}
-	return renderLineChart(timestamps, data, datasetNames, chartConfig, hiddenFlags)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, hiddenFlags)
 }
 
 func renderGaudiStatsChart(tableValues TableValues, chartStatFieldName string, titleText string, yAxisText string, suggestedMax string) string {
@@ -1500,7 +1527,7 @@ func renderGaudiStatsChart(tableValues TableValues, chartStatFieldName string, t
 		SuggestedMin:  "0",
 		SuggestedMax:  suggestedMax,
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
 func gaudiTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
@@ -1527,7 +1554,7 @@ func pduTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) s
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
 func callStackFrequencyTableHTMLRenderer(tableValues TableValues, targetName string) string {
