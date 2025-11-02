@@ -1428,7 +1428,7 @@ func instructionTelemetryTableHTMLRenderer(tableValues TableValues, targetname s
 		TitleText:     "",
 		DisplayTitle:  "false",
 		DisplayLegend: "true",
-		AspectRatio:   "2",
+		AspectRatio:   "1", // extra tall due to large number of data sets
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
