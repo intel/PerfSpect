@@ -1370,24 +1370,21 @@ func c6TelemetryTableHTMLRenderer(tableValues TableValues, targetName string) st
 }
 
 // instructionTelemetryTableHTMLRenderer renders instruction set usage statistics
-// These categories are included even if all values are zero:
-//
-//	"SSE", "AVX", "AVX2", "AVX512", "AMX_TILE"
-//
-// Other categories are only included if they have non-zero values.
-// Other categories are hidden by default.
-//
 // Each category is a separate dataset within the chart.
+// Categories with zero total usage are hidden by default.
 func instructionTelemetryTableHTMLRenderer(tableValues TableValues, targetname string) string {
-	//alwaysIncludeCategories := []string{"SSE", "AVX", "AVX2", "AVX512", "AMX_TILE"}
-	data := [][]float64{}
-	datasetNames := []string{}
-	var hiddenFlags []bool
-	for _, field := range tableValues.Fields[1:] {
+	// Collect entries with their sums so we can sort per requirements
+	type instrEntry struct {
+		name   string
+		points []float64
+		sum    float64
+	}
+	entries := []instrEntry{}
+	for _, field := range tableValues.Fields[1:] { // skip timestamp field
 		points := []float64{}
 		sum := 0.0
 		for _, val := range field.Values {
-			if val == "" {
+			if val == "" { // end of data for this category
 				break
 			}
 			stat, err := strconv.ParseFloat(val, 64)
@@ -1398,17 +1395,31 @@ func instructionTelemetryTableHTMLRenderer(tableValues TableValues, targetname s
 			points = append(points, stat)
 			sum += stat
 		}
-		if len(points) > 0 {
-			//include := sum > 0 || slices.Contains(alwaysIncludeCategories, field.Name)
-			include := true
-			if include {
-				data = append(data, points)
-				datasetNames = append(datasetNames, field.Name)
-				// hidden if sum == 0 (which can only happen for 'always include' categories)
-				hidden := sum == 0
-				hiddenFlags = append(hiddenFlags, hidden)
-			}
+		if len(points) > 0 { // only include categories with at least one point
+			entries = append(entries, instrEntry{name: field.Name, points: points, sum: sum})
 		}
+	}
+	// Partition into non-zero and zero-sum groups
+	nonZero := []instrEntry{}
+	zero := []instrEntry{}
+	for _, e := range entries {
+		if e.sum > 0 {
+			nonZero = append(nonZero, e)
+		} else {
+			zero = append(zero, e)
+		}
+	}
+	sort.Slice(nonZero, func(i, j int) bool { return nonZero[i].name < nonZero[j].name })
+	sort.Slice(zero, func(i, j int) bool { return zero[i].name < zero[j].name })
+	ordered := append(nonZero, zero...)
+	data := make([][]float64, 0, len(ordered))
+	datasetNames := make([]string, 0, len(ordered))
+	hiddenFlags := make([]bool, 0, len(ordered))
+	for _, e := range ordered {
+		data = append(data, e.points)
+		datasetNames = append(datasetNames, e.name)
+		// hide zero-sum categories by default
+		hiddenFlags = append(hiddenFlags, e.sum == 0)
 	}
 	chartConfig := chartTemplateStruct{
 		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
