@@ -1289,7 +1289,7 @@ if [ {{.InstrMixPID}} -eq 0 ]; then
 else
     arg_pid="-p {{.InstrMixPID}}"
 fi
-# -c: CSV output, -a: all categories, -p: PID, -s: sampling rate,-i: interval, -n: count
+# -c: CSV output, -a: all categories, -p: PID, -s: sampling rate, -i: interval, -n: count
 # example output:
 # interval,pid,name,INVALID,ADOX_ADCX,AES
 # 0,ALL,ALL,0.000000,0.000000,0.000000,0.000000
