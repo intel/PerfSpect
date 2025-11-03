@@ -116,6 +116,7 @@ const (
 	TurbostatTelemetryScriptName   = "turbostat telemetry"
 	InstructionTelemetryScriptName = "instruction telemetry"
 	GaudiTelemetryScriptName       = "gaudi telemetry"
+	PDUTelemetryScriptName         = "pdu telemetry"
 	// flamegraph scripts
 	CollapsedCallStacksScriptName = "collapsed call stacks"
 	// lock scripts
@@ -1288,13 +1289,14 @@ if [ {{.InstrMixPID}} -eq 0 ]; then
 else
     arg_pid="-p {{.InstrMixPID}}"
 fi
-# .InstrMixFilter is a space separated list of ISA categories
-# for each category in the list, add -f <category> to the command line
-for category in {{.InstrMixFilter}}; do
-    arg_filter="$arg_filter -f $category"
-done
-
-processwatch -c $arg_sampling_rate $arg_pid $arg_interval $arg_count $arg_filter &
+# -c: CSV output, -a: all categories, -p: PID, -s: sampling rate, -i: interval, -n: count
+# example output:
+# interval,pid,name,INVALID,ADOX_ADCX,AES
+# 0,ALL,ALL,0.000000,0.000000,0.000000,0.000000
+# 0,2038501,stress-ng-cpu,0.000000,0.000000,0.000000,0.000000
+# We only need the header line and the subsequent "ALL" lines (for each interval)
+# Filter output: keep header (NR==1) and lines where 2nd and 3rd columns are ALL
+processwatch -c -a $arg_pid $arg_sampling_rate $arg_interval $arg_count | awk -F',' 'NR==1 || ($2=="ALL" && $3=="ALL")' &
 echo $! > {{.ScriptName}}_cmd.pid
 wait
 `,
@@ -1306,23 +1308,57 @@ wait
 	GaudiTelemetryScriptName: {
 		Name: GaudiTelemetryScriptName,
 		ScriptTemplate: `
-# if the hl-smi program is in the path
-if command -v hl-smi &> /dev/null; then
-	hl-smi --query-aip=timestamp,name,temperature.aip,module_id,utilization.aip,memory.total,memory.free,memory.used,power.draw --format=csv,nounits -l {{.Interval}} &
-	echo $! > {{.ScriptName}}_cmd.pid
-	# if duration is set, sleep for the duration then kill the process
-	if [ {{.Duration}} -ne 0 ]; then
-		sleep {{.Duration}}
-		kill -SIGINT $(cat {{.ScriptName}}_cmd.pid)
-	fi
-	wait
+if command -v {{.GaudiHlsmiPath}} &> /dev/null; then
+    {{.GaudiHlsmiPath}} --query-aip=timestamp,name,temperature.aip,module_id,utilization.aip,memory.total,memory.free,memory.used,power.draw --format=csv,nounits -l {{.Interval}} &
+    echo $! > {{.ScriptName}}_cmd.pid
+    # if duration is set, sleep for the duration then kill the process
+    if [ {{.Duration}} -ne 0 ]; then
+        sleep {{.Duration}}
+        kill -SIGINT $(cat {{.ScriptName}}_cmd.pid)
+    fi
+    wait
 else
-	echo "hl-smi not found in the path" >&2
-	exit 1
+    echo "hl-smi not found at {{.GaudiHlsmiPath}}" >&2
+    exit 1
 fi
 `,
 		Superuser: true,
 		NeedsKill: true,
+	},
+	PDUTelemetryScriptName: {
+		Name: PDUTelemetryScriptName,
+		ScriptTemplate: `
+duration={{.Duration}}       # total duration in seconds
+interval={{.Interval}}       # time between readings in seconds
+pdu="{{.PDUHost}}"           # PDU hostname or IP address (must not start with protocol like http://, may include port)
+pdu_ip=$(echo "$pdu" | awk -F/ '{print $NF}' | awk -F: '{print $1}') # remove http:// or https:// and port if present
+pdu_username="{{.PDUUser}}"
+pdu_password="{{.PDUPassword}}"
+outletgroup="{{.PDUOutlet}}"
+count=$((duration / interval))
+echo "Timestamp,ActivePower(W)"
+for ((i=0; i<count; i++)); do
+    timestamp=$(date +%H:%M:%S)
+    response=$(no_proxy=$pdu_ip curl --max-time $interval -sS -k -u "$pdu_username:$pdu_password" \
+        -d "{'jsonrpc':'2.0','method':'getReading'}" \
+        "https://${pdu}/model/outletgroup/${outletgroup}/activePower")
+    # Check if curl succeeded
+    if [ $? -ne 0 ] || [ -z "$response" ]; then
+        echo "ERROR: Failed to retrieve data from PDU" >&2
+        exit 1
+    fi
+    # Try to parse the value using jq
+    w=$(echo "$response" | jq -r '.result._ret_.value // empty')
+    if [ -z "$w" ]; then
+        echo "ERROR: Invalid response format or missing value" >&2
+        exit 1
+    fi
+    echo "$timestamp,$w"
+    sleep $interval
+done
+`,
+		Superuser: false,
+		NeedsKill: false,
 	},
 	// flamegraph scripts
 	CollapsedCallStacksScriptName: {

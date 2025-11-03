@@ -377,7 +377,8 @@ const datasetTemplate = `
 	backgroundColor: '{{.Color}}',
 	borderColor: '{{.Color}}',
 	borderWidth: 1,
-	showLine: true
+	showLine: true,
+	hidden: {{.Hidden}}
 }
 `
 const lineChartTemplate = `<div class="chart-container" style="max-width: 900px">
@@ -715,20 +716,39 @@ func dimmTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	return renderHTMLTable(socketTableHeaders, socketTableValues, "pure-table pure-table-bordered", [][]string{})
 }
 
-func renderChart(chartType string, allFormattedPoints []string, datasetNames []string, xAxisLabels []string, config chartTemplateStruct) string {
+// renderChart generates an HTML/JavaScript representation of a chart using the provided data and configuration.
+// It supports different chart types (e.g., "line", "scatter") and uses Go templates to format the datasets and chart.
+// Parameters:
+//   - chartType: the type of chart to render ("line", "scatter").
+//   - allFormattedPoints: a slice of strings, each representing formatted data points for a dataset.
+//   - datasetNames: a slice of dataset names corresponding to each dataset.
+//   - xAxisLabels: a slice of labels for the x-axis (used for line charts).
+//   - config: a chartTemplateStruct containing chart configuration and template variables.
+//   - datasetHiddenFlags: a slice of booleans indicating whether each dataset should be hidden initially.
+//
+// Returns:
+//   - A string containing the rendered chart HTML/JavaScript, or an error message if rendering fails.
+func renderChart(chartType string, allFormattedPoints []string, datasetNames []string, xAxisLabels []string, config chartTemplateStruct, datasetHiddenFlags []bool) string {
 	datasets := []string{}
 	for dataIdx, formattedPoints := range allFormattedPoints {
 		specValues := formattedPoints
 		dst := texttemplate.Must(texttemplate.New("datasetTemplate").Parse(datasetTemplate))
 		buf := new(bytes.Buffer)
+		// determine hidden flag for this dataset
+		hidden := "false"
+		if datasetHiddenFlags != nil && dataIdx < len(datasetHiddenFlags) && datasetHiddenFlags[dataIdx] {
+			hidden = "true"
+		}
 		err := dst.Execute(buf, struct {
-			Label string
-			Data  string
-			Color string
+			Label  string
+			Data   string
+			Color  string
+			Hidden string
 		}{
-			Label: datasetNames[dataIdx],
-			Data:  specValues,
-			Color: getColor(dataIdx),
+			Label:  datasetNames[dataIdx],
+			Data:   specValues,
+			Color:  getColor(dataIdx),
+			Hidden: hidden,
 		})
 		if err != nil {
 			slog.Error("error executing template", slog.String("error", err.Error()))
@@ -772,6 +792,17 @@ type scatterPoint struct {
 	y float64
 }
 
+// renderScatterChart generates an HTML string for a scatter chart using the provided data and configuration.
+//
+// Parameters:
+//
+//	data   - 2D slice of scatterPoint values, where each inner slice represents a dataset's data points.
+//	datasetNames - Slice of strings representing the names of each dataset.
+//	config - chartTemplateStruct containing chart configuration options.
+//
+// Returns:
+//
+//	A string containing the rendered HTML for the scatter chart.
 func renderScatterChart(data [][]scatterPoint, datasetNames []string, config chartTemplateStruct) string {
 	allFormattedPoints := []string{}
 	for dataIdx := range data {
@@ -781,10 +812,23 @@ func renderScatterChart(data [][]scatterPoint, datasetNames []string, config cha
 		}
 		allFormattedPoints = append(allFormattedPoints, strings.Join(formattedPoints, ","))
 	}
-	return renderChart("scatter", allFormattedPoints, datasetNames, nil, config)
+	return renderChart("scatter", allFormattedPoints, datasetNames, nil, config, nil)
 }
 
-func renderLineChart(xAxisLabels []string, data [][]float64, datasetNames []string, config chartTemplateStruct) string {
+// renderLineChart generates an HTML string for a line chart using the provided data and configuration.
+//
+// Parameters:
+//
+//	xAxisLabels        - Slice of strings representing the labels for the X axis.
+//	data               - 2D slice of float64 values, where each inner slice represents a dataset's data points.
+//	datasetNames       - Slice of strings representing the names of each dataset.
+//	config             - chartTemplateStruct containing chart configuration options.
+//	datasetHiddenFlags - Slice of booleans indicating whether each dataset should be hidden initially.
+//
+// Returns:
+//
+//	A string containing the rendered HTML for the line chart.
+func renderLineChart(xAxisLabels []string, data [][]float64, datasetNames []string, config chartTemplateStruct, datasetHiddenFlags []bool) string {
 	allFormattedPoints := []string{}
 	for dataIdx := range data {
 		formattedPoints := []string{}
@@ -793,7 +837,7 @@ func renderLineChart(xAxisLabels []string, data [][]float64, datasetNames []stri
 		}
 		allFormattedPoints = append(allFormattedPoints, strings.Join(formattedPoints, ","))
 	}
-	return renderChart("line", allFormattedPoints, datasetNames, xAxisLabels, config)
+	return renderChart("line", allFormattedPoints, datasetNames, xAxisLabels, config, datasetHiddenFlags)
 }
 
 func renderFrequencyTable(tableValues TableValues) (out string) {
@@ -899,7 +943,7 @@ func getColor(idx int) string {
 	return colors[idx%len(colors)]
 }
 
-func telemetryTableHTMLRenderer(tableValues TableValues, data [][]float64, datasetNames []string, chartConfig chartTemplateStruct) string {
+func telemetryTableHTMLRenderer(tableValues TableValues, data [][]float64, datasetNames []string, chartConfig chartTemplateStruct, datasetHiddenFlags []bool) string {
 	tsFieldIdx := 0
 	var timestamps []string
 	for i := range tableValues.Fields[0].Values {
@@ -908,7 +952,7 @@ func telemetryTableHTMLRenderer(tableValues TableValues, data [][]float64, datas
 			timestamps = append(timestamps, timestamp)
 		}
 	}
-	return renderLineChart(timestamps, data, datasetNames, chartConfig)
+	return renderLineChart(timestamps, data, datasetNames, chartConfig, datasetHiddenFlags)
 }
 
 func cpuUtilizationTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
@@ -957,7 +1001,7 @@ func cpuUtilizationTelemetryTableHTMLRenderer(tableValues TableValues, targetNam
 		SuggestedMin:  "0",
 		SuggestedMax:  "100",
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
 func utilizationCategoriesTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
@@ -992,7 +1036,7 @@ func utilizationCategoriesTelemetryTableHTMLRenderer(tableValues TableValues, ta
 		SuggestedMin:  "0",
 		SuggestedMax:  "100",
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
 func irqRateTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
@@ -1032,7 +1076,7 @@ func irqRateTelemetryTableHTMLRenderer(tableValues TableValues, targetName strin
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
 // driveTelemetryTableHTMLRenderer renders charts of drive statistics
@@ -1088,7 +1132,7 @@ func driveTelemetryTableHTMLRenderer(tableValues TableValues, targetName string)
 			SuggestedMin:  "0",
 			SuggestedMax:  "0",
 		}
-		out += telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+		out += telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 	}
 	return out
 }
@@ -1146,7 +1190,7 @@ func networkTelemetryTableHTMLRenderer(tableValues TableValues, targetName strin
 			SuggestedMin:  "0",
 			SuggestedMax:  "0",
 		}
-		out += telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+		out += telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 	}
 	return out
 }
@@ -1183,7 +1227,7 @@ func memoryTelemetryTableHTMLRenderer(tableValues TableValues, targetName string
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
 func averageFrequencyTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
@@ -1218,7 +1262,7 @@ func averageFrequencyTelemetryTableHTMLRenderer(tableValues TableValues, targetN
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
 func powerTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
@@ -1253,7 +1297,7 @@ func powerTelemetryTableHTMLRenderer(tableValues TableValues, targetName string)
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
 func temperatureTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
@@ -1288,7 +1332,7 @@ func temperatureTelemetryTableHTMLRenderer(tableValues TableValues, targetName s
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
 func ipcTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
@@ -1323,7 +1367,7 @@ func ipcTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) s
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
 func c6TelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
@@ -1358,16 +1402,27 @@ func c6TelemetryTableHTMLRenderer(tableValues TableValues, targetName string) st
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
+// instructionTelemetryTableHTMLRenderer renders instruction set usage statistics.
+// Each category is a separate dataset within the chart.
+// Categories with zero total usage are hidden by default.
+// Categories are sorted in two tiers: first, all non-zero categories are sorted alphabetically;
+// then, all zero-sum categories are sorted alphabetically and placed after the non-zero categories.
 func instructionTelemetryTableHTMLRenderer(tableValues TableValues, targetname string) string {
-	data := [][]float64{}
-	datasetNames := []string{}
-	for _, field := range tableValues.Fields[1:] {
+	// Collect entries with their sums so we can sort per requirements
+	type instrEntry struct {
+		name   string
+		points []float64
+		sum    float64
+	}
+	entries := []instrEntry{}
+	for _, field := range tableValues.Fields[1:] { // skip timestamp field
 		points := []float64{}
+		sum := 0.0
 		for _, val := range field.Values {
-			if val == "" {
+			if val == "" { // end of data for this category
 				break
 			}
 			stat, err := strconv.ParseFloat(val, 64)
@@ -1376,11 +1431,33 @@ func instructionTelemetryTableHTMLRenderer(tableValues TableValues, targetname s
 				return ""
 			}
 			points = append(points, stat)
+			sum += stat
 		}
-		if len(points) > 0 {
-			data = append(data, points)
-			datasetNames = append(datasetNames, field.Name)
+		if len(points) > 0 { // only include categories with at least one point
+			entries = append(entries, instrEntry{name: field.Name, points: points, sum: sum})
 		}
+	}
+	// Partition into non-zero and zero-sum groups
+	nonZero := []instrEntry{}
+	zero := []instrEntry{}
+	for _, e := range entries {
+		if e.sum > 0 {
+			nonZero = append(nonZero, e)
+		} else {
+			zero = append(zero, e)
+		}
+	}
+	sort.Slice(nonZero, func(i, j int) bool { return nonZero[i].name < nonZero[j].name })
+	sort.Slice(zero, func(i, j int) bool { return zero[i].name < zero[j].name })
+	ordered := append(nonZero, zero...)
+	data := make([][]float64, 0, len(ordered))
+	datasetNames := make([]string, 0, len(ordered))
+	hiddenFlags := make([]bool, 0, len(ordered))
+	for _, e := range ordered {
+		data = append(data, e.points)
+		datasetNames = append(datasetNames, e.name)
+		// hide zero-sum categories by default
+		hiddenFlags = append(hiddenFlags, e.sum == 0)
 	}
 	chartConfig := chartTemplateStruct{
 		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
@@ -1389,11 +1466,11 @@ func instructionTelemetryTableHTMLRenderer(tableValues TableValues, targetname s
 		TitleText:     "",
 		DisplayTitle:  "false",
 		DisplayLegend: "true",
-		AspectRatio:   "2",
+		AspectRatio:   "1", // extra tall due to large number of data sets
 		SuggestedMin:  "0",
 		SuggestedMax:  "0",
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, hiddenFlags)
 }
 
 func renderGaudiStatsChart(tableValues TableValues, chartStatFieldName string, titleText string, yAxisText string, suggestedMax string) string {
@@ -1450,7 +1527,7 @@ func renderGaudiStatsChart(tableValues TableValues, chartStatFieldName string, t
 		SuggestedMin:  "0",
 		SuggestedMax:  suggestedMax,
 	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig)
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
 func gaudiTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
@@ -1461,6 +1538,43 @@ func gaudiTelemetryTableHTMLRenderer(tableValues TableValues, targetName string)
 	out += renderGaudiStatsChart(tableValues, "power.draw [W]", "Power", "Watts", "0")
 	out += renderGaudiStatsChart(tableValues, "temperature.aip [C]", "Temperature", "Temperature (C)", "0")
 	return out
+}
+
+func pduTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
+	data := [][]float64{}
+	for _, field := range tableValues.Fields[1:] {
+		points := []float64{}
+		for _, val := range field.Values {
+			if val == "" {
+				break
+			}
+			stat, err := strconv.ParseFloat(val, 64)
+			if err != nil {
+				slog.Error("error parsing stat", slog.String("error", err.Error()))
+				return ""
+			}
+			points = append(points, stat)
+		}
+		if len(points) > 0 {
+			data = append(data, points)
+		}
+	}
+	datasetNames := []string{}
+	for _, field := range tableValues.Fields[1:] {
+		datasetNames = append(datasetNames, field.Name)
+	}
+	chartConfig := chartTemplateStruct{
+		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
+		XaxisText:     "Time",
+		YaxisText:     "Watts",
+		TitleText:     "",
+		DisplayTitle:  "false",
+		DisplayLegend: "true",
+		AspectRatio:   "2",
+		SuggestedMin:  "0",
+		SuggestedMax:  "0",
+	}
+	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
 func callStackFrequencyTableHTMLRenderer(tableValues TableValues, targetName string) string {

@@ -290,7 +290,7 @@ endif
 perf: perf-x86_64 perf-aarch64
 	@echo "Perf tools built successfully in bin/x86_64 and bin/aarch64 directories."
 
-PROCESSWATCH_VERSION := "c394065"	
+PROCESSWATCH_VERSION := "v1.3"	
 processwatch:
 ifeq ("$(wildcard processwatch)","")
 	git clone --recursive https://github.com/intel/processwatch.git

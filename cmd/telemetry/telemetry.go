@@ -7,7 +7,7 @@ package telemetry
 import (
 	"fmt"
 	"log/slog"
-	"regexp"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -61,12 +61,10 @@ var (
 	flagPower       bool
 	flagTemperature bool
 	flagInstrMix    bool
-	flagGaudi       bool
 
 	flagNoSystemSummary bool
 
 	flagInstrMixPid       int
-	flagInstrMixFilter    []string
 	flagInstrMixFrequency int
 )
 
@@ -87,12 +85,10 @@ const (
 	flagPowerName       = "power"
 	flagTemperatureName = "temperature"
 	flagInstrMixName    = "instrmix"
-	flagGaudiName       = "gaudi"
 
 	flagNoSystemSummaryName = "no-summary"
 
 	flagInstrMixPidName       = "instrmix-pid"
-	flagInstrMixFilterName    = "instrmix-filter"
 	flagInstrMixFrequencyName = "instrmix-frequency"
 )
 
@@ -110,8 +106,12 @@ var categories = []common.Category{
 	{FlagName: flagStorageName, FlagVar: &flagStorage, DefaultValue: false, Help: "monitor storage", TableNames: []string{report.DriveTelemetryTableName}},
 	{FlagName: flagIRQRateName, FlagVar: &flagIRQRate, DefaultValue: false, Help: "monitor IRQ rate", TableNames: []string{report.IRQRateTelemetryTableName}},
 	{FlagName: flagInstrMixName, FlagVar: &flagInstrMix, DefaultValue: false, Help: "monitor instruction mix", TableNames: []string{report.InstructionTelemetryTableName}},
-	{FlagName: flagGaudiName, FlagVar: &flagGaudi, DefaultValue: false, Help: "monitor gaudi", TableNames: []string{report.GaudiTelemetryTableName}},
 }
+
+const (
+	instrmixFrequencyDefaultSystemWide = 10000000
+	instrmixFrequencyDefaultPerPID     = 100000
+)
 
 func init() {
 	// set up config category flags
@@ -124,8 +124,7 @@ func init() {
 	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 30, "")
 	Cmd.Flags().IntVar(&flagInterval, flagIntervalName, 2, "")
 	Cmd.Flags().IntVar(&flagInstrMixPid, flagInstrMixPidName, 0, "")
-	Cmd.Flags().StringSliceVar(&flagInstrMixFilter, flagInstrMixFilterName, []string{"SSE", "AVX", "AVX2", "AVX512", "AMX_TILE"}, "")
-	Cmd.Flags().IntVar(&flagInstrMixFrequency, flagInstrMixFrequencyName, 10000000, "") // 10 million
+	Cmd.Flags().IntVar(&flagInstrMixFrequency, flagInstrMixFrequencyName, instrmixFrequencyDefaultSystemWide, "")
 	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
 
 	common.AddTargetFlags(Cmd)
@@ -194,12 +193,8 @@ func getFlagGroups() []common.FlagGroup {
 			Help: "PID to monitor for instruction mix, no PID means all processes",
 		},
 		{
-			Name: flagInstrMixFilterName,
-			Help: "filter to apply to instruction mix",
-		},
-		{
 			Name: flagInstrMixFrequencyName,
-			Help: "number of instructions between samples when no PID specified",
+			Help: "number of instructions between samples, default is 10,000,000 when collecting system wide and 100,000 when collecting for a specific PID",
 		},
 		{
 			Name: flagNoSystemSummaryName,
@@ -259,16 +254,12 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	if flagDuration == 0 && (target != "" || targets != "") {
 		return common.FlagValidationError(cmd, "duration must be greater than 0 when collecting from a remote target")
 	}
-	if cmd.Flags().Lookup(flagInstrMixFilterName).Changed {
-		re := regexp.MustCompile("^[A-Z0-9_]+$")
-		for _, filter := range flagInstrMixFilter {
-			if !re.MatchString(filter) {
-				return common.FlagValidationError(cmd, fmt.Sprintf("invalid filter: %s, must be uppercase letters, numbers, and underscores", filter))
-			}
-		}
-	}
 	if flagInstrMixFrequency < 100000 { // 100,000 instructions is the minimum frequency
-		return common.FlagValidationError(cmd, "instruction mix frequency must be 100,000 or greater")
+		return common.FlagValidationError(cmd, "instruction mix frequency must be 100,000 or greater to limit overhead")
+	}
+	// warn if instruction mix frequency is low when collecting system wide
+	if flagInstrMix && flagInstrMixPid == 0 && flagInstrMixFrequency < instrmixFrequencyDefaultSystemWide {
+		slog.Warn("instruction mix frequency is set to a value lower than default for system wide collection, consider using a higher frequency to limit collection overhead", slog.Int("frequency", flagInstrMixFrequency))
 	}
 	// common target flags
 	if err := common.ValidateTargetFlags(cmd); err != nil {
@@ -289,6 +280,28 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			tableNames = append(tableNames, cat.TableNames...)
 		}
 	}
+	// confirm proper default for instrmix frequency
+	if flagInstrMix {
+		if flagInstrMixPid != 0 && !cmd.Flags().Changed(flagInstrMixFrequencyName) {
+			// per-PID collection and frequency not changed, set to per-PID default
+			flagInstrMixFrequency = instrmixFrequencyDefaultPerPID
+		}
+	}
+	// hidden feature - Gaudi telemetry, only enabled when PERFSPECT_GAUDI_HLSMI_PATH is set
+	gaudiHlsmiPath := os.Getenv("PERFSPECT_GAUDI_HLSMI_PATH") // must be full path to hlsmi binary
+	if gaudiHlsmiPath != "" {
+		slog.Info("Gaudi telemetry enabled", slog.String("hlsmi_path", gaudiHlsmiPath))
+		tableNames = append(tableNames, report.GaudiTelemetryTableName)
+	}
+	// hidden feature - PDU telemetry, only enabled when four environment variables are set
+	pduHost := os.Getenv("PERFSPECT_PDU_HOST")
+	pduUser := os.Getenv("PERFSPECT_PDU_USER")
+	pduPassword := os.Getenv("PERFSPECT_PDU_PASSWORD")
+	pduOutlet := os.Getenv("PERFSPECT_PDU_OUTLET")
+	if pduHost != "" && pduUser != "" && pduPassword != "" && pduOutlet != "" {
+		slog.Info("PDU telemetry enabled", slog.String("host", pduHost), slog.String("outlet", pduOutlet))
+		tableNames = append(tableNames, report.PDUTelemetryTableName)
+	}
 	// include telemetry summary table if all telemetry options are selected
 	var summaryFunc common.SummaryFunc
 	if flagAll {
@@ -306,8 +319,12 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			"Interval":          strconv.Itoa(flagInterval),
 			"Duration":          strconv.Itoa(flagDuration),
 			"InstrMixPID":       strconv.Itoa(flagInstrMixPid),
-			"InstrMixFilter":    strings.Join(flagInstrMixFilter, " "),
 			"InstrMixFrequency": strconv.Itoa(flagInstrMixFrequency),
+			"GaudiHlsmiPath":    gaudiHlsmiPath,
+			"PDUHost":           pduHost,
+			"PDUUser":           pduUser,
+			"PDUPassword":       pduPassword,
+			"PDUOutlet":         pduOutlet,
 		},
 		TableNames:             tableNames,
 		SummaryFunc:            summaryFunc,
