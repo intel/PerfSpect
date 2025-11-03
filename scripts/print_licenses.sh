@@ -11,11 +11,13 @@
 # List of GitHub projects, must have LICENSE file
 github_projects=(
     "async-profiler/async-profiler"
-    "harp-intel/avx-turbo"
+    "travisdowns/avx-turbo"
     "mirror/dmidecode"
+    "axboe/fio"
     "lyonel/lshw"
     "pciutils/pciutils"
     "intel/pcm"
+    "intel/processwatch"
     "ColinIanKing/stress-ng"
     "sysstat/sysstat"
 )
