@@ -127,7 +127,8 @@ endif
 ETHTOOL_VERSION := "v6.5"
 ethtool:
 ifeq ("$(wildcard ethtool)","")
-	git clone https://git.kernel.org/pub/scm/network/ethtool/ethtool.git
+	git clone https://git.kernel.org/pub/scm/network/ethtool/ethtool.git || \
+	git clone https://kernel.googlesource.com/pub/scm/network/ethtool/ethtool
 else
 	cd ethtool && git checkout master && git pull
 endif
@@ -139,7 +140,8 @@ endif
 
 ethtool-aarch64:
 ifeq ("$(wildcard ethtool-aarch64)","")
-	git clone https://git.kernel.org/pub/scm/network/ethtool/ethtool.git ethtool-aarch64
+	git clone https://git.kernel.org/pub/scm/network/ethtool/ethtool.git ethtool-aarch64 || \
+	git clone https://kernel.googlesource.com/pub/scm/network/ethtool/ethtool ethtool-aarch64
 else
 	cd ethtool-aarch64 && git checkout master && git pull
 endif
