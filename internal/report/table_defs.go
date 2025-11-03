@@ -2768,7 +2768,37 @@ func gaudiTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
 }
 
 func pduTelemetryTableValues(outputs map[string]script.ScriptOutput) []Field {
-	return []Field{}
+	// extract PDU fields and their values from PDU telemetry script output
+	// output is CSV formatted:
+	//   Timestamp,ActivePower(W)
+	//   18:32:38,123.45
+	//   18:32:40,124.10
+	//   ...
+	fields := []Field{}
+	reader := csv.NewReader(strings.NewReader(outputs[script.PDUTelemetryScriptName].Stdout))
+	records, err := reader.ReadAll()
+	if err != nil {
+		slog.Error("failed to read PDU telemetry CSV output", slog.String("error", err.Error()))
+		return []Field{}
+	}
+	if len(records) == 0 {
+		return []Field{}
+	}
+	// first row is the header
+	for _, header := range records[0] {
+		fields = append(fields, Field{Name: header, Values: []string{}})
+	}
+	// subsequent rows are data
+	for _, record := range records[1:] {
+		if len(record) != len(fields) {
+			slog.Error("unexpected number of fields in PDU telemetry output", slog.Int("expected", len(fields)), slog.Int("got", len(record)))
+			return []Field{}
+		}
+		for i, value := range record {
+			fields[i].Values = append(fields[i].Values, value)
+		}
+	}
+	return fields
 }
 
 func callStackFrequencyTableValues(outputs map[string]script.ScriptOutput) []Field {

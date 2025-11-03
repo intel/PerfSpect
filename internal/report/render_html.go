@@ -1542,11 +1542,31 @@ func gaudiTelemetryTableHTMLRenderer(tableValues TableValues, targetName string)
 
 func pduTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
 	data := [][]float64{}
+	for _, field := range tableValues.Fields[1:] {
+		points := []float64{}
+		for _, val := range field.Values {
+			if val == "" {
+				break
+			}
+			stat, err := strconv.ParseFloat(val, 64)
+			if err != nil {
+				slog.Error("error parsing stat", slog.String("error", err.Error()))
+				return ""
+			}
+			points = append(points, stat)
+		}
+		if len(points) > 0 {
+			data = append(data, points)
+		}
+	}
 	datasetNames := []string{}
+	for _, field := range tableValues.Fields[1:] {
+		datasetNames = append(datasetNames, field.Name)
+	}
 	chartConfig := chartTemplateStruct{
 		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
 		XaxisText:     "Time",
-		YaxisText:     "Value",
+		YaxisText:     "Watts",
 		TitleText:     "",
 		DisplayTitle:  "false",
 		DisplayLegend: "true",

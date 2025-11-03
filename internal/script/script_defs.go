@@ -1326,10 +1326,39 @@ fi
 		NeedsKill: true,
 	},
 	PDUTelemetryScriptName: {
-		Name:           PDUTelemetryScriptName,
-		ScriptTemplate: ``,
-		Superuser:      false,
-		NeedsKill:      false,
+		Name: PDUTelemetryScriptName,
+		ScriptTemplate: `
+duration={{.Duration}}       # total duration in seconds
+interval={{.Interval}}       # time between readings in seconds
+pdu="{{.PDUHost}}"           # PDU hostname or IP address (must not start with protocol like http://, may include port)
+pdu_ip=$(echo $pdu | awk -F/ '{print $NF}' | awk -F: '{print $1}') # remove http:// or https:// and port if present
+pdu_username="{{.PDUUser}}"
+pdu_password="{{.PDUPassword}}"
+outletgroup="{{.PDUOutlet}}"
+count=$((duration / interval))
+echo "Timestamp,ActivePower(W)"
+for ((i=0; i<count; i++)); do
+    timestamp=$(date +%H:%M:%S)
+    response=$(no_proxy=$pdu_ip curl --max-time $interval -sS -k -u "$pdu_username:$pdu_password" \
+        -d "{'jsonrpc':'2.0','method':'getReading'}" \
+        "https://${pdu}/model/outletgroup/${outletgroup}/activePower")
+    # Check if curl succeeded
+    if [ $? -ne 0 ] || [ -z "$response" ]; then
+        echo "ERROR: Failed to retrieve data from PDU" >&2
+        exit 1
+    fi
+    # Try to parse the value using jq
+    w=$(echo "$response" | jq -r '.result._ret_.value // empty')
+    if [ -z "$w" ]; then
+        echo "ERROR: Invalid response format or missing value" >&2
+        exit 1
+    fi
+    echo "$timestamp,$w"
+    sleep $interval
+done
+`,
+		Superuser: false,
+		NeedsKill: false,
 	},
 	// flamegraph scripts
 	CollapsedCallStacksScriptName: {
