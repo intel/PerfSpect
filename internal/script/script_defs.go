@@ -1331,7 +1331,7 @@ fi
 duration={{.Duration}}       # total duration in seconds
 interval={{.Interval}}       # time between readings in seconds
 pdu="{{.PDUHost}}"           # PDU hostname or IP address (must not start with protocol like http://, may include port)
-pdu_ip=$(echo $pdu | awk -F/ '{print $NF}' | awk -F: '{print $1}') # remove http:// or https:// and port if present
+pdu_ip=$(echo "$pdu" | awk -F/ '{print $NF}' | awk -F: '{print $1}') # remove http:// or https:// and port if present
 pdu_username="{{.PDUUser}}"
 pdu_password="{{.PDUPassword}}"
 outletgroup="{{.PDUOutlet}}"
