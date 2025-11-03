@@ -1754,6 +1754,9 @@ func nicSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 	}
 	var summary []string
 	for model, count := range modelCount {
+		if model == "" {
+			model = "Unknown NIC"
+		}
 		summary = append(summary, fmt.Sprintf("%dx %s", count, model))
 	}
 	return strings.Join(summary, ", ")
