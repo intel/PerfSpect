@@ -4,14 +4,99 @@ package report
 // SPDX-License-Identifier: BSD-3-Clause
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"perfspect/internal/script"
 	"perfspect/internal/util"
-	"regexp"
 	"strconv"
 	"strings"
 )
+
+// fioOutput is the top-level struct for the FIO JSON report.
+// ref: https://fio.readthedocs.io/en/latest/fio_doc.html#json-output
+type fioOutput struct {
+	FioVersion  string   `json:"fio version"`
+	Timestamp   int64    `json:"timestamp"`
+	TimestampMs int64    `json:"timestamp_ms"`
+	Time        string   `json:"time"`
+	Jobs        []fioJob `json:"jobs"`
+}
+
+// Job represents a single job's results within the FIO report.
+type fioJob struct {
+	Jobname           string             `json:"jobname"`
+	Groupid           int                `json:"groupid"`
+	JobStart          int64              `json:"job_start"`
+	Error             int                `json:"error"`
+	Eta               int                `json:"eta"`
+	Elapsed           int                `json:"elapsed"`
+	Read              fioIOStats         `json:"read"`
+	Write             fioIOStats         `json:"write"`
+	Trim              fioIOStats         `json:"trim"`
+	JobRuntime        int                `json:"job_runtime"`
+	UsrCPU            float64            `json:"usr_cpu"`
+	SysCPU            float64            `json:"sys_cpu"`
+	Ctx               int                `json:"ctx"`
+	Majf              int                `json:"majf"`
+	Minf              int                `json:"minf"`
+	IodepthLevel      map[string]float64 `json:"iodepth_level"`
+	IodepthSubmit     map[string]float64 `json:"iodepth_submit"`
+	IodepthComplete   map[string]float64 `json:"iodepth_complete"`
+	LatencyNs         map[string]float64 `json:"latency_ns"`
+	LatencyUs         map[string]float64 `json:"latency_us"`
+	LatencyMs         map[string]float64 `json:"latency_ms"`
+	LatencyDepth      int                `json:"latency_depth"`
+	LatencyTarget     int                `json:"latency_target"`
+	LatencyPercentile float64            `json:"latency_percentile"`
+	LatencyWindow     int                `json:"latency_window"`
+}
+
+// IOStats holds the detailed I/O statistics for read, write, or trim operations.
+type fioIOStats struct {
+	IoBytes     int64                      `json:"io_bytes"`
+	IoKbytes    int64                      `json:"io_kbytes"`
+	BwBytes     int64                      `json:"bw_bytes"`
+	Bw          int64                      `json:"bw"`
+	Iops        float64                    `json:"iops"`
+	Runtime     int                        `json:"runtime"`
+	TotalIos    int                        `json:"total_ios"`
+	ShortIos    int                        `json:"short_ios"`
+	DropIos     int                        `json:"drop_ios"`
+	SlatNs      fioLatencyStats            `json:"slat_ns"`
+	ClatNs      fioLatencyStatsPercentiles `json:"clat_ns"`
+	LatNs       fioLatencyStats            `json:"lat_ns"`
+	BwMin       int                        `json:"bw_min"`
+	BwMax       int                        `json:"bw_max"`
+	BwAgg       float64                    `json:"bw_agg"`
+	BwMean      float64                    `json:"bw_mean"`
+	BwDev       float64                    `json:"bw_dev"`
+	BwSamples   int                        `json:"bw_samples"`
+	IopsMin     int                        `json:"iops_min"`
+	IopsMax     int                        `json:"iops_max"`
+	IopsMean    float64                    `json:"iops_mean"`
+	IopsStddev  float64                    `json:"iops_stddev"`
+	IopsSamples int                        `json:"iops_samples"`
+}
+
+// fioLatencyStats holds basic latency metrics.
+type fioLatencyStats struct {
+	Min    int64   `json:"min"`
+	Max    int64   `json:"max"`
+	Mean   float64 `json:"mean"`
+	Stddev float64 `json:"stddev"`
+	N      int     `json:"N"`
+}
+
+// LatencyStatsPercentiles holds latency metrics including percentiles.
+type fioLatencyStatsPercentiles struct {
+	Min        int64            `json:"min"`
+	Max        int64            `json:"max"`
+	Mean       float64          `json:"mean"`
+	Stddev     float64          `json:"stddev"`
+	N          int              `json:"N"`
+	Percentile map[string]int64 `json:"percentile"`
+}
 
 func cpuSpeedFromOutput(outputs map[string]script.ScriptOutput) string {
 	var vals []float64
@@ -35,26 +120,40 @@ func cpuSpeedFromOutput(outputs map[string]script.ScriptOutput) string {
 	return fmt.Sprintf("%.0f", util.GeoMean(vals))
 }
 
-func storagePerfFromOutput(outputs map[string]script.ScriptOutput) (readBW, writeBW string) {
-	// fio output format:
-	// READ: bw=140MiB/s (146MB/s), 140MiB/s-140MiB/s (146MB/s-146MB/s), io=16.4GiB (17.6GB), run=120004-120004msec
-	// WRITE: bw=139MiB/s (146MB/s), 139MiB/s-139MiB/s (146MB/s-146MB/s), io=16.3GiB (17.5GB), run=120004-120004msec
-	re := regexp.MustCompile(` bw=(\d+[.]?[\d]*\w+\/s)`)
-	for line := range strings.SplitSeq(strings.TrimSpace(outputs[script.StorageBenchmarkScriptName].Stdout), "\n") {
-		if strings.Contains(line, "READ: bw=") {
-			matches := re.FindStringSubmatch(line)
-			if len(matches) != 0 {
-				readBW = matches[1]
-			}
-		} else if strings.Contains(line, "WRITE: bw=") {
-			matches := re.FindStringSubmatch(line)
-			if len(matches) != 0 {
-				writeBW = matches[1]
-			}
-		} else if strings.Contains(line, "ERROR: ") {
-			slog.Error("failed to run storage benchmark", slog.String("line", line))
-		}
+func storagePerfFromOutput(outputs map[string]script.ScriptOutput) (readLat, readBw, writeLat, writeBw string) {
+	output := outputs[script.StorageBenchmarkScriptName].Stdout
+	slog.Debug("storage benchmark output", slog.String("output", output))
+
+	i := strings.Index(output, "{\n  \"fio version\"")
+	if i >= 0 {
+		output = output[i:]
+	} else {
+		slog.Error("Unable to find fio output", slog.String("output", output))
+		return
 	}
+	if strings.Contains(output, "ERROR:") {
+		slog.Error("failed to run storage benchmark", slog.String("output", output))
+		return
+	}
+
+	slog.Debug("parsing storage benchmark output")
+	var fioData fioOutput
+	if err := json.Unmarshal([]byte(output), &fioData); err != nil {
+		slog.Error("Error unmarshalling JSON", slog.String("error", err.Error()))
+		return
+	}
+	if len(fioData.Jobs) > 0 {
+		slog.Debug("jobs found in storage benchmark output")
+		job := fioData.Jobs[0]
+		readBw = fmt.Sprintf("%d", job.Read.Bw/1024)
+		readLat = fmt.Sprintf("%.0f", job.Read.LatNs.Mean)
+		writeBw = fmt.Sprintf("%d", job.Write.Bw/1024)
+		writeLat = fmt.Sprintf("%.0f", job.Write.LatNs.Mean)
+	} else {
+		slog.Error("No jobs found in storage benchmark output", slog.String("output", output))
+	}
+
+	slog.Debug("storage benchmark output", slog.String("readLat", readLat), slog.String("readBw", readBw), slog.String("writeLat", writeLat), slog.String("writeBw", writeBw))
 	return
 }
 
