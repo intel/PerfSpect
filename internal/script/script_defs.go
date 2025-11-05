@@ -1176,7 +1176,8 @@ fio --name=bandwidth --directory=$test_dir --numjobs=$numjobs \
 --size="$file_size_g"G --time_based --runtime=$runtime --ramp_time=$ramp_time --ioengine=$ioengine \
 --direct=1 --verify=0 --bs=1M --iodepth=1 --rw=rw \
 --group_reporting=1 --iodepth_batch_submit=64 \
---iodepth_batch_complete_max=64
+--iodepth_batch_complete_max=64 \
+--output-format=json
 rm -rf $test_dir
 `,
 		Superuser:  true,
