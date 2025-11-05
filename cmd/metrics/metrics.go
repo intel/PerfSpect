@@ -1147,20 +1147,22 @@ func prepareTarget(targetContext *targetContext, localTempDir string, localPerfP
 	var err error
 	_ = statusUpdate(myTarget.GetName(), "configuring target")
 	// are PMUs being used on target?
-	if family, err := myTarget.GetFamily(); err == nil && cpus.IsIntelCPUFamilyStr(family) {
-		output, err := script.RunScript(myTarget, script.GetScriptByName(script.PMUBusyScriptName), localTempDir)
-		if err != nil {
-			err = fmt.Errorf("failed to check if PMUs are in use: %w", err)
-			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %v", err))
-			targetContext.err = err
-			channelError <- targetError{target: myTarget, err: err}
-			return
-		}
-		for line := range strings.SplitSeq(output.Stdout, "\n") {
-			// if one of the PMU MSR registers is active, then the PMU is in use (ignore cpu_cycles)
-			if strings.Contains(line, "Active") && !strings.Contains(line, "0x30a") {
-				slog.Warn("PMU is in use on target", slog.String("target", myTarget.GetName()), slog.String("line", line))
-				_ = statusUpdate(myTarget.GetName(), "Warning: PMU in use, see log for details")
+	if !flagNoRoot {
+		if family, err := myTarget.GetFamily(); err == nil && cpus.IsIntelCPUFamilyStr(family) {
+			output, err := script.RunScript(myTarget, script.GetScriptByName(script.PMUBusyScriptName), localTempDir)
+			if err != nil {
+				err = fmt.Errorf("failed to check if PMUs are in use: %w", err)
+				_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %v", err))
+				targetContext.err = err
+				channelError <- targetError{target: myTarget, err: err}
+				return
+			}
+			for line := range strings.SplitSeq(output.Stdout, "\n") {
+				// if one of the PMU MSR registers is active, then the PMU is in use (ignore cpu_cycles)
+				if strings.Contains(line, "Active") && !strings.Contains(line, "0x30a") {
+					slog.Warn("PMU is in use on target", slog.String("target", myTarget.GetName()), slog.String("line", line))
+					_ = statusUpdate(myTarget.GetName(), "Warning: PMU in use, see log for details")
+				}
 			}
 		}
 	}
