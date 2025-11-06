@@ -94,6 +94,7 @@ const (
 	NICTableName               = "NIC"
 	NetworkIRQMappingTableName = "Network IRQ Mapping"
 	NetworkConfigTableName     = "Network Configuration"
+	NICPacketSteeringTableName = "NIC Packet Steering"
 	DiskTableName              = "Disk"
 	FilesystemTableName        = "Filesystem"
 	GPUTableName               = "GPU"
@@ -380,6 +381,13 @@ var tableDefinitions = map[string]TableDefinition{
 			script.SysctlScriptName,
 		},
 		FieldsFunc: networkConfigTableValues},
+	NICPacketSteeringTableName: {
+		Name:    NICPacketSteeringTableName,
+		HasRows: true,
+		ScriptNames: []string{
+			script.NicInfoScriptName,
+		},
+		FieldsFunc: nicPacketSteeringTableValues},
 	NetworkIRQMappingTableName: {
 		Name:    NetworkIRQMappingTableName,
 		HasRows: true,
@@ -1626,6 +1634,8 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Driver Version"},
 		{Name: "Firmware Version"},
 		{Name: "MTU", Description: "Maximum Transmission Unit. The largest size packet or frame, specified in octets (eight-bit bytes), that can be sent in a packet- or frame-based network such as the Internet."},
+		{Name: "TX Queues"},
+		{Name: "RX Queues"},
 		{Name: "IRQBalance", Description: "System level setting. Dynamically monitors system activity and spreads IRQs across available cores, aiming to balance CPU load, improve throughput, and reduce latency for interrupt-heavy workloads."},
 		{Name: "Adaptive RX", Description: "Enables dynamic adjustment of receive interrupt coalescing based on traffic patterns."},
 		{Name: "Adaptive TX", Description: "Enables dynamic adjustment of transmit interrupt coalescing based on traffic patterns."},
@@ -1662,11 +1672,80 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 		fields[10].Values = append(fields[10].Values, nicInfo.DriverVersion)
 		fields[11].Values = append(fields[11].Values, nicInfo.FirmwareVersion)
 		fields[12].Values = append(fields[12].Values, nicInfo.MTU)
-		fields[13].Values = append(fields[13].Values, nicInfo.IRQBalance)
-		fields[14].Values = append(fields[14].Values, nicInfo.AdaptiveRX)
-		fields[15].Values = append(fields[15].Values, nicInfo.AdaptiveTX)
-		fields[16].Values = append(fields[16].Values, nicInfo.RxUsecs)
-		fields[17].Values = append(fields[17].Values, nicInfo.TxUsecs)
+		fields[13].Values = append(fields[13].Values, nicInfo.TXQueues)
+		fields[14].Values = append(fields[14].Values, nicInfo.RXQueues)
+		fields[15].Values = append(fields[15].Values, nicInfo.IRQBalance)
+		fields[16].Values = append(fields[16].Values, nicInfo.AdaptiveRX)
+		fields[17].Values = append(fields[17].Values, nicInfo.AdaptiveTX)
+		fields[18].Values = append(fields[18].Values, nicInfo.RxUsecs)
+		fields[19].Values = append(fields[19].Values, nicInfo.TxUsecs)
+	}
+	return fields
+}
+
+func nicPacketSteeringTableValues(outputs map[string]script.ScriptOutput) []Field {
+	allNicsInfo := parseNicInfo(outputs[script.NicInfoScriptName].Stdout)
+	if len(allNicsInfo) == 0 {
+		return []Field{}
+	}
+
+	// Find the maximum number of queues across all NICs for both TX and RX
+	maxNumQueues := 0
+	for _, nicInfo := range allNicsInfo {
+		txq, err := strconv.Atoi(nicInfo.TXQueues)
+		if err == nil && txq > maxNumQueues {
+			maxNumQueues = txq
+		}
+		rxq, err := strconv.Atoi(nicInfo.RXQueues)
+		if err == nil && rxq > maxNumQueues {
+			maxNumQueues = rxq
+		}
+	}
+
+	fields := []Field{
+		{Name: "Interface"},
+		{Name: "Type", Description: "XPS (Transmit Packet Steering) and RPS (Receive Packet Steering) are software-based mechanisms that allow the selection of a specific logical CPU core to handle the transmission or processing of network packets for a given queue."},
+	}
+	for i := 0; i < maxNumQueues; i++ {
+		fields = append(fields, Field{Name: strconv.Itoa(i)})
+	}
+
+	for _, nicInfo := range allNicsInfo {
+		// XPS row
+		if nicInfo.TXQueues != "0" && len(nicInfo.XPSCPUs) > 0 {
+			xpsValues := make([]string, maxNumQueues)
+			for queue, val := range nicInfo.XPSCPUs {
+				queueNum, err := strconv.Atoi(strings.TrimPrefix(queue, "tx-"))
+				if err == nil && queueNum < maxNumQueues {
+					xpsValues[queueNum] = hexBitmapToCPUList(val)
+				}
+			}
+			fields[0].Values = append(fields[0].Values, nicInfo.Name)
+			fields[1].Values = append(fields[1].Values, "xps_cpus")
+			for i := 0; i < maxNumQueues; i++ {
+				fields[i+2].Values = append(fields[i+2].Values, xpsValues[i])
+			}
+		}
+
+		// RPS row
+		if nicInfo.RXQueues != "0" && len(nicInfo.RPSCPUs) > 0 {
+			rpsValues := make([]string, maxNumQueues)
+			for queue, val := range nicInfo.RPSCPUs {
+				queueNum, err := strconv.Atoi(strings.TrimPrefix(queue, "rx-"))
+				if err == nil && queueNum < maxNumQueues {
+					rpsValues[queueNum] = hexBitmapToCPUList(val)
+				}
+			}
+			fields[0].Values = append(fields[0].Values, nicInfo.Name)
+			fields[1].Values = append(fields[1].Values, "rps_cpus")
+			for i := 0; i < maxNumQueues; i++ {
+				fields[i+2].Values = append(fields[i+2].Values, rpsValues[i])
+			}
+		}
+	}
+
+	if len(fields[0].Values) == 0 {
+		return []Field{}
 	}
 	return fields
 }
