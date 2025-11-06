@@ -1260,6 +1260,7 @@ type nicInfo struct {
 	TxUsecs         string
 	Card            string
 	Port            string
+	MTU             string
 	IsVirtual       bool
 }
 
@@ -1289,6 +1290,7 @@ func parseNicInfo(scriptOutput string) []nicInfo {
 			"IRQ Balance: ":      &nic.IRQBalance,
 			"rx-usecs: ":         &nic.RxUsecs,
 			"tx-usecs: ":         &nic.TxUsecs,
+			"MTU: ":              &nic.MTU,
 		}
 		for line := range strings.SplitSeq(nicOutput, "\n") {
 			line = strings.TrimSpace(line)

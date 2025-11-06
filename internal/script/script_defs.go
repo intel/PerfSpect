@@ -758,6 +758,7 @@ rdmsr 0x2FFE
 	echo "Model ID: $(echo "$udevadm_out" | grep ID_MODEL_ID= | cut -d'=' -f2)"
 	echo "Vendor: $(echo "$udevadm_out" | grep ID_VENDOR_FROM_DATABASE= | cut -d'=' -f2)"
 	echo "Model: $(echo "$udevadm_out" | grep ID_MODEL_FROM_DATABASE= | cut -d'=' -f2)"
+	echo "MTU: $(cat /sys/class/net/"$ifc"/mtu 2>/dev/null)"
 	echo "$ethtool_out"
 	echo "$ethtool_i_out"
 	if ethtool_c_out=$(ethtool -c "$ifc" 2>/dev/null); then

@@ -1625,6 +1625,7 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Driver"},
 		{Name: "Driver Version"},
 		{Name: "Firmware Version"},
+		{Name: "MTU", Description: "Maximum Transmission Unit. The largest size packet or frame, specified in octets (eight-bit bytes), that can be sent in a packet- or frame-based network such as the Internet."},
 		{Name: "IRQBalance", Description: "System level setting. Dynamically monitors system activity and spreads IRQs across available cores, aiming to balance CPU load, improve throughput, and reduce latency for interrupt-heavy workloads."},
 		{Name: "Adaptive RX", Description: "Enables dynamic adjustment of receive interrupt coalescing based on traffic patterns."},
 		{Name: "Adaptive TX", Description: "Enables dynamic adjustment of transmit interrupt coalescing based on traffic patterns."},
@@ -1660,11 +1661,12 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 		fields[9].Values = append(fields[9].Values, nicInfo.Driver)
 		fields[10].Values = append(fields[10].Values, nicInfo.DriverVersion)
 		fields[11].Values = append(fields[11].Values, nicInfo.FirmwareVersion)
-		fields[12].Values = append(fields[12].Values, nicInfo.IRQBalance)
-		fields[13].Values = append(fields[13].Values, nicInfo.AdaptiveRX)
-		fields[14].Values = append(fields[14].Values, nicInfo.AdaptiveTX)
-		fields[15].Values = append(fields[15].Values, nicInfo.RxUsecs)
-		fields[16].Values = append(fields[16].Values, nicInfo.TxUsecs)
+		fields[12].Values = append(fields[12].Values, nicInfo.MTU)
+		fields[13].Values = append(fields[13].Values, nicInfo.IRQBalance)
+		fields[14].Values = append(fields[14].Values, nicInfo.AdaptiveRX)
+		fields[15].Values = append(fields[15].Values, nicInfo.AdaptiveTX)
+		fields[16].Values = append(fields[16].Values, nicInfo.RxUsecs)
+		fields[17].Values = append(fields[17].Values, nicInfo.TxUsecs)
 	}
 	return fields
 }
