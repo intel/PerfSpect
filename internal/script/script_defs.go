@@ -780,6 +780,18 @@ rdmsr 0x2FFE
 	done
 	printf "\n"
 	echo "IRQ Balance: $(pgrep irqbalance >/dev/null 2>&1 && echo "Enabled" || echo "Disabled")"
+	echo "TX Queues: $(ls -d /sys/class/net/"$ifc"/queues/tx-* | wc -l)"
+	echo "RX Queues: $(ls -d /sys/class/net/"$ifc"/queues/rx-* | wc -l)"
+	for q in /sys/class/net/"$ifc"/queues/tx-*; do
+		if [ -f "$q/xps_cpus" ]; then
+			echo "xps_cpus $(basename "$q"): $(cat "$q/xps_cpus")"
+		fi
+	done
+	for q in /sys/class/net/"$ifc"/queues/rx-*; do
+		if [ -f "$q/rps_cpus" ]; then
+			echo "rps_cpus $(basename "$q"): $(cat "$q/rps_cpus")"
+		fi
+	done
 	echo "----------------------------------------"
 done
 `,

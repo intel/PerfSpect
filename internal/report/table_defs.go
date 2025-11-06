@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"regexp"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -94,6 +95,7 @@ const (
 	NICTableName               = "NIC"
 	NetworkIRQMappingTableName = "Network IRQ Mapping"
 	NetworkConfigTableName     = "Network Configuration"
+	NICPacketSteeringTableName = "NIC Packet Steering"
 	DiskTableName              = "Disk"
 	FilesystemTableName        = "Filesystem"
 	GPUTableName               = "GPU"
@@ -380,6 +382,13 @@ var tableDefinitions = map[string]TableDefinition{
 			script.SysctlScriptName,
 		},
 		FieldsFunc: networkConfigTableValues},
+	NICPacketSteeringTableName: {
+		Name:    NICPacketSteeringTableName,
+		HasRows: true,
+		ScriptNames: []string{
+			script.NicInfoScriptName,
+		},
+		FieldsFunc: nicPacketSteeringTableValues},
 	NetworkIRQMappingTableName: {
 		Name:    NetworkIRQMappingTableName,
 		HasRows: true,
@@ -1626,6 +1635,8 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Driver Version"},
 		{Name: "Firmware Version"},
 		{Name: "MTU", Description: "Maximum Transmission Unit. The largest size packet or frame, specified in octets (eight-bit bytes), that can be sent in a packet- or frame-based network such as the Internet."},
+		{Name: "TX Queues"},
+		{Name: "RX Queues"},
 		{Name: "IRQBalance", Description: "System level setting. Dynamically monitors system activity and spreads IRQs across available cores, aiming to balance CPU load, improve throughput, and reduce latency for interrupt-heavy workloads."},
 		{Name: "Adaptive RX", Description: "Enables dynamic adjustment of receive interrupt coalescing based on traffic patterns."},
 		{Name: "Adaptive TX", Description: "Enables dynamic adjustment of transmit interrupt coalescing based on traffic patterns."},
@@ -1662,13 +1673,77 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 		fields[10].Values = append(fields[10].Values, nicInfo.DriverVersion)
 		fields[11].Values = append(fields[11].Values, nicInfo.FirmwareVersion)
 		fields[12].Values = append(fields[12].Values, nicInfo.MTU)
-		fields[13].Values = append(fields[13].Values, nicInfo.IRQBalance)
-		fields[14].Values = append(fields[14].Values, nicInfo.AdaptiveRX)
-		fields[15].Values = append(fields[15].Values, nicInfo.AdaptiveTX)
-		fields[16].Values = append(fields[16].Values, nicInfo.RxUsecs)
-		fields[17].Values = append(fields[17].Values, nicInfo.TxUsecs)
+		fields[13].Values = append(fields[13].Values, nicInfo.TXQueues)
+		fields[14].Values = append(fields[14].Values, nicInfo.RXQueues)
+		fields[15].Values = append(fields[15].Values, nicInfo.IRQBalance)
+		fields[16].Values = append(fields[16].Values, nicInfo.AdaptiveRX)
+		fields[17].Values = append(fields[17].Values, nicInfo.AdaptiveTX)
+		fields[18].Values = append(fields[18].Values, nicInfo.RxUsecs)
+		fields[19].Values = append(fields[19].Values, nicInfo.TxUsecs)
 	}
 	return fields
+}
+
+func nicPacketSteeringTableValues(outputs map[string]script.ScriptOutput) []Field {
+	allNicsInfo := parseNicInfo(outputs[script.NicInfoScriptName].Stdout)
+	if len(allNicsInfo) == 0 {
+		return []Field{}
+	}
+
+	fields := []Field{
+		{Name: "Interface"},
+		{Name: "Type", Description: "XPS (Transmit Packet Steering) and RPS (Receive Packet Steering) are software-based mechanisms that allow the selection of a specific logical CPU core to handle the transmission or processing of network packets for a given queue."},
+		{Name: "Queue:CPU(s) | Queue|CPU(s) | ..."},
+	}
+
+	for _, nicInfo := range allNicsInfo {
+		// XPS row
+		if nicInfo.TXQueues != "0" {
+			fields[0].Values = append(fields[0].Values, nicInfo.Name)
+			fields[1].Values = append(fields[1].Values, "xps_cpus")
+			fields[2].Values = append(fields[2].Values, formatQueueCPUMappings(nicInfo.XPSCPUs, "tx-"))
+		}
+
+		// RPS row
+		if nicInfo.RXQueues != "0" {
+			fields[0].Values = append(fields[0].Values, nicInfo.Name)
+			fields[1].Values = append(fields[1].Values, "rps_cpus")
+			fields[2].Values = append(fields[2].Values, formatQueueCPUMappings(nicInfo.RPSCPUs, "rx-"))
+		}
+	}
+
+	if len(fields[0].Values) == 0 {
+		return []Field{}
+	}
+	return fields
+}
+
+func formatQueueCPUMappings(mappings map[string]string, prefix string) string {
+	var queueMappings []string
+
+	// Extract and sort queue numbers to ensure consistent output
+	var queues []int
+	for queueStr := range mappings {
+		queueNum, err := strconv.Atoi(strings.TrimPrefix(queueStr, prefix))
+		if err == nil {
+			queues = append(queues, queueNum)
+		}
+	}
+	sort.Ints(queues)
+
+	for _, queueNum := range queues {
+		queueStr := fmt.Sprintf("%s%d", prefix, queueNum)
+		cpus := mappings[queueStr]
+		// a nil value can be returned from the map if the key does not exist, so check for that
+		if cpus != "" {
+			queueMappings = append(queueMappings, fmt.Sprintf("%d:%s", queueNum, cpus))
+		}
+	}
+
+	if len(queueMappings) == 0 {
+		return "N/A"
+	}
+	return strings.Join(queueMappings, " | ")
 }
 
 func networkIRQMappingTableValues(outputs map[string]script.ScriptOutput) []Field {

@@ -171,7 +171,7 @@ var categories = []common.Category{
 	{FlagName: flagElcName, FlagVar: &flagElc, Help: "Efficiency Latency Control Settings", TableNames: []string{report.ElcTableName}},
 	{FlagName: flagMemoryName, FlagVar: &flagMemory, Help: "Memory Configuration", TableNames: []string{report.MemoryTableName}},
 	{FlagName: flagDimmName, FlagVar: &flagDimm, Help: "DIMM Population", TableNames: []string{report.DIMMTableName}},
-	{FlagName: flagNicName, FlagVar: &flagNic, Help: "Network Cards", TableNames: []string{report.NICTableName}},
+	{FlagName: flagNicName, FlagVar: &flagNic, Help: "Network Cards", TableNames: []string{report.NICTableName, report.NICPacketSteeringTableName}},
 	{FlagName: flagNetConfigName, FlagVar: &flagNetConfig, Help: "Network Configuration", TableNames: []string{report.NetworkConfigTableName}},
 	{FlagName: flagNetIrqName, FlagVar: &flagNetIrq, Help: "Network IRQ to CPU Mapping", TableNames: []string{report.NetworkIRQMappingTableName}},
 	{FlagName: flagDiskName, FlagVar: &flagDisk, Help: "Storage Devices", TableNames: []string{report.DiskTableName}},
