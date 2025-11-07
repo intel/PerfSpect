@@ -120,7 +120,7 @@ func (event CoreEvent) IsCollectable(metadata Metadata) bool {
 			return false // Off-core response events are not supported in process or cgroup scope
 		}
 	}
-	if !metadata.SupportsRefCycles && strings.Contains(event.EventName, "ref-cycles") {
+	if !metadata.SupportsRefCycles && strings.Contains(event.EventName, "CPU_CLK_UNHALTED.REF_TSC") { // AKA ref-cycles
 		slog.Debug("Ref-cycles events not supported", slog.String("event", event.EventName))
 		return false // ref-cycles events are not supported
 	}
