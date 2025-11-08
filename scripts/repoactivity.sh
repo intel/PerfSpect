@@ -28,7 +28,8 @@ repo=${GITHUB_REPO:-perfspect}
 for i in {5..0}
 do
   # Calculate the start date for the month
-  start_date=$(date -d "$current_date -$i month -$(($(date +%d)-1)) days" +%Y-%m-01)
+  # First day of the month that is $i months before current_date. Avoid arithmetic on %d (leading 0 -> octal).
+  start_date=$(date -d "$current_date -$i month" +%Y-%m-01)
   
   # Calculate the end date for the month
   end_date=$(date -d "$start_date +1 month -1 day" +%Y-%m-%d)
