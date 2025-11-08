@@ -1142,21 +1142,24 @@ avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd
 	StorageBenchmarkScriptName: {
 		Name: StorageBenchmarkScriptName,
 		ScriptTemplate: `
-numjobs=1
+numjobs=1 # number of parallel jobs to run
 file_size_g=5
 space_needed_k=$(( (file_size_g + 1) * 1024 * 1024 * numjobs )) # space needed in kilobytes: (file_size_g + 1) GB per job
 ramp_time=5s
-runtime=120s
-ioengine=sync
+runtime=30s
+ioengine=libaio
+iodepth=64
+iodepth_batch_submit=64         # must be less than or equal to iodepth
+iodepth_batch_complete_max=64   # must be less than or equal to iodepth
 # check if .StorageDir is a directory
 if [[ ! -d "{{.StorageDir}}" ]]; then
-	echo "ERROR: {{.StorageDir}} does not exist"
-	exit 1
+    echo "ERROR: {{.StorageDir}} does not exist"
+    exit 1
 fi
 # check if .StorageDir is writeable
 if [[ ! -w "{{.StorageDir}}" ]]; then
-	echo "ERROR: {{.StorageDir}} is not writeable"
-	exit 1
+    echo "ERROR: {{.StorageDir}} is not writeable"
+    exit 1
 fi
 # check if .StorageDir has enough space
 # example output for df -P /tmp:
@@ -1164,19 +1167,20 @@ fi
 # /dev/sdd        1055762868 196668944 805390452      20% /
 available_space=$(df -P "{{.StorageDir}}" | awk 'NR==2 {print $4}')
 if [[ $available_space -lt $space_needed_k ]]; then
-	echo "ERROR: {{.StorageDir}} has ${available_space}K available space. A minimum of ${space_needed_k}K is required to run this benchmark."
-	exit 1
+    echo "ERROR: {{.StorageDir}} has ${available_space}K available space. A minimum of ${space_needed_k}K is required to run this benchmark."
+    exit 1
 fi
 # create temporary directory for fio test
 test_dir=$(mktemp -d --tmpdir="{{.StorageDir}}")
 sync
 /sbin/sysctl -w vm.drop_caches=3 || true
-# single-threaded read & write bandwidth test
+# read & write bandwidth test
 fio --name=bandwidth --directory=$test_dir --numjobs=$numjobs \
 --size="$file_size_g"G --time_based --runtime=$runtime --ramp_time=$ramp_time --ioengine=$ioengine \
---direct=1 --verify=0 --bs=1M --iodepth=64 --rw=rw \
---group_reporting=1 --iodepth_batch_submit=64 \
---iodepth_batch_complete_max=64
+--direct=1 --verify=0 --bs=1M --iodepth=$iodepth --rw=rw \
+--group_reporting=1 --iodepth_batch_submit=$iodepth_batch_submit \
+--iodepth_batch_complete_max=$iodepth_batch_complete_max
+# cleanup
 rm -rf $test_dir
 `,
 		Superuser:  true,
