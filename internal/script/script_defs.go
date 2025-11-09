@@ -1142,13 +1142,13 @@ avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd
 	StorageBenchmarkScriptName: {
 		Name: StorageBenchmarkScriptName,
 		ScriptTemplate: `
-numjobs=1 # number of parallel jobs to run
-file_size_g=5
+numjobs=1     # number of parallel jobs to run
+file_size_g=5 # each job will use a file of this size in GB
 space_needed_k=$(( (file_size_g + 1) * 1024 * 1024 * numjobs )) # space needed in kilobytes: (file_size_g + 1) GB per job
 ramp_time=5s
 runtime=30s
 ioengine=libaio
-iodepth=64
+iodepth=64    # parallel operations per job
 iodepth_batch_submit=64         # must be less than or equal to iodepth
 iodepth_batch_complete_max=64   # must be less than or equal to iodepth
 # check if .StorageDir is a directory
