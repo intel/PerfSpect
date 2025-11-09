@@ -53,17 +53,6 @@ RUN success=false; \
     done; \
     $success || (echo "Failed to install build tools after 5 attempts" && exit 1)
 
-# install java
-# RUN success=false; \
-#     for i in {1..5}; do \
-#         apt-get install -y \
-#         default-jre default-jdk \
-#         && success=true && break; \
-#         echo "Retrying in 5 seconds... ($i/5)" && sleep 5; \
-#     done; \
-#     $success || (echo "Failed to install java after 5 attempts" && exit
-# ENV JAVA_HOME=/usr/lib/jvm/java-1.11.0-openjdk-amd64
-
 # need golang to build go tools like ethtool
 RUN rm -rf /usr/local/go && wget -qO- https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -C /usr/local -xz
 ENV PATH="${PATH}:/usr/local/go/bin"
