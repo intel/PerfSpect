@@ -303,18 +303,10 @@ func getSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 	for _, isaHex := range values[1:] {
 		var isaFreqs []string
 		var freqs []int
-		if isaHex != "0" {
-			var err error
-			freqs, err = getFrequenciesFromHex(isaHex)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get frequencies from Hex string: %w", err)
-			}
-		} else {
-			// if the ISA is not supported, set the frequency to zero for all buckets
-			freqs = make([]int, len(bucketCoreCounts))
-			for i := range freqs {
-				freqs[i] = 0
-			}
+		var err error
+		freqs, err = getFrequenciesFromHex(isaHex)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get frequencies from Hex string: %w", err)
 		}
 		if len(freqs) != len(bucketCoreCounts) {
 			freqs, err = padFrequencies(freqs, len(bucketCoreCounts))
@@ -339,6 +331,9 @@ func getSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 	}
 	// add fieldNames for ISAs that have frequencies
 	for i := range allIsaFreqs {
+		if len(allIsaFreqs[i]) < 1 {
+			return nil, fmt.Errorf("no frequencies found for isa")
+		}
 		if allIsaFreqs[i][0] == "0.0" {
 			continue
 		}
@@ -348,20 +343,25 @@ func getSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 		row := make([]string, 0, len(allIsaFreqs)+2)
 		// add the total core buckets for multi-die architectures
 		if archMultiplier > 1 {
+			if i >= len(totalCoreBuckets) {
+				return nil, fmt.Errorf("index out of range for total core buckets")
+			}
 			row = append(row, totalCoreBuckets[i])
 		}
 		// add the die core buckets
 		row = append(row, bucket)
 		// add the frequencies for each ISA
 		for _, isaFreqs := range allIsaFreqs {
+			if len(isaFreqs) < 1 {
+				return nil, fmt.Errorf("no frequencies found for isa")
+			}
 			if isaFreqs[0] == "0.0" {
 				continue
-			} else {
-				if i >= len(isaFreqs) {
-					return nil, fmt.Errorf("index out of range for isa frequencies")
-				}
-				row = append(row, isaFreqs[i])
 			}
+			if i >= len(isaFreqs) {
+				return nil, fmt.Errorf("index out of range for isa frequencies")
+			}
+			row = append(row, isaFreqs[i])
 		}
 		specCoreFreqs = append(specCoreFreqs, row)
 	}
@@ -895,7 +895,11 @@ func elcFieldValuesFromOutput(outputs map[string]script.ScriptOutput) (fieldValu
 		values := []string{}
 		// value rows
 		for _, row := range rows[1:] {
-			values = append(values, row[fieldNamesIndex])
+			if fieldNamesIndex < len(row) {
+				values = append(values, row[fieldNamesIndex])
+			} else {
+				values = append(values, "")
+			}
 		}
 		fieldValues = append(fieldValues, Field{Name: fieldName, Values: values})
 	}
@@ -1010,12 +1014,16 @@ func eppFromOutput(outputs map[string]script.ScriptOutput) string {
 	}
 	// check if the epp valid bit is set and consistent across all cores
 	var eppValid string
-	for i, line := range strings.Split(outputs[script.EppValidScriptName].Stdout, "\n") { // MSR 0x774, bit 60
+	for line := range strings.SplitSeq(outputs[script.EppValidScriptName].Stdout, "\n") { // MSR 0x774, bit 60
 		if line == "" {
 			continue
 		}
-		currentEpbValid := strings.TrimSpace(strings.Split(line, ":")[1])
-		if i == 0 {
+		parts := strings.Split(line, ":")
+		if len(parts) < 2 {
+			continue
+		}
+		currentEpbValid := strings.TrimSpace(parts[1])
+		if eppValid == "" {
 			eppValid = currentEpbValid
 			continue
 		}
@@ -1026,12 +1034,16 @@ func eppFromOutput(outputs map[string]script.ScriptOutput) string {
 	}
 	// check if epp package control bit is set and consistent across all cores
 	var eppPkgCtrl string
-	for i, line := range strings.Split(outputs[script.EppPackageControlScriptName].Stdout, "\n") { // MSR 0x774, bit 42
+	for line := range strings.SplitSeq(outputs[script.EppPackageControlScriptName].Stdout, "\n") { // MSR 0x774, bit 42
 		if line == "" {
 			continue
 		}
-		currentEppPkgCtrl := strings.TrimSpace(strings.Split(line, ":")[1])
-		if i == 0 {
+		parts := strings.Split(line, ":")
+		if len(parts) < 2 {
+			continue
+		}
+		currentEppPkgCtrl := strings.TrimSpace(parts[1])
+		if eppPkgCtrl == "" {
 			eppPkgCtrl = currentEppPkgCtrl
 			continue
 		}
@@ -1050,12 +1062,16 @@ func eppFromOutput(outputs map[string]script.ScriptOutput) string {
 		return eppValToLabel(int(msr))
 	} else {
 		var epp string
-		for i, line := range strings.Split(outputs[script.EppScriptName].Stdout, "\n") { // MSR 0x774, bits 24-31 (per-core)
+		for line := range strings.SplitSeq(outputs[script.EppScriptName].Stdout, "\n") { // MSR 0x774, bits 24-31 (per-core)
 			if line == "" {
 				continue
 			}
-			currentEpp := strings.TrimSpace(strings.Split(line, ":")[1])
-			if i == 0 {
+			parts := strings.Split(line, ":")
+			if len(parts) < 2 {
+				continue
+			}
+			currentEpp := strings.TrimSpace(parts[1])
+			if epp == "" {
 				epp = currentEpp
 				continue
 			}
@@ -1461,7 +1477,7 @@ func filesystemFieldValuesFromOutput(outputs map[string]script.ScriptOutput) []F
 		}
 		fields := strings.Fields(line)
 		// "Mounted On" gets split into two fields, rejoin
-		if i == 0 && fields[len(fields)-2] == "Mounted" && fields[len(fields)-1] == "on" {
+		if i == 0 && len(fields) >= 2 && fields[len(fields)-2] == "Mounted" && fields[len(fields)-1] == "on" {
 			fields[len(fields)-2] = "Mounted on"
 			fields = fields[:len(fields)-1]
 			for _, field := range fields {
@@ -1720,7 +1736,7 @@ func getPCIDevices(class string, outputs map[string]script.ScriptOutput) (device
 			continue
 		}
 		match := re.FindStringSubmatch(line)
-		if len(match) > 0 {
+		if len(match) >= 3 {
 			key := match[1]
 			value := match[2]
 			device[key] = value
