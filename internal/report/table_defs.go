@@ -667,7 +667,7 @@ var tableDefinitions = map[string]TableDefinition{
 	StorageBenchmarkTableName: {
 		Name:      StorageBenchmarkTableName,
 		MenuLabel: StorageBenchmarkTableName,
-		HasRows:   false,
+		HasRows:   true,
 		ScriptNames: []string{
 			script.StorageBenchmarkScriptName,
 		},
@@ -1690,6 +1690,7 @@ func nicPacketSteeringTableValues(outputs map[string]script.ScriptOutput) []Fiel
 	}
 
 	// Find the maximum number of queues across all NICs for both TX and RX
+	slog.Debug("allNicsInfo", slog.Any("allNicsInfo", allNicsInfo))
 	maxNumQueues := 0
 	for _, nicInfo := range allNicsInfo {
 		txq, err := strconv.Atoi(nicInfo.TXQueues)
@@ -1701,10 +1702,11 @@ func nicPacketSteeringTableValues(outputs map[string]script.ScriptOutput) []Fiel
 			maxNumQueues = rxq
 		}
 	}
+	slog.Debug("maxNumQueues", slog.Int("maxNumQueues", maxNumQueues))
 
 	fields := []Field{
 		{Name: "Interface"},
-		{Name: "Type", Description: "XPS (Transmit Packet Steering) and RPS (Receive Packet Steering) are software-based mechanisms that allow the selection of a specific CPU core to handle the transmission or processing of network packets for a given queue."},
+		{Name: "Queue Type", Description: "XPS (Transmit Packet Steering) and RPS (Receive Packet Steering) are software-based mechanisms that allow the selection of a specific CPU core to handle the transmission or processing of network packets for a given queue."},
 	}
 	for i := 0; i < maxNumQueues; i++ {
 		fields = append(fields, Field{Name: strconv.Itoa(i)})
@@ -1720,6 +1722,7 @@ func nicPacketSteeringTableValues(outputs map[string]script.ScriptOutput) []Fiel
 					xpsValues[queueNum] = hexBitmapToCPUList(val)
 				}
 			}
+			slog.Debug("xpsrow", slog.String("interface", nicInfo.Name), slog.String("type", "xps_cpus"), slog.Any("values", xpsValues))
 			fields[0].Values = append(fields[0].Values, nicInfo.Name)
 			fields[1].Values = append(fields[1].Values, "xps_cpus")
 			for i := 0; i < maxNumQueues; i++ {
@@ -2443,17 +2446,50 @@ func numaBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return fields
 }
 
+// formatOrEmpty formats a value and returns an empty string if the formatted value is "0".
+func formatOrEmpty(format string, value any) string {
+	s := fmt.Sprintf(format, value)
+	if s == "0" {
+		return ""
+	}
+	return s
+}
+
 func storageBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
-	readLat, readBw, writeLat, writeBw := storagePerfFromOutput(outputs)
-	if readLat == "" && readBw == "" && writeLat == "" && writeBw == "" {
+	fioData, err := storagePerfFromOutput(outputs)
+	if err != nil {
+		slog.Error("failed to get storage benchmark data", slog.String("error", err.Error()))
 		return []Field{}
 	}
-	return []Field{
-		{Name: "Single-Thread Read Latency (ns)", Values: []string{readLat}},
-		{Name: "Single-Thread Read Bandwidth (MiB/s)", Values: []string{readBw}},
-		{Name: "Single-Thread Write Latency (ns)", Values: []string{writeLat}},
-		{Name: "Single-Thread Write Bandwidth (MiB/s)", Values: []string{writeBw}},
+
+	if len(fioData.Jobs) == 0 {
+		return []Field{}
 	}
+
+	// Initialize the fields for metrics (column headers)
+	fields := []Field{
+		{Name: "Job"},
+		{Name: "Read Latency (us)"},
+		{Name: "Read IOPs"},
+		{Name: "Read Bandwidth (MiB/s)"},
+		{Name: "Write Latency (us)"},
+		{Name: "Write IOPs"},
+		{Name: "Write Bandwidth (MiB/s)"},
+	}
+
+	// For each FIO job, create a new row and populate its values
+	slog.Debug("fioData", slog.Any("jobs", fioData.Jobs))
+	for _, job := range fioData.Jobs {
+		fields[0].Values = append(fields[0].Values, job.Jobname)
+		fields[1].Values = append(fields[1].Values, formatOrEmpty("%.0f", job.Read.LatNs.Mean/1000))
+		fields[2].Values = append(fields[2].Values, formatOrEmpty("%.0f", job.Read.IopsMean))
+		fields[3].Values = append(fields[3].Values, formatOrEmpty("%d", job.Read.Bw/1024))
+		fields[4].Values = append(fields[4].Values, formatOrEmpty("%.0f", job.Write.LatNs.Mean/1000))
+		fields[5].Values = append(fields[5].Values, formatOrEmpty("%.0f", job.Write.IopsMean))
+		fields[6].Values = append(fields[6].Values, formatOrEmpty("%d", job.Write.Bw/1024))
+	}
+
+	return fields
 }
 
 // telemetry

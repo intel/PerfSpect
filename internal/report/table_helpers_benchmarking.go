@@ -120,7 +120,7 @@ func cpuSpeedFromOutput(outputs map[string]script.ScriptOutput) string {
 	return fmt.Sprintf("%.0f", util.GeoMean(vals))
 }
 
-func storagePerfFromOutput(outputs map[string]script.ScriptOutput) (readLat, readBw, writeLat, writeBw string) {
+func storagePerfFromOutput(outputs map[string]script.ScriptOutput) (fioOutput, error) {
 	output := outputs[script.StorageBenchmarkScriptName].Stdout
 	slog.Debug("storage benchmark output", slog.String("output", output))
 
@@ -128,33 +128,22 @@ func storagePerfFromOutput(outputs map[string]script.ScriptOutput) (readLat, rea
 	if i >= 0 {
 		output = output[i:]
 	} else {
-		slog.Error("Unable to find fio output", slog.String("output", output))
-		return
+		return fioOutput{}, fmt.Errorf("unable to find fio output")
 	}
 	if strings.Contains(output, "ERROR:") {
-		slog.Error("failed to run storage benchmark", slog.String("output", output))
-		return
+		return fioOutput{}, fmt.Errorf("failed to run storage benchmark: %s", output)
 	}
 
 	slog.Debug("parsing storage benchmark output")
 	var fioData fioOutput
 	if err := json.Unmarshal([]byte(output), &fioData); err != nil {
-		slog.Error("Error unmarshalling JSON", slog.String("error", err.Error()))
-		return
+		return fioOutput{}, fmt.Errorf("error unmarshalling JSON: %w", err)
 	}
-	if len(fioData.Jobs) > 0 {
-		slog.Debug("jobs found in storage benchmark output")
-		job := fioData.Jobs[0]
-		readBw = fmt.Sprintf("%d", job.Read.Bw/1024)
-		readLat = fmt.Sprintf("%.0f", job.Read.LatNs.Mean)
-		writeBw = fmt.Sprintf("%d", job.Write.Bw/1024)
-		writeLat = fmt.Sprintf("%.0f", job.Write.LatNs.Mean)
-	} else {
-		slog.Error("No jobs found in storage benchmark output", slog.String("output", output))
+	if len(fioData.Jobs) == 0 {
+		return fioOutput{}, fmt.Errorf("no jobs found in storage benchmark output")
 	}
 
-	slog.Debug("storage benchmark output", slog.String("readLat", readLat), slog.String("readBw", readBw), slog.String("writeLat", writeLat), slog.String("writeBw", writeBw))
-	return
+	return fioData, nil
 }
 
 // avxTurboFrequenciesFromOutput parses the output of avx-turbo and returns the turbo frequencies as a map of instruction type to frequencies
