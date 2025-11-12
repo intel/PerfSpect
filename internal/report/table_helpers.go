@@ -357,6 +357,9 @@ func getSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 			if isaFreqs[0] == "0.0" {
 				continue
 			} else {
+				if i >= len(isaFreqs) {
+					return nil, fmt.Errorf("index out of range for isa frequencies")
+				}
 				row = append(row, isaFreqs[i])
 			}
 		}
