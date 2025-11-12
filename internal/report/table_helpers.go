@@ -217,6 +217,18 @@ func getBucketSizesFromHex(hex string) ([]int, error) {
 	return bucketSizes, nil
 }
 
+// padFrequencies adds items to the frequencies slice until it reaches the desired length.
+// The value of the added items is the same as the last item in the original slice.
+func padFrequencies(freqs []int, desiredLength int) ([]int, error) {
+	if len(freqs) == 0 {
+		return nil, fmt.Errorf("cannot pad empty frequencies slice")
+	}
+	for len(freqs) < desiredLength {
+		freqs = append(freqs, freqs[len(freqs)-1])
+	}
+	return freqs, nil
+}
+
 // getSpecFrequencyBuckets
 // returns slice of rows
 // first row is header
@@ -304,6 +316,12 @@ func getSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 				freqs[i] = 0
 			}
 		}
+		if len(freqs) != len(bucketCoreCounts) {
+			freqs, err = padFrequencies(freqs, len(bucketCoreCounts))
+			if err != nil {
+				return nil, fmt.Errorf("failed to pad frequencies: %w", err)
+			}
+		}
 		for _, freq := range freqs {
 			// convert freq to GHz
 			freqf := float64(freq) / 10.0
@@ -339,6 +357,9 @@ func getSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 			if isaFreqs[0] == "0.0" {
 				continue
 			} else {
+				if i >= len(isaFreqs) {
+					return nil, fmt.Errorf("index out of range for isa frequencies")
+				}
 				row = append(row, isaFreqs[i])
 			}
 		}
