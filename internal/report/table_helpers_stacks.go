@@ -5,7 +5,9 @@ package report
 
 import (
 	"fmt"
+	"log/slog"
 	"math"
+	"perfspect/internal/script"
 	"regexp"
 	"strconv"
 	"strings"
@@ -162,4 +164,81 @@ func mergeSystemFolded(perfFp string, perfDwarf string) (merged string, err erro
 
 	merged = mergedStacks.dumpFolded()
 	return
+}
+
+func javaFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
+	sections := getSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
+	if len(sections) == 0 {
+		slog.Warn("no sections in collapsed call stack output")
+		return ""
+	}
+	javaFolded := make(map[string]string)
+	re := regexp.MustCompile(`^async-profiler (\d+) (.*)$`)
+	for header, stacks := range sections {
+		match := re.FindStringSubmatch(header)
+		if match == nil {
+			continue
+		}
+		pid := match[1]
+		processName := match[2]
+		if stacks == "" {
+			slog.Warn("no stacks for java process", slog.String("header", header))
+			continue
+		}
+		if strings.HasPrefix(stacks, "Failed to inject profiler") {
+			slog.Error("profiling data error", slog.String("header", header))
+			continue
+		}
+		_, ok := javaFolded[processName]
+		if processName == "" {
+			processName = "java (" + pid + ")"
+		} else if ok {
+			processName = processName + " (" + pid + ")"
+		}
+		javaFolded[processName] = stacks
+	}
+	folded, err := mergeJavaFolded(javaFolded)
+	if err != nil {
+		slog.Error("failed to merge java stacks", slog.String("error", err.Error()))
+	}
+	return folded
+}
+
+func nativeFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
+	sections := getSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
+	if len(sections) == 0 {
+		slog.Warn("no sections in collapsed call stack output")
+		return ""
+	}
+	var dwarfFolded, fpFolded string
+	for header, content := range sections {
+		switch header {
+		case "perf_dwarf":
+			dwarfFolded = content
+		case "perf_fp":
+			fpFolded = content
+		}
+	}
+	if dwarfFolded == "" && fpFolded == "" {
+		return ""
+	}
+	folded, err := mergeSystemFolded(fpFolded, dwarfFolded)
+	if err != nil {
+		slog.Error("failed to merge native stacks", slog.String("error", err.Error()))
+	}
+	return folded
+}
+
+func maxRenderDepthFromOutput(outputs map[string]script.ScriptOutput) string {
+	sections := getSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
+	if len(sections) == 0 {
+		slog.Warn("no sections in collapsed call stack output")
+		return ""
+	}
+	for header, content := range sections {
+		if header == "maximum depth" {
+			return content
+		}
+	}
+	return ""
 }
