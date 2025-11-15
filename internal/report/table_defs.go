@@ -94,6 +94,7 @@ const (
 	NICTableName               = "NIC"
 	NetworkIRQMappingTableName = "Network IRQ Mapping"
 	NetworkConfigTableName     = "Network Configuration"
+	NICPacketSteeringTableName = "NIC Packet Steering"
 	DiskTableName              = "Disk"
 	FilesystemTableName        = "Filesystem"
 	GPUTableName               = "GPU"
@@ -380,6 +381,13 @@ var tableDefinitions = map[string]TableDefinition{
 			script.SysctlScriptName,
 		},
 		FieldsFunc: networkConfigTableValues},
+	NICPacketSteeringTableName: {
+		Name:    NICPacketSteeringTableName,
+		HasRows: true,
+		ScriptNames: []string{
+			script.NicInfoScriptName,
+		},
+		FieldsFunc: nicPacketSteeringTableValues},
 	NetworkIRQMappingTableName: {
 		Name:    NetworkIRQMappingTableName,
 		HasRows: true,
@@ -659,7 +667,7 @@ var tableDefinitions = map[string]TableDefinition{
 	StorageBenchmarkTableName: {
 		Name:      StorageBenchmarkTableName,
 		MenuLabel: StorageBenchmarkTableName,
-		HasRows:   false,
+		HasRows:   true,
 		ScriptNames: []string{
 			script.StorageBenchmarkScriptName,
 		},
@@ -1625,6 +1633,9 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Driver"},
 		{Name: "Driver Version"},
 		{Name: "Firmware Version"},
+		{Name: "MTU", Description: "Maximum Transmission Unit. The largest size packet or frame, specified in octets (eight-bit bytes), that can be sent in a packet- or frame-based network such as the Internet."},
+		{Name: "TX Queues"},
+		{Name: "RX Queues"},
 		{Name: "IRQBalance", Description: "System level setting. Dynamically monitors system activity and spreads IRQs across available cores, aiming to balance CPU load, improve throughput, and reduce latency for interrupt-heavy workloads."},
 		{Name: "Adaptive RX", Description: "Enables dynamic adjustment of receive interrupt coalescing based on traffic patterns."},
 		{Name: "Adaptive TX", Description: "Enables dynamic adjustment of transmit interrupt coalescing based on traffic patterns."},
@@ -1660,11 +1671,84 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 		fields[9].Values = append(fields[9].Values, nicInfo.Driver)
 		fields[10].Values = append(fields[10].Values, nicInfo.DriverVersion)
 		fields[11].Values = append(fields[11].Values, nicInfo.FirmwareVersion)
-		fields[12].Values = append(fields[12].Values, nicInfo.IRQBalance)
-		fields[13].Values = append(fields[13].Values, nicInfo.AdaptiveRX)
-		fields[14].Values = append(fields[14].Values, nicInfo.AdaptiveTX)
-		fields[15].Values = append(fields[15].Values, nicInfo.RxUsecs)
-		fields[16].Values = append(fields[16].Values, nicInfo.TxUsecs)
+		fields[12].Values = append(fields[12].Values, nicInfo.MTU)
+		fields[13].Values = append(fields[13].Values, nicInfo.TXQueues)
+		fields[14].Values = append(fields[14].Values, nicInfo.RXQueues)
+		fields[15].Values = append(fields[15].Values, nicInfo.IRQBalance)
+		fields[16].Values = append(fields[16].Values, nicInfo.AdaptiveRX)
+		fields[17].Values = append(fields[17].Values, nicInfo.AdaptiveTX)
+		fields[18].Values = append(fields[18].Values, nicInfo.RxUsecs)
+		fields[19].Values = append(fields[19].Values, nicInfo.TxUsecs)
+	}
+	return fields
+}
+
+func nicPacketSteeringTableValues(outputs map[string]script.ScriptOutput) []Field {
+	allNicsInfo := parseNicInfo(outputs[script.NicInfoScriptName].Stdout)
+	if len(allNicsInfo) == 0 {
+		return []Field{}
+	}
+
+	// Find the maximum number of queues across all NICs for both TX and RX
+	slog.Debug("allNicsInfo", slog.Any("allNicsInfo", allNicsInfo))
+	maxNumQueues := 0
+	for _, nicInfo := range allNicsInfo {
+		txq, err := strconv.Atoi(nicInfo.TXQueues)
+		if err == nil && txq > maxNumQueues {
+			maxNumQueues = txq
+		}
+		rxq, err := strconv.Atoi(nicInfo.RXQueues)
+		if err == nil && rxq > maxNumQueues {
+			maxNumQueues = rxq
+		}
+	}
+	slog.Debug("maxNumQueues", slog.Int("maxNumQueues", maxNumQueues))
+
+	fields := []Field{
+		{Name: "Interface"},
+		{Name: "Queue Type", Description: "XPS (Transmit Packet Steering) and RPS (Receive Packet Steering) are software-based mechanisms that allow the selection of a specific CPU core to handle the transmission or processing of network packets for a given queue."},
+	}
+	for i := 0; i < maxNumQueues; i++ {
+		fields = append(fields, Field{Name: strconv.Itoa(i)})
+	}
+
+	for _, nicInfo := range allNicsInfo {
+		// XPS row
+		if nicInfo.TXQueues != "0" && len(nicInfo.XPSCPUs) > 0 {
+			xpsValues := make([]string, maxNumQueues)
+			for queue, val := range nicInfo.XPSCPUs {
+				queueNum, err := strconv.Atoi(strings.TrimPrefix(queue, "tx-"))
+				if err == nil && queueNum < maxNumQueues {
+					xpsValues[queueNum] = hexBitmapToCPUList(val)
+				}
+			}
+			slog.Debug("xpsrow", slog.String("interface", nicInfo.Name), slog.String("type", "xps_cpus"), slog.Any("values", xpsValues))
+			fields[0].Values = append(fields[0].Values, nicInfo.Name)
+			fields[1].Values = append(fields[1].Values, "xps_cpus")
+			for i := 0; i < maxNumQueues; i++ {
+				fields[i+2].Values = append(fields[i+2].Values, xpsValues[i])
+			}
+		}
+
+		// RPS row
+		if nicInfo.RXQueues != "0" && len(nicInfo.RPSCPUs) > 0 {
+			rpsValues := make([]string, maxNumQueues)
+			for queue, val := range nicInfo.RPSCPUs {
+				queueNum, err := strconv.Atoi(strings.TrimPrefix(queue, "rx-"))
+				if err == nil && queueNum < maxNumQueues {
+					rpsValues[queueNum] = hexBitmapToCPUList(val)
+				}
+			}
+			fields[0].Values = append(fields[0].Values, nicInfo.Name)
+			fields[1].Values = append(fields[1].Values, "rps_cpus")
+			for i := 0; i < maxNumQueues; i++ {
+				fields[i+2].Values = append(fields[i+2].Values, rpsValues[i])
+			}
+		}
+	}
+
+	if len(fields[0].Values) == 0 {
+		return []Field{}
 	}
 	return fields
 }
@@ -2362,15 +2446,50 @@ func numaBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
 	return fields
 }
 
+// formatOrEmpty formats a value and returns an empty string if the formatted value is "0".
+func formatOrEmpty(format string, value any) string {
+	s := fmt.Sprintf(format, value)
+	if s == "0" {
+		return ""
+	}
+	return s
+}
+
 func storageBenchmarkTableValues(outputs map[string]script.ScriptOutput) []Field {
-	readBW, writeBW := storagePerfFromOutput(outputs)
-	if readBW == "" && writeBW == "" {
+	fioData, err := storagePerfFromOutput(outputs)
+	if err != nil {
+		slog.Error("failed to get storage benchmark data", slog.String("error", err.Error()))
 		return []Field{}
 	}
-	return []Field{
-		{Name: "Single-Thread Read Bandwidth", Values: []string{readBW}},
-		{Name: "Single-Thread Write Bandwidth", Values: []string{writeBW}},
+
+	if len(fioData.Jobs) == 0 {
+		return []Field{}
 	}
+
+	// Initialize the fields for metrics (column headers)
+	fields := []Field{
+		{Name: "Job"},
+		{Name: "Read Latency (us)"},
+		{Name: "Read IOPs"},
+		{Name: "Read Bandwidth (MiB/s)"},
+		{Name: "Write Latency (us)"},
+		{Name: "Write IOPs"},
+		{Name: "Write Bandwidth (MiB/s)"},
+	}
+
+	// For each FIO job, create a new row and populate its values
+	slog.Debug("fioData", slog.Any("jobs", fioData.Jobs))
+	for _, job := range fioData.Jobs {
+		fields[0].Values = append(fields[0].Values, job.Jobname)
+		fields[1].Values = append(fields[1].Values, formatOrEmpty("%.0f", job.Read.LatNs.Mean/1000))
+		fields[2].Values = append(fields[2].Values, formatOrEmpty("%.0f", job.Read.IopsMean))
+		fields[3].Values = append(fields[3].Values, formatOrEmpty("%d", job.Read.Bw/1024))
+		fields[4].Values = append(fields[4].Values, formatOrEmpty("%.0f", job.Write.LatNs.Mean/1000))
+		fields[5].Values = append(fields[5].Values, formatOrEmpty("%.0f", job.Write.IopsMean))
+		fields[6].Values = append(fields[6].Values, formatOrEmpty("%d", job.Write.Bw/1024))
+	}
+
+	return fields
 }
 
 // telemetry
