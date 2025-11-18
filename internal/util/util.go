@@ -19,12 +19,14 @@ import (
 	"log/slog"
 	"math"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"unicode"
 )
 
@@ -537,13 +539,36 @@ func GetAppDir() string {
 
 // SignalProcess sends a signal to the process with the given PID
 func SignalProcess(pid int, sig os.Signal) error {
-	proc, err := os.FindProcess(pid)
+	proc, err := os.FindProcess(pid) // FindProcess always succeeds on Linux
 	if err != nil {
-		return fmt.Errorf("failed to find process: %w", err)
+		return fmt.Errorf("this shouldn't happen: failed to find process: %w", err)
+	}
+	err = proc.Signal(syscall.Signal(0)) // detect if process exists
+	if err != nil {
+		return fmt.Errorf("process with pid %d does not exist: %w", pid, err)
 	}
 	slog.Debug("sending signal to process", slog.Int("pid", pid), slog.String("signal", sig.String()))
 	err = proc.Signal(sig)
 	if err != nil {
+		// Check if EPERM - try sudo as fallback
+		var errno syscall.Errno
+		if errors.As(err, &errno) && errno == syscall.EPERM {
+			slog.Debug("permission denied, attempting with sudo", slog.Int("pid", pid))
+			// Convert os.Signal to signal number
+			var sigNum int
+			if s, ok := sig.(syscall.Signal); ok {
+				sigNum = int(s)
+			} else {
+				return fmt.Errorf("unsupported signal type: %T", sig)
+			}
+			// Try sudo kill as fallback
+			cmd := exec.Command("sudo", "-n", "kill", "-"+strconv.Itoa(sigNum), strconv.Itoa(pid))
+			if cmdErr := cmd.Run(); cmdErr == nil {
+				slog.Debug("successfully killed process with sudo", slog.Int("pid", pid))
+				return nil
+			}
+			slog.Debug("sudo kill also failed", slog.Int("pid", pid))
+		}
 		return fmt.Errorf("failed to send signal to process (pid %d): %w", pid, err)
 	}
 	return nil
