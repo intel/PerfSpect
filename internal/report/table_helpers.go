@@ -9,6 +9,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"log/slog"
+	"math/big"
 	"regexp"
 	"sort"
 	"strconv"
@@ -1260,7 +1261,12 @@ type nicInfo struct {
 	TxUsecs         string
 	Card            string
 	Port            string
+	MTU             string
 	IsVirtual       bool
+	TXQueues        string
+	RXQueues        string
+	XPSCPUs         map[string]string
+	RPSCPUs         map[string]string
 }
 
 func parseNicInfo(scriptOutput string) []nicInfo {
@@ -1270,6 +1276,8 @@ func parseNicInfo(scriptOutput string) []nicInfo {
 			continue
 		}
 		var nic nicInfo
+		nic.XPSCPUs = make(map[string]string)
+		nic.RPSCPUs = make(map[string]string)
 		// Map of prefixes to field pointers
 		fieldMap := map[string]*string{
 			"Interface: ":        &nic.Name,
@@ -1289,6 +1297,9 @@ func parseNicInfo(scriptOutput string) []nicInfo {
 			"IRQ Balance: ":      &nic.IRQBalance,
 			"rx-usecs: ":         &nic.RxUsecs,
 			"tx-usecs: ":         &nic.TxUsecs,
+			"MTU: ":              &nic.MTU,
+			"TX Queues: ":        &nic.TXQueues,
+			"RX Queues: ":        &nic.RXQueues,
 		}
 		for line := range strings.SplitSeq(nicOutput, "\n") {
 			line = strings.TrimSpace(line)
@@ -1306,6 +1317,23 @@ func parseNicInfo(scriptOutput string) []nicInfo {
 				nic.IsVirtual = (strings.TrimSpace(value) == "yes")
 				continue
 			}
+			// Special parsing for xps_cpus and rps_cpus
+			if strings.HasPrefix(line, "xps_cpus tx-") {
+				parts := strings.SplitN(line, ": ", 2)
+				if len(parts) == 2 {
+					queue := strings.TrimPrefix(parts[0], "xps_cpus ")
+					nic.XPSCPUs[queue] = hexBitmapToCPUList(parts[1])
+				}
+				continue
+			}
+			if strings.HasPrefix(line, "rps_cpus rx-") {
+				parts := strings.SplitN(line, ": ", 2)
+				if len(parts) == 2 {
+					queue := strings.TrimPrefix(parts[0], "rps_cpus ")
+					nic.RPSCPUs[queue] = hexBitmapToCPUList(parts[1])
+				}
+				continue
+			}
 			for prefix, fieldPtr := range fieldMap {
 				if after, ok := strings.CutPrefix(line, prefix); ok {
 					*fieldPtr = after
@@ -1320,6 +1348,35 @@ func parseNicInfo(scriptOutput string) []nicInfo {
 	// Assign card and port information
 	assignCardAndPort(nics)
 	return nics
+}
+
+func hexBitmapToCPUList(hexBitmap string) string {
+	if hexBitmap == "" {
+		return ""
+	}
+
+	// Remove commas to form a single continuous hex string.
+	// This assumes the comma-separated parts are in big-endian order.
+	fullHexBitmap := strings.ReplaceAll(hexBitmap, ",", "")
+
+	i := new(big.Int)
+	// The string is a hex string, so the base is 16.
+	if _, success := i.SetString(fullHexBitmap, 16); !success {
+		// If parsing fails, it might not be a hex string. Return as is.
+		return hexBitmap
+	}
+
+	var cpus []string
+	// Iterate through the bits of the big integer.
+	for bit := 0; bit < i.BitLen(); bit++ {
+		if i.Bit(bit) == 1 {
+			cpus = append(cpus, fmt.Sprintf("%d", bit))
+		}
+	}
+	if len(cpus) == 0 {
+		return ""
+	}
+	return strings.Join(cpus, ",")
 }
 
 // assignCardAndPort assigns card and port numbers to NICs based on their PCI addresses
