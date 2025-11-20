@@ -1254,7 +1254,6 @@ type nicInfo struct {
 	MACAddress      string
 	NUMANode        string
 	CPUAffinity     string
-	IRQBalance      string
 	AdaptiveRX      string
 	AdaptiveTX      string
 	RxUsecs         string
@@ -1294,7 +1293,6 @@ func parseNicInfo(scriptOutput string) []nicInfo {
 			"MAC Address: ":      &nic.MACAddress,
 			"NUMA Node: ":        &nic.NUMANode,
 			"CPU Affinity: ":     &nic.CPUAffinity,
-			"IRQ Balance: ":      &nic.IRQBalance,
 			"rx-usecs: ":         &nic.RxUsecs,
 			"tx-usecs: ":         &nic.TxUsecs,
 			"MTU: ":              &nic.MTU,

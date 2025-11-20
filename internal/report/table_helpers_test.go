@@ -654,9 +654,6 @@ func TestParseNicInfo(t *testing.T) {
 	if first.CPUAffinity == "" {
 		t.Errorf("expected non-empty CPUAffinity")
 	}
-	if first.IRQBalance != "Disabled" {
-		t.Errorf("expected IRQBalance 'Disabled', got '%s'", first.IRQBalance)
-	}
 	if first.AdaptiveRX != "off" {
 		t.Errorf("expected AdaptiveRX 'off', got '%s'", first.AdaptiveRX)
 	}
