@@ -1740,7 +1740,7 @@ func formatQueueCPUMappings(mappings map[string]string, prefix string) string {
 	}
 
 	if len(queueMappings) == 0 {
-		return "N/A"
+		return ""
 	}
 	return strings.Join(queueMappings, " | ")
 }
