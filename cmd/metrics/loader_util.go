@@ -166,7 +166,7 @@ func replaceConstants(metrics []MetricDefinition, metadata Metadata) ([]MetricDe
 		return nil, fmt.Errorf("unknown granularity: %s", flagGranularity)
 	}
 	coresPerSocket := fmt.Sprintf("%f", float64(metadata.CoresPerSocket))
-	chasPerSocket := fmt.Sprintf("%f", float64(len(metadata.UncoreDeviceIDs["cha"]))/float64(metadata.SocketCount))
+	chasPerSocket := fmt.Sprintf("%f", float64(len(metadata.UncoreDeviceIDs["cha"])))
 	socketCount := fmt.Sprintf("%f", float64(metadata.SocketCount))
 	hyperThreadingOn := fmt.Sprintf("%t", metadata.ThreadsPerCore > 1)
 	threadsPerCore := fmt.Sprintf("%f", float64(metadata.ThreadsPerCore))
