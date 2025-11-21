@@ -1788,14 +1788,14 @@ func networkConfigTableValues(outputs map[string]script.ScriptOutput) []Field {
 		}
 	}
 	// add the values to the fields
-	for i := range fields[:7] {
+	for i := range fields[:len(fields)-1] {
 		if val, ok := sysctlParams[fields[i].Name]; ok {
 			fields[i].Values = append(fields[i].Values, val)
 		} else {
 			fields[i].Values = append(fields[i].Values, "")
 		}
 	}
-	fields[7].Values = append(fields[7].Values, strings.TrimSpace(outputs[script.IRQBalanceScriptName].Stdout))
+	fields[len(fields)-1].Values = append(fields[len(fields)-1].Values, strings.TrimSpace(outputs[script.IRQBalanceScriptName].Stdout))
 	return fields
 }
 
