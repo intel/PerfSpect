@@ -201,20 +201,49 @@ func (group UncoreGroup) StringForPerf() (string, error) {
 }
 
 func MergeUncoreGroups(uncoreGroups []UncoreGroup) ([]UncoreGroup, error) {
-	i := 0
-	for i < len(uncoreGroups) { // this style of for loop is used to allow for removal of elements
-		j := i + 1
-		for j < len(uncoreGroups) { // len(coreGroups) is recalculated on each iteration
-			tmpGroup := uncoreGroups[i].Copy() // Copy the group to avoid modifying the original
-			if err := tmpGroup.Merge(uncoreGroups[j]); err == nil {
-				uncoreGroups[i] = tmpGroup // Update the group at index i with the merged group
-				// remove the group at index j
-				uncoreGroups = append(uncoreGroups[:j], uncoreGroups[j+1:]...)
+	// First, eliminate duplicate events across groups (only needs to be done once)
+	seenEvents := make(map[string]int) // map of event name to group index where it first appears
+	for i := range uncoreGroups {
+		for j := range uncoreGroups[i].GeneralPurposeCounters {
+			event := uncoreGroups[i].GeneralPurposeCounters[j]
+			if event.IsEmpty() {
+				continue
+			}
+
+			if firstGroupIdx, exists := seenEvents[event.EventName]; exists {
+				// Event already exists in another group, remove from current group
+				slog.Debug("removing duplicate uncore event from group",
+					slog.String("event", event.EventName),
+					slog.Int("firstGroup", firstGroupIdx),
+					slog.Int("currentGroup", i))
+				uncoreGroups[i].GeneralPurposeCounters[j] = UncoreEvent{}
 			} else {
-				j++ // Cannot merge these groups, try the next pair
+				// First time seeing this event, record it
+				seenEvents[event.EventName] = i
 			}
 		}
-		i++
+	}
+
+	// Then, keep merging until no more merges are possible
+	merged := true
+	for merged {
+		merged = false
+		i := 0
+		for i < len(uncoreGroups) {
+			j := i + 1
+			for j < len(uncoreGroups) {
+				tmpGroup := uncoreGroups[i].Copy()
+				if err := tmpGroup.Merge(uncoreGroups[j]); err == nil {
+					uncoreGroups[i] = tmpGroup
+					// remove the group at index j
+					uncoreGroups = append(uncoreGroups[:j], uncoreGroups[j+1:]...)
+					merged = true // mark that we made a change
+				} else {
+					j++
+				}
+			}
+			i++
+		}
 	}
 	return uncoreGroups, nil
 }
