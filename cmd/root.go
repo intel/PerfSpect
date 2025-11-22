@@ -148,7 +148,7 @@ func Execute() {
 
 func initializeApplication(cmd *cobra.Command, args []string) error {
 	timestamp := time.Now().Local().Format("2006-01-02_15-04-05") // app startup time
-	// verify requested output directory exists or create an output directory
+	// set output directory path (directory will be created later when needed)
 	var outputDir string
 	if flagOutputDir != "" {
 		var err error
@@ -157,17 +157,8 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 			fmt.Printf("Error: failed to expand output dir %v\n", err)
 			os.Exit(1)
 		}
-		exists, err := util.DirectoryExists(outputDir)
-		if err != nil {
-			fmt.Printf("Error: failed to determine if output dir exists: %v\n", err)
-			os.Exit(1)
-		}
-		if !exists {
-			fmt.Printf("Error: requested output dir, %s, does not exist\n", outputDir)
-			os.Exit(1)
-		}
 	} else {
-		// set output dir path to app name + timestamp (dont' create the directory)
+		// set output dir path to app name + timestamp
 		outputDirName := common.AppName + "_" + timestamp
 		var err error
 		// outputDir will be in current working directory
@@ -220,6 +211,15 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 	if gLogFile != nil {
 		logFilePath = gLogFile.Name()
 	}
+	// create the output directory now to fail fast if there are permission or disk space issues
+	// this validates write access before any data collection begins
+	err = common.CreateOutputDir(outputDir)
+	if err != nil {
+		slog.Error("failed to create output directory", slog.String("path", outputDir), slog.String("error", err.Error()))
+		fmt.Printf("Error: failed to create output directory: %v\n", err)
+		os.Exit(1)
+	}
+	slog.Debug("output directory created", slog.String("path", outputDir))
 	// set app context
 	cmd.Parent().SetContext(
 		context.WithValue(
