@@ -204,17 +204,9 @@ func (rc *ReportingCommand) Run() error {
 			return err
 		}
 	}
-	// we have output data so create the output directory
-	err := CreateOutputDir(outputDir)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		slog.Error(err.Error())
-		rc.Cmd.SilenceUsage = true
-		return err
-	}
 	// create the raw report before processing the data, so that we can save the raw data even if there is an error while processing
 	var rawReports []string
-	rawReports, err = rc.createRawReports(appContext, orderedTargetScriptOutputs)
+	rawReports, err := rc.createRawReports(appContext, orderedTargetScriptOutputs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
@@ -285,15 +277,6 @@ func (rc *ReportingCommand) Run() error {
 		// stop the progress indicator
 		multiSpinner.Finish()
 		fmt.Println()
-	}
-	return nil
-}
-
-// CreateOutputDir creates the output directory if it does not exist
-func CreateOutputDir(outputDir string) error {
-	err := os.MkdirAll(outputDir, 0755) // #nosec G301
-	if err != nil {
-		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 	return nil
 }

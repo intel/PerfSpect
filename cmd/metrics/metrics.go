@@ -842,16 +842,8 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	signalMgr := newSignalManager()
 	// short circuit when --input flag is set
 	if flagInput != "" {
-		// create output directory
-		err := common.CreateOutputDir(localOutputDir)
-		if err != nil {
-			err = fmt.Errorf("failed to create output directory: %w", err)
-			fmt.Fprintf(os.Stderr, "Error: %+v\n", err)
-			cmd.SilenceUsage = true
-			return err
-		}
 		// skip data collection and use raw data for reports
-		err = processRawData(localOutputDir)
+		err := processRawData(localOutputDir)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			slog.Error(err.Error())
@@ -1055,16 +1047,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	if flagPrometheusServer {
 		for _, targetContext := range targetContexts {
 			createPrometheusMetrics(targetContext.metricDefinitions)
-		}
-	}
-	// create the local output directory
-	if !flagLive && !flagPrometheusServer {
-		err = common.CreateOutputDir(localOutputDir)
-		if err != nil {
-			err = fmt.Errorf("failed to create output directory: %w", err)
-			fmt.Fprintf(os.Stderr, "Error: %+v\n", err)
-			cmd.SilenceUsage = true
-			return err
 		}
 	}
 	// start the metric production for each target
