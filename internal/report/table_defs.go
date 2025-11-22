@@ -92,9 +92,9 @@ const (
 	ElcTableName               = "Efficiency Latency Control"
 	MemoryTableName            = "Memory"
 	DIMMTableName              = "DIMM"
-	NICTableName               = "NIC"
-	NetworkIRQMappingTableName = "Network IRQ Mapping"
 	NetworkConfigTableName     = "Network Configuration"
+	NICTableName               = "NIC"
+	NICCpuAffinityTableName    = "NIC CPU Affinity"
 	NICPacketSteeringTableName = "NIC Packet Steering"
 	DiskTableName              = "Disk"
 	FilesystemTableName        = "Filesystem"
@@ -367,21 +367,29 @@ var tableDefinitions = map[string]TableDefinition{
 		FieldsFunc:            dimmTableValues,
 		InsightsFunc:          dimmTableInsights,
 		HTMLTableRendererFunc: dimmTableHTMLRenderer},
-	NICTableName: {
-		Name:      NICTableName,
-		HasRows:   true,
+	NetworkConfigTableName: {
+		Name:      NetworkConfigTableName,
+		HasRows:   false,
 		MenuLabel: NetworkMenuLabel,
+		ScriptNames: []string{
+			script.SysctlScriptName,
+			script.IRQBalanceScriptName,
+		},
+		FieldsFunc: networkConfigTableValues},
+	NICTableName: {
+		Name:    NICTableName,
+		HasRows: true,
 		ScriptNames: []string{
 			script.NicInfoScriptName,
 		},
 		FieldsFunc: nicTableValues},
-	NetworkConfigTableName: {
-		Name:    NetworkConfigTableName,
-		HasRows: false,
+	NICCpuAffinityTableName: {
+		Name:    NICCpuAffinityTableName,
+		HasRows: true,
 		ScriptNames: []string{
-			script.SysctlScriptName,
+			script.NicInfoScriptName,
 		},
-		FieldsFunc: networkConfigTableValues},
+		FieldsFunc: nicCpuAffinityTableValues},
 	NICPacketSteeringTableName: {
 		Name:    NICPacketSteeringTableName,
 		HasRows: true,
@@ -389,13 +397,6 @@ var tableDefinitions = map[string]TableDefinition{
 			script.NicInfoScriptName,
 		},
 		FieldsFunc: nicPacketSteeringTableValues},
-	NetworkIRQMappingTableName: {
-		Name:    NetworkIRQMappingTableName,
-		HasRows: true,
-		ScriptNames: []string{
-			script.NicInfoScriptName,
-		},
-		FieldsFunc: networkIRQMappingTableValues},
 	DiskTableName: {
 		Name:      DiskTableName,
 		HasRows:   true,
@@ -1637,7 +1638,6 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "MTU", Description: "Maximum Transmission Unit. The largest size packet or frame, specified in octets (eight-bit bytes), that can be sent in a packet- or frame-based network such as the Internet."},
 		{Name: "TX Queues"},
 		{Name: "RX Queues"},
-		{Name: "IRQBalance", Description: "System level setting. Dynamically monitors system activity and spreads IRQs across available cores, aiming to balance CPU load, improve throughput, and reduce latency for interrupt-heavy workloads."},
 		{Name: "Adaptive RX", Description: "Enables dynamic adjustment of receive interrupt coalescing based on traffic patterns."},
 		{Name: "Adaptive TX", Description: "Enables dynamic adjustment of transmit interrupt coalescing based on traffic patterns."},
 		{Name: "rx-usecs", Description: "Sets the delay, in microseconds, before an interrupt is generated after receiving a packet. Higher values reduce CPU usage (by batching packets), but increase latency. Lower values reduce latency, but increase interrupt rate and CPU load."},
@@ -1675,11 +1675,10 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []Field {
 		fields[12].Values = append(fields[12].Values, nicInfo.MTU)
 		fields[13].Values = append(fields[13].Values, nicInfo.TXQueues)
 		fields[14].Values = append(fields[14].Values, nicInfo.RXQueues)
-		fields[15].Values = append(fields[15].Values, nicInfo.IRQBalance)
-		fields[16].Values = append(fields[16].Values, nicInfo.AdaptiveRX)
-		fields[17].Values = append(fields[17].Values, nicInfo.AdaptiveTX)
-		fields[18].Values = append(fields[18].Values, nicInfo.RxUsecs)
-		fields[19].Values = append(fields[19].Values, nicInfo.TxUsecs)
+		fields[15].Values = append(fields[15].Values, nicInfo.AdaptiveRX)
+		fields[16].Values = append(fields[16].Values, nicInfo.AdaptiveTX)
+		fields[17].Values = append(fields[17].Values, nicInfo.RxUsecs)
+		fields[18].Values = append(fields[18].Values, nicInfo.TxUsecs)
 	}
 	return fields
 }
@@ -1700,14 +1699,14 @@ func nicPacketSteeringTableValues(outputs map[string]script.ScriptOutput) []Fiel
 		// XPS row
 		if nicInfo.TXQueues != "0" {
 			fields[0].Values = append(fields[0].Values, nicInfo.Name)
-			fields[1].Values = append(fields[1].Values, "xps_cpus")
+			fields[1].Values = append(fields[1].Values, "XPS")
 			fields[2].Values = append(fields[2].Values, formatQueueCPUMappings(nicInfo.XPSCPUs, "tx-"))
 		}
 
 		// RPS row
 		if nicInfo.RXQueues != "0" {
 			fields[0].Values = append(fields[0].Values, nicInfo.Name)
-			fields[1].Values = append(fields[1].Values, "rps_cpus")
+			fields[1].Values = append(fields[1].Values, "RPS")
 			fields[2].Values = append(fields[2].Values, formatQueueCPUMappings(nicInfo.RPSCPUs, "rx-"))
 		}
 	}
@@ -1741,12 +1740,12 @@ func formatQueueCPUMappings(mappings map[string]string, prefix string) string {
 	}
 
 	if len(queueMappings) == 0 {
-		return "N/A"
+		return ""
 	}
 	return strings.Join(queueMappings, " | ")
 }
 
-func networkIRQMappingTableValues(outputs map[string]script.ScriptOutput) []Field {
+func nicCpuAffinityTableValues(outputs map[string]script.ScriptOutput) []Field {
 	nicIRQMappings := nicIRQMappingsFromOutput(outputs)
 	if len(nicIRQMappings) == 0 {
 		return []Field{}
@@ -1772,6 +1771,7 @@ func networkConfigTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "net.core.netdev_max_backlog"},
 		{Name: "net.ipv4.tcp_max_syn_backlog"},
 		{Name: "net.core.somaxconn"},
+		{Name: "IRQ Balance"},
 	}
 	// load the params into a map so we can easily look them up
 	sysctlParams := make(map[string]string)
@@ -1788,13 +1788,14 @@ func networkConfigTableValues(outputs map[string]script.ScriptOutput) []Field {
 		}
 	}
 	// add the values to the fields
-	for i := range fields {
+	for i := range fields[:len(fields)-1] {
 		if val, ok := sysctlParams[fields[i].Name]; ok {
 			fields[i].Values = append(fields[i].Values, val)
 		} else {
 			fields[i].Values = append(fields[i].Values, "")
 		}
 	}
+	fields[len(fields)-1].Values = append(fields[len(fields)-1].Values, strings.TrimSpace(outputs[script.IRQBalanceScriptName].Stdout))
 	return fields
 }
 

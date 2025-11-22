@@ -83,6 +83,7 @@ const (
 	TransparentHugePagesScriptName   = "transparent huge pages"
 	NumaBalancingScriptName          = "numa balancing"
 	NicInfoScriptName                = "nic info"
+	IRQBalanceScriptName             = "irq balance"
 	DiskInfoScriptName               = "disk info"
 	HdparmScriptName                 = "hdparm"
 	DfScriptName                     = "df"
@@ -779,7 +780,6 @@ rdmsr 0x2FFE
 		printf "%s:%s;" "$int" "$cpu"
 	done
 	printf "\n"
-	echo "IRQ Balance: $(pgrep irqbalance >/dev/null 2>&1 && echo "Enabled" || echo "Disabled")"
 	echo "TX Queues: $(ls -d /sys/class/net/"$ifc"/queues/tx-* | wc -l)"
 	echo "RX Queues: $(ls -d /sys/class/net/"$ifc"/queues/rx-* | wc -l)"
 	for q in /sys/class/net/"$ifc"/queues/tx-*; do
@@ -797,6 +797,10 @@ done
 `,
 		Depends:   []string{"ethtool"},
 		Superuser: true,
+	},
+	IRQBalanceScriptName: {
+		Name:           IRQBalanceScriptName,
+		ScriptTemplate: "pgrep irqbalance >/dev/null 2>&1 && echo 'Enabled' || echo 'Disabled'",
 	},
 	DiskInfoScriptName: {
 		Name: DiskInfoScriptName,
