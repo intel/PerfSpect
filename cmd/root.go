@@ -146,30 +146,6 @@ func Execute() {
 	}
 }
 
-// createOutputDir creates the output directory if it does not exist.
-// Returns true if the directory was created, false if it already existed.
-func createOutputDir(outputDir string) (bool, error) {
-	// Check if directory already exists
-	info, err := os.Stat(outputDir)
-	if err == nil {
-		// Path exists, verify it's a directory
-		if !info.IsDir() {
-			return false, fmt.Errorf("output path exists but is not a directory: %s", outputDir)
-		}
-		return false, nil // Already exists
-	}
-	// If error is not "not exists", something else is wrong
-	if !os.IsNotExist(err) {
-		return false, fmt.Errorf("failed to check output directory: %w", err)
-	}
-	// Directory doesn't exist, create it
-	err = os.MkdirAll(outputDir, 0755) // #nosec G301
-	if err != nil {
-		return false, fmt.Errorf("failed to create output directory: %w", err)
-	}
-	return true, nil // Created successfully
-}
-
 func initializeApplication(cmd *cobra.Command, args []string) error {
 	timestamp := time.Now().Local().Format("2006-01-02_15-04-05") // app startup time
 	// set output directory path (directory will be created later when needed)
@@ -237,14 +213,40 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 	}
 	// create the output directory now to fail fast if there are permission or disk space issues
 	// this validates write access before any data collection begins
-	created, err := createOutputDir(outputDir)
-	if err != nil {
-		slog.Error("failed to create output directory", slog.String("path", outputDir), slog.String("error", err.Error()))
-		fmt.Printf("Error: failed to create output directory: %v\n", err)
-		os.Exit(1)
+	// skip creating output directory for config command since it doesn't generate output files
+	// also skip for metrics command with --live, --prometheus-server, or --list flags since they don't write files
+	// also skip for update command since it doesn't generate output files
+	needsOutputDir := true
+	if cmd.Name() == "config" || cmd.Name() == "update" {
+		needsOutputDir = false
+	} else if cmd.Name() == "metrics" {
+		// check if --live flag is set
+		if liveFlag, err := cmd.Flags().GetBool("live"); err == nil && liveFlag {
+			needsOutputDir = false
+		}
+		// check if --prometheus-server flag is set
+		if prometheusFlag, err := cmd.Flags().GetBool("prometheus-server"); err == nil && prometheusFlag {
+			needsOutputDir = false
+		}
+		// check if --prometheus-server-addr flag has been changed (which implies prometheus server mode)
+		if cmd.Flags().Changed("prometheus-server-addr") {
+			needsOutputDir = false
+		}
+		// check if --list flag is set (just lists metrics and exits)
+		if listFlag, err := cmd.Flags().GetBool("list"); err == nil && listFlag {
+			needsOutputDir = false
+		}
 	}
-	if created {
-		slog.Debug("output directory created", slog.String("path", outputDir))
+	if needsOutputDir {
+		created, err := createOutputDir(outputDir)
+		if err != nil {
+			slog.Error("failed to create output directory", slog.String("path", outputDir), slog.String("error", err.Error()))
+			fmt.Printf("Error: failed to create output directory: %v\n", err)
+			os.Exit(1)
+		}
+		if created {
+			slog.Debug("output directory created", slog.String("path", outputDir))
+		}
 	}
 	// set app context
 	cmd.Parent().SetContext(
@@ -346,6 +348,30 @@ func onIntelNetwork() bool {
 		return false
 	}
 	return true
+}
+
+// createOutputDir creates the output directory if it does not exist.
+// Returns true if the directory was created, false if it already existed.
+func createOutputDir(outputDir string) (bool, error) {
+	// Check if directory already exists
+	info, err := os.Stat(outputDir)
+	if err == nil {
+		// Path exists, verify it's a directory
+		if !info.IsDir() {
+			return false, fmt.Errorf("output path exists but is not a directory: %s", outputDir)
+		}
+		return false, nil // Already exists
+	}
+	// If error is not "not exists", something else is wrong
+	if !os.IsNotExist(err) {
+		return false, fmt.Errorf("failed to check output directory: %w", err)
+	}
+	// Directory doesn't exist, create it
+	err = os.MkdirAll(outputDir, 0755) // #nosec G301
+	if err != nil {
+		return false, fmt.Errorf("failed to create output directory: %w", err)
+	}
+	return true, nil // Created successfully
 }
 
 func checkForUpdates(version string) (bool, manifest, error) {
