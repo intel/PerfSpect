@@ -1159,41 +1159,65 @@ avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd
 	StorageBenchmarkScriptName: {
 		Name: StorageBenchmarkScriptName,
 		ScriptTemplate: `
-numjobs=1
-file_size_g=5
-space_needed_k=$(( (file_size_g + 1) * 1024 * 1024 * numjobs )) # space needed in kilobytes: (file_size_g + 1) GB per job
-ramp_time=5s
-runtime=120s
-ioengine=sync
-# check if .StorageDir is a directory
-if [[ ! -d "{{.StorageDir}}" ]]; then
-	echo "ERROR: {{.StorageDir}} does not exist"
-	exit 1
-fi
-# check if .StorageDir is writeable
-if [[ ! -w "{{.StorageDir}}" ]]; then
-	echo "ERROR: {{.StorageDir}} is not writeable"
-	exit 1
-fi
-# check if .StorageDir has enough space
-# example output for df -P /tmp:
-# Filesystem     1024-blocks      Used Available Capacity Mounted on
-# /dev/sdd        1055762868 196668944 805390452      20% /
-available_space=$(df -P "{{.StorageDir}}" | awk 'NR==2 {print $4}')
-if [[ $available_space -lt $space_needed_k ]]; then
-	echo "ERROR: {{.StorageDir}} has ${available_space}K available space. A minimum of ${space_needed_k}K is required to run this benchmark."
-	exit 1
-fi
-# create temporary directory for fio test
 test_dir=$(mktemp -d --tmpdir="{{.StorageDir}}")
-sync
-/sbin/sysctl -w vm.drop_caches=3 || true
-# single-threaded read & write bandwidth test
-fio --name=bandwidth --directory=$test_dir --numjobs=$numjobs \
---size="$file_size_g"G --time_based --runtime=$runtime --ramp_time=$ramp_time --ioengine=$ioengine \
---direct=1 --verify=0 --bs=1M --iodepth=64 --rw=rw \
---group_reporting=1 --iodepth_batch_submit=64 \
---iodepth_batch_complete_max=64
+FIO_JOBFILE=$(mktemp $test_dir/fio-job-XXXXXX.fio)
+
+cat > $FIO_JOBFILE <<EOF
+[global]
+ioengine=libaio
+direct=1
+size=5G
+ramp_time=5s
+time_based
+create_on_open=1
+unlink=1
+directory=$test_dir
+
+[iodepth_1_bs_4k_rand]
+wait_for_previous
+runtime=30s
+rw=randrw
+iodepth=1
+blocksize=4k
+iodepth_batch_submit=1
+iodepth_batch_complete_max=1
+
+[iodepth_256_bs_4k_rand]
+wait_for_previous
+runtime=30s
+rw=randrw
+iodepth=256
+blocksize=4k
+iodepth_batch_submit=256
+iodepth_batch_complete_max=256
+
+[iodepth_1_bs_1M_numjobs_16]
+wait_for_previous
+size=1G
+runtime=30s
+rw=readwrite
+iodepth=1
+iodepth_batch_submit=1
+iodepth_batch_complete_max=1
+blocksize=1M
+numjobs=16
+group_reporting=1
+
+[iodepth_64_bs_1M_numjobs_16]
+wait_for_previous
+size=1G
+runtime=30s
+rw=readwrite
+iodepth=64
+iodepth_batch_submit=64
+iodepth_batch_complete_max=64
+blocksize=1M
+numjobs=16
+group_reporting=1
+EOF
+
+fio --output-format=json $FIO_JOBFILE
+
 rm -rf $test_dir
 `,
 		Superuser:  true,
