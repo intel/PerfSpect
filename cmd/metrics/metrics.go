@@ -1320,6 +1320,7 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 	printCompleteChannel := make(chan []string)
 	// get current time for use in setting timestamps on output
 	targetContext.metadata.CollectionStartTime = time.Now() // save the start time in the metadata for use when using the --input option to process raw data
+	targetContext.metadata.WithWorkload = len(argsApplication) > 0
 	go printMetricsAsync(targetContext, localOutputDir, frameChannel, printCompleteChannel)
 	var err error
 	for !signalMgr.shouldStop() {

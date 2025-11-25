@@ -33,6 +33,10 @@ func summarizeMetrics(localOutputDir string, targetName string, metadata Metadat
 	if err != nil {
 		return filesCreated, fmt.Errorf("failed to read metrics from %s: %w", csvMetricsFile, err)
 	}
+	// exclude the final sample if metrics were collected with a workload
+	if metadata.WithWorkload {
+		metrics.excludeFinalSample()
+	}
 	// csv summary
 	out, err := metrics.getCSV()
 	if err != nil {
@@ -212,6 +216,40 @@ func newMetricCollection(csvPath string) (metrics MetricCollection, err error) {
 		}
 	}
 	return
+}
+
+// excludeFinalSample removes the final timestamp's rows from all metric groups.
+// This is used when collecting metrics with a workload to avoid including
+// post-workload data that can skew the summary statistics.
+func (mc MetricCollection) excludeFinalSample() {
+	if len(mc) == 0 {
+		return
+	}
+	// All metric groups should have the same number of rows since they come from the same CSV
+	// Check the first group to avoid redundant checking
+	if len(mc[0].rows) <= 1 {
+		// Don't exclude if there's only one sample or no samples
+		slog.Warn("metric collection has only one sample, not excluding final sample")
+		return
+	}
+	for i := range mc {
+		// Find the maximum timestamp in this group
+		maxTimestamp := mc[i].rows[0].timestamp
+		for _, row := range mc[i].rows {
+			if row.timestamp > maxTimestamp {
+				maxTimestamp = row.timestamp
+			}
+		}
+		// Remove all rows with the maximum timestamp
+		var filteredRows []row
+		for _, row := range mc[i].rows {
+			if row.timestamp != maxTimestamp {
+				filteredRows = append(filteredRows, row)
+			}
+		}
+		mc[i].rows = filteredRows
+	}
+	slog.Debug("excluded final sample from metric collection", slog.Int("num_groups", len(mc)))
 }
 
 // getStats - calculate summary stats (min, max, mean, stddev) for each metric
