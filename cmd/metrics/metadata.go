@@ -72,6 +72,7 @@ type Metadata struct {
 	// below are not loaded by LoadMetadata, but are set by the caller (should these be here at all?)
 	CollectionStartTime time.Time
 	PerfSpectVersion    string
+	WithWorkload        bool // true if metrics were collected with a user-provided workload application
 }
 
 // LoadMetadata - populates and returns a Metadata structure containing state of the
