@@ -75,7 +75,7 @@ RUN git clone https://github.com/madler/zlib.git zlib-aarch64 \
 RUN mkdir workdir
 ADD . /workdir
 WORKDIR /workdir
-RUN make tools
+RUN make tools -j$(nproc)
 RUN make oss-source
 
 FROM ubuntu:22.04 AS perf-builder
