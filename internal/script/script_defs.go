@@ -1160,8 +1160,35 @@ avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd
 		Name: StorageBenchmarkScriptName,
 		ScriptTemplate: `
 test_dir=$(mktemp -d --tmpdir="{{.StorageDir}}")
-FIO_JOBFILE=$(mktemp $test_dir/fio-job-XXXXXX.fio)
+numjobs_bw=16
+file_size_bw_g=1
+space_needed_bw_k=$(( (file_size_bw_g + 1) * 1024 * 1024 * numjobs_bw )) # space needed in kilobytes: (file_size_bw_g + 1) GB per job
+runtime=30s
 
+# check if .StorageDir is a directory
+if [[ ! -d "{{.StorageDir}}" ]]; then
+        echo "ERROR: {{.StorageDir}} does not exist"
+        exit 1
+fi
+# check if .StorageDir is writeable
+if [[ ! -w "{{.StorageDir}}" ]]; then
+        echo "ERROR: {{.StorageDir}} is not writeable"
+        exit 1
+fi
+# check if .StorageDir has enough space
+# example output for df -P /tmp:
+# Filesystem     1024-blocks      Used Available Capacity Mounted on
+# /dev/sdd        1055762868 196668944 805390452      20% /
+available_space=$(df -P "{{.StorageDir}}" | awk 'NR==2 {print $4}')
+if [[ $available_space -lt $space_needed_bw_k ]]; then
+        echo "ERROR: {{.StorageDir}} has ${available_space}K available space. A minimum of ${space_needed_bw_k}K is required to run the IO bandwidth benchmark job."
+        exit 1
+fi
+
+sync
+/sbin/sysctl -w vm.drop_caches=3 || true
+
+FIO_JOBFILE=$(mktemp $test_dir/fio-job-XXXXXX.fio)
 cat > $FIO_JOBFILE <<EOF
 [global]
 ioengine=libaio
@@ -1175,7 +1202,7 @@ directory=$test_dir
 
 [iodepth_1_bs_4k_rand]
 wait_for_previous
-runtime=30s
+runtime=${runtime}
 rw=randrw
 iodepth=1
 blocksize=4k
@@ -1184,35 +1211,35 @@ iodepth_batch_complete_max=1
 
 [iodepth_256_bs_4k_rand]
 wait_for_previous
-runtime=30s
+runtime=${runtime}
 rw=randrw
 iodepth=256
 blocksize=4k
 iodepth_batch_submit=256
 iodepth_batch_complete_max=256
 
-[iodepth_1_bs_1M_numjobs_16]
+[iodepth_1_bs_1M_numjobs_${numjobs_bw}]
 wait_for_previous
-size=1G
-runtime=30s
+size=${file_size_bw_g}G
+runtime=${runtime}
 rw=readwrite
 iodepth=1
 iodepth_batch_submit=1
 iodepth_batch_complete_max=1
 blocksize=1M
-numjobs=16
+numjobs=$numjobs_bw
 group_reporting=1
 
-[iodepth_64_bs_1M_numjobs_16]
+[iodepth_64_bs_1M_numjobs_${numjobs_bw}]
 wait_for_previous
-size=1G
-runtime=30s
+size=${file_size_bw_g}G
+runtime=${runtime}
 rw=readwrite
 iodepth=64
 iodepth_batch_submit=64
 iodepth_batch_complete_max=64
 blocksize=1M
-numjobs=16
+numjobs=$numjobs_bw
 group_reporting=1
 EOF
 
