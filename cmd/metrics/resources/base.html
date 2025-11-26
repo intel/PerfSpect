@@ -967,7 +967,7 @@
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {system_info.map(([key, value]) => (
+                    {system_info && system_info.map(([key, value]) => (
                       <TableRow key={key}>
                       <TableCell sx={{ fontFamily: 'Monospace' }} component="th" scope="row" >
                         {JSON.stringify(key)}
@@ -994,7 +994,7 @@
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {Object.entries(metadata).sort(([key1], [key2]) => key1.localeCompare(key2)).map(([key, value]) => (
+                    {metadata && Object.entries(metadata).sort(([key1], [key2]) => key1.localeCompare(key2)).map(([key, value]) => (
                       <TableRow key={key}>
                       <TableCell sx={{ fontFamily: 'Monospace' }} component="th" scope="row" >
                         {JSON.stringify(key)}

@@ -19,6 +19,7 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	texttemplate "text/template" // nosemgrep
 	"time"
 
@@ -815,4 +816,135 @@ func (mc MetricCollection) getCSV() (out string, err error) {
 		out += "\n"
 	}
 	return
+}
+
+// filterByTimeRange filters all metric groups to only include rows within the specified time range
+func (mc MetricCollection) filterByTimeRange(startTime, endTime float64) {
+	for i := range mc {
+		mc[i].filterByTimeRange(startTime, endTime)
+	}
+}
+
+// filterByTimeRange filters the metric group to only include rows within the specified time range
+func (mg *MetricGroup) filterByTimeRange(startTime, endTime float64) {
+	var filteredRows []row
+	for _, row := range mg.rows {
+		if row.timestamp >= startTime && row.timestamp <= endTime {
+			filteredRows = append(filteredRows, row)
+		}
+	}
+	mg.rows = filteredRows
+}
+
+// writeCSV writes the metric collection to a CSV file
+func (mc MetricCollection) writeCSV(path string) error {
+	if len(mc) == 0 {
+		return fmt.Errorf("no metrics to write")
+	}
+
+	file, err := os.Create(path) // #nosec G304
+	if err != nil {
+		return fmt.Errorf("failed to create CSV file: %w", err)
+	}
+	defer file.Close()
+
+	// Write header
+	header := "timestamp,socket,cpu,cgroup"
+	for _, name := range mc[0].names {
+		header += "," + name
+	}
+	if _, err := file.WriteString(header + "\n"); err != nil {
+		return fmt.Errorf("failed to write header: %w", err)
+	}
+
+	// Write rows from all metric groups
+	for _, mg := range mc {
+		for _, row := range mg.rows {
+			line := fmt.Sprintf("%d,%s,%s,%s",
+				int64(row.timestamp),
+				row.socket,
+				row.cpu,
+				row.cgroup)
+			for _, name := range mg.names {
+				val := row.metrics[name]
+				if math.IsNaN(val) {
+					line += ","
+				} else {
+					line += fmt.Sprintf(",%f", val)
+				}
+			}
+			if _, err := file.WriteString(line + "\n"); err != nil {
+				return fmt.Errorf("failed to write row: %w", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// loadMetadataIfExists attempts to load metadata from a companion JSON file
+// Returns the metadata, whether it was found, and any error
+func loadMetadataIfExists(csvPath string) (Metadata, bool, error) {
+	// Determine the expected metadata file path
+	// Input: hostname_metrics.csv -> hostname_metadata.json
+	dir := filepath.Dir(csvPath)
+	base := filepath.Base(csvPath)
+	baseName := strings.TrimSuffix(base, filepath.Ext(base))
+	// Replace _metrics with _metadata
+	metadataName := strings.Replace(baseName, "_metrics", "_metadata", 1) + ".json"
+	metadataPath := filepath.Join(dir, metadataName)
+
+	// Check if the metadata file exists
+	if _, err := os.Stat(metadataPath); os.IsNotExist(err) {
+		return Metadata{}, false, nil
+	}
+
+	// Read and parse the metadata file
+	data, err := os.ReadFile(metadataPath) // #nosec G304
+	if err != nil {
+		return Metadata{}, false, fmt.Errorf("failed to read metadata file: %w", err)
+	}
+
+	var metadata Metadata
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		return Metadata{}, false, fmt.Errorf("failed to parse metadata JSON: %w", err)
+	}
+
+	slog.Info("loaded metadata from file", slog.String("file", metadataPath))
+	return metadata, true, nil
+}
+
+// generateTrimmedSummaries creates CSV and HTML summary reports for trimmed metrics
+func generateTrimmedSummaries(csvPath, outputDir, targetName string, metadata Metadata, metricDefinitions []MetricDefinition) ([]string, error) {
+	filesCreated := []string{}
+
+	// Read the trimmed metrics from CSV
+	metrics, err := newMetricCollection(csvPath)
+	if err != nil {
+		return filesCreated, fmt.Errorf("failed to read trimmed metrics: %w", err)
+	}
+
+	// Generate CSV summary
+	out, err := metrics.getCSV()
+	if err != nil {
+		return filesCreated, fmt.Errorf("failed to generate CSV summary: %w", err)
+	}
+	csvSummaryFile := filepath.Join(outputDir, targetName+"_summary.csv")
+	if err := os.WriteFile(csvSummaryFile, []byte(out), 0644); err != nil { // #nosec G306
+		return filesCreated, fmt.Errorf("failed to write CSV summary: %w", err)
+	}
+	filesCreated = append(filesCreated, csvSummaryFile)
+
+	// Generate HTML summary
+	out, err = metrics.getHTML(metadata, metricDefinitions)
+	if err != nil {
+		return filesCreated, fmt.Errorf("failed to generate HTML summary: %w", err)
+	}
+	htmlSummaryFile := filepath.Join(outputDir, targetName+"_summary.html")
+	if err := os.WriteFile(htmlSummaryFile, []byte(out), 0644); err != nil { // #nosec G306
+		return filesCreated, fmt.Errorf("failed to write HTML summary: %w", err)
+	}
+	filesCreated = append(filesCreated, htmlSummaryFile)
+
+	return filesCreated, nil
 }
