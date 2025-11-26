@@ -122,7 +122,6 @@ func cpuSpeedFromOutput(outputs map[string]script.ScriptOutput) string {
 
 func storagePerfFromOutput(outputs map[string]script.ScriptOutput) (fioOutput, error) {
 	output := outputs[script.StorageBenchmarkScriptName].Stdout
-	slog.Debug("storage benchmark output", slog.String("output", output))
 
 	i := strings.Index(output, "{\n  \"fio version\"")
 	if i >= 0 {
