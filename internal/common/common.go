@@ -125,6 +125,15 @@ func (rc *ReportingCommand) Run() error {
 			slog.Error("error sending signal to children", slog.String("error", err.Error()))
 		}
 	}()
+	// create output directory
+	err := util.CreateDirectoryIfNotExists(outputDir, 0755) // #nosec G301
+	if err != nil {
+		err := fmt.Errorf("failed to create output directory: %w", err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		slog.Error(err.Error())
+		rc.Cmd.SilenceUsage = true
+		return err
+	}
 
 	var orderedTargetScriptOutputs []TargetScriptOutputs
 	var myTargets []target.Target
@@ -206,7 +215,7 @@ func (rc *ReportingCommand) Run() error {
 	}
 	// create the raw report before processing the data, so that we can save the raw data even if there is an error while processing
 	var rawReports []string
-	rawReports, err := rc.createRawReports(appContext, orderedTargetScriptOutputs)
+	rawReports, err = rc.createRawReports(appContext, orderedTargetScriptOutputs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
