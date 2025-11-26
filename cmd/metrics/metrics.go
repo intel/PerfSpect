@@ -849,7 +849,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	if needsOutputDir(cmd) {
 		err := util.CreateDirectoryIfNotExists(localOutputDir, 0755) // #nosec G301
 		if err != nil {
-			err := fmt.Errorf("failed to create output directory: %w", err)
+			err = fmt.Errorf("failed to create output directory: %w", err)
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			slog.Error(err.Error())
 			cmd.SilenceUsage = true

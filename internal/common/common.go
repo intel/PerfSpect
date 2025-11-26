@@ -128,7 +128,7 @@ func (rc *ReportingCommand) Run() error {
 	// create output directory
 	err := util.CreateDirectoryIfNotExists(outputDir, 0755) // #nosec G301
 	if err != nil {
-		err := fmt.Errorf("failed to create output directory: %w", err)
+		err = fmt.Errorf("failed to create output directory: %w", err)
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
 		rc.Cmd.SilenceUsage = true
