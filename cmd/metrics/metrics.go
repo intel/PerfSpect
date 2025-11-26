@@ -833,6 +833,11 @@ func processRawData(localOutputDir string) error {
 	printOutputFileNames([][]string{filesWritten})
 	return nil
 }
+
+func needsOutputDir(cmd *cobra.Command) bool {
+	return !flagLive && !flagPrometheusServer && !cmd.Flags().Changed("prometheus-server-addr") && !flagShowMetricNames
+}
+
 func runCmd(cmd *cobra.Command, args []string) error {
 	// appContext is the application context that holds common data and resources.
 	appContext := cmd.Parent().Context().Value(common.AppContext{}).(common.AppContext)
@@ -840,6 +845,17 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	localOutputDir := appContext.OutputDir
 	// Setup signal manager for coordinated shutdown
 	signalMgr := newSignalManager()
+	// create output directory if needed
+	if needsOutputDir(cmd) {
+		err := util.CreateDirectoryIfNotExists(localOutputDir, 0755) // #nosec G301
+		if err != nil {
+			err = fmt.Errorf("failed to create output directory: %w", err)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			cmd.SilenceUsage = true
+			return err
+		}
+	}
 	// short circuit when --input flag is set
 	if flagInput != "" {
 		// skip data collection and use raw data for reports
