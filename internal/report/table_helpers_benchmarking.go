@@ -123,14 +123,19 @@ func cpuSpeedFromOutput(outputs map[string]script.ScriptOutput) string {
 func storagePerfFromOutput(outputs map[string]script.ScriptOutput) (fioOutput, error) {
 	output := outputs[script.StorageBenchmarkScriptName].Stdout
 
+	if strings.Contains(output, "ERROR:") {
+		return fioOutput{}, fmt.Errorf("failed to run storage benchmark: %s", output)
+	}
 	i := strings.Index(output, "{\n  \"fio version\"")
 	if i >= 0 {
 		output = output[i:]
 	} else {
+		outputLen := len(output)
+		if outputLen > 100 {
+			outputLen = 100
+		}
+		slog.Info("fio output snip", "output", output[:outputLen], "stderr", outputs[script.StorageBenchmarkScriptName].Stderr)
 		return fioOutput{}, fmt.Errorf("unable to find fio output")
-	}
-	if strings.Contains(output, "ERROR:") {
-		return fioOutput{}, fmt.Errorf("failed to run storage benchmark: %s", output)
 	}
 
 	slog.Debug("parsing storage benchmark output")
