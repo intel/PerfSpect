@@ -130,10 +130,7 @@ func storagePerfFromOutput(outputs map[string]script.ScriptOutput) (fioOutput, e
 	if i >= 0 {
 		output = output[i:]
 	} else {
-		outputLen := len(output)
-		if outputLen > 100 {
-			outputLen = 100
-		}
+		outputLen := min(len(output), 100)
 		slog.Info("fio output snip", "output", output[:outputLen], "stderr", outputs[script.StorageBenchmarkScriptName].Stderr)
 		return fioOutput{}, fmt.Errorf("unable to find fio output")
 	}
