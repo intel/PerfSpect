@@ -151,6 +151,16 @@ ifeq ("$(wildcard ethtool-aarch64/Makefile)","")
 endif
 	cd ethtool-aarch64 && make -j$(NPROC)
 
+LIBAIO_VERSION := libaio-0.3.113
+libaio-aarch64:
+ifeq ("$(wildcard libaio-aarch64)","")
+	git clone https://pagure.io/libaio libaio-aarch64
+else
+	cd libaio-aarch64 && git checkout master && git pull
+endif
+	cd libaio-aarch64 && git checkout $(LIBAIO_VERSION)
+	cd libaio-aarch64 && CC=aarch64-linux-gnu-gcc make -j$(NPROC)
+
 FIO_VERSION := "fio-3.38"
 fio:
 ifeq ("$(wildcard fio)","")
@@ -164,15 +174,16 @@ ifeq ("$(wildcard fio/config.log)","")
 endif
 	cd fio && make -j$(NPROC)
 
-fio-aarch64:
+# fio-aarch64 needs de3d5e68dd017a6d6099913b7831bb94f46e49cc or newer to support "--extra-ldflags" from commit 6fbe3284d
+fio-aarch64: libaio-aarch64
 ifeq ("$(wildcard fio-aarch64)","")
 	git clone https://github.com/axboe/fio.git fio-aarch64
 else
 	cd fio-aarch64 && git checkout master && git pull
 endif
-	cd fio-aarch64 && git checkout $(FIO_VERSION)
+	cd fio-aarch64 && git checkout de3d5e68dd017a6d6099913b7831bb94f46e49cc
 ifeq ("$(wildcard fio-aarch64/config.log)","")
-	cd fio-aarch64 && ./configure --build-static --disable-native --cc=aarch64-linux-gnu-gcc
+	cd fio-aarch64 && ./configure --build-static --disable-native --cc=aarch64-linux-gnu-gcc --extra-cflags="-I../libaio-aarch64/src" --extra-ldflags="-L../libaio-aarch64/src"
 endif
 	cd fio-aarch64 && make -j$(NPROC)
 
