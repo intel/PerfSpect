@@ -57,7 +57,7 @@ After collecting metrics, you can generate new summary reports for a specific ti
 
 The time range can be specified using either absolute timestamps (seconds since epoch) or relative offsets from the beginning/end of the data. At least one time parameter must be specified.
 
-The trim command overwrites the CSV and HTML summary files in the input directory with new files containing the filtered data.
+The trimmed CSV and HTML summary files will be placed in a new output directory. The output directory can be specified using the `--output` flag.
 
 **Examples:**
 <pre>
@@ -165,7 +165,7 @@ $ ./perfspect metrics --syslog
 </pre>
 
 ##### Report Files
-By default, PerfSpect creates a unique directory in the user's current working directory to store output files. Users can specify a custom output directory, but the directory provided must exist; PerfSpect will not create it.
+By default, PerfSpect creates a unique directory in the user's current working directory to store output files. Users can specify a custom output directory with the --output flag.
 <pre>
 $./perfspect telemetry --output /home/elaine/perfspect/telemetry
 </pre>

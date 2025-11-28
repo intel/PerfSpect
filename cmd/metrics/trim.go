@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"perfspect/internal/common"
+	"perfspect/internal/util"
 
 	"github.com/spf13/cobra"
 )
@@ -127,8 +128,11 @@ func validateTrimFlags(cmd *cobra.Command, args []string) error {
 
 // runTrimCmd executes the trim command
 func runTrimCmd(cmd *cobra.Command, args []string) error {
+	// appContext is the application context that holds common data and resources.
+	appContext := cmd.Parent().Context().Value(common.AppContext{}).(common.AppContext)
+	outputDir := appContext.OutputDir
+
 	// flagTrimInput can be a file or directory
-	// get the directory and use it as output dir
 	var sourceDir string
 	fileInfo, err := os.Stat(flagTrimInput)
 	if err != nil {
@@ -143,8 +147,8 @@ func runTrimCmd(cmd *cobra.Command, args []string) error {
 	} else {
 		sourceDir = filepath.Dir(flagTrimInput)
 	}
-	outputDir := sourceDir
 
+	// Determine source files to process
 	sourceInfos, err := getTrimmedSourceInfos(flagTrimInput)
 	if err != nil {
 		err = fmt.Errorf("failed to determine source files: %w", err)
@@ -154,16 +158,27 @@ func runTrimCmd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if len(sourceInfos) == 0 {
-		err = fmt.Errorf("no valid metrics CSV files found to trim in: %s", sourceDir)
+		err = fmt.Errorf("no valid metrics CSV files found to trim")
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
 		cmd.SilenceUsage = true
 		return err
 	}
 
+	// create output directory if it doesn't exist
+	err = util.CreateDirectoryIfNotExists(outputDir, 0755) // #nosec G301
+	if err != nil {
+		err = fmt.Errorf("failed to create output directory: %w", err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		slog.Error(err.Error())
+		cmd.SilenceUsage = true
+		return err
+	}
+
+	// Process each source file
 	var filesCreated []string
 	for _, sourceInfo := range sourceInfos {
-		filesCreated, err = summarizeMetricsWithTrim(outputDir, sourceInfo.targetName, sourceInfo.metadata, sourceInfo.metricDefinitions, sourceInfo.startTime, sourceInfo.endTime)
+		filesCreated, err = summarizeMetricsWithTrim(sourceDir, outputDir, sourceInfo.targetName, sourceInfo.metadata, sourceInfo.metricDefinitions, sourceInfo.startTime, sourceInfo.endTime)
 		if err != nil {
 			err = fmt.Errorf("failed to generate trimmed summaries for %s: %w", sourceInfo.allCSVPath, err)
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)

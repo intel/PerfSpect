@@ -29,12 +29,12 @@ import (
 // generates summary files (CSV and HTML) using the provided metadata and metric definitions,
 // and returns a list of created summary file paths.
 func summarizeMetrics(localOutputDir string, targetName string, metadata Metadata, metricDefinitions []MetricDefinition) ([]string, error) {
-	return summarizeMetricsWithTrim(localOutputDir, targetName, metadata, metricDefinitions, 0, 0)
+	return summarizeMetricsWithTrim(localOutputDir, localOutputDir, targetName, metadata, metricDefinitions, 0, 0)
 }
-func summarizeMetricsWithTrim(localOutputDir string, targetName string, metadata Metadata, metricDefinitions []MetricDefinition, startTimestamp, endTimestamp int) ([]string, error) {
+func summarizeMetricsWithTrim(localInputDir, localOutputDir, targetName string, metadata Metadata, metricDefinitions []MetricDefinition, startTimestamp, endTimestamp int) ([]string, error) {
 	filesCreated := []string{}
 	// read the metrics from CSV
-	csvMetricsFile := filepath.Join(localOutputDir, targetName+"_metrics.csv")
+	csvMetricsFile := filepath.Join(localInputDir, targetName+"_metrics.csv")
 	metrics, err := newMetricCollection(csvMetricsFile)
 	if err != nil {
 		return filesCreated, fmt.Errorf("failed to read metrics from %s: %w", csvMetricsFile, err)
