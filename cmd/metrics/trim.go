@@ -127,9 +127,6 @@ func validateTrimFlags(cmd *cobra.Command, args []string) error {
 
 // runTrimCmd executes the trim command
 func runTrimCmd(cmd *cobra.Command, args []string) error {
-	// appContext is the application context that holds common data and resources.
-	// appContext := cmd.Parent().Parent().Context().Value(common.AppContext{}).(common.AppContext)
-
 	// flagTrimInput can be a file or directory
 	// get the directory and use it as output dir
 	var sourceDir string
