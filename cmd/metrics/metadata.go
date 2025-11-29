@@ -539,12 +539,19 @@ func (md Metadata) String() string {
 	return string(jsonData)
 }
 
+func (md Metadata) Initialized() bool {
+	return md.SocketCount != 0 && md.CoresPerSocket != 0
+}
+
 // JSON converts the Metadata struct to a JSON-encoded byte slice.
 //
 // Returns:
 // - out: JSON-encoded byte slice representation of the Metadata.
 // - err: error encountered during the marshaling process, if any.
 func (md Metadata) JSON() (out []byte, err error) {
+	if !md.Initialized() {
+		return []byte("null"), nil
+	}
 	if out, err = json.Marshal(md); err != nil {
 		slog.Error("failed to marshal metadata structure", slog.String("error", err.Error()))
 		return

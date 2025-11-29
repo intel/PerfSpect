@@ -265,6 +265,10 @@ func usageFunc(cmd *cobra.Command) error {
 			cmd.Printf("    --%-20s %s%s\n", flag.Name, flag.Help, flagDefault)
 		}
 	}
+	cmd.Printf("\nSubcommands:\n")
+	for _, subCmd := range cmd.Commands() {
+		cmd.Printf("  %s: %s\n", subCmd.Name(), subCmd.Short)
+	}
 	cmd.Println("\nGlobal Flags:")
 	cmd.Parent().PersistentFlags().VisitAll(func(pf *pflag.Flag) {
 		flagDefault := ""

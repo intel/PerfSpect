@@ -25,17 +25,29 @@ import (
 	"github.com/casbin/govaluate"
 )
 
+// summarizeMetrics reads the metrics CSV from localOutputDir for targetName,
+// generates summary files (CSV and HTML) using the provided metadata and metric definitions,
+// and returns a list of created summary file paths.
 func summarizeMetrics(localOutputDir string, targetName string, metadata Metadata, metricDefinitions []MetricDefinition) ([]string, error) {
+	return summarizeMetricsWithTrim(localOutputDir, localOutputDir, targetName, metadata, metricDefinitions, 0, 0)
+}
+func summarizeMetricsWithTrim(localInputDir, localOutputDir, targetName string, metadata Metadata, metricDefinitions []MetricDefinition, startTimestamp, endTimestamp int) ([]string, error) {
 	filesCreated := []string{}
 	// read the metrics from CSV
-	csvMetricsFile := filepath.Join(localOutputDir, targetName+"_metrics.csv")
+	csvMetricsFile := filepath.Join(localInputDir, targetName+"_metrics.csv")
 	metrics, err := newMetricCollection(csvMetricsFile)
 	if err != nil {
 		return filesCreated, fmt.Errorf("failed to read metrics from %s: %w", csvMetricsFile, err)
 	}
-	// exclude the final sample if metrics were collected with a workload
-	if metadata.WithWorkload {
-		metrics.excludeFinalSample()
+	if startTimestamp != 0 || endTimestamp != 0 {
+		// trim the metrics to the specified time range
+		metrics.filterByTimeRange(startTimestamp, endTimestamp)
+	} else {
+		// trim time range not specified,
+		// exclude the final sample if metrics were collected with a workload
+		if metadata.WithWorkload {
+			metrics.excludeFinalSample()
+		}
 	}
 	// csv summary
 	out, err := metrics.getCSV()
@@ -74,7 +86,7 @@ type metricStats struct {
 }
 
 type row struct {
-	timestamp float64
+	timestamp int
 	socket    string
 	cpu       string
 	cgroup    string
@@ -87,8 +99,8 @@ func newRow(fields []string, names []string) (r row, err error) {
 	for fIdx, field := range fields {
 		switch fIdx {
 		case idxTimestamp:
-			var ts float64
-			if ts, err = strconv.ParseFloat(field, 64); err != nil {
+			var ts int
+			if ts, err = strconv.Atoi(field); err != nil {
 				return
 			}
 			r.timestamp = ts
@@ -336,8 +348,8 @@ func (mc MetricCollection) aggregate() (m *MetricGroup, err error) {
 		groupByValue: "",
 	}
 	// aggregate the rows by timestamp
-	timestampMap := make(map[float64][]map[string]float64) // map of timestamp to list of metric maps
-	var timestamps []float64                               // list of timestamps in order
+	timestampMap := make(map[int][]map[string]float64) // map of timestamp to list of metric maps
+	var timestamps []int                               // list of timestamps in order
 	for _, metrics := range mc {
 		for _, row := range metrics.rows {
 			if _, ok := timestampMap[row.timestamp]; !ok {
@@ -815,4 +827,22 @@ func (mc MetricCollection) getCSV() (out string, err error) {
 		out += "\n"
 	}
 	return
+}
+
+// filterByTimeRange filters all metric groups to only include rows within the specified time range
+func (mc MetricCollection) filterByTimeRange(startTime, endTime int) {
+	for i := range mc {
+		mc[i].filterByTimeRange(startTime, endTime)
+	}
+}
+
+// filterByTimeRange filters the metric group to only include rows within the specified time range
+func (mg *MetricGroup) filterByTimeRange(startTime, endTime int) {
+	var filteredRows []row
+	for _, row := range mg.rows {
+		if row.timestamp >= startTime && row.timestamp <= endTime {
+			filteredRows = append(filteredRows, row)
+		}
+	}
+	mg.rows = filteredRows
 }

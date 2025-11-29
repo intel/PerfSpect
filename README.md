@@ -52,6 +52,22 @@ If neither sudo nor root access is available, an administrator must apply the fo
 
 Once the configuration changes are applied, use the `--noroot` flag on the command line, for example, `perfspect metrics --noroot`.
 
+##### Refining Metrics to a Specific Time Range
+After collecting metrics, you can generate new summary reports for a specific time interval using the `metrics trim` subcommand. This is useful when you've collected metrics for an entire workload but want to analyze only a specific portion, excluding setup, teardown, or other unwanted phases.
+
+The time range can be specified using either absolute timestamps (seconds since epoch) or relative offsets from the beginning/end of the data. At least one time parameter must be specified.
+
+The trimmed CSV and HTML summary files will be placed in a new output directory. The output directory can be specified using the `--output` flag.
+
+**Examples:**
+<pre>
+# Skip the first 10 seconds and last 5 seconds
+$ ./perfspect metrics trim --input perfspect_2025-11-28_09-21-56 --start-offset 10 --end-offset 5
+
+# Use absolute timestamps (seconds since epoch)
+$ ./perfspect metrics trim --input perfspect_2025-11-28_09-21-56 --start-time 1764174327 --end-time 1764174351
+</pre>
+
 ##### Prometheus Endpoint
 The `metrics` command can expose metrics via a Prometheus compatible `metrics` endpoint. This allows integration with Prometheus monitoring systems. To enable the Prometheus endpoint, use the `--prometheus-server` flag. By default, the endpoint listens on port 9090. The port can be changed using the `--prometheus-server-addr` flag. Run `perfspect metrics --prometheus-server`. See the [example daemonset](docs/perfspect-daemonset.md) for deploying in Kubernetes.
 
@@ -149,7 +165,7 @@ $ ./perfspect metrics --syslog
 </pre>
 
 ##### Report Files
-By default, PerfSpect creates a unique directory in the user's current working directory to store output files. Users can specify a custom output directory, but the directory provided must exist; PerfSpect will not create it.
+By default, PerfSpect creates a unique directory in the user's current working directory to store output files. Users can specify a custom output directory with the --output flag.
 <pre>
 $./perfspect telemetry --output /home/elaine/perfspect/telemetry
 </pre>

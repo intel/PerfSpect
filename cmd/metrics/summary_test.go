@@ -14,46 +14,46 @@ func TestExcludeFinalSample(t *testing.T) {
 		name          string
 		inputRows     []row
 		expectedCount int
-		expectedMaxTS float64
+		expectedMaxTS int
 	}{
 		{
 			name: "exclude single final timestamp",
 			inputRows: []row{
-				{timestamp: 5.0, metrics: map[string]float64{"metric1": 100.0}},
-				{timestamp: 10.0, metrics: map[string]float64{"metric1": 200.0}},
-				{timestamp: 15.0, metrics: map[string]float64{"metric1": 150.0}},
-				{timestamp: 20.0, metrics: map[string]float64{"metric1": 50.0}}, // this should be excluded
+				{timestamp: 5, metrics: map[string]float64{"metric1": 100.0}},
+				{timestamp: 10, metrics: map[string]float64{"metric1": 200.0}},
+				{timestamp: 15, metrics: map[string]float64{"metric1": 150.0}},
+				{timestamp: 20, metrics: map[string]float64{"metric1": 50.0}}, // this should be excluded
 			},
 			expectedCount: 3,
-			expectedMaxTS: 15.0,
+			expectedMaxTS: 15,
 		},
 		{
 			name: "exclude multiple rows with same final timestamp",
 			inputRows: []row{
-				{timestamp: 5.0, socket: "0", metrics: map[string]float64{"metric1": 100.0}},
-				{timestamp: 10.0, socket: "0", metrics: map[string]float64{"metric1": 200.0}},
-				{timestamp: 15.0, socket: "0", metrics: map[string]float64{"metric1": 150.0}},
-				{timestamp: 15.0, socket: "1", metrics: map[string]float64{"metric1": 160.0}}, // same timestamp, different socket
+				{timestamp: 5, socket: "0", metrics: map[string]float64{"metric1": 100.0}},
+				{timestamp: 10, socket: "0", metrics: map[string]float64{"metric1": 200.0}},
+				{timestamp: 15, socket: "0", metrics: map[string]float64{"metric1": 150.0}},
+				{timestamp: 15, socket: "1", metrics: map[string]float64{"metric1": 160.0}}, // same timestamp, different socket
 			},
 			expectedCount: 2,
-			expectedMaxTS: 10.0,
+			expectedMaxTS: 10,
 		},
 		{
 			name: "single sample - should not exclude",
 			inputRows: []row{
-				{timestamp: 5.0, metrics: map[string]float64{"metric1": 100.0}},
+				{timestamp: 5, metrics: map[string]float64{"metric1": 100.0}},
 			},
 			expectedCount: 1,
-			expectedMaxTS: 5.0,
+			expectedMaxTS: 5,
 		},
 		{
 			name: "two samples - exclude last one",
 			inputRows: []row{
-				{timestamp: 5.0, metrics: map[string]float64{"metric1": 100.0}},
-				{timestamp: 10.0, metrics: map[string]float64{"metric1": 50.0}},
+				{timestamp: 5, metrics: map[string]float64{"metric1": 100.0}},
+				{timestamp: 10, metrics: map[string]float64{"metric1": 50.0}},
 			},
 			expectedCount: 1,
-			expectedMaxTS: 5.0,
+			expectedMaxTS: 5,
 		},
 	}
 
@@ -93,9 +93,9 @@ func TestExcludeFinalSampleMultipleGroups(t *testing.T) {
 			groupByField: "SKT",
 			groupByValue: "0",
 			rows: []row{
-				{timestamp: 5.0, socket: "0", metrics: map[string]float64{"metric1": 100.0}},
-				{timestamp: 10.0, socket: "0", metrics: map[string]float64{"metric1": 200.0}},
-				{timestamp: 15.0, socket: "0", metrics: map[string]float64{"metric1": 50.0}}, // should be excluded
+				{timestamp: 5, socket: "0", metrics: map[string]float64{"metric1": 100.0}},
+				{timestamp: 10, socket: "0", metrics: map[string]float64{"metric1": 200.0}},
+				{timestamp: 15, socket: "0", metrics: map[string]float64{"metric1": 50.0}}, // should be excluded
 			},
 		},
 		MetricGroup{
@@ -103,9 +103,9 @@ func TestExcludeFinalSampleMultipleGroups(t *testing.T) {
 			groupByField: "SKT",
 			groupByValue: "1",
 			rows: []row{
-				{timestamp: 5.0, socket: "1", metrics: map[string]float64{"metric1": 110.0}},
-				{timestamp: 10.0, socket: "1", metrics: map[string]float64{"metric1": 210.0}},
-				{timestamp: 15.0, socket: "1", metrics: map[string]float64{"metric1": 60.0}}, // should be excluded
+				{timestamp: 5, socket: "1", metrics: map[string]float64{"metric1": 110.0}},
+				{timestamp: 10, socket: "1", metrics: map[string]float64{"metric1": 210.0}},
+				{timestamp: 15, socket: "1", metrics: map[string]float64{"metric1": 60.0}}, // should be excluded
 			},
 		},
 	}
@@ -117,8 +117,8 @@ func TestExcludeFinalSampleMultipleGroups(t *testing.T) {
 	assert.Equal(t, 2, len(mc[1].rows), "socket 1 should have 2 rows")
 
 	// Verify max timestamps
-	assert.Equal(t, 10.0, mc[0].rows[1].timestamp, "socket 0 max timestamp should be 10.0")
-	assert.Equal(t, 10.0, mc[1].rows[1].timestamp, "socket 1 max timestamp should be 10.0")
+	assert.Equal(t, 10, mc[0].rows[1].timestamp, "socket 0 max timestamp should be 10")
+	assert.Equal(t, 10, mc[1].rows[1].timestamp, "socket 1 max timestamp should be 10")
 }
 
 func TestExcludeFinalSampleEmptyCollection(t *testing.T) {
