@@ -131,7 +131,7 @@ RUN ulimit -n 4096 && success=false; \
     $success || (echo "Failed to install perf build tools after 5 attempts" && exit 1)
 
 # libdwfl will dlopen libdebuginfod at runtime, may cause segment fault in static build, disable it. ref: https://github.com/vgteam/vg/pull/3600
-RUN wget https://sourceware.org/elfutils/ftp/0.190/elfutils-0.190.tar.bz2 \
+RUN wget -4 --tries 5 --waitretry 10 https://sourceware.org/elfutils/ftp/0.190/elfutils-0.190.tar.bz2 \
 && tar -xf elfutils-0.190.tar.bz2 \
 && cd elfutils-0.190 \
 && ./configure --disable-debuginfod --disable-libdebuginfod \
@@ -145,7 +145,7 @@ RUN git clone https://github.com/madler/zlib.git zlib-aarch64 \
 && cp libz.a /usr/lib/aarch64-linux-gnu/
 
 # build libelf for aarch64
-RUN wget https://sourceware.org/elfutils/ftp/0.186/elfutils-0.186.tar.bz2 \
+RUN wget -4 --tries 5 --waitretry 10 https://sourceware.org/elfutils/ftp/0.186/elfutils-0.186.tar.bz2 \
 && tar -xf elfutils-0.186.tar.bz2 \
 && cd elfutils-0.186 \
 && ./configure --host=aarch64-linux-gnu --disable-debuginfod --disable-libdebuginfod \
