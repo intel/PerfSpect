@@ -7,8 +7,6 @@ package report
 import (
 	"fmt"
 	"strings"
-
-	"perfspect/internal/script"
 )
 
 const (
@@ -32,13 +30,12 @@ var FormatOptions = []string{FormatHtml, FormatXlsx, FormatJson, FormatTxt}
 // Parameters:
 // - format: The desired format of the report (txt, json, html, xlsx, raw).
 // - tableValues: The values for each field in each table.
-// - scriptOutputs: The outputs of any scripts used in the report.
 // - targetName: The name of the target for which the report is being generated.
 //
 // Returns:
 // - out: The generated report as a byte slice.
 // - err: An error, if any occurred during report generation.
-func Create(format string, allTableValues []TableValues, scriptOutputs map[string]script.ScriptOutput, targetName string) (out []byte, err error) {
+func Create(format string, allTableValues []TableValues, targetName string) (out []byte, err error) {
 	// make sure that all fields have the same number of values
 	for _, tableValue := range allTableValues {
 		numRows := -1

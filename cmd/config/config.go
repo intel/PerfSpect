@@ -280,7 +280,7 @@ func printConfig(myTargets []target.Target, localTempDir string) (err error) {
 		}
 		// create the report for this single table
 		var reportBytes []byte
-		if reportBytes, err = report.Create("txt", tableValues, targetScriptOutputs.ScriptOutputs, targetScriptOutputs.TargetName); err != nil {
+		if reportBytes, err = report.Create("txt", tableValues, targetScriptOutputs.TargetName); err != nil {
 			err = fmt.Errorf("failed to create report: %v", err)
 			return
 		}

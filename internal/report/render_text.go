@@ -97,3 +97,44 @@ func DefaultTextTableRendererFunc(tableValues TableValues) string {
 	}
 	return sb.String()
 }
+
+// configurationTableTextRenderer renders the configuration table for text reports.
+// It's similar to the default text table renderer, but uses the Description field
+// to show the command line argument for each config item.
+// Example output:
+// Configuration
+// =============
+// Cores per Socket:               86          --cores <N>
+// L3 Cache:                       336M        --llc <MB>
+// Package Power / TDP:            350W        --tdp <Watts>
+// All-Core Max Frequency:         3.2GHz      --core-max <GHz>
+func configurationTableTextRenderer(tableValues TableValues) string {
+	var sb strings.Builder
+
+	// Find the longest field name and value for formatting
+	maxFieldNameLen := 0
+	maxValueLen := 0
+	for _, field := range tableValues.Fields {
+		if len(field.Name) > maxFieldNameLen {
+			maxFieldNameLen = len(field.Name)
+		}
+		if len(field.Values) > 0 && len(field.Values[0]) > maxValueLen {
+			maxValueLen = len(field.Values[0])
+		}
+	}
+
+	// Print each field with name, value, and description (command-line arg)
+	for _, field := range tableValues.Fields {
+		var value string
+		if len(field.Values) > 0 {
+			value = field.Values[0]
+		}
+		// Format: "Field Name:      Value       Description"
+		sb.WriteString(fmt.Sprintf("%-*s  %-*s  %s\n",
+			maxFieldNameLen+1, field.Name+":",
+			maxValueLen, value,
+			field.Description))
+	}
+
+	return sb.String()
+}
