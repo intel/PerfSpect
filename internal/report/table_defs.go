@@ -599,7 +599,8 @@ var tableDefinitions = map[string]TableDefinition{
 			script.CstatesScriptName,
 			script.C1DemotionScriptName,
 		},
-		FieldsFunc: configurationTableValues},
+		TextTableRendererFunc: configurationTableTextRenderer,
+		FieldsFunc:            configurationTableValues},
 	//
 	// benchmarking tables
 	//
@@ -2176,34 +2177,36 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []Field {
 		slog.Error("failed to get uarch from script outputs")
 		return []Field{}
 	}
-
+	// This table is only shown in text mode on stdout for the config command. The config
+	// command implements its own print logic and uses the Description field to show the command line
+	// argument for each config item.
 	fields := []Field{
-		{Name: "Cores per Socket", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)}},
-		{Name: "L3 Cache", Values: []string{l3InstanceFromOutput(outputs)}},
-		{Name: "Package Power / TDP", Values: []string{tdpFromOutput(outputs)}},
-		{Name: "All-Core Max Frequency", Values: []string{allCoreMaxFrequencyFromOutput(outputs)}},
+		{Name: "Cores per Socket", Description: "--cores <N>", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)}},
+		{Name: "L3 Cache", Description: "--llc <MB>", Values: []string{l3InstanceFromOutput(outputs)}},
+		{Name: "Package Power / TDP", Description: "--tdp <Watts>", Values: []string{tdpFromOutput(outputs)}},
+		{Name: "All-Core Max Frequency", Description: "--core-max <GHz>", Values: []string{allCoreMaxFrequencyFromOutput(outputs)}},
 	}
 	if strings.Contains(uarch, "SRF") || strings.Contains(uarch, "GNR") || strings.Contains(uarch, "CWF") {
 		fields = append(fields, []Field{
-			{Name: "Uncore Min Frequency (Compute)", Values: []string{uncoreMinMaxDieFrequencyFromOutput(false, true, outputs)}},
-			{Name: "Uncore Min Frequency (I/O)", Values: []string{uncoreMinMaxDieFrequencyFromOutput(false, false, outputs)}},
-			{Name: "Uncore Max Frequency (Compute)", Values: []string{uncoreMinMaxDieFrequencyFromOutput(true, true, outputs)}},
-			{Name: "Uncore Max Frequency (I/O)", Values: []string{uncoreMinMaxDieFrequencyFromOutput(true, false, outputs)}},
+			{Name: "Uncore Max Frequency (Compute)", Description: "--uncore-max-compute <GHz>", Values: []string{uncoreMinMaxDieFrequencyFromOutput(true, true, outputs)}},
+			{Name: "Uncore Min Frequency (Compute)", Description: "--uncore-min-compute <GHz>", Values: []string{uncoreMinMaxDieFrequencyFromOutput(false, true, outputs)}},
+			{Name: "Uncore Max Frequency (I/O)", Description: "--uncore-max-io <GHz>", Values: []string{uncoreMinMaxDieFrequencyFromOutput(true, false, outputs)}},
+			{Name: "Uncore Min Frequency (I/O)", Description: "--uncore-min-io <GHz>", Values: []string{uncoreMinMaxDieFrequencyFromOutput(false, false, outputs)}},
 		}...)
 	} else {
 		fields = append(fields, []Field{
-			{Name: "Uncore Max Frequency (GHz)", Values: []string{uncoreMaxFrequencyFromOutput(outputs)}},
-			{Name: "Uncore Min Frequency (GHz)", Values: []string{uncoreMinFrequencyFromOutput(outputs)}},
+			{Name: "Uncore Max Frequency", Description: "--uncore-max <GHz>", Values: []string{uncoreMaxFrequencyFromOutput(outputs)}},
+			{Name: "Uncore Min Frequency", Description: "--uncore-min <GHz>", Values: []string{uncoreMinFrequencyFromOutput(outputs)}},
 		}...)
 	}
 	fields = append(fields, []Field{
-		{Name: "Energy Performance Bias", Values: []string{epbFromOutput(outputs)}},
-		{Name: "Energy Performance Preference", Values: []string{eppFromOutput(outputs)}},
-		{Name: "Scaling Governor", Values: []string{strings.TrimSpace(outputs[script.ScalingGovernorScriptName].Stdout)}},
+		{Name: "Energy Performance Bias", Description: "--epb <0-15>", Values: []string{epbFromOutput(outputs)}},
+		{Name: "Energy Performance Preference", Description: "--epp <0-255>", Values: []string{eppFromOutput(outputs)}},
+		{Name: "Scaling Governor", Description: "--gov <performance|powersave>", Values: []string{strings.TrimSpace(outputs[script.ScalingGovernorScriptName].Stdout)}},
 	}...)
 	// add ELC (for SRF, CWF and GNR only)
 	if strings.Contains(uarch, "SRF") || strings.Contains(uarch, "GNR") || strings.Contains(uarch, "CWF") {
-		fields = append(fields, Field{Name: "Efficiency Latency Control", Values: []string{elcSummaryFromOutput(outputs)}})
+		fields = append(fields, Field{Name: "Efficiency Latency Control", Description: "--elc <default|latency-optimized>", Values: []string{elcSummaryFromOutput(outputs)}})
 	}
 	// add prefetchers
 	for _, pf := range prefetcherDefinitions {
@@ -2232,18 +2235,23 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []Field {
 			} else {
 				enabledDisabled = "Disabled"
 			}
-			fields = append(fields, Field{Name: pf.ShortName + " prefetcher", Values: []string{enabledDisabled}})
+			fields = append(fields,
+				Field{
+					Name:        pf.ShortName + " prefetcher",
+					Description: "--" + "pref-" + strings.ReplaceAll(strings.ToLower(pf.ShortName), " ", "") + " <enable|disable>",
+					Values:      []string{enabledDisabled}},
+			)
 		}
 	}
-	// add C-states
-	cstates := cstatesSummaryFromOutput(outputs)
-	if cstates != "" {
-		fields = append(fields, Field{Name: "C-states", Values: []string{cstates}})
+	// add C6
+	c6 := c6FromOutput(outputs)
+	if c6 != "" {
+		fields = append(fields, Field{Name: "C6", Description: "--c6 <enable|disable>", Values: []string{c6}})
 	}
 	// add C1 Demotion
 	c1Demotion := strings.TrimSpace(outputs[script.C1DemotionScriptName].Stdout)
 	if c1Demotion != "" {
-		fields = append(fields, Field{Name: "C1 Demotion", Values: []string{c1Demotion}})
+		fields = append(fields, Field{Name: "C1 Demotion", Description: "--c1-demotion <enable|disable>", Values: []string{c1Demotion}})
 	}
 	return fields
 }
