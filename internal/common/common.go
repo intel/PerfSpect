@@ -580,10 +580,7 @@ func collectOnTarget(myTarget target.Target, scriptsToRun []script.ScriptDefinit
 	} else if duration != "0" && duration != "" {
 		status += fmt.Sprintf(" for %s seconds", duration)
 	}
-	if statusUpdate != nil {
-		_ = statusUpdate(myTarget.GetName(), status)
-	}
-	scriptOutputs, err := script.RunScripts(myTarget, scriptsToRun, true, localTempDir)
+	scriptOutputs, err := script.RunScripts(myTarget, scriptsToRun, true, localTempDir, statusUpdate, status)
 	if err != nil {
 		if statusUpdate != nil {
 			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("error collecting data: %v", err))
