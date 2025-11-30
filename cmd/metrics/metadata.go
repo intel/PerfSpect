@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"perfspect/internal/cpus"
+	"perfspect/internal/progress"
 	"perfspect/internal/report"
 	"perfspect/internal/script"
 	"perfspect/internal/target"
@@ -77,7 +78,7 @@ type Metadata struct {
 
 // LoadMetadata - populates and returns a Metadata structure containing state of the
 // system.
-func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, perfPath string, localTempDir string) (Metadata, error) {
+func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc) (Metadata, error) {
 	uarch, err := myTarget.GetArchitecture()
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to get target architecture: %v", err)
@@ -86,11 +87,11 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, per
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to create metadata collector: %v", err)
 	}
-	return collector.CollectMetadata(myTarget, noRoot, noSystemSummary, perfPath, localTempDir)
+	return collector.CollectMetadata(myTarget, noRoot, noSystemSummary, localTempDir, statusUpdate)
 }
 
 type MetadataCollector interface {
-	CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, perfPath string, localTempDir string) (Metadata, error)
+	CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc) (Metadata, error)
 }
 
 func NewMetadataCollector(architecture string) (MetadataCollector, error) {
@@ -112,7 +113,7 @@ type X86MetadataCollector struct {
 type ARMMetadataCollector struct {
 }
 
-func (c *X86MetadataCollector) CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, perfPath string, localTempDir string) (Metadata, error) {
+func (c *X86MetadataCollector) CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc) (Metadata, error) {
 	var metadata Metadata
 	var err error
 	// Hostname
@@ -158,12 +159,12 @@ func (c *X86MetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 		return Metadata{}, fmt.Errorf("failed to get number of general purpose counters: %v", err)
 	}
 	// the rest of the metadata is retrieved by running scripts in parallel
-	metadataScripts, err := getMetadataScripts(noRoot, perfPath, noSystemSummary, metadata.NumGeneralPurposeCounters)
+	metadataScripts, err := getMetadataScripts(noRoot, noSystemSummary, metadata.NumGeneralPurposeCounters)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to get metadata scripts: %v", err)
 	}
 	// run the scripts
-	scriptOutputs, err := script.RunScripts(myTarget, metadataScripts, true, localTempDir, nil, "") // nosemgrep
+	scriptOutputs, err := script.RunScripts(myTarget, metadataScripts, true, localTempDir, statusUpdate, "collecting metadata") // nosemgrep
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to run metadata scripts: %v", err)
 	}
@@ -282,7 +283,8 @@ func (c *X86MetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 	}
 	return metadata, nil
 }
-func (c *ARMMetadataCollector) CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, perfPath string, localTempDir string) (Metadata, error) {
+
+func (c *ARMMetadataCollector) CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc) (Metadata, error) {
 	var metadata Metadata
 	// Hostname
 	metadata.Hostname = myTarget.GetName()
@@ -342,7 +344,7 @@ func (c *ARMMetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 		return Metadata{}, fmt.Errorf("failed to get number of general purpose counters: %v", err)
 	}
 	// the rest of the metadata is retrieved by running scripts in parallel and then parsing the output
-	metadataScripts, err := getMetadataScripts(noRoot, perfPath, noSystemSummary, metadata.NumGeneralPurposeCounters)
+	metadataScripts, err := getMetadataScripts(noRoot, noSystemSummary, metadata.NumGeneralPurposeCounters)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to get metadata scripts: %v", err)
 	}
@@ -397,7 +399,7 @@ func (c *ARMMetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 	return metadata, nil
 }
 
-func getMetadataScripts(noRoot bool, perfPath string, noSystemSummary bool, numGPCounters int) (metadataScripts []script.ScriptDefinition, err error) {
+func getMetadataScripts(noRoot bool, noSystemSummary bool, numGPCounters int) (metadataScripts []script.ScriptDefinition, err error) {
 	// reduce startup time by running the metadata scripts in parallel
 	metadataScriptDefs := []script.ScriptDefinition{
 		{
@@ -407,8 +409,9 @@ func getMetadataScripts(noRoot bool, perfPath string, noSystemSummary bool, numG
 		},
 		{
 			Name:           "perf supported events",
-			ScriptTemplate: perfPath + " list",
+			ScriptTemplate: "perf list",
 			Superuser:      !noRoot,
+			Depends:        []string{"perf"},
 		},
 		{
 			Name:           "list uncore devices",
@@ -418,46 +421,54 @@ func getMetadataScripts(noRoot bool, perfPath string, noSystemSummary bool, numG
 		},
 		{
 			Name:           "perf stat instructions",
-			ScriptTemplate: perfPath + " stat -a -e instructions sleep 1",
+			ScriptTemplate: "perf stat -a -e instructions sleep 1",
 			Superuser:      !noRoot,
+			Depends:        []string{"perf"},
 		},
 		{
 			Name:           "perf stat ref-cycles",
-			ScriptTemplate: perfPath + " stat -a -e ref-cycles sleep 1",
+			ScriptTemplate: "perf stat -a -e ref-cycles sleep 1",
 			Superuser:      !noRoot,
+			Depends:        []string{"perf"},
 		},
 		{
 			Name:           "perf stat pebs",
-			ScriptTemplate: perfPath + " stat -a -e INT_MISC.UNKNOWN_BRANCH_CYCLES sleep 1",
+			ScriptTemplate: "perf stat -a -e INT_MISC.UNKNOWN_BRANCH_CYCLES sleep 1",
 			Superuser:      !noRoot,
 			Architectures:  []string{cpus.X86Architecture},
+			Depends:        []string{"perf"},
 		},
 		{
 			Name:           "perf stat ocr",
-			ScriptTemplate: perfPath + " stat -a -e OCR.READS_TO_CORE.LOCAL_DRAM sleep 1",
+			ScriptTemplate: "perf stat -a -e OCR.READS_TO_CORE.LOCAL_DRAM sleep 1",
 			Superuser:      !noRoot,
 			Architectures:  []string{cpus.X86Architecture},
+			Depends:        []string{"perf"},
 		},
 		{
 			Name:           "perf stat tma",
-			ScriptTemplate: perfPath + " stat -a -e '{topdown.slots, topdown-bad-spec}' sleep 1",
+			ScriptTemplate: "perf stat -a -e '{topdown.slots, topdown-bad-spec}' sleep 1",
 			Superuser:      !noRoot,
 			Architectures:  []string{cpus.X86Architecture},
+			Depends:        []string{"perf"},
 		},
 		{
 			Name:           "perf stat fixed instructions",
-			ScriptTemplate: perfPath + " stat -a -e '{{{.InstructionsList}}}' sleep 1",
+			ScriptTemplate: "perf stat -a -e '{{{.InstructionsList}}}' sleep 1",
 			Superuser:      !noRoot,
+			Depends:        []string{"perf"},
 		},
 		{
 			Name:           "perf stat fixed cpu-cycles",
-			ScriptTemplate: perfPath + " stat -a -e '{{{.CpuCyclesList}}}' sleep 1",
+			ScriptTemplate: "perf stat -a -e '{{{.CpuCyclesList}}}' sleep 1",
 			Superuser:      !noRoot,
+			Depends:        []string{"perf"},
 		},
 		{
 			Name:           "perf stat fixed ref-cycles",
-			ScriptTemplate: perfPath + " stat -a -e '{{{.RefCyclesList}}}' sleep 1",
+			ScriptTemplate: "perf stat -a -e '{{{.RefCyclesList}}}' sleep 1",
 			Superuser:      !noRoot,
+			Depends:        []string{"perf"},
 		},
 		{
 			Name:           "pmu driver version",

@@ -652,7 +652,6 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 type targetContext struct {
 	target              target.Target
 	err                 error
-	perfPath            string
 	metadata            Metadata
 	nmiDisabled         bool
 	perfMuxIntervalsSet bool
@@ -974,14 +973,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-	// extract perf into local temp directory (assumes all targets have the same architecture)
-	localPerfPath, err := extractPerf(myTargets[0], localTempDir)
-	if err != nil {
-		err = fmt.Errorf("failed to extract perf: %w", err)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		cmd.SilenceUsage = true
-		return err
-	}
 	// prepare the targets
 	channelTargetError := make(chan targetError)
 	var targetContexts []targetContext
@@ -989,7 +980,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		targetContexts = append(targetContexts, targetContext{target: myTarget})
 	}
 	for i := range targetContexts {
-		go prepareTarget(&targetContexts[i], localTempDir, localPerfPath, channelTargetError, multiSpinner.Status, !cmd.Flags().Lookup(flagPerfMuxIntervalName).Changed)
+		go prepareTarget(&targetContexts[i], localTempDir, channelTargetError, multiSpinner.Status, !cmd.Flags().Lookup(flagPerfMuxIntervalName).Changed)
 	}
 	// wait for all targets to be prepared
 	numPreparedTargets := 0
@@ -1144,7 +1135,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	return err
 }
 
-func prepareTarget(targetContext *targetContext, localTempDir string, localPerfPath string, channelError chan targetError, statusUpdate progress.MultiSpinnerUpdateFunc, useDefaultMuxInterval bool) {
+func prepareTarget(targetContext *targetContext, localTempDir string, channelError chan targetError, statusUpdate progress.MultiSpinnerUpdateFunc, useDefaultMuxInterval bool) {
 	myTarget := targetContext.target
 	var err error
 	_ = statusUpdate(myTarget.GetName(), "configuring target")
@@ -1215,15 +1206,6 @@ func prepareTarget(targetContext *targetContext, localTempDir string, localPerfP
 		}
 		targetContext.perfMuxIntervalsSet = true
 	}
-	// get the full path to the perf binary
-	if targetContext.perfPath, err = getPerfPath(myTarget, localPerfPath); err != nil {
-		err = fmt.Errorf("failed to find perf: %w", err)
-		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %v", err))
-		targetContext.err = err
-		channelError <- targetError{target: myTarget, err: err}
-		return
-	}
-	slog.Debug("Using Linux perf", slog.String("target", targetContext.target.GetName()), slog.String("path", targetContext.perfPath))
 	channelError <- targetError{target: myTarget, err: nil}
 }
 
@@ -1234,13 +1216,12 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 		return
 	}
 	// load metadata
-	_ = statusUpdate(myTarget.GetName(), "collecting metadata")
 	var err error
 	skipSystemSummary := flagNoSystemSummary
 	if flagLive {
 		skipSystemSummary = true // no system summary when live, it doesn't get used/printed
 	}
-	if targetContext.metadata, err = LoadMetadata(myTarget, flagNoRoot, skipSystemSummary, targetContext.perfPath, localTempDir); err != nil {
+	if targetContext.metadata, err = LoadMetadata(myTarget, flagNoRoot, skipSystemSummary, localTempDir, statusUpdate); err != nil {
 		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}
@@ -1379,8 +1360,7 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 				break
 			}
 		}
-		var perfCommand *exec.Cmd
-		perfCommand, err = getPerfCommand(targetContext.perfPath, targetContext.groupDefinitions, pids, cids, flagCpuRange)
+		perfCommand, err := getPerfCommand(targetContext.groupDefinitions, pids, cids, flagCpuRange)
 		if err != nil {
 			err = fmt.Errorf("failed to get perf command: %w", err)
 			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
@@ -1417,9 +1397,8 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 // until perf stops. When collecting for cgroups, perf will be manually terminated if/when the
 // run duration exceeds the collection time or the time when the cgroup list needs
 // to be refreshed.
-func runPerf(myTarget target.Target, noRoot bool, processes []Process, cmd *exec.Cmd, eventGroupDefinitions []GroupDefinition, metricDefinitions []MetricDefinition, metadata Metadata, localTempDir string, outputDir string, frameChannel chan []MetricFrame, errorChannel chan error, signalMgr *signalManager) {
+func runPerf(myTarget target.Target, noRoot bool, processes []Process, perfCommand string, eventGroupDefinitions []GroupDefinition, metricDefinitions []MetricDefinition, metadata Metadata, localTempDir string, outputDir string, frameChannel chan []MetricFrame, errorChannel chan error, signalMgr *signalManager) {
 	// start perf
-	perfCommand := strings.Join(cmd.Args, " ")
 	stdoutChannel := make(chan []byte)
 	stderrChannel := make(chan []byte)
 	exitcodeChannel := make(chan int)

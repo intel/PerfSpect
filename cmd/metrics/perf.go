@@ -5,59 +5,32 @@ package metrics
 
 import (
 	"fmt"
-	"log/slog"
-	"os/exec"
-	"path"
-	"perfspect/internal/script"
-	"perfspect/internal/target"
-	"perfspect/internal/util"
 	"strings"
 )
 
-// extractPerf extracts the perf binary from the resources to the local temporary directory.
-func extractPerf(myTarget target.Target, localTempDir string) (string, error) {
-	// get the target architecture
-	arch, err := myTarget.GetArchitecture()
-	if err != nil {
-		return "", fmt.Errorf("failed to get target architecture: %w", err)
+// getPerfCommand is responsible for assembling the command that will be
+// executed to collect event data
+func getPerfCommand(eventGroups []GroupDefinition, pids []string, cids []string, cpuRange string) (string, error) {
+	var duration int
+	switch flagScope {
+	case scopeSystem:
+		duration = flagDuration
+	case scopeProcess:
+		if flagDuration > 0 {
+			duration = flagDuration
+		} else if len(flagPidList) == 0 { // don't refresh if PIDs are specified
+			duration = flagRefresh // refresh hot processes every flagRefresh seconds
+		}
+	case scopeCgroup:
+		duration = 0
 	}
-	// extract the perf binary
-	return util.ExtractResource(script.Resources, path.Join("resources", arch, "perf"), localTempDir)
-}
 
-// getPerfPath determines the path to the `perf` binary for the given target.
-// If the target is a local target, it uses the provided localPerfPath.
-// If the target is remote, it checks if `perf` version 6.1 or later is available on the target.
-// If available, it uses the `perf` binary on the target.
-// If not available, it pushes the local `perf` binary to the target's temporary directory and uses that.
-//
-// Parameters:
-// - myTarget: The target system where the `perf` binary is needed.
-// - localPerfPath: The local path to the `perf` binary.
-//
-// Returns:
-// - perfPath: The path to the `perf` binary on the target.
-// - err: An error if any occurred during the process.
-func getPerfPath(myTarget target.Target, localPerfPath string) (string, error) {
-	if localPerfPath == "" {
-		slog.Error("local perf path is empty, cannot determine perf path")
-		return "", fmt.Errorf("local perf path is empty")
+	args, err := getPerfCommandArgs(pids, cids, duration, eventGroups, cpuRange)
+	if err != nil {
+		err = fmt.Errorf("failed to assemble perf args: %v", err)
+		return "", err
 	}
-	// local target
-	if _, ok := myTarget.(*target.LocalTarget); ok {
-		return localPerfPath, nil
-	}
-	// remote target
-	targetTempDir := myTarget.GetTempDirectory()
-	if targetTempDir == "" {
-		slog.Error("target temporary directory is empty for remote target", slog.String("target", myTarget.GetName()))
-		return "", fmt.Errorf("target temporary directory is empty for remote target %s", myTarget.GetName())
-	}
-	if err := myTarget.PushFile(localPerfPath, targetTempDir); err != nil {
-		slog.Error("failed to push perf binary to remote directory", slog.String("error", err.Error()))
-		return "", fmt.Errorf("failed to push perf binary to remote directory %s: %w", targetTempDir, err)
-	}
-	return path.Join(targetTempDir, "perf"), nil
+	return strings.Join(append([]string{"perf"}, args...), " "), nil
 }
 
 // getPerfCommandArgs returns the command arguments for the 'perf stat' command
@@ -119,30 +92,4 @@ func getPerfCommandArgs(pids []string, cgroups []string, timeout int, eventGroup
 		args = append(args, "sleep", fmt.Sprintf("%d", timeout))
 	}
 	return
-}
-
-// getPerfCommand is responsible for assembling the command that will be
-// executed to collect event data
-func getPerfCommand(perfPath string, eventGroups []GroupDefinition, pids []string, cids []string, cpuRange string) (*exec.Cmd, error) {
-	var duration int
-	switch flagScope {
-	case scopeSystem:
-		duration = flagDuration
-	case scopeProcess:
-		if flagDuration > 0 {
-			duration = flagDuration
-		} else if len(flagPidList) == 0 { // don't refresh if PIDs are specified
-			duration = flagRefresh // refresh hot processes every flagRefresh seconds
-		}
-	case scopeCgroup:
-		duration = 0
-	}
-
-	args, err := getPerfCommandArgs(pids, cids, duration, eventGroups, cpuRange)
-	if err != nil {
-		err = fmt.Errorf("failed to assemble perf args: %v", err)
-		return nil, err
-	}
-	perfCommand := exec.Command(perfPath, args...) // #nosec G204 // nosemgrep
-	return perfCommand, nil
 }
