@@ -17,6 +17,7 @@ import (
 	"text/template"
 
 	"perfspect/internal/cpus"
+	"perfspect/internal/progress"
 	"perfspect/internal/target"
 	"perfspect/internal/util"
 )
@@ -37,7 +38,7 @@ func RunScript(myTarget target.Target, script ScriptDefinition, localTempDir str
 		err := fmt.Errorf("the \"%s\" script is not intended for the target processor", script.Name)
 		return ScriptOutput{}, err
 	}
-	scriptOutputs, err := RunScripts(myTarget, []ScriptDefinition{script}, false, localTempDir)
+	scriptOutputs, err := RunScripts(myTarget, []ScriptDefinition{script}, false, localTempDir, nil, "")
 	if scriptOutputs == nil {
 		return ScriptOutput{}, err
 	}
@@ -49,7 +50,7 @@ func RunScript(myTarget target.Target, script ScriptDefinition, localTempDir str
 }
 
 // RunScripts runs a list of scripts on a target and returns the outputs of each script as a map with the script name as the key.
-func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScriptErrors bool, localTempDir string) (map[string]ScriptOutput, error) {
+func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScriptErrors bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc, collectingStatus string) (map[string]ScriptOutput, error) {
 	// drop scripts that should not be run and separate scripts that must run sequentially from those that can be run in parallel
 	canElevate := myTarget.CanElevatePrivileges()
 	var sequentialScripts []ScriptDefinition
@@ -70,6 +71,9 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 		}
 	}
 	// prepare target to run scripts by copying scripts and dependencies to target and installing LKMs
+	if statusUpdate != nil {
+		_ = statusUpdate(myTarget.GetName(), "preparing to collect data")
+	}
 	installedLkms, err := prepareTargetToRunScripts(myTarget, append(sequentialScripts, parallelScripts...), localTempDir, false)
 	if err != nil {
 		err = fmt.Errorf("error while preparing target to run scripts: %v", err)
@@ -82,6 +86,9 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 				slog.Error("error uninstalling LKMs", slog.String("lkms", strings.Join(installedLkms, ", ")), slog.String("error", err.Error()))
 			}
 		}()
+	}
+	if statusUpdate != nil {
+		_ = statusUpdate(myTarget.GetName(), collectingStatus)
 	}
 	// if there's only 1 parallel script, run it sequentially
 	if len(parallelScripts) == 1 {

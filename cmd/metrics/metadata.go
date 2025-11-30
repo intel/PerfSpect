@@ -163,7 +163,7 @@ func (c *X86MetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 		return Metadata{}, fmt.Errorf("failed to get metadata scripts: %v", err)
 	}
 	// run the scripts
-	scriptOutputs, err := script.RunScripts(myTarget, metadataScripts, true, localTempDir) // nosemgrep
+	scriptOutputs, err := script.RunScripts(myTarget, metadataScripts, true, localTempDir, nil, "") // nosemgrep
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to run metadata scripts: %v", err)
 	}
@@ -347,7 +347,7 @@ func (c *ARMMetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 		return Metadata{}, fmt.Errorf("failed to get metadata scripts: %v", err)
 	}
 	// run the scripts
-	scriptOutputs, err := script.RunScripts(myTarget, metadataScripts, true, localTempDir) // nosemgrep
+	scriptOutputs, err := script.RunScripts(myTarget, metadataScripts, true, localTempDir, nil, "") // nosemgrep
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to run metadata scripts: %v", err)
 	}
