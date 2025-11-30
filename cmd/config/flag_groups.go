@@ -40,8 +40,8 @@ const (
 const (
 	flagCoreCountName           = "cores"
 	flagLLCSizeName             = "llc"
-	flagAllCoreMaxFrequencyName = "core-max"
 	flagTDPName                 = "tdp"
+	flagAllCoreMaxFrequencyName = "core-max"
 	flagEPBName                 = "epb"
 	flagEPPName                 = "epp"
 	flagGovernorName            = "gov"
@@ -93,13 +93,13 @@ func initializeFlags(cmd *cobra.Command) {
 			func(cmd *cobra.Command) bool { value, _ := cmd.Flags().GetInt(flagCoreCountName); return value > 0 }),
 		newFloat64Flag(cmd, flagLLCSizeName, 0, setLlcSize, "LLC size in MB", "greater than 0",
 			func(cmd *cobra.Command) bool { value, _ := cmd.Flags().GetFloat64(flagLLCSizeName); return value > 0 }),
+		newIntFlag(cmd, flagTDPName, 0, setTDP, "maximum power per processor in Watts", "greater than 0",
+			func(cmd *cobra.Command) bool { value, _ := cmd.Flags().GetInt(flagTDPName); return value > 0 }),
 		newFloat64Flag(cmd, flagAllCoreMaxFrequencyName, 0, setCoreFrequency, "all-core max frequency in GHz", "greater than 0.1",
 			func(cmd *cobra.Command) bool {
 				value, _ := cmd.Flags().GetFloat64(flagAllCoreMaxFrequencyName)
 				return value > 0.1
 			}),
-		newIntFlag(cmd, flagTDPName, 0, setTDP, "maximum power per processor in Watts", "greater than 0",
-			func(cmd *cobra.Command) bool { value, _ := cmd.Flags().GetInt(flagTDPName); return value > 0 }),
 		newIntFlag(cmd, flagEPBName, 0, setEPB, "energy perf bias from best performance (0) to most power savings (15)", "0-15",
 			func(cmd *cobra.Command) bool {
 				value, _ := cmd.Flags().GetInt(flagEPBName)

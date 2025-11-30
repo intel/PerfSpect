@@ -407,7 +407,7 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 		})
 		// create the report(s)
 		for _, format := range formats {
-			reportBytes, err := report.Create(format, allTableValues, targetScriptOutputs.ScriptOutputs, targetScriptOutputs.TargetName)
+			reportBytes, err := report.Create(format, allTableValues, targetScriptOutputs.TargetName)
 			if err != nil {
 				err = fmt.Errorf("failed to create report: %w", err)
 				return nil, err

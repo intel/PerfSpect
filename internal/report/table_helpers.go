@@ -1088,6 +1088,19 @@ type cstateInfo struct {
 	Status string
 }
 
+func c6FromOutput(outputs map[string]script.ScriptOutput) string {
+	cstatesInfo := cstatesFromOutput(outputs)
+	if cstatesInfo == nil {
+		return ""
+	}
+	for _, cstateInfo := range cstatesInfo {
+		if cstateInfo.Name == "C6" {
+			return cstateInfo.Status
+		}
+	}
+	return ""
+}
+
 func cstatesFromOutput(outputs map[string]script.ScriptOutput) []cstateInfo {
 	var cstatesInfo []cstateInfo
 	output := outputs[script.CstatesScriptName].Stdout
