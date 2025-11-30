@@ -1216,13 +1216,12 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 		return
 	}
 	// load metadata
-	_ = statusUpdate(myTarget.GetName(), "collecting metadata")
 	var err error
 	skipSystemSummary := flagNoSystemSummary
 	if flagLive {
 		skipSystemSummary = true // no system summary when live, it doesn't get used/printed
 	}
-	if targetContext.metadata, err = LoadMetadata(myTarget, flagNoRoot, skipSystemSummary, localTempDir); err != nil {
+	if targetContext.metadata, err = LoadMetadata(myTarget, flagNoRoot, skipSystemSummary, localTempDir, statusUpdate); err != nil {
 		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 		targetContext.err = err
 		channelError <- targetError{target: myTarget, err: err}

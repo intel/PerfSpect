@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"perfspect/internal/cpus"
+	"perfspect/internal/progress"
 	"perfspect/internal/report"
 	"perfspect/internal/script"
 	"perfspect/internal/target"
@@ -77,7 +78,7 @@ type Metadata struct {
 
 // LoadMetadata - populates and returns a Metadata structure containing state of the
 // system.
-func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, localTempDir string) (Metadata, error) {
+func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc) (Metadata, error) {
 	uarch, err := myTarget.GetArchitecture()
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to get target architecture: %v", err)
@@ -86,11 +87,11 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, loc
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to create metadata collector: %v", err)
 	}
-	return collector.CollectMetadata(myTarget, noRoot, noSystemSummary, localTempDir)
+	return collector.CollectMetadata(myTarget, noRoot, noSystemSummary, localTempDir, statusUpdate)
 }
 
 type MetadataCollector interface {
-	CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, localTempDir string) (Metadata, error)
+	CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc) (Metadata, error)
 }
 
 func NewMetadataCollector(architecture string) (MetadataCollector, error) {
@@ -112,7 +113,7 @@ type X86MetadataCollector struct {
 type ARMMetadataCollector struct {
 }
 
-func (c *X86MetadataCollector) CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, localTempDir string) (Metadata, error) {
+func (c *X86MetadataCollector) CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc) (Metadata, error) {
 	var metadata Metadata
 	var err error
 	// Hostname
@@ -163,7 +164,7 @@ func (c *X86MetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 		return Metadata{}, fmt.Errorf("failed to get metadata scripts: %v", err)
 	}
 	// run the scripts
-	scriptOutputs, err := script.RunScripts(myTarget, metadataScripts, true, localTempDir, nil, "") // nosemgrep
+	scriptOutputs, err := script.RunScripts(myTarget, metadataScripts, true, localTempDir, statusUpdate, "collecting metadata") // nosemgrep
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to run metadata scripts: %v", err)
 	}
@@ -282,7 +283,8 @@ func (c *X86MetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 	}
 	return metadata, nil
 }
-func (c *ARMMetadataCollector) CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, localTempDir string) (Metadata, error) {
+
+func (c *ARMMetadataCollector) CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc) (Metadata, error) {
 	var metadata Metadata
 	// Hostname
 	metadata.Hostname = myTarget.GetName()
