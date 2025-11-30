@@ -126,7 +126,7 @@ func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir str
 	scripts = append(scripts, script.GetScriptByName(script.LspciBitsScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.LspciDevicesScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.L3CacheWayEnabledName))
-	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir)
+	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir, nil, "")
 	if err != nil {
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to run scripts on target: %w", err)}
 		return
@@ -296,7 +296,7 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 	// build list of compute or IO dies
 	scripts := []script.ScriptDefinition{}
 	scripts = append(scripts, script.GetScriptByName(script.UncoreDieTypesFromTPMIScriptName))
-	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir)
+	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir, nil, "")
 	if err != nil {
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to run scripts on target: %w", err)}
 		return
@@ -354,7 +354,7 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 		// Depends:        []string{"rdmsr"},
 		// Lkms:           []string{"msr"},
 	})
-	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir)
+	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir, nil, "")
 	if err != nil {
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to run scripts on target: %w", err)}
 		return
@@ -639,7 +639,7 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 	scripts = append(scripts, script.GetScriptByName(script.LscpuScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.LspciBitsScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.LspciDevicesScriptName))
-	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir)
+	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir, nil, "")
 	if err != nil {
 		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to run scripts on target: %w", err)}
 		return

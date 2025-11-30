@@ -296,10 +296,7 @@ func printConfig(myTargets []target.Target, localTempDir string) (err error) {
 // collectOnTarget runs the scripts on the target and sends the results to the appropriate channels
 func collectOnTarget(myTarget target.Target, scriptsToRun []script.ScriptDefinition, localTempDir string, channelTargetScriptOutputs chan common.TargetScriptOutputs, channelError chan error, statusUpdate progress.MultiSpinnerUpdateFunc) {
 	// run the scripts on the target
-	if statusUpdate != nil {
-		_ = statusUpdate(myTarget.GetName(), "collecting configuration")
-	}
-	scriptOutputs, err := script.RunScripts(myTarget, scriptsToRun, true, localTempDir)
+	scriptOutputs, err := script.RunScripts(myTarget, scriptsToRun, true, localTempDir, statusUpdate, "collecting configuration")
 	if err != nil {
 		if statusUpdate != nil {
 			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("error collecting configuration: %v", err))
