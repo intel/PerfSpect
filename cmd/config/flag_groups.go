@@ -66,6 +66,8 @@ const (
 // other flag names
 const (
 	flagNoSummaryName = "no-summary"
+	flagRecordName    = "record"
+	flagRestoreName   = "restore"
 )
 
 // governorOptions - list of valid governor options
@@ -236,6 +238,12 @@ func initializeFlags(cmd *cobra.Command) {
 	group = flagGroup{name: flagGroupOtherName, flags: []flagDefinition{}}
 	group.flags = append(group.flags,
 		newBoolFlag(cmd, flagNoSummaryName, false, nil, "do not print configuration summary", "", nil),
+	)
+	group.flags = append(group.flags,
+		newBoolFlag(cmd, flagRecordName, false, nil, "record the current configuration to a file to be restored later", "", nil),
+	)
+	group.flags = append(group.flags,
+		newStringFlag(cmd, flagRestoreName, "", nil, "restore a previously recorded configuration from the specified file", "", nil),
 	)
 	flagGroups = append(flagGroups, group)
 
