@@ -6,7 +6,9 @@ package config
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -114,7 +116,8 @@ func runRestoreCmd(cmd *cobra.Command, args []string) error {
 	// parse the configuration file
 	flagValues, err := parseConfigFile(configFilePath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: failed to parse configuration file: %v\n", err)
+		err = fmt.Errorf("failed to parse configuration file: %v", err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
 		cmd.SilenceUsage = true
 		return err
@@ -135,7 +138,11 @@ func runRestoreCmd(cmd *cobra.Command, args []string) error {
 	// build the command to execute
 	executable, err := os.Executable()
 	if err != nil {
-		return fmt.Errorf("failed to get executable path: %v", err)
+		err = fmt.Errorf("failed to get executable path: %v", err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		slog.Error(err.Error())
+		cmd.SilenceUsage = true
+		return err
 	}
 
 	// build arguments: perfspect config --target ... --flag1 value1 --flag2 value2 ...
@@ -169,6 +176,9 @@ func runRestoreCmd(cmd *cobra.Command, args []string) error {
 		cmdArgs = append(cmdArgs, fmt.Sprintf("--%s", fv.flagName), fv.value)
 	}
 
+	// always add --no-summary to avoid printing config summary before and after changes
+	cmdArgs = append(cmdArgs, "--no-summary")
+
 	// show the command that will be executed
 	fmt.Printf("Command: %s %s\n\n", executable, strings.Join(cmdArgs, " "))
 
@@ -178,7 +188,11 @@ func runRestoreCmd(cmd *cobra.Command, args []string) error {
 		reader := bufio.NewReader(os.Stdin)
 		response, err := reader.ReadString('\n')
 		if err != nil {
-			return fmt.Errorf("failed to read user input: %v", err)
+			err = fmt.Errorf("failed to read user input: %v", err)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			cmd.SilenceUsage = true
+			return err
 		}
 		response = strings.TrimSpace(strings.ToLower(response))
 		if response != "y" && response != "yes" {
@@ -193,15 +207,31 @@ func runRestoreCmd(cmd *cobra.Command, args []string) error {
 
 	execCmd := exec.Command(executable, cmdArgs...)
 	execCmd.Stdout = os.Stdout
-	execCmd.Stderr = os.Stderr
 	execCmd.Stdin = os.Stdin
 
+	// capture stderr for parsing
+	var stderrBuf bytes.Buffer
+	stderrWriter := io.MultiWriter(os.Stderr, &stderrBuf)
+	execCmd.Stderr = stderrWriter
+
 	err = execCmd.Run()
+
+	// parse stderr output and present results in flag order
+	parseAndPresentResults(stderrBuf.String(), flagValues)
+
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			return fmt.Errorf("config command failed with exit code %d", exitErr.ExitCode())
+			err = fmt.Errorf("config command failed with exit code %d", exitErr.ExitCode())
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			cmd.SilenceUsage = true
+			return err
 		}
-		return fmt.Errorf("failed to execute config command: %v", err)
+		err = fmt.Errorf("failed to execute config command: %v", err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		slog.Error(err.Error())
+		cmd.SilenceUsage = true
+		return err
 	}
 
 	return nil
@@ -370,4 +400,65 @@ func parseEnableDisableOrOption(value string, validOptions []string) (string, er
 	}
 
 	return "", fmt.Errorf("invalid value '%s', valid options are: %s", value, strings.Join(validOptions, ", "))
+}
+
+// parseAndPresentResults parses the stderr output from the config command and presents
+// successes and errors in the same order as the config flags were specified
+// example: "configuration update complete: set gov to powersave, set c1-demotion to disable, set tdp to 350, set c6 to enable, set epb to 0, set core-max to 3.2, set cores to 86, set elc to default, failed to set pref-l2hw to enable, set pref-dcuhw to enable, set pref-llc to disable, set pref-aop to enable, set pref-l2adj to enable, set uncore-max-compute to 2.2, failed to set llc to 336, set pref-dcunp to enable, set pref-homeless to enable, set pref-amp to enable, set pref-dcuip to enable, set pref-llcpp to enable, set uncore-max-io to 2.5, set uncore-min-compute to 0.8, set uncore-min-io to 0.8"
+func parseAndPresentResults(stderrOutput string, flagValues []flagValue) {
+	if stderrOutput == "" {
+		return
+	}
+
+	// Parse stderr for success and error messages
+	// Looking for patterns like:
+	// - "set <flag> to <value>"
+	// - "failed to set <flag> to <value>"
+	// - "error: ..." messages related to flags
+
+	// Build a map of flag names to their results
+	flagResults := make(map[string]string)
+
+	// Regex patterns to match success and error messages
+	// Flag names can contain hyphens, so use [\w-]+ instead of \S+
+	successPattern := regexp.MustCompile(`set ([\w-]+) to ([^,]+)`)
+	errorPattern := regexp.MustCompile(`failed to set ([\w-]+) to ([^,]+)`)
+
+	// Parse stderr line by line
+	lines := strings.Split(stderrOutput, "\n")
+	for _, line := range lines {
+		// Check for success messages - use FindAllStringSubmatch to find all matches on the line
+		successMatches := successPattern.FindAllStringSubmatch(line, -1)
+		for _, matches := range successMatches {
+			if len(matches) >= 3 {
+				flagName := matches[1]
+				value := strings.TrimSpace(matches[2])
+				flagResults[flagName] = fmt.Sprintf("✓ Set %s to %s", flagName, value)
+			}
+		}
+
+		// Check for error messages - use FindAllStringSubmatch to find all matches on the line
+		errorMatches := errorPattern.FindAllStringSubmatch(line, -1)
+		for _, matches := range errorMatches {
+			if len(matches) >= 3 {
+				flagName := matches[1]
+				value := strings.TrimSpace(matches[2])
+				flagResults[flagName] = fmt.Sprintf("✗ Failed to set %s to %s", flagName, value)
+			}
+		}
+	}
+
+	// Present results in the order of flagValues
+	if len(flagValues) > 0 {
+		fmt.Println("\nConfiguration Results:")
+		for _, fv := range flagValues {
+			if result, found := flagResults[fv.flagName]; found {
+				fmt.Printf("  %s\n", result)
+			} else {
+				// If no explicit success or error was found, show unknown status
+				fmt.Printf("  ? %s: status unknown\n", fv.flagName)
+			}
+		}
+		fmt.Println()
+	}
 }
