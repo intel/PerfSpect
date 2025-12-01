@@ -26,6 +26,8 @@ const cmdName = "config"
 var examples = []string{
 	fmt.Sprintf("  Set core count on local host:            $ %s %s --cores 32", common.AppName, cmdName),
 	fmt.Sprintf("  Set multiple config items on local host: $ %s %s --core-max 3.0 --uncore-max 2.1 --tdp 120", common.AppName, cmdName),
+	fmt.Sprintf("  Record current config to file:           $ %s %s --record", common.AppName, cmdName),
+	fmt.Sprintf("  Restore config from file:                $ %s %s restore gnr_config.txt", common.AppName, cmdName),
 	fmt.Sprintf("  Set core count on remote target:         $ %s %s --cores 32 --target 192.168.1.1 --user fred --key fred_key", common.AppName, cmdName),
 	fmt.Sprintf("  View current config on remote target:    $ %s %s --target 192.168.1.1 --user fred --key fred_key", common.AppName, cmdName),
 	fmt.Sprintf("  Set governor on remote targets:          $ %s %s --gov performance --targets targets.yaml", common.AppName, cmdName),
@@ -367,7 +369,7 @@ func printConfig(reports map[string][]byte, toStdout bool, toFile bool, outputDi
 			fmt.Print(string(reportBytes))
 		}
 		if toFile {
-			outputFilePath := fmt.Sprintf("%s/config_%s.txt", outputDir, targetName)
+			outputFilePath := fmt.Sprintf("%s/%s_config.txt", outputDir, targetName)
 			err := os.WriteFile(outputFilePath, reportBytes, 0644) // #nosec G306
 			if err != nil {
 				err = fmt.Errorf("failed to write configuration report to file: %v", err)

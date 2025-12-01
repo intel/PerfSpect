@@ -67,7 +67,6 @@ const (
 const (
 	flagNoSummaryName = "no-summary"
 	flagRecordName    = "record"
-	flagRestoreName   = "restore"
 )
 
 // governorOptions - list of valid governor options
@@ -242,9 +241,6 @@ func initializeFlags(cmd *cobra.Command) {
 	group.flags = append(group.flags,
 		newBoolFlag(cmd, flagRecordName, false, nil, "record the current configuration to a file to be restored later", "", nil),
 	)
-	group.flags = append(group.flags,
-		newStringFlag(cmd, flagRestoreName, "", nil, "restore a previously recorded configuration from the specified file", "", nil),
-	)
 	flagGroups = append(flagGroups, group)
 
 	common.AddTargetFlags(Cmd)
@@ -267,6 +263,11 @@ func usageFunc(cmd *cobra.Command) error {
 	cmd.Printf("  %s:\n", targetFlagGroup.GroupName)
 	for _, flag := range targetFlagGroup.Flags {
 		cmd.Printf("    --%-20s %s\n", flag.Name, flag.Help)
+	}
+
+	cmd.Printf("\nSubcommands:\n")
+	for _, subCmd := range cmd.Commands() {
+		cmd.Printf("  %s: %s\n", subCmd.Name(), subCmd.Short)
 	}
 
 	cmd.Println("\nGlobal Flags:")

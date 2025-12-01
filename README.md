@@ -129,6 +129,38 @@ $ ./perfspect config --cores 24 --llc 2.0 --uncore-max 1.8
 ...
 </pre>
 
+##### Recording Configuration
+Before making changes, you can record the current configuration to a file using the `--record` flag. This creates a human-readable configuration file that can be used to restore settings later.
+
+Example:
+<pre>
+$ ./perfspect config --record
+Configuration recorded to: perfspect_2025-12-01_14-30-45/gnr_config.txt
+</pre>
+
+##### Restoring Configuration
+The `config restore` subcommand restores configuration from a previously recorded file. This is useful for reverting changes or applying a known-good configuration across multiple systems.
+
+Example:
+<pre>
+$ ./perfspect config restore perfspect_2025-12-01_14-30-45/gnr_config.txt
+Configuration settings to restore from perfspect_2025-12-01_14-30-45/gnr_config.txt:
+  --cores 86
+  --llc 2.4
+  --uncore-max-compute 2.2
+  ...
+Apply these settings? (yes/no): yes
+...
+</pre>
+
+Use the `--yes` flag to skip the confirmation prompt:
+<pre>
+$ ./perfspect config restore perfspect_2025-12-01_14-30-45/gnr_config.txt --yes
+</pre>
+
+> [!TIP]
+> The restore command works with remote targets too. Use `--target` or `--targets` to restore configuration on remote systems.
+
 ### Common Command Options
 
 #### Local vs. Remote Targets
