@@ -326,7 +326,7 @@ func convertValue(flagName string, rawValue string) (string, error) {
 	case flagTDPName:
 		// "350W" -> "350" (Watts is assumed)
 		return parseNumericWithUnit(rawValue, "W")
-	case flagAllCoreMaxFrequencyName, flagUncoreMaxFrequencyName, flagUncoreMinFrequencyName,
+	case flagSSEFrequencyName, flagUncoreMaxFrequencyName, flagUncoreMinFrequencyName,
 		flagUncoreMaxComputeFrequencyName, flagUncoreMinComputeFrequencyName,
 		flagUncoreMaxIOFrequencyName, flagUncoreMinIOFrequencyName:
 		// "3.2GHz" -> "3.2" (GHz is assumed)

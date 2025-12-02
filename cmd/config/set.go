@@ -180,7 +180,7 @@ func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir str
 	return err
 }
 
-func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDir string) error {
+func setSSEFrequency(sseFrequency float64, myTarget target.Target, localTempDir string) error {
 	targetFamily, err := myTarget.GetFamily()
 	if err != nil {
 		return fmt.Errorf("failed to get target family: %w", err)
@@ -197,7 +197,7 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 		return fmt.Errorf("core frequency setting not supported on %s due to vendor mismatch", myTarget.GetName())
 	}
 	var setScript script.ScriptDefinition
-	freqInt := uint64(coreFrequency * 10)
+	freqInt := uint64(sseFrequency * 10)
 	if targetFamily == "6" && (targetModel == "175" || targetModel == "221") { // SRF, CWF
 		// get the pstate driver
 		getScript := script.ScriptDefinition{
@@ -252,6 +252,222 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
 		err = fmt.Errorf("failed to set core frequency: %w", err)
+	}
+	return err
+}
+
+// expandConsolidatedFrequencies takes a consolidated frequency string and bucket sizes,
+// and returns the 8 individual bucket frequencies.
+// Input format: "1-40/3.5, 41-60/3.4, 61-86/3.2"
+// bucketSizes: slice of 8 integers representing the end core number of each bucket (e.g., [20, 40, 60, 80, 86, 86, 86, 86]).
+// This example corresponds to the following buckets: 0-19, 20-39, 40-59, 60-79, 80-85, 80-85, 80-85, 80-85
+// Returns: slice of 8 float64 values, one frequency per bucket
+func expandConsolidatedFrequencies(consolidatedStr string, bucketSizes []int) ([]float64, error) {
+	if len(bucketSizes) != 8 {
+		return nil, fmt.Errorf("expected 8 bucket sizes, got %d", len(bucketSizes))
+	}
+
+	bucketFrequencies := make([]float64, 8)
+	entries := strings.Split(consolidatedStr, ", ")
+
+	// Parse all consolidated entries
+	type consolidatedRange struct {
+		startCore int
+		endCore   int
+		freq      float64
+	}
+	var ranges []consolidatedRange
+
+	for _, entry := range entries {
+		// Parse each entry in format "start-end/freq"
+		parts := strings.Split(entry, "/")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid format for entry: %s", entry)
+		}
+
+		// Parse the frequency
+		freq, err := strconv.ParseFloat(parts[1], 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid frequency in entry %s: %w", entry, err)
+		}
+
+		// Parse the range
+		rangeParts := strings.Split(parts[0], "-")
+		if len(rangeParts) != 2 {
+			return nil, fmt.Errorf("invalid range format in entry: %s", entry)
+		}
+
+		startCore, err := strconv.Atoi(rangeParts[0])
+		if err != nil {
+			return nil, fmt.Errorf("invalid start core in entry %s: %w", entry, err)
+		}
+
+		endCore, err := strconv.Atoi(rangeParts[1])
+		if err != nil {
+			return nil, fmt.Errorf("invalid end core in entry %s: %w", entry, err)
+		}
+
+		ranges = append(ranges, consolidatedRange{startCore, endCore, freq})
+	}
+
+	// Map each original bucket to its frequency
+	for i, bucketSize := range bucketSizes {
+		// Calculate the start and end of this original bucket
+		var bucketStart, bucketEnd int
+		if i == 0 {
+			bucketStart = 1
+		} else {
+			bucketStart = bucketSizes[i-1] + 1
+		}
+		bucketEnd = bucketSize
+
+		// Find which consolidated range contains the midpoint of this bucket
+		bucketMidpoint := (bucketStart + bucketEnd) / 2
+		for _, r := range ranges {
+			if bucketMidpoint >= r.startCore && bucketMidpoint <= r.endCore {
+				bucketFrequencies[i] = r.freq
+				break
+			}
+		}
+	}
+
+	return bucketFrequencies, nil
+}
+
+// setSSEFrequencies sets the SSE frequencies for all core buckets
+// The input string should be in the format "start-end/freq", comma-separated
+// e.g., "1-40/3.5, 41-60/3.4, 61-86/3.2"
+// Note that the buckets have been consolidated where frequencies are the same, so they
+// will need to be expanded back out to individual buckets for setting.
+func setSSEFrequencies(sseFrequencies string, myTarget target.Target, localTempDir string) error {
+	targetFamily, err := myTarget.GetFamily()
+	if err != nil {
+		return fmt.Errorf("failed to get target family: %w", err)
+	}
+	targetModel, err := myTarget.GetModel()
+	if err != nil {
+		return fmt.Errorf("failed to get target model: %w", err)
+	}
+	targetVendor, err := myTarget.GetVendor()
+	if err != nil {
+		return fmt.Errorf("failed to get target vendor: %w", err)
+	}
+	if targetVendor != cpus.IntelVendor {
+		return fmt.Errorf("core frequency setting not supported on %s due to vendor mismatch", myTarget.GetName())
+	}
+
+	// retrieve the original frequency bucket sizes so that we can expand the consolidated input
+	output, err := runScript(myTarget, script.GetScriptByName(script.SpecCoreFrequenciesScriptName), localTempDir)
+	if err != nil {
+		return fmt.Errorf("failed to get original frequency buckets: %w", err)
+	}
+	// expected script output format, the number of fields may vary:
+	// "cores sse avx2 avx512 avx512h amx"
+	// "hex hex hex hex hex hex"
+
+	// confirm output format
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) < 2 {
+		return fmt.Errorf("unexpected output format from spec-core-frequencies script")
+	}
+	// extract the bucket sizes from the first field (cores) in the 2nd line
+	coreCountsHex := strings.Fields(lines[1])[0]
+	bucketSizes, err := util.HexToIntList(coreCountsHex)
+	if err != nil {
+		return fmt.Errorf("failed to parse core counts from hex: %w", err)
+	}
+	// there should be 8 buckets
+	if len(bucketSizes) != 8 {
+		return fmt.Errorf("unexpected number of core buckets: %d", len(bucketSizes))
+	}
+	// they are in reverse order, so reverse the slice
+	slices.Reverse(bucketSizes)
+
+	// expand the consolidated input into the 8 original bucket sizes
+	// archMultiplier is used to adjust core numbering for certain architectures, i.e., multiply core numbers by 2, 3, or 4.
+	uarch, err := getUarch(myTarget, localTempDir)
+	if err != nil {
+		return fmt.Errorf("failed to get microarchitecture: %w", err)
+	}
+	var archMultiplier int
+	if strings.Contains(uarch, "SRF") || strings.Contains(uarch, "CWF") {
+		archMultiplier = 4
+	} else if strings.Contains(uarch, "GNR_X3") {
+		archMultiplier = 3
+	} else if strings.Contains(uarch, "GNR_X2") {
+		archMultiplier = 2
+	} else {
+		archMultiplier = 1
+	}
+	if archMultiplier == 0 {
+		return fmt.Errorf("unsupported microarchitecture for SSE frequency setting: %s", uarch)
+	}
+	adjustedBucketSizes := make([]int, len(bucketSizes))
+	for i, size := range bucketSizes {
+		adjustedBucketSizes[i] = size * archMultiplier
+	}
+
+	bucketFrequencies, err := expandConsolidatedFrequencies(sseFrequencies, adjustedBucketSizes)
+	if err != nil {
+		return fmt.Errorf("failed to expand consolidated frequencies: %w", err)
+	}
+
+	// Now set the frequencies using the same approach as setSSEFrequency
+	var setScript script.ScriptDefinition
+
+	if targetFamily == "6" && (targetModel == "175" || targetModel == "221") { // SRF, CWF
+		// get the pstate driver
+		getScript := script.ScriptDefinition{
+			Name:           "get pstate driver",
+			ScriptTemplate: "cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver",
+			Vendors:        []string{cpus.IntelVendor},
+		}
+		output, err := runScript(myTarget, getScript, localTempDir)
+		if err != nil {
+			return fmt.Errorf("failed to get pstate driver: %w", err)
+		}
+		if strings.Contains(output, "intel_pstate") {
+			// For SRF/CWF with intel_pstate, we only set 2 buckets
+			var value uint64
+			for i := uint(0); i < 2; i++ {
+				freqInt := uint64(bucketFrequencies[i] * 10)
+				value = value | freqInt<<(i*8)
+			}
+			setScript = script.ScriptDefinition{
+				Name:           "set frequency bins",
+				ScriptTemplate: fmt.Sprintf("wrmsr 0x774 %d", value),
+				Superuser:      true,
+				Vendors:        []string{cpus.IntelVendor},
+			}
+		} else {
+			// For non-intel_pstate driver
+			freqInt := uint64(bucketFrequencies[0] * 10)
+			value := freqInt << uint(2*8)
+			setScript = script.ScriptDefinition{
+				Name:           "set frequency bins",
+				ScriptTemplate: fmt.Sprintf("wrmsr 0x199 %d", value),
+				Superuser:      true,
+				Vendors:        []string{cpus.IntelVendor},
+			}
+		}
+	} else {
+		// For other platforms, set all 8 buckets
+		var value uint64
+		for i := uint(0); i < 8; i++ {
+			freqInt := uint64(bucketFrequencies[i] * 10)
+			value = value | freqInt<<(i*8)
+		}
+		setScript = script.ScriptDefinition{
+			Name:           "set frequency bins",
+			ScriptTemplate: fmt.Sprintf("wrmsr -a 0x1AD %d", value),
+			Superuser:      true,
+			Vendors:        []string{cpus.IntelVendor},
+		}
+	}
+
+	_, err = runScript(myTarget, setScript, localTempDir)
+	if err != nil {
+		err = fmt.Errorf("failed to set core frequencies: %w", err)
 	}
 	return err
 }
@@ -595,24 +811,30 @@ func setELC(elc string, myTarget target.Target, localTempDir string) error {
 	return err
 }
 
-func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir string, prefetcherType string) error {
-	pf, err := report.GetPrefetcherDefByName(prefetcherType)
-	if err != nil {
-		return fmt.Errorf("failed to get prefetcher definition: %w", err)
-	}
-	// check if the prefetcher is supported on this target's architecture
-	// get the uarch
+func getUarch(myTarget target.Target, localTempDir string) (string, error) {
 	scripts := []script.ScriptDefinition{}
 	scripts = append(scripts, script.GetScriptByName(script.LscpuScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.LspciBitsScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.LspciDevicesScriptName))
 	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir, nil, "")
 	if err != nil {
-		return fmt.Errorf("failed to run scripts on target: %w", err)
+		return "", fmt.Errorf("failed to run scripts on target: %w", err)
 	}
 	uarch := report.UarchFromOutput(outputs)
 	if uarch == "" {
-		return fmt.Errorf("failed to get microarchitecture")
+		return "", fmt.Errorf("failed to get microarchitecture")
+	}
+	return uarch, nil
+}
+
+func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir string, prefetcherType string) error {
+	pf, err := report.GetPrefetcherDefByName(prefetcherType)
+	if err != nil {
+		return fmt.Errorf("failed to get prefetcher definition: %w", err)
+	}
+	uarch, err := getUarch(myTarget, localTempDir)
+	if err != nil {
+		return fmt.Errorf("failed to get microarchitecture: %w", err)
 	}
 	// is the prefetcher supported on this uarch?
 	if !slices.Contains(pf.Uarchs, "all") && !slices.Contains(pf.Uarchs, uarch[:3]) {

@@ -8,6 +8,7 @@ import (
 	"perfspect/internal/common"
 	"perfspect/internal/report"
 	"perfspect/internal/target"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -38,14 +39,15 @@ const (
 
 // general flag names
 const (
-	flagCoreCountName           = "cores"
-	flagLLCSizeName             = "llc"
-	flagTDPName                 = "tdp"
-	flagAllCoreMaxFrequencyName = "core-max"
-	flagEPBName                 = "epb"
-	flagEPPName                 = "epp"
-	flagGovernorName            = "gov"
-	flagELCName                 = "elc"
+	flagCoreCountName              = "cores"
+	flagLLCSizeName                = "llc"
+	flagTDPName                    = "tdp"
+	flagSSEFrequencyName           = "core-max"
+	flagSSEFrequencyAllBucketsName = "core-sse-freq-buckets"
+	flagEPBName                    = "epb"
+	flagEPPName                    = "epp"
+	flagGovernorName               = "gov"
+	flagELCName                    = "elc"
 )
 
 // uncore frequency flag names
@@ -96,10 +98,19 @@ func initializeFlags(cmd *cobra.Command) {
 			func(cmd *cobra.Command) bool { value, _ := cmd.Flags().GetFloat64(flagLLCSizeName); return value > 0 }),
 		newIntFlag(cmd, flagTDPName, 0, setTDP, "maximum power per processor in Watts", "greater than 0",
 			func(cmd *cobra.Command) bool { value, _ := cmd.Flags().GetInt(flagTDPName); return value > 0 }),
-		newFloat64Flag(cmd, flagAllCoreMaxFrequencyName, 0, setCoreFrequency, "all-core max frequency in GHz", "greater than 0.1",
+		newFloat64Flag(cmd, flagSSEFrequencyName, 0, setSSEFrequency, "SSE frequency in GHz", "greater than 0.1",
 			func(cmd *cobra.Command) bool {
-				value, _ := cmd.Flags().GetFloat64(flagAllCoreMaxFrequencyName)
+				value, _ := cmd.Flags().GetFloat64(flagSSEFrequencyName)
 				return value > 0.1
+			}),
+		newStringFlag(cmd, flagSSEFrequencyAllBucketsName, "", setSSEFrequencies, "SSE frequencies for all core buckets in GHz (e.g., 1-40/3.5,41-60/3.4,61-86/3.2)", "correct format",
+			func(cmd *cobra.Command) bool {
+				value, _ := cmd.Flags().GetString(flagSSEFrequencyAllBucketsName)
+				// Regex pattern: 1-8 buckets in format "start-end/freq", comma-separated
+				// Example: "1-40/3.5, 41-60/3.4, 61-86/3.2"
+				pattern := `^\d+-\d+/\d+(\.\d+)?(, \d+-\d+/\d+(\.\d+)?){0,7}$`
+				matched, _ := regexp.MatchString(pattern, value)
+				return matched
 			}),
 		newIntFlag(cmd, flagEPBName, 0, setEPB, "energy perf bias from best performance (0) to most power savings (15)", "0-15",
 			func(cmd *cobra.Command) bool {
