@@ -26,8 +26,9 @@ const restoreCmdName = "restore"
 
 // flagValue represents a single flag name and value pair, preserving order
 type flagValue struct {
-	flagName string
-	value    string
+	fieldName string // the human-readable field name from config file (e.g., "Cores per Socket")
+	flagName  string // the command-line flag name (e.g., "cores")
+	value     string
 }
 
 var restoreExamples = []string{
@@ -130,8 +131,15 @@ func runRestoreCmd(cmd *cobra.Command, args []string) error {
 
 	// show what will be restored
 	fmt.Printf("Configuration settings to restore from %s:\n", configFilePath)
+	// find the longest field name for alignment
+	maxLen := 0
 	for _, fv := range flagValues {
-		fmt.Printf("  --%s %s\n", fv.flagName, fv.value)
+		if len(fv.fieldName) > maxLen {
+			maxLen = len(fv.fieldName)
+		}
+	}
+	for _, fv := range flagValues {
+		fmt.Printf("  %-*s: %s\n", maxLen, fv.fieldName, fv.value)
 	}
 	fmt.Println()
 
@@ -267,7 +275,8 @@ func parseConfigFile(filePath string) ([]flagValue, error) {
 		line := scanner.Text()
 		matches := flagLineRegex.FindStringSubmatch(line)
 		if len(matches) == 4 {
-			// matches[1] = field name (not used)
+			// matches[1] = field name (e.g., "Cores per Socket")
+			fieldName := strings.TrimSpace(matches[1])
 			rawValue := strings.TrimSpace(matches[2])
 			flagStr := matches[3]
 
@@ -282,8 +291,9 @@ func parseConfigFile(filePath string) ([]flagValue, error) {
 			}
 
 			flagValues = append(flagValues, flagValue{
-				flagName: flagName,
-				value:    convertedValue,
+				fieldName: fieldName,
+				flagName:  flagName,
+				value:     convertedValue,
 			})
 		}
 	}
@@ -420,14 +430,14 @@ func parseAndPresentResults(stderrOutput string, flagValues []flagValue) {
 		return
 	}
 
-	// Parse stderr for success and error messages
-	// Looking for patterns like:
-	// - "set <flag> to <value>"
-	// - "failed to set <flag> to <value>"
-	// - "error: ..." messages related to flags
+	// flagResult stores the success/failure status and value for each flag
+	type flagResult struct {
+		success bool
+		value   string
+	}
 
 	// Build a map of flag names to their results
-	flagResults := make(map[string]string)
+	flagResults := make(map[string]flagResult)
 
 	// Regex patterns to match success and error messages
 	// Flag names can contain hyphens, so use [\w-]+ instead of \S+
@@ -443,7 +453,7 @@ func parseAndPresentResults(stderrOutput string, flagValues []flagValue) {
 			if len(matches) >= 3 {
 				flagName := matches[1]
 				value := strings.TrimSpace(matches[2])
-				flagResults[flagName] = fmt.Sprintf("✓ Set %s to %s", flagName, value)
+				flagResults[flagName] = flagResult{success: true, value: value}
 			}
 		}
 
@@ -453,7 +463,7 @@ func parseAndPresentResults(stderrOutput string, flagValues []flagValue) {
 			if len(matches) >= 3 {
 				flagName := matches[1]
 				value := strings.TrimSpace(matches[2])
-				flagResults[flagName] = fmt.Sprintf("✗ Failed to set %s to %s", flagName, value)
+				flagResults[flagName] = flagResult{success: false, value: value}
 			}
 		}
 	}
@@ -461,12 +471,23 @@ func parseAndPresentResults(stderrOutput string, flagValues []flagValue) {
 	// Present results in the order of flagValues
 	if len(flagValues) > 0 {
 		fmt.Println("\nConfiguration Results:")
+		// find the longest field name for alignment
+		maxLen := 0
+		for _, fv := range flagValues {
+			if len(fv.fieldName) > maxLen {
+				maxLen = len(fv.fieldName)
+			}
+		}
 		for _, fv := range flagValues {
 			if result, found := flagResults[fv.flagName]; found {
-				fmt.Printf("  %s\n", result)
+				if result.success {
+					fmt.Printf("  ✓ %-*s: %s\n", maxLen, fv.fieldName, result.value)
+				} else {
+					fmt.Printf("  ✗ %-*s: %s\n", maxLen, fv.fieldName, result.value)
+				}
 			} else {
 				// If no explicit success or error was found, show unknown status
-				fmt.Printf("  ? %s: status unknown\n", fv.flagName)
+				fmt.Printf("  ? %-*s: status unknown\n", maxLen, fv.fieldName)
 			}
 		}
 		fmt.Println()
