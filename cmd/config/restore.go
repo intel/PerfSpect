@@ -8,11 +8,11 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"os/exec"
 	"perfspect/internal/common"
+	"perfspect/internal/progress"
 	"regexp"
 	"slices"
 	"strconv"
@@ -149,7 +149,7 @@ func runRestoreCmd(cmd *cobra.Command, args []string) error {
 	cmdArgs := []string{"config"}
 
 	// copy target flags from restore command first
-	targetFlags := []string{"target", "targets", "user", "key", "keystring", "port", "password"}
+	targetFlags := []string{"target", "targets", "user", "key", "port"}
 	for _, flagName := range targetFlags {
 		if flag := cmd.Flags().Lookup(flagName); flag != nil && flag.Changed {
 			cmdArgs = append(cmdArgs, fmt.Sprintf("--%s", flagName), flag.Value.String())
@@ -203,21 +203,28 @@ func runRestoreCmd(cmd *cobra.Command, args []string) error {
 
 	// execute the command
 	slog.Info("executing perfspect config", slog.String("command", executable), slog.String("args", strings.Join(cmdArgs, " ")))
-	fmt.Println() // blank line before config output
 
 	execCmd := exec.Command(executable, cmdArgs...)
 	execCmd.Stdout = os.Stdout
 	execCmd.Stdin = os.Stdin
 
-	// capture stderr for parsing
+	// capture stderr for parsing (don't display it in real-time to keep output clean)
 	var stderrBuf bytes.Buffer
-	stderrWriter := io.MultiWriter(os.Stderr, &stderrBuf)
-	execCmd.Stderr = stderrWriter
+	execCmd.Stderr = &stderrBuf
+
+	// show progress while command is running
+	multiSpinner := progress.NewMultiSpinner()
+	err = multiSpinner.AddSpinner("config")
+	if err != nil {
+		return fmt.Errorf("failed to add spinner: %v", err)
+	}
+	multiSpinner.Start()
+	_ = multiSpinner.Status("config", "applying configuration changes")
 
 	err = execCmd.Run()
 
-	// parse stderr output and present results in flag order
-	parseAndPresentResults(stderrBuf.String(), flagValues)
+	_ = multiSpinner.Status("config", "configuration changes complete")
+	multiSpinner.Finish()
 
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
@@ -233,6 +240,9 @@ func runRestoreCmd(cmd *cobra.Command, args []string) error {
 		cmd.SilenceUsage = true
 		return err
 	}
+
+	// parse stderr output and present results in flag order
+	parseAndPresentResults(stderrBuf.String(), flagValues)
 
 	return nil
 }
