@@ -324,19 +324,22 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 		bits = "15:21" // bits 15:21 are the min frequency
 	}
 	// run script for each die of specified type
+	scripts = []script.ScriptDefinition{}
 	for _, die := range dies {
 		setScript := script.ScriptDefinition{
-			Name:           "write max and min uncore frequency TPMI",
+			Name:           fmt.Sprintf("write max and min uncore frequency TPMI %s %s", die.instance, die.entry),
 			ScriptTemplate: fmt.Sprintf("pcm-tpmi 2 0x18 -d -b %s -w %d -i %s -e %s", bits, value, die.instance, die.entry),
 			Vendors:        []string{cpus.IntelVendor},
 			Depends:        []string{"pcm-tpmi"},
 			Superuser:      true,
+			Sequential:     true,
 		}
-		_, err = runScript(myTarget, setScript, localTempDir)
-		if err != nil {
-			err = fmt.Errorf("failed to set uncore die frequency: %w", err)
-			break
-		}
+		scripts = append(scripts, setScript)
+	}
+	_, err = script.RunScripts(myTarget, scripts, false, localTempDir, nil, "")
+	if err != nil {
+		err = fmt.Errorf("failed to set uncore die frequency: %w", err)
+		slog.Error(err.Error())
 	}
 	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
 }
