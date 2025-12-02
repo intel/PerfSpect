@@ -213,7 +213,7 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 			var value uint64
 			var i uint
 			for i = range 2 {
-				value = value | freqInt<<i*8
+				value = value | freqInt<<(i*8)
 			}
 			setScript = script.ScriptDefinition{
 				Name:           "set frequency bins",
@@ -238,7 +238,7 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 		var value uint64
 		var i uint
 		for i = range 8 {
-			value = value | freqInt<<i*8
+			value = value | freqInt<<(i*8)
 		}
 		setScript = script.ScriptDefinition{
 			Name:           "set frequency bins",
