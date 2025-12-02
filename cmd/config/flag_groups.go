@@ -126,8 +126,8 @@ func initializeFlags(cmd *cobra.Command) {
 	group = flagGroup{name: flagGroupUncoreFrequencyName, flags: []flagDefinition{}}
 	group.flags = append(group.flags,
 		newFloat64Flag(cmd, flagUncoreMaxFrequencyName, 0,
-			func(value float64, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
-				setUncoreFrequency(true, value, myTarget, localTempDir, completeChannel, goRoutineId)
+			func(value float64, myTarget target.Target, localTempDir string) error {
+				return setUncoreFrequency(true, value, myTarget, localTempDir)
 			},
 			"maximum uncore frequency in GHz [EMR-]", "greater than 0.1",
 			func(cmd *cobra.Command) bool {
@@ -135,8 +135,8 @@ func initializeFlags(cmd *cobra.Command) {
 				return value > 0.1
 			}),
 		newFloat64Flag(cmd, flagUncoreMinFrequencyName, 0,
-			func(value float64, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
-				setUncoreFrequency(false, value, myTarget, localTempDir, completeChannel, goRoutineId)
+			func(value float64, myTarget target.Target, localTempDir string) error {
+				return setUncoreFrequency(false, value, myTarget, localTempDir)
 			},
 			"minimum uncore frequency in GHz [EMR-]", "greater than 0.1",
 			func(cmd *cobra.Command) bool {
@@ -144,8 +144,8 @@ func initializeFlags(cmd *cobra.Command) {
 				return value > 0.1
 			}),
 		newFloat64Flag(cmd, flagUncoreMaxComputeFrequencyName, 0,
-			func(value float64, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
-				setUncoreDieFrequency(true, true, value, myTarget, localTempDir, completeChannel, goRoutineId)
+			func(value float64, myTarget target.Target, localTempDir string) error {
+				return setUncoreDieFrequency(true, true, value, myTarget, localTempDir)
 			},
 			"maximum uncore compute die frequency in GHz [SRF+]", "greater than 0.1",
 			func(cmd *cobra.Command) bool {
@@ -153,8 +153,8 @@ func initializeFlags(cmd *cobra.Command) {
 				return value > 0.1
 			}),
 		newFloat64Flag(cmd, flagUncoreMinComputeFrequencyName, 0,
-			func(value float64, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
-				setUncoreDieFrequency(false, true, value, myTarget, localTempDir, completeChannel, goRoutineId)
+			func(value float64, myTarget target.Target, localTempDir string) error {
+				return setUncoreDieFrequency(false, true, value, myTarget, localTempDir)
 			},
 			"minimum uncore compute die frequency in GHz [SRF+]", "greater than 0.1",
 			func(cmd *cobra.Command) bool {
@@ -162,8 +162,8 @@ func initializeFlags(cmd *cobra.Command) {
 				return value > 0.1
 			}),
 		newFloat64Flag(cmd, flagUncoreMaxIOFrequencyName, 0,
-			func(value float64, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
-				setUncoreDieFrequency(true, false, value, myTarget, localTempDir, completeChannel, goRoutineId)
+			func(value float64, myTarget target.Target, localTempDir string) error {
+				return setUncoreDieFrequency(true, false, value, myTarget, localTempDir)
 			},
 			"maximum uncore IO die frequency in GHz [SRF+]", "greater than 0.1",
 			func(cmd *cobra.Command) bool {
@@ -171,8 +171,8 @@ func initializeFlags(cmd *cobra.Command) {
 				return value > 0.1
 			}),
 		newFloat64Flag(cmd, flagUncoreMinIOFrequencyName, 0,
-			func(value float64, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
-				setUncoreDieFrequency(false, false, value, myTarget, localTempDir, completeChannel, goRoutineId)
+			func(value float64, myTarget target.Target, localTempDir string) error {
+				return setUncoreDieFrequency(false, false, value, myTarget, localTempDir)
 			},
 			"minimum uncore IO die frequency in GHz [SRF+]", "greater than 0.1",
 			func(cmd *cobra.Command) bool {
@@ -192,8 +192,8 @@ func initializeFlags(cmd *cobra.Command) {
 				// flag default value
 				"",
 				// flag value setter function
-				func(value string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
-					setPrefetcher(value, myTarget, localTempDir, pref.ShortName, completeChannel, goRoutineId)
+				func(value string, myTarget target.Target, localTempDir string) error {
+					return setPrefetcher(value, myTarget, localTempDir, pref.ShortName)
 				},
 				// flag help
 				func() string {
@@ -213,19 +213,13 @@ func initializeFlags(cmd *cobra.Command) {
 	// c-state options
 	group = flagGroup{name: flagGroupCstateName, flags: []flagDefinition{}}
 	group.flags = append(group.flags,
-		newStringFlag(cmd, flagC6Name, "",
-			func(value string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
-				setC6(value, myTarget, localTempDir, completeChannel, goRoutineId)
-			},
+		newStringFlag(cmd, flagC6Name, "", setC6,
 			"C6 ("+strings.Join(c6Options, ", ")+")", strings.Join(c6Options, ", "),
 			func(cmd *cobra.Command) bool {
 				value, _ := cmd.Flags().GetString(flagC6Name)
 				return slices.Contains(c6Options, value)
 			}),
-		newStringFlag(cmd, flagC1DemotionName, "",
-			func(value string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
-				setC1Demotion(value, myTarget, localTempDir, completeChannel, goRoutineId)
-			},
+		newStringFlag(cmd, flagC1DemotionName, "", setC1Demotion,
 			"C1 Demotion ("+strings.Join(c1DemotionOptions, ", ")+")", strings.Join(c1DemotionOptions, ", "),
 			func(cmd *cobra.Command) bool {
 				value, _ := cmd.Flags().GetString(flagC1DemotionName)

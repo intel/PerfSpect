@@ -236,7 +236,6 @@ func setOnTarget(cmd *cobra.Command, myTarget target.Target, flagGroups []flagGr
 		channelError <- nil
 		return
 	}
-	channelSetComplete := make(chan setOutput)
 	var statusMessages []string
 	_ = statusUpdate(myTarget.GetName(), "updating configuration")
 	for _, group := range flagGroups {
@@ -244,35 +243,31 @@ func setOnTarget(cmd *cobra.Command, myTarget target.Target, flagGroups []flagGr
 			if flag.HasSetFunc() && cmd.Flags().Lookup(flag.GetName()).Changed {
 				successMessage := fmt.Sprintf("set %s to %s", flag.GetName(), flag.GetValueAsString())
 				errorMessage := fmt.Sprintf("failed to set %s to %s", flag.GetName(), flag.GetValueAsString())
-				var out setOutput
+				var setErr error
 				switch flag.GetType() {
 				case "int":
 					if flag.intSetFunc != nil {
 						value, _ := cmd.Flags().GetInt(flag.GetName())
-						go flag.intSetFunc(value, myTarget, localTempDir, channelSetComplete, 0)
-						out = <-channelSetComplete
+						setErr = flag.intSetFunc(value, myTarget, localTempDir)
 					}
 				case "float64":
 					if flag.floatSetFunc != nil {
 						value, _ := cmd.Flags().GetFloat64(flag.GetName())
-						go flag.floatSetFunc(value, myTarget, localTempDir, channelSetComplete, 0)
-						out = <-channelSetComplete
+						setErr = flag.floatSetFunc(value, myTarget, localTempDir)
 					}
 				case "string":
 					if flag.stringSetFunc != nil {
 						value, _ := cmd.Flags().GetString(flag.GetName())
-						go flag.stringSetFunc(value, myTarget, localTempDir, channelSetComplete, 0)
-						out = <-channelSetComplete
+						setErr = flag.stringSetFunc(value, myTarget, localTempDir)
 					}
 				case "bool":
 					if flag.boolSetFunc != nil {
 						value, _ := cmd.Flags().GetBool(flag.GetName())
-						go flag.boolSetFunc(value, myTarget, localTempDir, channelSetComplete, 0)
-						out = <-channelSetComplete
+						setErr = flag.boolSetFunc(value, myTarget, localTempDir)
 					}
 				}
-				if out.err != nil {
-					slog.Error(out.err.Error())
+				if setErr != nil {
+					slog.Error(setErr.Error())
 					statusMessages = append(statusMessages, errorMessage)
 				} else {
 					statusMessages = append(statusMessages, successMessage)

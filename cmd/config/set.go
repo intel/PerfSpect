@@ -22,7 +22,7 @@ import (
 var uncoreDieFrequencyMutex sync.Mutex
 var uncoreFrequencyMutex sync.Mutex
 
-func setCoreCount(cores int, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+func setCoreCount(cores int, myTarget target.Target, localTempDir string) error {
 	setScript := script.ScriptDefinition{
 		Name: "set core count",
 		ScriptTemplate: fmt.Sprintf(`
@@ -115,10 +115,10 @@ done
 	if err != nil {
 		err = fmt.Errorf("failed to set core count: %w", err)
 	}
-	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
+	return err
 }
 
-func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir string) error {
 	// get the data we need to set the LLC size
 	scripts := []script.ScriptDefinition{}
 	scripts = append(scripts, script.GetScriptByName(script.LscpuScriptName))
@@ -128,51 +128,42 @@ func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir str
 	scripts = append(scripts, script.GetScriptByName(script.L3CacheWayEnabledName))
 	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir, nil, "")
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to run scripts on target: %w", err)}
-		return
+		return fmt.Errorf("failed to run scripts on target: %w", err)
 	}
 
 	uarch := report.UarchFromOutput(outputs)
 	cpu, err := cpus.GetCPUByMicroArchitecture(uarch)
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get CPU by microarchitecture: %w", err)}
-		return
+		return fmt.Errorf("failed to get CPU by microarchitecture: %w", err)
 	}
 	if cpu.CacheWayCount == 0 {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("cache way count is zero")}
-		return
+		return fmt.Errorf("cache way count is zero")
 	}
 	maximumLlcSize, _, err := report.GetL3LscpuMB(outputs)
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get maximum LLC size: %w", err)}
-		return
+		return fmt.Errorf("failed to get maximum LLC size: %w", err)
 	}
 	currentLlcSize, _, err := report.GetL3MSRMB(outputs)
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get current LLC size: %w", err)}
-		return
+		return fmt.Errorf("failed to get current LLC size: %w", err)
 	}
 	if currentLlcSize == desiredLlcSize {
 		// return success
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: nil}
-		return
+		return nil
 	}
 	if desiredLlcSize > maximumLlcSize {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("LLC size is too large, maximum is %.2f MB", maximumLlcSize)}
-		return
+		return fmt.Errorf("LLC size is too large, maximum is %.2f MB", maximumLlcSize)
 	}
 	// calculate the number of ways to set
 	cachePerWay := maximumLlcSize / float64(cpu.CacheWayCount)
 	waysToSet := int(math.Ceil(desiredLlcSize / cachePerWay))
 	if waysToSet > cpu.CacheWayCount {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("LLC size is too large, maximum is %.2f MB", maximumLlcSize)}
-		return
+		return fmt.Errorf("LLC size is too large, maximum is %.2f MB", maximumLlcSize)
 	}
 	// set the LLC size
 	msrVal, err := util.Uint64FromNumLowerBits(waysToSet)
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to convert waysToSet to uint64: %w", err)}
-		return
+		return fmt.Errorf("failed to convert waysToSet to uint64: %w", err)
 	}
 	setScript := script.ScriptDefinition{
 		Name:           "set LLC size",
@@ -186,28 +177,24 @@ func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir str
 	if err != nil {
 		err = fmt.Errorf("failed to set LLC size: %w", err)
 	}
-	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
+	return err
 }
 
-func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDir string) error {
 	targetFamily, err := myTarget.GetFamily()
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get target family: %w", err)}
-		return
+		return fmt.Errorf("failed to get target family: %w", err)
 	}
 	targetModel, err := myTarget.GetModel()
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get target model: %w", err)}
-		return
+		return fmt.Errorf("failed to get target model: %w", err)
 	}
 	targetVendor, err := myTarget.GetVendor()
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get target vendor: %w", err)}
-		return
+		return fmt.Errorf("failed to get target vendor: %w", err)
 	}
 	if targetVendor != cpus.IntelVendor {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("core frequency setting not supported on %s due to vendor mismatch", myTarget.GetName())}
-		return
+		return fmt.Errorf("core frequency setting not supported on %s due to vendor mismatch", myTarget.GetName())
 	}
 	var setScript script.ScriptDefinition
 	freqInt := uint64(coreFrequency * 10)
@@ -220,8 +207,7 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 		}
 		output, err := runScript(myTarget, getScript, localTempDir)
 		if err != nil {
-			completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get pstate driver: %w", err)}
-			return
+			return fmt.Errorf("failed to get pstate driver: %w", err)
 		}
 		if strings.Contains(output, "intel_pstate") {
 			var value uint64
@@ -267,27 +253,24 @@ func setCoreFrequency(coreFrequency float64, myTarget target.Target, localTempDi
 	if err != nil {
 		err = fmt.Errorf("failed to set core frequency: %w", err)
 	}
-	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
+	return err
 }
 
-func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float64, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float64, myTarget target.Target, localTempDir string) error {
 	// Acquire mutex lock to protect concurrent access
 	uncoreDieFrequencyMutex.Lock()
 	defer uncoreDieFrequencyMutex.Unlock()
 
 	targetFamily, err := myTarget.GetFamily()
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get target family: %w", err)}
-		return
+		return fmt.Errorf("failed to get target family: %w", err)
 	}
 	targetModel, err := myTarget.GetModel()
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get target model: %w", err)}
-		return
+		return fmt.Errorf("failed to get target model: %w", err)
 	}
 	if targetFamily != "6" || (targetFamily == "6" && targetModel != "173" && targetModel != "174" && targetModel != "175" && targetModel != "221") { // not Intel || not GNR, GNR-D, SRF, CWF
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())}
-		return
+		return fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())
 	}
 	type dieId struct {
 		instance string
@@ -299,8 +282,7 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 	scripts = append(scripts, script.GetScriptByName(script.UncoreDieTypesFromTPMIScriptName))
 	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir, nil, "")
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to run scripts on target: %w", err)}
-		return
+		return fmt.Errorf("failed to run scripts on target: %w", err)
 	}
 	re := regexp.MustCompile(`Read bits \d+:\d+ value (\d+) from TPMI ID .* for entry (\d+) in instance (\d+)`)
 	for line := range strings.SplitSeq(outputs[script.UncoreDieTypesFromTPMIScriptName].Stdout, "\n") {
@@ -341,10 +323,10 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 		err = fmt.Errorf("failed to set uncore die frequency: %w", err)
 		slog.Error(err.Error())
 	}
-	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
+	return err
 }
 
-func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.Target, localTempDir string) error {
 	// Acquire mutex lock to protect concurrent access
 	uncoreFrequencyMutex.Lock()
 	defer uncoreFrequencyMutex.Unlock()
@@ -360,27 +342,22 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 	})
 	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir, nil, "")
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to run scripts on target: %w", err)}
-		return
+		return fmt.Errorf("failed to run scripts on target: %w", err)
 	}
 	targetFamily, err := myTarget.GetFamily()
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get target family: %w", err)}
-		return
+		return fmt.Errorf("failed to get target family: %w", err)
 	}
 	targetModel, err := myTarget.GetModel()
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get target model: %w", err)}
-		return
+		return fmt.Errorf("failed to get target model: %w", err)
 	}
 	if targetFamily != "6" || (targetFamily == "6" && (targetModel == "173" || targetModel == "174" || targetModel == "175" || targetModel == "221")) { // not Intel || not GNR, GNR-D, SRF, CWF
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())}
-		return
+		return fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())
 	}
 	msrUint, err := strconv.ParseUint(strings.TrimSpace(outputs["get uncore frequency MSR"].Stdout), 16, 0)
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to parse uncore frequency MSR: %w", err)}
-		return
+		return fmt.Errorf("failed to parse uncore frequency MSR: %w", err)
 	}
 	newFreq := uint64((uncoreFrequency * 1000) / 100)
 	var newVal uint64
@@ -407,10 +384,10 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 	if err != nil {
 		err = fmt.Errorf("failed to set uncore frequency: %w", err)
 	}
-	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
+	return err
 }
 
-func setTDP(power int, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+func setTDP(power int, myTarget target.Target, localTempDir string) error {
 	readScript := script.ScriptDefinition{
 		Name:           "get power MSR",
 		ScriptTemplate: "rdmsr 0x610",
@@ -421,14 +398,12 @@ func setTDP(power int, myTarget target.Target, localTempDir string, completeChan
 	}
 	readOutput, err := script.RunScript(myTarget, readScript, localTempDir)
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to read power MSR: %w", err)}
-		return
+		return fmt.Errorf("failed to read power MSR: %w", err)
 	} else {
 		msrHex := strings.TrimSpace(readOutput.Stdout)
 		msrUint, err := strconv.ParseUint(msrHex, 16, 0)
 		if err != nil {
-			completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to parse power MSR: %w", err)}
-			return
+			return fmt.Errorf("failed to parse power MSR: %w", err)
 		} else {
 			// mask out lower 14 bits
 			newVal := uint64(msrUint) & 0xFFFFFFFFFFFFC000
@@ -444,26 +419,23 @@ func setTDP(power int, myTarget target.Target, localTempDir string, completeChan
 			}
 			_, err := runScript(myTarget, setScript, localTempDir)
 			if err != nil {
-				completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to set power: %w", err)}
-				return
+				return fmt.Errorf("failed to set power: %w", err)
 			}
 		}
 	}
-	completeChannel <- setOutput{goRoutineID: goRoutineId, err: nil}
+	return nil
 }
 
-func setEPB(epb int, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+func setEPB(epb int, myTarget target.Target, localTempDir string) error {
 	epbSourceScript := script.GetScriptByName(script.EpbSourceScriptName)
 	epbSourceOutput, err := runScript(myTarget, epbSourceScript, localTempDir)
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get EPB source: %w", err)}
-		return
+		return fmt.Errorf("failed to get EPB source: %w", err)
 	}
 	epbSource := strings.TrimSpace(epbSourceOutput)
 	source, err := strconv.ParseInt(epbSource, 16, 0)
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to parse EPB source: %w", err)}
-		return
+		return fmt.Errorf("failed to parse EPB source: %w", err)
 	}
 	var msr string
 	var bitOffset uint
@@ -484,13 +456,11 @@ func setEPB(epb int, myTarget target.Target, localTempDir string, completeChanne
 	}
 	readOutput, err := runScript(myTarget, readScript, localTempDir)
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to read EPB MSR %s: %w", msr, err)}
-		return
+		return fmt.Errorf("failed to read EPB MSR %s: %w", msr, err)
 	}
 	msrValue, err := strconv.ParseUint(strings.TrimSpace(readOutput), 16, 64)
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to parse EPB MSR %s: %w", msr, err)}
-		return
+		return fmt.Errorf("failed to parse EPB MSR %s: %w", msr, err)
 	}
 	// mask out 4 bits starting at bitOffset
 	maskedValue := msrValue &^ (0xF << bitOffset)
@@ -509,10 +479,10 @@ func setEPB(epb int, myTarget target.Target, localTempDir string, completeChanne
 	if err != nil {
 		err = fmt.Errorf("failed to set EPB: %w", err)
 	}
-	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
+	return err
 }
 
-func setEPP(epp int, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+func setEPP(epp int, myTarget target.Target, localTempDir string) error {
 	// Set both the per-core EPP value and the package EPP value
 	// Reference: 15.4.4 Managing HWP in the Intel SDM
 
@@ -527,13 +497,11 @@ func setEPP(epp int, myTarget target.Target, localTempDir string, completeChanne
 	}
 	stdout, err := runScript(myTarget, getScript, localTempDir)
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to read EPP MSR %s: %w", "0x774", err)}
-		return
+		return fmt.Errorf("failed to read EPP MSR %s: %w", "0x774", err)
 	}
 	msrValue, err := strconv.ParseUint(strings.TrimSpace(stdout), 16, 64)
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to parse EPP MSR %s: %w", "0x774", err)}
-		return
+		return fmt.Errorf("failed to parse EPP MSR %s: %w", "0x774", err)
 	}
 	// mask out bits 24-31 IA32_HWP_REQUEST MSR value
 	maskedValue := msrValue & 0xFFFFFFFF00FFFFFF
@@ -550,8 +518,7 @@ func setEPP(epp int, myTarget target.Target, localTempDir string, completeChanne
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to set EPP: %w", err)}
-		return
+		return fmt.Errorf("failed to set EPP: %w", err)
 	}
 	// get the current value of the IA32_HWP_REQUEST_PKG MSR that includes the current package EPP value
 	getScript = script.ScriptDefinition{
@@ -564,13 +531,11 @@ func setEPP(epp int, myTarget target.Target, localTempDir string, completeChanne
 	}
 	stdout, err = runScript(myTarget, getScript, localTempDir)
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to read EPP pkg MSR %s: %w", "0x772", err)}
-		return
+		return fmt.Errorf("failed to read EPP pkg MSR %s: %w", "0x772", err)
 	}
 	msrValue, err = strconv.ParseUint(strings.TrimSpace(stdout), 16, 64)
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to parse EPP pkg MSR %s: %w", "0x772", err)}
-		return
+		return fmt.Errorf("failed to parse EPP pkg MSR %s: %w", "0x772", err)
 	}
 	// mask out bits 24-31 IA32_HWP_REQUEST_PKG MSR value
 	maskedValue = msrValue & 0xFFFFFFFF00FFFFFF
@@ -589,10 +554,10 @@ func setEPP(epp int, myTarget target.Target, localTempDir string, completeChanne
 	if err != nil {
 		err = fmt.Errorf("failed to set EPP pkg: %w", err)
 	}
-	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
+	return err
 }
 
-func setGovernor(governor string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+func setGovernor(governor string, myTarget target.Target, localTempDir string) error {
 	setScript := script.ScriptDefinition{
 		Name:           "set governor",
 		ScriptTemplate: fmt.Sprintf("echo %s | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor", governor),
@@ -602,10 +567,10 @@ func setGovernor(governor string, myTarget target.Target, localTempDir string, c
 	if err != nil {
 		err = fmt.Errorf("failed to set governor: %w", err)
 	}
-	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
+	return err
 }
 
-func setELC(elc string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+func setELC(elc string, myTarget target.Target, localTempDir string) error {
 	var mode string
 	switch elc {
 	case elcOptions[0]:
@@ -613,8 +578,7 @@ func setELC(elc string, myTarget target.Target, localTempDir string, completeCha
 	case elcOptions[1]:
 		mode = "default"
 	default:
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("invalid ELC mode: %s", elc)}
-		return
+		return fmt.Errorf("invalid ELC mode: %s", elc)
 	}
 	setScript := script.ScriptDefinition{
 		Name:               "set elc",
@@ -628,14 +592,13 @@ func setELC(elc string, myTarget target.Target, localTempDir string, completeCha
 	if err != nil {
 		err = fmt.Errorf("failed to set ELC mode: %w", err)
 	}
-	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
+	return err
 }
 
-func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir string, prefetcherType string, completeChannel chan setOutput, goRoutineId int) {
+func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir string, prefetcherType string) error {
 	pf, err := report.GetPrefetcherDefByName(prefetcherType)
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get prefetcher definition: %w", err)}
-		return
+		return fmt.Errorf("failed to get prefetcher definition: %w", err)
 	}
 	// check if the prefetcher is supported on this target's architecture
 	// get the uarch
@@ -645,18 +608,15 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 	scripts = append(scripts, script.GetScriptByName(script.LspciDevicesScriptName))
 	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir, nil, "")
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to run scripts on target: %w", err)}
-		return
+		return fmt.Errorf("failed to run scripts on target: %w", err)
 	}
 	uarch := report.UarchFromOutput(outputs)
 	if uarch == "" {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get microarchitecture")}
-		return
+		return fmt.Errorf("failed to get microarchitecture")
 	}
 	// is the prefetcher supported on this uarch?
 	if !slices.Contains(pf.Uarchs, "all") && !slices.Contains(pf.Uarchs, uarch[:3]) {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("prefetcher %s is not supported on %s", prefetcherType, uarch)}
-		return
+		return fmt.Errorf("prefetcher %s is not supported on %s", prefetcherType, uarch)
 	}
 	// get the current value of the prefetcher MSR
 	getScript := script.ScriptDefinition{
@@ -669,13 +629,11 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 	}
 	stdout, err := runScript(myTarget, getScript, localTempDir)
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to read prefetcher MSR: %w", err)}
-		return
+		return fmt.Errorf("failed to read prefetcher MSR: %w", err)
 	}
 	msrValue, err := strconv.ParseUint(strings.TrimSpace(stdout), 16, 64)
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to parse prefetcher MSR: %w", err)}
-		return
+		return fmt.Errorf("failed to parse prefetcher MSR: %w", err)
 	}
 	// set the prefetcher bit to bitValue determined by the onOff value, note: 0 is enable, 1 is disable
 	var bitVal uint64
@@ -685,8 +643,7 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 	case prefetcherOptions[1]:
 		bitVal = 1
 	default:
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("invalid prefetcher setting: %s", enableDisable)}
-		return
+		return fmt.Errorf("invalid prefetcher setting: %s", enableDisable)
 	}
 	// mask out the prefetcher bit
 	maskedValue := msrValue &^ (1 << pf.Bit)
@@ -705,11 +662,11 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 	if err != nil {
 		err = fmt.Errorf("failed to set %s prefetcher: %w", prefetcherType, err)
 	}
-	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
+	return err
 }
 
 // setC6 enables or disables C6 C-States
-func setC6(enableDisable string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+func setC6(enableDisable string, myTarget target.Target, localTempDir string) error {
 	getScript := script.ScriptDefinition{
 		Name: "get C6 state folder names",
 		ScriptTemplate: `# This script finds the states of the CPU that include "C6" in their name
@@ -728,13 +685,11 @@ fi
 	}
 	stdout, err := runScript(myTarget, getScript, localTempDir)
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get C6 state folders: %w", err)}
-		return
+		return fmt.Errorf("failed to get C6 state folders: %w", err)
 	}
 	c6StateFolders := strings.Split(strings.TrimSpace(stdout), "\n")
 	if len(c6StateFolders) == 0 {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("no C6 state folders found")}
-		return
+		return fmt.Errorf("no C6 state folders found")
 	}
 	var enableDisableValue int
 	switch enableDisable {
@@ -743,8 +698,7 @@ fi
 	case c6Options[1]: // disable
 		enableDisableValue = 1
 	default:
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("invalid C6 setting: %s", enableDisable)}
-		return
+		return fmt.Errorf("invalid C6 setting: %s", enableDisable)
 	}
 	bash := "for cpu in /sys/devices/system/cpu/cpu[0-9]*; do\n"
 	for _, folder := range c6StateFolders {
@@ -760,10 +714,10 @@ fi
 	if err != nil {
 		err = fmt.Errorf("failed to set C6: %w", err)
 	}
-	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
+	return err
 }
 
-func setC1Demotion(enableDisable string, myTarget target.Target, localTempDir string, completeChannel chan setOutput, goRoutineId int) {
+func setC1Demotion(enableDisable string, myTarget target.Target, localTempDir string) error {
 	getScript := script.ScriptDefinition{
 		Name:           "get C1 demotion",
 		ScriptTemplate: "rdmsr 0xe2",
@@ -774,13 +728,11 @@ func setC1Demotion(enableDisable string, myTarget target.Target, localTempDir st
 	}
 	stdout, err := runScript(myTarget, getScript, localTempDir)
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to get C1 demotion: %w", err)}
-		return
+		return fmt.Errorf("failed to get C1 demotion: %w", err)
 	}
 	msrValue, err := strconv.ParseUint(strings.TrimSpace(stdout), 16, 64)
 	if err != nil {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("failed to parse C1 demotion MSR: %w", err)}
-		return
+		return fmt.Errorf("failed to parse C1 demotion MSR: %w", err)
 	}
 	// set the c1 demotion bits to bitValue, note: 1 is enable, 0 is disable
 	var bitVal uint64
@@ -790,8 +742,7 @@ func setC1Demotion(enableDisable string, myTarget target.Target, localTempDir st
 	case c1DemotionOptions[1]: // disable
 		bitVal = 0
 	default:
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("invalid C1 demotion setting: %s", enableDisable)}
-		return
+		return fmt.Errorf("invalid C1 demotion setting: %s", enableDisable)
 	}
 	// mask out the C1 demotion bits (26 and 28)
 	maskedValue := msrValue &^ (1 << 26)
@@ -811,7 +762,7 @@ func setC1Demotion(enableDisable string, myTarget target.Target, localTempDir st
 	if err != nil {
 		err = fmt.Errorf("failed to set C1 demotion: %w", err)
 	}
-	completeChannel <- setOutput{goRoutineID: goRoutineId, err: err}
+	return err
 }
 
 // runScript runs a script on the target and returns the output
