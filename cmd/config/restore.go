@@ -213,11 +213,11 @@ func runRestoreCmd(cmd *cobra.Command, args []string) error {
 	slog.Info("executing perfspect config", slog.String("command", executable), slog.String("args", strings.Join(cmdArgs, " ")))
 
 	execCmd := exec.Command(executable, cmdArgs...)
-	execCmd.Stdout = os.Stdout
 	execCmd.Stdin = os.Stdin
 
-	// capture stderr for parsing (don't display it in real-time to keep output clean)
-	var stderrBuf bytes.Buffer
+	// capture stdout and stderr (don't display in real-time to avoid interfering with spinner)
+	var stdoutBuf, stderrBuf bytes.Buffer
+	execCmd.Stdout = &stdoutBuf
 	execCmd.Stderr = &stderrBuf
 
 	// show progress while command is running
