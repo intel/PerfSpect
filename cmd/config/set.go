@@ -153,7 +153,8 @@ func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir str
 		return
 	}
 	if currentLlcSize == desiredLlcSize {
-		completeChannel <- setOutput{goRoutineID: goRoutineId, err: fmt.Errorf("LLC size is already set to %.2f MB", desiredLlcSize)}
+		// return success
+		completeChannel <- setOutput{goRoutineID: goRoutineId, err: nil}
 		return
 	}
 	if desiredLlcSize > maximumLlcSize {

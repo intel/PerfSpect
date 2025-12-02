@@ -237,48 +237,47 @@ func setOnTarget(cmd *cobra.Command, myTarget target.Target, flagGroups []flagGr
 		return
 	}
 	channelSetComplete := make(chan setOutput)
-	var successMessages []string
-	var errorMessages []string
+	var statusMessages []string
 	_ = statusUpdate(myTarget.GetName(), "updating configuration")
 	for _, group := range flagGroups {
 		for _, flag := range group.flags {
 			if flag.HasSetFunc() && cmd.Flags().Lookup(flag.GetName()).Changed {
-				successMessages = append(successMessages, fmt.Sprintf("set %s to %s", flag.GetName(), flag.GetValueAsString()))
-				errorMessages = append(errorMessages, fmt.Sprintf("failed to set %s to %s", flag.GetName(), flag.GetValueAsString()))
+				successMessage := fmt.Sprintf("set %s to %s", flag.GetName(), flag.GetValueAsString())
+				errorMessage := fmt.Sprintf("failed to set %s to %s", flag.GetName(), flag.GetValueAsString())
+				var out setOutput
 				switch flag.GetType() {
 				case "int":
 					if flag.intSetFunc != nil {
 						value, _ := cmd.Flags().GetInt(flag.GetName())
-						go flag.intSetFunc(value, myTarget, localTempDir, channelSetComplete, len(successMessages)-1)
+						go flag.intSetFunc(value, myTarget, localTempDir, channelSetComplete, 0)
+						out = <-channelSetComplete
 					}
 				case "float64":
 					if flag.floatSetFunc != nil {
 						value, _ := cmd.Flags().GetFloat64(flag.GetName())
-						go flag.floatSetFunc(value, myTarget, localTempDir, channelSetComplete, len(successMessages)-1)
+						go flag.floatSetFunc(value, myTarget, localTempDir, channelSetComplete, 0)
+						out = <-channelSetComplete
 					}
 				case "string":
 					if flag.stringSetFunc != nil {
 						value, _ := cmd.Flags().GetString(flag.GetName())
-						go flag.stringSetFunc(value, myTarget, localTempDir, channelSetComplete, len(successMessages)-1)
+						go flag.stringSetFunc(value, myTarget, localTempDir, channelSetComplete, 0)
+						out = <-channelSetComplete
 					}
 				case "bool":
 					if flag.boolSetFunc != nil {
 						value, _ := cmd.Flags().GetBool(flag.GetName())
-						go flag.boolSetFunc(value, myTarget, localTempDir, channelSetComplete, len(successMessages)-1)
+						go flag.boolSetFunc(value, myTarget, localTempDir, channelSetComplete, 0)
+						out = <-channelSetComplete
 					}
 				}
+				if out.err != nil {
+					slog.Error(out.err.Error())
+					statusMessages = append(statusMessages, errorMessage)
+				} else {
+					statusMessages = append(statusMessages, successMessage)
+				}
 			}
-		}
-	}
-	// wait for all set goroutines to finish
-	statusMessages := []string{}
-	for range successMessages {
-		out := <-channelSetComplete
-		if out.err != nil {
-			slog.Error(out.err.Error())
-			statusMessages = append(statusMessages, errorMessages[out.goRoutineID])
-		} else {
-			statusMessages = append(statusMessages, successMessages[out.goRoutineID])
 		}
 	}
 	statusMessage := fmt.Sprintf("configuration update complete: %s", strings.Join(statusMessages, ", "))
