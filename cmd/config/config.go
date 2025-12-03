@@ -14,6 +14,7 @@ import (
 	"perfspect/internal/report"
 	"perfspect/internal/script"
 	"perfspect/internal/target"
+	"perfspect/internal/util"
 	"slices"
 	"strings"
 
@@ -25,6 +26,8 @@ const cmdName = "config"
 var examples = []string{
 	fmt.Sprintf("  Set core count on local host:            $ %s %s --cores 32", common.AppName, cmdName),
 	fmt.Sprintf("  Set multiple config items on local host: $ %s %s --core-max 3.0 --uncore-max 2.1 --tdp 120", common.AppName, cmdName),
+	fmt.Sprintf("  Record config to file before changes:    $ %s %s --c6 disable --epb 0 --record", common.AppName, cmdName),
+	fmt.Sprintf("  Restore config from file:                $ %s %s restore gnr_config.txt", common.AppName, cmdName),
 	fmt.Sprintf("  Set core count on remote target:         $ %s %s --cores 32 --target 192.168.1.1 --user fred --key fred_key", common.AppName, cmdName),
 	fmt.Sprintf("  View current config on remote target:    $ %s %s --target 192.168.1.1 --user fred --key fred_key", common.AppName, cmdName),
 	fmt.Sprintf("  Set governor on remote targets:          $ %s %s --gov performance --targets targets.yaml", common.AppName, cmdName),
@@ -52,6 +55,22 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	// appContext is the application context that holds common data and resources.
 	appContext := cmd.Parent().Context().Value(common.AppContext{}).(common.AppContext)
 	localTempDir := appContext.LocalTempDir
+	outputDir := appContext.OutputDir
+
+	flagRecord := cmd.Flags().Lookup(flagRecordName).Value.String() == "true"
+	flagNoSummary := cmd.Flags().Lookup(flagNoSummaryName).Value.String() == "true"
+
+	// create output directory if we are recording the configuration
+	if flagRecord {
+		err := util.CreateDirectoryIfNotExists(outputDir, 0755) // #nosec G301
+		if err != nil {
+			err = fmt.Errorf("failed to create output directory: %w", err)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			cmd.SilenceUsage = true
+			return err
+		}
+	}
 	// get the targets
 	myTargets, targetErrs, err := common.GetTargets(cmd, true, true, localTempDir)
 	if err != nil {
@@ -91,13 +110,39 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		cmd.SilenceUsage = true
 		return err
 	}
-	// print config prior to changes, optionally
-	if !cmd.Flags().Lookup(flagNoSummaryName).Changed {
-		if err := printConfig(myTargets, localTempDir); err != nil {
+	// collect and print and/or record the configuration before making changes
+	if !flagNoSummary || flagRecord {
+		config, err := getConfig(myTargets, localTempDir)
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			slog.Error(err.Error())
 			cmd.SilenceUsage = true
 			return err
+		}
+		reports, err := processConfig(config)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			cmd.SilenceUsage = true
+			return err
+		}
+		filesWritten, err := printConfig(reports, !flagNoSummary, flagRecord, outputDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			cmd.SilenceUsage = true
+			return err
+		}
+		if len(filesWritten) > 0 {
+			message := "Configuration"
+			if len(filesWritten) > 1 {
+				message = "Configurations"
+			}
+			fmt.Printf("%s recorded:\n", message)
+			for _, fileWritten := range filesWritten {
+				fmt.Printf("  %s\n", fileWritten)
+			}
+			fmt.Println()
 		}
 	}
 	// if no changes were requested, print a message and return
@@ -138,9 +183,24 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 	multiSpinner.Finish()
 	fmt.Println() // blank line
-	// print config after making changes
-	if !cmd.Flags().Lookup(flagNoSummaryName).Changed {
-		if err := printConfig(myTargets, localTempDir); err != nil {
+	// collect and print the configuration before making changes
+	if !flagNoSummary {
+		config, err := getConfig(myTargets, localTempDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			cmd.SilenceUsage = true
+			return err
+		}
+		reports, err := processConfig(config)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			slog.Error(err.Error())
+			cmd.SilenceUsage = true
+			return err
+		}
+		_, err = printConfig(reports, !flagNoSummary, false, outputDir) // print, don't record
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			slog.Error(err.Error())
 			cmd.SilenceUsage = true
@@ -176,49 +236,43 @@ func setOnTarget(cmd *cobra.Command, myTarget target.Target, flagGroups []flagGr
 		channelError <- nil
 		return
 	}
-	channelSetComplete := make(chan setOutput)
-	var successMessages []string
-	var errorMessages []string
+	var statusMessages []string
 	_ = statusUpdate(myTarget.GetName(), "updating configuration")
 	for _, group := range flagGroups {
 		for _, flag := range group.flags {
 			if flag.HasSetFunc() && cmd.Flags().Lookup(flag.GetName()).Changed {
-				successMessages = append(successMessages, fmt.Sprintf("set %s to %s", flag.GetName(), flag.GetValueAsString()))
-				errorMessages = append(errorMessages, fmt.Sprintf("failed to set %s to %s", flag.GetName(), flag.GetValueAsString()))
+				successMessage := fmt.Sprintf("set %s to %s", flag.GetName(), flag.GetValueAsString())
+				errorMessage := fmt.Sprintf("failed to set %s to %s", flag.GetName(), flag.GetValueAsString())
+				var setErr error
 				switch flag.GetType() {
 				case "int":
 					if flag.intSetFunc != nil {
 						value, _ := cmd.Flags().GetInt(flag.GetName())
-						go flag.intSetFunc(value, myTarget, localTempDir, channelSetComplete, len(successMessages)-1)
+						setErr = flag.intSetFunc(value, myTarget, localTempDir)
 					}
 				case "float64":
 					if flag.floatSetFunc != nil {
 						value, _ := cmd.Flags().GetFloat64(flag.GetName())
-						go flag.floatSetFunc(value, myTarget, localTempDir, channelSetComplete, len(successMessages)-1)
+						setErr = flag.floatSetFunc(value, myTarget, localTempDir)
 					}
 				case "string":
 					if flag.stringSetFunc != nil {
 						value, _ := cmd.Flags().GetString(flag.GetName())
-						go flag.stringSetFunc(value, myTarget, localTempDir, channelSetComplete, len(successMessages)-1)
+						setErr = flag.stringSetFunc(value, myTarget, localTempDir)
 					}
 				case "bool":
 					if flag.boolSetFunc != nil {
 						value, _ := cmd.Flags().GetBool(flag.GetName())
-						go flag.boolSetFunc(value, myTarget, localTempDir, channelSetComplete, len(successMessages)-1)
+						setErr = flag.boolSetFunc(value, myTarget, localTempDir)
 					}
 				}
+				if setErr != nil {
+					slog.Error(setErr.Error())
+					statusMessages = append(statusMessages, errorMessage)
+				} else {
+					statusMessages = append(statusMessages, successMessage)
+				}
 			}
-		}
-	}
-	// wait for all set goroutines to finish
-	statusMessages := []string{}
-	for range successMessages {
-		out := <-channelSetComplete
-		if out.err != nil {
-			slog.Error(out.err.Error())
-			statusMessages = append(statusMessages, errorMessages[out.goRoutineID])
-		} else {
-			statusMessages = append(statusMessages, successMessages[out.goRoutineID])
 		}
 	}
 	statusMessage := fmt.Sprintf("configuration update complete: %s", strings.Join(statusMessages, ", "))
@@ -227,7 +281,8 @@ func setOnTarget(cmd *cobra.Command, myTarget target.Target, flagGroups []flagGr
 	channelError <- nil
 }
 
-func printConfig(myTargets []target.Target, localTempDir string) (err error) {
+// getConfig collects the configuration data from the target(s)
+func getConfig(myTargets []target.Target, localTempDir string) ([]common.TargetScriptOutputs, error) {
 	scriptNames := report.GetScriptNamesForTable(report.ConfigurationTableName)
 	var scriptsToRun []script.ScriptDefinition
 	for _, scriptName := range scriptNames {
@@ -239,10 +294,10 @@ func printConfig(myTargets []target.Target, localTempDir string) (err error) {
 	channelTargetScriptOutputs := make(chan common.TargetScriptOutputs)
 	channelError := make(chan error)
 	for _, myTarget := range myTargets {
-		err = multiSpinner.AddSpinner(myTarget.GetName())
+		err := multiSpinner.AddSpinner(myTarget.GetName())
 		if err != nil {
 			err = fmt.Errorf("failed to add spinner: %v", err)
-			return
+			return nil, err
 		}
 		// run the selected scripts on the target
 		go collectOnTarget(myTarget, scriptsToRun, localTempDir, channelTargetScriptOutputs, channelError, multiSpinner.Status)
@@ -269,28 +324,55 @@ func printConfig(myTargets []target.Target, localTempDir string) (err error) {
 		}
 	}
 	multiSpinner.Finish()
-	// process and print the table for each target
-	for _, targetScriptOutputs := range orderedTargetScriptOutputs {
+	return orderedTargetScriptOutputs, nil
+}
+
+// processConfig processes the collected configuration data and creates text reports
+func processConfig(targetScriptOutputs []common.TargetScriptOutputs) (map[string][]byte, error) {
+	reports := make(map[string][]byte)
+	var err error
+	for _, targetScriptOutput := range targetScriptOutputs {
 		// process the tables, i.e., get field values from raw script output
 		tableNames := []string{report.ConfigurationTableName}
 		var tableValues []report.TableValues
-		if tableValues, err = report.ProcessTables(tableNames, targetScriptOutputs.ScriptOutputs); err != nil {
+		if tableValues, err = report.ProcessTables(tableNames, targetScriptOutput.ScriptOutputs); err != nil {
 			err = fmt.Errorf("failed to process collected data: %v", err)
-			return
+			return nil, err
 		}
 		// create the report for this single table
 		var reportBytes []byte
-		if reportBytes, err = report.Create("txt", tableValues, targetScriptOutputs.TargetName); err != nil {
+		if reportBytes, err = report.Create("txt", tableValues, targetScriptOutput.TargetName); err != nil {
 			err = fmt.Errorf("failed to create report: %v", err)
-			return
+			return nil, err
 		}
-		// print the report
-		if len(orderedTargetScriptOutputs) > 1 {
-			fmt.Printf("%s\n", targetScriptOutputs.TargetName)
-		}
-		fmt.Print(string(reportBytes))
+		// append the report to the list
+		reports[targetScriptOutput.TargetName] = reportBytes
 	}
-	return
+	return reports, nil
+}
+
+// printConfig prints and/or saves the configuration reports
+func printConfig(reports map[string][]byte, toStdout bool, toFile bool, outputDir string) ([]string, error) {
+	filesWritten := []string{}
+	for targetName, reportBytes := range reports {
+		if toStdout {
+			// print the report to stdout
+			if len(reports) > 1 {
+				fmt.Printf("%s\n", targetName)
+			}
+			fmt.Print(string(reportBytes))
+		}
+		if toFile {
+			outputFilePath := fmt.Sprintf("%s/%s_config.txt", outputDir, targetName)
+			err := os.WriteFile(outputFilePath, reportBytes, 0644) // #nosec G306
+			if err != nil {
+				err = fmt.Errorf("failed to write configuration report to file: %v", err)
+				return filesWritten, err
+			}
+			filesWritten = append(filesWritten, outputFilePath)
+		}
+	}
+	return filesWritten, nil
 }
 
 // collectOnTarget runs the scripts on the target and sends the results to the appropriate channels

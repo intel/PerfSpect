@@ -2184,7 +2184,7 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []Field {
 		{Name: "Cores per Socket", Description: "--cores <N>", Values: []string{valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)}},
 		{Name: "L3 Cache", Description: "--llc <MB>", Values: []string{l3InstanceFromOutput(outputs)}},
 		{Name: "Package Power / TDP", Description: "--tdp <Watts>", Values: []string{tdpFromOutput(outputs)}},
-		{Name: "All-Core Max Frequency", Description: "--core-max <GHz>", Values: []string{allCoreMaxFrequencyFromOutput(outputs)}},
+		{Name: "Core SSE Frequency", Description: "--core-max <GHz>", Values: []string{sseFrequenciesFromOutput(outputs)}},
 	}
 	if strings.Contains(uarch, "SRF") || strings.Contains(uarch, "GNR") || strings.Contains(uarch, "CWF") {
 		fields = append(fields, []Field{

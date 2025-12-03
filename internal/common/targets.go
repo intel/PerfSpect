@@ -121,7 +121,20 @@ func ValidateTargetFlags(cmd *cobra.Command) error {
 // GetTargets retrieves the list of targets based on the provided command and parameters. It creates
 // a temporary directory for each target and returns a slice of target.Target objects.
 func GetTargets(cmd *cobra.Command, needsElevatedPrivileges bool, failIfCantElevate bool, localTempDir string) (targets []target.Target, targetErrs []error, err error) {
-	targetTempDirRoot := cmd.Parent().PersistentFlags().Lookup("tempdir").Value.String()
+	tempDirFlag := cmd.Parent().PersistentFlags().Lookup("tempdir")
+	if tempDirFlag == nil {
+		// try grand-parent command (in case this is a subcommand)
+		grandParent := cmd.Parent().Parent()
+		if grandParent != nil {
+			tempDirFlag = grandParent.PersistentFlags().Lookup("tempdir")
+		}
+	}
+	if tempDirFlag == nil {
+		err = fmt.Errorf("failed to find 'tempdir' persistent flag")
+		slog.Error(err.Error())
+		return
+	}
+	targetTempDirRoot := tempDirFlag.Value.String()
 	flagTargetsFile, _ := cmd.Flags().GetString(flagTargetsFileName)
 	if flagTargetsFile != "" {
 		targets, targetErrs, err = getTargetsFromFile(flagTargetsFile, localTempDir)
