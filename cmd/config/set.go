@@ -516,16 +516,19 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 
 	value := uint64(uncoreFrequency * 10)
 	var bits string
+	var freqType string
 	if maxFreq {
 		bits = "8:14" // bits 8:14 are the max frequency
+		freqType = "max"
 	} else {
 		bits = "15:21" // bits 15:21 are the min frequency
+		freqType = "min"
 	}
 	// run script for each die of specified type
 	scripts = []script.ScriptDefinition{}
 	for _, die := range dies {
 		setScript := script.ScriptDefinition{
-			Name:           fmt.Sprintf("write max and min uncore frequency TPMI %s %s", die.instance, die.entry),
+			Name:           fmt.Sprintf("write %s uncore frequency TPMI %s %s", freqType, die.instance, die.entry),
 			ScriptTemplate: fmt.Sprintf("pcm-tpmi 2 0x18 -d -b %s -w %d -i %s -e %s", bits, value, die.instance, die.entry),
 			Vendors:        []string{cpus.IntelVendor},
 			Depends:        []string{"pcm-tpmi"},
