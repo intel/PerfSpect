@@ -130,11 +130,11 @@ $ ./perfspect config --cores 24 --llc 2.0 --uncore-max 1.8
 </pre>
 
 ##### Recording Configuration
-Before making changes, you can record the current configuration to a file using the `--record` flag. This creates a human-readable configuration file that can be used to restore settings later.
+The current configuration can, optionally, be saved to a file using the `--record` flag. This creates a human-readable configuration file that can be used to restore settings later.
 
 Example:
 <pre>
-$ ./perfspect config --record
+$ ./perfspect config --tdp 300 --record
 Configuration recorded to: perfspect_2025-12-01_14-30-45/gnr_config.txt
 </pre>
 
@@ -145,11 +145,11 @@ Example:
 <pre>
 $ ./perfspect config restore perfspect_2025-12-01_14-30-45/gnr_config.txt
 Configuration settings to restore from perfspect_2025-12-01_14-30-45/gnr_config.txt:
-  --cores 86
-  --llc 2.4
-  --uncore-max-compute 2.2
+  Cores per Socket    : 86
+  L3 Cache            : 336
+  Package Power / TDP : 350
   ...
-Apply these settings? (yes/no): yes
+Apply these configuration changes? [y/N]: y
 ...
 </pre>
 
