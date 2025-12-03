@@ -353,7 +353,7 @@ func processConfig(targetScriptOutputs []common.TargetScriptOutputs) (map[string
 
 // printConfig prints and/or saves the configuration reports
 func printConfig(reports map[string][]byte, toStdout bool, toFile bool, outputDir string) ([]string, error) {
-	filesWriten := []string{}
+	filesWritten := []string{}
 	for targetName, reportBytes := range reports {
 		if toStdout {
 			// print the report to stdout
@@ -367,12 +367,12 @@ func printConfig(reports map[string][]byte, toStdout bool, toFile bool, outputDi
 			err := os.WriteFile(outputFilePath, reportBytes, 0644) // #nosec G306
 			if err != nil {
 				err = fmt.Errorf("failed to write configuration report to file: %v", err)
-				return filesWriten, err
+				return filesWritten, err
 			}
-			filesWriten = append(filesWriten, outputFilePath)
+			filesWritten = append(filesWritten, outputFilePath)
 		}
 	}
-	return filesWriten, nil
+	return filesWritten, nil
 }
 
 // collectOnTarget runs the scripts on the target and sends the results to the appropriate channels
