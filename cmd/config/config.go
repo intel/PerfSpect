@@ -26,7 +26,7 @@ const cmdName = "config"
 var examples = []string{
 	fmt.Sprintf("  Set core count on local host:            $ %s %s --cores 32", common.AppName, cmdName),
 	fmt.Sprintf("  Set multiple config items on local host: $ %s %s --core-max 3.0 --uncore-max 2.1 --tdp 120", common.AppName, cmdName),
-	fmt.Sprintf("  Record current config to file:           $ %s %s --record", common.AppName, cmdName),
+	fmt.Sprintf("  Record config to file before changes:    $ %s %s --c6 disable --epb 0 --record", common.AppName, cmdName),
 	fmt.Sprintf("  Restore config from file:                $ %s %s restore gnr_config.txt", common.AppName, cmdName),
 	fmt.Sprintf("  Set core count on remote target:         $ %s %s --cores 32 --target 192.168.1.1 --user fred --key fred_key", common.AppName, cmdName),
 	fmt.Sprintf("  View current config on remote target:    $ %s %s --target 192.168.1.1 --user fred --key fred_key", common.AppName, cmdName),

@@ -52,8 +52,8 @@ C6:                              Disabled         --c6 <enable|disable>
 	assert.Equal(t, "86", valueMap["cores"])
 	assert.Equal(t, "336", valueMap["llc"])
 	assert.Equal(t, "350", valueMap["tdp"])
-	// verify core-max with buckets is converted to core-sse-freq-buckets
-	assert.Equal(t, "1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0", valueMap["core-sse-freq-buckets"])
+	// verify core-max with buckets is converted to core-max-buckets
+	assert.Equal(t, "1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0", valueMap["core-max-buckets"])
 	assert.Equal(t, "2.2", valueMap["uncore-max-compute"])
 	assert.Equal(t, "0", valueMap["epb"])
 	assert.Equal(t, "powersave", valueMap["gov"])
@@ -115,8 +115,8 @@ C1 Demotion:                    Disabled                                        
 	assert.Equal(t, "4", valueMap["cores"])
 	assert.Equal(t, "105", valueMap["llc"])
 	assert.Equal(t, "", valueMap["tdp"])
-	// verify core-max with buckets is converted to core-sse-freq-buckets
-	assert.Equal(t, "1-24/3.8, 25-30/3.7, 31-34/3.6, 35-38/3.5, 39-44/3.3, 45-48/3.2", valueMap["core-sse-freq-buckets"])
+	// verify core-max with buckets is converted to core-max-buckets
+	assert.Equal(t, "1-24/3.8, 25-30/3.7, 31-34/3.6, 35-38/3.5, 39-44/3.3, 45-48/3.2", valueMap["core-max-buckets"])
 	assert.Equal(t, "", valueMap["uncore-max"])
 	assert.Equal(t, "", valueMap["uncore-min"])
 	assert.Equal(t, "", valueMap["gov"])
@@ -144,9 +144,9 @@ func TestConvertValue(t *testing.T) {
 		{"C6 enabled", "c6", "Enabled", "enable", false},
 		{"ELC lowercase", "elc", "default", "default", false},
 		{"ELC capitalized", "elc", "Default", "default", false},
-		{"Core SSE freq buckets", "core-sse-freq-buckets", "1-44/3.6, 45-52/3.5, 53-60/3.4", "1-44/3.6, 45-52/3.5, 53-60/3.4", false},
-		{"Core SSE freq buckets full", "core-sse-freq-buckets", "1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0", "1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0", false},
-		{"Core SSE freq buckets invalid", "core-sse-freq-buckets", "invalid-format", "", true},
+		{"Core SSE freq buckets", "core-max-buckets", "1-44/3.6, 45-52/3.5, 53-60/3.4", "1-44/3.6, 45-52/3.5, 53-60/3.4", false},
+		{"Core SSE freq buckets full", "core-max-buckets", "1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0", "1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0", false},
+		{"Core SSE freq buckets invalid", "core-max-buckets", "invalid-format", "", true},
 		{"Inconsistent value", "epp", "inconsistent", "", true},
 		{"Unknown flag", "unknown-flag", "value", "", true},
 	}
@@ -261,12 +261,12 @@ func TestParseAndPresentResults(t *testing.T) {
 	}{
 		{
 			name:         "Example from function header comment",
-			stderrOutput: "configuration update complete: set cores to 86, set llc to 336, set tdp to 350, set core-sse-freq-buckets to 1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0, set epb to 6, set epp to 128, set gov to powersave, set elc to default, set uncore-max-compute to 2.2, set uncore-min-compute to 0.8, set uncore-max-io to 2.5, set uncore-min-io to 0.8, set pref-l2hw to enable, set pref-l2adj to enable, set pref-dcuhw to enable, set pref-dcuip to enable, set pref-dcunp to enable, set pref-amp to enable, set pref-llcpp to enable, set pref-aop to enable, set pref-homeless to enable, set pref-llc to disable, set c6 to enable, set c1-demotion to disable",
+			stderrOutput: "configuration update complete: set cores to 86, set llc to 336, set tdp to 350, set core-max-buckets to 1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0, set epb to 6, set epp to 128, set gov to powersave, set elc to default, set uncore-max-compute to 2.2, set uncore-min-compute to 0.8, set uncore-max-io to 2.5, set uncore-min-io to 0.8, set pref-l2hw to enable, set pref-l2adj to enable, set pref-dcuhw to enable, set pref-dcuip to enable, set pref-dcunp to enable, set pref-amp to enable, set pref-llcpp to enable, set pref-aop to enable, set pref-homeless to enable, set pref-llc to disable, set c6 to enable, set c1-demotion to disable",
 			flagValues: []flagValue{
 				{fieldName: "Cores per Socket", flagName: "cores", value: "86"},
 				{fieldName: "L3 Cache", flagName: "llc", value: "336"},
 				{fieldName: "Package Power / TDP", flagName: "tdp", value: "350"},
-				{fieldName: "Core SSE Frequency", flagName: "core-sse-freq-buckets", value: "1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0"},
+				{fieldName: "Core SSE Frequency", flagName: "core-max-buckets", value: "1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0"},
 				{fieldName: "Uncore Max Frequency (Compute)", flagName: "uncore-max-compute", value: "2.2"},
 				{fieldName: "Uncore Min Frequency (Compute)", flagName: "uncore-min-compute", value: "0.8"},
 				{fieldName: "Uncore Max Frequency (I/O)", flagName: "uncore-max-io", value: "2.5"},
@@ -374,9 +374,9 @@ func TestParseAndPresentResults(t *testing.T) {
 		},
 		{
 			name:         "Core SSE freq buckets with commas in value",
-			stderrOutput: "set core-sse-freq-buckets to 1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0",
+			stderrOutput: "set core-max-buckets to 1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0",
 			flagValues: []flagValue{
-				{fieldName: "Core SSE Frequency", flagName: "core-sse-freq-buckets", value: "1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0"},
+				{fieldName: "Core SSE Frequency", flagName: "core-max-buckets", value: "1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0"},
 			},
 			expectedOutput: []string{
 				"✓ Core SSE Frequency",

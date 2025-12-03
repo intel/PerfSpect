@@ -283,7 +283,7 @@ func parseConfigFile(filePath string) ([]flagValue, error) {
 			// extract flag name (remove the leading --)
 			flagName := strings.TrimPrefix(flagStr, "--")
 
-			// special case: if flag is core-max change it to core-sse-freq-buckets
+			// special case: if flag is core-max change it to core-max-buckets
 			if flagName == flagSSEFrequencyName {
 				flagName = flagSSEFrequencyAllBucketsName
 			}
@@ -453,7 +453,7 @@ func parseAndPresentResults(stderrOutput string, flagValues []flagValue) {
 
 	// Parse stderr line by line
 	// We split on delimiters ", set " and ", failed to set " to handle messages where
-	// flag values themselves contain commas (like core-sse-freq-buckets)
+	// flag values themselves contain commas (like core-max-buckets)
 	for line := range strings.SplitSeq(stderrOutput, "\n") {
 		// Split on the delimiter patterns
 		// First, replace delimiters with a marker we can split on

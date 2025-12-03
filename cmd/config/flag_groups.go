@@ -43,7 +43,7 @@ const (
 	flagLLCSizeName                = "llc"
 	flagTDPName                    = "tdp"
 	flagSSEFrequencyName           = "core-max"
-	flagSSEFrequencyAllBucketsName = "core-sse-freq-buckets"
+	flagSSEFrequencyAllBucketsName = "core-max-buckets"
 	flagEPBName                    = "epb"
 	flagEPPName                    = "epp"
 	flagGovernorName               = "gov"
@@ -103,7 +103,7 @@ func initializeFlags(cmd *cobra.Command) {
 				value, _ := cmd.Flags().GetFloat64(flagSSEFrequencyName)
 				return value > 0.1
 			}),
-		newStringFlag(cmd, flagSSEFrequencyAllBucketsName, "", setSSEFrequencies, "SSE frequencies for all core buckets in GHz (e.g., 1-40/3.5,41-60/3.4,61-86/3.2)", "correct format",
+		newStringFlag(cmd, flagSSEFrequencyAllBucketsName, "", setSSEFrequencies, "SSE frequencies for all core buckets in GHz (e.g., 1-40/3.5, 41-60/3.4, 61-86/3.2)", "correct format",
 			func(cmd *cobra.Command) bool {
 				value, _ := cmd.Flags().GetString(flagSSEFrequencyAllBucketsName)
 				// Regex pattern: 1-8 buckets in format "start-end/freq", comma-separated
