@@ -429,7 +429,7 @@ func setSSEFrequencies(sseFrequencies string, myTarget target.Target, localTempD
 		if strings.Contains(output, "intel_pstate") {
 			// For SRF/CWF with intel_pstate, we only set 2 buckets
 			var value uint64
-			for i := uint(0); i < 2; i++ {
+			for i := range uint(2) {
 				freqInt := uint64(bucketFrequencies[i] * 10)
 				value = value | freqInt<<(i*8)
 			}
@@ -453,7 +453,7 @@ func setSSEFrequencies(sseFrequencies string, myTarget target.Target, localTempD
 	} else {
 		// For other platforms, set all 8 buckets
 		var value uint64
-		for i := uint(0); i < 8; i++ {
+		for i := range uint(8) {
 			freqInt := uint64(bucketFrequencies[i] * 10)
 			value = value | freqInt<<(i*8)
 		}
