@@ -70,6 +70,60 @@ C6:                              Disabled         --c6 <enable|disable>
 	assert.Equal(t, "tdp", flagValues[2].flagName)
 }
 
+func TestParseConfigFileMissingValues(t *testing.T) {
+	// create a temporary config file
+	content := `Configuration
+=============
+Cores per Socket:               4                                                                --cores <N>
+L3 Cache:                       105M                                                             --llc <MB>
+Package Power / TDP:                                                                             --tdp <Watts>
+Core SSE Frequency:             1-24/3.8, 25-30/3.7, 31-34/3.6, 35-38/3.5, 39-44/3.3, 45-48/3.2  --core-max <GHz>
+Uncore Max Frequency:                                                                            --uncore-max <GHz>
+Uncore Min Frequency:                                                                            --uncore-min <GHz>
+Energy Performance Bias:                                                                         --epb <0-15>
+Energy Performance Preference:                                                                   --epp <0-255>
+Scaling Governor:                                                                                --gov <performance|powersave>
+L2 HW prefetcher:               Enabled                                                          --pref-l2hw <enable|disable>
+L2 Adj prefetcher:              Enabled                                                          --pref-l2adj <enable|disable>
+DCU HW prefetcher:              Enabled                                                          --pref-dcuhw <enable|disable>
+DCU IP prefetcher:              Enabled                                                          --pref-dcuip <enable|disable>
+DCU NP prefetcher:              Enabled                                                          --pref-dcunp <enable|disable>
+AMP prefetcher:                 Enabled                                                          --pref-amp <enable|disable>
+C6:                             Enabled                                                          --c6 <enable|disable>
+C1 Demotion:                    Disabled                                                         --c1-demotion <enable|disable>
+`
+
+	tmpFile, err := os.CreateTemp("", "config_test_*.txt")
+	require.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+
+	_, err = tmpFile.WriteString(content)
+	require.NoError(t, err)
+	tmpFile.Close()
+
+	// parse the file
+	flagValues, err := parseConfigFile(tmpFile.Name())
+	require.NoError(t, err)
+
+	// convert slice to map for easier testing
+	valueMap := make(map[string]string)
+	for _, fv := range flagValues {
+		valueMap[fv.flagName] = fv.value
+	}
+
+	// verify expected values
+	assert.Equal(t, "4", valueMap["cores"])
+	assert.Equal(t, "105", valueMap["llc"])
+	assert.Equal(t, "", valueMap["tdp"])
+	// verify core-max with buckets is converted to core-sse-freq-buckets
+	assert.Equal(t, "1-24/3.8, 25-30/3.7, 31-34/3.6, 35-38/3.5, 39-44/3.3, 45-48/3.2", valueMap["core-sse-freq-buckets"])
+	assert.Equal(t, "", valueMap["uncore-max"])
+	assert.Equal(t, "", valueMap["uncore-min"])
+	assert.Equal(t, "", valueMap["gov"])
+	assert.Equal(t, "enable", valueMap["pref-l2hw"])
+	assert.Equal(t, "enable", valueMap["c6"])
+}
+
 func TestConvertValue(t *testing.T) {
 	tests := []struct {
 		name      string
