@@ -283,6 +283,11 @@ func parseConfigFile(filePath string) ([]flagValue, error) {
 			// extract flag name (remove the leading --)
 			flagName := strings.TrimPrefix(flagStr, "--")
 
+			// special case: if flag is core-max change it to core-sse-freq-buckets
+			if flagName == flagSSEFrequencyName {
+				flagName = flagSSEFrequencyAllBucketsName
+			}
+
 			// convert the raw value to the appropriate format
 			convertedValue, err := convertValue(flagName, rawValue)
 			if err != nil {
@@ -326,6 +331,13 @@ func convertValue(flagName string, rawValue string) (string, error) {
 	case flagTDPName:
 		// "350W" -> "350" (Watts is assumed)
 		return parseNumericWithUnit(rawValue, "W")
+	case flagSSEFrequencyAllBucketsName:
+		// "1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0" -> keep as-is
+		// Just validate the format: should contain core ranges and frequencies
+		if !strings.Contains(rawValue, "/") {
+			return "", fmt.Errorf("invalid frequency buckets format: %s", rawValue)
+		}
+		return rawValue, nil
 	case flagSSEFrequencyName, flagUncoreMaxFrequencyName, flagUncoreMinFrequencyName,
 		flagUncoreMaxComputeFrequencyName, flagUncoreMinComputeFrequencyName,
 		flagUncoreMaxIOFrequencyName, flagUncoreMinIOFrequencyName:
@@ -439,31 +451,49 @@ func parseAndPresentResults(stderrOutput string, flagValues []flagValue) {
 	// Build a map of flag names to their results
 	flagResults := make(map[string]flagResult)
 
-	// Regex patterns to match success and error messages
-	// Flag names can contain hyphens, so use [\w-]+ instead of \S+
-	successPattern := regexp.MustCompile(`set ([\w-]+) to ([^,]+)`)
-	errorPattern := regexp.MustCompile(`failed to set ([\w-]+) to ([^,]+)`)
-
 	// Parse stderr line by line
-	lines := strings.Split(stderrOutput, "\n")
-	for _, line := range lines {
-		// Check for success messages - use FindAllStringSubmatch to find all matches on the line
-		successMatches := successPattern.FindAllStringSubmatch(line, -1)
-		for _, matches := range successMatches {
-			if len(matches) >= 3 {
-				flagName := matches[1]
-				value := strings.TrimSpace(matches[2])
-				flagResults[flagName] = flagResult{success: true, value: value}
-			}
-		}
+	// We split on delimiters ", set " and ", failed to set " to handle messages where
+	// flag values themselves contain commas (like core-sse-freq-buckets)
+	for line := range strings.SplitSeq(stderrOutput, "\n") {
+		// Split on the delimiter patterns
+		// First, replace delimiters with a marker we can split on
+		line = strings.ReplaceAll(line, ", set ", "\x00SET\x00")
+		line = strings.ReplaceAll(line, ", failed to set ", "\x00FAILED\x00")
 
-		// Check for error messages - use FindAllStringSubmatch to find all matches on the line
-		errorMatches := errorPattern.FindAllStringSubmatch(line, -1)
-		for _, matches := range errorMatches {
-			if len(matches) >= 3 {
-				flagName := matches[1]
-				value := strings.TrimSpace(matches[2])
-				flagResults[flagName] = flagResult{success: false, value: value}
+		parts := strings.Split(line, "\x00")
+		for i := 0; i < len(parts); i++ {
+			part := parts[i]
+			if part == "SET" && i+1 < len(parts) {
+				// Next part should be "flagname to value"
+				i++
+				part = parts[i]
+				// Match "flagname to value"
+				if matches := regexp.MustCompile(`^([\w-]+) to (.+)$`).FindStringSubmatch(part); len(matches) == 3 {
+					flagName := matches[1]
+					value := strings.TrimSpace(matches[2])
+					flagResults[flagName] = flagResult{success: true, value: value}
+				}
+			} else if part == "FAILED" && i+1 < len(parts) {
+				// Next part should be "flagname to value"
+				i++
+				part = parts[i]
+				// Match "flagname to value"
+				if matches := regexp.MustCompile(`^([\w-]+) to (.+)$`).FindStringSubmatch(part); len(matches) == 3 {
+					flagName := matches[1]
+					value := strings.TrimSpace(matches[2])
+					flagResults[flagName] = flagResult{success: false, value: value}
+				}
+			} else if strings.Contains(part, " to ") {
+				// Handle the first item in the line (e.g., "configuration update complete: set cores to 86")
+				if matches := regexp.MustCompile(`\bset ([\w-]+) to (.+)$`).FindStringSubmatch(part); len(matches) == 3 {
+					flagName := matches[1]
+					value := strings.TrimSpace(matches[2])
+					flagResults[flagName] = flagResult{success: true, value: value}
+				} else if matches := regexp.MustCompile(`\bfailed to set ([\w-]+) to (.+)$`).FindStringSubmatch(part); len(matches) == 3 {
+					flagName := matches[1]
+					value := strings.TrimSpace(matches[2])
+					flagResults[flagName] = flagResult{success: false, value: value}
+				}
 			}
 		}
 	}

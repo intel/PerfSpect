@@ -21,7 +21,7 @@ func TestParseConfigFile(t *testing.T) {
 Cores per Socket:                86               --cores <N>
 L3 Cache:                        336M             --llc <MB>
 Package Power / TDP:             350W             --tdp <Watts>
-All-Core Max Frequency:          3.2GHz           --core-max <GHz>
+Core SSE Frequency:              1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0  --core-max <GHz>
 Uncore Max Frequency (Compute):  2.2GHz           --uncore-max-compute <GHz>
 Energy Performance Bias:         Performance (0)  --epb <0-15>
 Energy Performance Preference:   inconsistent     --epp <0-255>
@@ -52,7 +52,8 @@ C6:                              Disabled         --c6 <enable|disable>
 	assert.Equal(t, "86", valueMap["cores"])
 	assert.Equal(t, "336", valueMap["llc"])
 	assert.Equal(t, "350", valueMap["tdp"])
-	assert.Equal(t, "3.2", valueMap["core-max"])
+	// verify core-max with buckets is converted to core-sse-freq-buckets
+	assert.Equal(t, "1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0", valueMap["core-sse-freq-buckets"])
 	assert.Equal(t, "2.2", valueMap["uncore-max-compute"])
 	assert.Equal(t, "0", valueMap["epb"])
 	assert.Equal(t, "powersave", valueMap["gov"])
@@ -89,6 +90,9 @@ func TestConvertValue(t *testing.T) {
 		{"C6 enabled", "c6", "Enabled", "enable", false},
 		{"ELC lowercase", "elc", "default", "default", false},
 		{"ELC capitalized", "elc", "Default", "default", false},
+		{"Core SSE freq buckets", "core-sse-freq-buckets", "1-44/3.6, 45-52/3.5, 53-60/3.4", "1-44/3.6, 45-52/3.5, 53-60/3.4", false},
+		{"Core SSE freq buckets full", "core-sse-freq-buckets", "1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0", "1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0", false},
+		{"Core SSE freq buckets invalid", "core-sse-freq-buckets", "invalid-format", "", true},
 		{"Inconsistent value", "epp", "inconsistent", "", true},
 		{"Unknown flag", "unknown-flag", "value", "", true},
 	}
@@ -203,63 +207,65 @@ func TestParseAndPresentResults(t *testing.T) {
 	}{
 		{
 			name:         "Example from function header comment",
-			stderrOutput: "configuration update complete: set gov to powersave, set c1-demotion to disable, set tdp to 350, set c6 to enable, set epb to 0, set core-max to 3.2, set cores to 86, set elc to default, failed to set pref-l2hw to enable, set pref-dcuhw to enable, set pref-llc to disable, set pref-aop to enable, set pref-l2adj to enable, set uncore-max-compute to 2.2, failed to set llc to 336, set pref-dcunp to enable, set pref-homeless to enable, set pref-amp to enable, set pref-dcuip to enable, set pref-llcpp to enable, set uncore-max-io to 2.5, set uncore-min-compute to 0.8, set uncore-min-io to 0.8",
+			stderrOutput: "configuration update complete: set cores to 86, set llc to 336, set tdp to 350, set core-sse-freq-buckets to 1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0, set epb to 6, set epp to 128, set gov to powersave, set elc to default, set uncore-max-compute to 2.2, set uncore-min-compute to 0.8, set uncore-max-io to 2.5, set uncore-min-io to 0.8, set pref-l2hw to enable, set pref-l2adj to enable, set pref-dcuhw to enable, set pref-dcuip to enable, set pref-dcunp to enable, set pref-amp to enable, set pref-llcpp to enable, set pref-aop to enable, set pref-homeless to enable, set pref-llc to disable, set c6 to enable, set c1-demotion to disable",
 			flagValues: []flagValue{
-				{flagName: "cores", value: "86"},
-				{flagName: "llc", value: "336"},
-				{flagName: "tdp", value: "350"},
-				{flagName: "core-max", value: "3.2"},
-				{flagName: "uncore-max-compute", value: "2.2"},
-				{flagName: "uncore-min-compute", value: "0.8"},
-				{flagName: "uncore-max-io", value: "2.5"},
-				{flagName: "uncore-min-io", value: "0.8"},
-				{flagName: "epb", value: "0"},
-				{flagName: "gov", value: "powersave"},
-				{flagName: "elc", value: "default"},
-				{flagName: "pref-l2hw", value: "enable"},
-				{flagName: "pref-l2adj", value: "enable"},
-				{flagName: "pref-dcuhw", value: "enable"},
-				{flagName: "pref-dcuip", value: "enable"},
-				{flagName: "pref-dcunp", value: "enable"},
-				{flagName: "pref-amp", value: "enable"},
-				{flagName: "pref-llcpp", value: "enable"},
-				{flagName: "pref-aop", value: "enable"},
-				{flagName: "pref-homeless", value: "enable"},
-				{flagName: "pref-llc", value: "disable"},
-				{flagName: "c6", value: "enable"},
-				{flagName: "c1-demotion", value: "disable"},
+				{fieldName: "Cores per Socket", flagName: "cores", value: "86"},
+				{fieldName: "L3 Cache", flagName: "llc", value: "336"},
+				{fieldName: "Package Power / TDP", flagName: "tdp", value: "350"},
+				{fieldName: "Core SSE Frequency", flagName: "core-sse-freq-buckets", value: "1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0"},
+				{fieldName: "Uncore Max Frequency (Compute)", flagName: "uncore-max-compute", value: "2.2"},
+				{fieldName: "Uncore Min Frequency (Compute)", flagName: "uncore-min-compute", value: "0.8"},
+				{fieldName: "Uncore Max Frequency (I/O)", flagName: "uncore-max-io", value: "2.5"},
+				{fieldName: "Uncore Min Frequency (I/O)", flagName: "uncore-min-io", value: "0.8"},
+				{fieldName: "Energy Performance Bias", flagName: "epb", value: "6"},
+				{fieldName: "Energy Performance Preference", flagName: "epp", value: "128"},
+				{fieldName: "Scaling Governor", flagName: "gov", value: "powersave"},
+				{fieldName: "Efficiency Latency Control", flagName: "elc", value: "default"},
+				{fieldName: "L2 HW prefetcher", flagName: "pref-l2hw", value: "enable"},
+				{fieldName: "L2 Adj prefetcher", flagName: "pref-l2adj", value: "enable"},
+				{fieldName: "DCU HW prefetcher", flagName: "pref-dcuhw", value: "enable"},
+				{fieldName: "DCU IP prefetcher", flagName: "pref-dcuip", value: "enable"},
+				{fieldName: "DCU NP prefetcher", flagName: "pref-dcunp", value: "enable"},
+				{fieldName: "AMP prefetcher", flagName: "pref-amp", value: "enable"},
+				{fieldName: "LLCPP prefetcher", flagName: "pref-llcpp", value: "enable"},
+				{fieldName: "AOP prefetcher", flagName: "pref-aop", value: "enable"},
+				{fieldName: "Homeless prefetcher", flagName: "pref-homeless", value: "enable"},
+				{fieldName: "LLC prefetcher", flagName: "pref-llc", value: "disable"},
+				{fieldName: "C6", flagName: "c6", value: "enable"},
+				{fieldName: "C1 Demotion", flagName: "c1-demotion", value: "disable"},
 			},
 			expectedOutput: []string{
-				"✓ Set cores to 86",
-				"✗ Failed to set llc to 336",
-				"✓ Set tdp to 350",
-				"✓ Set core-max to 3.2",
-				"✓ Set uncore-max-compute to 2.2",
-				"✓ Set uncore-min-compute to 0.8",
-				"✓ Set uncore-max-io to 2.5",
-				"✓ Set uncore-min-io to 0.8",
-				"✓ Set epb to 0",
-				"✓ Set gov to powersave",
-				"✓ Set elc to default",
-				"✗ Failed to set pref-l2hw to enable",
-				"✓ Set pref-l2adj to enable",
-				"✓ Set pref-dcuhw to enable",
-				"✓ Set pref-dcuip to enable",
-				"✓ Set pref-dcunp to enable",
-				"✓ Set pref-amp to enable",
-				"✓ Set pref-llcpp to enable",
-				"✓ Set pref-aop to enable",
-				"✓ Set pref-homeless to enable",
-				"✓ Set pref-llc to disable",
-				"✓ Set c6 to enable",
-				"✓ Set c1-demotion to disable",
+				"✓ Cores per Socket",
+				"✓ L3 Cache",
+				"✓ Package Power / TDP",
+				"✓ Core SSE Frequency",
+				"✓ Uncore Max Frequency (Compute)",
+				"✓ Uncore Min Frequency (Compute)",
+				"✓ Uncore Max Frequency (I/O)",
+				"✓ Uncore Min Frequency (I/O)",
+				"✓ Energy Performance Bias",
+				"✓ Energy Performance Preference",
+				"✓ Scaling Governor",
+				"✓ Efficiency Latency Control",
+				"✓ L2 HW prefetcher",
+				"✓ L2 Adj prefetcher",
+				"✓ DCU HW prefetcher",
+				"✓ DCU IP prefetcher",
+				"✓ DCU NP prefetcher",
+				"✓ AMP prefetcher",
+				"✓ LLCPP prefetcher",
+				"✓ AOP prefetcher",
+				"✓ Homeless prefetcher",
+				"✓ LLC prefetcher",
+				"✓ C6",
+				"✓ C1 Demotion",
 			},
 		},
 		{
 			name:         "Empty stderr output",
 			stderrOutput: "",
 			flagValues: []flagValue{
-				{flagName: "cores", value: "86"},
+				{fieldName: "Cores per Socket", flagName: "cores", value: "86"},
 			},
 			expectedOutput: []string{}, // nothing should be printed
 		},
@@ -268,62 +274,72 @@ func TestParseAndPresentResults(t *testing.T) {
 			stderrOutput: "gnr                   ⣾  preparing target\n" +
 				"gnr                   ⣽  configuration update complete: set cores to 86, failed to set llc to 336, set tdp to 350\n",
 			flagValues: []flagValue{
-				{flagName: "cores", value: "86"},
-				{flagName: "llc", value: "336"},
-				{flagName: "tdp", value: "350"},
+				{fieldName: "Cores per Socket", flagName: "cores", value: "86"},
+				{fieldName: "L3 Cache", flagName: "llc", value: "336"},
+				{fieldName: "Package Power / TDP", flagName: "tdp", value: "350"},
 			},
 			expectedOutput: []string{
-				"✓ Set cores to 86",
-				"✗ Failed to set llc to 336",
-				"✓ Set tdp to 350",
+				"✓ Cores per Socket",
+				"✗ L3 Cache",
+				"✓ Package Power / TDP",
 			},
 		},
 		{
 			name:         "Flag name with multiple hyphens",
 			stderrOutput: "set uncore-max-compute to 2.2, set uncore-min-io to 0.8",
 			flagValues: []flagValue{
-				{flagName: "uncore-max-compute", value: "2.2"},
-				{flagName: "uncore-min-io", value: "0.8"},
+				{fieldName: "Uncore Max Frequency (Compute)", flagName: "uncore-max-compute", value: "2.2"},
+				{fieldName: "Uncore Min Frequency (I/O)", flagName: "uncore-min-io", value: "0.8"},
 			},
 			expectedOutput: []string{
-				"✓ Set uncore-max-compute to 2.2",
-				"✓ Set uncore-min-io to 0.8",
+				"✓ Uncore Max Frequency (Compute)",
+				"✓ Uncore Min Frequency (I/O)",
 			},
 		},
 		{
 			name:         "No matching flags in output",
 			stderrOutput: "some other message without flag updates",
 			flagValues: []flagValue{
-				{flagName: "cores", value: "86"},
+				{fieldName: "Cores per Socket", flagName: "cores", value: "86"},
 			},
 			expectedOutput: []string{
-				"? cores: status unknown",
+				"? Cores per Socket",
 			},
 		},
 		{
 			name:         "Flag with underscore and numbers",
 			stderrOutput: "set pref_test123 to enable, failed to set flag_456 to disable",
 			flagValues: []flagValue{
-				{flagName: "pref_test123", value: "enable"},
-				{flagName: "flag_456", value: "disable"},
+				{fieldName: "Pref Test", flagName: "pref_test123", value: "enable"},
+				{fieldName: "Flag 456", flagName: "flag_456", value: "disable"},
 			},
 			expectedOutput: []string{
-				"✓ Set pref_test123 to enable",
-				"✗ Failed to set flag_456 to disable",
+				"✓ Pref Test",
+				"✗ Flag 456",
+			},
+		},
+		{
+			name:         "Core SSE freq buckets with commas in value",
+			stderrOutput: "set core-sse-freq-buckets to 1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0",
+			flagValues: []flagValue{
+				{fieldName: "Core SSE Frequency", flagName: "core-sse-freq-buckets", value: "1-44/3.6, 45-52/3.5, 53-60/3.4, 61-72/3.2, 73-76/3.1, 77-86/3.0"},
+			},
+			expectedOutput: []string{
+				"✓ Core SSE Frequency",
 			},
 		},
 		{
 			name:         "Some flags updated, others not mentioned",
 			stderrOutput: "set cores to 86, set tdp to 350",
 			flagValues: []flagValue{
-				{flagName: "cores", value: "86"},
-				{flagName: "llc", value: "336"},
-				{flagName: "tdp", value: "350"},
+				{fieldName: "Cores per Socket", flagName: "cores", value: "86"},
+				{fieldName: "L3 Cache", flagName: "llc", value: "336"},
+				{fieldName: "Package Power / TDP", flagName: "tdp", value: "350"},
 			},
 			expectedOutput: []string{
-				"✓ Set cores to 86",
-				"? llc: status unknown",
-				"✓ Set tdp to 350",
+				"✓ Cores per Socket",
+				"? L3 Cache",
+				"✓ Package Power / TDP",
 			},
 		},
 	}
@@ -344,7 +360,7 @@ func TestParseAndPresentResults(t *testing.T) {
 
 			// Read captured output
 			var buf bytes.Buffer
-			io.Copy(&buf, r)
+			_, _ = io.Copy(&buf, r)
 			output := buf.String()
 
 			// Verify expected output
