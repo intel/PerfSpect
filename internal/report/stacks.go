@@ -5,11 +5,146 @@ package report
 
 import (
 	"fmt"
+	"log/slog"
 	"math"
+	"perfspect/internal/script"
 	"regexp"
 	"strconv"
 	"strings"
 )
+
+// getSectionsFromOutput parses output into sections, where the section name
+// is the key in a map and the section content is the value
+// sections are delimited by lines of the form ########## <section name> ##########
+// example:
+// ########## <section A name> ##########
+// <section content>
+// <section content>
+// ########## <section B name> ##########
+// <section content>
+//
+// returns a map of section name to section content
+// if the output is empty or contains no section headers, returns an empty map
+// if a section contains no content, the value for that section is an empty string
+func getSectionsFromOutput(output string) map[string]string {
+	sections := make(map[string]string)
+	re := regexp.MustCompile(`^########## (.+?) ##########$`)
+	var sectionName string
+	for line := range strings.SplitSeq(output, "\n") {
+		// check if the line is a section header
+		match := re.FindStringSubmatch(line)
+		if match != nil {
+			// if the section name isn't in the map yet, add it
+			if _, ok := sections[match[1]]; !ok {
+				sections[match[1]] = ""
+			}
+			// save the section name
+			sectionName = match[1]
+			continue
+		}
+		if sectionName != "" {
+			sections[sectionName] += line + "\n"
+		}
+	}
+	return sections
+}
+
+// sectionValueFromOutput returns the content of a section from the output
+// if the section doesn't exist, returns an empty string
+// if the section exists but has no content, returns an empty string
+func sectionValueFromOutput(output string, sectionName string) string {
+	sections := getSectionsFromOutput(output)
+	if len(sections) == 0 {
+		slog.Warn("no sections in output")
+		return ""
+	}
+	if _, ok := sections[sectionName]; !ok {
+		slog.Warn("section not found in output", slog.String("section", sectionName))
+		return ""
+	}
+	if sections[sectionName] == "" {
+		slog.Warn("No content for section:", slog.String("section", sectionName))
+		return ""
+	}
+	return sections[sectionName]
+}
+
+func javaFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
+	sections := getSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
+	if len(sections) == 0 {
+		slog.Warn("no sections in collapsed call stack output")
+		return ""
+	}
+	javaFolded := make(map[string]string)
+	re := regexp.MustCompile(`^async-profiler (\d+) (.*)$`)
+	for header, stacks := range sections {
+		match := re.FindStringSubmatch(header)
+		if match == nil {
+			continue
+		}
+		pid := match[1]
+		processName := match[2]
+		if stacks == "" {
+			slog.Warn("no stacks for java process", slog.String("header", header))
+			continue
+		}
+		if strings.HasPrefix(stacks, "Failed to inject profiler") {
+			slog.Error("profiling data error", slog.String("header", header))
+			continue
+		}
+		_, ok := javaFolded[processName]
+		if processName == "" {
+			processName = "java (" + pid + ")"
+		} else if ok {
+			processName = processName + " (" + pid + ")"
+		}
+		javaFolded[processName] = stacks
+	}
+	folded, err := mergeJavaFolded(javaFolded)
+	if err != nil {
+		slog.Error("failed to merge java stacks", slog.String("error", err.Error()))
+	}
+	return folded
+}
+
+func nativeFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
+	sections := getSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
+	if len(sections) == 0 {
+		slog.Warn("no sections in collapsed call stack output")
+		return ""
+	}
+	var dwarfFolded, fpFolded string
+	for header, content := range sections {
+		switch header {
+		case "perf_dwarf":
+			dwarfFolded = content
+		case "perf_fp":
+			fpFolded = content
+		}
+	}
+	if dwarfFolded == "" && fpFolded == "" {
+		return ""
+	}
+	folded, err := mergeSystemFolded(fpFolded, dwarfFolded)
+	if err != nil {
+		slog.Error("failed to merge native stacks", slog.String("error", err.Error()))
+	}
+	return folded
+}
+
+func maxRenderDepthFromOutput(outputs map[string]script.ScriptOutput) string {
+	sections := getSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
+	if len(sections) == 0 {
+		slog.Warn("no sections in collapsed call stack output")
+		return ""
+	}
+	for header, content := range sections {
+		if header == "maximum depth" {
+			return content
+		}
+	}
+	return ""
+}
 
 // ProcessStacks ...
 // [processName][callStack]=count
