@@ -1,9 +1,8 @@
-package report
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
-// table.go provides functions for accessing and processing table definitions.
+// Package table provides functions for accessing and processing table definitions.
+package table
 
 import (
 	"fmt"

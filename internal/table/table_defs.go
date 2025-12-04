@@ -1,4 +1,4 @@
-package report
+package table
 
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
@@ -61,11 +61,6 @@ type TableDefinition struct {
 	MenuLabel   string // add to tables that will be displayed in the menu
 	HasRows     bool   // table is meant to be displayed in row form, i.e., a field may have multiple values
 	NoDataFound string // message to display when no data is found
-	// render functions are used to override the default rendering behavior
-	HTMLTableRendererFunc            HTMLTableRenderer
-	HTMLMultiTargetTableRendererFunc HTMLMultiTargetTableRenderer
-	TextTableRendererFunc            TextTableRenderer
-	XlsxTableRendererFunc            XlsxTableRenderer
 	// insights function is used to retrieve insights about the data in the table
 	InsightsFunc InsightsRetriever
 }
@@ -364,9 +359,8 @@ var tableDefinitions = map[string]TableDefinition{
 			script.LspciBitsScriptName,
 			script.LspciDevicesScriptName,
 		},
-		FieldsFunc:            dimmTableValues,
-		InsightsFunc:          dimmTableInsights,
-		HTMLTableRendererFunc: dimmTableHTMLRenderer},
+		FieldsFunc:   dimmTableValues,
+		InsightsFunc: dimmTableInsights},
 	NetworkConfigTableName: {
 		Name:      NetworkConfigTableName,
 		HasRows:   false,
@@ -599,8 +593,7 @@ var tableDefinitions = map[string]TableDefinition{
 			script.CstatesScriptName,
 			script.C1DemotionScriptName,
 		},
-		TextTableRendererFunc: configurationTableTextRenderer,
-		FieldsFunc:            configurationTableValues},
+		FieldsFunc: configurationTableValues},
 	//
 	// benchmarking tables
 	//
@@ -643,8 +636,7 @@ var tableDefinitions = map[string]TableDefinition{
 			script.LspciDevicesScriptName,
 			script.FrequencyBenchmarkScriptName,
 		},
-		FieldsFunc:            frequencyBenchmarkTableValues,
-		HTMLTableRendererFunc: frequencyBenchmarkTableHtmlRenderer},
+		FieldsFunc: frequencyBenchmarkTableValues},
 	MemoryBenchmarkTableName: {
 		Name:          MemoryBenchmarkTableName,
 		MenuLabel:     MemoryBenchmarkTableName,
@@ -653,10 +645,8 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.MemoryBenchmarkScriptName,
 		},
-		NoDataFound:                      "No memory benchmark data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
-		FieldsFunc:                       memoryBenchmarkTableValues,
-		HTMLTableRendererFunc:            memoryBenchmarkTableHtmlRenderer,
-		HTMLMultiTargetTableRendererFunc: memoryBenchmarkTableMultiTargetHtmlRenderer},
+		NoDataFound: "No memory benchmark data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
+		FieldsFunc:  memoryBenchmarkTableValues},
 	NUMABenchmarkTableName: {
 		Name:          NUMABenchmarkTableName,
 		MenuLabel:     NUMABenchmarkTableName,
@@ -685,8 +675,7 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.MpstatTelemetryScriptName,
 		},
-		FieldsFunc:            cpuUtilizationTelemetryTableValues,
-		HTMLTableRendererFunc: cpuUtilizationTelemetryTableHTMLRenderer},
+		FieldsFunc: cpuUtilizationTelemetryTableValues},
 	UtilizationCategoriesTelemetryTableName: {
 		Name:      UtilizationCategoriesTelemetryTableName,
 		MenuLabel: UtilizationCategoriesTelemetryMenuLabel,
@@ -694,8 +683,7 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.MpstatTelemetryScriptName,
 		},
-		FieldsFunc:            utilizationCategoriesTelemetryTableValues,
-		HTMLTableRendererFunc: utilizationCategoriesTelemetryTableHTMLRenderer},
+		FieldsFunc: utilizationCategoriesTelemetryTableValues},
 	IPCTelemetryTableName: {
 		Name:          IPCTelemetryTableName,
 		MenuLabel:     IPCTelemetryMenuLabel,
@@ -704,8 +692,7 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.TurbostatTelemetryScriptName,
 		},
-		FieldsFunc:            ipcTelemetryTableValues,
-		HTMLTableRendererFunc: ipcTelemetryTableHTMLRenderer},
+		FieldsFunc: ipcTelemetryTableValues},
 	C6TelemetryTableName: {
 		Name:          C6TelemetryTableName,
 		MenuLabel:     C6TelemetryMenuLabel,
@@ -714,8 +701,7 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.TurbostatTelemetryScriptName,
 		},
-		FieldsFunc:            c6TelemetryTableValues,
-		HTMLTableRendererFunc: c6TelemetryTableHTMLRenderer},
+		FieldsFunc: c6TelemetryTableValues},
 	FrequencyTelemetryTableName: {
 		Name:          FrequencyTelemetryTableName,
 		MenuLabel:     FrequencyTelemetryMenuLabel,
@@ -724,8 +710,7 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.TurbostatTelemetryScriptName,
 		},
-		FieldsFunc:            frequencyTelemetryTableValues,
-		HTMLTableRendererFunc: averageFrequencyTelemetryTableHTMLRenderer},
+		FieldsFunc: frequencyTelemetryTableValues},
 	IRQRateTelemetryTableName: {
 		Name:      IRQRateTelemetryTableName,
 		MenuLabel: IRQRateTelemetryMenuLabel,
@@ -733,8 +718,7 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.MpstatTelemetryScriptName,
 		},
-		FieldsFunc:            irqRateTelemetryTableValues,
-		HTMLTableRendererFunc: irqRateTelemetryTableHTMLRenderer},
+		FieldsFunc: irqRateTelemetryTableValues},
 	DriveTelemetryTableName: {
 		Name:      DriveTelemetryTableName,
 		MenuLabel: DriveTelemetryMenuLabel,
@@ -742,8 +726,7 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.IostatTelemetryScriptName,
 		},
-		FieldsFunc:            driveTelemetryTableValues,
-		HTMLTableRendererFunc: driveTelemetryTableHTMLRenderer},
+		FieldsFunc: driveTelemetryTableValues},
 	NetworkTelemetryTableName: {
 		Name:      NetworkTelemetryTableName,
 		MenuLabel: NetworkTelemetryMenuLabel,
@@ -751,8 +734,7 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.NetworkTelemetryScriptName,
 		},
-		FieldsFunc:            networkTelemetryTableValues,
-		HTMLTableRendererFunc: networkTelemetryTableHTMLRenderer},
+		FieldsFunc: networkTelemetryTableValues},
 	MemoryTelemetryTableName: {
 		Name:      MemoryTelemetryTableName,
 		MenuLabel: MemoryTelemetryMenuLabel,
@@ -760,8 +742,7 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.MemoryTelemetryScriptName,
 		},
-		FieldsFunc:            memoryTelemetryTableValues,
-		HTMLTableRendererFunc: memoryTelemetryTableHTMLRenderer},
+		FieldsFunc: memoryTelemetryTableValues},
 	PowerTelemetryTableName: {
 		Name:          PowerTelemetryTableName,
 		MenuLabel:     PowerTelemetryMenuLabel,
@@ -770,8 +751,7 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.TurbostatTelemetryScriptName,
 		},
-		FieldsFunc:            powerTelemetryTableValues,
-		HTMLTableRendererFunc: powerTelemetryTableHTMLRenderer},
+		FieldsFunc: powerTelemetryTableValues},
 	TemperatureTelemetryTableName: {
 		Name:          TemperatureTelemetryTableName,
 		MenuLabel:     TemperatureTelemetryMenuLabel,
@@ -780,8 +760,7 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.TurbostatTelemetryScriptName,
 		},
-		FieldsFunc:            temperatureTelemetryTableValues,
-		HTMLTableRendererFunc: temperatureTelemetryTableHTMLRenderer},
+		FieldsFunc: temperatureTelemetryTableValues},
 	InstructionTelemetryTableName: {
 		Name:          InstructionTelemetryTableName,
 		MenuLabel:     InstructionTelemetryMenuLabel,
@@ -790,8 +769,7 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.InstructionTelemetryScriptName,
 		},
-		FieldsFunc:            instructionTelemetryTableValues,
-		HTMLTableRendererFunc: instructionTelemetryTableHTMLRenderer},
+		FieldsFunc: instructionTelemetryTableValues},
 	GaudiTelemetryTableName: {
 		Name:          GaudiTelemetryTableName,
 		MenuLabel:     GaudiTelemetryMenuLabel,
@@ -800,9 +778,8 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.GaudiTelemetryScriptName,
 		},
-		NoDataFound:           "No Gaudi telemetry found. Gaudi devices and the hl-smi tool must be installed on the target system to collect Gaudi stats.",
-		FieldsFunc:            gaudiTelemetryTableValues,
-		HTMLTableRendererFunc: gaudiTelemetryTableHTMLRenderer},
+		NoDataFound: "No Gaudi telemetry found. Gaudi devices and the hl-smi tool must be installed on the target system to collect Gaudi stats.",
+		FieldsFunc:  gaudiTelemetryTableValues},
 	PDUTelemetryTableName: {
 		Name:      PDUTelemetryTableName,
 		MenuLabel: PDUTelemetryMenuLabel,
@@ -810,8 +787,7 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.PDUTelemetryScriptName,
 		},
-		FieldsFunc:            pduTelemetryTableValues,
-		HTMLTableRendererFunc: pduTelemetryTableHTMLRenderer},
+		FieldsFunc: pduTelemetryTableValues},
 	//
 	// flamegraph tables
 	//
@@ -821,8 +797,7 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.CollapsedCallStacksScriptName,
 		},
-		FieldsFunc:            callStackFrequencyTableValues,
-		HTMLTableRendererFunc: callStackFrequencyTableHTMLRenderer},
+		FieldsFunc: callStackFrequencyTableValues},
 	//
 	// kernel lock analysis tables
 	//
@@ -832,9 +807,7 @@ var tableDefinitions = map[string]TableDefinition{
 		ScriptNames: []string{
 			script.ProfileKernelLockScriptName,
 		},
-		FieldsFunc:            kernelLockAnalysisTableValues,
-		HTMLTableRendererFunc: kernelLockAnalysisHTMLRenderer,
-	},
+		FieldsFunc: kernelLockAnalysisTableValues},
 }
 
 // GetScriptNamesForTable returns the script names required to generate the table with the given name
@@ -843,6 +816,22 @@ func GetScriptNamesForTable(name string) []string {
 		panic(fmt.Sprintf("table not found: %s", name))
 	}
 	return tableDefinitions[name].ScriptNames
+}
+
+// GetFieldIndex returns the index of a field with the given name in the TableValues structure.
+// Returns:
+//   - int: The index of the field if found and valid, -1 otherwise
+//   - error: nil if successful, an error describing the issue otherwise
+func GetFieldIndex(fieldName string, tableValues TableValues) (int, error) {
+	for i, field := range tableValues.Fields {
+		if field.Name == fieldName {
+			if len(field.Values) == 0 {
+				return -1, fmt.Errorf("field [%s] does not have associated value(s)", field.Name)
+			}
+			return i, nil
+		}
+	}
+	return -1, fmt.Errorf("field [%s] not found in table [%s]", fieldName, tableValues.Name)
 }
 
 // GetValuesForTable returns the fields and their values for the table with the given name
@@ -875,18 +864,6 @@ func GetValuesForTable(name string, outputs map[string]script.ScriptOutput) Tabl
 		tableValues.Insights = table.InsightsFunc(outputs, tableValues)
 	}
 	return tableValues
-}
-
-func getFieldIndex(fieldName string, tableValues TableValues) (int, error) {
-	for i, field := range tableValues.Fields {
-		if field.Name == fieldName {
-			if len(field.Values) == 0 {
-				return -1, fmt.Errorf("field [%s] does not have associated value(s)", field.Name)
-			}
-			return i, nil
-		}
-	}
-	return -1, fmt.Errorf("field [%s] not found in table [%s]", fieldName, tableValues.Name)
 }
 
 func validateTableValues(tableValues TableValues) error {
@@ -1089,7 +1066,7 @@ func prefetcherTableValues(outputs map[string]script.ScriptOutput) []Field {
 func cpuTableInsights(outputs map[string]script.ScriptOutput, tableValues TableValues) []Insight {
 	insights := []Insight{}
 	addInsightFunc := func(fieldName, bestValue string) {
-		fieldIndex, err := getFieldIndex(fieldName, tableValues)
+		fieldIndex, err := GetFieldIndex(fieldName, tableValues)
 		if err != nil {
 			slog.Warn(err.Error())
 		} else {
@@ -1105,13 +1082,13 @@ func cpuTableInsights(outputs map[string]script.ScriptOutput, tableValues TableV
 	addInsightFunc("Hyperthreading", "Enabled")
 	addInsightFunc("Intel Turbo Boost", "Enabled")
 	// Xeon Generation
-	familyIndex, err := getFieldIndex("Family", tableValues)
+	familyIndex, err := GetFieldIndex("Family", tableValues)
 	if err != nil {
 		slog.Warn(err.Error())
 	} else {
 		family := tableValues.Fields[familyIndex].Values[0]
 		if cpus.IsIntelCPUFamilyStr(family) { // Intel
-			uarchIndex, err := getFieldIndex("Microarchitecture", tableValues)
+			uarchIndex, err := GetFieldIndex("Microarchitecture", tableValues)
 			if err != nil {
 				slog.Warn(err.Error())
 			} else {
@@ -1179,17 +1156,17 @@ func acceleratorTableValues(outputs map[string]script.ScriptOutput) []Field {
 
 func acceleratorTableInsights(outputs map[string]script.ScriptOutput, tableValues TableValues) []Insight {
 	insights := []Insight{}
-	nameFieldIndex, err := getFieldIndex("Name", tableValues)
+	nameFieldIndex, err := GetFieldIndex("Name", tableValues)
 	if err != nil {
 		slog.Warn(err.Error())
 		return insights
 	}
-	countFieldIndex, err := getFieldIndex("Count", tableValues)
+	countFieldIndex, err := GetFieldIndex("Count", tableValues)
 	if err != nil {
 		slog.Warn(err.Error())
 		return insights
 	}
-	queuesFieldIndex, err := getFieldIndex("Work Queues", tableValues)
+	queuesFieldIndex, err := GetFieldIndex("Work Queues", tableValues)
 	if err != nil {
 		slog.Warn(err.Error())
 		return insights
@@ -1226,7 +1203,7 @@ func powerTableValues(outputs map[string]script.ScriptOutput) []Field {
 func powerTableInsights(outputs map[string]script.ScriptOutput, tableValues TableValues) []Insight {
 	insights := []Insight{}
 	addInsightFunc := func(fieldName, bestValue string) {
-		fieldIndex, err := getFieldIndex(fieldName, tableValues)
+		fieldIndex, err := GetFieldIndex(fieldName, tableValues)
 		if err != nil {
 			slog.Warn(err.Error())
 		} else {
@@ -1293,7 +1270,7 @@ func elcTableValues(outputs map[string]script.ScriptOutput) []Field {
 
 func elcTableInsights(outputs map[string]script.ScriptOutput, tableValues TableValues) []Insight {
 	insights := []Insight{}
-	modeFieldIndex, err := getFieldIndex("Mode", tableValues)
+	modeFieldIndex, err := GetFieldIndex("Mode", tableValues)
 	if err != nil {
 		slog.Warn(err.Error())
 	} else {
@@ -1470,7 +1447,7 @@ func memoryTableValues(outputs map[string]script.ScriptOutput) []Field {
 func memoryTableInsights(outputs map[string]script.ScriptOutput, tableValues TableValues) []Insight {
 	insights := []Insight{}
 	// check if memory is not fully populated
-	populatedChannelsIndex, err := getFieldIndex("Populated Memory Channels", tableValues)
+	populatedChannelsIndex, err := GetFieldIndex("Populated Memory Channels", tableValues)
 	if err != nil {
 		slog.Warn(err.Error())
 	} else {
@@ -1506,7 +1483,7 @@ func memoryTableInsights(outputs map[string]script.ScriptOutput, tableValues Tab
 		slog.Warn(err.Error())
 	} else {
 		if nodeCount > 1 {
-			numaBalancingIndex, err := getFieldIndex("Automatic NUMA Balancing", tableValues)
+			numaBalancingIndex, err := GetFieldIndex("Automatic NUMA Balancing", tableValues)
 			if err != nil {
 				slog.Warn(err.Error())
 			} else {
@@ -1584,11 +1561,11 @@ func dimmTableValues(outputs map[string]script.ScriptOutput) []Field {
 func dimmTableInsights(outputs map[string]script.ScriptOutput, tableValues TableValues) []Insight {
 	insights := []Insight{}
 	// check if are configured for their maximum speed
-	SpeedIndex, err := getFieldIndex("Speed", tableValues)
+	SpeedIndex, err := GetFieldIndex("Speed", tableValues)
 	if err != nil {
 		slog.Warn(err.Error())
 	} else {
-		ConfiguredSpeedIndex, err := getFieldIndex("Configured Speed", tableValues)
+		ConfiguredSpeedIndex, err := GetFieldIndex("Configured Speed", tableValues)
 		if err != nil {
 			slog.Warn(err.Error())
 		} else {
@@ -1846,7 +1823,7 @@ func filesystemTableValues(outputs map[string]script.ScriptOutput) []Field {
 
 func filesystemTableInsights(outputs map[string]script.ScriptOutput, tableValues TableValues) []Insight {
 	insights := []Insight{}
-	mountOptionsIndex, err := getFieldIndex("Mount Options", tableValues)
+	mountOptionsIndex, err := GetFieldIndex("Mount Options", tableValues)
 	if err != nil {
 		slog.Warn(err.Error())
 	} else {
@@ -2046,7 +2023,7 @@ func systemEventLogTableValues(outputs map[string]script.ScriptOutput) []Field {
 
 func systemEventLogTableInsights(outputs map[string]script.ScriptOutput, tableValues TableValues) []Insight {
 	insights := []Insight{}
-	sensorFieldIndex, err := getFieldIndex("Sensor", tableValues)
+	sensorFieldIndex, err := GetFieldIndex("Sensor", tableValues)
 	if err != nil {
 		slog.Warn(err.Error())
 	} else {

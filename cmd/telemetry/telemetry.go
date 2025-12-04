@@ -15,6 +15,7 @@ import (
 	"perfspect/internal/common"
 	"perfspect/internal/report"
 	"perfspect/internal/script"
+	"perfspect/internal/table"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -95,17 +96,17 @@ const (
 var telemetrySummaryTableName = "Telemetry Summary"
 
 var categories = []common.Category{
-	{FlagName: flagCPUName, FlagVar: &flagCPU, DefaultValue: false, Help: "monitor cpu utilization", TableNames: []string{report.CPUUtilizationTelemetryTableName, report.UtilizationCategoriesTelemetryTableName}},
-	{FlagName: flagIPCName, FlagVar: &flagIPC, DefaultValue: false, Help: "monitor IPC", TableNames: []string{report.IPCTelemetryTableName}},
-	{FlagName: flagC6Name, FlagVar: &flagC6, DefaultValue: false, Help: "monitor C6 residency", TableNames: []string{report.C6TelemetryTableName}},
-	{FlagName: flagFrequencyName, FlagVar: &flagFrequency, DefaultValue: false, Help: "monitor cpu frequency", TableNames: []string{report.FrequencyTelemetryTableName}},
-	{FlagName: flagPowerName, FlagVar: &flagPower, DefaultValue: false, Help: "monitor power", TableNames: []string{report.PowerTelemetryTableName}},
-	{FlagName: flagTemperatureName, FlagVar: &flagTemperature, DefaultValue: false, Help: "monitor temperature", TableNames: []string{report.TemperatureTelemetryTableName}},
-	{FlagName: flagMemoryName, FlagVar: &flagMemory, DefaultValue: false, Help: "monitor memory", TableNames: []string{report.MemoryTelemetryTableName}},
-	{FlagName: flagNetworkName, FlagVar: &flagNetwork, DefaultValue: false, Help: "monitor network", TableNames: []string{report.NetworkTelemetryTableName}},
-	{FlagName: flagStorageName, FlagVar: &flagStorage, DefaultValue: false, Help: "monitor storage", TableNames: []string{report.DriveTelemetryTableName}},
-	{FlagName: flagIRQRateName, FlagVar: &flagIRQRate, DefaultValue: false, Help: "monitor IRQ rate", TableNames: []string{report.IRQRateTelemetryTableName}},
-	{FlagName: flagInstrMixName, FlagVar: &flagInstrMix, DefaultValue: false, Help: "monitor instruction mix", TableNames: []string{report.InstructionTelemetryTableName}},
+	{FlagName: flagCPUName, FlagVar: &flagCPU, DefaultValue: false, Help: "monitor cpu utilization", TableNames: []string{table.CPUUtilizationTelemetryTableName, table.UtilizationCategoriesTelemetryTableName}},
+	{FlagName: flagIPCName, FlagVar: &flagIPC, DefaultValue: false, Help: "monitor IPC", TableNames: []string{table.IPCTelemetryTableName}},
+	{FlagName: flagC6Name, FlagVar: &flagC6, DefaultValue: false, Help: "monitor C6 residency", TableNames: []string{table.C6TelemetryTableName}},
+	{FlagName: flagFrequencyName, FlagVar: &flagFrequency, DefaultValue: false, Help: "monitor cpu frequency", TableNames: []string{table.FrequencyTelemetryTableName}},
+	{FlagName: flagPowerName, FlagVar: &flagPower, DefaultValue: false, Help: "monitor power", TableNames: []string{table.PowerTelemetryTableName}},
+	{FlagName: flagTemperatureName, FlagVar: &flagTemperature, DefaultValue: false, Help: "monitor temperature", TableNames: []string{table.TemperatureTelemetryTableName}},
+	{FlagName: flagMemoryName, FlagVar: &flagMemory, DefaultValue: false, Help: "monitor memory", TableNames: []string{table.MemoryTelemetryTableName}},
+	{FlagName: flagNetworkName, FlagVar: &flagNetwork, DefaultValue: false, Help: "monitor network", TableNames: []string{table.NetworkTelemetryTableName}},
+	{FlagName: flagStorageName, FlagVar: &flagStorage, DefaultValue: false, Help: "monitor storage", TableNames: []string{table.DriveTelemetryTableName}},
+	{FlagName: flagIRQRateName, FlagVar: &flagIRQRate, DefaultValue: false, Help: "monitor IRQ rate", TableNames: []string{table.IRQRateTelemetryTableName}},
+	{FlagName: flagInstrMixName, FlagVar: &flagInstrMix, DefaultValue: false, Help: "monitor instruction mix", TableNames: []string{table.InstructionTelemetryTableName}},
 }
 
 const (
@@ -272,7 +273,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	var tableNames []string
 	// add system summary table if not disabled
 	if !flagNoSystemSummary {
-		tableNames = append(tableNames, report.BriefSysSummaryTableName)
+		tableNames = append(tableNames, table.BriefSysSummaryTableName)
 	}
 	// add category tables
 	for _, cat := range categories {
@@ -291,7 +292,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	gaudiHlsmiPath := os.Getenv("PERFSPECT_GAUDI_HLSMI_PATH") // must be full path to hlsmi binary
 	if gaudiHlsmiPath != "" {
 		slog.Info("Gaudi telemetry enabled", slog.String("hlsmi_path", gaudiHlsmiPath))
-		tableNames = append(tableNames, report.GaudiTelemetryTableName)
+		tableNames = append(tableNames, table.GaudiTelemetryTableName)
 	}
 	// hidden feature - PDU telemetry, only enabled when four environment variables are set
 	pduHost := os.Getenv("PERFSPECT_PDU_HOST")
@@ -300,7 +301,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	pduOutlet := os.Getenv("PERFSPECT_PDU_OUTLET")
 	if pduHost != "" && pduUser != "" && pduPassword != "" && pduOutlet != "" {
 		slog.Info("PDU telemetry enabled", slog.String("host", pduHost), slog.String("outlet", pduOutlet))
-		tableNames = append(tableNames, report.PDUTelemetryTableName)
+		tableNames = append(tableNames, table.PDUTelemetryTableName)
 	}
 	// include telemetry summary table if all telemetry options are selected
 	var summaryFunc common.SummaryFunc
@@ -329,40 +330,40 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		TableNames:             tableNames,
 		SummaryFunc:            summaryFunc,
 		SummaryTableName:       telemetrySummaryTableName,
-		SummaryBeforeTableName: report.CPUUtilizationTelemetryTableName,
+		SummaryBeforeTableName: table.CPUUtilizationTelemetryTableName,
 		InsightsFunc:           insightsFunc,
 	}
 	return reportingCommand.Run()
 }
 
-func getTableValues(allTableValues []report.TableValues, tableName string) report.TableValues {
+func getTableValues(allTableValues []table.TableValues, tableName string) table.TableValues {
 	for _, tv := range allTableValues {
 		if tv.Name == tableName {
 			return tv
 		}
 	}
-	return report.TableValues{}
+	return table.TableValues{}
 }
 
-func summaryFromTableValues(allTableValues []report.TableValues, _ map[string]script.ScriptOutput) report.TableValues {
-	cpuUtil := getCPUAveragePercentage(getTableValues(allTableValues, report.UtilizationCategoriesTelemetryTableName), "%idle", true)
-	ipc := getCPUAveragePercentage(getTableValues(allTableValues, report.IPCTelemetryTableName), "Core (Avg.)", false)
-	c6 := getCPUAveragePercentage(getTableValues(allTableValues, report.C6TelemetryTableName), "Core (Avg.)", false)
-	avgCoreFreq := getMetricAverage(getTableValues(allTableValues, report.FrequencyTelemetryTableName), []string{"Core (Avg.)"}, "Time")
+func summaryFromTableValues(allTableValues []table.TableValues, _ map[string]script.ScriptOutput) table.TableValues {
+	cpuUtil := getCPUAveragePercentage(getTableValues(allTableValues, table.UtilizationCategoriesTelemetryTableName), "%idle", true)
+	ipc := getCPUAveragePercentage(getTableValues(allTableValues, table.IPCTelemetryTableName), "Core (Avg.)", false)
+	c6 := getCPUAveragePercentage(getTableValues(allTableValues, table.C6TelemetryTableName), "Core (Avg.)", false)
+	avgCoreFreq := getMetricAverage(getTableValues(allTableValues, table.FrequencyTelemetryTableName), []string{"Core (Avg.)"}, "Time")
 	pkgPower := getPkgAveragePower(allTableValues)
 	pkgTemperature := getPkgAverageTemperature(allTableValues)
-	driveReads := getMetricAverage(getTableValues(allTableValues, report.DriveTelemetryTableName), []string{"kB_read/s"}, "Device")
-	driveWrites := getMetricAverage(getTableValues(allTableValues, report.DriveTelemetryTableName), []string{"kB_wrtn/s"}, "Device")
-	networkReads := getMetricAverage(getTableValues(allTableValues, report.NetworkTelemetryTableName), []string{"rxkB/s"}, "Time")
-	networkWrites := getMetricAverage(getTableValues(allTableValues, report.NetworkTelemetryTableName), []string{"txkB/s"}, "Time")
-	memAvail := getMetricAverage(getTableValues(allTableValues, report.MemoryTelemetryTableName), []string{"avail"}, "Time")
-	return report.TableValues{
-		TableDefinition: report.TableDefinition{
+	driveReads := getMetricAverage(getTableValues(allTableValues, table.DriveTelemetryTableName), []string{"kB_read/s"}, "Device")
+	driveWrites := getMetricAverage(getTableValues(allTableValues, table.DriveTelemetryTableName), []string{"kB_wrtn/s"}, "Device")
+	networkReads := getMetricAverage(getTableValues(allTableValues, table.NetworkTelemetryTableName), []string{"rxkB/s"}, "Time")
+	networkWrites := getMetricAverage(getTableValues(allTableValues, table.NetworkTelemetryTableName), []string{"txkB/s"}, "Time")
+	memAvail := getMetricAverage(getTableValues(allTableValues, table.MemoryTelemetryTableName), []string{"avail"}, "Time")
+	return table.TableValues{
+		TableDefinition: table.TableDefinition{
 			Name:      telemetrySummaryTableName,
 			HasRows:   false,
 			MenuLabel: telemetrySummaryTableName,
 		},
-		Fields: []report.Field{
+		Fields: []table.Field{
 			{Name: "CPU Utilization (%)", Values: []string{cpuUtil}},
 			{Name: "IPC", Values: []string{ipc}},
 			{Name: "C6 Core Residency (%)", Values: []string{c6}},
@@ -378,7 +379,7 @@ func summaryFromTableValues(allTableValues []report.TableValues, _ map[string]sc
 	}
 }
 
-func getMetricAverage(tableValues report.TableValues, fieldNames []string, separatorFieldName string) (average string) {
+func getMetricAverage(tableValues table.TableValues, fieldNames []string, separatorFieldName string) (average string) {
 	sum, seps, err := getSumOfFields(tableValues.Fields, fieldNames, separatorFieldName)
 	if err != nil {
 		slog.Error("failed to get sum of fields for IO metrics", slog.String("error", err.Error()))
@@ -392,7 +393,7 @@ func getMetricAverage(tableValues report.TableValues, fieldNames []string, separ
 	return
 }
 
-func getFieldIndex(fields []report.Field, fieldName string) (int, error) {
+func getFieldIndex(fields []table.Field, fieldName string) (int, error) {
 	for i, field := range fields {
 		if field.Name == fieldName {
 			return i, nil
@@ -401,7 +402,7 @@ func getFieldIndex(fields []report.Field, fieldName string) (int, error) {
 	return -1, fmt.Errorf("field not found: %s", fieldName)
 }
 
-func getSumOfFields(fields []report.Field, fieldNames []string, separatorFieldName string) (sum float64, numSeparators int, err error) {
+func getSumOfFields(fields []table.Field, fieldNames []string, separatorFieldName string) (sum float64, numSeparators int, err error) {
 	prevSeparator := ""
 	var separatorIdx int
 	if separatorFieldName != "" {
@@ -438,12 +439,12 @@ func getSumOfFields(fields []report.Field, fieldNames []string, separatorFieldNa
 	return
 }
 
-func getCPUAveragePercentage(tableValues report.TableValues, fieldName string, inverse bool) string {
+func getCPUAveragePercentage(tableValues table.TableValues, fieldName string, inverse bool) string {
 	if len(tableValues.Fields) == 0 {
 		return ""
 	}
 	var fieldIndex int
-	var fv report.Field
+	var fv table.Field
 	for fieldIndex, fv = range tableValues.Fields {
 		if fv.Name == fieldName {
 			break
@@ -468,8 +469,8 @@ func getCPUAveragePercentage(tableValues report.TableValues, fieldName string, i
 	return ""
 }
 
-func getPkgAverageTemperature(allTableValues []report.TableValues) string {
-	tableValues := getTableValues(allTableValues, report.TemperatureTelemetryTableName)
+func getPkgAverageTemperature(allTableValues []table.TableValues) string {
+	tableValues := getTableValues(allTableValues, table.TemperatureTelemetryTableName)
 	// number of packages can vary, so we need to find the average temperature across all packages
 	if len(tableValues.Fields) == 0 {
 		return ""
@@ -501,8 +502,8 @@ func getPkgAverageTemperature(allTableValues []report.TableValues) string {
 	return ""
 }
 
-func getPkgAveragePower(allTableValues []report.TableValues) string {
-	tableValues := getTableValues(allTableValues, report.PowerTelemetryTableName)
+func getPkgAveragePower(allTableValues []table.TableValues) string {
+	tableValues := getTableValues(allTableValues, table.PowerTelemetryTableName)
 	// number of packages can vary, so we need to find the average power across all packages
 	if len(tableValues.Fields) == 0 {
 		return ""

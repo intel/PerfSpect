@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"perfspect/internal/table"
 	"perfspect/internal/util"
 	"slices"
 	"strconv"
@@ -147,8 +148,8 @@ func convertFoldedToJSON(folded string, maxStackDepth int) (out string, err erro
 	return
 }
 
-func renderFlameGraph(header string, tableValues TableValues, field string) (out string) {
-	maxDepthFieldIndex, err := getFieldIndex("Maximum Render Depth", tableValues)
+func renderFlameGraph(header string, tableValues table.TableValues, field string) (out string) {
+	maxDepthFieldIndex, err := table.GetFieldIndex("Maximum Render Depth", tableValues)
 	if err != nil {
 		slog.Error("didn't find expected field (Maximum Render Depth) in table", slog.String("error", err.Error()))
 		return
@@ -159,7 +160,7 @@ func renderFlameGraph(header string, tableValues TableValues, field string) (out
 		slog.Error("failed to convert maximum stack depth", slog.String("error", err.Error()))
 		return
 	}
-	fieldIdx, err := getFieldIndex(field, tableValues)
+	fieldIdx, err := table.GetFieldIndex(field, tableValues)
 	if err != nil {
 		slog.Error("didn't find expected field in table", slog.String("field", field), slog.String("error", err.Error()))
 		return

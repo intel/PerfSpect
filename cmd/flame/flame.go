@@ -9,6 +9,7 @@ import (
 	"os"
 	"perfspect/internal/common"
 	"perfspect/internal/report"
+	"perfspect/internal/table"
 	"perfspect/internal/util"
 	"slices"
 	"strconv"
@@ -177,9 +178,9 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 func runCmd(cmd *cobra.Command, args []string) error {
 	var tableNames []string
 	if !flagNoSystemSummary {
-		tableNames = append(tableNames, report.BriefSysSummaryTableName)
+		tableNames = append(tableNames, table.BriefSysSummaryTableName)
 	}
-	tableNames = append(tableNames, report.CallStackFrequencyTableName)
+	tableNames = append(tableNames, table.CallStackFrequencyTableName)
 	reportingCommand := common.ReportingCommand{
 		Cmd:            cmd,
 		ReportNamePost: "flame",

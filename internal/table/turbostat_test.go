@@ -1,4 +1,4 @@
-package report
+package table
 
 import (
 	"reflect"

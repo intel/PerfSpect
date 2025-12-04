@@ -11,6 +11,7 @@ import (
 	"perfspect/internal/progress"
 	"perfspect/internal/report"
 	"perfspect/internal/script"
+	"perfspect/internal/table"
 	"perfspect/internal/target"
 	"slices"
 	"strconv"
@@ -165,7 +166,7 @@ func formalizeOutputFormat(outputFormat []string) []string {
 
 func pullDataFiles(appContext common.AppContext, scriptOutputs map[string]script.ScriptOutput, myTarget target.Target, statusUpdate progress.MultiSpinnerUpdateFunc) error {
 	localOutputDir := appContext.OutputDir
-	tableValues := report.GetValuesForTable(report.KernelLockAnalysisTableName, scriptOutputs)
+	tableValues := table.GetValuesForTable(table.KernelLockAnalysisTableName, scriptOutputs)
 	found := false
 	for _, field := range tableValues.Fields {
 		if field.Name == "Perf Package Path" {
@@ -194,9 +195,9 @@ func pullDataFiles(appContext common.AppContext, scriptOutputs map[string]script
 func runCmd(cmd *cobra.Command, args []string) error {
 	var tableNames []string
 	if !flagNoSystemSummary {
-		tableNames = append(tableNames, report.BriefSysSummaryTableName)
+		tableNames = append(tableNames, table.BriefSysSummaryTableName)
 	}
-	tableNames = append(tableNames, report.KernelLockAnalysisTableName)
+	tableNames = append(tableNames, table.KernelLockAnalysisTableName)
 	reportingCommand := common.ReportingCommand{
 		Cmd:            cmd,
 		ReportNamePost: "lock",

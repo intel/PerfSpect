@@ -6,6 +6,7 @@ package report
 
 import (
 	"fmt"
+	"perfspect/internal/table"
 	"strings"
 )
 
@@ -35,7 +36,7 @@ var FormatOptions = []string{FormatHtml, FormatXlsx, FormatJson, FormatTxt}
 // Returns:
 // - out: The generated report as a byte slice.
 // - err: An error, if any occurred during report generation.
-func Create(format string, allTableValues []TableValues, targetName string) (out []byte, err error) {
+func Create(format string, allTableValues []table.TableValues, targetName string) (out []byte, err error) {
 	// make sure that all fields have the same number of values
 	for _, tableValue := range allTableValues {
 		numRows := -1
@@ -76,7 +77,7 @@ func Create(format string, allTableValues []TableValues, targetName string) (out
 // - err: An error if the report generation fails.
 //
 // Note: If an unsupported format is provided, the function will panic.
-func CreateMultiTarget(format string, allTargetsTableValues [][]TableValues, targetNames []string, allTableNames []string) (out []byte, err error) {
+func CreateMultiTarget(format string, allTargetsTableValues [][]table.TableValues, targetNames []string, allTableNames []string) (out []byte, err error) {
 	switch format {
 	case "html":
 		return createHtmlReportMultiTarget(allTargetsTableValues, targetNames, allTableNames)

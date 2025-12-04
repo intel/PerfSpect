@@ -10,6 +10,7 @@ import (
 	htmltemplate "html/template"
 	"log/slog"
 	"math"
+	"perfspect/internal/table"
 	"perfspect/internal/util"
 	"slices"
 	"sort"
@@ -17,6 +18,53 @@ import (
 	"strings"
 	texttemplate "text/template" // nosemgrep
 )
+
+// Package-level maps for custom HTML renderers
+var customHTMLRenderers = map[string]table.HTMLTableRenderer{
+	table.DIMMTableName:                           dimmTableHTMLRenderer,
+	table.FrequencyBenchmarkTableName:             frequencyBenchmarkTableHtmlRenderer,
+	table.MemoryBenchmarkTableName:                memoryBenchmarkTableHtmlRenderer,
+	table.CPUUtilizationTelemetryTableName:        cpuUtilizationTelemetryTableHTMLRenderer,
+	table.UtilizationCategoriesTelemetryTableName: utilizationCategoriesTelemetryTableHTMLRenderer,
+	table.IPCTelemetryTableName:                   ipcTelemetryTableHTMLRenderer,
+	table.C6TelemetryTableName:                    c6TelemetryTableHTMLRenderer,
+	table.FrequencyTelemetryTableName:             averageFrequencyTelemetryTableHTMLRenderer,
+	table.IRQRateTelemetryTableName:               irqRateTelemetryTableHTMLRenderer,
+	table.DriveTelemetryTableName:                 driveTelemetryTableHTMLRenderer,
+	table.NetworkTelemetryTableName:               networkTelemetryTableHTMLRenderer,
+	table.MemoryTelemetryTableName:                memoryTelemetryTableHTMLRenderer,
+	table.PowerTelemetryTableName:                 powerTelemetryTableHTMLRenderer,
+	table.TemperatureTelemetryTableName:           temperatureTelemetryTableHTMLRenderer,
+	table.InstructionTelemetryTableName:           instructionTelemetryTableHTMLRenderer,
+	table.GaudiTelemetryTableName:                 gaudiTelemetryTableHTMLRenderer,
+	table.PDUTelemetryTableName:                   pduTelemetryTableHTMLRenderer,
+	table.CallStackFrequencyTableName:             callStackFrequencyTableHTMLRenderer,
+	table.KernelLockAnalysisTableName:             kernelLockAnalysisHTMLRenderer,
+}
+
+var customHTMLMultiTargetRenderers = map[string]table.HTMLMultiTargetTableRenderer{
+	table.MemoryBenchmarkTableName: memoryBenchmarkTableMultiTargetHtmlRenderer,
+}
+
+// getCustomHTMLRenderer returns the custom renderer for a table, or nil if no custom renderer exists
+func getCustomHTMLRenderer(tableName string) table.HTMLTableRenderer {
+	return customHTMLRenderers[tableName]
+}
+
+// getCustomHTMLMultiTargetRenderer returns the custom multi-target renderer for a table, or nil if no custom renderer exists
+func getCustomHTMLMultiTargetRenderer(tableName string) table.HTMLMultiTargetTableRenderer {
+	return customHTMLMultiTargetRenderers[tableName]
+}
+
+// RegisterHTMLRenderer allows external packages to register custom HTML renderers for specific tables
+func RegisterHTMLRenderer(tableName string, renderer table.HTMLTableRenderer) {
+	customHTMLRenderers[tableName] = renderer
+}
+
+// RegisterHTMLMultiTargetRenderer allows external packages to register custom multi-target HTML renderers for specific tables
+func RegisterHTMLMultiTargetRenderer(tableName string, renderer table.HTMLMultiTargetTableRenderer) {
+	customHTMLMultiTargetRenderers[tableName] = renderer
+}
 
 func getHtmlReportBegin() string {
 	var sb strings.Builder
@@ -180,7 +228,7 @@ func getHtmlReportBegin() string {
 	return sb.String()
 }
 
-func getHtmlReportMenu(allTableValues []TableValues) string {
+func getHtmlReportMenu(allTableValues []table.TableValues) string {
 	var sb strings.Builder
 	// if none of the tables have menu labels, don't add the sidebar
 	hasMenuLabels := false
@@ -233,7 +281,7 @@ func getHtmlReportSidebarJavascript() string {
 	`
 }
 
-func createHtmlReport(allTableValues []TableValues, targetName string) (out []byte, err error) {
+func createHtmlReport(allTableValues []table.TableValues, targetName string) (out []byte, err error) {
 	var sb strings.Builder
 	sb.WriteString(getHtmlReportBegin())
 
@@ -263,8 +311,8 @@ func createHtmlReport(allTableValues []TableValues, targetName string) (out []by
 			continue
 		}
 		// render the tables
-		if tableValues.HTMLTableRendererFunc != nil { // custom table renderer
-			sb.WriteString(tableValues.HTMLTableRendererFunc(tableValues, targetName))
+		if renderer := getCustomHTMLRenderer(tableValues.Name); renderer != nil { // custom table renderer
+			sb.WriteString(renderer(tableValues, targetName))
 		} else {
 			sb.WriteString(DefaultHTMLTableRendererFunc(tableValues))
 		}
@@ -281,7 +329,7 @@ func createHtmlReport(allTableValues []TableValues, targetName string) (out []by
 	return
 }
 
-func createHtmlReportMultiTarget(allTargetsTableValues [][]TableValues, targetNames []string, allTableNames []string) (out []byte, err error) {
+func createHtmlReportMultiTarget(allTargetsTableValues [][]table.TableValues, targetNames []string, allTableNames []string) (out []byte, err error) {
 	var sb strings.Builder
 	sb.WriteString(getHtmlReportBegin())
 
@@ -300,10 +348,10 @@ func createHtmlReportMultiTarget(allTargetsTableValues [][]TableValues, targetNa
 `)
 	// print the tables in the order they were passed in
 	for _, tableName := range allTableNames {
-		oneTableValuesForAllTargets := []TableValues{}
-		// build list of target names and TableValues for targets that have values for this table
+		oneTableValuesForAllTargets := []table.TableValues{}
+		// build list of target names and table.TableValues for targets that have values for this table
 		tableTargets := []string{}
-		tableValues := []TableValues{}
+		tableValues := []table.TableValues{}
 		for targetIndex, targetTableValues := range allTargetsTableValues {
 			tableIndex := findTableIndex(targetTableValues, tableName)
 			if tableIndex == -1 {
@@ -316,7 +364,7 @@ func createHtmlReportMultiTarget(allTargetsTableValues [][]TableValues, targetNa
 		for targetIndex, targetTableValues := range tableValues {
 			targetName := tableTargets[targetIndex]
 			// if the table has rows and no custom renderer, print the table for the target normally
-			if targetTableValues.HasRows && targetTableValues.HTMLMultiTargetTableRendererFunc == nil {
+			if targetTableValues.HasRows && getCustomHTMLMultiTargetRenderer(targetTableValues.Name) == nil {
 				// print the table name only one time per table
 				if targetIndex == 0 {
 					sb.WriteString(fmt.Sprintf("<h2 id=\"%[1]s\">%[1]s</h2>\n", html.EscapeString(targetTableValues.Name)))
@@ -328,8 +376,8 @@ func createHtmlReportMultiTarget(allTargetsTableValues [][]TableValues, targetNa
 					sb.WriteString("<p>" + noDataFound + "</p>\n")
 					continue
 				}
-				if targetTableValues.HTMLTableRendererFunc != nil { // custom table renderer
-					sb.WriteString(targetTableValues.HTMLTableRendererFunc(targetTableValues, targetNames[targetIndex]))
+				if renderer := getCustomHTMLRenderer(targetTableValues.Name); renderer != nil { // custom table renderer
+					sb.WriteString(renderer(targetTableValues, targetNames[targetIndex]))
 				} else {
 					sb.WriteString(DefaultHTMLTableRendererFunc(targetTableValues))
 				}
@@ -340,8 +388,8 @@ func createHtmlReportMultiTarget(allTargetsTableValues [][]TableValues, targetNa
 		// print the multi-target table, if any
 		if len(oneTableValuesForAllTargets) > 0 {
 			sb.WriteString(fmt.Sprintf("<h2 id=\"%[1]s\">%[1]s</h2>\n", html.EscapeString(oneTableValuesForAllTargets[0].Name)))
-			if oneTableValuesForAllTargets[0].HTMLMultiTargetTableRendererFunc != nil {
-				sb.WriteString(oneTableValuesForAllTargets[0].HTMLMultiTargetTableRendererFunc(oneTableValuesForAllTargets, targetNames))
+			if renderer := getCustomHTMLMultiTargetRenderer(oneTableValuesForAllTargets[0].Name); renderer != nil {
+				sb.WriteString(renderer(oneTableValuesForAllTargets, targetNames))
 			} else {
 				// render the multi-target table
 				sb.WriteString(RenderMultiTargetTableValuesAsHTML(oneTableValuesForAllTargets, targetNames))
@@ -361,7 +409,7 @@ func createHtmlReportMultiTarget(allTargetsTableValues [][]TableValues, targetNa
 }
 
 // findTableIndex
-func findTableIndex(tableValues []TableValues, tableName string) int {
+func findTableIndex(tableValues []table.TableValues, tableName string) int {
 	for i, tableValue := range tableValues {
 		if tableValue.Name == tableName {
 			return i
@@ -549,7 +597,7 @@ func renderHTMLTableWithDescriptions(tableHeaders []string, headerDescriptions [
 	return sb.String()
 }
 
-func DefaultHTMLTableRendererFunc(tableValues TableValues) string {
+func DefaultHTMLTableRendererFunc(tableValues table.TableValues) string {
 	if tableValues.HasRows { // print the field names as column headings across the top of the table
 		headers := []string{}
 		headerDescriptions := []string{}
@@ -581,8 +629,8 @@ func DefaultHTMLTableRendererFunc(tableValues TableValues) string {
 }
 
 // RenderMultiTargetTableValuesAsHTML renders a table for multiple targets
-// tableValues is a slice of TableValues, each of which represents the same table from a single target
-func RenderMultiTargetTableValuesAsHTML(tableValues []TableValues, targetNames []string) string {
+// tableValues is a slice of table.TableValues, each of which represents the same table from a single target
+func RenderMultiTargetTableValuesAsHTML(tableValues []table.TableValues, targetNames []string) string {
 	values := [][]string{}
 	var tableValueStyles [][]string
 	for fieldIndex, field := range tableValues[0].Fields {
@@ -604,51 +652,51 @@ func RenderMultiTargetTableValuesAsHTML(tableValues []TableValues, targetNames [
 }
 
 func dimmDetails(dimm []string) (details string) {
-	if strings.Contains(dimm[SizeIdx], "No") {
+	if strings.Contains(dimm[table.SizeIdx], "No") {
 		details = "No Module Installed"
 	} else {
 		// Intel PMEM modules may have serial number appended to end of part number...
 		// strip that off so it doesn't mess with color selection later
-		partNumber := dimm[PartIdx]
-		if strings.Contains(dimm[DetailIdx], "Synchronous Non-Volatile") &&
-			dimm[ManufacturerIdx] == "Intel" &&
-			strings.HasSuffix(dimm[PartIdx], dimm[SerialIdx]) {
-			partNumber = dimm[PartIdx][:len(dimm[PartIdx])-len(dimm[SerialIdx])]
+		partNumber := dimm[table.PartIdx]
+		if strings.Contains(dimm[table.DetailIdx], "Synchronous Non-Volatile") &&
+			dimm[table.ManufacturerIdx] == "Intel" &&
+			strings.HasSuffix(dimm[table.PartIdx], dimm[table.SerialIdx]) {
+			partNumber = dimm[table.PartIdx][:len(dimm[table.PartIdx])-len(dimm[table.SerialIdx])]
 		}
 		// example: "64GB DDR5 R2 Synchronous Registered (Buffered) Micron Technology MTC78ASF4G72PZ-2G6E1 6400 MT/s [6000 MT/s]"
 		details = fmt.Sprintf("%s %s %s R%s %s %s %s [%s]",
-			strings.ReplaceAll(dimm[SizeIdx], " ", ""),
-			dimm[TypeIdx],
-			dimm[DetailIdx],
-			dimm[RankIdx],
-			dimm[ManufacturerIdx],
+			strings.ReplaceAll(dimm[table.SizeIdx], " ", ""),
+			dimm[table.TypeIdx],
+			dimm[table.DetailIdx],
+			dimm[table.RankIdx],
+			dimm[table.ManufacturerIdx],
 			partNumber,
-			strings.ReplaceAll(dimm[SpeedIdx], " ", ""),
-			strings.ReplaceAll(dimm[ConfiguredSpeedIdx], " ", ""))
+			strings.ReplaceAll(dimm[table.SpeedIdx], " ", ""),
+			strings.ReplaceAll(dimm[table.ConfiguredSpeedIdx], " ", ""))
 	}
 	return
 }
 
-func dimmTableHTMLRenderer(tableValues TableValues, targetName string) string {
-	if tableValues.Fields[DerivedSocketIdx].Values[0] == "" || tableValues.Fields[DerivedChannelIdx].Values[0] == "" || tableValues.Fields[DerivedSlotIdx].Values[0] == "" {
+func dimmTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
+	if tableValues.Fields[table.DerivedSocketIdx].Values[0] == "" || tableValues.Fields[table.DerivedChannelIdx].Values[0] == "" || tableValues.Fields[table.DerivedSlotIdx].Values[0] == "" {
 		return DefaultHTMLTableRendererFunc(tableValues)
 	}
 	htmlColors := []string{"lightgreen", "orange", "aqua", "lime", "yellow", "beige", "magenta", "violet", "salmon", "pink"}
 	var slotColorIndices = make(map[string]int)
 	// socket -> channel -> slot -> dimm details
 	var dimms = map[string]map[string]map[string]string{}
-	for dimmIdx := range tableValues.Fields[DerivedSocketIdx].Values {
-		if _, ok := dimms[tableValues.Fields[DerivedSocketIdx].Values[dimmIdx]]; !ok {
-			dimms[tableValues.Fields[DerivedSocketIdx].Values[dimmIdx]] = make(map[string]map[string]string)
+	for dimmIdx := range tableValues.Fields[table.DerivedSocketIdx].Values {
+		if _, ok := dimms[tableValues.Fields[table.DerivedSocketIdx].Values[dimmIdx]]; !ok {
+			dimms[tableValues.Fields[table.DerivedSocketIdx].Values[dimmIdx]] = make(map[string]map[string]string)
 		}
-		if _, ok := dimms[tableValues.Fields[DerivedSocketIdx].Values[dimmIdx]][tableValues.Fields[DerivedChannelIdx].Values[dimmIdx]]; !ok {
-			dimms[tableValues.Fields[DerivedSocketIdx].Values[dimmIdx]][tableValues.Fields[DerivedChannelIdx].Values[dimmIdx]] = make(map[string]string)
+		if _, ok := dimms[tableValues.Fields[table.DerivedSocketIdx].Values[dimmIdx]][tableValues.Fields[table.DerivedChannelIdx].Values[dimmIdx]]; !ok {
+			dimms[tableValues.Fields[table.DerivedSocketIdx].Values[dimmIdx]][tableValues.Fields[table.DerivedChannelIdx].Values[dimmIdx]] = make(map[string]string)
 		}
 		dimmValues := []string{}
 		for _, field := range tableValues.Fields {
 			dimmValues = append(dimmValues, field.Values[dimmIdx])
 		}
-		dimms[tableValues.Fields[DerivedSocketIdx].Values[dimmIdx]][tableValues.Fields[DerivedChannelIdx].Values[dimmIdx]][tableValues.Fields[DerivedSlotIdx].Values[dimmIdx]] = dimmDetails(dimmValues)
+		dimms[tableValues.Fields[table.DerivedSocketIdx].Values[dimmIdx]][tableValues.Fields[table.DerivedChannelIdx].Values[dimmIdx]][tableValues.Fields[table.DerivedSlotIdx].Values[dimmIdx]] = dimmDetails(dimmValues)
 	}
 
 	var socketTableHeaders = []string{"Socket", ""}
@@ -840,7 +888,7 @@ func renderLineChart(xAxisLabels []string, data [][]float64, datasetNames []stri
 	return renderChart("line", allFormattedPoints, datasetNames, xAxisLabels, config, datasetHiddenFlags)
 }
 
-func renderFrequencyTable(tableValues TableValues) (out string) {
+func renderFrequencyTable(tableValues table.TableValues) (out string) {
 	var rows [][]string
 	headers := []string{""}
 	valuesStyles := [][]string{}
@@ -856,7 +904,7 @@ func renderFrequencyTable(tableValues TableValues) (out string) {
 	return
 }
 
-func coreTurboFrequencyTableHTMLRenderer(tableValues TableValues) string {
+func coreTurboFrequencyTableHTMLRenderer(tableValues table.TableValues) string {
 	data := [][]scatterPoint{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -894,15 +942,15 @@ func coreTurboFrequencyTableHTMLRenderer(tableValues TableValues) string {
 	return out
 }
 
-func frequencyBenchmarkTableHtmlRenderer(tableValues TableValues, targetName string) string {
+func frequencyBenchmarkTableHtmlRenderer(tableValues table.TableValues, targetName string) string {
 	return coreTurboFrequencyTableHTMLRenderer(tableValues)
 }
 
-func memoryBenchmarkTableHtmlRenderer(tableValues TableValues, targetName string) string {
-	return memoryBenchmarkTableMultiTargetHtmlRenderer([]TableValues{tableValues}, []string{targetName})
+func memoryBenchmarkTableHtmlRenderer(tableValues table.TableValues, targetName string) string {
+	return memoryBenchmarkTableMultiTargetHtmlRenderer([]table.TableValues{tableValues}, []string{targetName})
 }
 
-func memoryBenchmarkTableMultiTargetHtmlRenderer(allTableValues []TableValues, targetNames []string) string {
+func memoryBenchmarkTableMultiTargetHtmlRenderer(allTableValues []table.TableValues, targetNames []string) string {
 	data := [][]scatterPoint{}
 	datasetNames := []string{}
 	for targetIdx, tableValues := range allTableValues {
@@ -943,7 +991,7 @@ func getColor(idx int) string {
 	return colors[idx%len(colors)]
 }
 
-func telemetryTableHTMLRenderer(tableValues TableValues, data [][]float64, datasetNames []string, chartConfig chartTemplateStruct, datasetHiddenFlags []bool) string {
+func telemetryTableHTMLRenderer(tableValues table.TableValues, data [][]float64, datasetNames []string, chartConfig chartTemplateStruct, datasetHiddenFlags []bool) string {
 	tsFieldIdx := 0
 	var timestamps []string
 	for i := range tableValues.Fields[0].Values {
@@ -955,7 +1003,7 @@ func telemetryTableHTMLRenderer(tableValues TableValues, data [][]float64, datas
 	return renderLineChart(timestamps, data, datasetNames, chartConfig, datasetHiddenFlags)
 }
 
-func cpuUtilizationTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func cpuUtilizationTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
 	// collect the busy (100 - idle) values for each CPU
@@ -1004,7 +1052,7 @@ func cpuUtilizationTelemetryTableHTMLRenderer(tableValues TableValues, targetNam
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
-func utilizationCategoriesTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func utilizationCategoriesTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -1039,7 +1087,7 @@ func utilizationCategoriesTelemetryTableHTMLRenderer(tableValues TableValues, ta
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
-func irqRateTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func irqRateTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[2:] { // 1 data set per field, e.g., %usr, %nice, etc., skip Time and CPU fields
@@ -1082,7 +1130,7 @@ func irqRateTelemetryTableHTMLRenderer(tableValues TableValues, targetName strin
 // driveTelemetryTableHTMLRenderer renders charts of drive statistics
 // - one scatter chart per drive, showing the drive's utilization over time
 // - each drive stat is a separate dataset within the chart
-func driveTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func driveTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
 	var out string
 	driveStats := make(map[string][][]string)
 	for i := range tableValues.Fields[0].Values {
@@ -1140,7 +1188,7 @@ func driveTelemetryTableHTMLRenderer(tableValues TableValues, targetName string)
 // networkTelemetryTableHTMLRenderer renders charts of network device statistics
 // - one scatter chart per network device, showing the device's utilization over time
 // - each network stat is a separate dataset within the chart
-func networkTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func networkTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
 	var out string
 	nicStats := make(map[string][][]string)
 	for i := range tableValues.Fields[0].Values {
@@ -1195,7 +1243,7 @@ func networkTelemetryTableHTMLRenderer(tableValues TableValues, targetName strin
 	return out
 }
 
-func memoryTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func memoryTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -1230,7 +1278,7 @@ func memoryTelemetryTableHTMLRenderer(tableValues TableValues, targetName string
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
-func averageFrequencyTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func averageFrequencyTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -1265,7 +1313,7 @@ func averageFrequencyTelemetryTableHTMLRenderer(tableValues TableValues, targetN
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
-func powerTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func powerTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -1300,7 +1348,7 @@ func powerTelemetryTableHTMLRenderer(tableValues TableValues, targetName string)
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
-func temperatureTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func temperatureTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -1335,7 +1383,7 @@ func temperatureTelemetryTableHTMLRenderer(tableValues TableValues, targetName s
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
-func ipcTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func ipcTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -1370,7 +1418,7 @@ func ipcTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) s
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
-func c6TelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func c6TelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -1410,7 +1458,7 @@ func c6TelemetryTableHTMLRenderer(tableValues TableValues, targetName string) st
 // Categories with zero total usage are hidden by default.
 // Categories are sorted in two tiers: first, all non-zero categories are sorted alphabetically;
 // then, all zero-sum categories are sorted alphabetically and placed after the non-zero categories.
-func instructionTelemetryTableHTMLRenderer(tableValues TableValues, targetname string) string {
+func instructionTelemetryTableHTMLRenderer(tableValues table.TableValues, targetname string) string {
 	// Collect entries with their sums so we can sort per requirements
 	type instrEntry struct {
 		name   string
@@ -1473,18 +1521,18 @@ func instructionTelemetryTableHTMLRenderer(tableValues TableValues, targetname s
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, hiddenFlags)
 }
 
-func renderGaudiStatsChart(tableValues TableValues, chartStatFieldName string, titleText string, yAxisText string, suggestedMax string) string {
+func renderGaudiStatsChart(tableValues table.TableValues, chartStatFieldName string, titleText string, yAxisText string, suggestedMax string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
 	// timestamp is in the first field
 	// find the module_id field index
-	moduleIdFieldIdx, err := getFieldIndex("module_id", tableValues)
+	moduleIdFieldIdx, err := table.GetFieldIndex("module_id", tableValues)
 	if err != nil {
 		slog.Error("no gaudi module_id field found")
 		return ""
 	}
 	// find the chartStatFieldName field index
-	chartStatFieldIndex, err := getFieldIndex(chartStatFieldName, tableValues)
+	chartStatFieldIndex, err := table.GetFieldIndex(chartStatFieldName, tableValues)
 	if err != nil {
 		slog.Error("no gaudi chartStatFieldName field found")
 		return ""
@@ -1530,7 +1578,7 @@ func renderGaudiStatsChart(tableValues TableValues, chartStatFieldName string, t
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
-func gaudiTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func gaudiTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
 	out := ""
 	out += renderGaudiStatsChart(tableValues, "utilization.aip [%]", "Utilization", "% Utilization", "100")
 	out += renderGaudiStatsChart(tableValues, "memory.free [MiB]", "Memory Free", "Memory (MiB)", "0")
@@ -1540,7 +1588,7 @@ func gaudiTelemetryTableHTMLRenderer(tableValues TableValues, targetName string)
 	return out
 }
 
-func pduTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func pduTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
 	data := [][]float64{}
 	for _, field := range tableValues.Fields[1:] {
 		points := []float64{}
@@ -1577,7 +1625,7 @@ func pduTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) s
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
-func callStackFrequencyTableHTMLRenderer(tableValues TableValues, targetName string) string {
+func callStackFrequencyTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
 	out := `<style>
 
 /* Custom page header */
@@ -1606,7 +1654,7 @@ func callStackFrequencyTableHTMLRenderer(tableValues TableValues, targetName str
 	return out
 }
 
-func kernelLockAnalysisHTMLRenderer(tableValues TableValues, targetName string) string {
+func kernelLockAnalysisHTMLRenderer(tableValues table.TableValues, targetName string) string {
 	values := [][]string{}
 	var tableValueStyles [][]string
 	for _, field := range tableValues.Fields {

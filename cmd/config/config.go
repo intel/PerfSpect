@@ -13,6 +13,7 @@ import (
 	"perfspect/internal/progress"
 	"perfspect/internal/report"
 	"perfspect/internal/script"
+	"perfspect/internal/table"
 	"perfspect/internal/target"
 	"perfspect/internal/util"
 	"slices"
@@ -283,7 +284,7 @@ func setOnTarget(cmd *cobra.Command, myTarget target.Target, flagGroups []flagGr
 
 // getConfig collects the configuration data from the target(s)
 func getConfig(myTargets []target.Target, localTempDir string) ([]common.TargetScriptOutputs, error) {
-	scriptNames := report.GetScriptNamesForTable(report.ConfigurationTableName)
+	scriptNames := table.GetScriptNamesForTable(table.ConfigurationTableName)
 	var scriptsToRun []script.ScriptDefinition
 	for _, scriptName := range scriptNames {
 		scriptsToRun = append(scriptsToRun, script.GetScriptByName(scriptName))
@@ -317,7 +318,7 @@ func getConfig(myTargets []target.Target, localTempDir string) ([]common.TargetS
 	for _, target := range myTargets {
 		for _, targetScriptOutputs := range allTargetScriptOutputs {
 			if targetScriptOutputs.TargetName == target.GetName() {
-				targetScriptOutputs.TableNames = []string{report.ConfigurationTableName}
+				targetScriptOutputs.TableNames = []string{table.ConfigurationTableName}
 				orderedTargetScriptOutputs = append(orderedTargetScriptOutputs, targetScriptOutputs)
 				break
 			}
@@ -333,9 +334,9 @@ func processConfig(targetScriptOutputs []common.TargetScriptOutputs) (map[string
 	var err error
 	for _, targetScriptOutput := range targetScriptOutputs {
 		// process the tables, i.e., get field values from raw script output
-		tableNames := []string{report.ConfigurationTableName}
-		var tableValues []report.TableValues
-		if tableValues, err = report.ProcessTables(tableNames, targetScriptOutput.ScriptOutputs); err != nil {
+		tableNames := []string{table.ConfigurationTableName}
+		var tableValues []table.TableValues
+		if tableValues, err = table.ProcessTables(tableNames, targetScriptOutput.ScriptOutputs); err != nil {
 			err = fmt.Errorf("failed to process collected data: %v", err)
 			return nil, err
 		}

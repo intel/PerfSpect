@@ -3,7 +3,7 @@
 
 // table_helpers.go contains base helper functions that are used to extract values from the output of the scripts.
 
-package report
+package table
 
 import (
 	"regexp"

@@ -20,8 +20,8 @@ import (
 
 	"perfspect/internal/cpus"
 	"perfspect/internal/progress"
-	"perfspect/internal/report"
 	"perfspect/internal/script"
+	"perfspect/internal/table"
 	"perfspect/internal/target"
 )
 
@@ -526,7 +526,7 @@ func getMetadataScripts(noRoot bool, noSystemSummary bool, numGPCounters int) (m
 	}
 	// add the system summary table scripts to the list
 	if !noSystemSummary {
-		table := report.GetTableByName(report.BriefSysSummaryTableName)
+		table := table.GetTableByName(table.BriefSysSummaryTableName)
 		for _, scriptName := range table.ScriptNames {
 			scriptDef := script.GetScriptByName(scriptName)
 			metadataScripts = append(metadataScripts, scriptDef)
@@ -609,8 +609,8 @@ func ReadJSONFromFile(path string) (md Metadata, err error) {
 
 // getSystemSummary - retrieves the system summary from the target
 func getSystemSummary(scriptOutputs map[string]script.ScriptOutput) (summaryFields [][]string, err error) {
-	var allTableValues []report.TableValues
-	allTableValues, err = report.ProcessTables([]string{report.BriefSysSummaryTableName}, scriptOutputs)
+	var allTableValues []table.TableValues
+	allTableValues, err = table.ProcessTables([]string{table.BriefSysSummaryTableName}, scriptOutputs)
 	if err != nil {
 		err = fmt.Errorf("failed to process script outputs: %w", err)
 		return
