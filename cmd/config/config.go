@@ -284,9 +284,9 @@ func setOnTarget(cmd *cobra.Command, myTarget target.Target, flagGroups []flagGr
 
 // getConfig collects the configuration data from the target(s)
 func getConfig(myTargets []target.Target, localTempDir string) ([]common.TargetScriptOutputs, error) {
-	scriptNames := table.GetScriptNamesForTable(table.ConfigurationTableName)
+
 	var scriptsToRun []script.ScriptDefinition
-	for _, scriptName := range scriptNames {
+	for _, scriptName := range tableDefinitions[ConfigurationTableName].ScriptNames {
 		scriptsToRun = append(scriptsToRun, script.GetScriptByName(scriptName))
 	}
 	multiSpinner := progress.NewMultiSpinner()
@@ -318,7 +318,6 @@ func getConfig(myTargets []target.Target, localTempDir string) ([]common.TargetS
 	for _, target := range myTargets {
 		for _, targetScriptOutputs := range allTargetScriptOutputs {
 			if targetScriptOutputs.TargetName == target.GetName() {
-				targetScriptOutputs.TableNames = []string{table.ConfigurationTableName}
 				orderedTargetScriptOutputs = append(orderedTargetScriptOutputs, targetScriptOutputs)
 				break
 			}
@@ -334,15 +333,17 @@ func processConfig(targetScriptOutputs []common.TargetScriptOutputs) (map[string
 	var err error
 	for _, targetScriptOutput := range targetScriptOutputs {
 		// process the tables, i.e., get field values from raw script output
-		tableNames := []string{table.ConfigurationTableName}
+		tables := []table.TableDefinition{tableDefinitions[ConfigurationTableName]}
 		var tableValues []table.TableValues
-		if tableValues, err = table.ProcessTables(tableNames, targetScriptOutput.ScriptOutputs); err != nil {
+		if tableValues, err = table.ProcessTables(tables, targetScriptOutput.ScriptOutputs); err != nil {
 			err = fmt.Errorf("failed to process collected data: %v", err)
 			return nil, err
 		}
 		// create the report for this single table
 		var reportBytes []byte
-		if reportBytes, err = report.Create("txt", tableValues, targetScriptOutput.TargetName); err != nil {
+		report.RegisterTextRenderer(ConfigurationTableName, configurationTableTextRenderer)
+
+		if reportBytes, err = report.Create("txt", tableValues, targetScriptOutput.TargetName, ""); err != nil {
 			err = fmt.Errorf("failed to create report: %v", err)
 			return nil, err
 		}

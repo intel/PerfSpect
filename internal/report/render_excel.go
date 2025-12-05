@@ -52,7 +52,7 @@ func renderXlsxTable(tableValues table.TableValues, f *excelize.File, sheetName 
 	_ = f.SetCellStyle(sheetName, cellName(col, *row), cellName(col, *row), tableNameStyle)
 	*row++
 	if len(tableValues.Fields) == 0 || len(tableValues.Fields[0].Values) == 0 {
-		msg := noDataFound
+		msg := NoDataFound
 		if tableValues.NoDataFound != "" {
 			msg = tableValues.NoDataFound
 		}
@@ -128,7 +128,7 @@ func renderXlsxTableMultiTarget(targetTableValues []table.TableValues, targetNam
 
 			// if no data found, print a message and skip to the next target
 			if len(targetTableValues[targetIdx].Fields) == 0 || len(targetTableValues[targetIdx].Fields[0].Values) == 0 {
-				msg := noDataFound
+				msg := NoDataFound
 				if targetTableValues[targetIdx].NoDataFound != "" {
 					msg = targetTableValues[targetIdx].NoDataFound
 				}
@@ -223,7 +223,7 @@ const (
 	XlsxBriefSheetName   = "Brief"
 )
 
-func createXlsxReport(allTableValues []table.TableValues) (out []byte, err error) {
+func createXlsxReport(allTableValues []table.TableValues, systemSummaryTableName string) (out []byte, err error) {
 	f := excelize.NewFile()
 	sheetName := XlsxPrimarySheetName
 	_ = f.SetSheetName("Sheet1", sheetName)
@@ -231,7 +231,7 @@ func createXlsxReport(allTableValues []table.TableValues) (out []byte, err error
 	_ = f.SetColWidth(sheetName, "B", "L", 25)
 	row := 1
 	for _, tableValues := range allTableValues {
-		if tableValues.Name == table.SystemSummaryTableName {
+		if tableValues.Name == systemSummaryTableName {
 			row := 1
 			sheetName := XlsxBriefSheetName
 			_, _ = f.NewSheet(sheetName)
@@ -252,7 +252,7 @@ func createXlsxReport(allTableValues []table.TableValues) (out []byte, err error
 	return
 }
 
-func createXlsxReportMultiTarget(allTargetsTableValues [][]table.TableValues, targetNames []string, allTableNames []string) (out []byte, err error) {
+func createXlsxReportMultiTarget(allTargetsTableValues [][]table.TableValues, targetNames []string, allTableNames []string, systemSummaryTableName string) (out []byte, err error) {
 	f := excelize.NewFile()
 	sheetName := XlsxPrimarySheetName
 	_ = f.SetSheetName("Sheet1", sheetName)
@@ -274,7 +274,7 @@ func createXlsxReportMultiTarget(allTargetsTableValues [][]table.TableValues, ta
 			tableValues = append(tableValues, targetTableValues[tableIndex])
 		}
 		// render the table, if system summary table put it in a separate sheet
-		if tableName == table.SystemSummaryTableName {
+		if tableName == systemSummaryTableName {
 			summaryRow := 1
 			sheetName := XlsxBriefSheetName
 			_, _ = f.NewSheet(sheetName)

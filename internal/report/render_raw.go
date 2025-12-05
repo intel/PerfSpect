@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"perfspect/internal/script"
+	"perfspect/internal/table"
 	"strings"
 )
 
@@ -21,7 +22,11 @@ type RawReport struct {
 // CreateRawReport creates a raw report with the specified table names, script outputs, and target name.
 // It marshals the report into a JSON format with indentation for readability.
 // The function returns the JSON byte slice and any error encountered during the process.
-func CreateRawReport(tableNames []string, scriptOutputs map[string]script.ScriptOutput, targetName string) (out []byte, err error) {
+func CreateRawReport(tables []table.TableDefinition, scriptOutputs map[string]script.ScriptOutput, targetName string) (out []byte, err error) {
+	tableNames := []string{}
+	for _, tbl := range tables {
+		tableNames = append(tableNames, tbl.Name)
+	}
 	report := RawReport{
 		TargetName:    targetName,
 		TableNames:    tableNames,

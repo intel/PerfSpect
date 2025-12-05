@@ -1,4 +1,4 @@
-package table
+package common
 
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
@@ -27,7 +27,7 @@ func GetL3MSRMB(outputs map[string]script.ScriptOutput) (instance float64, total
 		err = fmt.Errorf("L3 cache way count is zero")
 		return 0, 0, err
 	}
-	sockets := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)
+	sockets := ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)
 	if sockets == "" {
 		return 0, 0, fmt.Errorf("failed to parse sockets from lscpu output")
 	}
@@ -69,7 +69,7 @@ func GetL3MSRMB(outputs map[string]script.ScriptOutput) (instance float64, total
 
 // GetL3LscpuMB returns the L3 cache size in MB as reported by lscpu.
 func GetL3LscpuMB(outputs map[string]script.ScriptOutput) (instance float64, total float64, err error) {
-	lscpuCache, err := parseLscpuCacheOutput(outputs[script.LscpuCacheScriptName].Stdout)
+	lscpuCache, err := ParseLscpuCacheOutput(outputs[script.LscpuCacheScriptName].Stdout)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -88,11 +88,11 @@ func GetL3LscpuMB(outputs map[string]script.ScriptOutput) (instance float64, tot
 	return instance, total, nil
 }
 
-// l3FromOutput attempts to retrieve the L3 cache size in megabytes from the provided
+// L3FromOutput attempts to retrieve the L3 cache size in megabytes from the provided
 // script outputs. It first tries to obtain the value using GetL3MSRMB. If that fails,
 // it falls back to using lscpu cache output. If both methods fail, it logs the errors and
 // returns an empty string. On success, it returns the formatted cache size as a string.
-func l3FromOutput(outputs map[string]script.ScriptOutput) string {
+func L3FromOutput(outputs map[string]script.ScriptOutput) string {
 	l3InstanceMB, l3TotalMB, err := GetL3MSRMB(outputs)
 	if err != nil {
 		slog.Info("Could not get L3 size from MSR, falling back to lscpu", slog.String("error", err.Error()))
@@ -102,24 +102,10 @@ func l3FromOutput(outputs map[string]script.ScriptOutput) string {
 			return ""
 		}
 	}
-	return fmt.Sprintf("%s/%s", formatCacheSizeMB(l3InstanceMB), formatCacheSizeMB(l3TotalMB))
+	return fmt.Sprintf("%s/%s", FormatCacheSizeMB(l3InstanceMB), FormatCacheSizeMB(l3TotalMB))
 }
 
-// l3InstanceFromOutput retrieves the L3 cache size per instance (per socket on Intel) in megabytes
-func l3InstanceFromOutput(outputs map[string]script.ScriptOutput) string {
-	l3InstanceMB, _, err := GetL3MSRMB(outputs)
-	if err != nil {
-		slog.Info("Could not get L3 size from MSR, falling back to lscpu", slog.String("error", err.Error()))
-		l3InstanceMB, _, err = GetL3LscpuMB(outputs)
-		if err != nil {
-			slog.Error("Could not get L3 size from lscpu", slog.String("error", err.Error()))
-			return ""
-		}
-	}
-	return formatCacheSizeMB(l3InstanceMB)
-}
-
-// l3PerCoreFromOutput calculates the amount of L3 cache (in MiB) available per core
+// L3PerCoreFromOutput calculates the amount of L3 cache (in MiB) available per core
 // based on the provided script outputs. It first checks if the host is virtualized,
 // in which case it returns an empty string since the calculation is not applicable.
 // It parses the number of cores per socket and the number of sockets from the lscpu
@@ -127,13 +113,13 @@ func l3InstanceFromOutput(outputs map[string]script.ScriptOutput) string {
 // back to parsing lscpu output if necessary. The result is formatted as a string
 // with up to three decimal places, followed by " MiB". If any required data cannot
 // be parsed, it logs an error and returns an empty string.
-func l3PerCoreFromOutput(outputs map[string]script.ScriptOutput) string {
-	virtualization := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Virtualization.*:\s*(.+?)$`)
+func L3PerCoreFromOutput(outputs map[string]script.ScriptOutput) string {
+	virtualization := ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Virtualization.*:\s*(.+?)$`)
 	if virtualization == "full" {
 		slog.Info("Can't calculate L3 per Core on virtualized host.")
 		return ""
 	}
-	coresPerSocket, err := strconv.Atoi(valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket.*:\s*(.+?)$`))
+	coresPerSocket, err := strconv.Atoi(ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket.*:\s*(.+?)$`))
 	if err != nil {
 		slog.Error("failed to parse cores per socket", slog.String("error", err.Error()))
 		return ""
@@ -142,7 +128,7 @@ func l3PerCoreFromOutput(outputs map[string]script.ScriptOutput) string {
 		slog.Error("cores per socket is zero")
 		return ""
 	}
-	sockets, err := strconv.Atoi(valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+?)$`))
+	sockets, err := strconv.Atoi(ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+?)$`))
 	if err != nil {
 		slog.Error("failed to parse sockets from lscpu output", slog.String("error", err.Error()))
 		return ""
@@ -161,12 +147,12 @@ func l3PerCoreFromOutput(outputs map[string]script.ScriptOutput) string {
 			return ""
 		}
 	}
-	return formatCacheSizeMB(l3TotalMB / (float64(coresPerSocket) * float64(sockets)))
+	return FormatCacheSizeMB(l3TotalMB / (float64(coresPerSocket) * float64(sockets)))
 }
 
-// formatCacheSizeMB formats a floating-point cache size value (in MB) as a string
+// FormatCacheSizeMB formats a floating-point cache size value (in MB) as a string
 // with the "M" unit suffix.
-func formatCacheSizeMB(size float64) string {
+func FormatCacheSizeMB(size float64) string {
 	val := strconv.FormatFloat(size, 'f', 3, 64)
 	val = strings.TrimRight(val, "0") // trim trailing zeros
 	val = strings.TrimRight(val, ".") // trim decimal point if trailing
@@ -185,14 +171,14 @@ type lscpuCacheEntry struct {
 	CoherencySize string
 }
 
-// parseLscpuCacheOutput parses the output of `lscpu -C` (text/tabular)
+// ParseLscpuCacheOutput parses the output of `lscpu -C` (text/tabular)
 // Example output:
 // NAME ONE-SIZE ALL-SIZE WAYS TYPE        LEVEL   SETS PHY-LINE COHERENCY-SIZE
 // L1d       48K     8.1M   12 Data            1     64        1             64
 // L1i       64K    10.8M   16 Instruction     1     64        1             64
 // L2         2M     344M   16 Unified         2   2048        1             64
 // L3       336M     672M   16 Unified         3 344064        1             64
-func parseLscpuCacheOutput(LscpuCacheOutput string) (map[string]lscpuCacheEntry, error) {
+func ParseLscpuCacheOutput(LscpuCacheOutput string) (map[string]lscpuCacheEntry, error) {
 	trimmed := strings.TrimSpace(LscpuCacheOutput)
 	if trimmed == "" {
 		slog.Warn("lscpu cache output is empty")
@@ -258,8 +244,8 @@ func parseLscpuCacheOutput(LscpuCacheOutput string) (map[string]lscpuCacheEntry,
 	return out, nil
 }
 
-// l1l2CacheSizeFromLscpuCache extracts the data cache size from the provided lscpuCacheEntry.
-func l1l2CacheSizeFromLscpuCache(entry lscpuCacheEntry) string {
+// L1l2CacheSizeFromLscpuCache extracts the data cache size from the provided lscpuCacheEntry.
+func L1l2CacheSizeFromLscpuCache(entry lscpuCacheEntry) string {
 	return entry.OneSize
 }
 

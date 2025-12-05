@@ -1,7 +1,7 @@
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
-package table
+package report
 
 import (
 	"log/slog"
@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"perfspect/internal/common"
 	"perfspect/internal/script"
 )
 
@@ -142,7 +143,7 @@ type GPU struct {
 
 func gpuInfoFromOutput(outputs map[string]script.ScriptOutput) []GPU {
 	gpus := []GPU{}
-	gpusLshw := valsArrayFromRegexSubmatch(outputs[script.LshwScriptName].Stdout, `^pci.*?\s+display\s+(\w+).*?\s+\[(\w+):(\w+)]$`)
+	gpusLshw := common.ValsArrayFromRegexSubmatch(outputs[script.LshwScriptName].Stdout, `^pci.*?\s+display\s+(\w+).*?\s+\[(\w+):(\w+)]$`)
 	idxMfgName := 0
 	idxMfgID := 1
 	idxDevID := 2
@@ -206,7 +207,7 @@ func gaudiInfoFromOutput(outputs map[string]script.ScriptOutput) []Gaudi {
 		gaudis[i].Microarchitecture = strings.TrimSpace(outputs[script.GaudiArchitectureScriptName].Stdout)
 	}
 	// get NUMA affinity
-	numaAffinities := valsArrayFromRegexSubmatch(outputs[script.GaudiNumaScriptName].Stdout, `^(\d+)\s+(\d+)\s+$`)
+	numaAffinities := common.ValsArrayFromRegexSubmatch(outputs[script.GaudiNumaScriptName].Stdout, `^(\d+)\s+(\d+)\s+$`)
 	if len(numaAffinities) != len(gaudis) {
 		slog.Error("number of gaudis in gaudi info and numa output do not match", slog.Int("gaudis", len(gaudis)), slog.Int("numaAffinities", len(numaAffinities)))
 		return nil

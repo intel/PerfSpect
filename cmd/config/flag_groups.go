@@ -6,7 +6,6 @@ package config
 import (
 	"fmt"
 	"perfspect/internal/common"
-	"perfspect/internal/table"
 	"perfspect/internal/target"
 	"regexp"
 	"slices"
@@ -193,7 +192,7 @@ func initializeFlags(cmd *cobra.Command) {
 	flagGroups = append(flagGroups, group)
 	// prefetcher options
 	group = flagGroup{name: flagGroupPrefetcherName, flags: []flagDefinition{}}
-	for _, pref := range table.GetPrefetcherDefinitions() {
+	for _, pref := range common.GetPrefetcherDefinitions() {
 		group.flags = append(group.flags,
 			newStringFlag(cmd,
 				// flag name

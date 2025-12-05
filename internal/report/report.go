@@ -19,7 +19,7 @@ const (
 	FormatAll  = "all"
 )
 
-const noDataFound = "No data found."
+const NoDataFound = "No data found."
 
 var FormatOptions = []string{FormatHtml, FormatXlsx, FormatJson, FormatTxt}
 
@@ -36,7 +36,7 @@ var FormatOptions = []string{FormatHtml, FormatXlsx, FormatJson, FormatTxt}
 // Returns:
 // - out: The generated report as a byte slice.
 // - err: An error, if any occurred during report generation.
-func Create(format string, allTableValues []table.TableValues, targetName string) (out []byte, err error) {
+func Create(format string, allTableValues []table.TableValues, targetName string, systemSummaryTableName string) (out []byte, err error) {
 	// make sure that all fields have the same number of values
 	for _, tableValue := range allTableValues {
 		numRows := -1
@@ -59,7 +59,7 @@ func Create(format string, allTableValues []table.TableValues, targetName string
 	case FormatHtml:
 		return createHtmlReport(allTableValues, targetName)
 	case FormatXlsx:
-		return createXlsxReport(allTableValues)
+		return createXlsxReport(allTableValues, systemSummaryTableName)
 	}
 	panic(fmt.Sprintf("expected one of %s, got %s", strings.Join(FormatOptions, ", "), format))
 }
@@ -77,12 +77,12 @@ func Create(format string, allTableValues []table.TableValues, targetName string
 // - err: An error if the report generation fails.
 //
 // Note: If an unsupported format is provided, the function will panic.
-func CreateMultiTarget(format string, allTargetsTableValues [][]table.TableValues, targetNames []string, allTableNames []string) (out []byte, err error) {
+func CreateMultiTarget(format string, allTargetsTableValues [][]table.TableValues, targetNames []string, allTableNames []string, systemSummaryTableName string) (out []byte, err error) {
 	switch format {
 	case "html":
 		return createHtmlReportMultiTarget(allTargetsTableValues, targetNames, allTableNames)
 	case "xlsx":
-		return createXlsxReportMultiTarget(allTargetsTableValues, targetNames, allTableNames)
+		return createXlsxReportMultiTarget(allTargetsTableValues, targetNames, allTableNames, systemSummaryTableName)
 	}
 	panic("only HTML and XLSX multi-target report supported currently")
 }

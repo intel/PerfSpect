@@ -1,7 +1,7 @@
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
-package table
+package common
 
 import (
 	"fmt"
@@ -29,7 +29,7 @@ type diskInfo struct {
 	MaxLinkWidth     string
 }
 
-func diskInfoFromOutput(outputs map[string]script.ScriptOutput) []diskInfo {
+func DiskInfoFromOutput(outputs map[string]script.ScriptOutput) []diskInfo {
 	diskInfos := []diskInfo{}
 	for i, line := range strings.Split(outputs[script.DiskInfoScriptName].Stdout, "\n") {
 		// first line is the header
@@ -71,55 +71,8 @@ func diskInfoFromOutput(outputs map[string]script.ScriptOutput) []diskInfo {
 	return diskInfos
 }
 
-func filesystemFieldValuesFromOutput(outputs map[string]script.ScriptOutput) []Field {
-	fieldValues := []Field{}
-	reFindmnt := regexp.MustCompile(`(.*)\s(.*)\s(.*)\s(.*)`)
-	for i, line := range strings.Split(outputs[script.DfScriptName].Stdout, "\n") {
-		if line == "" {
-			continue
-		}
-		fields := strings.Fields(line)
-		// "Mounted On" gets split into two fields, rejoin
-		if i == 0 && fields[len(fields)-2] == "Mounted" && fields[len(fields)-1] == "on" {
-			fields[len(fields)-2] = "Mounted on"
-			fields = fields[:len(fields)-1]
-			for _, field := range fields {
-				fieldValues = append(fieldValues, Field{Name: field, Values: []string{}})
-			}
-			// add an additional field
-			fieldValues = append(fieldValues, Field{Name: "Mount Options", Values: []string{}})
-			continue
-		}
-		if len(fields) != len(fieldValues)-1 {
-			slog.Error("unexpected number of fields in df output", slog.String("line", line))
-			return nil
-		}
-		for i, field := range fields {
-			fieldValues[i].Values = append(fieldValues[i].Values, field)
-		}
-		// get mount options for the current file system
-		var options string
-		for i, line := range strings.Split(outputs[script.FindMntScriptName].Stdout, "\n") {
-			if i == 0 {
-				continue
-			}
-			match := reFindmnt.FindStringSubmatch(line)
-			if match != nil {
-				target := match[1]
-				source := match[2]
-				if fields[0] == source && fields[5] == target {
-					options = match[4]
-					break
-				}
-			}
-		}
-		fieldValues[len(fieldValues)-1].Values = append(fieldValues[len(fieldValues)-1].Values, options)
-	}
-	return fieldValues
-}
-
-func diskSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
-	disks := diskInfoFromOutput(outputs)
+func DiskSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
+	disks := DiskInfoFromOutput(outputs)
 	if len(disks) == 0 {
 		return "N/A"
 	}

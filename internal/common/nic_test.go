@@ -1,10 +1,9 @@
-package table
+package common
 
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
 import (
-	"perfspect/internal/script"
 	"testing"
 )
 
@@ -183,7 +182,7 @@ tx-usecs: 1
 Adaptive RX: off  TX: off
 ----------------------------------------`
 
-	nics := parseNicInfo(sampleOutput)
+	nics := ParseNicInfo(sampleOutput)
 
 	if len(nics) != 4 {
 		t.Fatalf("Expected 4 NICs, got %d", len(nics))
@@ -215,91 +214,8 @@ Adaptive RX: off  TX: off
 	}
 }
 
-func TestNicTableValuesWithCardPort(t *testing.T) {
-	// Sample output simulating the scenario from the issue
-	sampleOutput := `Interface: eth2
-bus-info: 0000:32:00.0
-Vendor: Intel Corporation
-Model: Ethernet Controller 10G X550T
-Speed: 1000Mb/s
-Link detected: yes
-----------------------------------------
-Interface: eth3
-bus-info: 0000:32:00.1
-Vendor: Intel Corporation
-Model: Ethernet Controller 10G X550T
-Speed: Unknown!
-Link detected: no
-----------------------------------------
-Interface: eth0
-bus-info: 0000:c0:00.0
-Vendor: Intel Corporation
-Model: Ethernet Controller E810-C for QSFP
-Speed: 100000Mb/s
-Link detected: yes
-----------------------------------------
-Interface: eth1
-bus-info: 0000:c0:00.1
-Vendor: Intel Corporation
-Model: Ethernet Controller E810-C for QSFP
-Speed: 100000Mb/s
-Link detected: yes
-----------------------------------------`
-
-	outputs := map[string]script.ScriptOutput{
-		script.NicInfoScriptName: {Stdout: sampleOutput},
-	}
-
-	fields := nicTableValues(outputs)
-
-	// Find the "Card / Port" field
-	var cardPortField Field
-	found := false
-	for _, field := range fields {
-		if field.Name == "Card / Port" {
-			cardPortField = field
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		t.Fatal("Card / Port field not found in NIC table")
-	}
-
-	// Verify we have 4 entries
-	if len(cardPortField.Values) != 4 {
-		t.Fatalf("Expected 4 Card / Port values, got %d", len(cardPortField.Values))
-	}
-
-	// Find the Name field to match values
-	var nameField Field
-	for _, field := range fields {
-		if field.Name == "Name" {
-			nameField = field
-			break
-		}
-	}
-
-	// Verify card/port assignments
-	expectedCardPort := map[string]string{
-		"eth2": "1 / 1",
-		"eth3": "1 / 2",
-		"eth0": "2 / 1",
-		"eth1": "2 / 2",
-	}
-
-	for i, name := range nameField.Values {
-		expected := expectedCardPort[name]
-		actual := cardPortField.Values[i]
-		if actual != expected {
-			t.Errorf("NIC %s: expected Card / Port %q, got %q", name, expected, actual)
-		}
-	}
-}
-
 func TestParseNicInfo(t *testing.T) {
-	nics := parseNicInfo(nicinfo)
+	nics := ParseNicInfo(nicinfo)
 	if len(nics) != 3 {
 		t.Errorf("expected 3 NICs, got %d", len(nics))
 	}
@@ -435,7 +351,7 @@ rx-usecs: 50
 tx-usecs: 50
 ----------------------------------------
 `
-	nics := parseNicInfo(nicinfoWithVF)
+	nics := ParseNicInfo(nicinfoWithVF)
 	if len(nics) != 2 {
 		t.Fatalf("expected 2 NICs, got %d", len(nics))
 	}

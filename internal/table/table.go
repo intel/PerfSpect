@@ -58,17 +58,8 @@ type TableDefinition struct {
 	InsightsFunc InsightsRetriever
 }
 
-// GetTableByName retrieves a table definition by its name.
-func GetTableByName(name string) TableDefinition {
-	if table, ok := tableDefinitions[name]; ok {
-		return table
-	}
-	panic(fmt.Sprintf("table not found: %s", name))
-}
-
 // IsTableForTarget checks if the given table is applicable for the specified target
-func IsTableForTarget(tableName string, myTarget target.Target) bool {
-	table := GetTableByName(tableName)
+func IsTableForTarget(table TableDefinition, myTarget target.Target) bool {
 	if len(table.Architectures) > 0 {
 		architecture, err := myTarget.GetArchitecture()
 		if err != nil {
@@ -120,19 +111,11 @@ func IsTableForTarget(tableName string, myTarget target.Target) bool {
 // ProcessTables processes the given tables and script outputs to generate table values.
 // It collects values for each field in the tables and returns a slice of TableValues.
 // If any error occurs during processing, it is returned along with the table values.
-func ProcessTables(tableNames []string, scriptOutputs map[string]script.ScriptOutput) (allTableValues []TableValues, err error) {
-	for _, tableName := range tableNames {
-		allTableValues = append(allTableValues, GetValuesForTable(tableName, scriptOutputs))
+func ProcessTables(tables []TableDefinition, scriptOutputs map[string]script.ScriptOutput) (allTableValues []TableValues, err error) {
+	for _, table := range tables {
+		allTableValues = append(allTableValues, GetValuesForTable(table, scriptOutputs))
 	}
 	return
-}
-
-// GetScriptNamesForTable returns the script names required to generate the table with the given name
-func GetScriptNamesForTable(name string) []string {
-	if _, ok := tableDefinitions[name]; !ok {
-		panic(fmt.Sprintf("table not found: %s", name))
-	}
-	return tableDefinitions[name].ScriptNames
 }
 
 // GetFieldIndex returns the index of a field with the given name in the TableValues structure.
@@ -152,27 +135,22 @@ func GetFieldIndex(fieldName string, tableValues TableValues) (int, error) {
 }
 
 // GetValuesForTable returns the fields and their values for the table with the given name
-func GetValuesForTable(name string, outputs map[string]script.ScriptOutput) TableValues {
-	// if table with given name doesn't exist, panic
-	if _, ok := tableDefinitions[name]; !ok {
-		panic(fmt.Sprintf("table not found: %s", name))
-	}
-	table := tableDefinitions[name]
+func GetValuesForTable(table TableDefinition, outputs map[string]script.ScriptOutput) TableValues {
 	// ValuesFunc can't be nil
 	if table.FieldsFunc == nil {
-		panic(fmt.Sprintf("table %s, ValuesFunc cannot be nil", name))
+		panic(fmt.Sprintf("table %s, ValuesFunc cannot be nil", table.Name))
 	}
 	// call the table's FieldsFunc to get the table's fields and values
 	fields := table.FieldsFunc(outputs)
 	tableValues := TableValues{
-		TableDefinition: tableDefinitions[name],
+		TableDefinition: table,
 		Fields:          fields,
 	}
 	// sanity check
 	if err := validateTableValues(tableValues); err != nil {
-		slog.Error("table validation failed", "table", name, "error", err)
+		slog.Error("table validation failed", "table", table.Name, "error", err)
 		return TableValues{
-			TableDefinition: tableDefinitions[name],
+			TableDefinition: table,
 			Fields:          []Field{},
 		}
 	}

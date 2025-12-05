@@ -1,20 +1,21 @@
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
-package table
+package report
 
 import (
 	"fmt"
 	"sort"
 	"strings"
 
+	"perfspect/internal/common"
 	"perfspect/internal/script"
 )
 
 func cveInfoFromOutput(outputs map[string]script.ScriptOutput) [][]string {
 	vulns := make(map[string]string)
 	// from spectre-meltdown-checker
-	for _, pair := range valsArrayFromRegexSubmatch(outputs[script.CveScriptName].Stdout, `(CVE-\d+-\d+): (.+)`) {
+	for _, pair := range common.ValsArrayFromRegexSubmatch(outputs[script.CveScriptName].Stdout, `(CVE-\d+-\d+): (.+)`) {
 		vulns[pair[0]] = pair[1]
 	}
 	// sort the vulnerabilities by CVE ID

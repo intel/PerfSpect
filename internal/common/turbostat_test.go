@@ -1,4 +1,4 @@
-package table
+package common
 
 import (
 	"reflect"
@@ -120,7 +120,7 @@ func TestTurbostatPlatformRows(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := turbostatPlatformRows(tt.turbostatOutput, tt.fieldNames)
+			got, err := TurbostatPlatformRows(tt.turbostatOutput, tt.fieldNames)
 			if (err != nil) != tt.expectErr {
 				t.Errorf("turbostatSummaryRows() error = %v, expectErr %v", err, tt.expectErr)
 				return
@@ -243,7 +243,7 @@ Package Core    CPU     PkgWatt
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := maxTotalPackagePowerFromOutput(tt.turbostatOutput)
+			got := MaxTotalPackagePowerFromOutput(tt.turbostatOutput)
 			if got != tt.want {
 				t.Errorf("maxTotalPackagePowerFromOutput() = %q, want %q", got, tt.want)
 			}
@@ -335,7 +335,7 @@ Package Core    CPU     PkgWatt
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := minTotalPackagePowerFromOutput(tt.turbostatOutput)
+			got := MinTotalPackagePowerFromOutput(tt.turbostatOutput)
 			if got != tt.want {
 				t.Errorf("minTotalPackagePowerFromOutput() = %q, want %q", got, tt.want)
 			}
@@ -426,7 +426,7 @@ Package Core    CPU     PkgTmp
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := maxPackageTemperatureFromOutput(tt.turbostatOutput)
+			got := MaxPackageTemperatureFromOutput(tt.turbostatOutput)
 			if got != tt.want {
 				t.Errorf("maxPackageTemperatureFromOutput() = %q, want %q", got, tt.want)
 			}
@@ -564,7 +564,7 @@ Package Core    CPU     Avg_MHz Busy%
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := turbostatPackageRows(tt.turbostatOutput, tt.fieldNames)
+			got, err := TurbostatPackageRows(tt.turbostatOutput, tt.fieldNames)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("turbostatPackageRows() error = %v, wantErr %v", err, tt.wantErr)
 				return

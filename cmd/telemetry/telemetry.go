@@ -96,17 +96,17 @@ const (
 var telemetrySummaryTableName = "Telemetry Summary"
 
 var categories = []common.Category{
-	{FlagName: flagCPUName, FlagVar: &flagCPU, DefaultValue: false, Help: "monitor cpu utilization", TableNames: []string{table.CPUUtilizationTelemetryTableName, table.UtilizationCategoriesTelemetryTableName}},
-	{FlagName: flagIPCName, FlagVar: &flagIPC, DefaultValue: false, Help: "monitor IPC", TableNames: []string{table.IPCTelemetryTableName}},
-	{FlagName: flagC6Name, FlagVar: &flagC6, DefaultValue: false, Help: "monitor C6 residency", TableNames: []string{table.C6TelemetryTableName}},
-	{FlagName: flagFrequencyName, FlagVar: &flagFrequency, DefaultValue: false, Help: "monitor cpu frequency", TableNames: []string{table.FrequencyTelemetryTableName}},
-	{FlagName: flagPowerName, FlagVar: &flagPower, DefaultValue: false, Help: "monitor power", TableNames: []string{table.PowerTelemetryTableName}},
-	{FlagName: flagTemperatureName, FlagVar: &flagTemperature, DefaultValue: false, Help: "monitor temperature", TableNames: []string{table.TemperatureTelemetryTableName}},
-	{FlagName: flagMemoryName, FlagVar: &flagMemory, DefaultValue: false, Help: "monitor memory", TableNames: []string{table.MemoryTelemetryTableName}},
-	{FlagName: flagNetworkName, FlagVar: &flagNetwork, DefaultValue: false, Help: "monitor network", TableNames: []string{table.NetworkTelemetryTableName}},
-	{FlagName: flagStorageName, FlagVar: &flagStorage, DefaultValue: false, Help: "monitor storage", TableNames: []string{table.DriveTelemetryTableName}},
-	{FlagName: flagIRQRateName, FlagVar: &flagIRQRate, DefaultValue: false, Help: "monitor IRQ rate", TableNames: []string{table.IRQRateTelemetryTableName}},
-	{FlagName: flagInstrMixName, FlagVar: &flagInstrMix, DefaultValue: false, Help: "monitor instruction mix", TableNames: []string{table.InstructionTelemetryTableName}},
+	{FlagName: flagCPUName, FlagVar: &flagCPU, DefaultValue: false, Help: "monitor cpu utilization", Tables: []table.TableDefinition{tableDefinitions[CPUUtilizationTelemetryTableName], tableDefinitions[UtilizationCategoriesTelemetryTableName]}},
+	{FlagName: flagIPCName, FlagVar: &flagIPC, DefaultValue: false, Help: "monitor IPC", Tables: []table.TableDefinition{tableDefinitions[IPCTelemetryTableName]}},
+	{FlagName: flagC6Name, FlagVar: &flagC6, DefaultValue: false, Help: "monitor C6 residency", Tables: []table.TableDefinition{tableDefinitions[C6TelemetryTableName]}},
+	{FlagName: flagFrequencyName, FlagVar: &flagFrequency, DefaultValue: false, Help: "monitor cpu frequency", Tables: []table.TableDefinition{tableDefinitions[FrequencyTelemetryTableName]}},
+	{FlagName: flagPowerName, FlagVar: &flagPower, DefaultValue: false, Help: "monitor power", Tables: []table.TableDefinition{tableDefinitions[PowerTelemetryTableName]}},
+	{FlagName: flagTemperatureName, FlagVar: &flagTemperature, DefaultValue: false, Help: "monitor temperature", Tables: []table.TableDefinition{tableDefinitions[TemperatureTelemetryTableName]}},
+	{FlagName: flagMemoryName, FlagVar: &flagMemory, DefaultValue: false, Help: "monitor memory", Tables: []table.TableDefinition{tableDefinitions[MemoryTelemetryTableName]}},
+	{FlagName: flagNetworkName, FlagVar: &flagNetwork, DefaultValue: false, Help: "monitor network", Tables: []table.TableDefinition{tableDefinitions[NetworkTelemetryTableName]}},
+	{FlagName: flagStorageName, FlagVar: &flagStorage, DefaultValue: false, Help: "monitor storage", Tables: []table.TableDefinition{tableDefinitions[DriveTelemetryTableName]}},
+	{FlagName: flagIRQRateName, FlagVar: &flagIRQRate, DefaultValue: false, Help: "monitor IRQ rate", Tables: []table.TableDefinition{tableDefinitions[IRQRateTelemetryTableName]}},
+	{FlagName: flagInstrMixName, FlagVar: &flagInstrMix, DefaultValue: false, Help: "monitor instruction mix", Tables: []table.TableDefinition{tableDefinitions[InstructionTelemetryTableName]}},
 }
 
 const (
@@ -270,15 +270,15 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 }
 
 func runCmd(cmd *cobra.Command, args []string) error {
-	var tableNames []string
+	var tables []table.TableDefinition
 	// add system summary table if not disabled
 	if !flagNoSystemSummary {
-		tableNames = append(tableNames, table.BriefSysSummaryTableName)
+		tables = append(tables, common.TableDefinitions[common.BriefSysSummaryTableName])
 	}
 	// add category tables
 	for _, cat := range categories {
 		if *cat.FlagVar || flagAll {
-			tableNames = append(tableNames, cat.TableNames...)
+			tables = append(tables, cat.Tables...)
 		}
 	}
 	// confirm proper default for instrmix frequency
@@ -292,7 +292,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	gaudiHlsmiPath := os.Getenv("PERFSPECT_GAUDI_HLSMI_PATH") // must be full path to hlsmi binary
 	if gaudiHlsmiPath != "" {
 		slog.Info("Gaudi telemetry enabled", slog.String("hlsmi_path", gaudiHlsmiPath))
-		tableNames = append(tableNames, table.GaudiTelemetryTableName)
+		tables = append(tables, tableDefinitions[GaudiTelemetryTableName])
 	}
 	// hidden feature - PDU telemetry, only enabled when four environment variables are set
 	pduHost := os.Getenv("PERFSPECT_PDU_HOST")
@@ -301,7 +301,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	pduOutlet := os.Getenv("PERFSPECT_PDU_OUTLET")
 	if pduHost != "" && pduUser != "" && pduPassword != "" && pduOutlet != "" {
 		slog.Info("PDU telemetry enabled", slog.String("host", pduHost), slog.String("outlet", pduOutlet))
-		tableNames = append(tableNames, table.PDUTelemetryTableName)
+		tables = append(tables, tableDefinitions[PDUTelemetryTableName])
 	}
 	// include telemetry summary table if all telemetry options are selected
 	var summaryFunc common.SummaryFunc
@@ -327,12 +327,28 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			"PDUPassword":       pduPassword,
 			"PDUOutlet":         pduOutlet,
 		},
-		TableNames:             tableNames,
+		Tables:                 tables,
 		SummaryFunc:            summaryFunc,
 		SummaryTableName:       telemetrySummaryTableName,
-		SummaryBeforeTableName: table.CPUUtilizationTelemetryTableName,
+		SummaryBeforeTableName: CPUUtilizationTelemetryTableName,
 		InsightsFunc:           insightsFunc,
 	}
+
+	report.RegisterHTMLRenderer(CPUUtilizationTelemetryTableName, cpuUtilizationTelemetryTableHTMLRenderer)
+	report.RegisterHTMLRenderer(UtilizationCategoriesTelemetryTableName, utilizationCategoriesTelemetryTableHTMLRenderer)
+	report.RegisterHTMLRenderer(IPCTelemetryTableName, ipcTelemetryTableHTMLRenderer)
+	report.RegisterHTMLRenderer(C6TelemetryTableName, c6TelemetryTableHTMLRenderer)
+	report.RegisterHTMLRenderer(FrequencyTelemetryTableName, averageFrequencyTelemetryTableHTMLRenderer)
+	report.RegisterHTMLRenderer(IRQRateTelemetryTableName, irqRateTelemetryTableHTMLRenderer)
+	report.RegisterHTMLRenderer(DriveTelemetryTableName, driveTelemetryTableHTMLRenderer)
+	report.RegisterHTMLRenderer(NetworkTelemetryTableName, networkTelemetryTableHTMLRenderer)
+	report.RegisterHTMLRenderer(MemoryTelemetryTableName, memoryTelemetryTableHTMLRenderer)
+	report.RegisterHTMLRenderer(PowerTelemetryTableName, powerTelemetryTableHTMLRenderer)
+	report.RegisterHTMLRenderer(TemperatureTelemetryTableName, temperatureTelemetryTableHTMLRenderer)
+	report.RegisterHTMLRenderer(InstructionTelemetryTableName, instructionTelemetryTableHTMLRenderer)
+	report.RegisterHTMLRenderer(GaudiTelemetryTableName, gaudiTelemetryTableHTMLRenderer)
+	report.RegisterHTMLRenderer(PDUTelemetryTableName, pduTelemetryTableHTMLRenderer)
+
 	return reportingCommand.Run()
 }
 
@@ -346,17 +362,17 @@ func getTableValues(allTableValues []table.TableValues, tableName string) table.
 }
 
 func summaryFromTableValues(allTableValues []table.TableValues, _ map[string]script.ScriptOutput) table.TableValues {
-	cpuUtil := getCPUAveragePercentage(getTableValues(allTableValues, table.UtilizationCategoriesTelemetryTableName), "%idle", true)
-	ipc := getCPUAveragePercentage(getTableValues(allTableValues, table.IPCTelemetryTableName), "Core (Avg.)", false)
-	c6 := getCPUAveragePercentage(getTableValues(allTableValues, table.C6TelemetryTableName), "Core (Avg.)", false)
-	avgCoreFreq := getMetricAverage(getTableValues(allTableValues, table.FrequencyTelemetryTableName), []string{"Core (Avg.)"}, "Time")
+	cpuUtil := getCPUAveragePercentage(getTableValues(allTableValues, UtilizationCategoriesTelemetryTableName), "%idle", true)
+	ipc := getCPUAveragePercentage(getTableValues(allTableValues, IPCTelemetryTableName), "Core (Avg.)", false)
+	c6 := getCPUAveragePercentage(getTableValues(allTableValues, C6TelemetryTableName), "Core (Avg.)", false)
+	avgCoreFreq := getMetricAverage(getTableValues(allTableValues, FrequencyTelemetryTableName), []string{"Core (Avg.)"}, "Time")
 	pkgPower := getPkgAveragePower(allTableValues)
 	pkgTemperature := getPkgAverageTemperature(allTableValues)
-	driveReads := getMetricAverage(getTableValues(allTableValues, table.DriveTelemetryTableName), []string{"kB_read/s"}, "Device")
-	driveWrites := getMetricAverage(getTableValues(allTableValues, table.DriveTelemetryTableName), []string{"kB_wrtn/s"}, "Device")
-	networkReads := getMetricAverage(getTableValues(allTableValues, table.NetworkTelemetryTableName), []string{"rxkB/s"}, "Time")
-	networkWrites := getMetricAverage(getTableValues(allTableValues, table.NetworkTelemetryTableName), []string{"txkB/s"}, "Time")
-	memAvail := getMetricAverage(getTableValues(allTableValues, table.MemoryTelemetryTableName), []string{"avail"}, "Time")
+	driveReads := getMetricAverage(getTableValues(allTableValues, DriveTelemetryTableName), []string{"kB_read/s"}, "Device")
+	driveWrites := getMetricAverage(getTableValues(allTableValues, DriveTelemetryTableName), []string{"kB_wrtn/s"}, "Device")
+	networkReads := getMetricAverage(getTableValues(allTableValues, NetworkTelemetryTableName), []string{"rxkB/s"}, "Time")
+	networkWrites := getMetricAverage(getTableValues(allTableValues, NetworkTelemetryTableName), []string{"txkB/s"}, "Time")
+	memAvail := getMetricAverage(getTableValues(allTableValues, MemoryTelemetryTableName), []string{"avail"}, "Time")
 	return table.TableValues{
 		TableDefinition: table.TableDefinition{
 			Name:      telemetrySummaryTableName,
@@ -470,7 +486,7 @@ func getCPUAveragePercentage(tableValues table.TableValues, fieldName string, in
 }
 
 func getPkgAverageTemperature(allTableValues []table.TableValues) string {
-	tableValues := getTableValues(allTableValues, table.TemperatureTelemetryTableName)
+	tableValues := getTableValues(allTableValues, TemperatureTelemetryTableName)
 	// number of packages can vary, so we need to find the average temperature across all packages
 	if len(tableValues.Fields) == 0 {
 		return ""
@@ -503,7 +519,7 @@ func getPkgAverageTemperature(allTableValues []table.TableValues) string {
 }
 
 func getPkgAveragePower(allTableValues []table.TableValues) string {
-	tableValues := getTableValues(allTableValues, table.PowerTelemetryTableName)
+	tableValues := getTableValues(allTableValues, PowerTelemetryTableName)
 	// number of packages can vary, so we need to find the average power across all packages
 	if len(tableValues.Fields) == 0 {
 		return ""

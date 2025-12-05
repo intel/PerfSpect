@@ -1,4 +1,4 @@
-package table
+package common
 
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
@@ -196,7 +196,7 @@ func TestExpandTurboFrequencies(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := expandTurboFrequencies(tt.buckets, tt.isa)
+			got, err := ExpandTurboFrequencies(tt.buckets, tt.isa)
 			if (err != nil) != tt.expectErr {
 				t.Errorf("expandTurboFrequencies() error = %v, expectErr %v", err, tt.expectErr)
 				return

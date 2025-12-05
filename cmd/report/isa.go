@@ -1,9 +1,10 @@
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
-package table
+package report
 
 import (
+	"perfspect/internal/common"
 	"perfspect/internal/script"
 )
 
@@ -56,7 +57,7 @@ func yesIfTrue(val string) string {
 func isaSupportedFromOutput(outputs map[string]script.ScriptOutput) []string {
 	var supported []string
 	for _, isa := range isas {
-		oneSupported := yesIfTrue(valFromRegexSubmatch(outputs[script.CpuidScriptName].Stdout, isa.CPUID+`\s*= (.+?)$`))
+		oneSupported := yesIfTrue(common.ValFromRegexSubmatch(outputs[script.CpuidScriptName].Stdout, isa.CPUID+`\s*= (.+?)$`))
 		supported = append(supported, oneSupported)
 	}
 	return supported

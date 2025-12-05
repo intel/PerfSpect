@@ -166,7 +166,7 @@ func formalizeOutputFormat(outputFormat []string) []string {
 
 func pullDataFiles(appContext common.AppContext, scriptOutputs map[string]script.ScriptOutput, myTarget target.Target, statusUpdate progress.MultiSpinnerUpdateFunc) error {
 	localOutputDir := appContext.OutputDir
-	tableValues := table.GetValuesForTable(table.KernelLockAnalysisTableName, scriptOutputs)
+	tableValues := table.GetValuesForTable(tableDefinitions[KernelLockAnalysisTableName], scriptOutputs)
 	found := false
 	for _, field := range tableValues.Fields {
 		if field.Name == "Perf Package Path" {
@@ -193,11 +193,11 @@ func pullDataFiles(appContext common.AppContext, scriptOutputs map[string]script
 }
 
 func runCmd(cmd *cobra.Command, args []string) error {
-	var tableNames []string
+	var tables []table.TableDefinition
 	if !flagNoSystemSummary {
-		tableNames = append(tableNames, table.BriefSysSummaryTableName)
+		tables = append(tables, common.TableDefinitions[common.BriefSysSummaryTableName])
 	}
-	tableNames = append(tableNames, table.KernelLockAnalysisTableName)
+	tables = append(tables, tableDefinitions[KernelLockAnalysisTableName])
 	reportingCommand := common.ReportingCommand{
 		Cmd:            cmd,
 		ReportNamePost: "lock",
@@ -206,7 +206,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			"Duration":  strconv.Itoa(flagDuration),
 			"Package":   strconv.FormatBool(flagPackage),
 		},
-		TableNames: tableNames,
+		Tables: tables,
 	}
 
 	// only try to download package when option specified
@@ -219,5 +219,8 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	// workaround is to make an assignment to ensure the current command's output format
 	// flag takes effect as expected.
 	common.FlagFormat = formalizeOutputFormat(flagFormat)
+
+	report.RegisterHTMLRenderer(KernelLockAnalysisTableName, kernelLockAnalysisHTMLRenderer)
+
 	return reportingCommand.Run()
 }

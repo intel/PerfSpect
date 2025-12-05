@@ -1,7 +1,7 @@
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
-package table
+package common
 
 import (
 	"fmt"
@@ -42,7 +42,7 @@ type nicInfo struct {
 	RPSCPUs         map[string]string
 }
 
-func parseNicInfo(scriptOutput string) []nicInfo {
+func ParseNicInfo(scriptOutput string) []nicInfo {
 	var nics []nicInfo
 	for nicOutput := range strings.SplitSeq(scriptOutput, "----------------------------------------") {
 		if strings.TrimSpace(nicOutput) == "" {
@@ -222,8 +222,8 @@ func extractFunction(busAddr string) int {
 	return funcNum
 }
 
-func nicIRQMappingsFromOutput(outputs map[string]script.ScriptOutput) [][]string {
-	nics := parseNicInfo(outputs[script.NicInfoScriptName].Stdout)
+func NICIrqMappingsFromOutput(outputs map[string]script.ScriptOutput) [][]string {
+	nics := ParseNicInfo(outputs[script.NicInfoScriptName].Stdout)
 	if len(nics) == 0 {
 		return nil
 	}
@@ -238,8 +238,8 @@ func nicIRQMappingsFromOutput(outputs map[string]script.ScriptOutput) [][]string
 	return nicIRQMappings
 }
 
-func nicSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
-	nics := parseNicInfo(outputs[script.NicInfoScriptName].Stdout)
+func NICSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
+	nics := ParseNicInfo(outputs[script.NicInfoScriptName].Stdout)
 	if len(nics) == 0 {
 		return "N/A"
 	}

@@ -1,4 +1,4 @@
-package table
+package flame
 
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
@@ -7,70 +7,41 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"perfspect/internal/common"
 	"perfspect/internal/script"
+	"perfspect/internal/table"
 	"regexp"
 	"strconv"
 	"strings"
 )
 
-// getSectionsFromOutput parses output into sections, where the section name
-// is the key in a map and the section content is the value
-// sections are delimited by lines of the form ########## <section name> ##########
-// example:
-// ########## <section A name> ##########
-// <section content>
-// <section content>
-// ########## <section B name> ##########
-// <section content>
-//
-// returns a map of section name to section content
-// if the output is empty or contains no section headers, returns an empty map
-// if a section contains no content, the value for that section is an empty string
-func getSectionsFromOutput(output string) map[string]string {
-	sections := make(map[string]string)
-	re := regexp.MustCompile(`^########## (.+?) ##########$`)
-	var sectionName string
-	for line := range strings.SplitSeq(output, "\n") {
-		// check if the line is a section header
-		match := re.FindStringSubmatch(line)
-		if match != nil {
-			// if the section name isn't in the map yet, add it
-			if _, ok := sections[match[1]]; !ok {
-				sections[match[1]] = ""
-			}
-			// save the section name
-			sectionName = match[1]
-			continue
-		}
-		if sectionName != "" {
-			sections[sectionName] += line + "\n"
-		}
-	}
-	return sections
+// flamegraph table names
+const (
+	CallStackFrequencyTableName = "Call Stack Frequency"
+)
+
+// flamegraph tables
+var tableDefinitions = map[string]table.TableDefinition{
+	CallStackFrequencyTableName: {
+		Name:      CallStackFrequencyTableName,
+		MenuLabel: CallStackFrequencyTableName,
+		ScriptNames: []string{
+			script.CollapsedCallStacksScriptName,
+		},
+		FieldsFunc: callStackFrequencyTableValues},
 }
 
-// sectionValueFromOutput returns the content of a section from the output
-// if the section doesn't exist, returns an empty string
-// if the section exists but has no content, returns an empty string
-func sectionValueFromOutput(output string, sectionName string) string {
-	sections := getSectionsFromOutput(output)
-	if len(sections) == 0 {
-		slog.Warn("no sections in output")
-		return ""
+func callStackFrequencyTableValues(outputs map[string]script.ScriptOutput) []table.Field {
+	fields := []table.Field{
+		{Name: "Native Stacks", Values: []string{nativeFoldedFromOutput(outputs)}},
+		{Name: "Java Stacks", Values: []string{javaFoldedFromOutput(outputs)}},
+		{Name: "Maximum Render Depth", Values: []string{maxRenderDepthFromOutput(outputs)}},
 	}
-	if _, ok := sections[sectionName]; !ok {
-		slog.Warn("section not found in output", slog.String("section", sectionName))
-		return ""
-	}
-	if sections[sectionName] == "" {
-		slog.Warn("No content for section:", slog.String("section", sectionName))
-		return ""
-	}
-	return sections[sectionName]
+	return fields
 }
 
 func javaFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
-	sections := getSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
+	sections := common.GetSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
 	if len(sections) == 0 {
 		slog.Warn("no sections in collapsed call stack output")
 		return ""
@@ -108,7 +79,7 @@ func javaFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
 }
 
 func nativeFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
-	sections := getSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
+	sections := common.GetSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
 	if len(sections) == 0 {
 		slog.Warn("no sections in collapsed call stack output")
 		return ""
@@ -133,7 +104,7 @@ func nativeFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
 }
 
 func maxRenderDepthFromOutput(outputs map[string]script.ScriptOutput) string {
-	sections := getSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
+	sections := common.GetSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
 	if len(sections) == 0 {
 		slog.Warn("no sections in collapsed call stack output")
 		return ""
@@ -297,4 +268,33 @@ func mergeSystemFolded(perfFp string, perfDwarf string) (merged string, err erro
 
 	merged = mergedStacks.dumpFolded()
 	return
+}
+
+func callStackFrequencyTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
+	out := `<style>
+
+/* Custom page header */
+.fgheader {
+	padding-bottom: 15px;
+	padding-right: 15px;
+	padding-left: 15px;
+	border-bottom: 1px solid #e5e5e5;
+}
+
+/* Make the masthead heading the same height as the navigation */
+.fgheader h3 {
+    margin-top: 0;
+    margin-bottom: 0;
+    line-height: 40px;
+}
+
+/* Customize container */
+.fgcontainer {
+	max-width: 990px;
+}
+</style>
+`
+	out += renderFlameGraph("Native", tableValues, "Native Stacks")
+	out += renderFlameGraph("Java", tableValues, "Java Stacks")
+	return out
 }

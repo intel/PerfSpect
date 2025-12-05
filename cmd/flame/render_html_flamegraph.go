@@ -1,4 +1,4 @@
-package report
+package flame
 
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"perfspect/internal/report"
 	"perfspect/internal/table"
 	"perfspect/internal/util"
 	"slices"
@@ -168,7 +169,7 @@ func renderFlameGraph(header string, tableValues table.TableValues, field string
 	folded := tableValues.Fields[fieldIdx].Values[0]
 	if folded == "" {
 		out += `<div class="fgheader clearfix"><h3 class="text-muted">` + header + `</h3></div>`
-		msg := noDataFound
+		msg := report.NoDataFound
 		if tableValues.NoDataFound != "" {
 			msg = tableValues.NoDataFound
 		}
