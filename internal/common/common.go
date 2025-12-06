@@ -57,9 +57,6 @@ type TargetScriptOutputs struct {
 func (tso *TargetScriptOutputs) GetScriptOutputs() map[string]script.ScriptOutput {
 	return tso.ScriptOutputs
 }
-func (tso *TargetScriptOutputs) GetTables() []table.TableDefinition {
-	return tso.Tables
-}
 
 const (
 	TableNameInsights  = "Insights"
@@ -140,7 +137,7 @@ func (rc *ReportingCommand) Run() error {
 	var myTargets []target.Target
 	if FlagInput != "" {
 		var err error
-		orderedTargetScriptOutputs, err = outputsFromInput(rc.SummaryTableName)
+		orderedTargetScriptOutputs, err = outputsFromInput(rc.Tables, rc.SummaryTableName)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			slog.Error(err.Error())
@@ -477,29 +474,41 @@ func extractTableNamesFromValues(allTargetsTableValues [][]table.TableValues) []
 	return targetTableNames
 }
 
+func findTableByName(tables []table.TableDefinition, name string) (*table.TableDefinition, error) {
+	for _, tbl := range tables {
+		if tbl.Name == name {
+			return &tbl, nil
+		}
+	}
+	return nil, fmt.Errorf("table [%s] not found", name)
+}
+
 // outputsFromInput reads the raw file(s) and returns the data in the order of the raw files
-// TODO: this won't work post re-factor
-func outputsFromInput(summaryTableName string) ([]TargetScriptOutputs, error) {
-	return nil, fmt.Errorf("outputsFromInput not implemented post refactor")
-	// orderedTargetScriptOutputs := []TargetScriptOutputs{}
-	// tables := []table.TableDefinition{}
-	// // read the raw file(s) as JSON
-	// rawReports, err := report.ReadRawReports(FlagInput)
-	// if err != nil {
-	// 	err = fmt.Errorf("failed to read raw file(s): %w", err)
-	// 	return nil, err
-	// }
-	// for _, rawReport := range rawReports {
-	// 	for _, tableName := range rawReport.TableNames { // just in case someone tries to use the raw files that were collected with a different set of categories
-	// 		// filter out tables that we add after processing
-	// 		if tableName == TableNameInsights || tableName == TableNamePerfspect || tableName == summaryTableName {
-	// 			continue
-	// 		}
-	// 		tables = append(tables, table.GetTableByName(tableName))
-	// 	}
-	// 	orderedTargetScriptOutputs = append(orderedTargetScriptOutputs, TargetScriptOutputs{TargetName: rawReport.TargetName, ScriptOutputs: rawReport.ScriptOutputs, Tables: tables})
-	// }
-	// return orderedTargetScriptOutputs, nil
+func outputsFromInput(tables []table.TableDefinition, summaryTableName string) ([]TargetScriptOutputs, error) {
+	orderedTargetScriptOutputs := []TargetScriptOutputs{}
+	includedTables := []table.TableDefinition{}
+	// read the raw file(s) as JSON
+	rawReports, err := report.ReadRawReports(FlagInput)
+	if err != nil {
+		err = fmt.Errorf("failed to read raw file(s): %w", err)
+		return nil, err
+	}
+	for _, rawReport := range rawReports {
+		for _, tableName := range rawReport.TableNames { // just in case someone tries to use the raw files that were collected with a different set of categories
+			// filter out tables that we add after processing
+			if tableName == TableNameInsights || tableName == TableNamePerfspect || tableName == summaryTableName {
+				continue
+			}
+			includedTable, err := findTableByName(tables, tableName)
+			if err != nil {
+				slog.Warn("table from raw report not found in current tables", slog.String("table", tableName), slog.String("target", rawReport.TargetName))
+				continue
+			}
+			includedTables = append(includedTables, *includedTable)
+		}
+		orderedTargetScriptOutputs = append(orderedTargetScriptOutputs, TargetScriptOutputs{TargetName: rawReport.TargetName, ScriptOutputs: rawReport.ScriptOutputs, Tables: includedTables})
+	}
+	return orderedTargetScriptOutputs, nil
 }
 
 // outputsFromTargets runs the scripts on the targets and returns the data in the order of the targets

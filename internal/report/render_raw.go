@@ -79,9 +79,13 @@ func ReadRawReports(path string) (reports []RawReport, err error) {
 func readRawReport(rawReportPath string) (report RawReport, err error) {
 	reportBytes, err := os.ReadFile(rawReportPath) // #nosec G304
 	if err != nil {
-		err = fmt.Errorf("failed to read raw report file: %v", err)
+		err = fmt.Errorf("failed to read raw report file (%s): %v", rawReportPath, err)
 		return
 	}
 	err = json.Unmarshal(reportBytes, &report)
+	if err != nil {
+		err = fmt.Errorf("failed to unmarshal raw report JSON: %v", err)
+		return
+	}
 	return
 }
