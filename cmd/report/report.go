@@ -19,6 +19,7 @@ import (
 	"perfspect/internal/common"
 	"perfspect/internal/report"
 	"perfspect/internal/script"
+	"perfspect/internal/table"
 	"perfspect/internal/util"
 )
 
@@ -138,52 +139,53 @@ var benchmarkOptions = []string{
 
 var benchmarkAll = "all"
 
-var benchmarkTableNames = map[string][]string{
-	"speed":       {report.SpeedBenchmarkTableName},
-	"power":       {report.PowerBenchmarkTableName},
-	"temperature": {report.TemperatureBenchmarkTableName},
-	"frequency":   {report.FrequencyBenchmarkTableName},
-	"memory":      {report.MemoryBenchmarkTableName},
-	"numa":        {report.NUMABenchmarkTableName},
-	"storage":     {report.StorageBenchmarkTableName},
+// map benchmark flag values, e.g., "--benchmark speed,power" to associated tables
+var benchmarkTables = map[string][]table.TableDefinition{
+	"speed":       {tableDefinitions[SpeedBenchmarkTableName]},
+	"power":       {tableDefinitions[PowerBenchmarkTableName]},
+	"temperature": {tableDefinitions[TemperatureBenchmarkTableName]},
+	"frequency":   {tableDefinitions[FrequencyBenchmarkTableName]},
+	"memory":      {tableDefinitions[MemoryBenchmarkTableName]},
+	"numa":        {tableDefinitions[NUMABenchmarkTableName]},
+	"storage":     {tableDefinitions[StorageBenchmarkTableName]},
 }
 
 var benchmarkSummaryTableName = "Benchmark Summary"
 
 // categories maps flag names to tables that will be included in report
 var categories = []common.Category{
-	{FlagName: flagSystemSummaryName, FlagVar: &flagSystemSummary, Help: "System Summary", TableNames: []string{report.SystemSummaryTableName}},
-	{FlagName: flagHostName, FlagVar: &flagHost, Help: "Host", TableNames: []string{report.HostTableName}},
-	{FlagName: flagBiosName, FlagVar: &flagBios, Help: "BIOS", TableNames: []string{report.BIOSTableName}},
-	{FlagName: flagOsName, FlagVar: &flagOs, Help: "Operating System", TableNames: []string{report.OperatingSystemTableName}},
-	{FlagName: flagSoftwareName, FlagVar: &flagSoftware, Help: "Software Versions", TableNames: []string{report.SoftwareVersionTableName}},
-	{FlagName: flagCpuName, FlagVar: &flagCpu, Help: "Processor Details", TableNames: []string{report.CPUTableName}},
-	{FlagName: flagPrefetcherName, FlagVar: &flagPrefetcher, Help: "Prefetchers", TableNames: []string{report.PrefetcherTableName}},
-	{FlagName: flagIsaName, FlagVar: &flagIsa, Help: "Instruction Sets", TableNames: []string{report.ISATableName}},
-	{FlagName: flagAcceleratorName, FlagVar: &flagAccelerator, Help: "On-board Accelerators", TableNames: []string{report.AcceleratorTableName}},
-	{FlagName: flagPowerName, FlagVar: &flagPower, Help: "Power Settings", TableNames: []string{report.PowerTableName}},
-	{FlagName: flagCstatesName, FlagVar: &flagCstates, Help: "C-states", TableNames: []string{report.CstateTableName}},
-	{FlagName: flagFrequencyName, FlagVar: &flagFrequency, Help: "Maximum Frequencies", TableNames: []string{report.MaximumFrequencyTableName}},
-	{FlagName: flagSSTName, FlagVar: &flagSST, Help: "Speed Select Technology Settings", TableNames: []string{report.SSTTFHPTableName, report.SSTTFLPTableName}},
-	{FlagName: flagUncoreName, FlagVar: &flagUncore, Help: "Uncore Configuration", TableNames: []string{report.UncoreTableName}},
-	{FlagName: flagElcName, FlagVar: &flagElc, Help: "Efficiency Latency Control Settings", TableNames: []string{report.ElcTableName}},
-	{FlagName: flagMemoryName, FlagVar: &flagMemory, Help: "Memory Configuration", TableNames: []string{report.MemoryTableName}},
-	{FlagName: flagDimmName, FlagVar: &flagDimm, Help: "DIMM Population", TableNames: []string{report.DIMMTableName}},
-	{FlagName: flagNetConfigName, FlagVar: &flagNetConfig, Help: "Network Configuration", TableNames: []string{report.NetworkConfigTableName}},
-	{FlagName: flagNicName, FlagVar: &flagNic, Help: "Network Cards", TableNames: []string{report.NICTableName, report.NICCpuAffinityTableName, report.NICPacketSteeringTableName}},
-	{FlagName: flagDiskName, FlagVar: &flagDisk, Help: "Storage Devices", TableNames: []string{report.DiskTableName}},
-	{FlagName: flagFilesystemName, FlagVar: &flagFilesystem, Help: "File Systems", TableNames: []string{report.FilesystemTableName}},
-	{FlagName: flagGpuName, FlagVar: &flagGpu, Help: "GPUs", TableNames: []string{report.GPUTableName}},
-	{FlagName: flagGaudiName, FlagVar: &flagGaudi, Help: "Gaudi Devices", TableNames: []string{report.GaudiTableName}},
-	{FlagName: flagCxlName, FlagVar: &flagCxl, Help: "CXL Devices", TableNames: []string{report.CXLTableName}},
-	{FlagName: flagPcieName, FlagVar: &flagPcie, Help: "PCIE Slots", TableNames: []string{report.PCIeTableName}},
-	{FlagName: flagCveName, FlagVar: &flagCve, Help: "Vulnerabilities", TableNames: []string{report.CVETableName}},
-	{FlagName: flagProcessName, FlagVar: &flagProcess, Help: "Process List", TableNames: []string{report.ProcessTableName}},
-	{FlagName: flagSensorName, FlagVar: &flagSensor, Help: "Sensor Status", TableNames: []string{report.SensorTableName}},
-	{FlagName: flagChassisStatusName, FlagVar: &flagChassisStatus, Help: "Chassis Status", TableNames: []string{report.ChassisStatusTableName}},
-	{FlagName: flagPmuName, FlagVar: &flagPmu, Help: "Performance Monitoring Unit Status", TableNames: []string{report.PMUTableName}},
-	{FlagName: flagSystemEventLogName, FlagVar: &flagSystemEventLog, Help: "System Event Log", TableNames: []string{report.SystemEventLogTableName}},
-	{FlagName: flagKernelLogName, FlagVar: &flagKernelLog, Help: "Kernel Log", TableNames: []string{report.KernelLogTableName}},
+	{FlagName: flagSystemSummaryName, FlagVar: &flagSystemSummary, Help: "System Summary", Tables: []table.TableDefinition{tableDefinitions[SystemSummaryTableName]}},
+	{FlagName: flagHostName, FlagVar: &flagHost, Help: "Host", Tables: []table.TableDefinition{tableDefinitions[HostTableName]}},
+	{FlagName: flagBiosName, FlagVar: &flagBios, Help: "BIOS", Tables: []table.TableDefinition{tableDefinitions[BIOSTableName]}},
+	{FlagName: flagOsName, FlagVar: &flagOs, Help: "Operating System", Tables: []table.TableDefinition{tableDefinitions[OperatingSystemTableName]}},
+	{FlagName: flagSoftwareName, FlagVar: &flagSoftware, Help: "Software Versions", Tables: []table.TableDefinition{tableDefinitions[SoftwareVersionTableName]}},
+	{FlagName: flagCpuName, FlagVar: &flagCpu, Help: "Processor Details", Tables: []table.TableDefinition{tableDefinitions[CPUTableName]}},
+	{FlagName: flagPrefetcherName, FlagVar: &flagPrefetcher, Help: "Prefetchers", Tables: []table.TableDefinition{tableDefinitions[PrefetcherTableName]}},
+	{FlagName: flagIsaName, FlagVar: &flagIsa, Help: "Instruction Sets", Tables: []table.TableDefinition{tableDefinitions[ISATableName]}},
+	{FlagName: flagAcceleratorName, FlagVar: &flagAccelerator, Help: "On-board Accelerators", Tables: []table.TableDefinition{tableDefinitions[AcceleratorTableName]}},
+	{FlagName: flagPowerName, FlagVar: &flagPower, Help: "Power Settings", Tables: []table.TableDefinition{tableDefinitions[PowerTableName]}},
+	{FlagName: flagCstatesName, FlagVar: &flagCstates, Help: "C-states", Tables: []table.TableDefinition{tableDefinitions[CstateTableName]}},
+	{FlagName: flagFrequencyName, FlagVar: &flagFrequency, Help: "Maximum Frequencies", Tables: []table.TableDefinition{tableDefinitions[MaximumFrequencyTableName]}},
+	{FlagName: flagSSTName, FlagVar: &flagSST, Help: "Speed Select Technology Settings", Tables: []table.TableDefinition{tableDefinitions[SSTTFHPTableName], tableDefinitions[SSTTFLPTableName]}},
+	{FlagName: flagUncoreName, FlagVar: &flagUncore, Help: "Uncore Configuration", Tables: []table.TableDefinition{tableDefinitions[UncoreTableName]}},
+	{FlagName: flagElcName, FlagVar: &flagElc, Help: "Efficiency Latency Control Settings", Tables: []table.TableDefinition{tableDefinitions[ElcTableName]}},
+	{FlagName: flagMemoryName, FlagVar: &flagMemory, Help: "Memory Configuration", Tables: []table.TableDefinition{tableDefinitions[MemoryTableName]}},
+	{FlagName: flagDimmName, FlagVar: &flagDimm, Help: "DIMM Population", Tables: []table.TableDefinition{tableDefinitions[DIMMTableName]}},
+	{FlagName: flagNetConfigName, FlagVar: &flagNetConfig, Help: "Network Configuration", Tables: []table.TableDefinition{tableDefinitions[NetworkConfigTableName]}},
+	{FlagName: flagNicName, FlagVar: &flagNic, Help: "Network Cards", Tables: []table.TableDefinition{tableDefinitions[NICTableName], tableDefinitions[NICCpuAffinityTableName], tableDefinitions[NICPacketSteeringTableName]}},
+	{FlagName: flagDiskName, FlagVar: &flagDisk, Help: "Storage Devices", Tables: []table.TableDefinition{tableDefinitions[DiskTableName]}},
+	{FlagName: flagFilesystemName, FlagVar: &flagFilesystem, Help: "File Systems", Tables: []table.TableDefinition{tableDefinitions[FilesystemTableName]}},
+	{FlagName: flagGpuName, FlagVar: &flagGpu, Help: "GPUs", Tables: []table.TableDefinition{tableDefinitions[GPUTableName]}},
+	{FlagName: flagGaudiName, FlagVar: &flagGaudi, Help: "Gaudi Devices", Tables: []table.TableDefinition{tableDefinitions[GaudiTableName]}},
+	{FlagName: flagCxlName, FlagVar: &flagCxl, Help: "CXL Devices", Tables: []table.TableDefinition{tableDefinitions[CXLTableName]}},
+	{FlagName: flagPcieName, FlagVar: &flagPcie, Help: "PCIE Slots", Tables: []table.TableDefinition{tableDefinitions[PCIeTableName]}},
+	{FlagName: flagCveName, FlagVar: &flagCve, Help: "Vulnerabilities", Tables: []table.TableDefinition{tableDefinitions[CVETableName]}},
+	{FlagName: flagProcessName, FlagVar: &flagProcess, Help: "Process List", Tables: []table.TableDefinition{tableDefinitions[ProcessTableName]}},
+	{FlagName: flagSensorName, FlagVar: &flagSensor, Help: "Sensor Status", Tables: []table.TableDefinition{tableDefinitions[SensorTableName]}},
+	{FlagName: flagChassisStatusName, FlagVar: &flagChassisStatus, Help: "Chassis Status", Tables: []table.TableDefinition{tableDefinitions[ChassisStatusTableName]}},
+	{FlagName: flagPmuName, FlagVar: &flagPmu, Help: "Performance Monitoring Unit Status", Tables: []table.TableDefinition{tableDefinitions[PMUTableName]}},
+	{FlagName: flagSystemEventLogName, FlagVar: &flagSystemEventLog, Help: "System Event Log", Tables: []table.TableDefinition{tableDefinitions[SystemEventLogTableName]}},
+	{FlagName: flagKernelLogName, FlagVar: &flagKernelLog, Help: "Kernel Log", Tables: []table.TableDefinition{tableDefinitions[KernelLogTableName]}},
 }
 
 func init() {
@@ -327,16 +329,16 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 }
 
 func runCmd(cmd *cobra.Command, args []string) error {
-	tableNames := []string{}
+	tables := []table.TableDefinition{}
 	// add category tables
 	for _, cat := range categories {
 		if *cat.FlagVar || flagAll {
-			tableNames = append(tableNames, cat.TableNames...)
+			tables = append(tables, cat.Tables...)
 		}
 	}
 	// add benchmark tables
-	for _, benchmark := range flagBenchmark {
-		tableNames = append(tableNames, benchmarkTableNames[benchmark]...)
+	for _, benchmarkFlagValue := range flagBenchmark {
+		tables = append(tables, benchmarkTables[benchmarkFlagValue]...)
 	}
 	// include benchmark summary table if all benchmark options are selected
 	var summaryFunc common.SummaryFunc
@@ -351,29 +353,36 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	reportingCommand := common.ReportingCommand{
 		Cmd:                    cmd,
 		ScriptParams:           map[string]string{"StorageDir": flagStorageDir},
-		TableNames:             tableNames,
+		Tables:                 tables,
 		SummaryFunc:            summaryFunc,
 		SummaryTableName:       benchmarkSummaryTableName,
-		SummaryBeforeTableName: report.SpeedBenchmarkTableName,
+		SummaryBeforeTableName: SpeedBenchmarkTableName,
 		InsightsFunc:           insightsFunc,
 	}
+
+	report.RegisterHTMLRenderer(DIMMTableName, dimmTableHTMLRenderer)
+	report.RegisterHTMLRenderer(FrequencyBenchmarkTableName, frequencyBenchmarkTableHtmlRenderer)
+	report.RegisterHTMLRenderer(MemoryBenchmarkTableName, memoryBenchmarkTableHtmlRenderer)
+
+	report.RegisterHTMLMultiTargetRenderer(MemoryBenchmarkTableName, memoryBenchmarkTableMultiTargetHtmlRenderer)
+
 	return reportingCommand.Run()
 }
 
-func benchmarkSummaryFromTableValues(allTableValues []report.TableValues, outputs map[string]script.ScriptOutput) report.TableValues {
-	maxFreq := getValueFromTableValues(getTableValues(allTableValues, report.FrequencyBenchmarkTableName), "SSE", 0)
+func benchmarkSummaryFromTableValues(allTableValues []table.TableValues, outputs map[string]script.ScriptOutput) table.TableValues {
+	maxFreq := getValueFromTableValues(getTableValues(allTableValues, FrequencyBenchmarkTableName), "SSE", 0)
 	if maxFreq != "" {
 		maxFreq = maxFreq + " GHz"
 	}
-	allCoreMaxFreq := getValueFromTableValues(getTableValues(allTableValues, report.FrequencyBenchmarkTableName), "SSE", -1)
+	allCoreMaxFreq := getValueFromTableValues(getTableValues(allTableValues, FrequencyBenchmarkTableName), "SSE", -1)
 	if allCoreMaxFreq != "" {
 		allCoreMaxFreq = allCoreMaxFreq + " GHz"
 	}
 	// get the maximum memory bandwidth from the memory latency table
-	memLatTableValues := getTableValues(allTableValues, report.MemoryBenchmarkTableName)
+	memLatTableValues := getTableValues(allTableValues, MemoryBenchmarkTableName)
 	var bandwidthValues []string
 	if len(memLatTableValues.Fields) > 1 {
-		bandwidthValues = getTableValues(allTableValues, report.MemoryBenchmarkTableName).Fields[1].Values
+		bandwidthValues = getTableValues(allTableValues, MemoryBenchmarkTableName).Fields[1].Values
 	}
 	maxBandwidth := 0.0
 	for _, bandwidthValue := range bandwidthValues {
@@ -391,50 +400,51 @@ func benchmarkSummaryFromTableValues(allTableValues []report.TableValues, output
 		maxMemBW = fmt.Sprintf("%.1f GB/s", maxBandwidth)
 	}
 	// get the minimum memory latency
-	minLatency := getValueFromTableValues(getTableValues(allTableValues, report.MemoryBenchmarkTableName), "Latency (ns)", 0)
+	minLatency := getValueFromTableValues(getTableValues(allTableValues, MemoryBenchmarkTableName), "Latency (ns)", 0)
 	if minLatency != "" {
 		minLatency = minLatency + " ns"
 	}
 
-	return report.TableValues{
-		TableDefinition: report.TableDefinition{
-			Name:                  benchmarkSummaryTableName,
-			HasRows:               false,
-			MenuLabel:             benchmarkSummaryTableName,
-			HTMLTableRendererFunc: summaryHTMLTableRenderer,
-			XlsxTableRendererFunc: summaryXlsxTableRenderer,
-			TextTableRendererFunc: summaryTextTableRenderer,
+	report.RegisterHTMLRenderer(benchmarkSummaryTableName, summaryHTMLTableRenderer)
+	report.RegisterTextRenderer(benchmarkSummaryTableName, summaryTextTableRenderer)
+	report.RegisterXlsxRenderer(benchmarkSummaryTableName, summaryXlsxTableRenderer)
+
+	return table.TableValues{
+		TableDefinition: table.TableDefinition{
+			Name:      benchmarkSummaryTableName,
+			HasRows:   false,
+			MenuLabel: benchmarkSummaryTableName,
 		},
-		Fields: []report.Field{
-			{Name: "CPU Speed", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.SpeedBenchmarkTableName), "Ops/s", 0) + " Ops/s"}},
+		Fields: []table.Field{
+			{Name: "CPU Speed", Values: []string{getValueFromTableValues(getTableValues(allTableValues, SpeedBenchmarkTableName), "Ops/s", 0) + " Ops/s"}},
 			{Name: "Single-core Maximum frequency", Values: []string{maxFreq}},
 			{Name: "All-core Maximum frequency", Values: []string{allCoreMaxFreq}},
-			{Name: "Maximum Power", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.PowerBenchmarkTableName), "Maximum Power", 0)}},
-			{Name: "Maximum Temperature", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.TemperatureBenchmarkTableName), "Maximum Temperature", 0)}},
-			{Name: "Minimum Power", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.PowerBenchmarkTableName), "Minimum Power", 0)}},
+			{Name: "Maximum Power", Values: []string{getValueFromTableValues(getTableValues(allTableValues, PowerBenchmarkTableName), "Maximum Power", 0)}},
+			{Name: "Maximum Temperature", Values: []string{getValueFromTableValues(getTableValues(allTableValues, TemperatureBenchmarkTableName), "Maximum Temperature", 0)}},
+			{Name: "Minimum Power", Values: []string{getValueFromTableValues(getTableValues(allTableValues, PowerBenchmarkTableName), "Minimum Power", 0)}},
 			{Name: "Memory Peak Bandwidth", Values: []string{maxMemBW}},
 			{Name: "Memory Minimum Latency", Values: []string{minLatency}},
-			{Name: "Disk Read Bandwidth", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.StorageBenchmarkTableName), "Single-Thread Read Bandwidth", 0)}},
-			{Name: "Disk Write Bandwidth", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.StorageBenchmarkTableName), "Single-Thread Write Bandwidth", 0)}},
-			{Name: "Microarchitecture", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.SystemSummaryTableName), "Microarchitecture", 0)}},
-			{Name: "Sockets", Values: []string{getValueFromTableValues(getTableValues(allTableValues, report.SystemSummaryTableName), "Sockets", 0)}},
+			{Name: "Disk Read Bandwidth", Values: []string{getValueFromTableValues(getTableValues(allTableValues, StorageBenchmarkTableName), "Single-Thread Read Bandwidth", 0)}},
+			{Name: "Disk Write Bandwidth", Values: []string{getValueFromTableValues(getTableValues(allTableValues, StorageBenchmarkTableName), "Single-Thread Write Bandwidth", 0)}},
+			{Name: "Microarchitecture", Values: []string{getValueFromTableValues(getTableValues(allTableValues, SystemSummaryTableName), "Microarchitecture", 0)}},
+			{Name: "Sockets", Values: []string{getValueFromTableValues(getTableValues(allTableValues, SystemSummaryTableName), "Sockets", 0)}},
 		},
 	}
 }
 
 // getTableValues returns the table values for a table with a given name
-func getTableValues(allTableValues []report.TableValues, tableName string) report.TableValues {
+func getTableValues(allTableValues []table.TableValues, tableName string) table.TableValues {
 	for _, tv := range allTableValues {
 		if tv.Name == tableName {
 			return tv
 		}
 	}
-	return report.TableValues{}
+	return table.TableValues{}
 }
 
 // getValueFromTableValues returns the value of a field in a table
 // if row is -1, it returns the last value
-func getValueFromTableValues(tv report.TableValues, fieldName string, row int) string {
+func getValueFromTableValues(tv table.TableValues, fieldName string, row int) string {
 	for _, fv := range tv.Fields {
 		if fv.Name == fieldName {
 			if row == -1 { // return the last value
@@ -485,7 +495,7 @@ var referenceData = map[ReferenceDataKey]ReferenceData{
 }
 
 // getFieldIndex returns the index of a field in a list of fields
-func getFieldIndex(fields []report.Field, fieldName string) (int, error) {
+func getFieldIndex(fields []table.Field, fieldName string) (int, error) {
 	for i, field := range fields {
 		if field.Name == fieldName {
 			return i, nil
@@ -496,7 +506,7 @@ func getFieldIndex(fields []report.Field, fieldName string) (int, error) {
 
 // summaryHTMLTableRenderer is a custom HTML table renderer for the summary table
 // it removes the Microarchitecture and Sockets fields and adds a reference table
-func summaryHTMLTableRenderer(tv report.TableValues, targetName string) string {
+func summaryHTMLTableRenderer(tv table.TableValues, targetName string) string {
 	uarchFieldIdx, err := getFieldIndex(tv.Fields, "Microarchitecture")
 	if err != nil {
 		panic(err)
@@ -509,8 +519,8 @@ func summaryHTMLTableRenderer(tv report.TableValues, targetName string) string {
 	if refData, ok := referenceData[ReferenceDataKey{tv.Fields[uarchFieldIdx].Values[0], tv.Fields[socketsFieldIdx].Values[0]}]; ok {
 		// remove microarchitecture and sockets fields
 		fields := tv.Fields[:len(tv.Fields)-2]
-		refTableValues := report.TableValues{
-			Fields: []report.Field{
+		refTableValues := table.TableValues{
+			Fields: []table.Field{
 				{Name: "CPU Speed", Values: []string{fmt.Sprintf("%.0f Ops/s", refData.CPUSpeed)}},
 				{Name: "Single-core Maximum frequency", Values: []string{fmt.Sprintf("%.0f MHz", refData.SingleCoreFreq)}},
 				{Name: "All-core Maximum frequency", Values: []string{fmt.Sprintf("%.0f MHz", refData.AllCoreFreq)}},
@@ -521,22 +531,22 @@ func summaryHTMLTableRenderer(tv report.TableValues, targetName string) string {
 				{Name: "Memory Minimum Latency", Values: []string{fmt.Sprintf("%.0f ns", refData.MemMinLatency)}},
 			},
 		}
-		return report.RenderMultiTargetTableValuesAsHTML([]report.TableValues{{TableDefinition: tv.TableDefinition, Fields: fields}, refTableValues}, []string{targetName, refData.Description})
+		return report.RenderMultiTargetTableValuesAsHTML([]table.TableValues{{TableDefinition: tv.TableDefinition, Fields: fields}, refTableValues}, []string{targetName, refData.Description})
 	} else {
 		// remove microarchitecture and sockets fields
 		fields := tv.Fields[:len(tv.Fields)-2]
-		return report.DefaultHTMLTableRendererFunc(report.TableValues{TableDefinition: tv.TableDefinition, Fields: fields})
+		return report.DefaultHTMLTableRendererFunc(table.TableValues{TableDefinition: tv.TableDefinition, Fields: fields})
 	}
 }
 
-func summaryXlsxTableRenderer(tv report.TableValues, f *excelize.File, targetName string, row *int) {
+func summaryXlsxTableRenderer(tv table.TableValues, f *excelize.File, targetName string, row *int) {
 	// remove microarchitecture and sockets fields
 	fields := tv.Fields[:len(tv.Fields)-2]
-	report.DefaultXlsxTableRendererFunc(report.TableValues{TableDefinition: tv.TableDefinition, Fields: fields}, f, report.XlsxPrimarySheetName, row)
+	report.DefaultXlsxTableRendererFunc(table.TableValues{TableDefinition: tv.TableDefinition, Fields: fields}, f, report.XlsxPrimarySheetName, row)
 }
 
-func summaryTextTableRenderer(tv report.TableValues) string {
+func summaryTextTableRenderer(tv table.TableValues) string {
 	// remove microarchitecture and sockets fields
 	fields := tv.Fields[:len(tv.Fields)-2]
-	return report.DefaultTextTableRendererFunc(report.TableValues{TableDefinition: tv.TableDefinition, Fields: fields})
+	return report.DefaultTextTableRendererFunc(table.TableValues{TableDefinition: tv.TableDefinition, Fields: fields})
 }

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"perfspect/internal/common"
 	"perfspect/internal/cpus"
-	"perfspect/internal/report"
 	"perfspect/internal/script"
 	"perfspect/internal/target"
 	"perfspect/internal/util"
@@ -131,7 +131,7 @@ func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir str
 		return fmt.Errorf("failed to run scripts on target: %w", err)
 	}
 
-	uarch := report.UarchFromOutput(outputs)
+	uarch := common.UarchFromOutput(outputs)
 	cpu, err := cpus.GetCPUByMicroArchitecture(uarch)
 	if err != nil {
 		return fmt.Errorf("failed to get CPU by microarchitecture: %w", err)
@@ -139,11 +139,11 @@ func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir str
 	if cpu.CacheWayCount == 0 {
 		return fmt.Errorf("cache way count is zero")
 	}
-	maximumLlcSize, _, err := report.GetL3LscpuMB(outputs)
+	maximumLlcSize, _, err := common.GetL3LscpuMB(outputs)
 	if err != nil {
 		return fmt.Errorf("failed to get maximum LLC size: %w", err)
 	}
-	currentLlcSize, _, err := report.GetL3MSRMB(outputs)
+	currentLlcSize, _, err := common.GetL3MSRMB(outputs)
 	if err != nil {
 		return fmt.Errorf("failed to get current LLC size: %w", err)
 	}
@@ -823,7 +823,7 @@ func getUarch(myTarget target.Target, localTempDir string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to run scripts on target: %w", err)
 	}
-	uarch := report.UarchFromOutput(outputs)
+	uarch := common.UarchFromOutput(outputs)
 	if uarch == "" {
 		return "", fmt.Errorf("failed to get microarchitecture")
 	}
@@ -831,7 +831,7 @@ func getUarch(myTarget target.Target, localTempDir string) (string, error) {
 }
 
 func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir string, prefetcherType string) error {
-	pf, err := report.GetPrefetcherDefByName(prefetcherType)
+	pf, err := common.GetPrefetcherDefByName(prefetcherType)
 	if err != nil {
 		return fmt.Errorf("failed to get prefetcher definition: %w", err)
 	}

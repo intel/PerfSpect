@@ -1,4 +1,4 @@
-package report
+package common
 
 import (
 	"fmt"
@@ -86,11 +86,11 @@ func parseTurbostatOutput(output string) ([]map[string]string, error) {
 	return rows, nil
 }
 
-// turbostatPlatformRows parses the output of the turbostat script and returns the rows
+// TurbostatPlatformRows parses the output of the turbostat script and returns the rows
 // for the platform (summary) only, for the specified field names.
 // The "platform" rows are those where Package, Die, Core, and CPU are all "-".
 // The first column is the sample time, and the rest are the values for the specified fields.
-func turbostatPlatformRows(turboStatScriptOutput string, fieldNames []string) ([][]string, error) {
+func TurbostatPlatformRows(turboStatScriptOutput string, fieldNames []string) ([][]string, error) {
 	if len(fieldNames) == 0 {
 		err := fmt.Errorf("no field names provided")
 		slog.Error(err.Error())
@@ -141,11 +141,10 @@ func isPlatformRow(row map[string]string) bool {
 	return true
 }
 
-// turbostatPackageRows
-// parses the output of the turbostat script and returns the rows
+// TurbostatPackageRows parses the output of the turbostat script and returns the rows
 // for each package, for the specified field names.
 // The first column is the sample time, and the rest are the values for the specified fields.
-func turbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([][][]string, error) {
+func TurbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([][][]string, error) {
 	if len(fieldNames) == 0 {
 		err := fmt.Errorf("no field names provided")
 		return nil, err
@@ -211,8 +210,8 @@ func isPackageRow(row map[string]string) bool {
 	return false
 }
 
-// maxTotalPackagePowerFromOutput calculates the maximum total package power from the turbostat output.
-func maxTotalPackagePowerFromOutput(turbostatOutput string) string {
+// MaxTotalPackagePowerFromOutput calculates the maximum total package power from the turbostat output.
+func MaxTotalPackagePowerFromOutput(turbostatOutput string) string {
 	rows, err := parseTurbostatOutput(turbostatOutput)
 	if err != nil {
 		slog.Error("unable to parse turbostat output", slog.String("error", err.Error()))
@@ -252,8 +251,8 @@ func maxTotalPackagePowerFromOutput(turbostatOutput string) string {
 	return fmt.Sprintf("%.2f Watts", maxPower)
 }
 
-// minTotalPackagePowerFromOutput calculates the minimum total package power from the turbostat output.
-func minTotalPackagePowerFromOutput(turbostatOutput string) string {
+// MinTotalPackagePowerFromOutput calculates the minimum total package power from the turbostat output.
+func MinTotalPackagePowerFromOutput(turbostatOutput string) string {
 	rows, err := parseTurbostatOutput(turbostatOutput)
 	if err != nil {
 		slog.Error("unable to parse turbostat output", slog.String("error", err.Error()))
@@ -287,8 +286,8 @@ func minTotalPackagePowerFromOutput(turbostatOutput string) string {
 	return fmt.Sprintf("%.2f Watts", minPower)
 }
 
-// maxPackageTemperatureFromOutput calculates the maximum package temperature from the turbostat output.
-func maxPackageTemperatureFromOutput(turbostatOutput string) string {
+// MaxPackageTemperatureFromOutput calculates the maximum package temperature from the turbostat output.
+func MaxPackageTemperatureFromOutput(turbostatOutput string) string {
 	rows, err := parseTurbostatOutput(turbostatOutput)
 	if err != nil {
 		slog.Error("unable to parse turbostat output", slog.String("error", err.Error()))

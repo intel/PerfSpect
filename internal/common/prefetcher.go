@@ -1,11 +1,17 @@
-package report
-
-import "fmt"
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
-// prefetcher_defs.go
+package common
+
+import (
+	"fmt"
+	"log/slog"
+	"perfspect/internal/script"
+	"slices"
+	"strconv"
+	"strings"
+)
+
 // prefetchers are enabled when associated bit in msr is 0
 
 type PrefetcherDefinition struct {
@@ -36,7 +42,7 @@ const (
 	PrefetcherLLCStreamName = "LLC Stream"
 )
 
-var prefetcherDefinitions = []PrefetcherDefinition{
+var PrefetcherDefinitions = []PrefetcherDefinition{
 	{
 		ShortName:   PrefetcherL2HWName,
 		Description: "L2 Hardware (MLC Streamer) fetches additional lines of code or data into the L2 cache.",
@@ -119,7 +125,7 @@ var prefetcherDefinitions = []PrefetcherDefinition{
 // GetPrefetcherDefByName returns the Prefetcher definition by its short name.
 // It returns error if the Prefetcher is not found.
 func GetPrefetcherDefByName(name string) (PrefetcherDefinition, error) {
-	for _, p := range prefetcherDefinitions {
+	for _, p := range PrefetcherDefinitions {
 		if p.ShortName == name {
 			return p, nil
 		}
@@ -129,5 +135,105 @@ func GetPrefetcherDefByName(name string) (PrefetcherDefinition, error) {
 
 // GetPrefetcherDefinitions returns all Prefetcher definitions.
 func GetPrefetcherDefinitions() []PrefetcherDefinition {
-	return prefetcherDefinitions
+	return PrefetcherDefinitions
+}
+
+func IsPrefetcherEnabled(msrValue string, bit int) (bool, error) {
+	if msrValue == "" {
+		return false, fmt.Errorf("msrValue is empty")
+	}
+	msrInt, err := strconv.ParseInt(msrValue, 16, 64)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse msrValue: %s, %v", msrValue, err)
+	}
+	bitMask := int64(1) << bit
+	// enabled if bit is zero
+	return bitMask&msrInt == 0, nil
+}
+
+func PrefetchersFromOutput(outputs map[string]script.ScriptOutput) [][]string {
+	out := make([][]string, 0)
+	uarch := UarchFromOutput(outputs)
+	if uarch == "" {
+		// uarch is required
+		return [][]string{}
+	}
+	for _, pf := range PrefetcherDefinitions {
+		if slices.Contains(pf.Uarchs, "all") || slices.Contains(pf.Uarchs, uarch[:3]) {
+			var scriptName string
+			switch pf.Msr {
+			case MsrPrefetchControl:
+				scriptName = script.PrefetchControlName
+			case MsrPrefetchers:
+				scriptName = script.PrefetchersName
+			case MsrAtomPrefTuning1:
+				scriptName = script.PrefetchersAtomName
+			default:
+				slog.Error("unknown msr for prefetcher", slog.String("msr", fmt.Sprintf("0x%x", pf.Msr)))
+				continue
+			}
+			msrVal := ValFromRegexSubmatch(outputs[scriptName].Stdout, `^([0-9a-fA-F]+)`)
+			if msrVal == "" {
+				continue
+			}
+			var enabledDisabled string
+			enabled, err := IsPrefetcherEnabled(msrVal, pf.Bit)
+			if err != nil {
+				slog.Warn("error checking prefetcher enabled status", slog.String("error", err.Error()))
+				continue
+			}
+			if enabled {
+				enabledDisabled = "Enabled"
+			} else {
+				enabledDisabled = "Disabled"
+			}
+			out = append(out, []string{pf.ShortName, pf.Description, fmt.Sprintf("0x%04X", pf.Msr), strconv.Itoa(pf.Bit), enabledDisabled})
+		}
+	}
+	return out
+}
+
+func PrefetchersSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
+	uarch := UarchFromOutput(outputs)
+	if uarch == "" {
+		// uarch is required
+		return ""
+	}
+	var prefList []string
+	for _, pf := range PrefetcherDefinitions {
+		if slices.Contains(pf.Uarchs, "all") || slices.Contains(pf.Uarchs, uarch[:3]) {
+			var scriptName string
+			switch pf.Msr {
+			case MsrPrefetchControl:
+				scriptName = script.PrefetchControlName
+			case MsrPrefetchers:
+				scriptName = script.PrefetchersName
+			case MsrAtomPrefTuning1:
+				scriptName = script.PrefetchersAtomName
+			default:
+				slog.Error("unknown msr for prefetcher", slog.String("msr", fmt.Sprintf("0x%x", pf.Msr)))
+				continue
+			}
+			msrVal := ValFromRegexSubmatch(outputs[scriptName].Stdout, `^([0-9a-fA-F]+)`)
+			if msrVal == "" {
+				continue
+			}
+			var enabledDisabled string
+			enabled, err := IsPrefetcherEnabled(msrVal, pf.Bit)
+			if err != nil {
+				slog.Warn("error checking prefetcher enabled status", slog.String("error", err.Error()))
+				continue
+			}
+			if enabled {
+				enabledDisabled = "Enabled"
+			} else {
+				enabledDisabled = "Disabled"
+			}
+			prefList = append(prefList, fmt.Sprintf("%s: %s", pf.ShortName, enabledDisabled))
+		}
+	}
+	if len(prefList) > 0 {
+		return strings.Join(prefList, ", ")
+	}
+	return "None"
 }

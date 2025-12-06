@@ -5,10 +5,24 @@ package report
 
 import (
 	"fmt"
+	"perfspect/internal/table"
 	"strings"
 )
 
-func createTextReport(allTableValues []TableValues) (out []byte, err error) {
+// Package-level map for custom text renderers
+var customTextRenderers = map[string]table.TextTableRenderer{}
+
+// getCustomTextRenderer returns the custom text renderer for a table, or nil if no custom renderer exists
+func getCustomTextRenderer(tableName string) table.TextTableRenderer {
+	return customTextRenderers[tableName]
+}
+
+// RegisterTextRenderer allows external packages to register custom text renderers for specific tables
+func RegisterTextRenderer(tableName string, renderer table.TextTableRenderer) {
+	customTextRenderers[tableName] = renderer
+}
+
+func createTextReport(allTableValues []table.TableValues) (out []byte, err error) {
 	var sb strings.Builder
 	for _, tableValues := range allTableValues {
 		sb.WriteString(fmt.Sprintf("%s\n", tableValues.Name))
@@ -17,7 +31,7 @@ func createTextReport(allTableValues []TableValues) (out []byte, err error) {
 		}
 		sb.WriteString("\n")
 		if len(tableValues.Fields) == 0 || len(tableValues.Fields[0].Values) == 0 {
-			msg := noDataFound
+			msg := NoDataFound
 			if tableValues.NoDataFound != "" {
 				msg = tableValues.NoDataFound
 			}
@@ -25,8 +39,8 @@ func createTextReport(allTableValues []TableValues) (out []byte, err error) {
 			continue
 		}
 		// custom renderer defined?
-		if tableValues.TextTableRendererFunc != nil {
-			sb.WriteString(tableValues.TextTableRendererFunc(tableValues))
+		if renderer := getCustomTextRenderer(tableValues.Name); renderer != nil {
+			sb.WriteString(renderer(tableValues))
 		} else {
 			sb.WriteString(DefaultTextTableRendererFunc(tableValues))
 		}
@@ -36,7 +50,7 @@ func createTextReport(allTableValues []TableValues) (out []byte, err error) {
 	return
 }
 
-func DefaultTextTableRendererFunc(tableValues TableValues) string {
+func DefaultTextTableRendererFunc(tableValues table.TableValues) string {
 	var sb strings.Builder
 	if tableValues.HasRows { // print the field names as column headings across the top of the table
 		// find the longest item per column -- can be the field name (column header) or a value
@@ -95,46 +109,5 @@ func DefaultTextTableRendererFunc(tableValues TableValues) string {
 			sb.WriteString(fmt.Sprintf("%s%-*s %s\n", field.Name, maxFieldNameLen-len(field.Name)+1, ":", value))
 		}
 	}
-	return sb.String()
-}
-
-// configurationTableTextRenderer renders the configuration table for text reports.
-// It's similar to the default text table renderer, but uses the Description field
-// to show the command line argument for each config item.
-// Example output:
-// Configuration
-// =============
-// Cores per Socket:               86          --cores <N>
-// L3 Cache:                       336M        --llc <MB>
-// Package Power / TDP:            350W        --tdp <Watts>
-// All-Core Max Frequency:         3.2GHz      --core-max <GHz>
-func configurationTableTextRenderer(tableValues TableValues) string {
-	var sb strings.Builder
-
-	// Find the longest field name and value for formatting
-	maxFieldNameLen := 0
-	maxValueLen := 0
-	for _, field := range tableValues.Fields {
-		if len(field.Name) > maxFieldNameLen {
-			maxFieldNameLen = len(field.Name)
-		}
-		if len(field.Values) > 0 && len(field.Values[0]) > maxValueLen {
-			maxValueLen = len(field.Values[0])
-		}
-	}
-
-	// Print each field with name, value, and description (command-line arg)
-	for _, field := range tableValues.Fields {
-		var value string
-		if len(field.Values) > 0 {
-			value = field.Values[0]
-		}
-		// Format: "Field Name:      Value       Description"
-		sb.WriteString(fmt.Sprintf("%-*s  %-*s  %s\n",
-			maxFieldNameLen+1, field.Name+":",
-			maxValueLen, value,
-			field.Description))
-	}
-
 	return sb.String()
 }

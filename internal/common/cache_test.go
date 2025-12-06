@@ -1,4 +1,4 @@
-package report
+package common
 
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
@@ -98,7 +98,7 @@ func TestParseLscpuCacheOutput(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := parseLscpuCacheOutput(tt.input)
+			result, err := ParseLscpuCacheOutput(tt.input)
 			if tt.expectedError {
 				require.Error(t, err)
 				assert.Nil(t, result)

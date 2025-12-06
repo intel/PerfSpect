@@ -1,4 +1,4 @@
-package report
+package common
 
 import (
 	"fmt"
@@ -14,12 +14,12 @@ import (
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
-// baseFrequencyFromOutput gets base core frequency
+// BaseFrequencyFromOutput gets base core frequency
 //
 //	1st option) /sys/devices/system/cpu/cpu0/cpufreq/base_frequency
 //	2nd option) from dmidecode "Current Speed"
 //	3nd option) parse it from the model name
-func baseFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
+func BaseFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 	cmdout := strings.TrimSpace(outputs[script.BaseFrequencyScriptName].Stdout)
 	if cmdout != "" {
 		freqf, err := strconv.ParseFloat(cmdout, 64)
@@ -28,7 +28,7 @@ func baseFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 			return fmt.Sprintf("%.1fGHz", freqf)
 		}
 	}
-	currentSpeedVal := valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "4", `Current Speed:\s(.*)$`)
+	currentSpeedVal := ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "4", `Current Speed:\s(.*)$`)
 	tokens := strings.Split(currentSpeedVal, " ")
 	if len(tokens) == 2 {
 		num, err := strconv.ParseFloat(tokens[0], 64)
@@ -42,7 +42,7 @@ func baseFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 		}
 	}
 	// the frequency (if included) is at the end of the model name in lscpu's output
-	modelName := valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^[Mm]odel name.*:\s*(.+?)$`)
+	modelName := ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^[Mm]odel name.*:\s*(.+?)$`)
 	tokens = strings.Split(modelName, " ")
 	if len(tokens) > 0 {
 		lastToken := tokens[len(tokens)-1]
@@ -91,7 +91,7 @@ func padFrequencies(freqs []int, desiredLength int) ([]int, error) {
 	return freqs, nil
 }
 
-// getSpecFrequencyBuckets
+// GetSpecFrequencyBuckets gets the core frequency buckets from the script output
 // returns slice of rows
 // first row is header
 // each row is a slice of strings
@@ -101,7 +101,7 @@ func padFrequencies(freqs []int, desiredLength int) ([]int, error) {
 // "64-85", "32-43", "3.5", "3.5", "3.3", "3.2", "3.1"
 // ...
 // the "cores per die" column is only present for some architectures
-func getSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string, error) {
+func GetSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string, error) {
 	arch := UarchFromOutput(outputs)
 	if arch == "" {
 		return nil, fmt.Errorf("uarch is required")
@@ -230,14 +230,14 @@ func getSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 	return specCoreFreqs, nil
 }
 
-// expandTurboFrequencies expands the turbo frequencies to a list of frequencies
+// ExpandTurboFrequencies expands the turbo frequencies to a list of frequencies
 // input is the output of getSpecFrequencyBuckets, e.g.:
 // "cores", "cores per die", "sse", "avx2", "avx512", "avx512h", "amx"
 // "0-41", "0-20", "3.5", "3.5", "3.3", "3.2", "3.1"
 // "42-63", "21-31", "3.5", "3.5", "3.3", "3.2", "3.1"
 // ...
 // output is the expanded list of the frequencies for the requested ISA
-func expandTurboFrequencies(specFrequencyBuckets [][]string, isa string) ([]string, error) {
+func ExpandTurboFrequencies(specFrequencyBuckets [][]string, isa string) ([]string, error) {
 	if len(specFrequencyBuckets) < 2 || len(specFrequencyBuckets[0]) < 2 {
 		return nil, fmt.Errorf("unable to parse core frequency buckets")
 	}
@@ -270,12 +270,12 @@ func expandTurboFrequencies(specFrequencyBuckets [][]string, isa string) ([]stri
 	return freqs, nil
 }
 
-// maxFrequencyFromOutputs gets max core frequency
+// MaxFrequencyFromOutput gets max core frequency
 //
 //	1st option) /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq
 //	2nd option) from MSR/tpmi
 //	3rd option) from dmidecode "Max Speed"
-func maxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
+func MaxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 	cmdout := strings.TrimSpace(outputs[script.MaximumFrequencyScriptName].Stdout)
 	if cmdout != "" {
 		freqf, err := strconv.ParseFloat(cmdout, 64)
@@ -285,18 +285,18 @@ func maxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 		}
 	}
 	// get the max frequency from the MSR/tpmi
-	specCoreFrequencies, err := getSpecFrequencyBuckets(outputs)
+	specCoreFrequencies, err := GetSpecFrequencyBuckets(outputs)
 	if err == nil {
-		sseFreqs := getSSEFreqsFromBuckets(specCoreFrequencies)
+		sseFreqs := GetSSEFreqsFromBuckets(specCoreFrequencies)
 		if len(sseFreqs) > 0 {
 			// max (single-core) frequency is the first SSE frequency
 			return sseFreqs[0] + "GHz"
 		}
 	}
-	return valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "4", `Max Speed:\s(.*)`)
+	return ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "4", `Max Speed:\s(.*)`)
 }
 
-func getSSEFreqsFromBuckets(buckets [][]string) []string {
+func GetSSEFreqsFromBuckets(buckets [][]string) []string {
 	if len(buckets) < 2 {
 		return nil
 	}
@@ -321,12 +321,12 @@ func getSSEFreqsFromBuckets(buckets [][]string) []string {
 	return sse
 }
 
-func allCoreMaxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
-	specCoreFrequencies, err := getSpecFrequencyBuckets(outputs)
+func AllCoreMaxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
+	specCoreFrequencies, err := GetSpecFrequencyBuckets(outputs)
 	if err != nil {
 		return ""
 	}
-	sseFreqs := getSSEFreqsFromBuckets(specCoreFrequencies)
+	sseFreqs := GetSSEFreqsFromBuckets(specCoreFrequencies)
 	if len(sseFreqs) < 1 {
 		return ""
 	}
@@ -334,47 +334,7 @@ func allCoreMaxFrequencyFromOutput(outputs map[string]script.ScriptOutput) strin
 	return sseFreqs[len(sseFreqs)-1] + "GHz"
 }
 
-// sseFrequenciesFromOutput gets the bucketed SSE frequencies from the output
-// and returns a compact string representation with consolidated ranges, e.g.:
-// "1-40/3.5, 41-60/3.4, 61-86/3.2"
-func sseFrequenciesFromOutput(outputs map[string]script.ScriptOutput) string {
-	specCoreFrequencies, err := getSpecFrequencyBuckets(outputs)
-	if err != nil {
-		return ""
-	}
-	sseFreqs := getSSEFreqsFromBuckets(specCoreFrequencies)
-	if len(sseFreqs) < 1 {
-		return ""
-	}
-
-	var result []string
-	i := 1
-	for i < len(specCoreFrequencies) {
-		startIdx := i
-		currentFreq := sseFreqs[i-1]
-
-		// Find consecutive buckets with the same frequency
-		for i < len(specCoreFrequencies) && sseFreqs[i-1] == currentFreq {
-			i++
-		}
-		endIdx := i - 1
-
-		// Extract start and end core numbers from the ranges
-		startRange := strings.Split(specCoreFrequencies[startIdx][0], "-")[0]
-		endRange := strings.Split(specCoreFrequencies[endIdx][0], "-")[1]
-
-		// Format the consolidated range
-		if startRange == endRange {
-			result = append(result, fmt.Sprintf("%s/%s", startRange, currentFreq))
-		} else {
-			result = append(result, fmt.Sprintf("%s-%s/%s", startRange, endRange, currentFreq))
-		}
-	}
-
-	return strings.Join(result, ", ")
-}
-
-func uncoreMinMaxDieFrequencyFromOutput(maxFreq bool, computeDie bool, outputs map[string]script.ScriptOutput) string {
+func UncoreMinMaxDieFrequencyFromOutput(maxFreq bool, computeDie bool, outputs map[string]script.ScriptOutput) string {
 	// find the first die that matches requrested die type (compute or I/O)
 	re := regexp.MustCompile(`Read bits \d+:\d+ value (\d+) from TPMI ID .* for entry (\d+) in instance (\d+)`)
 	var instance, entry string
@@ -431,7 +391,7 @@ func uncoreMinMaxDieFrequencyFromOutput(maxFreq bool, computeDie bool, outputs m
 	return fmt.Sprintf("%.1fGHz", float64(parsed)/10)
 }
 
-func uncoreMinMaxFrequencyFromOutput(maxFreq bool, outputs map[string]script.ScriptOutput) string {
+func UncoreMinMaxFrequencyFromOutput(maxFreq bool, outputs map[string]script.ScriptOutput) string {
 	var parsed int64
 	var err error
 	var scriptName string
@@ -454,10 +414,10 @@ func uncoreMinMaxFrequencyFromOutput(maxFreq bool, outputs map[string]script.Scr
 	return fmt.Sprintf("%.1fGHz", float64(parsed)/10)
 }
 
-func uncoreMinFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
-	return uncoreMinMaxFrequencyFromOutput(false, outputs)
+func UncoreMinFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
+	return UncoreMinMaxFrequencyFromOutput(false, outputs)
 }
 
-func uncoreMaxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
-	return uncoreMinMaxFrequencyFromOutput(true, outputs)
+func UncoreMaxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
+	return UncoreMinMaxFrequencyFromOutput(true, outputs)
 }

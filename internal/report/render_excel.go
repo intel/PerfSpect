@@ -7,10 +7,26 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"perfspect/internal/table"
 	"strconv"
 
 	"github.com/xuri/excelize/v2"
 )
+
+// Package-level map for custom XLSX renderers
+var customXlsxRenderers = map[string]table.XlsxTableRenderer{
+	// No custom XLSX renderers currently defined
+}
+
+// getCustomXlsxRenderer returns the custom XLSX renderer for a table, or nil if no custom renderer exists
+func getCustomXlsxRenderer(tableName string) table.XlsxTableRenderer {
+	return customXlsxRenderers[tableName]
+}
+
+// RegisterXlsxRenderer allows external packages to register custom XLSX renderers for specific tables
+func RegisterXlsxRenderer(tableName string, renderer table.XlsxTableRenderer) {
+	customXlsxRenderers[tableName] = renderer
+}
 
 func cellName(col int, row int) (name string) {
 	columnName, err := excelize.ColumnNumberToName(col)
@@ -24,7 +40,7 @@ func cellName(col int, row int) (name string) {
 	return
 }
 
-func renderXlsxTable(tableValues TableValues, f *excelize.File, sheetName string, row *int) {
+func renderXlsxTable(tableValues table.TableValues, f *excelize.File, sheetName string, row *int) {
 	col := 1
 	// print the table name
 	tableNameStyle, _ := f.NewStyle(&excelize.Style{
@@ -36,7 +52,7 @@ func renderXlsxTable(tableValues TableValues, f *excelize.File, sheetName string
 	_ = f.SetCellStyle(sheetName, cellName(col, *row), cellName(col, *row), tableNameStyle)
 	*row++
 	if len(tableValues.Fields) == 0 || len(tableValues.Fields[0].Values) == 0 {
-		msg := noDataFound
+		msg := NoDataFound
 		if tableValues.NoDataFound != "" {
 			msg = tableValues.NoDataFound
 		}
@@ -44,15 +60,15 @@ func renderXlsxTable(tableValues TableValues, f *excelize.File, sheetName string
 		*row += 2
 		return
 	}
-	if tableValues.XlsxTableRendererFunc != nil {
-		tableValues.XlsxTableRendererFunc(tableValues, f, sheetName, row)
+	if renderer := getCustomXlsxRenderer(tableValues.Name); renderer != nil {
+		renderer(tableValues, f, sheetName, row)
 	} else {
 		DefaultXlsxTableRendererFunc(tableValues, f, sheetName, row)
 	}
 	*row++
 }
 
-func renderXlsxTableMultiTarget(targetTableValues []TableValues, targetNames []string, f *excelize.File, sheetName string, row *int) {
+func renderXlsxTableMultiTarget(targetTableValues []table.TableValues, targetNames []string, f *excelize.File, sheetName string, row *int) {
 	col := 1
 	// print the table name
 	tableNameStyle, _ := f.NewStyle(&excelize.Style{
@@ -112,7 +128,7 @@ func renderXlsxTableMultiTarget(targetTableValues []TableValues, targetNames []s
 
 			// if no data found, print a message and skip to the next target
 			if len(targetTableValues[targetIdx].Fields) == 0 || len(targetTableValues[targetIdx].Fields[0].Values) == 0 {
-				msg := noDataFound
+				msg := NoDataFound
 				if targetTableValues[targetIdx].NoDataFound != "" {
 					msg = targetTableValues[targetIdx].NoDataFound
 				}
@@ -146,7 +162,7 @@ func renderXlsxTableMultiTarget(targetTableValues []TableValues, targetNames []s
 	*row++
 }
 
-func DefaultXlsxTableRendererFunc(tableValues TableValues, f *excelize.File, sheetName string, row *int) {
+func DefaultXlsxTableRendererFunc(tableValues table.TableValues, f *excelize.File, sheetName string, row *int) {
 	headerStyle, _ := f.NewStyle(&excelize.Style{
 		Font: &excelize.Font{
 			Bold: true,
@@ -207,7 +223,7 @@ const (
 	XlsxBriefSheetName   = "Brief"
 )
 
-func createXlsxReport(allTableValues []TableValues) (out []byte, err error) {
+func createXlsxReport(allTableValues []table.TableValues, systemSummaryTableName string) (out []byte, err error) {
 	f := excelize.NewFile()
 	sheetName := XlsxPrimarySheetName
 	_ = f.SetSheetName("Sheet1", sheetName)
@@ -215,7 +231,7 @@ func createXlsxReport(allTableValues []TableValues) (out []byte, err error) {
 	_ = f.SetColWidth(sheetName, "B", "L", 25)
 	row := 1
 	for _, tableValues := range allTableValues {
-		if tableValues.Name == SystemSummaryTableName {
+		if tableValues.Name == systemSummaryTableName {
 			row := 1
 			sheetName := XlsxBriefSheetName
 			_, _ = f.NewSheet(sheetName)
@@ -236,7 +252,7 @@ func createXlsxReport(allTableValues []TableValues) (out []byte, err error) {
 	return
 }
 
-func createXlsxReportMultiTarget(allTargetsTableValues [][]TableValues, targetNames []string, allTableNames []string) (out []byte, err error) {
+func createXlsxReportMultiTarget(allTargetsTableValues [][]table.TableValues, targetNames []string, allTableNames []string, systemSummaryTableName string) (out []byte, err error) {
 	f := excelize.NewFile()
 	sheetName := XlsxPrimarySheetName
 	_ = f.SetSheetName("Sheet1", sheetName)
@@ -248,7 +264,7 @@ func createXlsxReportMultiTarget(allTargetsTableValues [][]TableValues, targetNa
 	for _, tableName := range allTableNames {
 		// build list of target names and TableValues for targets that have values for this table
 		tableTargets := []string{}
-		tableValues := []TableValues{}
+		tableValues := []table.TableValues{}
 		for targetIndex, targetTableValues := range allTargetsTableValues {
 			tableIndex := findTableIndex(targetTableValues, tableName)
 			if tableIndex == -1 {
@@ -258,7 +274,7 @@ func createXlsxReportMultiTarget(allTargetsTableValues [][]TableValues, targetNa
 			tableValues = append(tableValues, targetTableValues[tableIndex])
 		}
 		// render the table, if system summary table put it in a separate sheet
-		if tableName == SystemSummaryTableName {
+		if tableName == systemSummaryTableName {
 			summaryRow := 1
 			sheetName := XlsxBriefSheetName
 			_, _ = f.NewSheet(sheetName)

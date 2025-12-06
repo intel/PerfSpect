@@ -3,9 +3,12 @@ package report
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"perfspect/internal/table"
+)
 
-func createJsonReport(allTableValues []TableValues) (out []byte, err error) {
+func createJsonReport(allTableValues []table.TableValues) (out []byte, err error) {
 	type outRecord map[string]string
 	type outTable []outRecord
 	type outReport map[string]outTable

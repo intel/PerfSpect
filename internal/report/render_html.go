@@ -9,14 +9,35 @@ import (
 	"html"
 	htmltemplate "html/template"
 	"log/slog"
-	"math"
-	"perfspect/internal/util"
-	"slices"
-	"sort"
-	"strconv"
+	"perfspect/internal/table"
 	"strings"
 	texttemplate "text/template" // nosemgrep
 )
+
+// Package-level maps for custom HTML renderers
+var customHTMLRenderers = map[string]table.HTMLTableRenderer{}
+
+var customHTMLMultiTargetRenderers = map[string]table.HTMLMultiTargetTableRenderer{}
+
+// getCustomHTMLRenderer returns the custom renderer for a table, or nil if no custom renderer exists
+func getCustomHTMLRenderer(tableName string) table.HTMLTableRenderer {
+	return customHTMLRenderers[tableName]
+}
+
+// getCustomHTMLMultiTargetRenderer returns the custom multi-target renderer for a table, or nil if no custom renderer exists
+func getCustomHTMLMultiTargetRenderer(tableName string) table.HTMLMultiTargetTableRenderer {
+	return customHTMLMultiTargetRenderers[tableName]
+}
+
+// RegisterHTMLRenderer allows external packages to register custom HTML renderers for specific tables
+func RegisterHTMLRenderer(tableName string, renderer table.HTMLTableRenderer) {
+	customHTMLRenderers[tableName] = renderer
+}
+
+// RegisterHTMLMultiTargetRenderer allows external packages to register custom multi-target HTML renderers for specific tables
+func RegisterHTMLMultiTargetRenderer(tableName string, renderer table.HTMLMultiTargetTableRenderer) {
+	customHTMLMultiTargetRenderers[tableName] = renderer
+}
 
 func getHtmlReportBegin() string {
 	var sb strings.Builder
@@ -180,7 +201,7 @@ func getHtmlReportBegin() string {
 	return sb.String()
 }
 
-func getHtmlReportMenu(allTableValues []TableValues) string {
+func getHtmlReportMenu(allTableValues []table.TableValues) string {
 	var sb strings.Builder
 	// if none of the tables have menu labels, don't add the sidebar
 	hasMenuLabels := false
@@ -233,7 +254,7 @@ func getHtmlReportSidebarJavascript() string {
 	`
 }
 
-func createHtmlReport(allTableValues []TableValues, targetName string) (out []byte, err error) {
+func createHtmlReport(allTableValues []table.TableValues, targetName string) (out []byte, err error) {
 	var sb strings.Builder
 	sb.WriteString(getHtmlReportBegin())
 
@@ -255,7 +276,7 @@ func createHtmlReport(allTableValues []TableValues, targetName string) (out []by
 		sb.WriteString(fmt.Sprintf("<h2 id=\"%[1]s\">%[1]s</h2>\n", html.EscapeString(tableValues.Name)))
 		// if there's no data in the table, print a message and continue
 		if len(tableValues.Fields) == 0 || len(tableValues.Fields[0].Values) == 0 {
-			msg := noDataFound
+			msg := NoDataFound
 			if tableValues.NoDataFound != "" {
 				msg = tableValues.NoDataFound
 			}
@@ -263,8 +284,8 @@ func createHtmlReport(allTableValues []TableValues, targetName string) (out []by
 			continue
 		}
 		// render the tables
-		if tableValues.HTMLTableRendererFunc != nil { // custom table renderer
-			sb.WriteString(tableValues.HTMLTableRendererFunc(tableValues, targetName))
+		if renderer := getCustomHTMLRenderer(tableValues.Name); renderer != nil { // custom table renderer
+			sb.WriteString(renderer(tableValues, targetName))
 		} else {
 			sb.WriteString(DefaultHTMLTableRendererFunc(tableValues))
 		}
@@ -281,7 +302,7 @@ func createHtmlReport(allTableValues []TableValues, targetName string) (out []by
 	return
 }
 
-func createHtmlReportMultiTarget(allTargetsTableValues [][]TableValues, targetNames []string, allTableNames []string) (out []byte, err error) {
+func createHtmlReportMultiTarget(allTargetsTableValues [][]table.TableValues, targetNames []string, allTableNames []string) (out []byte, err error) {
 	var sb strings.Builder
 	sb.WriteString(getHtmlReportBegin())
 
@@ -300,10 +321,10 @@ func createHtmlReportMultiTarget(allTargetsTableValues [][]TableValues, targetNa
 `)
 	// print the tables in the order they were passed in
 	for _, tableName := range allTableNames {
-		oneTableValuesForAllTargets := []TableValues{}
-		// build list of target names and TableValues for targets that have values for this table
+		oneTableValuesForAllTargets := []table.TableValues{}
+		// build list of target names and table.TableValues for targets that have values for this table
 		tableTargets := []string{}
-		tableValues := []TableValues{}
+		tableValues := []table.TableValues{}
 		for targetIndex, targetTableValues := range allTargetsTableValues {
 			tableIndex := findTableIndex(targetTableValues, tableName)
 			if tableIndex == -1 {
@@ -316,7 +337,7 @@ func createHtmlReportMultiTarget(allTargetsTableValues [][]TableValues, targetNa
 		for targetIndex, targetTableValues := range tableValues {
 			targetName := tableTargets[targetIndex]
 			// if the table has rows and no custom renderer, print the table for the target normally
-			if targetTableValues.HasRows && targetTableValues.HTMLMultiTargetTableRendererFunc == nil {
+			if targetTableValues.HasRows && getCustomHTMLMultiTargetRenderer(targetTableValues.Name) == nil {
 				// print the table name only one time per table
 				if targetIndex == 0 {
 					sb.WriteString(fmt.Sprintf("<h2 id=\"%[1]s\">%[1]s</h2>\n", html.EscapeString(targetTableValues.Name)))
@@ -325,11 +346,11 @@ func createHtmlReportMultiTarget(allTargetsTableValues [][]TableValues, targetNa
 				sb.WriteString(fmt.Sprintf("<h3>%s</h3>\n", targetName))
 				// if there's no data in the table, print a message and continue
 				if len(targetTableValues.Fields) == 0 || len(targetTableValues.Fields[0].Values) == 0 {
-					sb.WriteString("<p>" + noDataFound + "</p>\n")
+					sb.WriteString("<p>" + NoDataFound + "</p>\n")
 					continue
 				}
-				if targetTableValues.HTMLTableRendererFunc != nil { // custom table renderer
-					sb.WriteString(targetTableValues.HTMLTableRendererFunc(targetTableValues, targetNames[targetIndex]))
+				if renderer := getCustomHTMLRenderer(targetTableValues.Name); renderer != nil { // custom table renderer
+					sb.WriteString(renderer(targetTableValues, targetNames[targetIndex]))
 				} else {
 					sb.WriteString(DefaultHTMLTableRendererFunc(targetTableValues))
 				}
@@ -340,8 +361,8 @@ func createHtmlReportMultiTarget(allTargetsTableValues [][]TableValues, targetNa
 		// print the multi-target table, if any
 		if len(oneTableValuesForAllTargets) > 0 {
 			sb.WriteString(fmt.Sprintf("<h2 id=\"%[1]s\">%[1]s</h2>\n", html.EscapeString(oneTableValuesForAllTargets[0].Name)))
-			if oneTableValuesForAllTargets[0].HTMLMultiTargetTableRendererFunc != nil {
-				sb.WriteString(oneTableValuesForAllTargets[0].HTMLMultiTargetTableRendererFunc(oneTableValuesForAllTargets, targetNames))
+			if renderer := getCustomHTMLMultiTargetRenderer(oneTableValuesForAllTargets[0].Name); renderer != nil {
+				sb.WriteString(renderer(oneTableValuesForAllTargets, targetNames))
 			} else {
 				// render the multi-target table
 				sb.WriteString(RenderMultiTargetTableValuesAsHTML(oneTableValuesForAllTargets, targetNames))
@@ -361,7 +382,7 @@ func createHtmlReportMultiTarget(allTargetsTableValues [][]TableValues, targetNa
 }
 
 // findTableIndex
-func findTableIndex(tableValues []TableValues, tableName string) int {
+func findTableIndex(tableValues []table.TableValues, tableName string) int {
 	for i, tableValue := range tableValues {
 		if tableValue.Name == tableName {
 			return i
@@ -489,7 +510,7 @@ new Chart(document.getElementById('{{.ID}}'), {
 </script>
 `
 
-type chartTemplateStruct struct {
+type ChartTemplateStruct struct {
 	ID            string
 	Labels        string // only for line charts
 	Datasets      string
@@ -511,7 +532,7 @@ func CreateFieldNameWithDescription(fieldName, description string) string {
 	return htmltemplate.HTMLEscapeString(fieldName) + `<span class="field-description"><span class="tooltip-icon">?</span><span class="tooltip-text">` + htmltemplate.HTMLEscapeString(description) + `</span></span>`
 }
 
-func renderHTMLTable(tableHeaders []string, tableValues [][]string, class string, valuesStyle [][]string) string {
+func RenderHTMLTable(tableHeaders []string, tableValues [][]string, class string, valuesStyle [][]string) string {
 	return renderHTMLTableWithDescriptions(tableHeaders, nil, tableValues, class, valuesStyle)
 }
 
@@ -549,7 +570,7 @@ func renderHTMLTableWithDescriptions(tableHeaders []string, headerDescriptions [
 	return sb.String()
 }
 
-func DefaultHTMLTableRendererFunc(tableValues TableValues) string {
+func DefaultHTMLTableRendererFunc(tableValues table.TableValues) string {
 	if tableValues.HasRows { // print the field names as column headings across the top of the table
 		headers := []string{}
 		headerDescriptions := []string{}
@@ -576,13 +597,13 @@ func DefaultHTMLTableRendererFunc(tableValues TableValues) string {
 			values = append(values, rowValues)
 			tableValueStyles = append(tableValueStyles, []string{"font-weight:bold"})
 		}
-		return renderHTMLTable([]string{}, values, "pure-table pure-table-striped", tableValueStyles)
+		return RenderHTMLTable([]string{}, values, "pure-table pure-table-striped", tableValueStyles)
 	}
 }
 
 // RenderMultiTargetTableValuesAsHTML renders a table for multiple targets
-// tableValues is a slice of TableValues, each of which represents the same table from a single target
-func RenderMultiTargetTableValuesAsHTML(tableValues []TableValues, targetNames []string) string {
+// tableValues is a slice of table.TableValues, each of which represents the same table from a single target
+func RenderMultiTargetTableValuesAsHTML(tableValues []table.TableValues, targetNames []string) string {
 	values := [][]string{}
 	var tableValueStyles [][]string
 	for fieldIndex, field := range tableValues[0].Fields {
@@ -600,123 +621,10 @@ func RenderMultiTargetTableValuesAsHTML(tableValues []TableValues, targetNames [
 	}
 	headers := []string{""}
 	headers = append(headers, targetNames...)
-	return renderHTMLTable(headers, values, "pure-table pure-table-striped", tableValueStyles)
+	return RenderHTMLTable(headers, values, "pure-table pure-table-striped", tableValueStyles)
 }
 
-func dimmDetails(dimm []string) (details string) {
-	if strings.Contains(dimm[SizeIdx], "No") {
-		details = "No Module Installed"
-	} else {
-		// Intel PMEM modules may have serial number appended to end of part number...
-		// strip that off so it doesn't mess with color selection later
-		partNumber := dimm[PartIdx]
-		if strings.Contains(dimm[DetailIdx], "Synchronous Non-Volatile") &&
-			dimm[ManufacturerIdx] == "Intel" &&
-			strings.HasSuffix(dimm[PartIdx], dimm[SerialIdx]) {
-			partNumber = dimm[PartIdx][:len(dimm[PartIdx])-len(dimm[SerialIdx])]
-		}
-		// example: "64GB DDR5 R2 Synchronous Registered (Buffered) Micron Technology MTC78ASF4G72PZ-2G6E1 6400 MT/s [6000 MT/s]"
-		details = fmt.Sprintf("%s %s %s R%s %s %s %s [%s]",
-			strings.ReplaceAll(dimm[SizeIdx], " ", ""),
-			dimm[TypeIdx],
-			dimm[DetailIdx],
-			dimm[RankIdx],
-			dimm[ManufacturerIdx],
-			partNumber,
-			strings.ReplaceAll(dimm[SpeedIdx], " ", ""),
-			strings.ReplaceAll(dimm[ConfiguredSpeedIdx], " ", ""))
-	}
-	return
-}
-
-func dimmTableHTMLRenderer(tableValues TableValues, targetName string) string {
-	if tableValues.Fields[DerivedSocketIdx].Values[0] == "" || tableValues.Fields[DerivedChannelIdx].Values[0] == "" || tableValues.Fields[DerivedSlotIdx].Values[0] == "" {
-		return DefaultHTMLTableRendererFunc(tableValues)
-	}
-	htmlColors := []string{"lightgreen", "orange", "aqua", "lime", "yellow", "beige", "magenta", "violet", "salmon", "pink"}
-	var slotColorIndices = make(map[string]int)
-	// socket -> channel -> slot -> dimm details
-	var dimms = map[string]map[string]map[string]string{}
-	for dimmIdx := range tableValues.Fields[DerivedSocketIdx].Values {
-		if _, ok := dimms[tableValues.Fields[DerivedSocketIdx].Values[dimmIdx]]; !ok {
-			dimms[tableValues.Fields[DerivedSocketIdx].Values[dimmIdx]] = make(map[string]map[string]string)
-		}
-		if _, ok := dimms[tableValues.Fields[DerivedSocketIdx].Values[dimmIdx]][tableValues.Fields[DerivedChannelIdx].Values[dimmIdx]]; !ok {
-			dimms[tableValues.Fields[DerivedSocketIdx].Values[dimmIdx]][tableValues.Fields[DerivedChannelIdx].Values[dimmIdx]] = make(map[string]string)
-		}
-		dimmValues := []string{}
-		for _, field := range tableValues.Fields {
-			dimmValues = append(dimmValues, field.Values[dimmIdx])
-		}
-		dimms[tableValues.Fields[DerivedSocketIdx].Values[dimmIdx]][tableValues.Fields[DerivedChannelIdx].Values[dimmIdx]][tableValues.Fields[DerivedSlotIdx].Values[dimmIdx]] = dimmDetails(dimmValues)
-	}
-
-	var socketTableHeaders = []string{"Socket", ""}
-	var socketTableValues [][]string
-	var socketKeys []string
-	for k := range dimms {
-		socketKeys = append(socketKeys, k)
-	}
-	sort.Strings(socketKeys)
-	for _, socket := range socketKeys {
-		socketMap := dimms[socket]
-		socketTableValues = append(socketTableValues, []string{})
-		var channelTableHeaders = []string{"Channel", "Slots"}
-		var channelTableValues [][]string
-		var channelKeys []int
-		for k := range socketMap {
-			channel, err := strconv.Atoi(k)
-			if err != nil {
-				slog.Error("failed to convert channel to int", slog.String("error", err.Error()))
-				return ""
-			}
-			channelKeys = append(channelKeys, channel)
-		}
-		sort.Ints(channelKeys)
-		for _, channel := range channelKeys {
-			channelMap := socketMap[strconv.Itoa(channel)]
-			channelTableValues = append(channelTableValues, []string{})
-			var slotTableHeaders []string
-			var slotTableValues [][]string
-			var slotTableValuesStyles [][]string
-			var slotKeys []string
-			for k := range channelMap {
-				slotKeys = append(slotKeys, k)
-			}
-			sort.Strings(slotKeys)
-			slotTableValues = append(slotTableValues, []string{})
-			slotTableValuesStyles = append(slotTableValuesStyles, []string{})
-			for _, slot := range slotKeys {
-				dimmDetails := channelMap[slot]
-				slotTableValues[0] = append(slotTableValues[0], htmltemplate.HTMLEscapeString(dimmDetails))
-				var slotColor string
-				if dimmDetails == "No Module Installed" {
-					slotColor = "background-color:silver"
-				} else {
-					if _, ok := slotColorIndices[dimmDetails]; !ok {
-						slotColorIndices[dimmDetails] = int(math.Min(float64(len(slotColorIndices)), float64(len(htmlColors)-1)))
-					}
-					slotColor = "background-color:" + htmlColors[slotColorIndices[dimmDetails]]
-				}
-				slotTableValuesStyles[0] = append(slotTableValuesStyles[0], slotColor)
-			}
-			slotTable := renderHTMLTable(slotTableHeaders, slotTableValues, "pure-table pure-table-bordered", slotTableValuesStyles)
-			// channel number
-			channelTableValues[len(channelTableValues)-1] = append(channelTableValues[len(channelTableValues)-1], strconv.Itoa(channel))
-			// slot table
-			channelTableValues[len(channelTableValues)-1] = append(channelTableValues[len(channelTableValues)-1], slotTable)
-			// style
-		}
-		channelTable := renderHTMLTable(channelTableHeaders, channelTableValues, "pure-table pure-table-bordered", [][]string{})
-		// socket number
-		socketTableValues[len(socketTableValues)-1] = append(socketTableValues[len(socketTableValues)-1], socket)
-		// channel table
-		socketTableValues[len(socketTableValues)-1] = append(socketTableValues[len(socketTableValues)-1], channelTable)
-	}
-	return renderHTMLTable(socketTableHeaders, socketTableValues, "pure-table pure-table-bordered", [][]string{})
-}
-
-// renderChart generates an HTML/JavaScript representation of a chart using the provided data and configuration.
+// RenderChart generates an HTML/JavaScript representation of a chart using the provided data and configuration.
 // It supports different chart types (e.g., "line", "scatter") and uses Go templates to format the datasets and chart.
 // Parameters:
 //   - chartType: the type of chart to render ("line", "scatter").
@@ -728,7 +636,7 @@ func dimmTableHTMLRenderer(tableValues TableValues, targetName string) string {
 //
 // Returns:
 //   - A string containing the rendered chart HTML/JavaScript, or an error message if rendering fails.
-func renderChart(chartType string, allFormattedPoints []string, datasetNames []string, xAxisLabels []string, config chartTemplateStruct, datasetHiddenFlags []bool) string {
+func RenderChart(chartType string, allFormattedPoints []string, datasetNames []string, xAxisLabels []string, config ChartTemplateStruct, datasetHiddenFlags []bool) string {
 	datasets := []string{}
 	for dataIdx, formattedPoints := range allFormattedPoints {
 		specValues := formattedPoints
@@ -787,12 +695,12 @@ func renderChart(chartType string, allFormattedPoints []string, datasetNames []s
 	return out
 }
 
-type scatterPoint struct {
-	x float64
-	y float64
+type ScatterPoint struct {
+	X float64
+	Y float64
 }
 
-// renderScatterChart generates an HTML string for a scatter chart using the provided data and configuration.
+// RenderScatterChart generates an HTML string for a scatter chart using the provided data and configuration.
 //
 // Parameters:
 //
@@ -803,821 +711,20 @@ type scatterPoint struct {
 // Returns:
 //
 //	A string containing the rendered HTML for the scatter chart.
-func renderScatterChart(data [][]scatterPoint, datasetNames []string, config chartTemplateStruct) string {
+func RenderScatterChart(data [][]ScatterPoint, datasetNames []string, config ChartTemplateStruct) string {
 	allFormattedPoints := []string{}
 	for dataIdx := range data {
 		formattedPoints := []string{}
 		for _, point := range data[dataIdx] {
-			formattedPoints = append(formattedPoints, fmt.Sprintf("{x: %f, y: %f}", point.x, point.y))
+			formattedPoints = append(formattedPoints, fmt.Sprintf("{x: %f, y: %f}", point.X, point.Y))
 		}
 		allFormattedPoints = append(allFormattedPoints, strings.Join(formattedPoints, ","))
 	}
-	return renderChart("scatter", allFormattedPoints, datasetNames, nil, config, nil)
-}
-
-// renderLineChart generates an HTML string for a line chart using the provided data and configuration.
-//
-// Parameters:
-//
-//	xAxisLabels        - Slice of strings representing the labels for the X axis.
-//	data               - 2D slice of float64 values, where each inner slice represents a dataset's data points.
-//	datasetNames       - Slice of strings representing the names of each dataset.
-//	config             - chartTemplateStruct containing chart configuration options.
-//	datasetHiddenFlags - Slice of booleans indicating whether each dataset should be hidden initially.
-//
-// Returns:
-//
-//	A string containing the rendered HTML for the line chart.
-func renderLineChart(xAxisLabels []string, data [][]float64, datasetNames []string, config chartTemplateStruct, datasetHiddenFlags []bool) string {
-	allFormattedPoints := []string{}
-	for dataIdx := range data {
-		formattedPoints := []string{}
-		for _, point := range data[dataIdx] {
-			formattedPoints = append(formattedPoints, fmt.Sprintf("%f", point))
-		}
-		allFormattedPoints = append(allFormattedPoints, strings.Join(formattedPoints, ","))
-	}
-	return renderChart("line", allFormattedPoints, datasetNames, xAxisLabels, config, datasetHiddenFlags)
-}
-
-func renderFrequencyTable(tableValues TableValues) (out string) {
-	var rows [][]string
-	headers := []string{""}
-	valuesStyles := [][]string{}
-	for i := range tableValues.Fields[0].Values {
-		headers = append(headers, fmt.Sprintf("%d", i+1))
-	}
-	for _, field := range tableValues.Fields[1:] {
-		row := append([]string{CreateFieldNameWithDescription(field.Name, field.Description)}, field.Values...)
-		rows = append(rows, row)
-		valuesStyles = append(valuesStyles, []string{"font-weight:bold"})
-	}
-	out = renderHTMLTable(headers, rows, "pure-table pure-table-striped", valuesStyles)
-	return
-}
-
-func coreTurboFrequencyTableHTMLRenderer(tableValues TableValues) string {
-	data := [][]scatterPoint{}
-	datasetNames := []string{}
-	for _, field := range tableValues.Fields[1:] {
-		points := []scatterPoint{}
-		for i, val := range field.Values {
-			if val == "" {
-				break
-			}
-			freq, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				slog.Error("error parsing frequency", slog.String("error", err.Error()))
-				return ""
-			}
-			points = append(points, scatterPoint{float64(i + 1), freq})
-		}
-		if len(points) > 0 {
-			data = append(data, points)
-			datasetNames = append(datasetNames, field.Name)
-		}
-	}
-	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("turboFrequency%d", util.RandUint(10000)),
-		XaxisText:     "Core Count",
-		YaxisText:     "Frequency (GHz)",
-		TitleText:     "",
-		DisplayTitle:  "false",
-		DisplayLegend: "true",
-		AspectRatio:   "4",
-		SuggestedMin:  "2",
-		SuggestedMax:  "4",
-	}
-	out := renderScatterChart(data, datasetNames, chartConfig)
-	out += "\n"
-	out += renderFrequencyTable(tableValues)
-	return out
-}
-
-func frequencyBenchmarkTableHtmlRenderer(tableValues TableValues, targetName string) string {
-	return coreTurboFrequencyTableHTMLRenderer(tableValues)
-}
-
-func memoryBenchmarkTableHtmlRenderer(tableValues TableValues, targetName string) string {
-	return memoryBenchmarkTableMultiTargetHtmlRenderer([]TableValues{tableValues}, []string{targetName})
-}
-
-func memoryBenchmarkTableMultiTargetHtmlRenderer(allTableValues []TableValues, targetNames []string) string {
-	data := [][]scatterPoint{}
-	datasetNames := []string{}
-	for targetIdx, tableValues := range allTableValues {
-		points := []scatterPoint{}
-		for valIdx := range tableValues.Fields[0].Values {
-			latency, err := strconv.ParseFloat(tableValues.Fields[0].Values[valIdx], 64)
-			if err != nil {
-				slog.Error("error parsing latency", slog.String("error", err.Error()))
-				return ""
-			}
-			bandwidth, err := strconv.ParseFloat(tableValues.Fields[1].Values[valIdx], 64)
-			if err != nil {
-				slog.Error("error parsing bandwidth", slog.String("error", err.Error()))
-				return ""
-			}
-			points = append(points, scatterPoint{bandwidth, latency})
-		}
-		data = append(data, points)
-		datasetNames = append(datasetNames, targetNames[targetIdx])
-	}
-	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("latencyBandwidth%d", util.RandUint(10000)),
-		XaxisText:     "Bandwidth (GB/s)",
-		YaxisText:     "Latency (ns)",
-		TitleText:     "",
-		DisplayTitle:  "false",
-		DisplayLegend: "true",
-		AspectRatio:   "4",
-		SuggestedMin:  "0",
-		SuggestedMax:  "0",
-	}
-	return renderScatterChart(data, datasetNames, chartConfig)
+	return RenderChart("scatter", allFormattedPoints, datasetNames, nil, config, nil)
 }
 
 func getColor(idx int) string {
 	// color-blind safe palette from here: http://mkweb.bcgsc.ca/colorblind/palettes.mhtml#page-container
 	colors := []string{"#9F0162", "#009F81", "#FF5AAF", "#00FCCF", "#8400CD", "#008DF9", "#00C2F9", "#FFB2FD", "#A40122", "#E20134", "#FF6E3A", "#FFC33B"}
 	return colors[idx%len(colors)]
-}
-
-func telemetryTableHTMLRenderer(tableValues TableValues, data [][]float64, datasetNames []string, chartConfig chartTemplateStruct, datasetHiddenFlags []bool) string {
-	tsFieldIdx := 0
-	var timestamps []string
-	for i := range tableValues.Fields[0].Values {
-		timestamp := tableValues.Fields[tsFieldIdx].Values[i]
-		if !slices.Contains(timestamps, timestamp) { // could be slow if list is long
-			timestamps = append(timestamps, timestamp)
-		}
-	}
-	return renderLineChart(timestamps, data, datasetNames, chartConfig, datasetHiddenFlags)
-}
-
-func cpuUtilizationTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
-	data := [][]float64{}
-	datasetNames := []string{}
-	// collect the busy (100 - idle) values for each CPU
-	cpuBusyStats := make(map[int][]float64)
-	idleFieldIdx := len(tableValues.Fields) - 1
-	cpuFieldIdx := 1
-	for i := range tableValues.Fields[0].Values {
-		idle, err := strconv.ParseFloat(tableValues.Fields[idleFieldIdx].Values[i], 64)
-		if err != nil {
-			continue
-		}
-		busy := 100 - idle
-		cpu, err := strconv.Atoi(tableValues.Fields[cpuFieldIdx].Values[i])
-		if err != nil {
-			continue
-		}
-		if _, ok := cpuBusyStats[cpu]; !ok {
-			cpuBusyStats[cpu] = []float64{}
-		}
-		cpuBusyStats[cpu] = append(cpuBusyStats[cpu], busy)
-	}
-	// sort map keys by cpu number
-	var keys []int
-	for cpu := range cpuBusyStats {
-		keys = append(keys, cpu)
-	}
-	sort.Ints(keys)
-	// build the data
-	for _, cpu := range keys {
-		if len(cpuBusyStats[cpu]) > 0 {
-			data = append(data, cpuBusyStats[cpu])
-			datasetNames = append(datasetNames, fmt.Sprintf("CPU %d", cpu))
-		}
-	}
-	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
-		XaxisText:     "Time",
-		YaxisText:     "% Utilization",
-		TitleText:     "",
-		DisplayTitle:  "false",
-		DisplayLegend: "false",
-		AspectRatio:   "2",
-		SuggestedMin:  "0",
-		SuggestedMax:  "100",
-	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
-}
-
-func utilizationCategoriesTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
-	data := [][]float64{}
-	datasetNames := []string{}
-	for _, field := range tableValues.Fields[1:] {
-		points := []float64{}
-		for _, val := range field.Values {
-			if val == "" {
-				break
-			}
-			util, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				slog.Error("error parsing percentage", slog.String("error", err.Error()))
-				return ""
-			}
-			points = append(points, util)
-		}
-		if len(points) > 0 {
-			data = append(data, points)
-			datasetNames = append(datasetNames, field.Name)
-		}
-	}
-	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
-		XaxisText:     "Time",
-		YaxisText:     "% Utilization",
-		TitleText:     "",
-		DisplayTitle:  "false",
-		DisplayLegend: "true",
-		AspectRatio:   "2",
-		SuggestedMin:  "0",
-		SuggestedMax:  "100",
-	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
-}
-
-func irqRateTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
-	data := [][]float64{}
-	datasetNames := []string{}
-	for _, field := range tableValues.Fields[2:] { // 1 data set per field, e.g., %usr, %nice, etc., skip Time and CPU fields
-		datasetNames = append(datasetNames, field.Name)
-		// sum the values in the field per timestamp, store the sum as a point
-		timeStamp := tableValues.Fields[0].Values[0]
-		points := []float64{}
-		total := 0.0
-		for i := range field.Values {
-			if tableValues.Fields[0].Values[i] != timeStamp { // new timestamp?
-				points = append(points, total)
-				total = 0.0
-				timeStamp = tableValues.Fields[0].Values[i]
-			}
-			val, err := strconv.ParseFloat(field.Values[i], 64)
-			if err != nil {
-				slog.Error("error parsing value", slog.String("error", err.Error()))
-				return ""
-			}
-			total += val
-		}
-		points = append(points, total) // add the point for the last timestamp
-		// save the points in the data slice
-		data = append(data, points)
-	}
-	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
-		XaxisText:     "Time",
-		YaxisText:     "IRQ/s",
-		TitleText:     "",
-		DisplayTitle:  "false",
-		DisplayLegend: "true",
-		AspectRatio:   "2",
-		SuggestedMin:  "0",
-		SuggestedMax:  "0",
-	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
-}
-
-// driveTelemetryTableHTMLRenderer renders charts of drive statistics
-// - one scatter chart per drive, showing the drive's utilization over time
-// - each drive stat is a separate dataset within the chart
-func driveTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
-	var out string
-	driveStats := make(map[string][][]string)
-	for i := range tableValues.Fields[0].Values {
-		drive := tableValues.Fields[1].Values[i]
-		if _, ok := driveStats[drive]; !ok {
-			driveStats[drive] = make([][]string, len(tableValues.Fields)-2)
-		}
-		for j := range len(tableValues.Fields) - 2 {
-			driveStats[drive][j] = append(driveStats[drive][j], tableValues.Fields[j+2].Values[i])
-		}
-	}
-	var keys []string
-	for drive := range driveStats {
-		keys = append(keys, drive)
-	}
-	sort.Strings(keys)
-	for _, drive := range keys {
-		data := [][]float64{}
-		datasetNames := []string{}
-		for i, statVals := range driveStats[drive] {
-			points := []float64{}
-			for i, val := range statVals {
-				if val == "" {
-					slog.Error("empty stat value", slog.String("drive", drive), slog.Int("index", i))
-					return ""
-				}
-				util, err := strconv.ParseFloat(val, 64)
-				if err != nil {
-					slog.Error("error parsing stat", slog.String("error", err.Error()))
-					return ""
-				}
-				points = append(points, util)
-			}
-			if len(points) > 0 {
-				data = append(data, points)
-				datasetNames = append(datasetNames, tableValues.Fields[i+2].Name)
-			}
-		}
-		chartConfig := chartTemplateStruct{
-			ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
-			XaxisText:     "Time",
-			YaxisText:     "",
-			TitleText:     drive,
-			DisplayTitle:  "true",
-			DisplayLegend: "true",
-			AspectRatio:   "2",
-			SuggestedMin:  "0",
-			SuggestedMax:  "0",
-		}
-		out += telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
-	}
-	return out
-}
-
-// networkTelemetryTableHTMLRenderer renders charts of network device statistics
-// - one scatter chart per network device, showing the device's utilization over time
-// - each network stat is a separate dataset within the chart
-func networkTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
-	var out string
-	nicStats := make(map[string][][]string)
-	for i := range tableValues.Fields[0].Values {
-		drive := tableValues.Fields[1].Values[i]
-		if _, ok := nicStats[drive]; !ok {
-			nicStats[drive] = make([][]string, len(tableValues.Fields)-2)
-		}
-		for j := range len(tableValues.Fields) - 2 {
-			nicStats[drive][j] = append(nicStats[drive][j], tableValues.Fields[j+2].Values[i])
-		}
-	}
-	var keys []string
-	for drive := range nicStats {
-		keys = append(keys, drive)
-	}
-	sort.Strings(keys)
-	for _, nic := range keys {
-		data := [][]float64{}
-		datasetNames := []string{}
-		for i, statVals := range nicStats[nic] {
-			points := []float64{}
-			for i, val := range statVals {
-				if val == "" {
-					slog.Error("empty stat value", slog.String("nic", nic), slog.Int("index", i))
-					return ""
-				}
-				util, err := strconv.ParseFloat(val, 64)
-				if err != nil {
-					slog.Error("error parsing stat", slog.String("error", err.Error()))
-					return ""
-				}
-				points = append(points, util)
-			}
-			if len(points) > 0 {
-				data = append(data, points)
-				datasetNames = append(datasetNames, tableValues.Fields[i+2].Name)
-			}
-		}
-		chartConfig := chartTemplateStruct{
-			ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
-			XaxisText:     "Time",
-			YaxisText:     "",
-			TitleText:     nic,
-			DisplayTitle:  "true",
-			DisplayLegend: "true",
-			AspectRatio:   "2",
-			SuggestedMin:  "0",
-			SuggestedMax:  "0",
-		}
-		out += telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
-	}
-	return out
-}
-
-func memoryTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
-	data := [][]float64{}
-	datasetNames := []string{}
-	for _, field := range tableValues.Fields[1:] {
-		points := []float64{}
-		for _, val := range field.Values {
-			if val == "" {
-				break
-			}
-			stat, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				slog.Error("error parsing stat", slog.String("error", err.Error()))
-				return ""
-			}
-			points = append(points, stat)
-		}
-		if len(points) > 0 {
-			data = append(data, points)
-			datasetNames = append(datasetNames, field.Name)
-		}
-	}
-	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
-		XaxisText:     "Time",
-		YaxisText:     "kilobytes",
-		TitleText:     "",
-		DisplayTitle:  "false",
-		DisplayLegend: "true",
-		AspectRatio:   "2",
-		SuggestedMin:  "0",
-		SuggestedMax:  "0",
-	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
-}
-
-func averageFrequencyTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
-	data := [][]float64{}
-	datasetNames := []string{}
-	for _, field := range tableValues.Fields[1:] {
-		points := []float64{}
-		for _, val := range field.Values {
-			if val == "" {
-				break
-			}
-			stat, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				slog.Error("error parsing stat", slog.String("error", err.Error()))
-				return ""
-			}
-			points = append(points, stat)
-		}
-		if len(points) > 0 {
-			data = append(data, points)
-			datasetNames = append(datasetNames, field.Name)
-		}
-	}
-	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
-		XaxisText:     "Time",
-		YaxisText:     "MHz",
-		TitleText:     "",
-		DisplayTitle:  "false",
-		DisplayLegend: "true",
-		AspectRatio:   "2",
-		SuggestedMin:  "0",
-		SuggestedMax:  "0",
-	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
-}
-
-func powerTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
-	data := [][]float64{}
-	datasetNames := []string{}
-	for _, field := range tableValues.Fields[1:] {
-		points := []float64{}
-		for _, val := range field.Values {
-			if val == "" {
-				break
-			}
-			stat, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				slog.Error("error parsing stat", slog.String("error", err.Error()))
-				return ""
-			}
-			points = append(points, stat)
-		}
-		if len(points) > 0 {
-			data = append(data, points)
-			datasetNames = append(datasetNames, field.Name)
-		}
-	}
-	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
-		XaxisText:     "Time",
-		YaxisText:     "Watts",
-		TitleText:     "",
-		DisplayTitle:  "false",
-		DisplayLegend: "true",
-		AspectRatio:   "2",
-		SuggestedMin:  "0",
-		SuggestedMax:  "0",
-	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
-}
-
-func temperatureTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
-	data := [][]float64{}
-	datasetNames := []string{}
-	for _, field := range tableValues.Fields[1:] {
-		points := []float64{}
-		for _, val := range field.Values {
-			if val == "" {
-				break
-			}
-			stat, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				slog.Error("error parsing stat", slog.String("error", err.Error()))
-				return ""
-			}
-			points = append(points, stat)
-		}
-		if len(points) > 0 {
-			data = append(data, points)
-			datasetNames = append(datasetNames, field.Name)
-		}
-	}
-	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
-		XaxisText:     "Time",
-		YaxisText:     "Celsius",
-		TitleText:     "",
-		DisplayTitle:  "false",
-		DisplayLegend: "true",
-		AspectRatio:   "2",
-		SuggestedMin:  "0",
-		SuggestedMax:  "0",
-	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
-}
-
-func ipcTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
-	data := [][]float64{}
-	datasetNames := []string{}
-	for _, field := range tableValues.Fields[1:] {
-		points := []float64{}
-		for _, val := range field.Values {
-			if val == "" {
-				break
-			}
-			stat, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				slog.Error("error parsing stat", slog.String("error", err.Error()))
-				return ""
-			}
-			points = append(points, stat)
-		}
-		if len(points) > 0 {
-			data = append(data, points)
-			datasetNames = append(datasetNames, field.Name)
-		}
-	}
-	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
-		XaxisText:     "Time",
-		YaxisText:     "IPC",
-		TitleText:     "",
-		DisplayTitle:  "false",
-		DisplayLegend: "true",
-		AspectRatio:   "2",
-		SuggestedMin:  "0",
-		SuggestedMax:  "0",
-	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
-}
-
-func c6TelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
-	data := [][]float64{}
-	datasetNames := []string{}
-	for _, field := range tableValues.Fields[1:] {
-		points := []float64{}
-		for _, val := range field.Values {
-			if val == "" {
-				break
-			}
-			stat, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				slog.Error("error parsing stat", slog.String("error", err.Error()))
-				return ""
-			}
-			points = append(points, stat)
-		}
-		if len(points) > 0 {
-			data = append(data, points)
-			datasetNames = append(datasetNames, field.Name)
-		}
-	}
-	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
-		XaxisText:     "Time",
-		YaxisText:     "% C6 Residency",
-		TitleText:     "",
-		DisplayTitle:  "false",
-		DisplayLegend: "true",
-		AspectRatio:   "2",
-		SuggestedMin:  "0",
-		SuggestedMax:  "0",
-	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
-}
-
-// instructionTelemetryTableHTMLRenderer renders instruction set usage statistics.
-// Each category is a separate dataset within the chart.
-// Categories with zero total usage are hidden by default.
-// Categories are sorted in two tiers: first, all non-zero categories are sorted alphabetically;
-// then, all zero-sum categories are sorted alphabetically and placed after the non-zero categories.
-func instructionTelemetryTableHTMLRenderer(tableValues TableValues, targetname string) string {
-	// Collect entries with their sums so we can sort per requirements
-	type instrEntry struct {
-		name   string
-		points []float64
-		sum    float64
-	}
-	entries := []instrEntry{}
-	for _, field := range tableValues.Fields[1:] { // skip timestamp field
-		points := []float64{}
-		sum := 0.0
-		for _, val := range field.Values {
-			if val == "" { // end of data for this category
-				break
-			}
-			stat, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				slog.Error("error parsing stat", slog.String("error", err.Error()))
-				return ""
-			}
-			points = append(points, stat)
-			sum += stat
-		}
-		if len(points) > 0 { // only include categories with at least one point
-			entries = append(entries, instrEntry{name: field.Name, points: points, sum: sum})
-		}
-	}
-	// Partition into non-zero and zero-sum groups
-	nonZero := []instrEntry{}
-	zero := []instrEntry{}
-	for _, e := range entries {
-		if e.sum > 0 {
-			nonZero = append(nonZero, e)
-		} else {
-			zero = append(zero, e)
-		}
-	}
-	sort.Slice(nonZero, func(i, j int) bool { return nonZero[i].name < nonZero[j].name })
-	sort.Slice(zero, func(i, j int) bool { return zero[i].name < zero[j].name })
-	ordered := append(nonZero, zero...)
-	data := make([][]float64, 0, len(ordered))
-	datasetNames := make([]string, 0, len(ordered))
-	hiddenFlags := make([]bool, 0, len(ordered))
-	for _, e := range ordered {
-		data = append(data, e.points)
-		datasetNames = append(datasetNames, e.name)
-		// hide zero-sum categories by default
-		hiddenFlags = append(hiddenFlags, e.sum == 0)
-	}
-	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
-		XaxisText:     "Time",
-		YaxisText:     "% Samples",
-		TitleText:     "",
-		DisplayTitle:  "false",
-		DisplayLegend: "true",
-		AspectRatio:   "1", // extra tall due to large number of data sets
-		SuggestedMin:  "0",
-		SuggestedMax:  "0",
-	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, hiddenFlags)
-}
-
-func renderGaudiStatsChart(tableValues TableValues, chartStatFieldName string, titleText string, yAxisText string, suggestedMax string) string {
-	data := [][]float64{}
-	datasetNames := []string{}
-	// timestamp is in the first field
-	// find the module_id field index
-	moduleIdFieldIdx, err := getFieldIndex("module_id", tableValues)
-	if err != nil {
-		slog.Error("no gaudi module_id field found")
-		return ""
-	}
-	// find the chartStatFieldName field index
-	chartStatFieldIndex, err := getFieldIndex(chartStatFieldName, tableValues)
-	if err != nil {
-		slog.Error("no gaudi chartStatFieldName field found")
-		return ""
-	}
-	// group the data points by module_id
-	moduleStat := make(map[string][]float64)
-	for i := range tableValues.Fields[0].Values {
-		moduleId := tableValues.Fields[moduleIdFieldIdx].Values[i]
-		val, err := strconv.ParseFloat(tableValues.Fields[chartStatFieldIndex].Values[i], 64)
-		if err != nil {
-			slog.Error("error parsing utilization", slog.String("error", err.Error()))
-			return ""
-		}
-		if _, ok := moduleStat[moduleId]; !ok {
-			moduleStat[moduleId] = []float64{}
-		}
-		moduleStat[moduleId] = append(moduleStat[moduleId], val)
-	}
-	// sort the module ids
-	var moduleIds []string
-	for moduleId := range moduleStat {
-		moduleIds = append(moduleIds, moduleId)
-	}
-	sort.Strings(moduleIds)
-	// build the data
-	for _, moduleId := range moduleIds {
-		if len(moduleStat[moduleId]) > 0 {
-			data = append(data, moduleStat[moduleId])
-			datasetNames = append(datasetNames, "module "+moduleId)
-		}
-	}
-	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
-		XaxisText:     "Time",
-		YaxisText:     yAxisText,
-		TitleText:     titleText,
-		DisplayTitle:  "true",
-		DisplayLegend: "true",
-		AspectRatio:   "2",
-		SuggestedMin:  "0",
-		SuggestedMax:  suggestedMax,
-	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
-}
-
-func gaudiTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
-	out := ""
-	out += renderGaudiStatsChart(tableValues, "utilization.aip [%]", "Utilization", "% Utilization", "100")
-	out += renderGaudiStatsChart(tableValues, "memory.free [MiB]", "Memory Free", "Memory (MiB)", "0")
-	out += renderGaudiStatsChart(tableValues, "memory.used [MiB]", "Memory Used", "Memory (MiB)", "0")
-	out += renderGaudiStatsChart(tableValues, "power.draw [W]", "Power", "Watts", "0")
-	out += renderGaudiStatsChart(tableValues, "temperature.aip [C]", "Temperature", "Temperature (C)", "0")
-	return out
-}
-
-func pduTelemetryTableHTMLRenderer(tableValues TableValues, targetName string) string {
-	data := [][]float64{}
-	for _, field := range tableValues.Fields[1:] {
-		points := []float64{}
-		for _, val := range field.Values {
-			if val == "" {
-				break
-			}
-			stat, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				slog.Error("error parsing stat", slog.String("error", err.Error()))
-				return ""
-			}
-			points = append(points, stat)
-		}
-		if len(points) > 0 {
-			data = append(data, points)
-		}
-	}
-	datasetNames := []string{}
-	for _, field := range tableValues.Fields[1:] {
-		datasetNames = append(datasetNames, field.Name)
-	}
-	chartConfig := chartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
-		XaxisText:     "Time",
-		YaxisText:     "Watts",
-		TitleText:     "",
-		DisplayTitle:  "false",
-		DisplayLegend: "true",
-		AspectRatio:   "2",
-		SuggestedMin:  "0",
-		SuggestedMax:  "0",
-	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
-}
-
-func callStackFrequencyTableHTMLRenderer(tableValues TableValues, targetName string) string {
-	out := `<style>
-
-/* Custom page header */
-.fgheader {
-	padding-bottom: 15px;
-	padding-right: 15px;
-	padding-left: 15px;
-	border-bottom: 1px solid #e5e5e5;
-}
-
-/* Make the masthead heading the same height as the navigation */
-.fgheader h3 {
-    margin-top: 0;
-    margin-bottom: 0;
-    line-height: 40px;
-}
-
-/* Customize container */
-.fgcontainer {
-	max-width: 990px;
-}
-</style>
-`
-	out += renderFlameGraph("Native", tableValues, "Native Stacks")
-	out += renderFlameGraph("Java", tableValues, "Java Stacks")
-	return out
-}
-
-func kernelLockAnalysisHTMLRenderer(tableValues TableValues, targetName string) string {
-	values := [][]string{}
-	var tableValueStyles [][]string
-	for _, field := range tableValues.Fields {
-		rowValues := []string{}
-		rowValues = append(rowValues, field.Name)
-		rowValues = append(rowValues, htmltemplate.HTMLEscapeString(field.Values[0]))
-		values = append(values, rowValues)
-		rowStyles := []string{}
-		rowStyles = append(rowStyles, "font-weight:bold")
-		rowStyles = append(rowStyles, "white-space: pre-wrap")
-		tableValueStyles = append(tableValueStyles, rowStyles)
-	}
-	return renderHTMLTable([]string{}, values, "pure-table pure-table-striped", tableValueStyles)
 }

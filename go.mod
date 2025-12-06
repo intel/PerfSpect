@@ -7,6 +7,7 @@ replace (
 	perfspect/internal/cpudb => ./internal/cpudb
 	perfspect/internal/progress => ./internal/progress
 	perfspect/internal/report => ./internal/report
+	perfspect/internal/table => ./internal/table
 	perfspect/internal/script => ./internal/script
 	perfspect/internal/target => ./internal/target
 	perfspect/internal/util => ./internal/util

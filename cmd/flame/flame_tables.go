@@ -1,15 +1,121 @@
-package report
+package flame
 
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
 import (
 	"fmt"
+	"log/slog"
 	"math"
+	"perfspect/internal/common"
+	"perfspect/internal/script"
+	"perfspect/internal/table"
 	"regexp"
 	"strconv"
 	"strings"
 )
+
+// flamegraph table names
+const (
+	CallStackFrequencyTableName = "Call Stack Frequency"
+)
+
+// flamegraph tables
+var tableDefinitions = map[string]table.TableDefinition{
+	CallStackFrequencyTableName: {
+		Name:      CallStackFrequencyTableName,
+		MenuLabel: CallStackFrequencyTableName,
+		ScriptNames: []string{
+			script.CollapsedCallStacksScriptName,
+		},
+		FieldsFunc: callStackFrequencyTableValues},
+}
+
+func callStackFrequencyTableValues(outputs map[string]script.ScriptOutput) []table.Field {
+	fields := []table.Field{
+		{Name: "Native Stacks", Values: []string{nativeFoldedFromOutput(outputs)}},
+		{Name: "Java Stacks", Values: []string{javaFoldedFromOutput(outputs)}},
+		{Name: "Maximum Render Depth", Values: []string{maxRenderDepthFromOutput(outputs)}},
+	}
+	return fields
+}
+
+func javaFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
+	sections := common.GetSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
+	if len(sections) == 0 {
+		slog.Warn("no sections in collapsed call stack output")
+		return ""
+	}
+	javaFolded := make(map[string]string)
+	re := regexp.MustCompile(`^async-profiler (\d+) (.*)$`)
+	for header, stacks := range sections {
+		match := re.FindStringSubmatch(header)
+		if match == nil {
+			continue
+		}
+		pid := match[1]
+		processName := match[2]
+		if stacks == "" {
+			slog.Warn("no stacks for java process", slog.String("header", header))
+			continue
+		}
+		if strings.HasPrefix(stacks, "Failed to inject profiler") {
+			slog.Error("profiling data error", slog.String("header", header))
+			continue
+		}
+		_, ok := javaFolded[processName]
+		if processName == "" {
+			processName = "java (" + pid + ")"
+		} else if ok {
+			processName = processName + " (" + pid + ")"
+		}
+		javaFolded[processName] = stacks
+	}
+	folded, err := mergeJavaFolded(javaFolded)
+	if err != nil {
+		slog.Error("failed to merge java stacks", slog.String("error", err.Error()))
+	}
+	return folded
+}
+
+func nativeFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
+	sections := common.GetSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
+	if len(sections) == 0 {
+		slog.Warn("no sections in collapsed call stack output")
+		return ""
+	}
+	var dwarfFolded, fpFolded string
+	for header, content := range sections {
+		switch header {
+		case "perf_dwarf":
+			dwarfFolded = content
+		case "perf_fp":
+			fpFolded = content
+		}
+	}
+	if dwarfFolded == "" && fpFolded == "" {
+		return ""
+	}
+	folded, err := mergeSystemFolded(fpFolded, dwarfFolded)
+	if err != nil {
+		slog.Error("failed to merge native stacks", slog.String("error", err.Error()))
+	}
+	return folded
+}
+
+func maxRenderDepthFromOutput(outputs map[string]script.ScriptOutput) string {
+	sections := common.GetSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
+	if len(sections) == 0 {
+		slog.Warn("no sections in collapsed call stack output")
+		return ""
+	}
+	for header, content := range sections {
+		if header == "maximum depth" {
+			return content
+		}
+	}
+	return ""
+}
 
 // ProcessStacks ...
 // [processName][callStack]=count
@@ -162,4 +268,33 @@ func mergeSystemFolded(perfFp string, perfDwarf string) (merged string, err erro
 
 	merged = mergedStacks.dumpFolded()
 	return
+}
+
+func callStackFrequencyTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
+	out := `<style>
+
+/* Custom page header */
+.fgheader {
+	padding-bottom: 15px;
+	padding-right: 15px;
+	padding-left: 15px;
+	border-bottom: 1px solid #e5e5e5;
+}
+
+/* Make the masthead heading the same height as the navigation */
+.fgheader h3 {
+    margin-top: 0;
+    margin-bottom: 0;
+    line-height: 40px;
+}
+
+/* Customize container */
+.fgcontainer {
+	max-width: 990px;
+}
+</style>
+`
+	out += renderFlameGraph("Native", tableValues, "Native Stacks")
+	out += renderFlameGraph("Java", tableValues, "Java Stacks")
+	return out
 }

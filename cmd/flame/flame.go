@@ -9,6 +9,7 @@ import (
 	"os"
 	"perfspect/internal/common"
 	"perfspect/internal/report"
+	"perfspect/internal/table"
 	"perfspect/internal/util"
 	"slices"
 	"strconv"
@@ -175,11 +176,11 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 }
 
 func runCmd(cmd *cobra.Command, args []string) error {
-	var tableNames []string
+	var tables []table.TableDefinition
 	if !flagNoSystemSummary {
-		tableNames = append(tableNames, report.BriefSysSummaryTableName)
+		tables = append(tables, common.TableDefinitions[common.BriefSysSummaryTableName])
 	}
-	tableNames = append(tableNames, report.CallStackFrequencyTableName)
+	tables = append(tables, tableDefinitions[CallStackFrequencyTableName])
 	reportingCommand := common.ReportingCommand{
 		Cmd:            cmd,
 		ReportNamePost: "flame",
@@ -189,7 +190,10 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			"PIDs":      strings.Join(util.IntSliceToStringSlice(flagPids), ","),
 			"MaxDepth":  strconv.Itoa(flagMaxDepth),
 		},
-		TableNames: tableNames,
+		Tables: tables,
 	}
+
+	report.RegisterHTMLRenderer(CallStackFrequencyTableName, callStackFrequencyTableHTMLRenderer)
+
 	return reportingCommand.Run()
 }

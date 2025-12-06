@@ -6,6 +6,7 @@ package report
 import (
 	"fmt"
 	"log/slog"
+	"perfspect/internal/common"
 	"perfspect/internal/script"
 	"regexp"
 	"strconv"
@@ -30,7 +31,7 @@ const (
 )
 
 func dimmInfoFromDmiDecode(dmiDecodeOutput string) [][]string {
-	return valsArrayFromDmiDecodeRegexSubmatch(
+	return common.ValsArrayFromDmiDecodeRegexSubmatch(
 		dmiDecodeOutput,
 		"17",
 		`^Bank Locator:\s*(.+?)$`,
@@ -116,8 +117,8 @@ func derivedDimmsFieldFromOutput(outputs map[string]script.ScriptOutput) []deriv
 	if err != nil || numChannels == 0 {
 		return nil
 	}
-	platformVendor := valFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "0", `Vendor:\s*(.*)`)
-	numSockets, err := strconv.Atoi(valFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(.*:\s*(.+?)$`))
+	platformVendor := common.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "0", `Vendor:\s*(.*)`)
+	numSockets, err := strconv.Atoi(common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(.*:\s*(.+?)$`))
 	if err != nil || numSockets == 0 {
 		return nil
 	}

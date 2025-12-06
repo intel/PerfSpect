@@ -15,6 +15,7 @@ import (
 	"perfspect/internal/progress"
 	"perfspect/internal/report"
 	"perfspect/internal/script"
+	"perfspect/internal/table"
 	"perfspect/internal/target"
 	"perfspect/internal/util"
 	"strings"
@@ -50,14 +51,11 @@ type FlagGroup struct {
 type TargetScriptOutputs struct {
 	TargetName    string
 	ScriptOutputs map[string]script.ScriptOutput
-	TableNames    []string
+	Tables        []table.TableDefinition
 }
 
 func (tso *TargetScriptOutputs) GetScriptOutputs() map[string]script.ScriptOutput {
 	return tso.ScriptOutputs
-}
-func (tso *TargetScriptOutputs) GetTableNames() []string {
-	return tso.TableNames
 }
 
 const (
@@ -67,7 +65,7 @@ const (
 
 type Category struct {
 	FlagName     string
-	TableNames   []string
+	Tables       []table.TableDefinition
 	FlagVar      *bool
 	DefaultValue bool
 	Help         string
@@ -83,14 +81,14 @@ const (
 	FlagFormatName = "format"
 )
 
-type SummaryFunc func([]report.TableValues, map[string]script.ScriptOutput) report.TableValues
+type SummaryFunc func([]table.TableValues, map[string]script.ScriptOutput) table.TableValues
 type InsightsFunc SummaryFunc
 type AdhocFunc func(AppContext, map[string]script.ScriptOutput, target.Target, progress.MultiSpinnerUpdateFunc) error
 
 type ReportingCommand struct {
 	Cmd                    *cobra.Command
 	ReportNamePost         string
-	TableNames             []string
+	Tables                 []table.TableDefinition
 	ScriptParams           map[string]string
 	SummaryFunc            SummaryFunc
 	SummaryTableName       string
@@ -139,7 +137,7 @@ func (rc *ReportingCommand) Run() error {
 	var myTargets []target.Target
 	if FlagInput != "" {
 		var err error
-		orderedTargetScriptOutputs, err = outputsFromInput(rc.SummaryTableName)
+		orderedTargetScriptOutputs, err = outputsFromInput(rc.Tables, rc.SummaryTableName)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			slog.Error(err.Error())
@@ -150,7 +148,7 @@ func (rc *ReportingCommand) Run() error {
 		// get the targets
 		var targetErrs []error
 		var err error
-		myTargets, targetErrs, err = GetTargets(rc.Cmd, elevatedPrivilegesRequired(rc.TableNames), false, localTempDir)
+		myTargets, targetErrs, err = GetTargets(rc.Cmd, elevatedPrivilegesRequired(rc.Tables), false, localTempDir)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			slog.Error(err.Error())
@@ -195,7 +193,7 @@ func (rc *ReportingCommand) Run() error {
 			myTargets = slices.Delete(myTargets, indicesToRemove[i], indicesToRemove[i]+1)
 		}
 		// collect data from targets
-		orderedTargetScriptOutputs, err = outputsFromTargets(rc.Cmd, myTargets, rc.TableNames, rc.ScriptParams, multiSpinner.Status, localTempDir)
+		orderedTargetScriptOutputs, err = outputsFromTargets(rc.Cmd, myTargets, rc.Tables, rc.ScriptParams, multiSpinner.Status, localTempDir)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			slog.Error(err.Error())
@@ -291,14 +289,14 @@ func (rc *ReportingCommand) Run() error {
 }
 
 // DefaultInsightsFunc returns the insights table values from the table values
-func DefaultInsightsFunc(allTableValues []report.TableValues, scriptOutputs map[string]script.ScriptOutput) report.TableValues {
-	insightsTableValues := report.TableValues{
-		TableDefinition: report.TableDefinition{
+func DefaultInsightsFunc(allTableValues []table.TableValues, scriptOutputs map[string]script.ScriptOutput) table.TableValues {
+	insightsTableValues := table.TableValues{
+		TableDefinition: table.TableDefinition{
 			Name:      TableNameInsights,
 			HasRows:   true,
 			MenuLabel: TableNameInsights,
 		},
-		Fields: []report.Field{
+		Fields: []table.Field{
 			{Name: "Recommendation", Values: []string{}},
 			{Name: "Justification", Values: []string{}},
 		},
@@ -326,7 +324,7 @@ func FlagValidationError(cmd *cobra.Command, msg string) error {
 func (rc *ReportingCommand) createRawReports(appContext AppContext, orderedTargetScriptOutputs []TargetScriptOutputs) ([]string, error) {
 	var reports []string
 	for _, targetScriptOutputs := range orderedTargetScriptOutputs {
-		reportBytes, err := report.CreateRawReport(rc.TableNames, targetScriptOutputs.ScriptOutputs, targetScriptOutputs.TargetName)
+		reportBytes, err := report.CreateRawReport(rc.Tables, targetScriptOutputs.ScriptOutputs, targetScriptOutputs.TargetName)
 		if err != nil {
 			err = fmt.Errorf("failed to create raw report: %w", err)
 			return reports, err
@@ -361,10 +359,10 @@ func writeReport(reportBytes []byte, reportPath string) error {
 // createReports processes the collected data and creates the requested report(s)
 func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetScriptOutputs []TargetScriptOutputs, formats []string) ([]string, error) {
 	reportFilePaths := []string{}
-	allTargetsTableValues := make([][]report.TableValues, 0)
+	allTargetsTableValues := make([][]table.TableValues, 0)
 	for _, targetScriptOutputs := range orderedTargetScriptOutputs {
 		// process the tables, i.e., get field values from script output
-		allTableValues, err := report.ProcessTables(targetScriptOutputs.TableNames, targetScriptOutputs.ScriptOutputs)
+		allTableValues, err := table.ProcessTables(targetScriptOutputs.Tables, targetScriptOutputs.ScriptOutputs)
 		if err != nil {
 			err = fmt.Errorf("failed to process collected data: %w", err)
 			return nil, err
@@ -379,7 +377,7 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 					if tableValues.TableDefinition.Name == rc.SummaryBeforeTableName {
 						summaryBeforeTableFound = true
 						// insert the summary table before this table
-						allTableValues = append(allTableValues[:i], append([]report.TableValues{summaryTableValues}, allTableValues[i:]...)...)
+						allTableValues = append(allTableValues[:i], append([]table.TableValues{summaryTableValues}, allTableValues[i:]...)...)
 						break
 					}
 				}
@@ -395,11 +393,11 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 			allTableValues = append(allTableValues, insightsTableValues)
 		}
 		// special case - add tableValues for the application version
-		allTableValues = append(allTableValues, report.TableValues{
-			TableDefinition: report.TableDefinition{
+		allTableValues = append(allTableValues, table.TableValues{
+			TableDefinition: table.TableDefinition{
 				Name: TableNamePerfspect,
 			},
-			Fields: []report.Field{
+			Fields: []table.Field{
 				{Name: "Version", Values: []string{appContext.Version}},
 				{Name: "Args", Values: []string{strings.Join(os.Args, " ")}},
 				{Name: "OutputDir", Values: []string{appContext.OutputDir}},
@@ -407,7 +405,7 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 		})
 		// create the report(s)
 		for _, format := range formats {
-			reportBytes, err := report.Create(format, allTableValues, targetScriptOutputs.TargetName)
+			reportBytes, err := report.Create(format, allTableValues, targetScriptOutputs.TargetName, rc.SummaryTableName)
 			if err != nil {
 				err = fmt.Errorf("failed to create report: %w", err)
 				return nil, err
@@ -445,7 +443,7 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 			if !slices.Contains(formats, format) {
 				continue
 			}
-			reportBytes, err := report.CreateMultiTarget(format, allTargetsTableValues, targetNames, mergedTableNames)
+			reportBytes, err := report.CreateMultiTarget(format, allTargetsTableValues, targetNames, mergedTableNames, rc.SummaryTableName)
 			if err != nil {
 				err = fmt.Errorf("failed to create multi-target %s report: %w", format, err)
 				return nil, err
@@ -464,7 +462,7 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 
 // extractTableNamesFromValues extracts the table names from the processed table values for each target.
 // It returns a slice of slices, where each inner slice contains the table names for a target.
-func extractTableNamesFromValues(allTargetsTableValues [][]report.TableValues) [][]string {
+func extractTableNamesFromValues(allTargetsTableValues [][]table.TableValues) [][]string {
 	targetTableNames := make([][]string, 0, len(allTargetsTableValues))
 	for _, tableValues := range allTargetsTableValues {
 		names := make([]string, 0, len(tableValues))
@@ -476,10 +474,19 @@ func extractTableNamesFromValues(allTargetsTableValues [][]report.TableValues) [
 	return targetTableNames
 }
 
+func findTableByName(tables []table.TableDefinition, name string) (*table.TableDefinition, error) {
+	for _, tbl := range tables {
+		if tbl.Name == name {
+			return &tbl, nil
+		}
+	}
+	return nil, fmt.Errorf("table [%s] not found", name)
+}
+
 // outputsFromInput reads the raw file(s) and returns the data in the order of the raw files
-func outputsFromInput(summaryTableName string) ([]TargetScriptOutputs, error) {
+func outputsFromInput(tables []table.TableDefinition, summaryTableName string) ([]TargetScriptOutputs, error) {
 	orderedTargetScriptOutputs := []TargetScriptOutputs{}
-	tableNames := []string{} // use the table names from the raw files
+	includedTables := []table.TableDefinition{}
 	// read the raw file(s) as JSON
 	rawReports, err := report.ReadRawReports(FlagInput)
 	if err != nil {
@@ -492,34 +499,39 @@ func outputsFromInput(summaryTableName string) ([]TargetScriptOutputs, error) {
 			if tableName == TableNameInsights || tableName == TableNamePerfspect || tableName == summaryTableName {
 				continue
 			}
-			tableNames = util.UniqueAppend(tableNames, tableName)
+			includedTable, err := findTableByName(tables, tableName)
+			if err != nil {
+				slog.Warn("table from raw report not found in current tables", slog.String("table", tableName), slog.String("target", rawReport.TargetName))
+				continue
+			}
+			includedTables = append(includedTables, *includedTable)
 		}
-		orderedTargetScriptOutputs = append(orderedTargetScriptOutputs, TargetScriptOutputs{TargetName: rawReport.TargetName, ScriptOutputs: rawReport.ScriptOutputs, TableNames: tableNames})
+		orderedTargetScriptOutputs = append(orderedTargetScriptOutputs, TargetScriptOutputs{TargetName: rawReport.TargetName, ScriptOutputs: rawReport.ScriptOutputs, Tables: includedTables})
 	}
 	return orderedTargetScriptOutputs, nil
 }
 
 // outputsFromTargets runs the scripts on the targets and returns the data in the order of the targets
-func outputsFromTargets(cmd *cobra.Command, myTargets []target.Target, tableNames []string, scriptParams map[string]string, statusUpdate progress.MultiSpinnerUpdateFunc, localTempDir string) ([]TargetScriptOutputs, error) {
+func outputsFromTargets(cmd *cobra.Command, myTargets []target.Target, tables []table.TableDefinition, scriptParams map[string]string, statusUpdate progress.MultiSpinnerUpdateFunc, localTempDir string) ([]TargetScriptOutputs, error) {
 	orderedTargetScriptOutputs := []TargetScriptOutputs{}
 	channelTargetScriptOutputs := make(chan TargetScriptOutputs)
 	channelError := make(chan error)
 	// create the list of tables and associated scripts for each target
-	targetTableNames := [][]string{}
+	targetTables := [][]table.TableDefinition{}
 	targetScriptNames := [][]string{}
 	for targetIdx, target := range myTargets {
-		targetTableNames = append(targetTableNames, []string{})
+		targetTables = append(targetTables, []table.TableDefinition{})
 		targetScriptNames = append(targetScriptNames, []string{})
-		for _, tableName := range tableNames {
-			if report.IsTableForTarget(tableName, target) {
+		for _, tbl := range tables {
+			if table.IsTableForTarget(tbl, target) {
 				// add table to list of tables to collect
-				targetTableNames[targetIdx] = util.UniqueAppend(targetTableNames[targetIdx], tableName)
+				targetTables[targetIdx] = append(targetTables[targetIdx], tbl)
 				// add scripts to list of scripts to run
-				for _, scriptName := range report.GetScriptNamesForTable(tableName) {
+				for _, scriptName := range tbl.ScriptNames {
 					targetScriptNames[targetIdx] = util.UniqueAppend(targetScriptNames[targetIdx], scriptName)
 				}
 			} else {
-				slog.Info("table not supported for target", slog.String("table", tableName), slog.String("target", target.GetName()))
+				slog.Info("table not supported for target", slog.String("table", tbl.Name), slog.String("target", target.GetName()))
 			}
 		}
 	}
@@ -548,7 +560,7 @@ func outputsFromTargets(cmd *cobra.Command, myTargets []target.Target, tableName
 	for targetIdx, target := range myTargets {
 		for _, targetScriptOutputs := range allTargetScriptOutputs {
 			if targetScriptOutputs.TargetName == target.GetName() {
-				targetScriptOutputs.TableNames = targetTableNames[targetIdx]
+				targetScriptOutputs.Tables = targetTables[targetIdx]
 				orderedTargetScriptOutputs = append(orderedTargetScriptOutputs, targetScriptOutputs)
 				break
 			}
@@ -558,10 +570,9 @@ func outputsFromTargets(cmd *cobra.Command, myTargets []target.Target, tableName
 }
 
 // elevatedPrivilegesRequired returns true if any of the scripts needed for the tables require elevated privileges
-func elevatedPrivilegesRequired(tableNames []string) bool {
-	for _, tableName := range tableNames {
-		// add scripts to list of scripts to run
-		for _, scriptName := range report.GetScriptNamesForTable(tableName) {
+func elevatedPrivilegesRequired(tables []table.TableDefinition) bool {
+	for _, tbl := range tables {
+		for _, scriptName := range tbl.ScriptNames {
 			script := script.GetScriptByName(scriptName)
 			if script.Superuser {
 				return true
