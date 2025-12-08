@@ -829,7 +829,7 @@ func RunScripts(t target.Target, s []script.ScriptDefinition, ignoreScriptErrors
 		return nil, fmt.Errorf("failed to check if scripts are supported on target %v", err)
 	}
 	if len(supportedScripts) == 0 {
-		return nil, fmt.Errorf("script are not supported on target %s", t.GetName())
+		return nil, fmt.Errorf("zero scripts are supported on target %s", t.GetName())
 	}
 	return script.RunScripts(t, supportedScripts, ignoreScriptErrors, localTempDir, statusUpdate, collectingStatusMsg)
 }
