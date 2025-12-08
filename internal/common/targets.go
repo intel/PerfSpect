@@ -614,7 +614,7 @@ func GetTargetCapid4(t target.Target, localTempDir string, noRoot bool) (string,
 		getScript := script.GetScriptByName(script.LspciBitsScriptName)
 		scriptOutput, err := script.RunScript(t, getScript, localTempDir) // don't call common.RunScript, otherwise infinite loop
 		if err != nil {
-			return "", fmt.Errorf("failed to run cpuid capid4 script: %v", err)
+			return "", fmt.Errorf("failed to run lspci bits script: %v", err)
 		}
 		capid4 = strings.TrimSpace(scriptOutput.Stdout)
 		t.SetCapid4(capid4)
@@ -628,7 +628,7 @@ func GetTargetDevices(t target.Target, localTempDir string, noRoot bool) (string
 		getScript := script.GetScriptByName(script.LspciDevicesScriptName)
 		scriptOutput, err := script.RunScript(t, getScript, localTempDir) // don't call common.RunScript, otherwise infinite loop
 		if err != nil {
-			return "", fmt.Errorf("failed to run cpu devices script: %v", err)
+			return "", fmt.Errorf("failed to run lspci devices script: %v", err)
 		}
 		devices = strings.TrimSpace(scriptOutput.Stdout)
 		t.SetDevices(devices)
@@ -729,11 +729,13 @@ func GetX86TargetMicroarchitecture(t target.Target, localTempDir string, noRoot 
 	}
 	capid4, err := GetTargetCapid4(t, localTempDir, noRoot)
 	if err != nil {
-		return "", err
+		slog.Warn("failed to read lspci bits to get capid4 for microarchitecture identification", slog.String("error", err.Error()))
+		// continue
 	}
 	devices, err := GetTargetDevices(t, localTempDir, noRoot)
 	if err != nil {
-		return "", err
+		slog.Warn("failed to read lspci devices for microarchitecture identification", slog.String("error", err.Error()))
+		// continue
 	}
 	cpu, err := cpus.GetCPU(cpus.NewX86Identifier(family, model, stepping, capid4, devices))
 	if err != nil {
