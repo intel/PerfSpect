@@ -36,6 +36,9 @@ var TableDefinitions = map[string]table.TableDefinition{
 			script.ScalingGovernorScriptName,
 			script.CstatesScriptName,
 			script.ElcScriptName,
+			script.ArmImplementerScriptName,
+			script.ArmPartScriptName,
+			script.ArmDmidecodePartScriptName,
 		},
 		FieldsFunc: briefSummaryTableValues},
 }
