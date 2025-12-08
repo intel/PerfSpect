@@ -495,12 +495,16 @@ func initializeComponentMetricEvaluable(expression string, evaluatorFunctions ma
 // the cpus module, to the directory where the associated events and metrics reside
 func getUarchDir(uarch string) (string, error) {
 	switch uarch {
-	case cpus.UarchGraviton4, cpus.UarchAxion, cpus.UarchAmpereOneAC04, cpus.UarchAmpereOneAC04_1:
+	case cpus.UarchGraviton4, cpus.UarchAxion:
 		return "neoverse-n2-v2", nil
 	case cpus.UarchGraviton2:
 		return "neoverse-n1", nil
 	case cpus.UarchGraviton3:
 		return "neoverse-v1", nil
+	case cpus.UarchAmpereOneAC03:
+		return "ampereone", nil
+	case cpus.UarchAmpereOneAC04, cpus.UarchAmpereOneAC04_1:
+		return "ampereonex", nil
 	}
 	return "", fmt.Errorf("unsupported component loader architecture: %s", uarch)
 }

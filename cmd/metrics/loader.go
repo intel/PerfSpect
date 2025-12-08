@@ -88,7 +88,7 @@ func NewLoader(uarch string) (Loader, error) {
 	case cpus.UarchGNR, cpus.UarchGNR_X1, cpus.UarchGNR_X2, cpus.UarchGNR_X3, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchSRF_SP, cpus.UarchSRF_AP, cpus.UarchEMR, cpus.UarchEMR_MCC, cpus.UarchEMR_XCC, cpus.UarchSPR, cpus.UarchSPR_MCC, cpus.UarchSPR_XCC, cpus.UarchICX:
 		slog.Debug("Using perfmon loader for microarchitecture", slog.String("uarch", uarch))
 		return newPerfmonLoader(), nil
-	case cpus.UarchGraviton2, cpus.UarchGraviton3, cpus.UarchGraviton4, cpus.UarchAxion, cpus.UarchAmpereOneAC04, cpus.UarchAmpereOneAC04_1:
+	case cpus.UarchGraviton2, cpus.UarchGraviton3, cpus.UarchGraviton4, cpus.UarchAxion, cpus.UarchAmpereOneAC03, cpus.UarchAmpereOneAC04, cpus.UarchAmpereOneAC04_1:
 		slog.Debug("Using component loader for microarchitecture", slog.String("uarch", uarch))
 		return newComponentLoader(), nil
 	default:

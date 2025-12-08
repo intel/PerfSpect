@@ -902,6 +902,8 @@ func getARMSlotsByArchitecture(uarch string) (slots int, err error) {
 		slots = 8
 	case cpus.UarchGraviton2, cpus.UarchGraviton3:
 		slots = 6
+	case cpus.UarchAmpereOneAC03:
+		slots = 6
 	case cpus.UarchAmpereOneAC04, cpus.UarchAmpereOneAC04_1:
 		slots = 10
 	default:
