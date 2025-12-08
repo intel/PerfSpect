@@ -84,7 +84,7 @@ var cpuCharacteristicsMap = map[string]CPUCharacteristics{
 	"GNR_X1":  {MicroArchitecture: "GNR_X1", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 16},  // Granite Rapids - SP (MCC/LCC)
 	"GNR_X2":  {MicroArchitecture: "GNR_X2", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 16},  // Granite Rapids - SP (XCC)
 	"GNR_X3":  {MicroArchitecture: "GNR_X3", MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 16}, // Granite Rapids - AP (UCC)
-	"GNR_D":   {MicroArchitecture: "GNR_D", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 16},   // Granite Rapids - D
+	"GNR-D":   {MicroArchitecture: "GNR-D", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 16},   // Granite Rapids - D
 	"CWF":     {MicroArchitecture: "CWF", MemoryChannelCount: 12, LogicalThreadCount: 1, CacheWayCount: 0},     // Clearwater Forest - generic
 	"DMR":     {MicroArchitecture: "DMR", MemoryChannelCount: 16, LogicalThreadCount: 1, CacheWayCount: 0},     // Diamond Rapids
 	// AMD CPUs
@@ -133,7 +133,7 @@ var cpuIdentifiersX86 = []struct {
 	{CPUIdentifierX86{Family: "6", Model: "207", Stepping: "", Capid4: "", Devices: ""}, "EMR"},           // Emerald Rapids
 	{CPUIdentifierX86{Family: "6", Model: "175", Stepping: "", Capid4: "", Devices: ""}, "SRF"},           // Sierra Forest
 	{CPUIdentifierX86{Family: "6", Model: "173", Stepping: "", Capid4: "", Devices: ""}, "GNR"},           // Granite Rapids
-	{CPUIdentifierX86{Family: "6", Model: "174", Stepping: "", Capid4: "", Devices: ""}, "GNR_D"},         // Granite Rapids - D
+	{CPUIdentifierX86{Family: "6", Model: "174", Stepping: "", Capid4: "", Devices: ""}, "GNR-D"},         // Granite Rapids - D
 	{CPUIdentifierX86{Family: "6", Model: "221", Stepping: "", Capid4: "", Devices: ""}, "CWF"},           // Clearwater Forest
 	{CPUIdentifierX86{Family: "19", Model: "1", Stepping: "", Capid4: "", Devices: ""}, "DMR"},            // Diamond Rapids
 	// AMD CPUs
@@ -313,6 +313,20 @@ func GetCPUByMicroArchitecture(uarch string) (cpu CPUCharacteristics, err error)
 	return
 }
 
+// IsIntelCPUFamily checks if the CPU family corresponds to Intel CPUs.
+func IsIntelCPUFamily(family int) bool {
+	return slices.Contains(IntelFamilies, family)
+}
+
+// IsIntelCPUFamilyStr checks if the CPU family string corresponds to Intel CPUs.
+func IsIntelCPUFamilyStr(familyStr string) bool {
+	family, err := strconv.Atoi(familyStr)
+	if err != nil {
+		return false
+	}
+	return IsIntelCPUFamily(family)
+}
+
 func getSpecificMicroArchitecture(family, model, capid4, devices string) (uarch string, err error) {
 	if family == "6" && model == "143" { // SPR
 		uarch, err = getSPRMicroArchitecture(capid4)
@@ -404,26 +418,4 @@ func getSRFMicroArchitecture(devices string) (uarch string, err error) {
 		uarch = "SRF"
 	}
 	return
-}
-
-func (c CPUCharacteristics) GetMicroArchitecture() string {
-	return c.MicroArchitecture
-}
-
-func (c CPUCharacteristics) GetShortMicroArchitecture() string {
-	return strings.Split(c.MicroArchitecture, "_")[0]
-}
-
-// IsIntelCPUFamily checks if the CPU family corresponds to Intel CPUs.
-func IsIntelCPUFamily(family int) bool {
-	return slices.Contains(IntelFamilies, family)
-}
-
-// IsIntelCPUFamilyStr checks if the CPU family string corresponds to Intel CPUs.
-func IsIntelCPUFamilyStr(familyStr string) bool {
-	family, err := strconv.Atoi(familyStr)
-	if err != nil {
-		return false
-	}
-	return IsIntelCPUFamily(family)
 }

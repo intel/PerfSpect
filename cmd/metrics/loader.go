@@ -84,7 +84,7 @@ func NewLoader(uarch string) (Loader, error) {
 	case "CLX", "SKX", "BDX", "Bergamo", "Genoa", "Turin (Zen 5)", "Turin (Zen 5c)":
 		slog.Debug("Using legacy loader for microarchitecture", slog.String("uarch", uarch))
 		return newLegacyLoader(), nil
-	case "GNR", "SRF", "EMR", "SPR", "ICX":
+	case "GNR", "GNR_X1", "GNR_X2", "GNR_X3", "GNR-D", "SRF", "SRF_SP", "SRF_AP", "EMR", "EMR_MCC", "EMR_XCC", "SPR", "SPR_MCC", "SPR_XCC", "ICX":
 		slog.Debug("Using perfmon loader for microarchitecture", slog.String("uarch", uarch))
 		return newPerfmonLoader(), nil
 	case "Graviton2", "Graviton3", "Graviton4", "Axion", "AmpereOne AC04", "AmpereOne AC04_1":

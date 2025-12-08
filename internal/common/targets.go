@@ -788,7 +788,10 @@ func ScriptSupportedOnTarget(t target.Target, scriptDef script.ScriptDefinition,
 		if err != nil {
 			return false, err
 		}
-		if !slices.Contains(scriptDef.MicroArchitectures, uarch) && !slices.Contains(scriptDef.MicroArchitectures, strings.Split(uarch, "_")[0]) {
+		shortUarch := strings.Split(uarch, "_")[0]     // handle EMR_XCC, etc.
+		shortUarch = strings.Split(shortUarch, "-")[0] // handle GNR-D
+		shortUarch = strings.Split(shortUarch, " ")[0] // handle Turin (Zen 5)
+		if !slices.Contains(scriptDef.MicroArchitectures, uarch) && !slices.Contains(scriptDef.MicroArchitectures, shortUarch) {
 			slog.Info("script not supported on target CPU microarchitecture", slog.String("script", scriptDef.Name), slog.String("target", t.GetName()), slog.String("microarchitecture", uarch))
 			return false, nil
 		}

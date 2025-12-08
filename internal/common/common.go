@@ -596,7 +596,10 @@ func isTableForTarget(tbl table.TableDefinition, t target.Target, localTempDir s
 		if err != nil {
 			slog.Error("failed to get microarchitecture for target", slog.String("target", t.GetName()), slog.String("error", err.Error()))
 		}
-		if !slices.Contains(tbl.MicroArchitectures, uarch) && !slices.Contains(tbl.MicroArchitectures, strings.Split(uarch, "_")[0]) {
+		shortUarch := strings.Split(uarch, "_")[0]     // handle EMR_XCC, etc.
+		shortUarch = strings.Split(shortUarch, "-")[0] // handle GNR-D
+		shortUarch = strings.Split(shortUarch, " ")[0] // handle Turin (Zen 5)
+		if !slices.Contains(tbl.MicroArchitectures, uarch) && !slices.Contains(tbl.MicroArchitectures, shortUarch) {
 			return false
 		}
 	}

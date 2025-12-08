@@ -184,6 +184,7 @@ func (l *PerfmonLoader) Load(loaderConfig LoaderConfig) ([]MetricDefinition, []G
 func uarchToResourceName(uarch string) string {
 	name := strings.ToLower(uarch)
 	name = strings.Split(name, "_")[0] // Handle "GNR_X2", etc.
+	name = strings.Split(name, "-")[0] // Handle GNR-D
 	return name
 }
 
