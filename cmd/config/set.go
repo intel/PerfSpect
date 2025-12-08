@@ -484,16 +484,9 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 	var dies []dieId
 	// build list of compute or IO dies
 	dieTypesScript := script.GetScriptByName(script.UncoreDieTypesFromTPMIScriptName)
-	supported, err := common.ScriptSupportedOnTarget(myTarget, dieTypesScript, localTempDir, false)
-	if err != nil {
-		return fmt.Errorf("failed to check if script is supported on target: %w", err)
-	}
-	if !supported {
-		return fmt.Errorf("uncore die frequency setting not supported on %s", myTarget.GetName())
-	}
 	scriptOutput, err := common.RunScript(myTarget, dieTypesScript, localTempDir, false)
 	if err != nil {
-		return fmt.Errorf("failed to run scripts on target: %w", err)
+		return fmt.Errorf("failed to run script on target: %w", err)
 	}
 	re := regexp.MustCompile(`Read bits \d+:\d+ value (\d+) from TPMI ID .* for entry (\d+) in instance (\d+)`)
 	for line := range strings.SplitSeq(scriptOutput.Stdout, "\n") {
