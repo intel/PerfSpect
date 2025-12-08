@@ -72,38 +72,6 @@ func (t *RemoteTarget) GetArchitecture() (string, error) {
 	return t.arch, err
 }
 
-func (t *RemoteTarget) GetFamily() (string, error) {
-	var err error
-	if t.family == "" {
-		t.family, err = getFamily(t)
-	}
-	return t.family, err
-}
-
-func (t *RemoteTarget) GetModel() (string, error) {
-	var err error
-	if t.model == "" {
-		t.model, err = getModel(t)
-	}
-	return t.model, err
-}
-
-func (t *RemoteTarget) GetStepping() (string, error) {
-	var err error
-	if t.stepping == "" {
-		t.stepping, err = getStepping(t)
-	}
-	return t.stepping, err
-}
-
-func (t *RemoteTarget) GetVendor() (string, error) {
-	var err error
-	if t.vendor == "" {
-		t.vendor, err = getVendor(t)
-	}
-	return t.vendor, err
-}
-
 // CreateTempDirectory creates a temporary directory on the remote target.
 // If a temporary directory has already been created, it returns the existing one.
 // The function takes an optional rootDir parameter to specify the root directory
@@ -258,6 +226,86 @@ func (t *RemoteTarget) GetUserPath() (string, error) {
 		t.userPath = strings.TrimSpace(stdout)
 	}
 	return t.userPath, nil
+}
+
+func (t *RemoteTarget) GetFamily() string {
+	return t.family
+}
+
+func (t *RemoteTarget) SetFamily(family string) {
+	t.family = family
+}
+
+func (t *RemoteTarget) GetModel() string {
+	return t.model
+}
+
+func (t *RemoteTarget) SetModel(model string) {
+	t.model = model
+}
+
+func (t *RemoteTarget) GetStepping() string {
+	return t.stepping
+}
+
+func (t *RemoteTarget) SetStepping(stepping string) {
+	t.stepping = stepping
+}
+
+func (t *RemoteTarget) GetVendor() string {
+	return t.vendor
+}
+
+func (t *RemoteTarget) SetVendor(vendor string) {
+	t.vendor = vendor
+}
+
+func (t *RemoteTarget) GetCapid4() string {
+	return t.capid4
+}
+
+func (t *RemoteTarget) SetCapid4(capid4 string) {
+	t.capid4 = capid4
+}
+
+func (t *RemoteTarget) GetDevices() string {
+	return t.devices
+}
+
+func (t *RemoteTarget) SetDevices(devices string) {
+	t.devices = devices
+}
+
+func (t *RemoteTarget) GetImplementer() string {
+	return t.implementer
+}
+
+func (t *RemoteTarget) SetImplementer(implementer string) {
+	t.implementer = implementer
+}
+
+func (t *RemoteTarget) GetPart() string {
+	return t.part
+}
+
+func (t *RemoteTarget) SetPart(part string) {
+	t.part = part
+}
+
+func (t *RemoteTarget) GetDmidecodePart() string {
+	return t.dmidecodePart
+}
+
+func (t *RemoteTarget) SetDmidecodePart(dmidecodePart string) {
+	t.dmidecodePart = dmidecodePart
+}
+
+func (t *RemoteTarget) GetMicroarchitecture() string {
+	return t.microarchitecture
+}
+
+func (t *RemoteTarget) SetMicroarchitecture(microarchitecture string) {
+	t.microarchitecture = microarchitecture
 }
 
 func (t *RemoteTarget) prepareSSHFlags(scp bool, useControlMaster bool, prompt bool) (flags []string) {

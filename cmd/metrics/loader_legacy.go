@@ -32,6 +32,14 @@ func (l *LegacyLoader) Load(loaderConfig LoaderConfig) ([]MetricDefinition, []Gr
 	return configuredMetricDefinitions, loadedEventGroups, nil
 }
 
+// getUarchFileName maps the CPU's microarchitecture, as defined in the cpus
+// module, to the resource file name used by the legacy loader
+func getUarchFileName(uarch string) string {
+	filename := strings.ToLower(uarch)
+	filename = strings.Split(filename, " ")[0] // Handle "Turin (Zen 5)" case
+	return filename
+}
+
 // loadMetricDefinitions reads and parses metric definitions from an architecture-specific metric
 // definition file. When the override path argument is empty, the function will load metrics from
 // the file associated with the platform's architecture found in the provided metadata. When
@@ -44,9 +52,7 @@ func (l *LegacyLoader) loadMetricDefinitions(metricDefinitionOverridePath string
 			return
 		}
 	} else {
-		uarch := strings.ToLower(strings.Split(metadata.Microarchitecture, "_")[0])
-		uarch = strings.Split(uarch, " ")[0]
-		metricFileName := fmt.Sprintf("%s.json", uarch)
+		metricFileName := fmt.Sprintf("%s.json", getUarchFileName(metadata.Microarchitecture))
 		if bytes, err = resources.ReadFile(filepath.Join("resources", "legacy", "metrics", metadata.Architecture, metadata.Vendor, metricFileName)); err != nil {
 			return
 		}
@@ -90,9 +96,7 @@ func (l *LegacyLoader) loadEventGroups(eventDefinitionOverridePath string, metad
 			return
 		}
 	} else {
-		uarch := strings.ToLower(strings.Split(metadata.Microarchitecture, "_")[0])
-		uarch = strings.Split(uarch, " ")[0]
-		eventFileName := fmt.Sprintf("%s.txt", uarch)
+		eventFileName := fmt.Sprintf("%s.txt", getUarchFileName(metadata.Microarchitecture))
 		if file, err = resources.Open(filepath.Join("resources", "legacy", "events", metadata.Architecture, metadata.Vendor, eventFileName)); err != nil {
 			return
 		}

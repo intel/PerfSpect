@@ -523,7 +523,7 @@ func outputsFromTargets(cmd *cobra.Command, myTargets []target.Target, tables []
 		targetTables = append(targetTables, []table.TableDefinition{})
 		targetScriptNames = append(targetScriptNames, []string{})
 		for _, tbl := range tables {
-			if table.IsTableForTarget(tbl, target) {
+			if isTableForTarget(tbl, target, localTempDir) {
 				// add table to list of tables to collect
 				targetTables[targetIdx] = append(targetTables[targetIdx], tbl)
 				// add scripts to list of scripts to run
@@ -569,6 +569,40 @@ func outputsFromTargets(cmd *cobra.Command, myTargets []target.Target, tables []
 	return orderedTargetScriptOutputs, nil
 }
 
+// isTableForTarget checks if the given table is applicable for the specified target
+func isTableForTarget(tbl table.TableDefinition, t target.Target, localTempDir string) bool {
+	if len(tbl.Architectures) > 0 {
+		architecture, err := t.GetArchitecture()
+		if err != nil {
+			slog.Error("failed to get architecture for target", slog.String("target", t.GetName()), slog.String("error", err.Error()))
+			return false
+		}
+		if !slices.Contains(tbl.Architectures, architecture) {
+			return false
+		}
+	}
+	if len(tbl.Vendors) > 0 {
+		vendor, err := GetTargetVendor(t)
+		if err != nil {
+			slog.Error("failed to get vendor for target", slog.String("target", t.GetName()), slog.String("error", err.Error()))
+			return false
+		}
+		if !slices.Contains(tbl.Vendors, vendor) {
+			return false
+		}
+	}
+	if len(tbl.MicroArchitectures) > 0 {
+		uarch, err := GetTargetMicroArchitecture(t, localTempDir, false)
+		if err != nil {
+			slog.Error("failed to get microarchitecture for target", slog.String("target", t.GetName()), slog.String("error", err.Error()))
+		}
+		if !slices.Contains(tbl.MicroArchitectures, uarch) && !slices.Contains(tbl.MicroArchitectures, strings.Split(uarch, "_")[0]) {
+			return false
+		}
+	}
+	return true
+}
+
 // elevatedPrivilegesRequired returns true if any of the scripts needed for the tables require elevated privileges
 func elevatedPrivilegesRequired(tables []table.TableDefinition) bool {
 	for _, tbl := range tables {
@@ -591,7 +625,7 @@ func collectOnTarget(myTarget target.Target, scriptsToRun []script.ScriptDefinit
 	} else if duration != "0" && duration != "" {
 		status += fmt.Sprintf(" for %s seconds", duration)
 	}
-	scriptOutputs, err := script.RunScripts(myTarget, scriptsToRun, true, localTempDir, statusUpdate, status)
+	scriptOutputs, err := RunScripts(myTarget, scriptsToRun, true, localTempDir, statusUpdate, status, false)
 	if err != nil {
 		if statusUpdate != nil {
 			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("error collecting data: %v", err))

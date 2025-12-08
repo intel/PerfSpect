@@ -196,11 +196,12 @@ func UarchFromOutput(outputs map[string]script.ScriptOutput) string {
 	stepping := ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Stepping:\s*(.+)$`)
 	capid4 := ValFromRegexSubmatch(outputs[script.LspciBitsScriptName].Stdout, `^([0-9a-fA-F]+)`)
 	devices := ValFromRegexSubmatch(outputs[script.LspciDevicesScriptName].Stdout, `^([0-9]+)`)
-	cpu, err := cpus.GetCPUExtended(family, model, stepping, capid4, devices)
-	if err == nil {
-		return cpu.MicroArchitecture
+	cpu, err := cpus.GetCPU(cpus.NewX86Identifier(family, model, stepping, capid4, devices))
+	if err != nil {
+		slog.Error("error getting CPU characteristics", slog.String("error", err.Error()))
+		return ""
 	}
-	return ""
+	return cpu.MicroArchitecture
 }
 
 func HyperthreadingFromOutput(outputs map[string]script.ScriptOutput) string {
@@ -239,8 +240,9 @@ func HyperthreadingFromOutput(outputs map[string]script.ScriptOutput) string {
 		slog.Error("error parsing cores per sockets from lscpu")
 		return ""
 	}
-	cpu, err := cpus.GetCPUExtended(family, model, stepping, "", "")
+	cpu, err := cpus.GetCPU(cpus.NewX86Identifier(family, model, stepping, "", ""))
 	if err != nil {
+		slog.Warn("error getting CPU characteristics", slog.String("error", err.Error()))
 		return ""
 	}
 	if numOnlineCpus > 0 && numOnlineCpus < numCPUs {

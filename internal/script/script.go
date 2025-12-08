@@ -11,12 +11,10 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"slices"
 	"strconv"
 	"strings"
 	"text/template"
 
-	"perfspect/internal/cpus"
 	"perfspect/internal/progress"
 	"perfspect/internal/target"
 	"perfspect/internal/util"
@@ -34,10 +32,6 @@ type ScriptOutput struct {
 
 // RunScript runs a script on the specified target and returns the output.
 func RunScript(myTarget target.Target, script ScriptDefinition, localTempDir string) (ScriptOutput, error) {
-	if !scriptForTarget(script, myTarget) {
-		err := fmt.Errorf("the \"%s\" script is not intended for the target processor", script.Name)
-		return ScriptOutput{}, err
-	}
 	scriptOutputs, err := RunScripts(myTarget, []ScriptDefinition{script}, false, localTempDir, nil, "")
 	if scriptOutputs == nil {
 		return ScriptOutput{}, err
@@ -56,10 +50,6 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 	var sequentialScripts []ScriptDefinition
 	var parallelScripts []ScriptDefinition
 	for _, script := range scripts {
-		if !scriptForTarget(script, myTarget) {
-			slog.Debug("skipping script because it is not intended to run on the target processor", slog.String("target", myTarget.GetName()), slog.String("script", script.Name))
-			continue
-		}
 		if script.Superuser && !canElevate {
 			slog.Debug("skipping script because it requires superuser privileges and the user cannot elevate privileges on target", slog.String("script", script.Name))
 			continue
@@ -184,17 +174,6 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 
 // RunScriptStream runs a script on the specified target and streams the output to the specified channels.
 func RunScriptStream(myTarget target.Target, script ScriptDefinition, localTempDir string, stdoutChannel chan []byte, stderrChannel chan []byte, exitcodeChannel chan int, errorChannel chan error, cmdChannel chan *exec.Cmd) {
-	targetArchitecture, err := myTarget.GetArchitecture()
-	if err != nil {
-		err = fmt.Errorf("error getting target architecture: %v", err)
-		errorChannel <- err
-		return
-	}
-	if len(script.Architectures) > 0 && !slices.Contains(script.Architectures, targetArchitecture) {
-		err = fmt.Errorf("skipping script because it is not meant for this architecture: %s", targetArchitecture)
-		errorChannel <- err
-		return
-	}
 	installedLkms, err := prepareTargetToRunScripts(myTarget, []ScriptDefinition{script}, localTempDir, true)
 	if err != nil {
 		err = fmt.Errorf("error while preparing target to run script: %v", err)
@@ -212,56 +191,6 @@ func RunScriptStream(myTarget target.Target, script ScriptDefinition, localTempD
 	cmd := prepareCommand(script, myTarget.GetTempDirectory())
 	err = myTarget.RunCommandStream(cmd, 0, false, stdoutChannel, stderrChannel, exitcodeChannel, cmdChannel)
 	errorChannel <- err
-}
-
-// scriptForTarget checks if the script is intended for the target processor.
-func scriptForTarget(script ScriptDefinition, myTarget target.Target) bool {
-	if len(script.Architectures) > 0 {
-		architecture, err := myTarget.GetArchitecture()
-		if err != nil {
-			slog.Error("failed to get architecture for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-			return false
-		}
-		if !slices.Contains(script.Architectures, architecture) {
-			return false
-		}
-	}
-	if len(script.Vendors) > 0 {
-		vendor, err := myTarget.GetVendor()
-		if err != nil {
-			slog.Error("failed to get vendor for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-			return false
-		}
-		if !slices.Contains(script.Vendors, vendor) {
-			return false
-		}
-	}
-	if len(script.MicroArchitectures) > 0 {
-		family, err := myTarget.GetFamily()
-		if err != nil {
-			slog.Error("failed to get family for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-			return false
-		}
-		model, err := myTarget.GetModel()
-		if err != nil {
-			slog.Error("failed to get model for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-			return false
-		}
-		stepping, err := myTarget.GetStepping()
-		if err != nil {
-			slog.Error("failed to get stepping for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-			return false
-		}
-		cpu, err := cpus.GetCPU(family, model, stepping)
-		if err != nil {
-			slog.Error("failed to get CPU for target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
-			return false
-		}
-		if !slices.Contains(script.MicroArchitectures, cpu.GetMicroArchitecture()) && !slices.Contains(script.MicroArchitectures, cpu.GetShortMicroArchitecture()) {
-			return false
-		}
-	}
-	return true
 }
 
 func prepareCommand(script ScriptDefinition, targetTempDirectory string) (cmd *exec.Cmd) {

@@ -158,7 +158,7 @@ done | sort -nr | head -n %d
 `, filter, maxCgroups),
 		Superuser: true,
 	}
-	output, err := script.RunScript(myTarget, hotCgroupsScript, localTempDir)
+	output, err := common.RunScript(myTarget, hotCgroupsScript, localTempDir, flagNoRoot)
 	if err != nil {
 		err = fmt.Errorf("failed to get hot cgroups: %v", err)
 		return
@@ -219,7 +219,7 @@ echo $cgroup_path
 `, cid),
 		Superuser: true,
 	}
-	output, err := script.RunScript(myTarget, cgroupScript, localTempDir)
+	output, err := common.RunScript(myTarget, cgroupScript, localTempDir, flagNoRoot)
 	if err != nil {
 		err = fmt.Errorf("failed to get cgroup: %v", err)
 		return

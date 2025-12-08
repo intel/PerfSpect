@@ -67,7 +67,7 @@ func (l *ComponentLoader) loadMetricDefinitions(metricDefinitionOverridePath str
 		}
 	} else {
 		var archDir string
-		archDir, err = getArchDir(metadata.Microarchitecture)
+		archDir, err = getUarchDir(metadata.Microarchitecture)
 		if err != nil {
 			return nil, err
 		}
@@ -168,7 +168,7 @@ func compareCPUID(mapCpuId string, idStr string) (int, error) {
 // skip metrics.json
 func (l *ComponentLoader) loadEventDefinitions(metadata Metadata) (events []ComponentEvent, err error) {
 	var archDir string
-	archDir, err = getArchDir(metadata.Microarchitecture)
+	archDir, err = getUarchDir(metadata.Microarchitecture)
 	if err != nil {
 		return nil, err
 	}
@@ -490,16 +490,18 @@ func initializeComponentMetricEvaluable(expression string, evaluatorFunctions ma
 	return expr
 }
 
-func getArchDir(uarch string) (string, error) {
-	if strings.ToLower(uarch) == "neoverse-n2" || strings.ToLower(uarch) == "neoverse-v2" {
+// getUarchDir maps from the CPU's microarchitecture, as defined in
+// the cpus module, to the directory where the associated events and metrics reside
+func getUarchDir(uarch string) (string, error) {
+	switch uarch {
+	case "Graviton4", "Axion", "AmpereOne AC04", "AmpereOne AC04_1":
 		return "neoverse-n2-v2", nil
-	} else if strings.ToLower(uarch) == "neoverse-n1" {
+	case "Graviton2":
 		return "neoverse-n1", nil
-	} else if strings.ToLower(uarch) == "neoverse-v1" {
+	case "Graviton3":
 		return "neoverse-v1", nil
-	} else {
-		return "", fmt.Errorf("unsupported component loader architecture")
 	}
+	return "", fmt.Errorf("unsupported component loader architecture: %s", uarch)
 }
 
 // deduplicateGroups eliminates duplicate and overlapping groups

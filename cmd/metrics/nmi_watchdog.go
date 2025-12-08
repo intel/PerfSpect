@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"perfspect/internal/common"
 	"perfspect/internal/script"
 	"perfspect/internal/target"
 )
@@ -64,11 +65,12 @@ func setNMIWatchdog(myTarget target.Target, setting string, localTempDir string)
 	if sysctl, err = findSysctl(myTarget); err != nil {
 		return
 	}
-	_, err = script.RunScript(myTarget, script.ScriptDefinition{
+	_, err = common.RunScript(myTarget, script.ScriptDefinition{
 		Name:           "set NMI watchdog",
 		ScriptTemplate: fmt.Sprintf("%s kernel.nmi_watchdog=%s", sysctl, setting),
 		Superuser:      true},
-		localTempDir)
+		localTempDir,
+		flagNoRoot)
 	if err != nil {
 		err = fmt.Errorf("failed to set NMI watchdog to %s, %v", setting, err)
 		return

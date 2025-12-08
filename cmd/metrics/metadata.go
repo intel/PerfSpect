@@ -79,8 +79,8 @@ type Metadata struct {
 
 // LoadMetadata - populates and returns a Metadata structure containing state of the
 // system.
-func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc) (Metadata, error) {
-	uarch, err := myTarget.GetArchitecture()
+func LoadMetadata(t target.Target, noRoot bool, noSystemSummary bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc) (Metadata, error) {
+	uarch, err := common.GetTargetArchitecture(t)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to get target architecture: %v", err)
 	}
@@ -88,11 +88,11 @@ func LoadMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, loc
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to create metadata collector: %v", err)
 	}
-	return collector.CollectMetadata(myTarget, noRoot, noSystemSummary, localTempDir, statusUpdate)
+	return collector.CollectMetadata(t, noRoot, noSystemSummary, localTempDir, statusUpdate)
 }
 
 type MetadataCollector interface {
-	CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc) (Metadata, error)
+	CollectMetadata(t target.Target, noRoot bool, noSystemSummary bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc) (Metadata, error)
 }
 
 func NewMetadataCollector(architecture string) (MetadataCollector, error) {
@@ -114,14 +114,13 @@ type X86MetadataCollector struct {
 type ARMMetadataCollector struct {
 }
 
-func (c *X86MetadataCollector) CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc) (Metadata, error) {
+func (c *X86MetadataCollector) CollectMetadata(t target.Target, noRoot bool, noSystemSummary bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc) (Metadata, error) {
 	var metadata Metadata
 	var err error
 	// Hostname
-	metadata.Hostname = myTarget.GetName()
+	metadata.Hostname = t.GetName()
 	// CPU Info (from /proc/cpuinfo)
-	var cpuInfo []map[string]string
-	cpuInfo, err = getCPUInfo(myTarget)
+	cpuInfo, err := getCPUInfo(t)
 	if err != nil || len(cpuInfo) < 1 {
 		return Metadata{}, fmt.Errorf("failed to read cpu info: %v", err)
 	}
@@ -149,11 +148,10 @@ func (c *X86MetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 	// Vendor (from cpuInfo)
 	metadata.Vendor = cpuInfo[0]["vendor_id"]
 	// CPU microarchitecture (from cpuInfo)
-	cpu, err := cpus.GetCPU(cpuInfo[0]["cpu family"], cpuInfo[0]["model"], cpuInfo[0]["stepping"])
+	metadata.Microarchitecture, err = common.GetTargetMicroArchitecture(t, localTempDir, noRoot)
 	if err != nil {
-		return Metadata{}, err
+		return Metadata{}, fmt.Errorf("failed to get x86 microarchitecture: %v", err)
 	}
-	metadata.Microarchitecture = cpu.MicroArchitecture
 	// Number of General Purpose Counters
 	metadata.NumGeneralPurposeCounters, err = getNumGPCounters(metadata.Microarchitecture)
 	if err != nil {
@@ -165,7 +163,7 @@ func (c *X86MetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 		return Metadata{}, fmt.Errorf("failed to get metadata scripts: %v", err)
 	}
 	// run the scripts
-	scriptOutputs, err := script.RunScripts(myTarget, metadataScripts, true, localTempDir, statusUpdate, "collecting metadata") // nosemgrep
+	scriptOutputs, err := common.RunScripts(t, metadataScripts, true, localTempDir, statusUpdate, "collecting metadata", noRoot) // nosemgrep
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to run metadata scripts: %v", err)
 	}
@@ -285,12 +283,17 @@ func (c *X86MetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 	return metadata, nil
 }
 
-func (c *ARMMetadataCollector) CollectMetadata(myTarget target.Target, noRoot bool, noSystemSummary bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc) (Metadata, error) {
+func (c *ARMMetadataCollector) CollectMetadata(t target.Target, noRoot bool, noSystemSummary bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc) (Metadata, error) {
 	var metadata Metadata
 	// Hostname
-	metadata.Hostname = myTarget.GetName()
+	metadata.Hostname = t.GetName()
+	// CPU Info (from /proc/cpuinfo)
+	cpuInfo, err := getCPUInfo(t)
+	if err != nil || len(cpuInfo) < 1 {
+		return Metadata{}, fmt.Errorf("failed to read cpu info: %v", err)
+	}
 	// lscpu output will be used for several metadata fields
-	lscpu, err := getLscpu(myTarget)
+	lscpu, err := getLscpu(t)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to get lscpu output: %v", err)
 	}
@@ -325,22 +328,11 @@ func (c *ARMMetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 	for i := range metadata.CoresPerSocket {
 		metadata.CPUSocketMap[i] = 0
 	}
-	// family, model, stepping used to get microarchitecture
-	family := "" // not used for ARM
-	model, err := parseLscpuStringField(lscpu, `^Model:\s*(.+)$`)
+	metadata.Microarchitecture, err = common.GetTargetMicroArchitecture(t, localTempDir, noRoot)
 	if err != nil {
-		return Metadata{}, fmt.Errorf("failed to parse model: %v", err)
+		return Metadata{}, fmt.Errorf("failed to get ARM microarchitecture: %v", err)
 	}
-	stepping, err := parseLscpuStringField(lscpu, `^Stepping:\s*(.+)$`)
-	if err != nil {
-		return Metadata{}, fmt.Errorf("failed to parse stepping: %v", err)
-	}
-	cpu, err := cpus.GetCPU(family, model, stepping)
-	if err != nil {
-		return Metadata{}, err
-	}
-	metadata.Microarchitecture = cpu.MicroArchitecture
-	metadata.NumGeneralPurposeCounters, err = getNumGPCountersARM(myTarget)
+	metadata.NumGeneralPurposeCounters, err = getNumGPCountersARM(t, localTempDir, noRoot)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to get number of general purpose counters: %v", err)
 	}
@@ -350,7 +342,7 @@ func (c *ARMMetadataCollector) CollectMetadata(myTarget target.Target, noRoot bo
 		return Metadata{}, fmt.Errorf("failed to get metadata scripts: %v", err)
 	}
 	// run the scripts
-	scriptOutputs, err := script.RunScripts(myTarget, metadataScripts, true, localTempDir, nil, "") // nosemgrep
+	scriptOutputs, err := common.RunScripts(t, metadataScripts, true, localTempDir, nil, "", noRoot) // nosemgrep
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to run metadata scripts: %v", err)
 	}
@@ -662,9 +654,9 @@ func getUncoreDeviceIDs(isAMDArchitecture bool, scriptOutputs map[string]script.
 }
 
 // getCPUInfo - reads and returns all data from /proc/cpuinfo
-func getCPUInfo(myTarget target.Target) (cpuInfo []map[string]string, err error) {
+func getCPUInfo(t target.Target) (cpuInfo []map[string]string, err error) {
 	cmd := exec.Command("cat", "/proc/cpuinfo")
-	stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, true)
+	stdout, stderr, exitcode, err := t.RunCommand(cmd, 0, true)
 	if err != nil {
 		err = fmt.Errorf("failed to get cpuinfo: %s, %d, %v", stderr, exitcode, err)
 		return
@@ -687,9 +679,9 @@ func getCPUInfo(myTarget target.Target) (cpuInfo []map[string]string, err error)
 }
 
 // getLscpu - runs lscpu on the target and returns the output
-func getLscpu(myTarget target.Target) (output string, err error) {
+func getLscpu(t target.Target) (output string, err error) {
 	cmd := exec.Command("lscpu")
-	output, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, true)
+	output, stderr, exitcode, err := t.RunCommand(cmd, 0, true)
 	if err != nil || exitcode != 0 {
 		err = fmt.Errorf("failed to run lscpu: %s, %d, %v", stderr, exitcode, err)
 		return
@@ -834,19 +826,24 @@ func getNumGPCounters(uarch string) (numGPCounters int, err error) {
 // Copyright 2025 Google LLC.
 // SPDX-License-Identifier: BSD-3-Clause
 // Contributed by Edwin Chiu
-func getNumGPCountersARM(target target.Target) (numGPCounters int, err error) {
-	numGPCounters = 0
-	var cmd *exec.Cmd
-	if target.CanElevatePrivileges() {
-		cmd = exec.Command("sudo", "bash", "-c", "dmesg | grep -i \"PMU Driver\"")
-	} else {
-		cmd = exec.Command("bash", "-c", "dmesg | grep -i \"PMU Driver\"")
+func getNumGPCountersARM(t target.Target, localTempDir string, noRoot bool) (numGPCounters int, err error) {
+	getScript := script.ScriptDefinition{
+		Name:           "get pmu driver version line",
+		ScriptTemplate: "dmesg | grep -i \"PMU Driver\"",
+		Superuser:      !noRoot,
+		Architectures:  []string{cpus.ARMArchitecture},
 	}
-	stdout, stderr, exitcode, err := target.RunCommand(cmd, 0, true)
+	scriptOutput, err := common.RunScript(t, getScript, localTempDir, noRoot)
 	if err != nil {
-		err = fmt.Errorf("failed to get PMU Driver line: %s, %d, %v", stderr, exitcode, err)
+		err = fmt.Errorf("failed to run pmu driver version script: %v", err)
 		return
 	}
+	lines := strings.Split(strings.TrimSpace(scriptOutput.Stdout), "\n")
+	if len(lines) == 0 {
+		err = fmt.Errorf("no output from pmu driver version script")
+		return
+	}
+	stdout := lines[0]
 	// examples:
 	//   [    1.339550] hw perfevents: enabled with armv8_pmuv3_0 PMU driver, 5 counters available
 	//   [    3.663956] hw perfevents: enabled with armv8_pmuv3_0 PMU driver, 6 (0,8000001f) counters available
@@ -901,10 +898,12 @@ func getARMSlots(scriptOutputs map[string]script.ScriptOutput) (slots int, err e
 // Used as a fallback when we cannot read the slots from sysfs
 func getARMSlotsByArchitecture(uarch string) (slots int, err error) {
 	switch uarch {
-	case "Neoverse-N2", "Neoverse-V2":
+	case "Graviton4", "Axion":
 		slots = 8
-	case "Neoverse-N1", "Neoverse-V1":
-		slots = 6 // TODO: confirm
+	case "Graviton2", "Graviton3":
+		slots = 6
+	case "AmpereOne AC04", "AmpereOne AC04_1":
+		slots = 10
 	default:
 		err = fmt.Errorf("unsupported ARM uarch: %s", uarch)
 		return
@@ -959,7 +958,7 @@ func getPMUDriverVersion(scriptOutputs map[string]script.ScriptOutput) (version 
 }
 
 // getTSCFreqHz returns the frequency of the Time Stamp Counter (TSC) in hertz.
-// It takes a myTarget parameter of type target.Target and returns the frequency
+// It takes a t parameter of type target.Target and returns the frequency
 // in hertz and an error if any.
 func getTSCFreqHz(scriptOutputs map[string]script.ScriptOutput) (freqHz int, err error) {
 	if scriptOutputs["tsc"].Exitcode != 0 {

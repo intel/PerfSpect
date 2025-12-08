@@ -47,9 +47,9 @@ func channelsFromOutput(outputs map[string]script.ScriptOutput) string {
 	stepping := common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Stepping:\s*(.+)$`)
 	capid4 := common.ValFromRegexSubmatch(outputs[script.LspciBitsScriptName].Stdout, `^([0-9a-fA-F]+)`)
 	devices := common.ValFromRegexSubmatch(outputs[script.LspciDevicesScriptName].Stdout, `^([0-9]+)`)
-	cpu, err := cpus.GetCPUExtended(family, model, stepping, capid4, devices)
+	cpu, err := cpus.GetCPU(cpus.NewX86Identifier(family, model, stepping, capid4, devices))
 	if err != nil {
-		slog.Error("error getting CPU from CPUdb", slog.String("error", err.Error()))
+		slog.Error("error getting CPU characteristics", slog.String("error", err.Error()))
 		return ""
 	}
 	return fmt.Sprintf("%d", cpu.MemoryChannelCount)

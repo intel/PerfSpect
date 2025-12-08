@@ -51,38 +51,6 @@ func (t *LocalTarget) GetArchitecture() (string, error) {
 	return t.arch, err
 }
 
-func (t *LocalTarget) GetFamily() (string, error) {
-	var err error
-	if t.family == "" {
-		t.family, err = getFamily(t)
-	}
-	return t.family, err
-}
-
-func (t *LocalTarget) GetModel() (string, error) {
-	var err error
-	if t.model == "" {
-		t.model, err = getModel(t)
-	}
-	return t.model, err
-}
-
-func (t *LocalTarget) GetStepping() (string, error) {
-	var err error
-	if t.stepping == "" {
-		t.stepping, err = getStepping(t)
-	}
-	return t.stepping, err
-}
-
-func (t *LocalTarget) GetVendor() (string, error) {
-	var err error
-	if t.vendor == "" {
-		t.vendor, err = getVendor(t)
-	}
-	return t.vendor, err
-}
-
 // CreateTempDirectory creates a temporary directory under the specified root directory.
 // If the root directory is not specified, the temporary directory will be created in the current directory.
 // It returns the path of the created temporary directory and any error encountered.
@@ -265,4 +233,84 @@ func (t *LocalTarget) GetUserPath() (string, error) {
 		t.userPath = strings.Join(verifiedPaths, ":")
 	}
 	return t.userPath, nil
+}
+
+func (t *LocalTarget) GetFamily() string {
+	return t.family
+}
+
+func (t *LocalTarget) SetFamily(family string) {
+	t.family = family
+}
+
+func (t *LocalTarget) GetModel() string {
+	return t.model
+}
+
+func (t *LocalTarget) SetModel(model string) {
+	t.model = model
+}
+
+func (t *LocalTarget) GetStepping() string {
+	return t.stepping
+}
+
+func (t *LocalTarget) SetStepping(stepping string) {
+	t.stepping = stepping
+}
+
+func (t *LocalTarget) GetVendor() string {
+	return t.vendor
+}
+
+func (t *LocalTarget) SetVendor(vendor string) {
+	t.vendor = vendor
+}
+
+func (t *LocalTarget) GetCapid4() string {
+	return t.capid4
+}
+
+func (t *LocalTarget) SetCapid4(capid4 string) {
+	t.capid4 = capid4
+}
+
+func (t *LocalTarget) GetDevices() string {
+	return t.devices
+}
+
+func (t *LocalTarget) SetDevices(devices string) {
+	t.devices = devices
+}
+
+func (t *LocalTarget) GetImplementer() string {
+	return t.implementer
+}
+
+func (t *LocalTarget) SetImplementer(implementer string) {
+	t.implementer = implementer
+}
+
+func (t *LocalTarget) GetPart() string {
+	return t.part
+}
+
+func (t *LocalTarget) SetPart(part string) {
+	t.part = part
+}
+
+func (t *LocalTarget) GetDmidecodePart() string {
+	return t.dmidecodePart
+}
+
+func (t *LocalTarget) SetDmidecodePart(dmidecodePart string) {
+	t.dmidecodePart = dmidecodePart
+}
+
+func (t *LocalTarget) GetMicroarchitecture() string {
+	return t.microarchitecture
+}
+
+func (t *LocalTarget) SetMicroarchitecture(microarchitecture string) {
+	t.microarchitecture = microarchitecture
 }
