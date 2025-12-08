@@ -179,7 +179,7 @@ func (l *PerfmonLoader) Load(loaderConfig LoaderConfig) ([]MetricDefinition, []G
 	return metricDefs, allGroups, nil
 }
 
-// uarchToResourceName maps from the CPU's microarchiteture, as defined in the cpus
+// uarchToResourceName maps from the CPU's microarchitecture, as defined in the cpus
 // module, to the associated perfmon resource directory and config file name
 func uarchToResourceName(uarch string) string {
 	name := strings.ToLower(uarch)

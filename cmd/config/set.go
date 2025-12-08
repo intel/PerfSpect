@@ -577,7 +577,6 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 		// Depends:        []string{"wrmsr"},
 		// Lkms:           []string{"msr"},
 	}
-	// don't need to check script for target compatability since we already checked support above
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
 		err = fmt.Errorf("failed to set uncore frequency: %w", err)
