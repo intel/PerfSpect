@@ -3,6 +3,7 @@ package common
 import (
 	"fmt"
 	"log/slog"
+	"perfspect/internal/cpus"
 	"perfspect/internal/script"
 	"perfspect/internal/util"
 	"regexp"
@@ -136,11 +137,11 @@ func GetSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 	totalCoreStartRange := 1
 	startRange := 1
 	var archMultiplier int
-	if strings.Contains(arch, "SRF") || strings.Contains(arch, "CWF") {
+	if strings.Contains(arch, cpus.UarchSRF) || strings.Contains(arch, cpus.UarchCWF) {
 		archMultiplier = 4
-	} else if strings.Contains(arch, "GNR_X3") {
+	} else if strings.Contains(arch, cpus.UarchGNR_X3) {
 		archMultiplier = 3
-	} else if strings.Contains(arch, "GNR_X2") {
+	} else if strings.Contains(arch, cpus.UarchGNR_X2) {
 		archMultiplier = 2
 	} else {
 		archMultiplier = 1

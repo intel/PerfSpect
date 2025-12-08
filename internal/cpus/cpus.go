@@ -21,6 +21,61 @@ const ARMArchitecture = "aarch64"
 
 var IntelFamilies = []int{6, 19}
 
+// Microarchitecture constants
+const (
+	// Intel Core CPUs
+	UarchHSW = "HSW"
+	UarchBDW = "BDW"
+	UarchSKL = "SKL"
+	UarchKBL = "KBL"
+	UarchCFL = "CFL"
+	UarchRKL = "RKL"
+	UarchTGL = "TGL"
+	UarchADL = "ADL"
+	UarchMTL = "MTL"
+	UarchARL = "ARL"
+	// Intel Xeon CPUs
+	UarchHSX     = "HSX"
+	UarchBDX     = "BDX"
+	UarchSKX     = "SKX"
+	UarchCLX     = "CLX"
+	UarchCPX     = "CPX"
+	UarchICX     = "ICX"
+	UarchSPR     = "SPR"
+	UarchSPR_MCC = "SPR_MCC" //lint:ignore ST1003 microarchitecture names use underscores to match Intel specifications
+	UarchSPR_XCC = "SPR_XCC" //lint:ignore ST1003 microarchitecture names use underscores to match Intel specifications
+	UarchEMR     = "EMR"
+	UarchEMR_MCC = "EMR_MCC" //lint:ignore ST1003 microarchitecture names use underscores to match Intel specifications
+	UarchEMR_XCC = "EMR_XCC" //lint:ignore ST1003 microarchitecture names use underscores to match Intel specifications
+	UarchSRF     = "SRF"
+	UarchSRF_SP  = "SRF_SP" //lint:ignore ST1003 microarchitecture names use underscores to match Intel specifications
+	UarchSRF_AP  = "SRF_AP" //lint:ignore ST1003 microarchitecture names use underscores to match Intel specifications
+	UarchGNR     = "GNR"
+	UarchGNR_X1  = "GNR_X1" //lint:ignore ST1003 microarchitecture names use underscores to match Intel specifications
+	UarchGNR_X2  = "GNR_X2" //lint:ignore ST1003 microarchitecture names use underscores to match Intel specifications
+	UarchGNR_X3  = "GNR_X3" //lint:ignore ST1003 microarchitecture names use underscores to match Intel specifications
+	UarchGNR_D   = "GNR-D"  //lint:ignore ST1003 microarchitecture names use underscores to match Intel specifications
+	UarchCWF     = "CWF"
+	UarchDMR     = "DMR"
+	// AMD CPUs
+	UarchNaples     = "Naples"
+	UarchRome       = "Rome"
+	UarchMilan      = "Milan"
+	UarchGenoa      = "Genoa"
+	UarchBergamo    = "Bergamo"
+	UarchTurinZen5  = "Turin (Zen 5)"
+	UarchTurinZen5c = "Turin (Zen 5c)"
+	// ARM CPUs
+	UarchGraviton2       = "Graviton2"
+	UarchGraviton3       = "Graviton3"
+	UarchGraviton4       = "Graviton4"
+	UarchAxion           = "Axion"
+	UarchAltraFamily     = "Altra Family"
+	UarchAmpereOneAC03   = "AmpereOne AC03"
+	UarchAmpereOneAC04   = "AmpereOne AC04"
+	UarchAmpereOneAC04_1 = "AmpereOne AC04_1"
+)
+
 type CPUCharacteristics struct {
 	MicroArchitecture  string
 	MemoryChannelCount int
@@ -54,56 +109,56 @@ type CPUIdentifier struct {
 // cpuCharacteristicsMap maps microarchitecture name to CPU characteristics
 var cpuCharacteristicsMap = map[string]CPUCharacteristics{
 	// Intel Core CPUs
-	"HSW": {MicroArchitecture: "HSW", MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0}, // Haswell
-	"BDW": {MicroArchitecture: "BDW", MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0}, // Broadwell
-	"SKL": {MicroArchitecture: "SKL", MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0}, // Skylake
-	"KBL": {MicroArchitecture: "KBL", MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0}, // Kabylake
-	"CFL": {MicroArchitecture: "CFL", MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0}, // Coffeelake
-	"RKL": {MicroArchitecture: "RKL", MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0}, // Rocket Lake
-	"TGL": {MicroArchitecture: "TGL", MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0}, // Tiger Lake
-	"ADL": {MicroArchitecture: "ADL", MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0}, // Alder Lake
-	"MTL": {MicroArchitecture: "MTL", MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0}, // Meteor Lake
-	"ARL": {MicroArchitecture: "ARL", MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0}, // Arrow Lake
+	UarchHSW: {MicroArchitecture: UarchHSW, MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0}, // Haswell
+	UarchBDW: {MicroArchitecture: UarchBDW, MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0}, // Broadwell
+	UarchSKL: {MicroArchitecture: UarchSKL, MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0}, // Skylake
+	UarchKBL: {MicroArchitecture: UarchKBL, MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0}, // Kabylake
+	UarchCFL: {MicroArchitecture: UarchCFL, MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0}, // Coffeelake
+	UarchRKL: {MicroArchitecture: UarchRKL, MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0}, // Rocket Lake
+	UarchTGL: {MicroArchitecture: UarchTGL, MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0}, // Tiger Lake
+	UarchADL: {MicroArchitecture: UarchADL, MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0}, // Alder Lake
+	UarchMTL: {MicroArchitecture: UarchMTL, MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0}, // Meteor Lake
+	UarchARL: {MicroArchitecture: UarchARL, MemoryChannelCount: 2, LogicalThreadCount: 2, CacheWayCount: 0}, // Arrow Lake
 	// Intel Xeon CPUs
-	"HSX":     {MicroArchitecture: "HSX", MemoryChannelCount: 4, LogicalThreadCount: 2, CacheWayCount: 20},     // Haswell
-	"BDX":     {MicroArchitecture: "BDX", MemoryChannelCount: 4, LogicalThreadCount: 2, CacheWayCount: 20},     // Broadwell
-	"SKX":     {MicroArchitecture: "SKX", MemoryChannelCount: 6, LogicalThreadCount: 2, CacheWayCount: 11},     // Skylake
-	"CLX":     {MicroArchitecture: "CLX", MemoryChannelCount: 6, LogicalThreadCount: 2, CacheWayCount: 11},     // Cascadelake
-	"CPX":     {MicroArchitecture: "CPX", MemoryChannelCount: 6, LogicalThreadCount: 2, CacheWayCount: 11},     // Cooperlake
-	"ICX":     {MicroArchitecture: "ICX", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 12},     // Icelake
-	"SPR":     {MicroArchitecture: "SPR", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 15},     // Sapphire Rapids - generic
-	"SPR_MCC": {MicroArchitecture: "SPR_MCC", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 15}, // Sapphire Rapids - MCC
-	"SPR_XCC": {MicroArchitecture: "SPR_XCC", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 15}, // Sapphire Rapids - XCC
-	"EMR":     {MicroArchitecture: "EMR", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 15},     // Emerald Rapids - generic
-	"EMR_MCC": {MicroArchitecture: "EMR_MCC", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 15}, // Emerald Rapids - MCC
-	"EMR_XCC": {MicroArchitecture: "EMR_XCC", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 20}, // Emerald Rapids - XCC
-	"SRF":     {MicroArchitecture: "SRF", MemoryChannelCount: 0, LogicalThreadCount: 1, CacheWayCount: 12},     // Sierra Forest
-	"SRF_SP":  {MicroArchitecture: "SRF_SP", MemoryChannelCount: 8, LogicalThreadCount: 1, CacheWayCount: 12},  // Sierra Forest
-	"SRF_AP":  {MicroArchitecture: "SRF_AP", MemoryChannelCount: 12, LogicalThreadCount: 1, CacheWayCount: 12}, // Sierra Forest
-	"GNR":     {MicroArchitecture: "GNR", MemoryChannelCount: 0, LogicalThreadCount: 2, CacheWayCount: 16},     // Granite Rapids - generic
-	"GNR_X1":  {MicroArchitecture: "GNR_X1", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 16},  // Granite Rapids - SP (MCC/LCC)
-	"GNR_X2":  {MicroArchitecture: "GNR_X2", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 16},  // Granite Rapids - SP (XCC)
-	"GNR_X3":  {MicroArchitecture: "GNR_X3", MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 16}, // Granite Rapids - AP (UCC)
-	"GNR-D":   {MicroArchitecture: "GNR-D", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 16},   // Granite Rapids - D
-	"CWF":     {MicroArchitecture: "CWF", MemoryChannelCount: 12, LogicalThreadCount: 1, CacheWayCount: 0},     // Clearwater Forest - generic
-	"DMR":     {MicroArchitecture: "DMR", MemoryChannelCount: 16, LogicalThreadCount: 1, CacheWayCount: 0},     // Diamond Rapids
+	UarchHSX:     {MicroArchitecture: UarchHSX, MemoryChannelCount: 4, LogicalThreadCount: 2, CacheWayCount: 20},     // Haswell
+	UarchBDX:     {MicroArchitecture: UarchBDX, MemoryChannelCount: 4, LogicalThreadCount: 2, CacheWayCount: 20},     // Broadwell
+	UarchSKX:     {MicroArchitecture: UarchSKX, MemoryChannelCount: 6, LogicalThreadCount: 2, CacheWayCount: 11},     // Skylake
+	UarchCLX:     {MicroArchitecture: UarchCLX, MemoryChannelCount: 6, LogicalThreadCount: 2, CacheWayCount: 11},     // Cascadelake
+	UarchCPX:     {MicroArchitecture: UarchCPX, MemoryChannelCount: 6, LogicalThreadCount: 2, CacheWayCount: 11},     // Cooperlake
+	UarchICX:     {MicroArchitecture: UarchICX, MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 12},     // Icelake
+	UarchSPR:     {MicroArchitecture: UarchSPR, MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 15},     // Sapphire Rapids - generic
+	UarchSPR_MCC: {MicroArchitecture: UarchSPR_MCC, MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 15}, // Sapphire Rapids - MCC
+	UarchSPR_XCC: {MicroArchitecture: UarchSPR_XCC, MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 15}, // Sapphire Rapids - XCC
+	UarchEMR:     {MicroArchitecture: UarchEMR, MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 15},     // Emerald Rapids - generic
+	UarchEMR_MCC: {MicroArchitecture: UarchEMR_MCC, MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 15}, // Emerald Rapids - MCC
+	UarchEMR_XCC: {MicroArchitecture: UarchEMR_XCC, MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 20}, // Emerald Rapids - XCC
+	UarchSRF:     {MicroArchitecture: UarchSRF, MemoryChannelCount: 0, LogicalThreadCount: 1, CacheWayCount: 12},     // Sierra Forest
+	UarchSRF_SP:  {MicroArchitecture: UarchSRF_SP, MemoryChannelCount: 8, LogicalThreadCount: 1, CacheWayCount: 12},  // Sierra Forest
+	UarchSRF_AP:  {MicroArchitecture: UarchSRF_AP, MemoryChannelCount: 12, LogicalThreadCount: 1, CacheWayCount: 12}, // Sierra Forest
+	UarchGNR:     {MicroArchitecture: UarchGNR, MemoryChannelCount: 0, LogicalThreadCount: 2, CacheWayCount: 16},     // Granite Rapids - generic
+	UarchGNR_X1:  {MicroArchitecture: UarchGNR_X1, MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 16},  // Granite Rapids - SP (MCC/LCC)
+	UarchGNR_X2:  {MicroArchitecture: UarchGNR_X2, MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 16},  // Granite Rapids - SP (XCC)
+	UarchGNR_X3:  {MicroArchitecture: UarchGNR_X3, MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 16}, // Granite Rapids - AP (UCC)
+	UarchGNR_D:   {MicroArchitecture: UarchGNR_D, MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 16},   // Granite Rapids - D
+	UarchCWF:     {MicroArchitecture: UarchCWF, MemoryChannelCount: 12, LogicalThreadCount: 1, CacheWayCount: 0},     // Clearwater Forest - generic
+	UarchDMR:     {MicroArchitecture: UarchDMR, MemoryChannelCount: 16, LogicalThreadCount: 1, CacheWayCount: 0},     // Diamond Rapids
 	// AMD CPUs
-	"Naples":         {MicroArchitecture: "Naples", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 0},          // Naples
-	"Rome":           {MicroArchitecture: "Rome", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 0},            // Rome
-	"Milan":          {MicroArchitecture: "Milan", MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 0},           // Milan
-	"Genoa":          {MicroArchitecture: "Genoa", MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 0},          // Genoa
-	"Bergamo":        {MicroArchitecture: "Bergamo", MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 0},        // Bergamo
-	"Turin (Zen 5)":  {MicroArchitecture: "Turin (Zen 5)", MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 0},  // Turin (Zen 5)
-	"Turin (Zen 5c)": {MicroArchitecture: "Turin (Zen 5c)", MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 0}, // Turin (Zen 5c)
+	UarchNaples:     {MicroArchitecture: UarchNaples, MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 0},      // Naples
+	UarchRome:       {MicroArchitecture: UarchRome, MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 0},        // Rome
+	UarchMilan:      {MicroArchitecture: UarchMilan, MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 0},       // Milan
+	UarchGenoa:      {MicroArchitecture: UarchGenoa, MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 0},      // Genoa
+	UarchBergamo:    {MicroArchitecture: UarchBergamo, MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 0},    // Bergamo
+	UarchTurinZen5:  {MicroArchitecture: UarchTurinZen5, MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 0},  // Turin (Zen 5)
+	UarchTurinZen5c: {MicroArchitecture: UarchTurinZen5c, MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 0}, // Turin (Zen 5c)
 	// ARM CPUs
-	"Graviton2":        {MicroArchitecture: "Graviton2", MemoryChannelCount: 8, LogicalThreadCount: 1},         // AWS Graviton 2 ([m|c|r]6g) Neoverse-N1
-	"Graviton3":        {MicroArchitecture: "Graviton3", MemoryChannelCount: 8, LogicalThreadCount: 1},         // AWS Graviton 3 ([m|c|r]7g) Neoverse-V1
-	"Graviton4":        {MicroArchitecture: "Graviton4", MemoryChannelCount: 12, LogicalThreadCount: 1},        // AWS Graviton 4 ([m|c|r]8g) Neoverse-V2
-	"Axion":            {MicroArchitecture: "Axion", MemoryChannelCount: 12, LogicalThreadCount: 1},            // GCP Axion (c4a) Neoverse-V2
-	"Altra Family":     {MicroArchitecture: "Altra Family", MemoryChannelCount: 8, LogicalThreadCount: 1},      // Ampere Altra
-	"AmpereOne AC03":   {MicroArchitecture: "AmpereOne AC03", MemoryChannelCount: 8, LogicalThreadCount: 1},    // AmpereOne AC03
-	"AmpereOne AC04":   {MicroArchitecture: "AmpereOne AC04", MemoryChannelCount: 8, LogicalThreadCount: 1},    // AmpereOne AC04
-	"AmpereOne AC04_1": {MicroArchitecture: "AmpereOne AC04_1", MemoryChannelCount: 12, LogicalThreadCount: 1}, // AmpereOne AC04_1
+	UarchGraviton2:       {MicroArchitecture: UarchGraviton2, MemoryChannelCount: 8, LogicalThreadCount: 1},        // AWS Graviton 2 ([m|c|r]6g) Neoverse-N1
+	UarchGraviton3:       {MicroArchitecture: UarchGraviton3, MemoryChannelCount: 8, LogicalThreadCount: 1},        // AWS Graviton 3 ([m|c|r]7g) Neoverse-V1
+	UarchGraviton4:       {MicroArchitecture: UarchGraviton4, MemoryChannelCount: 12, LogicalThreadCount: 1},       // AWS Graviton 4 ([m|c|r]8g) Neoverse-V2
+	UarchAxion:           {MicroArchitecture: UarchAxion, MemoryChannelCount: 12, LogicalThreadCount: 1},           // GCP Axion (c4a) Neoverse-V2
+	UarchAltraFamily:     {MicroArchitecture: UarchAltraFamily, MemoryChannelCount: 8, LogicalThreadCount: 1},      // Ampere Altra
+	UarchAmpereOneAC03:   {MicroArchitecture: UarchAmpereOneAC03, MemoryChannelCount: 8, LogicalThreadCount: 1},    // AmpereOne AC03
+	UarchAmpereOneAC04:   {MicroArchitecture: UarchAmpereOneAC04, MemoryChannelCount: 8, LogicalThreadCount: 1},    // AmpereOne AC04
+	UarchAmpereOneAC04_1: {MicroArchitecture: UarchAmpereOneAC04_1, MemoryChannelCount: 12, LogicalThreadCount: 1}, // AmpereOne AC04_1
 }
 
 // cpuIdentifiersX86 maps x86 CPU identification to microarchitecture names
@@ -112,38 +167,38 @@ var cpuIdentifiersX86 = []struct {
 	MicroArchitecture string
 }{
 	// Intel Core CPUs
-	{CPUIdentifierX86{Family: "6", Model: "(50|69|70)", Stepping: "", Capid4: "", Devices: ""}, "HSW"},             // Haswell
-	{CPUIdentifierX86{Family: "6", Model: "(61|71)", Stepping: "", Capid4: "", Devices: ""}, "BDW"},                // Broadwell
-	{CPUIdentifierX86{Family: "6", Model: "(78|94)", Stepping: "", Capid4: "", Devices: ""}, "SKL"},                // Skylake
-	{CPUIdentifierX86{Family: "6", Model: "(142|158)", Stepping: "9", Capid4: "", Devices: ""}, "KBL"},             // Kabylake
-	{CPUIdentifierX86{Family: "6", Model: "(142|158)", Stepping: "(10|11|12|13)", Capid4: "", Devices: ""}, "CFL"}, // Coffeelake
-	{CPUIdentifierX86{Family: "6", Model: "167", Stepping: "", Capid4: "", Devices: ""}, "RKL"},                    // Rocket Lake
-	{CPUIdentifierX86{Family: "6", Model: "(140|141)", Stepping: "", Capid4: "", Devices: ""}, "TGL"},              // Tiger Lake
-	{CPUIdentifierX86{Family: "6", Model: "(151|154)", Stepping: "", Capid4: "", Devices: ""}, "ADL"},              // Alder Lake
-	{CPUIdentifierX86{Family: "6", Model: "170", Stepping: "4", Capid4: "", Devices: ""}, "MTL"},                   // Meteor Lake
-	{CPUIdentifierX86{Family: "6", Model: "197", Stepping: "2", Capid4: "", Devices: ""}, "ARL"},                   // Arrow Lake
+	{CPUIdentifierX86{Family: "6", Model: "(50|69|70)", Stepping: "", Capid4: "", Devices: ""}, UarchHSW},             // Haswell
+	{CPUIdentifierX86{Family: "6", Model: "(61|71)", Stepping: "", Capid4: "", Devices: ""}, UarchBDW},                // Broadwell
+	{CPUIdentifierX86{Family: "6", Model: "(78|94)", Stepping: "", Capid4: "", Devices: ""}, UarchSKL},                // Skylake
+	{CPUIdentifierX86{Family: "6", Model: "(142|158)", Stepping: "9", Capid4: "", Devices: ""}, UarchKBL},             // Kabylake
+	{CPUIdentifierX86{Family: "6", Model: "(142|158)", Stepping: "(10|11|12|13)", Capid4: "", Devices: ""}, UarchCFL}, // Coffeelake
+	{CPUIdentifierX86{Family: "6", Model: "167", Stepping: "", Capid4: "", Devices: ""}, UarchRKL},                    // Rocket Lake
+	{CPUIdentifierX86{Family: "6", Model: "(140|141)", Stepping: "", Capid4: "", Devices: ""}, UarchTGL},              // Tiger Lake
+	{CPUIdentifierX86{Family: "6", Model: "(151|154)", Stepping: "", Capid4: "", Devices: ""}, UarchADL},              // Alder Lake
+	{CPUIdentifierX86{Family: "6", Model: "170", Stepping: "4", Capid4: "", Devices: ""}, UarchMTL},                   // Meteor Lake
+	{CPUIdentifierX86{Family: "6", Model: "197", Stepping: "2", Capid4: "", Devices: ""}, UarchARL},                   // Arrow Lake
 	// Intel Xeon CPUs
-	{CPUIdentifierX86{Family: "6", Model: "63", Stepping: "", Capid4: "", Devices: ""}, "HSX"},            // Haswell
-	{CPUIdentifierX86{Family: "6", Model: "(79|86)", Stepping: "", Capid4: "", Devices: ""}, "BDX"},       // Broadwell
-	{CPUIdentifierX86{Family: "6", Model: "85", Stepping: "(0|1|2|3|4)", Capid4: "", Devices: ""}, "SKX"}, // Skylake
-	{CPUIdentifierX86{Family: "6", Model: "85", Stepping: "(5|6|7)", Capid4: "", Devices: ""}, "CLX"},     // Cascadelake
-	{CPUIdentifierX86{Family: "6", Model: "85", Stepping: "11", Capid4: "", Devices: ""}, "CPX"},          // Cooperlake
-	{CPUIdentifierX86{Family: "6", Model: "(106|108)", Stepping: "", Capid4: "", Devices: ""}, "ICX"},     // Icelake
-	{CPUIdentifierX86{Family: "6", Model: "143", Stepping: "", Capid4: "", Devices: ""}, "SPR"},           // Sapphire Rapids
-	{CPUIdentifierX86{Family: "6", Model: "207", Stepping: "", Capid4: "", Devices: ""}, "EMR"},           // Emerald Rapids
-	{CPUIdentifierX86{Family: "6", Model: "175", Stepping: "", Capid4: "", Devices: ""}, "SRF"},           // Sierra Forest
-	{CPUIdentifierX86{Family: "6", Model: "173", Stepping: "", Capid4: "", Devices: ""}, "GNR"},           // Granite Rapids
-	{CPUIdentifierX86{Family: "6", Model: "174", Stepping: "", Capid4: "", Devices: ""}, "GNR-D"},         // Granite Rapids - D
-	{CPUIdentifierX86{Family: "6", Model: "221", Stepping: "", Capid4: "", Devices: ""}, "CWF"},           // Clearwater Forest
-	{CPUIdentifierX86{Family: "19", Model: "1", Stepping: "", Capid4: "", Devices: ""}, "DMR"},            // Diamond Rapids
+	{CPUIdentifierX86{Family: "6", Model: "63", Stepping: "", Capid4: "", Devices: ""}, UarchHSX},            // Haswell
+	{CPUIdentifierX86{Family: "6", Model: "(79|86)", Stepping: "", Capid4: "", Devices: ""}, UarchBDX},       // Broadwell
+	{CPUIdentifierX86{Family: "6", Model: "85", Stepping: "(0|1|2|3|4)", Capid4: "", Devices: ""}, UarchSKX}, // Skylake
+	{CPUIdentifierX86{Family: "6", Model: "85", Stepping: "(5|6|7)", Capid4: "", Devices: ""}, UarchCLX},     // Cascadelake
+	{CPUIdentifierX86{Family: "6", Model: "85", Stepping: "11", Capid4: "", Devices: ""}, UarchCPX},          // Cooperlake
+	{CPUIdentifierX86{Family: "6", Model: "(106|108)", Stepping: "", Capid4: "", Devices: ""}, UarchICX},     // Icelake
+	{CPUIdentifierX86{Family: "6", Model: "143", Stepping: "", Capid4: "", Devices: ""}, UarchSPR},           // Sapphire Rapids
+	{CPUIdentifierX86{Family: "6", Model: "207", Stepping: "", Capid4: "", Devices: ""}, UarchEMR},           // Emerald Rapids
+	{CPUIdentifierX86{Family: "6", Model: "175", Stepping: "", Capid4: "", Devices: ""}, UarchSRF},           // Sierra Forest
+	{CPUIdentifierX86{Family: "6", Model: "173", Stepping: "", Capid4: "", Devices: ""}, UarchGNR},           // Granite Rapids
+	{CPUIdentifierX86{Family: "6", Model: "174", Stepping: "", Capid4: "", Devices: ""}, UarchGNR_D},         // Granite Rapids - D
+	{CPUIdentifierX86{Family: "6", Model: "221", Stepping: "", Capid4: "", Devices: ""}, UarchCWF},           // Clearwater Forest
+	{CPUIdentifierX86{Family: "19", Model: "1", Stepping: "", Capid4: "", Devices: ""}, UarchDMR},            // Diamond Rapids
 	// AMD CPUs
-	{CPUIdentifierX86{Family: "23", Model: "1", Stepping: "", Capid4: "", Devices: ""}, "Naples"},                    // Naples
-	{CPUIdentifierX86{Family: "23", Model: "49", Stepping: "", Capid4: "", Devices: ""}, "Rome"},                     // Rome
-	{CPUIdentifierX86{Family: "25", Model: "1", Stepping: "", Capid4: "", Devices: ""}, "Milan"},                     // Milan
-	{CPUIdentifierX86{Family: "25", Model: "(1[6-9]|2[0-9]|3[01])", Stepping: "", Capid4: "", Devices: ""}, "Genoa"}, // Genoa, model 16-31
-	{CPUIdentifierX86{Family: "25", Model: "(16[0-9]|17[0-5])", Stepping: "", Capid4: "", Devices: ""}, "Bergamo"},   // Bergamo, model 160-175
-	{CPUIdentifierX86{Family: "26", Model: "2", Stepping: "", Capid4: "", Devices: ""}, "Turin (Zen 5)"},             // Turin (Zen 5)
-	{CPUIdentifierX86{Family: "26", Model: "17", Stepping: "", Capid4: "", Devices: ""}, "Turin (Zen 5c)"},           // Turin (Zen 5c)
+	{CPUIdentifierX86{Family: "23", Model: "1", Stepping: "", Capid4: "", Devices: ""}, UarchNaples},                    // Naples
+	{CPUIdentifierX86{Family: "23", Model: "49", Stepping: "", Capid4: "", Devices: ""}, UarchRome},                     // Rome
+	{CPUIdentifierX86{Family: "25", Model: "1", Stepping: "", Capid4: "", Devices: ""}, UarchMilan},                     // Milan
+	{CPUIdentifierX86{Family: "25", Model: "(1[6-9]|2[0-9]|3[01])", Stepping: "", Capid4: "", Devices: ""}, UarchGenoa}, // Genoa, model 16-31
+	{CPUIdentifierX86{Family: "25", Model: "(16[0-9]|17[0-5])", Stepping: "", Capid4: "", Devices: ""}, UarchBergamo},   // Bergamo, model 160-175
+	{CPUIdentifierX86{Family: "26", Model: "2", Stepping: "", Capid4: "", Devices: ""}, UarchTurinZen5},                 // Turin (Zen 5)
+	{CPUIdentifierX86{Family: "26", Model: "17", Stepping: "", Capid4: "", Devices: ""}, UarchTurinZen5c},               // Turin (Zen 5c)
 }
 
 // cpuIdentifiersARM maps ARM CPU identification to microarchitecture names
@@ -151,14 +206,14 @@ var cpuIdentifiersARM = []struct {
 	Identifier        CPUIdentifierARM
 	MicroArchitecture string
 }{
-	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd0c", DmidecodePart: "AWS Graviton2"}, "Graviton2"}, // AWS Graviton 2 ([m|c|r]6g) Neoverse-N1
-	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd40", DmidecodePart: "AWS Graviton3"}, "Graviton3"}, // AWS Graviton 3 ([m|c|r]7g) Neoverse-V1
-	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd4f", DmidecodePart: "AWS Graviton4"}, "Graviton4"}, // AWS Graviton 4 ([m|c|r]8g) Neoverse-V2
-	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd4f", DmidecodePart: "Not Specified"}, "Axion"},     // GCP Axion (c4a) Neoverse-V2
-	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd0c", DmidecodePart: ""}, "Altra Family"},           // Ampere Altra
-	{CPUIdentifierARM{Implementer: "0xc0", Part: "0xac3", DmidecodePart: ""}, "AmpereOne AC03"},         // AmpereOne AC03
-	{CPUIdentifierARM{Implementer: "0xc0", Part: "0xac4", DmidecodePart: "X"}, "AmpereOne AC04"},        // AmpereOne AC04
-	{CPUIdentifierARM{Implementer: "0xc0", Part: "0xac4", DmidecodePart: "M"}, "AmpereOne AC04_1"},      // AmpereOne AC04_1
+	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd0c", DmidecodePart: "AWS Graviton2"}, UarchGraviton2}, // AWS Graviton 2 ([m|c|r]6g) Neoverse-N1
+	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd40", DmidecodePart: "AWS Graviton3"}, UarchGraviton3}, // AWS Graviton 3 ([m|c|r]7g) Neoverse-V1
+	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd4f", DmidecodePart: "AWS Graviton4"}, UarchGraviton4}, // AWS Graviton 4 ([m|c|r]8g) Neoverse-V2
+	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd4f", DmidecodePart: "Not Specified"}, UarchAxion},     // GCP Axion (c4a) Neoverse-V2
+	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd0c", DmidecodePart: ""}, UarchAltraFamily},            // Ampere Altra
+	{CPUIdentifierARM{Implementer: "0xc0", Part: "0xac3", DmidecodePart: ""}, UarchAmpereOneAC03},          // AmpereOne AC03
+	{CPUIdentifierARM{Implementer: "0xc0", Part: "0xac4", DmidecodePart: "X"}, UarchAmpereOneAC04},         // AmpereOne AC04
+	{CPUIdentifierARM{Implementer: "0xc0", Part: "0xac4", DmidecodePart: "M"}, UarchAmpereOneAC04_1},       // AmpereOne AC04_1
 }
 
 // NewCPUIdentifier creates a CPUIdentifier with all data elements
@@ -370,13 +425,13 @@ func getSPRMicroArchitecture(capid4 string) (uarch string, err error) {
 		bits = (capid4Int >> 6) & 0b11
 		switch bits {
 		case 3:
-			uarch = "SPR_XCC"
+			uarch = UarchSPR_XCC
 		case 1:
-			uarch = "SPR_MCC"
+			uarch = UarchSPR_MCC
 		}
 	}
 	if uarch == "" {
-		uarch = "SPR"
+		uarch = UarchSPR
 	}
 	return
 }
@@ -392,13 +447,13 @@ func getEMRMicroArchitecture(capid4 string) (uarch string, err error) {
 		bits = (capid4Int >> 6) & 0b11
 		switch bits {
 		case 3:
-			uarch = "EMR_XCC"
+			uarch = UarchEMR_XCC
 		case 1:
-			uarch = "EMR_MCC"
+			uarch = UarchEMR_MCC
 		}
 	}
 	if uarch == "" {
-		uarch = "EMR"
+		uarch = UarchEMR
 	}
 	return
 }
@@ -408,16 +463,16 @@ func getGNRMicroArchitecture(devices string) (uarch string, err error) {
 		d, err := strconv.Atoi(devices)
 		if err == nil && d != 0 {
 			if d%5 == 0 { // device count is multiple of 5
-				uarch = "GNR_X3"
+				uarch = UarchGNR_X3
 			} else if d%4 == 0 { // device count is multiple of 4
-				uarch = "GNR_X2"
+				uarch = UarchGNR_X2
 			} else if d%3 == 0 { // device count is multiple of 3
-				uarch = "GNR_X1"
+				uarch = UarchGNR_X1
 			}
 		}
 	}
 	if uarch == "" {
-		uarch = "GNR"
+		uarch = UarchGNR
 	}
 	return
 }
@@ -427,14 +482,14 @@ func getSRFMicroArchitecture(devices string) (uarch string, err error) {
 		d, err := strconv.Atoi(devices)
 		if err == nil && d != 0 {
 			if d%3 == 0 { // device count is multiple of 3
-				uarch = "SRF_SP"
+				uarch = UarchSRF_SP
 			} else if d%4 == 0 { // device count is multiple of 4
-				uarch = "SRF_AP"
+				uarch = UarchSRF_AP
 			}
 		}
 	}
 	if uarch == "" {
-		uarch = "SRF"
+		uarch = UarchSRF
 	}
 	return
 }

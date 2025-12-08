@@ -809,9 +809,9 @@ func getSupportsFixedTMA(scriptOutputs map[string]script.ScriptOutput) (supporte
 func getNumGPCounters(uarch string) (numGPCounters int, err error) {
 	shortUarch := uarch[:3]
 	switch shortUarch {
-	case "BDX", "SKX", "CLX":
+	case cpus.UarchBDX, cpus.UarchSKX, cpus.UarchCLX:
 		numGPCounters = 4
-	case "ICX", "SPR", "EMR", "SRF", "CWF", "GNR":
+	case cpus.UarchICX, cpus.UarchSPR, cpus.UarchEMR, cpus.UarchSRF, cpus.UarchCWF, cpus.UarchGNR:
 		numGPCounters = 8
 	case "Gen", "Ber", "Tur":
 		numGPCounters = 5
@@ -898,11 +898,11 @@ func getARMSlots(scriptOutputs map[string]script.ScriptOutput) (slots int, err e
 // Used as a fallback when we cannot read the slots from sysfs
 func getARMSlotsByArchitecture(uarch string) (slots int, err error) {
 	switch uarch {
-	case "Graviton4", "Axion":
+	case cpus.UarchGraviton4, cpus.UarchAxion:
 		slots = 8
-	case "Graviton2", "Graviton3":
+	case cpus.UarchGraviton2, cpus.UarchGraviton3:
 		slots = 6
-	case "AmpereOne AC04", "AmpereOne AC04_1":
+	case cpus.UarchAmpereOneAC04, cpus.UarchAmpereOneAC04_1:
 		slots = 10
 	default:
 		err = fmt.Errorf("unsupported ARM uarch: %s", uarch)

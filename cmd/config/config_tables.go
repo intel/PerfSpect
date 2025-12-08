@@ -70,7 +70,7 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []table.Fi
 		{Name: "Package Power / TDP", Description: "--tdp <Watts>", Values: []string{common.TDPFromOutput(outputs)}},
 		{Name: "Core SSE Frequency", Description: "--core-max <GHz>", Values: []string{sseFrequenciesFromOutput(outputs)}},
 	}
-	if strings.Contains(uarch, "SRF") || strings.Contains(uarch, "GNR") || strings.Contains(uarch, "CWF") {
+	if strings.Contains(uarch, cpus.UarchSRF) || strings.Contains(uarch, cpus.UarchGNR) || strings.Contains(uarch, cpus.UarchCWF) {
 		fields = append(fields, []table.Field{
 			{Name: "Uncore Max Frequency (Compute)", Description: "--uncore-max-compute <GHz>", Values: []string{common.UncoreMinMaxDieFrequencyFromOutput(true, true, outputs)}},
 			{Name: "Uncore Min Frequency (Compute)", Description: "--uncore-min-compute <GHz>", Values: []string{common.UncoreMinMaxDieFrequencyFromOutput(false, true, outputs)}},
@@ -89,7 +89,7 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []table.Fi
 		{Name: "Scaling Governor", Description: "--gov <performance|powersave>", Values: []string{strings.TrimSpace(outputs[script.ScalingGovernorScriptName].Stdout)}},
 	}...)
 	// add ELC (for SRF, CWF and GNR only)
-	if strings.Contains(uarch, "SRF") || strings.Contains(uarch, "GNR") || strings.Contains(uarch, "CWF") {
+	if strings.Contains(uarch, cpus.UarchSRF) || strings.Contains(uarch, cpus.UarchGNR) || strings.Contains(uarch, cpus.UarchCWF) {
 		fields = append(fields, table.Field{Name: "Efficiency Latency Control", Description: "--elc <default|latency-optimized>", Values: []string{common.ELCSummaryFromOutput(outputs)}})
 	}
 	// add prefetchers

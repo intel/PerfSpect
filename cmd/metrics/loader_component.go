@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"perfspect/internal/cpus"
 	"perfspect/internal/util"
 	"regexp"
 	"slices"
@@ -494,11 +495,11 @@ func initializeComponentMetricEvaluable(expression string, evaluatorFunctions ma
 // the cpus module, to the directory where the associated events and metrics reside
 func getUarchDir(uarch string) (string, error) {
 	switch uarch {
-	case "Graviton4", "Axion", "AmpereOne AC04", "AmpereOne AC04_1":
+	case cpus.UarchGraviton4, cpus.UarchAxion, cpus.UarchAmpereOneAC04, cpus.UarchAmpereOneAC04_1:
 		return "neoverse-n2-v2", nil
-	case "Graviton2":
+	case cpus.UarchGraviton2:
 		return "neoverse-n1", nil
-	case "Graviton3":
+	case cpus.UarchGraviton3:
 		return "neoverse-v1", nil
 	}
 	return "", fmt.Errorf("unsupported component loader architecture: %s", uarch)

@@ -6,6 +6,7 @@ package metrics
 import (
 	"fmt"
 	"log/slog"
+	"perfspect/internal/cpus"
 
 	"github.com/casbin/govaluate"
 )
@@ -81,13 +82,13 @@ type ComponentLoader struct {
 // Input is the CPU microarchitecture name as defined in the cpus module.
 func NewLoader(uarch string) (Loader, error) {
 	switch uarch {
-	case "CLX", "SKX", "BDX", "Bergamo", "Genoa", "Turin (Zen 5)", "Turin (Zen 5c)":
+	case cpus.UarchCLX, cpus.UarchSKX, cpus.UarchBDX, cpus.UarchBergamo, cpus.UarchGenoa, cpus.UarchTurinZen5, cpus.UarchTurinZen5c:
 		slog.Debug("Using legacy loader for microarchitecture", slog.String("uarch", uarch))
 		return newLegacyLoader(), nil
-	case "GNR", "GNR_X1", "GNR_X2", "GNR_X3", "GNR-D", "SRF", "SRF_SP", "SRF_AP", "EMR", "EMR_MCC", "EMR_XCC", "SPR", "SPR_MCC", "SPR_XCC", "ICX":
+	case cpus.UarchGNR, cpus.UarchGNR_X1, cpus.UarchGNR_X2, cpus.UarchGNR_X3, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchSRF_SP, cpus.UarchSRF_AP, cpus.UarchEMR, cpus.UarchEMR_MCC, cpus.UarchEMR_XCC, cpus.UarchSPR, cpus.UarchSPR_MCC, cpus.UarchSPR_XCC, cpus.UarchICX:
 		slog.Debug("Using perfmon loader for microarchitecture", slog.String("uarch", uarch))
 		return newPerfmonLoader(), nil
-	case "Graviton2", "Graviton3", "Graviton4", "Axion", "AmpereOne AC04", "AmpereOne AC04_1":
+	case cpus.UarchGraviton2, cpus.UarchGraviton3, cpus.UarchGraviton4, cpus.UarchAxion, cpus.UarchAmpereOneAC04, cpus.UarchAmpereOneAC04_1:
 		slog.Debug("Using component loader for microarchitecture", slog.String("uarch", uarch))
 		return newComponentLoader(), nil
 	default:

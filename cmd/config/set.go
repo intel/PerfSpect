@@ -390,11 +390,11 @@ func setSSEFrequencies(sseFrequencies string, myTarget target.Target, localTempD
 		return fmt.Errorf("failed to get microarchitecture: %w", err)
 	}
 	var archMultiplier int
-	if strings.Contains(uarch, "SRF") || strings.Contains(uarch, "CWF") {
+	if strings.Contains(uarch, cpus.UarchSRF) || strings.Contains(uarch, cpus.UarchCWF) {
 		archMultiplier = 4
-	} else if strings.Contains(uarch, "GNR_X3") {
+	} else if strings.Contains(uarch, cpus.UarchGNR_X3) {
 		archMultiplier = 3
-	} else if strings.Contains(uarch, "GNR_X2") {
+	} else if strings.Contains(uarch, cpus.UarchGNR_X2) {
 		archMultiplier = 2
 	} else {
 		archMultiplier = 1
@@ -542,7 +542,7 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 		Name:               "get uncore frequency MSR",
 		ScriptTemplate:     "rdmsr 0x620",
 		Vendors:            []string{cpus.IntelVendor},
-		MicroArchitectures: []string{"GNR", "GNR-D", "SRF", "CWF"},
+		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF},
 		Superuser:          true,
 		// Depends:        []string{"rdmsr"},
 		// Lkms:           []string{"msr"},
@@ -573,7 +573,7 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 		ScriptTemplate:     fmt.Sprintf("wrmsr -a 0x620 %d", newVal),
 		Superuser:          true,
 		Vendors:            []string{cpus.IntelVendor},
-		MicroArchitectures: []string{"GNR", "GNR-D", "SRF", "CWF"},
+		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF},
 		// Depends:        []string{"wrmsr"},
 		// Lkms:           []string{"msr"},
 	}
@@ -782,7 +782,7 @@ func setELC(elc string, myTarget target.Target, localTempDir string) error {
 		ScriptTemplate:     fmt.Sprintf("bhs-power-mode.sh --%s", mode),
 		Superuser:          true,
 		Vendors:            []string{cpus.IntelVendor},
-		MicroArchitectures: []string{"GNR", "GNR-D", "SRF", "CWF"},
+		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF},
 		Depends:            []string{"bhs-power-mode.sh", "pcm-tpmi"},
 	}
 	_, err := runScript(myTarget, setScript, localTempDir)
