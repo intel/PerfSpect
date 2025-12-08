@@ -1000,12 +1000,12 @@ echo $__DEFAULT_HL_DEVICE
 	},
 	ArmImplementerScriptName: {
 		Name:           ArmImplementerScriptName,
-		ScriptTemplate: "cat /proc/cpuinfo | grep -i \"^CPU implementer\" | head -1 | awk '{print $NF}'",
+		ScriptTemplate: "grep -i \"^CPU implementer\" /proc/cpuinfo | head -1 | awk '{print $NF}'",
 		Architectures:  []string{cpus.ARMArchitecture},
 	},
 	ArmPartScriptName: {
 		Name:           ArmPartScriptName,
-		ScriptTemplate: "cat /proc/cpuinfo | grep -i \"^CPU part\" | head -1 | awk '{print $NF}'",
+		ScriptTemplate: "grep -i \"^CPU part\" /proc/cpuinfo | head -1 | awk '{print $NF}'",
 		Architectures:  []string{cpus.ARMArchitecture},
 	},
 	ArmDmidecodePartScriptName: {
