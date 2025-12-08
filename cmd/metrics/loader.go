@@ -81,7 +81,7 @@ type ComponentLoader struct {
 // Input is the CPU microarchitecture name as defined in the cpus module.
 func NewLoader(uarch string) (Loader, error) {
 	switch uarch {
-	case "CLX", "SKX", "BDX", "Bergamo", "Genoa", "Turin":
+	case "CLX", "SKX", "BDX", "Bergamo", "Genoa", "Turin (Zen 5)", "Turin (Zen 5c)":
 		slog.Debug("Using legacy loader for microarchitecture", slog.String("uarch", uarch))
 		return newLegacyLoader(), nil
 	case "GNR", "SRF", "EMR", "SPR", "ICX":
