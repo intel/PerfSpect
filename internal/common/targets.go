@@ -639,11 +639,7 @@ func GetTargetDevices(t target.Target, localTempDir string, noRoot bool) (string
 func GetTargetImplementer(t target.Target, localTempDir string, noRoot bool) (string, error) {
 	implementer := t.GetImplementer()
 	if implementer == "" {
-		getScript := script.ScriptDefinition{
-			Name:           "get target implementer",
-			ScriptTemplate: "cat /proc/cpuinfo | grep -i \"^CPU implementer\" | head -1 | awk '{print $NF}'",
-			Superuser:      !noRoot,
-		}
+		getScript := script.GetScriptByName(script.ArmImplementerScriptName)
 		scriptOutput, err := script.RunScript(t, getScript, localTempDir)
 		if err != nil {
 			return "", fmt.Errorf("failed to run implementer retrieval script: %v", err)
@@ -657,11 +653,7 @@ func GetTargetImplementer(t target.Target, localTempDir string, noRoot bool) (st
 func GetTargetPart(t target.Target, localTempDir string, noRoot bool) (string, error) {
 	part := t.GetPart()
 	if part == "" {
-		getScript := script.ScriptDefinition{
-			Name:           "get target part",
-			ScriptTemplate: "cat /proc/cpuinfo | grep -i \"^CPU part\" | head -1 | awk '{print $NF}'",
-			Superuser:      !noRoot,
-		}
+		getScript := script.GetScriptByName(script.ArmPartScriptName)
 		scriptOutput, err := script.RunScript(t, getScript, localTempDir)
 		if err != nil {
 			return "", fmt.Errorf("failed to run part retrieval script: %v", err)
@@ -675,12 +667,7 @@ func GetTargetPart(t target.Target, localTempDir string, noRoot bool) (string, e
 func GetTargetDmidecodePart(t target.Target, localTempDir string, noRoot bool) (string, error) {
 	dmidecodePart := t.GetDmidecodePart()
 	if dmidecodePart == "" {
-		getScript := script.ScriptDefinition{
-			Name:           "get dmidecode processor part number",
-			ScriptTemplate: "dmidecode -t processor | grep -m 1 \"Part Number\" | awk -F': ' '{print $2}'",
-			Superuser:      !noRoot,
-			Depends:        []string{"dmidecode"},
-		}
+		getScript := script.GetScriptByName(script.ArmDmidecodePartScriptName)
 		scriptOutput, err := script.RunScript(t, getScript, localTempDir) // don't call common.RunScript, otherwise infinite loop
 		if err != nil {
 			return "", fmt.Errorf("failed to run dmidecode part number script: %v", err)

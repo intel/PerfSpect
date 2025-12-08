@@ -48,6 +48,9 @@ var tableDefinitions = map[string]table.TableDefinition{
 			script.PrefetchersAtomName,
 			script.CstatesScriptName,
 			script.C1DemotionScriptName,
+			script.ArmImplementerScriptName,
+			script.ArmPartScriptName,
+			script.ArmDmidecodePartScriptName,
 		},
 		FieldsFunc: configurationTableValues},
 }

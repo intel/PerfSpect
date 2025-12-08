@@ -161,6 +161,25 @@ var cpuIdentifiersARM = []struct {
 	{CPUIdentifierARM{Implementer: "0xc0", Part: "0xac4", DmidecodePart: "M"}, "AmpereOne AC04_1"},      // AmpereOne AC04_1
 }
 
+// NewCPUIdentifier creates a CPUIdentifier with all data elements
+func NewCPUIdentifier(family, model, stepping, capid4, devices, implementer, part, dmidecodePart, architecture string) CPUIdentifier {
+	return CPUIdentifier{
+		CPUIdentifierX86: CPUIdentifierX86{
+			Family:   family,
+			Model:    model,
+			Stepping: stepping,
+			Capid4:   capid4,
+			Devices:  devices,
+		},
+		CPUIdentifierARM: CPUIdentifierARM{
+			Implementer:   implementer,
+			Part:          part,
+			DmidecodePart: dmidecodePart,
+		},
+		Architecture: architecture,
+	}
+}
+
 // NewX86Identifier creates a CPUIdentifier for x86/AMD CPUs with extended parameters
 func NewX86Identifier(family, model, stepping, capid4, devices string) CPUIdentifier {
 	return CPUIdentifier{
@@ -192,7 +211,7 @@ func GetCPU(id CPUIdentifier) (CPUCharacteristics, error) {
 	// Auto-detect architecture if not specified
 	arch := id.Architecture
 	if arch == "" {
-		if id.Family != "" || id.Model != "" {
+		if id.Implementer == "" && id.Family != "" && id.Model != "" {
 			arch = X86Architecture
 		} else if id.Implementer != "" || id.Part != "" {
 			arch = ARMArchitecture

@@ -101,6 +101,9 @@ const (
 	GaudiFirmwareScriptName          = "gaudi firmware"
 	GaudiNumaScriptName              = "gaudi numa"
 	GaudiArchitectureScriptName      = "gaudi architecture"
+	ArmImplementerScriptName         = "arm implementer"
+	ArmPartScriptName                = "arm part"
+	ArmDmidecodePartScriptName       = "arm dmidecode part"
 	// benchmark scripts
 	MemoryBenchmarkScriptName    = "memory benchmark"
 	NumaBenchmarkScriptName      = "numa benchmark"
@@ -994,6 +997,22 @@ fi
 echo $__DEFAULT_HL_DEVICE
 `,
 		Vendors: []string{cpus.IntelVendor},
+	},
+	ArmImplementerScriptName: {
+		Name:           ArmImplementerScriptName,
+		ScriptTemplate: "cat /proc/cpuinfo | grep -i \"^CPU implementer\" | head -1 | awk '{print $NF}'",
+		Architectures:  []string{cpus.ARMArchitecture},
+	},
+	ArmPartScriptName: {
+		Name:           ArmPartScriptName,
+		ScriptTemplate: "cat /proc/cpuinfo | grep -i \"^CPU part\" | head -1 | awk '{print $NF}'",
+		Architectures:  []string{cpus.ARMArchitecture},
+	},
+	ArmDmidecodePartScriptName: {
+		Name:           ArmDmidecodePartScriptName,
+		ScriptTemplate: "dmidecode -t processor | grep -m 1 \"Part Number\" | awk -F': ' '{print $2}'",
+		Architectures:  []string{cpus.ARMArchitecture},
+		Superuser:      true,
 	},
 	MemoryBenchmarkScriptName: {
 		Name: MemoryBenchmarkScriptName,
