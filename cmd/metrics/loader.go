@@ -6,7 +6,7 @@ package metrics
 import (
 	"fmt"
 	"log/slog"
-	"strings"
+	"perfspect/internal/cpus"
 
 	"github.com/casbin/govaluate"
 )
@@ -64,7 +64,6 @@ type Loader interface {
 }
 
 type BaseLoader struct {
-	microarchitecture string
 }
 
 type LegacyLoader struct {
@@ -79,44 +78,38 @@ type ComponentLoader struct {
 	BaseLoader
 }
 
+// NewLoader creates the right type of Loader for each CPU microarchitecture
+// Input is the CPU microarchitecture name as defined in the cpus module.
 func NewLoader(uarch string) (Loader, error) {
-	uarch = strings.ToLower(uarch)
-	uarch = strings.Split(uarch, " ")[0] // Handle "Turin (Zen 5)" case
 	switch uarch {
-	case "clx", "skx", "bdx", "bergamo", "genoa", "turin":
+	case cpus.UarchCLX, cpus.UarchSKX, cpus.UarchBDX, cpus.UarchBergamo, cpus.UarchGenoa, cpus.UarchTurinZen5, cpus.UarchTurinZen5c:
 		slog.Debug("Using legacy loader for microarchitecture", slog.String("uarch", uarch))
-		return newLegacyLoader(uarch), nil
-	case "gnr", "srf", "emr", "spr", "icx":
+		return newLegacyLoader(), nil
+	case cpus.UarchGNR, cpus.UarchGNR_X1, cpus.UarchGNR_X2, cpus.UarchGNR_X3, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchSRF_SP, cpus.UarchSRF_AP, cpus.UarchEMR, cpus.UarchEMR_MCC, cpus.UarchEMR_XCC, cpus.UarchSPR, cpus.UarchSPR_MCC, cpus.UarchSPR_XCC, cpus.UarchICX:
 		slog.Debug("Using perfmon loader for microarchitecture", slog.String("uarch", uarch))
-		return newPerfmonLoader(uarch), nil
-	case "neoverse-n2", "neoverse-v2", "neoverse-n1", "neoverse-v1":
+		return newPerfmonLoader(), nil
+	case cpus.UarchGraviton2, cpus.UarchGraviton3, cpus.UarchGraviton4, cpus.UarchAxion, cpus.UarchAmpereOneAC03, cpus.UarchAmpereOneAC04, cpus.UarchAmpereOneAC04_1:
 		slog.Debug("Using component loader for microarchitecture", slog.String("uarch", uarch))
-		return newComponentLoader(uarch), nil
+		return newComponentLoader(), nil
 	default:
 		return nil, fmt.Errorf("unsupported microarchitecture: %s", uarch)
 	}
 }
 
-func newLegacyLoader(uarch string) *LegacyLoader {
+func newLegacyLoader() *LegacyLoader {
 	return &LegacyLoader{
-		BaseLoader: BaseLoader{
-			microarchitecture: uarch,
-		},
+		BaseLoader: BaseLoader{},
 	}
 }
 
-func newPerfmonLoader(uarch string) *PerfmonLoader {
+func newPerfmonLoader() *PerfmonLoader {
 	return &PerfmonLoader{
-		BaseLoader: BaseLoader{
-			microarchitecture: uarch,
-		},
+		BaseLoader: BaseLoader{},
 	}
 }
 
-func newComponentLoader(uarch string) *ComponentLoader {
+func newComponentLoader() *ComponentLoader {
 	return &ComponentLoader{
-		BaseLoader: BaseLoader{
-			microarchitecture: uarch,
-		},
+		BaseLoader: BaseLoader{},
 	}
 }

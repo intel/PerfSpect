@@ -99,7 +99,6 @@ func EPPFromOutput(outputs map[string]script.ScriptOutput) string {
 // EPBFromOutput gets EPB value from script outputs
 func EPBFromOutput(outputs map[string]script.ScriptOutput) string {
 	if outputs[script.EpbScriptName].Exitcode != 0 || len(outputs[script.EpbScriptName].Stdout) == 0 {
-		slog.Warn("EPB scripts failed or produced no output")
 		return ""
 	}
 	epb := strings.TrimSpace(outputs[script.EpbScriptName].Stdout)

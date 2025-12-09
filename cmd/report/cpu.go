@@ -47,9 +47,12 @@ func channelsFromOutput(outputs map[string]script.ScriptOutput) string {
 	stepping := common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Stepping:\s*(.+)$`)
 	capid4 := common.ValFromRegexSubmatch(outputs[script.LspciBitsScriptName].Stdout, `^([0-9a-fA-F]+)`)
 	devices := common.ValFromRegexSubmatch(outputs[script.LspciDevicesScriptName].Stdout, `^([0-9]+)`)
-	cpu, err := cpus.GetCPUExtended(family, model, stepping, capid4, devices)
+	implementer := strings.TrimSpace(outputs[script.ArmImplementerScriptName].Stdout)
+	part := strings.TrimSpace(outputs[script.ArmPartScriptName].Stdout)
+	dmidecodePart := strings.TrimSpace(outputs[script.ArmDmidecodePartScriptName].Stdout)
+	cpu, err := cpus.GetCPU(cpus.NewCPUIdentifier(family, model, stepping, capid4, devices, implementer, part, dmidecodePart, ""))
 	if err != nil {
-		slog.Error("error getting CPU from CPUdb", slog.String("error", err.Error()))
+		slog.Error("error getting CPU characteristics", slog.String("error", err.Error()))
 		return ""
 	}
 	return fmt.Sprintf("%d", cpu.MemoryChannelCount)
@@ -126,32 +129,32 @@ func clusteringModeFromOutput(outputs map[string]script.ScriptOutput) string {
 	}
 	nodesPerSocket := nodeCount / socketCount
 	switch uarch {
-	case "GNR_X1":
+	case cpus.UarchGNR_X1:
 		return "All2All"
-	case "GNR_X2":
+	case cpus.UarchGNR_X2:
 		switch nodesPerSocket {
 		case 1:
 			return "UMA 4 (Quad)"
 		case 2:
 			return "SNC 2"
 		}
-	case "GNR_X3":
+	case cpus.UarchGNR_X3:
 		switch nodesPerSocket {
 		case 1:
 			return "UMA 6 (Hex)"
 		case 3:
 			return "SNC 3"
 		}
-	case "SRF_SP":
+	case cpus.UarchSRF_SP:
 		return "UMA 2 (Hemi)"
-	case "SRF_AP":
+	case cpus.UarchSRF_AP:
 		switch nodesPerSocket {
 		case 1:
 			return "UMA 4 (Quad)"
 		case 2:
 			return "SNC 2"
 		}
-	case "CWF":
+	case cpus.UarchCWF:
 		switch nodesPerSocket {
 		case 1:
 			return "UMA 6 (Hex)"

@@ -101,6 +101,9 @@ const (
 	GaudiFirmwareScriptName          = "gaudi firmware"
 	GaudiNumaScriptName              = "gaudi numa"
 	GaudiArchitectureScriptName      = "gaudi architecture"
+	ArmImplementerScriptName         = "arm implementer"
+	ArmPartScriptName                = "arm part"
+	ArmDmidecodePartScriptName       = "arm dmidecode part"
 	// benchmark scripts
 	MemoryBenchmarkScriptName    = "memory benchmark"
 	NumaBenchmarkScriptName      = "numa benchmark"
@@ -180,14 +183,14 @@ var scriptDefinitions = map[string]ScriptDefinition{
 	LspciBitsScriptName: {
 		Name:               LspciBitsScriptName,
 		ScriptTemplate:     `lspci -s $(lspci | grep 325b | awk 'NR==1{{"{"}}print $1{{"}"}}') -xxx |  awk '$1 ~ /^90/{{"{"}}print $9 $8 $7 $6; exit{{"}"}}'`,
-		MicroArchitectures: []string{"SPR", "EMR"},
+		MicroArchitectures: []string{cpus.UarchSPR, cpus.UarchEMR},
 		Superuser:          true,
 		Depends:            []string{"lspci"},
 	},
 	LspciDevicesScriptName: {
 		Name:               LspciDevicesScriptName,
 		ScriptTemplate:     "lspci -d 8086:3258 | wc -l",
-		MicroArchitectures: []string{"GNR", "GNR-D", "SRF", "CWF", "DMR"},
+		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF, cpus.UarchDMR},
 		Depends:            []string{"lspci"},
 	},
 	LspciVmmScriptName: {
@@ -376,7 +379,7 @@ echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
 		Name:               PrefetchersAtomName,
 		ScriptTemplate:     "rdmsr 0x1320", // Atom Pref_tuning1
 		Vendors:            []string{cpus.IntelVendor},
-		MicroArchitectures: []string{"SRF", "CWF"}, // SRF, CWF
+		MicroArchitectures: []string{cpus.UarchSRF, cpus.UarchCWF}, // SRF, CWF
 		Lkms:               []string{"msr"},
 		Depends:            []string{"rdmsr"},
 		Superuser:          true,
@@ -484,21 +487,21 @@ echo "$epb"`,
 	UncoreMaxFromTPMIScriptName: {
 		Name:               UncoreMaxFromTPMIScriptName,
 		ScriptTemplate:     "pcm-tpmi 2 0x18 -d -b 8:14",
-		MicroArchitectures: []string{"GNR", "GNR-D", "SRF", "CWF", "DMR"},
+		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF, cpus.UarchDMR},
 		Depends:            []string{"pcm-tpmi"},
 		Superuser:          true,
 	},
 	UncoreMinFromTPMIScriptName: {
 		Name:               UncoreMinFromTPMIScriptName,
 		ScriptTemplate:     "pcm-tpmi 2 0x18 -d -b 15:21",
-		MicroArchitectures: []string{"GNR", "GNR-D", "SRF", "CWF", "DMR"},
+		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF, cpus.UarchDMR},
 		Depends:            []string{"pcm-tpmi"},
 		Superuser:          true,
 	},
 	UncoreDieTypesFromTPMIScriptName: {
 		Name:               UncoreDieTypesFromTPMIScriptName,
 		ScriptTemplate:     "pcm-tpmi 2 0x10 -d -b 26:26",
-		MicroArchitectures: []string{"GNR", "GNR-D", "SRF", "CWF", "DMR"},
+		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF, cpus.UarchDMR},
 		Depends:            []string{"pcm-tpmi"},
 		Superuser:          true,
 	},
@@ -569,7 +572,7 @@ for die in "${!die_types[@]}"; do
 	done <<< "$output"
 done
 `,
-		MicroArchitectures: []string{"GNR", "GNR-D", "SRF", "CWF", "DMR"},
+		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF, cpus.UarchDMR},
 		Depends:            []string{"pcm-tpmi"},
 		Superuser:          true,
 	},
@@ -644,7 +647,7 @@ do
 	echo "" # finish the line
 done
 `,
-		MicroArchitectures: []string{"GNR", "GNR-D", "DMR"},
+		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchDMR},
 		Depends:            []string{"pcm-tpmi"},
 		Superuser:          true,
 	},
@@ -699,7 +702,7 @@ do
 done
 echo "" # finish the line
 `,
-		MicroArchitectures: []string{"GNR", "GNR-D", "DMR"},
+		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchDMR},
 		Depends:            []string{"pcm-tpmi"},
 		Superuser:          true,
 	},
@@ -994,6 +997,22 @@ fi
 echo $__DEFAULT_HL_DEVICE
 `,
 		Vendors: []string{cpus.IntelVendor},
+	},
+	ArmImplementerScriptName: {
+		Name:           ArmImplementerScriptName,
+		ScriptTemplate: "grep -i \"^CPU implementer\" /proc/cpuinfo | head -1 | awk '{print $NF}'",
+		Architectures:  []string{cpus.ARMArchitecture},
+	},
+	ArmPartScriptName: {
+		Name:           ArmPartScriptName,
+		ScriptTemplate: "grep -i \"^CPU part\" /proc/cpuinfo | head -1 | awk '{print $NF}'",
+		Architectures:  []string{cpus.ARMArchitecture},
+	},
+	ArmDmidecodePartScriptName: {
+		Name:           ArmDmidecodePartScriptName,
+		ScriptTemplate: "dmidecode -t processor | grep -m 1 \"Part Number\" | awk -F': ' '{print $2}'",
+		Architectures:  []string{cpus.ARMArchitecture},
+		Superuser:      true,
 	},
 	MemoryBenchmarkScriptName: {
 		Name: MemoryBenchmarkScriptName,

@@ -69,7 +69,7 @@ type MetricsConfig struct {
 
 func (l *PerfmonLoader) Load(loaderConfig LoaderConfig) ([]MetricDefinition, []GroupDefinition, error) {
 	// Load the metrics configuration from the JSON file
-	config, err := l.loadMetricsConfig(loaderConfig.ConfigFileOverride)
+	config, err := l.loadMetricsConfig(loaderConfig)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load metrics config: %w", err)
 	}
@@ -179,18 +179,28 @@ func (l *PerfmonLoader) Load(loaderConfig LoaderConfig) ([]MetricDefinition, []G
 	return metricDefs, allGroups, nil
 }
 
-func (l *PerfmonLoader) loadMetricsConfig(configFileOverride string) (MetricsConfig, error) {
+// uarchToResourceName maps from the CPU's microarchitecture, as defined in the cpus
+// module, to the associated perfmon resource directory and config file name
+func uarchToResourceName(uarch string) string {
+	name := strings.ToLower(uarch)
+	name = strings.Split(name, "_")[0] // Handle "GNR_X2", etc.
+	name = strings.Split(name, "-")[0] // Handle GNR-D
+	return name
+}
+
+func (l *PerfmonLoader) loadMetricsConfig(loaderConfig LoaderConfig) (MetricsConfig, error) {
 	var config MetricsConfig
 	var bytes []byte
-	if configFileOverride != "" {
+	if loaderConfig.ConfigFileOverride != "" {
 		var err error
-		bytes, err = os.ReadFile(configFileOverride)
+		bytes, err = os.ReadFile(loaderConfig.ConfigFileOverride)
 		if err != nil {
 			return MetricsConfig{}, fmt.Errorf("error reading metric config override file: %w", err)
 		}
 	} else {
 		var err error
-		bytes, err = resources.ReadFile(filepath.Join("resources", "perfmon", strings.ToLower(l.microarchitecture), strings.ToLower(l.microarchitecture)+".json"))
+		resourceName := uarchToResourceName(loaderConfig.Metadata.Microarchitecture)
+		bytes, err = resources.ReadFile(filepath.Join("resources", "perfmon", resourceName, resourceName+".json"))
 		if err != nil {
 			return MetricsConfig{}, fmt.Errorf("error reading metrics config file: %w", err)
 		}

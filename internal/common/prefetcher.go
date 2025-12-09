@@ -6,6 +6,7 @@ package common
 import (
 	"fmt"
 	"log/slog"
+	"perfspect/internal/cpus"
 	"perfspect/internal/script"
 	"slices"
 	"strconv"
@@ -83,42 +84,42 @@ var PrefetcherDefinitions = []PrefetcherDefinition{
 		Description: "Adaptive Multipath Probability (MLC AMP) predicts access patterns based on previous patterns and fetches the corresponding cache lines into the L2 cache.",
 		Msr:         MsrPrefetchControl,
 		Bit:         5,
-		Uarchs:      []string{"SPR", "EMR", "GNR"},
+		Uarchs:      []string{cpus.UarchSPR, cpus.UarchEMR, cpus.UarchGNR},
 	},
 	{
 		ShortName:   PrefetcherLLCPPName,
 		Description: "Last Level Cache Page (MLC LLC Page) Prefetcher",
 		Msr:         MsrPrefetchControl,
 		Bit:         6,
-		Uarchs:      []string{"GNR"},
+		Uarchs:      []string{cpus.UarchGNR},
 	},
 	{
 		ShortName:   PrefetcherAOPName,
 		Description: "L2 Array of Pointers (DCU AOP) Prefetcher",
 		Msr:         MsrPrefetchControl,
 		Bit:         7,
-		Uarchs:      []string{"GNR"},
+		Uarchs:      []string{cpus.UarchGNR},
 	},
 	{
 		ShortName:   PrefetcherHomelessName,
-		Description: "Homeless prefetch allows early fetch of the demand miss into the MLC when we don’t have enough resources to track this demand in the L1 cache.",
+		Description: "Homeless prefetch allows early fetch of the demand miss into the MLC when we don't have enough resources to track this demand in the L1 cache.",
 		Msr:         MsrPrefetchers,
 		Bit:         14,
-		Uarchs:      []string{"SPR", "EMR", "GNR"},
+		Uarchs:      []string{cpus.UarchSPR, cpus.UarchEMR, cpus.UarchGNR},
 	},
 	{
 		ShortName:   PrefetcherLLCName,
 		Description: "Last level cache gives the core prefetcher the ability to prefetch data directly into the LLC without necessarily filling into the L1 and L2 caches first.",
 		Msr:         MsrPrefetchers,
 		Bit:         42,
-		Uarchs:      []string{"SPR", "EMR", "GNR"},
+		Uarchs:      []string{cpus.UarchSPR, cpus.UarchEMR, cpus.UarchGNR},
 	},
 	{
 		ShortName:   PrefetcherLLCStreamName,
 		Description: "Last level cache stream prefetcher.",
 		Msr:         MsrAtomPrefTuning1,
 		Bit:         43,
-		Uarchs:      []string{"SRF", "CWF"},
+		Uarchs:      []string{cpus.UarchSRF, cpus.UarchCWF},
 	},
 }
 

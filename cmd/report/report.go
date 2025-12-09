@@ -17,6 +17,7 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"perfspect/internal/common"
+	"perfspect/internal/cpus"
 	"perfspect/internal/report"
 	"perfspect/internal/script"
 	"perfspect/internal/table"
@@ -483,15 +484,15 @@ type ReferenceDataKey struct {
 
 // referenceData is a map of reference data for microarchitectures
 var referenceData = map[ReferenceDataKey]ReferenceData{
-	{"BDX", "2"}:     {Description: "Reference (Intel 2S Xeon E5-2699 v4)", CPUSpeed: 403415, SingleCoreFreq: 3509, AllCoreFreq: 2980, MaxPower: 289.9, MaxTemp: 0, MinPower: 0, MemPeakBandwidth: 138.1, MemMinLatency: 78},
-	{"SKX", "2"}:     {Description: "Reference (Intel 2S Xeon 8180)", CPUSpeed: 585157, SingleCoreFreq: 3758, AllCoreFreq: 3107, MaxPower: 429.07, MaxTemp: 0, MinPower: 0, MemPeakBandwidth: 225.1, MemMinLatency: 71},
-	{"CLX", "2"}:     {Description: "Reference (Intel 2S Xeon 8280)", CPUSpeed: 548644, SingleCoreFreq: 3928, AllCoreFreq: 3926, MaxPower: 415.93, MaxTemp: 0, MinPower: 0, MemPeakBandwidth: 223.9, MemMinLatency: 72},
-	{"ICX", "2"}:     {Description: "Reference (Intel 2S Xeon 8380)", CPUSpeed: 933644, SingleCoreFreq: 3334, AllCoreFreq: 2950, MaxPower: 552, MaxTemp: 0, MinPower: 175.38, MemPeakBandwidth: 350.7, MemMinLatency: 70},
-	{"SPR_XCC", "2"}: {Description: "Reference (Intel 2S Xeon 8480+)", CPUSpeed: 1678712, SingleCoreFreq: 3776, AllCoreFreq: 2996, MaxPower: 698.35, MaxTemp: 0, MinPower: 249.21, MemPeakBandwidth: 524.6, MemMinLatency: 111.8},
-	{"SPR_XCC", "1"}: {Description: "Reference (Intel 1S Xeon 8480+)", CPUSpeed: 845743, SingleCoreFreq: 3783, AllCoreFreq: 2999, MaxPower: 334.68, MaxTemp: 0, MinPower: 163.79, MemPeakBandwidth: 264.0, MemMinLatency: 112.2},
-	{"EMR_XCC", "2"}: {Description: "Reference (Intel 2S Xeon 8592V)", CPUSpeed: 1789534, SingleCoreFreq: 3862, AllCoreFreq: 2898, MaxPower: 664.4, MaxTemp: 0, MinPower: 166.36, MemPeakBandwidth: 553.5, MemMinLatency: 92.0},
-	{"SRF_SP", "2"}:  {Description: "Reference (Intel 2S Xeon 6780E)", CPUSpeed: 3022446, SingleCoreFreq: 3001, AllCoreFreq: 3001, MaxPower: 583.97, MaxTemp: 0, MinPower: 123.34, MemPeakBandwidth: 534.3, MemMinLatency: 129.25},
-	{"GNR_X2", "2"}:  {Description: "Reference (Intel 2S Xeon 6787P)", CPUSpeed: 3178562, SingleCoreFreq: 3797, AllCoreFreq: 3199, MaxPower: 679, MaxTemp: 0, MinPower: 248.49, MemPeakBandwidth: 749.6, MemMinLatency: 117.51},
+	{cpus.UarchBDX, "2"}:     {Description: "Reference (Intel 2S Xeon E5-2699 v4)", CPUSpeed: 403415, SingleCoreFreq: 3509, AllCoreFreq: 2980, MaxPower: 289.9, MaxTemp: 0, MinPower: 0, MemPeakBandwidth: 138.1, MemMinLatency: 78},
+	{cpus.UarchSKX, "2"}:     {Description: "Reference (Intel 2S Xeon 8180)", CPUSpeed: 585157, SingleCoreFreq: 3758, AllCoreFreq: 3107, MaxPower: 429.07, MaxTemp: 0, MinPower: 0, MemPeakBandwidth: 225.1, MemMinLatency: 71},
+	{cpus.UarchCLX, "2"}:     {Description: "Reference (Intel 2S Xeon 8280)", CPUSpeed: 548644, SingleCoreFreq: 3928, AllCoreFreq: 3926, MaxPower: 415.93, MaxTemp: 0, MinPower: 0, MemPeakBandwidth: 223.9, MemMinLatency: 72},
+	{cpus.UarchICX, "2"}:     {Description: "Reference (Intel 2S Xeon 8380)", CPUSpeed: 933644, SingleCoreFreq: 3334, AllCoreFreq: 2950, MaxPower: 552, MaxTemp: 0, MinPower: 175.38, MemPeakBandwidth: 350.7, MemMinLatency: 70},
+	{cpus.UarchSPR_XCC, "2"}: {Description: "Reference (Intel 2S Xeon 8480+)", CPUSpeed: 1678712, SingleCoreFreq: 3776, AllCoreFreq: 2996, MaxPower: 698.35, MaxTemp: 0, MinPower: 249.21, MemPeakBandwidth: 524.6, MemMinLatency: 111.8},
+	{cpus.UarchSPR_XCC, "1"}: {Description: "Reference (Intel 1S Xeon 8480+)", CPUSpeed: 845743, SingleCoreFreq: 3783, AllCoreFreq: 2999, MaxPower: 334.68, MaxTemp: 0, MinPower: 163.79, MemPeakBandwidth: 264.0, MemMinLatency: 112.2},
+	{cpus.UarchEMR_XCC, "2"}: {Description: "Reference (Intel 2S Xeon 8592V)", CPUSpeed: 1789534, SingleCoreFreq: 3862, AllCoreFreq: 2898, MaxPower: 664.4, MaxTemp: 0, MinPower: 166.36, MemPeakBandwidth: 553.5, MemMinLatency: 92.0},
+	{cpus.UarchSRF_SP, "2"}:  {Description: "Reference (Intel 2S Xeon 6780E)", CPUSpeed: 3022446, SingleCoreFreq: 3001, AllCoreFreq: 3001, MaxPower: 583.97, MaxTemp: 0, MinPower: 123.34, MemPeakBandwidth: 534.3, MemMinLatency: 129.25},
+	{cpus.UarchGNR_X2, "2"}:  {Description: "Reference (Intel 2S Xeon 6787P)", CPUSpeed: 3178562, SingleCoreFreq: 3797, AllCoreFreq: 3199, MaxPower: 679, MaxTemp: 0, MinPower: 248.49, MemPeakBandwidth: 749.6, MemMinLatency: 117.51},
 }
 
 // getFieldIndex returns the index of a field in a list of fields

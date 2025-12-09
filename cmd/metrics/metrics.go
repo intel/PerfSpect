@@ -949,7 +949,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 	// check if all targets have the same architecture
 	for _, target := range myTargets {
-		tArch, err := target.GetArchitecture()
+		tArch, err := common.GetTargetArchitecture(target)
 		if err != nil {
 			err = fmt.Errorf("failed to get architecture: %w", err)
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -957,7 +957,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			return err
 		}
-		tArch0, err := myTargets[0].GetArchitecture()
+		tArch0, err := common.GetTargetArchitecture(myTargets[0])
 		if err != nil {
 			err = fmt.Errorf("failed to get architecture: %w", err)
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -1141,8 +1141,8 @@ func prepareTarget(targetContext *targetContext, localTempDir string, channelErr
 	_ = statusUpdate(myTarget.GetName(), "configuring target")
 	// are PMUs being used on target?
 	if !flagNoRoot {
-		if family, err := myTarget.GetFamily(); err == nil && cpus.IsIntelCPUFamilyStr(family) {
-			output, err := script.RunScript(myTarget, script.GetScriptByName(script.PMUBusyScriptName), localTempDir)
+		if family, err := common.GetTargetFamily(myTarget); err == nil && cpus.IsIntelCPUFamilyStr(family) {
+			output, err := common.RunScript(myTarget, script.GetScriptByName(script.PMUBusyScriptName), localTempDir, flagNoRoot)
 			if err != nil {
 				err = fmt.Errorf("failed to check if PMUs are in use: %w", err)
 				_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %v", err))
@@ -1192,7 +1192,7 @@ func prepareTarget(targetContext *targetContext, localTempDir string, channelErr
 		perfMuxInterval := flagPerfMuxInterval
 		if useDefaultMuxInterval {
 			// set the default mux interval to 16ms for AMD architecture
-			vendor, err := myTarget.GetVendor()
+			vendor, err := common.GetTargetVendor(myTarget)
 			if err == nil && vendor == cpus.AMDVendor {
 				perfMuxInterval = 16
 			}
@@ -1411,7 +1411,7 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, perfComma
 		Superuser:      !noRoot,
 	}
 	// start goroutine to run perf, output will be streamed back in provided channels
-	go script.RunScriptStream(myTarget, perfStatScript, localTempDir, stdoutChannel, stderrChannel, exitcodeChannel, scriptErrorChannel, cmdChannel)
+	go common.RunScriptStream(myTarget, perfStatScript, localTempDir, stdoutChannel, stderrChannel, exitcodeChannel, scriptErrorChannel, cmdChannel, flagNoRoot)
 	select {
 	case <-cmdChannel:
 	case err := <-scriptErrorChannel:

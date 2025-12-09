@@ -11,6 +11,7 @@ import (
 	"os/user"
 	"path"
 	"perfspect/internal/cpus"
+	"perfspect/internal/progress"
 	"perfspect/internal/script"
 	"perfspect/internal/target"
 	"perfspect/internal/util"
@@ -541,4 +542,299 @@ func isDirNoExec(t target.Target, dir string) (bool, error) {
 		return false, fmt.Errorf("filesystem %s is found but mount point %s is not found in mount records", filesystem, mountedOn)
 	}
 	return false, fmt.Errorf("filesystem %s and mount point %s are not found in mount records", filesystem, mountedOn)
+}
+
+func GetTargetArchitecture(t target.Target) (string, error) {
+	return t.GetArchitecture()
+}
+
+func GetTargetVendor(t target.Target) (string, error) {
+	vendor := t.GetVendor()
+	if vendor == "" {
+		cmd := exec.Command("bash", "-c", "lscpu | grep -i \"^Vendor ID:\" | awk '{print $NF}'")
+		var err error
+		vendor, _, _, err = t.RunCommand(cmd, 0, true)
+		if err != nil {
+			return "", fmt.Errorf("failed to get target CPU vendor: %v", err)
+		}
+		vendor = strings.TrimSpace(vendor)
+		t.SetVendor(vendor)
+	}
+	return vendor, nil
+}
+
+func GetTargetFamily(t target.Target) (string, error) {
+	family := t.GetFamily()
+	if family == "" {
+		cmd := exec.Command("bash", "-c", "lscpu | grep -i \"^CPU family:\" | awk '{print $NF}'")
+		var err error
+		family, _, _, err = t.RunCommand(cmd, 0, true)
+		if err != nil {
+			return "", fmt.Errorf("failed to get target CPU family: %v", err)
+		}
+		family = strings.TrimSpace(family)
+		t.SetFamily(family)
+	}
+	return family, nil
+}
+
+func GetTargetModel(t target.Target) (string, error) {
+	model := t.GetModel()
+	if model == "" {
+		cmd := exec.Command("bash", "-c", "lscpu | grep -i \"^Model:\" | awk '{print $NF}'")
+		var err error
+		model, _, _, err = t.RunCommand(cmd, 0, true)
+		if err != nil {
+			return "", fmt.Errorf("failed to get target CPU model: %v", err)
+		}
+		model = strings.TrimSpace(model)
+		t.SetModel(model)
+	}
+	return model, nil
+}
+
+func GetTargetStepping(t target.Target) (string, error) {
+	stepping := t.GetStepping()
+	if stepping == "" {
+		cmd := exec.Command("bash", "-c", "lscpu | grep -i \"^Stepping:\" | awk '{print $NF}'")
+		var err error
+		stepping, _, _, err = t.RunCommand(cmd, 0, true)
+		if err != nil {
+			return "", fmt.Errorf("failed to get target CPU stepping: %v", err)
+		}
+		stepping = strings.TrimSpace(stepping)
+		t.SetStepping(stepping)
+	}
+	return stepping, nil
+}
+
+func GetTargetCapid4(t target.Target, localTempDir string, noRoot bool) (string, error) {
+	capid4 := t.GetCapid4()
+	if capid4 == "" {
+		getScript := script.GetScriptByName(script.LspciBitsScriptName)
+		scriptOutput, err := script.RunScript(t, getScript, localTempDir) // don't call common.RunScript, otherwise infinite loop
+		if err != nil {
+			return "", fmt.Errorf("failed to run lspci bits script: %v", err)
+		}
+		capid4 = strings.TrimSpace(scriptOutput.Stdout)
+		t.SetCapid4(capid4)
+	}
+	return capid4, nil
+}
+
+func GetTargetDevices(t target.Target, localTempDir string, noRoot bool) (string, error) {
+	devices := t.GetDevices()
+	if devices == "" {
+		getScript := script.GetScriptByName(script.LspciDevicesScriptName)
+		scriptOutput, err := script.RunScript(t, getScript, localTempDir) // don't call common.RunScript, otherwise infinite loop
+		if err != nil {
+			return "", fmt.Errorf("failed to run lspci devices script: %v", err)
+		}
+		devices = strings.TrimSpace(scriptOutput.Stdout)
+		t.SetDevices(devices)
+	}
+	return devices, nil
+}
+
+func GetTargetImplementer(t target.Target, localTempDir string, noRoot bool) (string, error) {
+	implementer := t.GetImplementer()
+	if implementer == "" {
+		getScript := script.GetScriptByName(script.ArmImplementerScriptName)
+		scriptOutput, err := script.RunScript(t, getScript, localTempDir)
+		if err != nil {
+			return "", fmt.Errorf("failed to run implementer retrieval script: %v", err)
+		}
+		implementer = strings.TrimSpace(scriptOutput.Stdout)
+		t.SetImplementer(implementer)
+	}
+	return implementer, nil
+}
+
+func GetTargetPart(t target.Target, localTempDir string, noRoot bool) (string, error) {
+	part := t.GetPart()
+	if part == "" {
+		getScript := script.GetScriptByName(script.ArmPartScriptName)
+		scriptOutput, err := script.RunScript(t, getScript, localTempDir)
+		if err != nil {
+			return "", fmt.Errorf("failed to run part retrieval script: %v", err)
+		}
+		part = strings.TrimSpace(scriptOutput.Stdout)
+		t.SetPart(part)
+	}
+	return part, nil
+}
+
+func GetTargetDmidecodePart(t target.Target, localTempDir string, noRoot bool) (string, error) {
+	dmidecodePart := t.GetDmidecodePart()
+	if dmidecodePart == "" {
+		getScript := script.GetScriptByName(script.ArmDmidecodePartScriptName)
+		scriptOutput, err := script.RunScript(t, getScript, localTempDir) // don't call common.RunScript, otherwise infinite loop
+		if err != nil {
+			return "", fmt.Errorf("failed to run dmidecode part number script: %v", err)
+		}
+		dmidecodePart = strings.TrimSpace(scriptOutput.Stdout)
+		t.SetDmidecodePart(dmidecodePart)
+	}
+	return dmidecodePart, nil
+}
+
+func GetTargetMicroArchitecture(t target.Target, localTempDir string, noRoot bool) (string, error) {
+	uarch := t.GetMicroarchitecture()
+	if uarch == "" {
+		arch, err := GetTargetArchitecture(t)
+		if err != nil {
+			return "", err
+		}
+		switch arch {
+		case cpus.X86Architecture:
+			uarch, err = GetX86TargetMicroarchitecture(t, localTempDir, noRoot)
+		case cpus.ARMArchitecture:
+			uarch, err = GetARMTargetMicroarchitecture(t, localTempDir, noRoot)
+		default:
+			uarch, err = "", fmt.Errorf("unsupported architecture: %s", arch)
+		}
+		if err != nil {
+			return "", err
+		}
+		t.SetMicroarchitecture(uarch)
+	}
+	return uarch, nil
+}
+
+func GetX86TargetMicroarchitecture(t target.Target, localTempDir string, noRoot bool) (string, error) {
+	family, err := GetTargetFamily(t)
+	if err != nil {
+		return "", err
+	}
+	model, err := GetTargetModel(t)
+	if err != nil {
+		return "", err
+	}
+	stepping, err := GetTargetStepping(t)
+	if err != nil {
+		return "", err
+	}
+	capid4, err := GetTargetCapid4(t, localTempDir, noRoot)
+	if err != nil {
+		slog.Warn("failed to read lspci bits to get capid4 for microarchitecture identification", slog.String("error", err.Error()))
+		// continue
+	}
+	devices, err := GetTargetDevices(t, localTempDir, noRoot)
+	if err != nil {
+		slog.Warn("failed to read lspci devices for microarchitecture identification", slog.String("error", err.Error()))
+		// continue
+	}
+	cpu, err := cpus.GetCPU(cpus.NewX86Identifier(family, model, stepping, capid4, devices))
+	if err != nil {
+		return "", err
+	}
+	return cpu.MicroArchitecture, nil
+}
+
+func GetARMTargetMicroarchitecture(t target.Target, localTempDir string, noRoot bool) (string, error) {
+	implementer, err := GetTargetImplementer(t, localTempDir, noRoot)
+	if err != nil {
+		return "", err
+	}
+	part, err := GetTargetPart(t, localTempDir, noRoot)
+	if err != nil {
+		return "", err
+	}
+	dmidecodePart, err := GetTargetDmidecodePart(t, localTempDir, noRoot)
+	if err != nil {
+		return "", err
+	}
+	cpu, err := cpus.GetCPU(cpus.NewARMIdentifier(implementer, part, dmidecodePart))
+	if err != nil {
+		return "", err
+	}
+	return cpu.MicroArchitecture, nil
+}
+
+func ScriptSupportedOnTarget(t target.Target, scriptDef script.ScriptDefinition, localTempDir string, noRoot bool) (bool, error) {
+	if len(scriptDef.Architectures) > 0 {
+		arch, err := GetTargetArchitecture(t)
+		if err != nil {
+			return false, err
+		}
+		if !slices.Contains(scriptDef.Architectures, arch) {
+			slog.Info("script not supported on target architecture", slog.String("script", scriptDef.Name), slog.String("target", t.GetName()), slog.String("architecture", arch))
+			return false, nil
+		}
+	}
+	if len(scriptDef.Vendors) > 0 {
+		vendor, err := GetTargetVendor(t)
+		if err != nil {
+			return false, err
+		}
+		if !slices.Contains(scriptDef.Vendors, vendor) {
+			slog.Info("script not supported on target CPU vendor", slog.String("script", scriptDef.Name), slog.String("target", t.GetName()), slog.String("vendor", vendor))
+			return false, nil
+		}
+	}
+	if len(scriptDef.MicroArchitectures) > 0 {
+		uarch, err := GetTargetMicroArchitecture(t, localTempDir, noRoot)
+		if err != nil {
+			return false, err
+		}
+		shortUarch := strings.Split(uarch, "_")[0]     // handle EMR_XCC, etc.
+		shortUarch = strings.Split(shortUarch, "-")[0] // handle GNR-D
+		shortUarch = strings.Split(shortUarch, " ")[0] // handle Turin (Zen 5)
+		if !slices.Contains(scriptDef.MicroArchitectures, uarch) && !slices.Contains(scriptDef.MicroArchitectures, shortUarch) {
+			slog.Info("script not supported on target CPU microarchitecture", slog.String("script", scriptDef.Name), slog.String("target", t.GetName()), slog.String("microarchitecture", uarch))
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func FilterScriptsForTarget(t target.Target, scriptDefs []script.ScriptDefinition, localTempDir string, noRoot bool) (supportedScripts []script.ScriptDefinition, err error) {
+	for _, scriptDef := range scriptDefs {
+		supported, err := ScriptSupportedOnTarget(t, scriptDef, localTempDir, noRoot)
+		if err != nil {
+			slog.Warn("failed to determine if script is compatible with target", slog.String("script", scriptDef.Name), slog.String("target", t.GetName()))
+			continue
+		}
+		if supported {
+			supportedScripts = append(supportedScripts, scriptDef)
+		}
+	}
+	return
+}
+
+// Create wrappers around script.RunScript* that first check if the scripts are compatible with the target
+
+func RunScript(t target.Target, s script.ScriptDefinition, localTempDir string, noRoot bool) (script.ScriptOutput, error) {
+	supported, err := ScriptSupportedOnTarget(t, s, localTempDir, noRoot)
+	if err != nil {
+		return script.ScriptOutput{}, fmt.Errorf("failed to check if script is supported on target %v", err)
+	}
+	if !supported {
+		return script.ScriptOutput{}, fmt.Errorf("script %s not supported on target %s", s.Name, t.GetName())
+	}
+	return script.RunScript(t, s, localTempDir)
+}
+
+func RunScripts(t target.Target, s []script.ScriptDefinition, ignoreScriptErrors bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc, collectingStatusMsg string, noRoot bool) (map[string]script.ScriptOutput, error) {
+	supportedScripts, err := FilterScriptsForTarget(t, s, localTempDir, noRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if scripts are supported on target %v", err)
+	}
+	if len(supportedScripts) == 0 {
+		return nil, fmt.Errorf("zero scripts are supported on target %s", t.GetName())
+	}
+	return script.RunScripts(t, supportedScripts, ignoreScriptErrors, localTempDir, statusUpdate, collectingStatusMsg)
+}
+
+func RunScriptStream(t target.Target, s script.ScriptDefinition, localTempDir string, stdoutChannel chan []byte, stderrChannel chan []byte, exitcodeChannel chan int, errorChannel chan error, cmdChannel chan *exec.Cmd, noRoot bool) {
+	supported, err := ScriptSupportedOnTarget(t, s, localTempDir, noRoot)
+	if err != nil {
+		errorChannel <- fmt.Errorf("failed to check if script is supported on target %v", err)
+		return
+	}
+	if !supported {
+		errorChannel <- fmt.Errorf("script %s not supported on target %s", s.Name, t.GetName())
+		return
+	}
+	script.RunScriptStream(t, s, localTempDir, stdoutChannel, stderrChannel, exitcodeChannel, errorChannel, cmdChannel)
 }

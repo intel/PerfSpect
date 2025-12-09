@@ -188,25 +188,31 @@ func SectionValueFromOutput(output string, sectionName string) string {
 	return sections[sectionName]
 }
 
-// UarchFromOutput returns the architecture of the CPU that matches family, model, stepping,
-// capid4, and devices information from the output or an empty string, if no match is found.
+// UarchFromOutput returns the microarchitecture of the CPU or an empty string, if no match is found.
 func UarchFromOutput(outputs map[string]script.ScriptOutput) string {
 	family := ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU family:\s*(.+)$`)
 	model := ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Model:\s*(.+)$`)
 	stepping := ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Stepping:\s*(.+)$`)
 	capid4 := ValFromRegexSubmatch(outputs[script.LspciBitsScriptName].Stdout, `^([0-9a-fA-F]+)`)
 	devices := ValFromRegexSubmatch(outputs[script.LspciDevicesScriptName].Stdout, `^([0-9]+)`)
-	cpu, err := cpus.GetCPUExtended(family, model, stepping, capid4, devices)
-	if err == nil {
-		return cpu.MicroArchitecture
+	implementer := strings.TrimSpace(outputs[script.ArmImplementerScriptName].Stdout)
+	part := strings.TrimSpace(outputs[script.ArmPartScriptName].Stdout)
+	dmidecodePart := strings.TrimSpace(outputs[script.ArmDmidecodePartScriptName].Stdout)
+	cpu, err := cpus.GetCPU(cpus.NewCPUIdentifier(family, model, stepping, capid4, devices, implementer, part, dmidecodePart, ""))
+	if err != nil {
+		slog.Error("error getting CPU characteristics", slog.String("error", err.Error()))
+		return ""
 	}
-	return ""
+	return cpu.MicroArchitecture
 }
 
 func HyperthreadingFromOutput(outputs map[string]script.ScriptOutput) string {
 	family := ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU family:\s*(.+)$`)
 	model := ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Model:\s*(.+)$`)
 	stepping := ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Stepping:\s*(.+)$`)
+	implementer := strings.TrimSpace(outputs[script.ArmImplementerScriptName].Stdout)
+	part := strings.TrimSpace(outputs[script.ArmPartScriptName].Stdout)
+	dmidecodePart := strings.TrimSpace(outputs[script.ArmDmidecodePartScriptName].Stdout)
 	sockets := ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)
 	coresPerSocket := ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)
 	cpuCount := ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU\(.*:\s*(.+?)$`)
@@ -239,8 +245,9 @@ func HyperthreadingFromOutput(outputs map[string]script.ScriptOutput) string {
 		slog.Error("error parsing cores per sockets from lscpu")
 		return ""
 	}
-	cpu, err := cpus.GetCPUExtended(family, model, stepping, "", "")
+	cpu, err := cpus.GetCPU(cpus.NewCPUIdentifier(family, model, stepping, "", "", implementer, part, dmidecodePart, ""))
 	if err != nil {
+		slog.Warn("error getting CPU characteristics", slog.String("error", err.Error()))
 		return ""
 	}
 	if numOnlineCpus > 0 && numOnlineCpus < numCPUs {

@@ -126,7 +126,7 @@ func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir str
 	scripts = append(scripts, script.GetScriptByName(script.LspciBitsScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.LspciDevicesScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.L3CacheWayEnabledName))
-	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir, nil, "")
+	outputs, err := common.RunScripts(myTarget, scripts, true, localTempDir, nil, "", false)
 	if err != nil {
 		return fmt.Errorf("failed to run scripts on target: %w", err)
 	}
@@ -181,15 +181,15 @@ func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir str
 }
 
 func setSSEFrequency(sseFrequency float64, myTarget target.Target, localTempDir string) error {
-	targetFamily, err := myTarget.GetFamily()
+	targetFamily, err := common.GetTargetFamily(myTarget)
 	if err != nil {
 		return fmt.Errorf("failed to get target family: %w", err)
 	}
-	targetModel, err := myTarget.GetModel()
+	targetModel, err := common.GetTargetModel(myTarget)
 	if err != nil {
 		return fmt.Errorf("failed to get target model: %w", err)
 	}
-	targetVendor, err := myTarget.GetVendor()
+	targetVendor, err := common.GetTargetVendor(myTarget)
 	if err != nil {
 		return fmt.Errorf("failed to get target vendor: %w", err)
 	}
@@ -340,15 +340,15 @@ func expandConsolidatedFrequencies(consolidatedStr string, bucketSizes []int) ([
 // Note that the buckets have been consolidated where frequencies are the same, so they
 // will need to be expanded back out to individual buckets for setting.
 func setSSEFrequencies(sseFrequencies string, myTarget target.Target, localTempDir string) error {
-	targetFamily, err := myTarget.GetFamily()
+	targetFamily, err := common.GetTargetFamily(myTarget)
 	if err != nil {
 		return fmt.Errorf("failed to get target family: %w", err)
 	}
-	targetModel, err := myTarget.GetModel()
+	targetModel, err := common.GetTargetModel(myTarget)
 	if err != nil {
 		return fmt.Errorf("failed to get target model: %w", err)
 	}
-	targetVendor, err := myTarget.GetVendor()
+	targetVendor, err := common.GetTargetVendor(myTarget)
 	if err != nil {
 		return fmt.Errorf("failed to get target vendor: %w", err)
 	}
@@ -390,11 +390,11 @@ func setSSEFrequencies(sseFrequencies string, myTarget target.Target, localTempD
 		return fmt.Errorf("failed to get microarchitecture: %w", err)
 	}
 	var archMultiplier int
-	if strings.Contains(uarch, "SRF") || strings.Contains(uarch, "CWF") {
+	if strings.Contains(uarch, cpus.UarchSRF) || strings.Contains(uarch, cpus.UarchCWF) {
 		archMultiplier = 4
-	} else if strings.Contains(uarch, "GNR_X3") {
+	} else if strings.Contains(uarch, cpus.UarchGNR_X3) {
 		archMultiplier = 3
-	} else if strings.Contains(uarch, "GNR_X2") {
+	} else if strings.Contains(uarch, cpus.UarchGNR_X2) {
 		archMultiplier = 2
 	} else {
 		archMultiplier = 1
@@ -477,31 +477,19 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 	uncoreDieFrequencyMutex.Lock()
 	defer uncoreDieFrequencyMutex.Unlock()
 
-	targetFamily, err := myTarget.GetFamily()
-	if err != nil {
-		return fmt.Errorf("failed to get target family: %w", err)
-	}
-	targetModel, err := myTarget.GetModel()
-	if err != nil {
-		return fmt.Errorf("failed to get target model: %w", err)
-	}
-	if targetFamily != "6" || (targetFamily == "6" && targetModel != "173" && targetModel != "174" && targetModel != "175" && targetModel != "221") { // not Intel || not GNR, GNR-D, SRF, CWF
-		return fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())
-	}
 	type dieId struct {
 		instance string
 		entry    string
 	}
 	var dies []dieId
 	// build list of compute or IO dies
-	scripts := []script.ScriptDefinition{}
-	scripts = append(scripts, script.GetScriptByName(script.UncoreDieTypesFromTPMIScriptName))
-	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir, nil, "")
+	dieTypesScript := script.GetScriptByName(script.UncoreDieTypesFromTPMIScriptName)
+	scriptOutput, err := common.RunScript(myTarget, dieTypesScript, localTempDir, false)
 	if err != nil {
-		return fmt.Errorf("failed to run scripts on target: %w", err)
+		return fmt.Errorf("failed to run script on target: %w", err)
 	}
 	re := regexp.MustCompile(`Read bits \d+:\d+ value (\d+) from TPMI ID .* for entry (\d+) in instance (\d+)`)
-	for line := range strings.SplitSeq(outputs[script.UncoreDieTypesFromTPMIScriptName].Stdout, "\n") {
+	for line := range strings.SplitSeq(scriptOutput.Stdout, "\n") {
 		match := re.FindStringSubmatch(line)
 		if match == nil {
 			continue
@@ -525,7 +513,7 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 		freqType = "min"
 	}
 	// run script for each die of specified type
-	scripts = []script.ScriptDefinition{}
+	scripts := []script.ScriptDefinition{}
 	for _, die := range dies {
 		setScript := script.ScriptDefinition{
 			Name:           fmt.Sprintf("write %s uncore frequency TPMI %s %s", freqType, die.instance, die.entry),
@@ -537,7 +525,7 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 		}
 		scripts = append(scripts, setScript)
 	}
-	_, err = script.RunScripts(myTarget, scripts, false, localTempDir, nil, "")
+	_, err = common.RunScripts(myTarget, scripts, false, localTempDir, nil, "", false)
 	if err != nil {
 		err = fmt.Errorf("failed to set uncore die frequency: %w", err)
 		slog.Error(err.Error())
@@ -550,31 +538,20 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 	uncoreFrequencyMutex.Lock()
 	defer uncoreFrequencyMutex.Unlock()
 
-	scripts := []script.ScriptDefinition{}
-	scripts = append(scripts, script.ScriptDefinition{
-		Name:           "get uncore frequency MSR",
-		ScriptTemplate: "rdmsr 0x620",
-		Vendors:        []string{cpus.IntelVendor},
-		Superuser:      true,
+	getScript := script.ScriptDefinition{
+		Name:               "get uncore frequency MSR",
+		ScriptTemplate:     "rdmsr 0x620",
+		Vendors:            []string{cpus.IntelVendor},
+		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF},
+		Superuser:          true,
 		// Depends:        []string{"rdmsr"},
 		// Lkms:           []string{"msr"},
-	})
-	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir, nil, "")
+	}
+	scriptOutput, err := common.RunScript(myTarget, getScript, localTempDir, false)
 	if err != nil {
 		return fmt.Errorf("failed to run scripts on target: %w", err)
 	}
-	targetFamily, err := myTarget.GetFamily()
-	if err != nil {
-		return fmt.Errorf("failed to get target family: %w", err)
-	}
-	targetModel, err := myTarget.GetModel()
-	if err != nil {
-		return fmt.Errorf("failed to get target model: %w", err)
-	}
-	if targetFamily != "6" || (targetFamily == "6" && (targetModel == "173" || targetModel == "174" || targetModel == "175" || targetModel == "221")) { // not Intel || not GNR, GNR-D, SRF, CWF
-		return fmt.Errorf("uncore frequency setting not supported on %s due to family/model mismatch", myTarget.GetName())
-	}
-	msrUint, err := strconv.ParseUint(strings.TrimSpace(outputs["get uncore frequency MSR"].Stdout), 16, 0)
+	msrUint, err := strconv.ParseUint(strings.TrimSpace(scriptOutput.Stdout), 16, 0)
 	if err != nil {
 		return fmt.Errorf("failed to parse uncore frequency MSR: %w", err)
 	}
@@ -592,10 +569,11 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 		newVal = newVal | newFreq<<8
 	}
 	setScript := script.ScriptDefinition{
-		Name:           "set uncore frequency MSR",
-		ScriptTemplate: fmt.Sprintf("wrmsr -a 0x620 %d", newVal),
-		Superuser:      true,
-		Vendors:        []string{cpus.IntelVendor},
+		Name:               "set uncore frequency MSR",
+		ScriptTemplate:     fmt.Sprintf("wrmsr -a 0x620 %d", newVal),
+		Superuser:          true,
+		Vendors:            []string{cpus.IntelVendor},
+		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF},
 		// Depends:        []string{"wrmsr"},
 		// Lkms:           []string{"msr"},
 	}
@@ -615,7 +593,7 @@ func setTDP(power int, myTarget target.Target, localTempDir string) error {
 		// Lkms:           []string{"msr"},
 		// Depends:        []string{"rdmsr"},
 	}
-	readOutput, err := script.RunScript(myTarget, readScript, localTempDir)
+	readOutput, err := common.RunScript(myTarget, readScript, localTempDir, false)
 	if err != nil {
 		return fmt.Errorf("failed to read power MSR: %w", err)
 	} else {
@@ -804,7 +782,7 @@ func setELC(elc string, myTarget target.Target, localTempDir string) error {
 		ScriptTemplate:     fmt.Sprintf("bhs-power-mode.sh --%s", mode),
 		Superuser:          true,
 		Vendors:            []string{cpus.IntelVendor},
-		MicroArchitectures: []string{"GNR", "GNR-D", "SRF", "CWF"},
+		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF},
 		Depends:            []string{"bhs-power-mode.sh", "pcm-tpmi"},
 	}
 	_, err := runScript(myTarget, setScript, localTempDir)
@@ -819,7 +797,7 @@ func getUarch(myTarget target.Target, localTempDir string) (string, error) {
 	scripts = append(scripts, script.GetScriptByName(script.LscpuScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.LspciBitsScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.LspciDevicesScriptName))
-	outputs, err := script.RunScripts(myTarget, scripts, true, localTempDir, nil, "")
+	outputs, err := common.RunScripts(myTarget, scripts, true, localTempDir, nil, "", false)
 	if err != nil {
 		return "", fmt.Errorf("failed to run scripts on target: %w", err)
 	}
@@ -992,7 +970,7 @@ func setC1Demotion(enableDisable string, myTarget target.Target, localTempDir st
 
 // runScript runs a script on the target and returns the output
 func runScript(myTarget target.Target, myScript script.ScriptDefinition, localTempDir string) (string, error) {
-	output, err := script.RunScript(myTarget, myScript, localTempDir) // nosemgrep
+	output, err := common.RunScript(myTarget, myScript, localTempDir, false) // nosemgrep
 	if err != nil {
 		slog.Error("failed to run script on target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()), slog.String("stdout", output.Stdout), slog.String("stderr", output.Stderr))
 	} else {

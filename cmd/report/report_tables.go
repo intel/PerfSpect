@@ -146,7 +146,10 @@ var tableDefinitions = map[string]table.TableDefinition{
 			script.MaximumFrequencyScriptName,
 			script.SpecCoreFrequenciesScriptName,
 			script.PPINName,
-			script.L3CacheWayEnabledName},
+			script.L3CacheWayEnabledName,
+			script.ArmImplementerScriptName,
+			script.ArmPartScriptName,
+			script.ArmDmidecodePartScriptName},
 		FieldsFunc:   cpuTableValues,
 		InsightsFunc: cpuTableInsights},
 	PrefetcherTableName: {
@@ -170,7 +173,7 @@ var tableDefinitions = map[string]table.TableDefinition{
 	AcceleratorTableName: {
 		Name:               AcceleratorTableName,
 		Vendors:            []string{cpus.IntelVendor},
-		MicroArchitectures: []string{"SPR", "EMR", "GNR", "SRF", "CWF", "DMR"},
+		MicroArchitectures: []string{cpus.UarchSPR, cpus.UarchEMR, cpus.UarchGNR, cpus.UarchSRF, cpus.UarchCWF, cpus.UarchDMR},
 		HasRows:            true,
 		ScriptNames: []string{
 			script.LshwScriptName,
@@ -229,7 +232,7 @@ var tableDefinitions = map[string]table.TableDefinition{
 		FieldsFunc: uncoreTableValues},
 	ElcTableName: {
 		Name:               ElcTableName,
-		MicroArchitectures: []string{"GNR", "SRF", "CWF", "DMR"},
+		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchSRF, cpus.UarchCWF, cpus.UarchDMR},
 		HasRows:            true,
 		ScriptNames: []string{
 			script.ElcScriptName,
@@ -238,7 +241,7 @@ var tableDefinitions = map[string]table.TableDefinition{
 		InsightsFunc: elcTableInsights},
 	SSTTFHPTableName: {
 		Name:               SSTTFHPTableName,
-		MicroArchitectures: []string{"GNR", "SRF", "CWF", "DMR"},
+		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchSRF, cpus.UarchCWF, cpus.UarchDMR},
 		HasRows:            true,
 		ScriptNames: []string{
 			script.SSTTFHPScriptName,
@@ -246,7 +249,7 @@ var tableDefinitions = map[string]table.TableDefinition{
 		FieldsFunc: sstTFHPTableValues},
 	SSTTFLPTableName: {
 		Name:               SSTTFLPTableName,
-		MicroArchitectures: []string{"GNR", "SRF", "CWF", "DMR"},
+		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchSRF, cpus.UarchCWF, cpus.UarchDMR},
 		HasRows:            true,
 		ScriptNames: []string{
 			script.SSTTFLPScriptName,
@@ -264,7 +267,11 @@ var tableDefinitions = map[string]table.TableDefinition{
 			script.LscpuScriptName,
 			script.LspciBitsScriptName,
 			script.LspciDevicesScriptName,
-			script.TmeScriptName},
+			script.TmeScriptName,
+			script.ArmImplementerScriptName,
+			script.ArmPartScriptName,
+			script.ArmDmidecodePartScriptName,
+		},
 		FieldsFunc:   memoryTableValues,
 		InsightsFunc: memoryTableInsights},
 	DIMMTableName: {
@@ -275,6 +282,9 @@ var tableDefinitions = map[string]table.TableDefinition{
 			script.LscpuScriptName,
 			script.LspciBitsScriptName,
 			script.LspciDevicesScriptName,
+			script.ArmImplementerScriptName,
+			script.ArmPartScriptName,
+			script.ArmDmidecodePartScriptName,
 		},
 		FieldsFunc:   dimmTableValues,
 		InsightsFunc: dimmTableInsights},
@@ -449,6 +459,9 @@ var tableDefinitions = map[string]table.TableDefinition{
 			script.CstatesScriptName,
 			script.ElcScriptName,
 			script.CveScriptName,
+			script.ArmImplementerScriptName,
+			script.ArmPartScriptName,
+			script.ArmDmidecodePartScriptName,
 		},
 		FieldsFunc: systemSummaryTableValues},
 	//
@@ -727,23 +740,23 @@ func cpuTableInsights(outputs map[string]script.ScriptOutput, tableValues table.
 				slog.Warn(err.Error())
 			} else {
 				xeonGens := map[string]int{
-					"HSX": 1,
-					"BDX": 2,
-					"SKX": 3,
-					"CLX": 4,
-					"ICX": 5,
-					"SPR": 6,
-					"EMR": 7,
-					"SRF": 8,
-					"CWF": 8,
-					"GNR": 8,
-					"DMR": 9,
+					cpus.UarchHSX: 1,
+					cpus.UarchBDX: 2,
+					cpus.UarchSKX: 3,
+					cpus.UarchCLX: 4,
+					cpus.UarchICX: 5,
+					cpus.UarchSPR: 6,
+					cpus.UarchEMR: 7,
+					cpus.UarchSRF: 8,
+					cpus.UarchCWF: 8,
+					cpus.UarchGNR: 8,
+					cpus.UarchDMR: 9,
 				}
 				uarch := tableValues.Fields[uarchIndex].Values[0]
 				if len(uarch) >= 3 {
 					xeonGen, ok := xeonGens[uarch[:3]]
 					if ok {
-						if xeonGen < xeonGens["SPR"] {
+						if xeonGen < xeonGens[cpus.UarchSPR] {
 							insights = append(insights, table.Insight{
 								Recommendation: "Consider upgrading to the latest generation Intel(r) Xeon(r) CPU.",
 								Justification:  "The CPU is 2 or more generations behind the latest Intel(r) Xeon(r) CPU.",
@@ -879,7 +892,7 @@ func uncoreTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 		slog.Error("failed to get uarch from script outputs")
 		return []table.Field{}
 	}
-	if strings.Contains(uarch, "SRF") || strings.Contains(uarch, "GNR") || strings.Contains(uarch, "CWF") {
+	if strings.Contains(uarch, cpus.UarchSRF) || strings.Contains(uarch, cpus.UarchGNR) || strings.Contains(uarch, cpus.UarchCWF) {
 		return []table.Field{
 			{Name: "Min Frequency (Compute)", Values: []string{common.UncoreMinMaxDieFrequencyFromOutput(false, true, outputs)}},
 			{Name: "Min Frequency (I/O)", Values: []string{common.UncoreMinMaxDieFrequencyFromOutput(false, false, outputs)}},

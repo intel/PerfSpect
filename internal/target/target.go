@@ -32,22 +32,6 @@ type Target interface {
 	// It returns a string representing the architecture and any error that occurred.
 	GetArchitecture() (arch string, err error)
 
-	// GetFamily returns the family of the target system's CPU.
-	// It returns a string representing the family and any error that occurred.
-	GetFamily() (family string, err error)
-
-	// GetModel returns the model of the target system's CPU.
-	// It returns a string representing the model and any error that occurred.
-	GetModel() (model string, err error)
-
-	// GetStepping returns the stepping of the target system's CPU.
-	// It returns a string representing the stepping and any error that occurred.
-	GetStepping() (stepping string, err error)
-
-	// GetVendor returns the vendor of the target system.
-	// It returns a string representing the vendor and any error that occurred.
-	GetVendor() (vendor string, err error)
-
 	// GetName returns the name of the target system.
 	// It returns a string representing the host.
 	GetName() (name string)
@@ -55,6 +39,28 @@ type Target interface {
 	// GetUserPath returns the path of the current user on the target system.
 	// It returns a string representing the path and any error that occurred.
 	GetUserPath() (path string, err error)
+
+	// GetSet* used to cache values for target
+	GetFamily() string
+	SetFamily(string)
+	GetModel() string
+	SetModel(string)
+	GetStepping() string
+	SetStepping(string)
+	GetVendor() string
+	SetVendor(string)
+	GetCapid4() string
+	SetCapid4(string)
+	GetDevices() string
+	SetDevices(string)
+	GetImplementer() string   // for ARM
+	SetImplementer(string)    // for ARM
+	GetPart() string          // for ARM
+	SetPart(string)           // for ARM
+	GetDmidecodePart() string // for ARM
+	SetDmidecodePart(string)  // for ARM
+	GetMicroarchitecture() string
+	SetMicroarchitecture(string)
 
 	// RunCommand runs the specified command on the target.
 	// Arguments:
@@ -114,14 +120,20 @@ type Target interface {
 }
 
 type BaseTarget struct {
-	tempDir    string
-	canElevate int // zero indicates unknown, 1 indicates yes, -1 indicates no
-	arch       string
-	family     string
-	model      string
-	stepping   string
-	vendor     string
-	userPath   string
+	tempDir           string
+	canElevate        int // zero indicates unknown, 1 indicates yes, -1 indicates no
+	arch              string
+	family            string
+	model             string
+	stepping          string
+	vendor            string
+	capid4            string
+	devices           string
+	implementer       string
+	part              string
+	dmidecodePart     string
+	microarchitecture string
+	userPath          string
 }
 
 type LocalTarget struct {
