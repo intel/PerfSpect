@@ -505,6 +505,8 @@ func getUarchDir(uarch string) (string, error) {
 		return "ampereone", nil
 	case cpus.UarchAmpereOneAC04, cpus.UarchAmpereOneAC04_1:
 		return "ampereonex", nil
+	case cpus.UarchAltraFamily:
+		return "neoverse-n1", nil
 	}
 	return "", fmt.Errorf("unsupported component loader architecture: %s", uarch)
 }

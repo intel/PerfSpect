@@ -906,6 +906,8 @@ func getARMSlotsByArchitecture(uarch string) (slots int, err error) {
 		slots = 6
 	case cpus.UarchAmpereOneAC04, cpus.UarchAmpereOneAC04_1:
 		slots = 10
+	case cpus.UarchAltraFamily:
+		slots = 6
 	default:
 		err = fmt.Errorf("unsupported ARM uarch: %s", uarch)
 		return

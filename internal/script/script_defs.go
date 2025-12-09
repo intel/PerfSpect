@@ -1013,6 +1013,7 @@ echo $__DEFAULT_HL_DEVICE
 		ScriptTemplate: "dmidecode -t processor | grep -m 1 \"Part Number\" | awk -F': ' '{print $2}'",
 		Architectures:  []string{cpus.ARMArchitecture},
 		Superuser:      true,
+		Depends:        []string{"dmidecode"},
 	},
 	MemoryBenchmarkScriptName: {
 		Name: MemoryBenchmarkScriptName,
