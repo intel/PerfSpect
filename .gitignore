@@ -10,4 +10,4 @@
 /internal/script/resources/aarch64
 /test
 /__debug_bin*.log
-/.claude
+/.claude/settings.local.json
