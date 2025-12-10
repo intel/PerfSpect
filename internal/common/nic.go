@@ -114,7 +114,10 @@ func ParseNicInfo(scriptOutput string) []nicInfo {
 			}
 		}
 		// special case for model as it sometimes has additional information in parentheses
-		nic.Model = strings.TrimSpace(strings.Split(nic.Model, "(")[0])
+		modelParts := strings.Split(nic.Model, "(")
+		if len(modelParts) > 0 {
+			nic.Model = strings.TrimSpace(modelParts[0])
+		}
 		nics = append(nics, nic)
 	}
 	// Assign card and port information
@@ -176,7 +179,7 @@ func assignCardAndPort(nics []nicInfo) {
 		}
 		// Further split the last part to separate device from function
 		deviceFunc := strings.Split(parts[2], ".")
-		if len(deviceFunc) != 2 {
+		if len(deviceFunc) < 1 {
 			continue
 		}
 		// Card identifier is domain:bus:device
