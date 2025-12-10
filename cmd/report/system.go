@@ -102,7 +102,7 @@ func filesystemFieldValuesFromOutput(outputs map[string]script.ScriptOutput) []t
 		}
 		fields := strings.Fields(line)
 		// "Mounted On" gets split into two fields, rejoin
-		if i == 0 && fields[len(fields)-2] == "Mounted" && fields[len(fields)-1] == "on" {
+		if i == 0 && len(fields) >= 2 && fields[len(fields)-2] == "Mounted" && fields[len(fields)-1] == "on" {
 			fields[len(fields)-2] = "Mounted on"
 			fields = fields[:len(fields)-1]
 			for _, field := range fields {
@@ -126,7 +126,7 @@ func filesystemFieldValuesFromOutput(outputs map[string]script.ScriptOutput) []t
 				continue
 			}
 			match := reFindmnt.FindStringSubmatch(line)
-			if match != nil {
+			if match != nil && len(match) > 4 && len(fields) > 5 {
 				target := match[1]
 				source := match[2]
 				if fields[0] == source && fields[5] == target {
