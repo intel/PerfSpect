@@ -126,7 +126,7 @@ func filesystemFieldValuesFromOutput(outputs map[string]script.ScriptOutput) []t
 				continue
 			}
 			match := reFindmnt.FindStringSubmatch(line)
-			if match != nil && len(match) > 4 && len(fields) > 5 {
+			if match != nil && len(fields) > 5 {
 				target := match[1]
 				source := match[2]
 				if fields[0] == source && fields[5] == target {
