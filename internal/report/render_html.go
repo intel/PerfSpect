@@ -303,6 +303,9 @@ func createHtmlReport(allTableValues []table.TableValues, targetName string) (ou
 }
 
 func createHtmlReportMultiTarget(allTargetsTableValues [][]table.TableValues, targetNames []string, allTableNames []string) (out []byte, err error) {
+	if len(allTargetsTableValues) == 0 {
+		return nil, fmt.Errorf("no target table values provided")
+	}
 	var sb strings.Builder
 	sb.WriteString(getHtmlReportBegin())
 
@@ -593,7 +596,11 @@ func DefaultHTMLTableRendererFunc(tableValues table.TableValues) string {
 		for _, field := range tableValues.Fields {
 			rowValues := []string{}
 			rowValues = append(rowValues, CreateFieldNameWithDescription(field.Name, field.Description))
-			rowValues = append(rowValues, htmltemplate.HTMLEscapeString(field.Values[0]))
+			if len(field.Values) > 0 {
+				rowValues = append(rowValues, htmltemplate.HTMLEscapeString(field.Values[0]))
+			} else {
+				rowValues = append(rowValues, "")
+			}
 			values = append(values, rowValues)
 			tableValueStyles = append(tableValueStyles, []string{"font-weight:bold"})
 		}
@@ -604,6 +611,9 @@ func DefaultHTMLTableRendererFunc(tableValues table.TableValues) string {
 // RenderMultiTargetTableValuesAsHTML renders a table for multiple targets
 // tableValues is a slice of table.TableValues, each of which represents the same table from a single target
 func RenderMultiTargetTableValuesAsHTML(tableValues []table.TableValues, targetNames []string) string {
+	if len(tableValues) == 0 {
+		return ""
+	}
 	values := [][]string{}
 	var tableValueStyles [][]string
 	for fieldIndex, field := range tableValues[0].Fields {

@@ -69,6 +69,9 @@ func renderXlsxTable(tableValues table.TableValues, f *excelize.File, sheetName 
 }
 
 func renderXlsxTableMultiTarget(targetTableValues []table.TableValues, targetNames []string, f *excelize.File, sheetName string, row *int) {
+	if len(targetTableValues) == 0 {
+		return
+	}
 	col := 1
 	// print the table name
 	tableNameStyle, _ := f.NewStyle(&excelize.Style{
@@ -202,7 +205,7 @@ func DefaultXlsxTableRendererFunc(tableValues table.TableValues, f *excelize.Fil
 		col := 1
 		for _, field := range tableValues.Fields {
 			var fieldValue string
-			if len(tableValues.Fields[0].Values) > 0 {
+			if len(field.Values) > 0 {
 				fieldValue = field.Values[0]
 			}
 			_ = f.SetCellValue(sheetName, cellName(col, *row), field.Name)
