@@ -758,7 +758,7 @@ func ScriptSupportedOnTarget(t target.Target, scriptDef script.ScriptDefinition,
 			return false, err
 		}
 		if !slices.Contains(scriptDef.Architectures, arch) {
-			slog.Info("script not supported on target architecture", slog.String("script", scriptDef.Name), slog.String("target", t.GetName()), slog.String("architecture", arch))
+			slog.Debug("script not supported on target architecture", slog.String("script", scriptDef.Name), slog.String("target", t.GetName()), slog.String("architecture", arch))
 			return false, nil
 		}
 	}
@@ -768,7 +768,7 @@ func ScriptSupportedOnTarget(t target.Target, scriptDef script.ScriptDefinition,
 			return false, err
 		}
 		if !slices.Contains(scriptDef.Vendors, vendor) {
-			slog.Info("script not supported on target CPU vendor", slog.String("script", scriptDef.Name), slog.String("target", t.GetName()), slog.String("vendor", vendor))
+			slog.Debug("script not supported on target CPU vendor", slog.String("script", scriptDef.Name), slog.String("target", t.GetName()), slog.String("vendor", vendor))
 			return false, nil
 		}
 	}
@@ -781,7 +781,7 @@ func ScriptSupportedOnTarget(t target.Target, scriptDef script.ScriptDefinition,
 		shortUarch = strings.Split(shortUarch, "-")[0] // handle GNR-D
 		shortUarch = strings.Split(shortUarch, " ")[0] // handle Turin (Zen 5)
 		if !slices.Contains(scriptDef.MicroArchitectures, uarch) && !slices.Contains(scriptDef.MicroArchitectures, shortUarch) {
-			slog.Info("script not supported on target CPU microarchitecture", slog.String("script", scriptDef.Name), slog.String("target", t.GetName()), slog.String("microarchitecture", uarch))
+			slog.Debug("script not supported on target CPU microarchitecture", slog.String("script", scriptDef.Name), slog.String("target", t.GetName()), slog.String("microarchitecture", uarch))
 			return false, nil
 		}
 	}
