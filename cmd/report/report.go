@@ -383,7 +383,7 @@ func benchmarkSummaryFromTableValues(allTableValues []table.TableValues, outputs
 	memLatTableValues := getTableValues(allTableValues, MemoryBenchmarkTableName)
 	var bandwidthValues []string
 	if len(memLatTableValues.Fields) > 1 {
-		bandwidthValues = getTableValues(allTableValues, MemoryBenchmarkTableName).Fields[1].Values
+		bandwidthValues = memLatTableValues.Fields[1].Values
 	}
 	maxBandwidth := 0.0
 	for _, bandwidthValue := range bandwidthValues {
@@ -517,27 +517,28 @@ func summaryHTMLTableRenderer(tv table.TableValues, targetName string) string {
 		panic(err)
 	}
 	// if we have reference data that matches the microarchitecture and sockets, use it
-	if refData, ok := referenceData[ReferenceDataKey{tv.Fields[uarchFieldIdx].Values[0], tv.Fields[socketsFieldIdx].Values[0]}]; ok {
-		// remove microarchitecture and sockets fields
-		fields := tv.Fields[:len(tv.Fields)-2]
-		refTableValues := table.TableValues{
-			Fields: []table.Field{
-				{Name: "CPU Speed", Values: []string{fmt.Sprintf("%.0f Ops/s", refData.CPUSpeed)}},
-				{Name: "Single-core Maximum frequency", Values: []string{fmt.Sprintf("%.0f MHz", refData.SingleCoreFreq)}},
-				{Name: "All-core Maximum frequency", Values: []string{fmt.Sprintf("%.0f MHz", refData.AllCoreFreq)}},
-				{Name: "Maximum Power", Values: []string{fmt.Sprintf("%.0f W", refData.MaxPower)}},
-				{Name: "Maximum Temperature", Values: []string{fmt.Sprintf("%.0f C", refData.MaxTemp)}},
-				{Name: "Minimum Power", Values: []string{fmt.Sprintf("%.0f W", refData.MinPower)}},
-				{Name: "Memory Peak Bandwidth", Values: []string{fmt.Sprintf("%.0f GB/s", refData.MemPeakBandwidth)}},
-				{Name: "Memory Minimum Latency", Values: []string{fmt.Sprintf("%.0f ns", refData.MemMinLatency)}},
-			},
+	if len(tv.Fields[uarchFieldIdx].Values) > 0 && len(tv.Fields[socketsFieldIdx].Values) > 0 {
+		if refData, ok := referenceData[ReferenceDataKey{tv.Fields[uarchFieldIdx].Values[0], tv.Fields[socketsFieldIdx].Values[0]}]; ok {
+			// remove microarchitecture and sockets fields
+			fields := tv.Fields[:len(tv.Fields)-2]
+			refTableValues := table.TableValues{
+				Fields: []table.Field{
+					{Name: "CPU Speed", Values: []string{fmt.Sprintf("%.0f Ops/s", refData.CPUSpeed)}},
+					{Name: "Single-core Maximum frequency", Values: []string{fmt.Sprintf("%.0f MHz", refData.SingleCoreFreq)}},
+					{Name: "All-core Maximum frequency", Values: []string{fmt.Sprintf("%.0f MHz", refData.AllCoreFreq)}},
+					{Name: "Maximum Power", Values: []string{fmt.Sprintf("%.0f W", refData.MaxPower)}},
+					{Name: "Maximum Temperature", Values: []string{fmt.Sprintf("%.0f C", refData.MaxTemp)}},
+					{Name: "Minimum Power", Values: []string{fmt.Sprintf("%.0f W", refData.MinPower)}},
+					{Name: "Memory Peak Bandwidth", Values: []string{fmt.Sprintf("%.0f GB/s", refData.MemPeakBandwidth)}},
+					{Name: "Memory Minimum Latency", Values: []string{fmt.Sprintf("%.0f ns", refData.MemMinLatency)}},
+				},
+			}
+			return report.RenderMultiTargetTableValuesAsHTML([]table.TableValues{{TableDefinition: tv.TableDefinition, Fields: fields}, refTableValues}, []string{targetName, refData.Description})
 		}
-		return report.RenderMultiTargetTableValuesAsHTML([]table.TableValues{{TableDefinition: tv.TableDefinition, Fields: fields}, refTableValues}, []string{targetName, refData.Description})
-	} else {
-		// remove microarchitecture and sockets fields
-		fields := tv.Fields[:len(tv.Fields)-2]
-		return report.DefaultHTMLTableRendererFunc(table.TableValues{TableDefinition: tv.TableDefinition, Fields: fields})
 	}
+	// remove microarchitecture and sockets fields
+	fields := tv.Fields[:len(tv.Fields)-2]
+	return report.DefaultHTMLTableRendererFunc(table.TableValues{TableDefinition: tv.TableDefinition, Fields: fields})
 }
 
 func summaryXlsxTableRenderer(tv table.TableValues, f *excelize.File, targetName string, row *int) {

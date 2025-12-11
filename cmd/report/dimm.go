@@ -625,7 +625,11 @@ func deriveDIMMInfoOther(dimms [][]string, channelsPerSocket int) ([]derivedFiel
 		err := fmt.Errorf("no DIMMs")
 		return nil, err
 	}
-	dimmType, reBankLoc, reLoc := getDIMMParseInfo((dimms)[0][BankLocatorIdx], (dimms)[0][LocatorIdx])
+	if len(dimms[0]) <= max(BankLocatorIdx, LocatorIdx) {
+		err := fmt.Errorf("DIMM data has insufficient fields")
+		return nil, err
+	}
+	dimmType, reBankLoc, reLoc := getDIMMParseInfo(dimms[0][BankLocatorIdx], dimms[0][LocatorIdx])
 	if dimmType == DIMMTypeUNKNOWN {
 		err := fmt.Errorf("unknown DIMM identification format")
 		return nil, err

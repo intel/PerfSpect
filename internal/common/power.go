@@ -37,7 +37,11 @@ func EPPFromOutput(outputs map[string]script.ScriptOutput) string {
 		if line == "" {
 			continue
 		}
-		currentEpbValid := strings.TrimSpace(strings.Split(line, ":")[1])
+		lineParts := strings.Split(line, ":")
+		if len(lineParts) < 2 {
+			continue
+		}
+		currentEpbValid := strings.TrimSpace(lineParts[1])
 		if i == 0 {
 			eppValid = currentEpbValid
 			continue
@@ -53,7 +57,11 @@ func EPPFromOutput(outputs map[string]script.ScriptOutput) string {
 		if line == "" {
 			continue
 		}
-		currentEppPkgCtrl := strings.TrimSpace(strings.Split(line, ":")[1])
+		lineParts := strings.Split(line, ":")
+		if len(lineParts) < 2 {
+			continue
+		}
+		currentEppPkgCtrl := strings.TrimSpace(lineParts[1])
 		if i == 0 {
 			eppPkgCtrl = currentEppPkgCtrl
 			continue
@@ -77,7 +85,11 @@ func EPPFromOutput(outputs map[string]script.ScriptOutput) string {
 			if line == "" {
 				continue
 			}
-			currentEpp := strings.TrimSpace(strings.Split(line, ":")[1])
+			lineParts := strings.Split(line, ":")
+			if len(lineParts) < 2 {
+				continue
+			}
+			currentEpp := strings.TrimSpace(lineParts[1])
 			if i == 0 {
 				epp = currentEpp
 				continue
@@ -112,13 +124,7 @@ func EPBFromOutput(outputs map[string]script.ScriptOutput) string {
 
 func ELCSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 	fieldValues := ELCFieldValuesFromOutput(outputs)
-	if len(fieldValues) == 0 {
-		return ""
-	}
-	if len(fieldValues) < 10 {
-		return ""
-	}
-	if len(fieldValues[9].Values) == 0 {
+	if len(fieldValues) < 10 || len(fieldValues[9].Values) == 0 {
 		return ""
 	}
 	summary := fieldValues[9].Values[0]
@@ -203,7 +209,7 @@ func ELCFieldValuesFromOutput(outputs map[string]script.ScriptOutput) (fieldValu
 	// value rows
 	for _, row := range rows[1:] {
 		var mode string
-		if row[2] == "IO" {
+		if len(row) > 7 && row[2] == "IO" {
 			if row[5] == "0" && row[6] == "0" && row[7] == "0" {
 				mode = "Latency Optimized"
 			} else if row[5] == "800" && row[6] == "10" && row[7] == "94" {
@@ -211,7 +217,7 @@ func ELCFieldValuesFromOutput(outputs map[string]script.ScriptOutput) (fieldValu
 			} else {
 				mode = "Custom"
 			}
-		} else { // COMPUTE
+		} else if len(row) > 5 { // COMPUTE
 			switch row[5] {
 			case "0":
 				mode = "Latency Optimized"

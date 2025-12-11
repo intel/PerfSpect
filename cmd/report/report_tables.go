@@ -1219,19 +1219,23 @@ func dimmTableInsights(outputs map[string]script.ScriptOutput, tableValues table
 			for i, speed := range tableValues.Fields[SpeedIndex].Values {
 				configuredSpeed := tableValues.Fields[ConfiguredSpeedIndex].Values[i]
 				if speed != "" && configuredSpeed != "" && speed != "Unknown" && configuredSpeed != "Unknown" {
-					speedVal, err := strconv.Atoi(strings.Split(speed, " ")[0])
-					if err != nil {
-						slog.Warn(err.Error())
-					} else {
-						configuredSpeedVal, err := strconv.Atoi(strings.Split(configuredSpeed, " ")[0])
+					speedParts := strings.Split(speed, " ")
+					configuredSpeedParts := strings.Split(configuredSpeed, " ")
+					if len(speedParts) > 0 && len(configuredSpeedParts) > 0 {
+						speedVal, err := strconv.Atoi(speedParts[0])
 						if err != nil {
 							slog.Warn(err.Error())
 						} else {
-							if speedVal < configuredSpeedVal {
-								insights = append(insights, table.Insight{
-									Recommendation: "Consider configuring DIMMs for their maximum speed.",
-									Justification:  fmt.Sprintf("DIMMs configured for %s when their maximum speed is %s.", configuredSpeed, speed),
-								})
+							configuredSpeedVal, err := strconv.Atoi(configuredSpeedParts[0])
+							if err != nil {
+								slog.Warn(err.Error())
+							} else {
+								if speedVal < configuredSpeedVal {
+									insights = append(insights, table.Insight{
+										Recommendation: "Consider configuring DIMMs for their maximum speed.",
+										Justification:  fmt.Sprintf("DIMMs configured for %s when their maximum speed is %s.", configuredSpeed, speed),
+									})
+								}
 							}
 						}
 					}
@@ -2033,7 +2037,13 @@ func dimmDetails(dimm []string) (details string) {
 }
 
 func dimmTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
-	if tableValues.Fields[DerivedSocketIdx].Values[0] == "" || tableValues.Fields[DerivedChannelIdx].Values[0] == "" || tableValues.Fields[DerivedSlotIdx].Values[0] == "" {
+	if len(tableValues.Fields) <= max(DerivedSocketIdx, DerivedChannelIdx, DerivedSlotIdx) ||
+		len(tableValues.Fields[DerivedSocketIdx].Values) == 0 ||
+		len(tableValues.Fields[DerivedChannelIdx].Values) == 0 ||
+		len(tableValues.Fields[DerivedSlotIdx].Values) == 0 ||
+		tableValues.Fields[DerivedSocketIdx].Values[0] == "" ||
+		tableValues.Fields[DerivedChannelIdx].Values[0] == "" ||
+		tableValues.Fields[DerivedSlotIdx].Values[0] == "" {
 		return report.DefaultHTMLTableRendererFunc(tableValues)
 	}
 	htmlColors := []string{"lightgreen", "orange", "aqua", "lime", "yellow", "beige", "magenta", "violet", "salmon", "pink"}
