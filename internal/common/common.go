@@ -532,7 +532,7 @@ func outputsFromTargets(cmd *cobra.Command, myTargets []target.Target, tables []
 					targetScriptNames[targetIdx] = util.UniqueAppend(targetScriptNames[targetIdx], scriptName)
 				}
 			} else {
-				slog.Info("table not supported for target", slog.String("table", tbl.Name), slog.String("target", target.GetName()))
+				slog.Debug("table not supported for target", slog.String("table", tbl.Name), slog.String("target", target.GetName()))
 			}
 		}
 	}
