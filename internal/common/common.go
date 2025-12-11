@@ -95,7 +95,7 @@ type ReportingCommand struct {
 	SummaryBeforeTableName string // the name of the table that the summary table should be placed before in the report
 	InsightsFunc           InsightsFunc
 	AdhocFunc              AdhocFunc
-	SystemSummaryTableName string // e.g., "System Summary" for xlsx report that becomes the "Brief" sheet
+	SystemSummaryTableName string // Optional: Only affects xlsx format reports. If set, the table with this name will be used as the "Brief" sheet in the xlsx report. If empty or unset, no "Brief" sheet is generated.
 }
 
 // Run is the common flow/logic for all reporting commands, i.e., 'report', 'telemetry', 'flame', 'lock'
