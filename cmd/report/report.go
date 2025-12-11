@@ -426,8 +426,6 @@ func benchmarkSummaryFromTableValues(allTableValues []table.TableValues, outputs
 			{Name: "Minimum Power", Values: []string{getValueFromTableValues(getTableValues(allTableValues, PowerBenchmarkTableName), "Minimum Power", 0)}},
 			{Name: "Memory Peak Bandwidth", Values: []string{maxMemBW}},
 			{Name: "Memory Minimum Latency", Values: []string{minLatency}},
-			{Name: "Disk Read Bandwidth", Values: []string{getValueFromTableValues(getTableValues(allTableValues, StorageBenchmarkTableName), "Single-Thread Read Bandwidth", 0)}},
-			{Name: "Disk Write Bandwidth", Values: []string{getValueFromTableValues(getTableValues(allTableValues, StorageBenchmarkTableName), "Single-Thread Write Bandwidth", 0)}},
 			{Name: "Microarchitecture", Values: []string{getValueFromTableValues(getTableValues(allTableValues, SystemSummaryTableName), "Microarchitecture", 0)}},
 			{Name: "Sockets", Values: []string{getValueFromTableValues(getTableValues(allTableValues, SystemSummaryTableName), "Sockets", 0)}},
 		},
