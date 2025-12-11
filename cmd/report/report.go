@@ -359,6 +359,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		SummaryTableName:       benchmarkSummaryTableName,
 		SummaryBeforeTableName: SpeedBenchmarkTableName,
 		InsightsFunc:           insightsFunc,
+		SystemSummaryTableName: SystemSummaryTableName,
 	}
 
 	report.RegisterHTMLRenderer(DIMMTableName, dimmTableHTMLRenderer)
