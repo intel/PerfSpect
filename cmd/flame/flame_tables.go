@@ -111,7 +111,7 @@ func maxRenderDepthFromOutput(outputs map[string]script.ScriptOutput) string {
 	}
 	for header, content := range sections {
 		if header == "maximum depth" {
-			return content
+			return strings.TrimSpace(content)
 		}
 	}
 	return ""
