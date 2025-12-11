@@ -91,10 +91,11 @@ type ReportingCommand struct {
 	Tables                 []table.TableDefinition
 	ScriptParams           map[string]string
 	SummaryFunc            SummaryFunc
-	SummaryTableName       string
+	SummaryTableName       string // e.g., the benchmark or telemetry summary table
 	SummaryBeforeTableName string // the name of the table that the summary table should be placed before in the report
 	InsightsFunc           InsightsFunc
 	AdhocFunc              AdhocFunc
+	SystemSummaryTableName string // Optional: Only affects xlsx format reports. If set, the table with this name will be used as the "Brief" sheet in the xlsx report. If empty or unset, no "Brief" sheet is generated.
 }
 
 // Run is the common flow/logic for all reporting commands, i.e., 'report', 'telemetry', 'flame', 'lock'
@@ -405,7 +406,7 @@ func (rc *ReportingCommand) createReports(appContext AppContext, orderedTargetSc
 		})
 		// create the report(s)
 		for _, format := range formats {
-			reportBytes, err := report.Create(format, allTableValues, targetScriptOutputs.TargetName, rc.SummaryTableName)
+			reportBytes, err := report.Create(format, allTableValues, targetScriptOutputs.TargetName, rc.SystemSummaryTableName)
 			if err != nil {
 				err = fmt.Errorf("failed to create report: %w", err)
 				return nil, err
