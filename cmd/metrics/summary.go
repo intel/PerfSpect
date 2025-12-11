@@ -16,7 +16,6 @@ import (
 	"os"
 	"path/filepath"
 	"perfspect/internal/cpus"
-	"regexp"
 	"slices"
 	"strconv"
 	texttemplate "text/template" // nosemgrep
@@ -628,13 +627,7 @@ func (mg *MetricGroup) loadHTMLTemplateValues(metadata Metadata, metricDefinitio
 	if err != nil {
 		return
 	}
-	// remove PerfSupportedEvents from json
-	re := regexp.MustCompile(`"PerfSupportedEvents":".*?",`)
-	jsonMetadataPurged := re.ReplaceAll(jsonMetadata, []byte(""))
-	// remove SystemSummaryFields from json
-	re = regexp.MustCompile(`,"SystemSummaryFields":\[\[.*?\]\]`)
-	jsonMetadataPurged = re.ReplaceAll(jsonMetadataPurged, []byte(""))
-	templateVals["METADATA"] = string(jsonMetadataPurged)
+	templateVals["METADATA"] = string(jsonMetadata)
 
 	// system info tab
 	jsonSystemInfo, err := json.Marshal(metadata.SystemSummaryFields)
