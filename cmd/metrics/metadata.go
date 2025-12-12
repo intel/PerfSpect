@@ -403,8 +403,8 @@ func getMetadataScripts(noRoot bool, noSystemSummary bool, numGPCounters int) (m
 		{
 			Name: "perf supported events",
 			ScriptTemplate: `# Parse perf list JSON output to extract Hardware events and cstate/power events
-./perf list --json 2>/dev/null | awk '
-BEGIN {
+perf list --json 2>/dev/null | awk '
+BEGIN { 
     in_hardware_event = 0
     event_name = ""
 }
@@ -412,8 +412,10 @@ BEGIN {
 # Capture EventName
 /"EventName":/ {
     # Extract the value between quotes after "EventName":
-    match($0, /"EventName": "([^"]+)"/, arr)
-    event_name = arr[1]
+    line = $0
+    sub(/.*"EventName": "/, "", line)
+    sub(/".*/, "", line)
+    event_name = line
 }
 
 # Check if EventType is Hardware event
@@ -423,9 +425,10 @@ BEGIN {
 
 # At end of object (closing brace), check if we should print
 /^}/ {
-    if (in_hardware_event ||
-        event_name ~ /^cstate_/ ||
-        event_name ~ /^power/) {
+    if (in_hardware_event || 
+        event_name ~ /^cstate_core\// || 
+        event_name ~ /^cstate_pkg\// || 
+        event_name ~ /^power\//) {
         if (event_name != "") {
             print event_name
         }
