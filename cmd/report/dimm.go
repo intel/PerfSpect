@@ -67,7 +67,7 @@ func installedMemoryFromOutput(outputs map[string]script.ScriptOutput) string {
 		if match != nil {
 			size, err := strconv.Atoi(match[1])
 			if err != nil {
-				slog.Error("Don't recognize DIMM size format.", slog.String("field", fields[1]))
+				slog.Warn("Don't recognize DIMM size format.", slog.String("field", fields[1]))
 				return ""
 			}
 			sum := count * size
@@ -87,7 +87,7 @@ func populatedChannelsFromOutput(outputs map[string]script.ScriptOutput) string 
 	dimmInfo := dimmInfoFromDmiDecode(outputs[script.DmidecodeScriptName].Stdout)
 	derivedDimmFields := derivedDimmsFieldFromOutput(outputs)
 	if len(derivedDimmFields) != len(dimmInfo) {
-		slog.Error("derivedDimmFields and dimmInfo have different lengths", slog.Int("derivedDimmFields", len(derivedDimmFields)), slog.Int("dimmInfo", len(dimmInfo)))
+		slog.Warn("derivedDimmFields and dimmInfo have different lengths", slog.Int("derivedDimmFields", len(derivedDimmFields)), slog.Int("dimmInfo", len(dimmInfo)))
 		return ""
 	}
 	for i, dimm := range dimmInfo {
@@ -126,26 +126,26 @@ func derivedDimmsFieldFromOutput(outputs map[string]script.ScriptOutput) []deriv
 	if strings.Contains(platformVendor, "Dell") {
 		derivedFields, err = deriveDIMMInfoDell(dimmInfo, numChannels)
 		if err != nil {
-			slog.Info("failed to parse dimm info on Dell platform", slog.String("error", err.Error()))
+			slog.Warn("failed to parse dimm info on Dell platform", slog.String("error", err.Error()))
 		}
 		success = err == nil
 	} else if platformVendor == "HPE" {
 		derivedFields, err = deriveDIMMInfoHPE(dimmInfo, numSockets, numChannels)
 		if err != nil {
-			slog.Info("failed to parse dimm info on HPE platform", slog.String("error", err.Error()))
+			slog.Warn("failed to parse dimm info on HPE platform", slog.String("error", err.Error()))
 		}
 		success = err == nil
 	} else if platformVendor == "Amazon EC2" {
 		derivedFields, err = deriveDIMMInfoEC2(dimmInfo, numChannels)
 		if err != nil {
-			slog.Info("failed to parse dimm info on Amazon EC2 platform", slog.String("error", err.Error()))
+			slog.Warn("failed to parse dimm info on Amazon EC2 platform", slog.String("error", err.Error()))
 		}
 		success = err == nil
 	}
 	if !success {
 		derivedFields, err = deriveDIMMInfoOther(dimmInfo, numChannels)
 		if err != nil {
-			slog.Info("failed to parse dimm info on other platform", slog.String("error", err.Error()))
+			slog.Warn("failed to parse dimm info on other platform", slog.String("error", err.Error()))
 		}
 	}
 	return derivedFields
