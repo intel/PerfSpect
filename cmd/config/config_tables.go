@@ -226,10 +226,10 @@ func configurationTableTextRenderer(tableValues table.TableValues) string {
 			value = field.Values[0]
 		}
 		// Format: "Field Name:      Value       Description"
-		sb.WriteString(fmt.Sprintf("%-*s  %-*s  %s\n",
+		fmt.Fprintf(&sb, "%-*s  %-*s  %s\n",
 			maxFieldNameLen+1, field.Name+":",
 			maxValueLen, value,
-			field.Description))
+			field.Description)
 	}
 
 	return sb.String()

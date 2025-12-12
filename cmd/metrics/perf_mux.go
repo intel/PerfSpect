@@ -36,11 +36,11 @@ func GetMuxIntervals(myTarget target.Target, localTempDir string) (intervals map
 
 // SetMuxIntervals - write the given intervals (values in ms) to the given sysfs device file names (key)
 func SetMuxIntervals(myTarget target.Target, intervals map[string]int, localTempDir string) (err error) {
-	var bash string
+	var bash strings.Builder
 	for device := range intervals {
-		bash += fmt.Sprintf("echo %d > %s; ", intervals[device], device)
+		fmt.Fprintf(&bash, "echo %d > %s; ", intervals[device], device)
 	}
-	_, err = common.RunScript(myTarget, script.ScriptDefinition{Name: "set mux intervals", ScriptTemplate: bash, Superuser: true}, localTempDir, flagNoRoot)
+	_, err = common.RunScript(myTarget, script.ScriptDefinition{Name: "set mux intervals", ScriptTemplate: bash.String(), Superuser: true}, localTempDir, flagNoRoot)
 	return
 }
 

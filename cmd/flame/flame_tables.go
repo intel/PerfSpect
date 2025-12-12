@@ -206,7 +206,7 @@ func (p *ProcessStacks) dumpFolded() (folded string) {
 	var sb strings.Builder
 	for processName, stacks := range *p {
 		for stack, stackCount := range stacks {
-			sb.WriteString(fmt.Sprintf("%s;%s %d\n", processName, stack, stackCount))
+			fmt.Fprintf(&sb, "%s;%s %d\n", processName, stack, stackCount)
 		}
 	}
 	folded = sb.String()

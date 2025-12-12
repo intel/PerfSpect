@@ -873,7 +873,7 @@ func irqRateTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName
 // - one scatter chart per drive, showing the drive's utilization over time
 // - each drive stat is a separate dataset within the chart
 func driveTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
-	var out string
+	var out strings.Builder
 	driveStats := make(map[string][][]string)
 	for i := range tableValues.Fields[0].Values {
 		drive := tableValues.Fields[1].Values[i]
@@ -922,16 +922,16 @@ func driveTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName s
 			SuggestedMin:  "0",
 			SuggestedMax:  "0",
 		}
-		out += telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
+		out.WriteString(telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil))
 	}
-	return out
+	return out.String()
 }
 
 // networkTelemetryTableHTMLRenderer renders charts of network device statistics
 // - one scatter chart per network device, showing the device's utilization over time
 // - each network stat is a separate dataset within the chart
 func networkTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
-	var out string
+	var out strings.Builder
 	nicStats := make(map[string][][]string)
 	for i := range tableValues.Fields[0].Values {
 		drive := tableValues.Fields[1].Values[i]
@@ -980,9 +980,9 @@ func networkTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName
 			SuggestedMin:  "0",
 			SuggestedMax:  "0",
 		}
-		out += telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
+		out.WriteString(telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil))
 	}
-	return out
+	return out.String()
 }
 
 func memoryTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {

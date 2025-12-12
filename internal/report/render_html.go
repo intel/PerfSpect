@@ -218,7 +218,7 @@ func getHtmlReportMenu(allTableValues []table.TableValues) string {
 		// insert menu items into sidebar
 		for _, tableValues := range allTableValues {
 			if tableValues.MenuLabel != "" {
-				sb.WriteString(fmt.Sprintf("<a href=\"#%s\">%s</a>\n", html.EscapeString(tableValues.Name), html.EscapeString(tableValues.MenuLabel)))
+				fmt.Fprintf(&sb, "<a href=\"#%s\">%s</a>\n", html.EscapeString(tableValues.Name), html.EscapeString(tableValues.MenuLabel))
 			}
 		}
 		sb.WriteString("</div>\n") // end of sidebar
@@ -273,7 +273,7 @@ func createHtmlReport(allTableValues []table.TableValues, targetName string) (ou
 `)
 	for _, tableValues := range allTableValues {
 		// print the table name
-		sb.WriteString(fmt.Sprintf("<h2 id=\"%[1]s\">%[1]s</h2>\n", html.EscapeString(tableValues.Name)))
+		fmt.Fprintf(&sb, "<h2 id=\"%[1]s\">%[1]s</h2>\n", html.EscapeString(tableValues.Name))
 		// if there's no data in the table, print a message and continue
 		if len(tableValues.Fields) == 0 || len(tableValues.Fields[0].Values) == 0 {
 			msg := NoDataFound
@@ -343,10 +343,10 @@ func createHtmlReportMultiTarget(allTargetsTableValues [][]table.TableValues, ta
 			if targetTableValues.HasRows && getCustomHTMLMultiTargetRenderer(targetTableValues.Name) == nil {
 				// print the table name only one time per table
 				if targetIndex == 0 {
-					sb.WriteString(fmt.Sprintf("<h2 id=\"%[1]s\">%[1]s</h2>\n", html.EscapeString(targetTableValues.Name)))
+					fmt.Fprintf(&sb, "<h2 id=\"%[1]s\">%[1]s</h2>\n", html.EscapeString(targetTableValues.Name))
 				}
 				// print the target name
-				sb.WriteString(fmt.Sprintf("<h3>%s</h3>\n", targetName))
+				fmt.Fprintf(&sb, "<h3>%s</h3>\n", targetName)
 				// if there's no data in the table, print a message and continue
 				if len(targetTableValues.Fields) == 0 || len(targetTableValues.Fields[0].Values) == 0 {
 					sb.WriteString("<p>" + NoDataFound + "</p>\n")
@@ -363,7 +363,7 @@ func createHtmlReportMultiTarget(allTargetsTableValues [][]table.TableValues, ta
 		}
 		// print the multi-target table, if any
 		if len(oneTableValuesForAllTargets) > 0 {
-			sb.WriteString(fmt.Sprintf("<h2 id=\"%[1]s\">%[1]s</h2>\n", html.EscapeString(oneTableValuesForAllTargets[0].Name)))
+			fmt.Fprintf(&sb, "<h2 id=\"%[1]s\">%[1]s</h2>\n", html.EscapeString(oneTableValuesForAllTargets[0].Name))
 			if renderer := getCustomHTMLMultiTargetRenderer(oneTableValuesForAllTargets[0].Name); renderer != nil {
 				sb.WriteString(renderer(oneTableValuesForAllTargets, targetNames))
 			} else {
