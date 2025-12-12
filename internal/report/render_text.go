@@ -25,7 +25,7 @@ func RegisterTextRenderer(tableName string, renderer table.TextTableRenderer) {
 func createTextReport(allTableValues []table.TableValues) (out []byte, err error) {
 	var sb strings.Builder
 	for _, tableValues := range allTableValues {
-		sb.WriteString(fmt.Sprintf("%s\n", tableValues.Name))
+		fmt.Fprintf(&sb, "%s\n", tableValues.Name)
 		for range len(tableValues.Name) {
 			sb.WriteString("=")
 		}
@@ -72,23 +72,23 @@ func DefaultTextTableRendererFunc(tableValues table.TableValues) string {
 		columnSpacing := 3
 		// print the field names
 		for _, field := range tableValues.Fields {
-			sb.WriteString(fmt.Sprintf("%-*s", maxFieldLen[field.Name]+columnSpacing, field.Name))
+			fmt.Fprintf(&sb, "%-*s", maxFieldLen[field.Name]+columnSpacing, field.Name)
 		}
 		sb.WriteString("\n")
 		// underline the field names
 		for _, field := range tableValues.Fields {
-			underline := ""
+			var underline strings.Builder
 			for range len(field.Name) {
-				underline += "-"
+				underline.WriteString("-")
 			}
-			sb.WriteString(fmt.Sprintf("%-*s", maxFieldLen[field.Name]+columnSpacing, underline))
+			fmt.Fprintf(&sb, "%-*s", maxFieldLen[field.Name]+columnSpacing, underline.String())
 		}
 		sb.WriteString("\n")
 		// print the rows
 		numRows := len(tableValues.Fields[0].Values)
 		for row := range numRows {
 			for fieldIdx, field := range tableValues.Fields {
-				sb.WriteString(fmt.Sprintf("%-*s", maxFieldLen[field.Name]+columnSpacing, tableValues.Fields[fieldIdx].Values[row]))
+				fmt.Fprintf(&sb, "%-*s", maxFieldLen[field.Name]+columnSpacing, tableValues.Fields[fieldIdx].Values[row])
 			}
 			sb.WriteString("\n")
 		}
@@ -106,7 +106,7 @@ func DefaultTextTableRendererFunc(tableValues table.TableValues) string {
 			if len(field.Values) > 0 {
 				value = field.Values[0]
 			}
-			sb.WriteString(fmt.Sprintf("%s%-*s %s\n", field.Name, maxFieldNameLen-len(field.Name)+1, ":", value))
+			fmt.Fprintf(&sb, "%s%-*s %s\n", field.Name, maxFieldNameLen-len(field.Name)+1, ":", value)
 		}
 	}
 	return sb.String()

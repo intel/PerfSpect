@@ -380,8 +380,8 @@ func parseNumericWithUnit(value string, units ...string) (string, error) {
 
 	// try to remove each unit suffix
 	for _, unit := range units {
-		if strings.HasSuffix(value, unit) {
-			numStr := strings.TrimSuffix(value, unit)
+		if before, ok := strings.CutSuffix(value, unit); ok {
+			numStr := before
 			// validate it's a valid number
 			if _, err := strconv.ParseFloat(numStr, 64); err != nil {
 				return "", fmt.Errorf("invalid numeric value: %s", value)

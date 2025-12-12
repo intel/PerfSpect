@@ -903,14 +903,15 @@ fi
 	default:
 		return fmt.Errorf("invalid C6 setting: %s", enableDisable)
 	}
-	bash := "for cpu in /sys/devices/system/cpu/cpu[0-9]*; do\n"
+	var bash strings.Builder
+	bash.WriteString("for cpu in /sys/devices/system/cpu/cpu[0-9]*; do\n")
 	for _, folder := range c6StateFolders {
-		bash += fmt.Sprintf("  echo %d > $cpu/cpuidle/%s/disable\n", enableDisableValue, folder)
+		fmt.Fprintf(&bash, "  echo %d > $cpu/cpuidle/%s/disable\n", enableDisableValue, folder)
 	}
-	bash += "done\n"
+	bash.WriteString("done\n")
 	setScript := script.ScriptDefinition{
 		Name:           "configure c6",
-		ScriptTemplate: bash,
+		ScriptTemplate: bash.String(),
 		Superuser:      true,
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
