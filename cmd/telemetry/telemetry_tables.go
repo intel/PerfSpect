@@ -406,7 +406,7 @@ func temperatureTelemetryTableValues(outputs map[string]script.ScriptOutput) []t
 	}
 	platformRows, err := common.TurbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"CoreTmp"})
 	if err != nil {
-		slog.Error(err.Error())
+		slog.Warn(err.Error()) // not all systems report core temperature, e.g., cloud VMs
 		return []table.Field{}
 	}
 	packageRows, err := common.TurbostatPackageRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"PkgTmp"})
