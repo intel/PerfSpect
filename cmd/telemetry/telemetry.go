@@ -396,6 +396,9 @@ func summaryFromTableValues(allTableValues []table.TableValues, _ map[string]scr
 }
 
 func getMetricAverage(tableValues table.TableValues, fieldNames []string, separatorFieldName string) (average string) {
+	if len(tableValues.Fields) == 0 {
+		return ""
+	}
 	sum, seps, err := getSumOfFields(tableValues.Fields, fieldNames, separatorFieldName)
 	if err != nil {
 		slog.Error("failed to get sum of fields for IO metrics", slog.String("error", err.Error()))
