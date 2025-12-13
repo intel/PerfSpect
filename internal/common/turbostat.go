@@ -102,8 +102,8 @@ func TurbostatPlatformRows(turboStatScriptOutput string, fieldNames []string) ([
 		return nil, err
 	}
 	if len(rows) == 0 {
-		err := fmt.Errorf("turbostat output is empty")
-		return nil, err
+		slog.Warn("no platform rows found in turbostat output")
+		return nil, nil
 	}
 	// filter the rows to the summary rows only
 	var fieldValues [][]string
@@ -155,8 +155,8 @@ func TurbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([]
 		return nil, err
 	}
 	if len(rows) == 0 {
-		err := fmt.Errorf("turbostat output is empty")
-		return nil, err
+		slog.Warn("no package rows found in turbostat output")
+		return nil, nil
 	}
 	var packageRows [][][]string
 	for _, row := range rows {

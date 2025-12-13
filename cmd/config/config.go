@@ -179,8 +179,9 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		go setOnTarget(cmd, myTarget, flagGroups, localTempDir, channelError, multiSpinner.Status)
 	}
 	// wait for all targets to finish
+	var setOnTargetErr error
 	for range myTargets {
-		<-channelError
+		setOnTargetErr = <-channelError
 	}
 	multiSpinner.Finish()
 	fmt.Println() // blank line
@@ -207,6 +208,12 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			return err
 		}
+	}
+	if setOnTargetErr != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", setOnTargetErr)
+		slog.Error(setOnTargetErr.Error())
+		cmd.SilenceUsage = true
+		return setOnTargetErr
 	}
 	return nil
 }
@@ -239,6 +246,7 @@ func setOnTarget(cmd *cobra.Command, myTarget target.Target, flagGroups []flagGr
 	}
 	var statusMessages []string
 	_ = statusUpdate(myTarget.GetName(), "updating configuration")
+	var setErrs []error // collect errors but continue setting other flags
 	for _, group := range flagGroups {
 		for _, flag := range group.flags {
 			if flag.HasSetFunc() && cmd.Flags().Lookup(flag.GetName()).Changed {
@@ -268,6 +276,7 @@ func setOnTarget(cmd *cobra.Command, myTarget target.Target, flagGroups []flagGr
 					}
 				}
 				if setErr != nil {
+					setErrs = append(setErrs, setErr)
 					slog.Error(setErr.Error())
 					statusMessages = append(statusMessages, errorMessage)
 				} else {
@@ -279,6 +288,15 @@ func setOnTarget(cmd *cobra.Command, myTarget target.Target, flagGroups []flagGr
 	statusMessage := fmt.Sprintf("configuration update complete: %s", strings.Join(statusMessages, ", "))
 	slog.Info(statusMessage, slog.String("target", myTarget.GetName()))
 	_ = statusUpdate(myTarget.GetName(), statusMessage)
+	// aggregate setErrs and send to channel
+	if len(setErrs) > 0 {
+		aggregateErrMessages := []string{}
+		for _, setErr := range setErrs {
+			aggregateErrMessages = append(aggregateErrMessages, setErr.Error())
+		}
+		channelError <- fmt.Errorf("errors setting configuration on target %s: %s", myTarget.GetName(), strings.Join(aggregateErrMessages, "; "))
+		return
+	}
 	channelError <- nil
 }
 
