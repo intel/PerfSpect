@@ -373,7 +373,7 @@ func powerTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.F
 	}
 	packageRows, err := common.TurbostatPackageRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"PkgWatt", "RAMWatt"})
 	if err != nil {
-		slog.Error(err.Error())
+		slog.Warn(err.Error())
 		return []table.Field{}
 	}
 	for i := range packageRows {
@@ -511,7 +511,7 @@ func c6TelemetryTableValues(outputs map[string]script.ScriptOutput) []table.Fiel
 	}
 	platformRows, err := common.TurbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"C6%", "CPU%c6"})
 	if err != nil {
-		slog.Error(err.Error())
+		slog.Warn(err.Error())
 		return []table.Field{}
 	}
 	if len(platformRows) == 0 {
