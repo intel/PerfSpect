@@ -359,7 +359,7 @@ func UncoreMinMaxDieFrequencyFromOutput(maxFreq bool, computeDie bool, outputs m
 		}
 	}
 	if !found {
-		slog.Error("failed to find uncore die type in TPMI output", slog.String("output", outputs[script.UncoreDieTypesFromTPMIScriptName].Stdout))
+		slog.Warn("failed to find uncore die type in TPMI output", slog.String("output", outputs[script.UncoreDieTypesFromTPMIScriptName].Stdout))
 		return ""
 	}
 	// get the frequency for the found die

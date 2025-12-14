@@ -446,7 +446,7 @@ func frequencyTelemetryTableValues(outputs map[string]script.ScriptOutput) []tab
 	}
 	platformRows, err := common.TurbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"Bzy_MHz"})
 	if err != nil {
-		slog.Error(err.Error())
+		slog.Warn(err.Error())
 		return []table.Field{}
 	}
 	packageRows, err := common.TurbostatPackageRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"UncMHz"})
@@ -486,7 +486,7 @@ func ipcTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.Fie
 	}
 	platformRows, err := common.TurbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"IPC"})
 	if err != nil {
-		slog.Error(err.Error())
+		slog.Warn(err.Error())
 		return []table.Field{}
 	}
 	if len(platformRows) == 0 {

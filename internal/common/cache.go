@@ -95,10 +95,10 @@ func GetL3LscpuMB(outputs map[string]script.ScriptOutput) (instance float64, tot
 func L3FromOutput(outputs map[string]script.ScriptOutput) string {
 	l3InstanceMB, l3TotalMB, err := GetL3MSRMB(outputs)
 	if err != nil {
-		slog.Info("Could not get L3 size from MSR, falling back to lscpu", slog.String("error", err.Error()))
+		slog.Debug("Could not get L3 size from MSR, falling back to lscpu", slog.String("error", err.Error()))
 		l3InstanceMB, l3TotalMB, err = GetL3LscpuMB(outputs)
 		if err != nil {
-			slog.Error("Could not get L3 size from lscpu", slog.String("error", err.Error()))
+			slog.Warn("Could not get L3 size from lscpu", slog.String("error", err.Error()))
 			return ""
 		}
 	}
@@ -143,7 +143,7 @@ func L3PerCoreFromOutput(outputs map[string]script.ScriptOutput) string {
 		slog.Debug("Could not get L3 size from MSR, falling back to lscpu", slog.String("error", err.Error()))
 		_, l3TotalMB, err = GetL3LscpuMB(outputs)
 		if err != nil {
-			slog.Error("Could not get L3 size from lscpu", slog.String("error", err.Error()))
+			slog.Warn("Could not get L3 size from lscpu", slog.String("error", err.Error()))
 			return ""
 		}
 	}

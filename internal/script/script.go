@@ -161,7 +161,7 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 		}
 		stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, false)
 		if err != nil {
-			slog.Error("error running script on target", slog.String("script", script.ScriptTemplate), slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitcode", exitcode), slog.String("error", err.Error()))
+			slog.Warn("error running script on target", slog.String("name", script.Name), slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitcode", exitcode), slog.String("error", err.Error()))
 		}
 		scriptOutputs[script.Name] = ScriptOutput{ScriptDefinition: script, Stdout: stdout, Stderr: stderr, Exitcode: exitcode}
 		if !ignoreScriptErrors {

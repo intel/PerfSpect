@@ -144,10 +144,10 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []table.Fi
 func l3InstanceFromOutput(outputs map[string]script.ScriptOutput) string {
 	l3InstanceMB, _, err := common.GetL3MSRMB(outputs)
 	if err != nil {
-		slog.Info("Could not get L3 size from MSR, falling back to lscpu", slog.String("error", err.Error()))
+		slog.Debug("Could not get L3 size from MSR, falling back to lscpu", slog.String("error", err.Error()))
 		l3InstanceMB, _, err = common.GetL3LscpuMB(outputs)
 		if err != nil {
-			slog.Error("Could not get L3 size from lscpu", slog.String("error", err.Error()))
+			slog.Warn("Could not get L3 size from lscpu", slog.String("error", err.Error()))
 			return ""
 		}
 	}

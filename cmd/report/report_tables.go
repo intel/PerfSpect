@@ -1797,7 +1797,7 @@ func frequencyBenchmarkTableValues(outputs map[string]script.ScriptOutput) []tab
 	// get the sse, avx256, and avx512 frequencies from the avx-turbo output
 	instructionFreqs, err := avxTurboFrequenciesFromOutput(outputs[script.FrequencyBenchmarkScriptName].Stdout)
 	if err != nil {
-		slog.Error("unable to get avx turbo frequencies", slog.String("error", err.Error()))
+		slog.Warn("unable to get avx turbo frequencies", slog.String("error", err.Error()))
 		return []table.Field{}
 	}
 	// we're expecting scalar_iadd, avx256_fma, avx512_fma
