@@ -132,7 +132,7 @@ func parseEvents(rawEvents [][]byte) ([]Event, error) {
 		var event Event
 		if err := json.Unmarshal(rawEvent, &event); err != nil {
 			err = fmt.Errorf("unrecognized event format: %w", err)
-			slog.Error(err.Error(), slog.String("event", string(rawEvent)))
+			slog.Warn(err.Error(), slog.String("event", string(rawEvent)))
 			return nil, err
 		}
 		// sometimes perf will prepend "cpu/" to the topdown event names, e.g., cpu/topdown-retiring/ to x86 events, and

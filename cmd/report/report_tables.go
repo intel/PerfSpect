@@ -1797,7 +1797,7 @@ func frequencyBenchmarkTableValues(outputs map[string]script.ScriptOutput) []tab
 	// get the sse, avx256, and avx512 frequencies from the avx-turbo output
 	instructionFreqs, err := avxTurboFrequenciesFromOutput(outputs[script.FrequencyBenchmarkScriptName].Stdout)
 	if err != nil {
-		slog.Error("unable to get avx turbo frequencies", slog.String("error", err.Error()))
+		slog.Warn("unable to get avx turbo frequencies", slog.String("error", err.Error()))
 		return []table.Field{}
 	}
 	// we're expecting scalar_iadd, avx256_fma, avx512_fma
@@ -1806,7 +1806,7 @@ func frequencyBenchmarkTableValues(outputs map[string]script.ScriptOutput) []tab
 	avx512FmaFreqs := instructionFreqs["avx512_fma"]
 	// stop if we don't have any scalar_iadd frequencies
 	if len(scalarIaddFreqs) == 0 {
-		slog.Error("no scalar_iadd frequencies found")
+		slog.Warn("no scalar_iadd frequencies found")
 		return []table.Field{}
 	}
 	// get the spec core frequencies from the spec output
@@ -1976,14 +1976,9 @@ func formatOrEmpty(format string, value any) string {
 func storageBenchmarkTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	fioData, err := storagePerfFromOutput(outputs)
 	if err != nil {
-		slog.Error("failed to get storage benchmark data", slog.String("error", err.Error()))
+		slog.Warn("failed to get storage benchmark data", slog.String("error", err.Error()))
 		return []table.Field{}
 	}
-
-	if len(fioData.Jobs) == 0 {
-		return []table.Field{}
-	}
-
 	// Initialize the fields for metrics (column headers)
 	fields := []table.Field{
 		{Name: "Job"},
@@ -1994,9 +1989,7 @@ func storageBenchmarkTableValues(outputs map[string]script.ScriptOutput) []table
 		{Name: "Write IOPs"},
 		{Name: "Write Bandwidth (MiB/s)"},
 	}
-
 	// For each FIO job, create a new row and populate its values
-	slog.Debug("fioData", slog.Any("jobs", fioData.Jobs))
 	for _, job := range fioData.Jobs {
 		fields[0].Values = append(fields[0].Values, job.Jobname)
 		fields[1].Values = append(fields[1].Values, formatOrEmpty("%.0f", job.Read.LatNs.Mean/1000))
@@ -2006,7 +1999,6 @@ func storageBenchmarkTableValues(outputs map[string]script.ScriptOutput) []table
 		fields[5].Values = append(fields[5].Values, formatOrEmpty("%.0f", job.Write.IopsMean))
 		fields[6].Values = append(fields[6].Values, formatOrEmpty("%d", job.Write.Bw/1024))
 	}
-
 	return fields
 }
 
