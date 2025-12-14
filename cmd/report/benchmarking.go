@@ -122,7 +122,9 @@ func cpuSpeedFromOutput(outputs map[string]script.ScriptOutput) string {
 
 func storagePerfFromOutput(outputs map[string]script.ScriptOutput) (fioOutput, error) {
 	output := outputs[script.StorageBenchmarkScriptName].Stdout
-
+	if output == "" {
+		return fioOutput{}, fmt.Errorf("no output from storage benchmark")
+	}
 	if strings.Contains(output, "ERROR:") {
 		return fioOutput{}, fmt.Errorf("failed to run storage benchmark: %s", output)
 	}
@@ -134,8 +136,6 @@ func storagePerfFromOutput(outputs map[string]script.ScriptOutput) (fioOutput, e
 		slog.Info("fio output snip", "output", output[:outputLen], "stderr", outputs[script.StorageBenchmarkScriptName].Stderr)
 		return fioOutput{}, fmt.Errorf("unable to find fio output")
 	}
-
-	slog.Debug("parsing storage benchmark output")
 	var fioData fioOutput
 	if err := json.Unmarshal([]byte(output), &fioData); err != nil {
 		return fioOutput{}, fmt.Errorf("error unmarshalling JSON: %w", err)
@@ -143,7 +143,6 @@ func storagePerfFromOutput(outputs map[string]script.ScriptOutput) (fioOutput, e
 	if len(fioData.Jobs) == 0 {
 		return fioOutput{}, fmt.Errorf("no jobs found in storage benchmark output")
 	}
-
 	return fioData, nil
 }
 
