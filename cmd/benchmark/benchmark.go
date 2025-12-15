@@ -56,6 +56,8 @@ var (
 	flagNuma        bool
 	flagStorage     bool
 
+	flagNoSystemSummary bool
+
 	flagStorageDir string
 )
 
@@ -70,6 +72,8 @@ const (
 	flagMemoryName      = "memory"
 	flagNumaName        = "numa"
 	flagStorageName     = "storage"
+
+	flagNoSystemSummaryName = "no-summary"
 
 	flagStorageDirName = "storage-dir"
 )
@@ -95,6 +99,7 @@ func init() {
 	Cmd.Flags().StringVar(&common.FlagInput, common.FlagInputName, "", "")
 	Cmd.Flags().BoolVar(&flagAll, flagAllName, true, "")
 	Cmd.Flags().StringSliceVar(&common.FlagFormat, common.FlagFormatName, []string{report.FormatAll}, "")
+	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
 	Cmd.Flags().StringVar(&flagStorageDir, flagStorageDirName, "/tmp", "")
 
 	common.AddTargetFlags(Cmd)
@@ -146,6 +151,10 @@ func getFlagGroups() []common.FlagGroup {
 		Flags:     flags,
 	})
 	flags = []common.Flag{
+		{
+			Name: flagNoSystemSummaryName,
+			Help: "do not include system summary in output",
+		},
 		{
 			Name: flagStorageDirName,
 			Help: "existing directory where storage performance benchmark data will be temporarily stored",
@@ -210,7 +219,11 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 }
 
 func runCmd(cmd *cobra.Command, args []string) error {
-	tables := []table.TableDefinition{}
+	var tables []table.TableDefinition
+	// add system summary table if not disabled
+	if !flagNoSystemSummary {
+		tables = append(tables, common.TableDefinitions[common.BriefSysSummaryTableName])
+	}
 	// add benchmark tables
 	selectedBenchmarkCount := 0
 	for _, benchmark := range benchmarks {
