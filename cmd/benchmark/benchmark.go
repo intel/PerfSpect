@@ -35,6 +35,7 @@ var examples = []string{
 
 var Cmd = &cobra.Command{
 	Use:           cmdName,
+	Aliases:       []string{"bench"},
 	Short:         "Run performance benchmarks on target(s)",
 	Example:       strings.Join(examples, "\n"),
 	RunE:          runCmd,
