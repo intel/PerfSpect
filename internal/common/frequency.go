@@ -271,21 +271,8 @@ func ExpandTurboFrequencies(specFrequencyBuckets [][]string, isa string) ([]stri
 	return freqs, nil
 }
 
-// MaxFrequencyFromOutput gets max core frequency
-//
-//	1st option) /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq
-//	2nd option) from MSR/tpmi
-//	3rd option) from dmidecode "Max Speed"
+// MaxFrequencyFromOutput gets max core frequency from MSR/TPMI
 func MaxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
-	cmdout := strings.TrimSpace(outputs[script.MaximumFrequencyScriptName].Stdout)
-	if cmdout != "" {
-		freqf, err := strconv.ParseFloat(cmdout, 64)
-		if err == nil {
-			freqf = freqf / 1000000
-			return fmt.Sprintf("%.1fGHz", freqf)
-		}
-	}
-	// get the max frequency from the MSR/tpmi
 	specCoreFrequencies, err := GetSpecFrequencyBuckets(outputs)
 	if err == nil {
 		sseFreqs := GetSSEFreqsFromBuckets(specCoreFrequencies)
@@ -294,7 +281,7 @@ func MaxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 			return sseFreqs[0] + "GHz"
 		}
 	}
-	return ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "4", `Max Speed:\s(.*)`)
+	return ""
 }
 
 func GetSSEFreqsFromBuckets(buckets [][]string) []string {

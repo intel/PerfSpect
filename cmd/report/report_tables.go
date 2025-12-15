@@ -143,7 +143,6 @@ var tableDefinitions = map[string]table.TableDefinition{
 			script.LspciDevicesScriptName,
 			script.CpuidScriptName,
 			script.BaseFrequencyScriptName,
-			script.MaximumFrequencyScriptName,
 			script.SpecCoreFrequenciesScriptName,
 			script.PPINName,
 			script.L3CacheWayEnabledName,
