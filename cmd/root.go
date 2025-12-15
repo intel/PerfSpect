@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"perfspect/cmd/config"
-	"perfspect/cmd/flame"
+	"perfspect/cmd/flamegraph"
 	"perfspect/cmd/lock"
 	"perfspect/cmd/metrics"
 	"perfspect/cmd/report"
@@ -116,7 +116,7 @@ Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
 	rootCmd.AddCommand(report.Cmd)
 	rootCmd.AddCommand(metrics.Cmd)
 	rootCmd.AddCommand(telemetry.Cmd)
-	rootCmd.AddCommand(flame.Cmd)
+	rootCmd.AddCommand(flamegraph.Cmd)
 	rootCmd.AddCommand(lock.Cmd)
 	rootCmd.AddCommand(config.Cmd)
 	rootCmd.AddGroup([]*cobra.Group{{ID: "other", Title: "Other Commands:"}}...)

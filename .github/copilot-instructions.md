@@ -6,7 +6,7 @@ PerfSpect is a performance analysis tool for Linux systems written in Go. It pro
 - `metrics`: Collects CPU performance metrics using hardware performance counters
 - `report`: Generates system configuration and health (performance) from collected data
 - `telemetry`: Gathers system telemetry data
-- `flame`: Creates CPU flamegraphs
+- `flamegraph`: Creates CPU flamegraphs
 - `lock`: Analyzes lock contention
 - `config`: Modifies system configuration for performance tuning
 
@@ -15,7 +15,7 @@ The tool can target both local and remote systems via SSH.
 ## Project Structure
 
 - `main.go` - Application entry point
-- `cmd/` - Command implementations (metrics, report, telemetry, flame, lock, config)
+- `cmd/` - Command implementations (metrics, report, telemetry, flamegraph, lock, config)
 - `internal/` - Internal packages (common, cpus, progress, report, script, table, target, util)
 - `internal/common/` - Shared types, functions, and workflows for commands
 - `internal/target/` - Abstraction for local and remote target systems

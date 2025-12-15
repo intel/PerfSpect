@@ -4,9 +4,7 @@ package lock
 // SPDX-License-Identifier: BSD-3-Clause
 
 import (
-	htmltemplate "html/template"
 	"perfspect/internal/common"
-	"perfspect/internal/report"
 	"perfspect/internal/script"
 	"perfspect/internal/table"
 	"strings"
@@ -38,20 +36,4 @@ func kernelLockAnalysisTableValues(outputs map[string]script.ScriptOutput) []tab
 		{Name: "Perf Package Path", Values: []string{strings.TrimSpace(common.SectionValueFromOutput(outputs[script.ProfileKernelLockScriptName].Stdout, "perf_package_path"))}},
 	}
 	return fields
-}
-
-func kernelLockAnalysisHTMLRenderer(tableValues table.TableValues, targetName string) string {
-	values := [][]string{}
-	var tableValueStyles [][]string
-	for _, field := range tableValues.Fields {
-		rowValues := []string{}
-		rowValues = append(rowValues, field.Name)
-		rowValues = append(rowValues, htmltemplate.HTMLEscapeString(field.Values[0]))
-		values = append(values, rowValues)
-		rowStyles := []string{}
-		rowStyles = append(rowStyles, "font-weight:bold")
-		rowStyles = append(rowStyles, "white-space: pre-wrap")
-		tableValueStyles = append(tableValueStyles, rowStyles)
-	}
-	return report.RenderHTMLTable([]string{}, values, "pure-table pure-table-striped", tableValueStyles)
 }
