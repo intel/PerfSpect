@@ -25,7 +25,6 @@ const (
 	MemoryBenchmarkTableName      = "Memory Benchmark"
 	NUMABenchmarkTableName        = "NUMA Benchmark"
 	StorageBenchmarkTableName     = "Storage Benchmark"
-	SystemSummaryTableName        = "System Summary"
 )
 
 var tableDefinitions = map[string]table.TableDefinition{
@@ -97,15 +96,6 @@ var tableDefinitions = map[string]table.TableDefinition{
 			script.StorageBenchmarkScriptName,
 		},
 		FieldsFunc: storageBenchmarkTableValues},
-	SystemSummaryTableName: {
-		Name:      SystemSummaryTableName,
-		MenuLabel: SystemSummaryTableName,
-		HasRows:   false,
-		ScriptNames: []string{
-			script.LscpuScriptName,
-			script.UnameScriptName,
-		},
-		FieldsFunc: systemSummaryTableValues},
 }
 
 func speedBenchmarkTableValues(outputs map[string]script.ScriptOutput) []table.Field {
@@ -334,12 +324,4 @@ func storageBenchmarkTableValues(outputs map[string]script.ScriptOutput) []table
 		fields[6].Values = append(fields[6].Values, formatOrEmpty("%d", job.Write.Bw/1024))
 	}
 	return fields
-}
-
-func systemSummaryTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	lscpuOutput := outputs[script.LscpuScriptName].Stdout
-	return []table.Field{
-		{Name: "Microarchitecture", Values: []string{common.UarchFromOutput(outputs)}},
-		{Name: "Sockets", Values: []string{common.ValFromRegexSubmatch(lscpuOutput, `^Socket\(s\):\s*(.+)$`)}},
-	}
 }

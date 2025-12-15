@@ -81,7 +81,7 @@ const (
 
 var benchmarkSummaryTableName = "Benchmark Summary"
 
-var benchmarks = []common.Category{
+var categories = []common.Category{
 	{FlagName: flagSpeedName, FlagVar: &flagSpeed, DefaultValue: false, Help: "CPU speed benchmark", Tables: []table.TableDefinition{tableDefinitions[SpeedBenchmarkTableName]}},
 	{FlagName: flagPowerName, FlagVar: &flagPower, DefaultValue: false, Help: "power consumption benchmark", Tables: []table.TableDefinition{tableDefinitions[PowerBenchmarkTableName]}},
 	{FlagName: flagTemperatureName, FlagVar: &flagTemperature, DefaultValue: false, Help: "temperature benchmark", Tables: []table.TableDefinition{tableDefinitions[TemperatureBenchmarkTableName]}},
@@ -93,7 +93,7 @@ var benchmarks = []common.Category{
 
 func init() {
 	// set up benchmark flags
-	for _, benchmark := range benchmarks {
+	for _, benchmark := range categories {
 		Cmd.Flags().BoolVar(benchmark.FlagVar, benchmark.FlagName, benchmark.DefaultValue, benchmark.Help)
 	}
 	// set up other flags
@@ -141,7 +141,7 @@ func getFlagGroups() []common.FlagGroup {
 			Help: "run all benchmarks",
 		},
 	}
-	for _, benchmark := range benchmarks {
+	for _, benchmark := range categories {
 		flags = append(flags, common.Flag{
 			Name: benchmark.FlagName,
 			Help: benchmark.Help,
@@ -186,7 +186,7 @@ func getFlagGroups() []common.FlagGroup {
 func validateFlags(cmd *cobra.Command, args []string) error {
 	// clear flagAll if any benchmarks are selected
 	if flagAll {
-		for _, benchmark := range benchmarks {
+		for _, benchmark := range categories {
 			if benchmark.FlagVar != nil && *benchmark.FlagVar {
 				flagAll = false
 				break
@@ -227,7 +227,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 	// add benchmark tables
 	selectedBenchmarkCount := 0
-	for _, benchmark := range benchmarks {
+	for _, benchmark := range categories {
 		if *benchmark.FlagVar || flagAll {
 			tables = append(tables, benchmark.Tables...)
 			selectedBenchmarkCount++
@@ -235,7 +235,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 	// include benchmark summary table if all benchmarks are selected
 	var summaryFunc common.SummaryFunc
-	if selectedBenchmarkCount == len(benchmarks) {
+	if selectedBenchmarkCount == len(categories) {
 		summaryFunc = benchmarkSummaryFromTableValues
 	}
 
@@ -247,7 +247,6 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		SummaryTableName:       benchmarkSummaryTableName,
 		SummaryBeforeTableName: SpeedBenchmarkTableName,
 		InsightsFunc:           nil,
-		SystemSummaryTableName: SystemSummaryTableName,
 	}
 
 	report.RegisterHTMLRenderer(FrequencyBenchmarkTableName, frequencyBenchmarkTableHtmlRenderer)
@@ -313,8 +312,8 @@ func benchmarkSummaryFromTableValues(allTableValues []table.TableValues, outputs
 			{Name: "Minimum Power", Values: []string{getValueFromTableValues(getTableValues(allTableValues, PowerBenchmarkTableName), "Minimum Power", 0)}},
 			{Name: "Memory Peak Bandwidth", Values: []string{maxMemBW}},
 			{Name: "Memory Minimum Latency", Values: []string{minLatency}},
-			{Name: "Microarchitecture", Values: []string{getValueFromTableValues(getTableValues(allTableValues, SystemSummaryTableName), "Microarchitecture", 0)}},
-			{Name: "Sockets", Values: []string{getValueFromTableValues(getTableValues(allTableValues, SystemSummaryTableName), "Sockets", 0)}},
+			{Name: "Microarchitecture", Values: []string{common.UarchFromOutput(outputs)}},
+			{Name: "Sockets", Values: []string{common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)}},
 		},
 	}
 }
