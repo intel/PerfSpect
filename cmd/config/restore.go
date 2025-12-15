@@ -39,7 +39,7 @@ var restoreExamples = []string{
 
 var RestoreCmd = &cobra.Command{
 	Use:   restoreCmdName + " <file>",
-	Short: "Restore system configuration from a previously recorded file",
+	Short: "Restore system configuration from file",
 	Long: `Restores system configuration from a file that was previously recorded using the --record flag.
 
 The restore command will parse the configuration file, validate the settings against the target system,

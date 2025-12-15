@@ -44,7 +44,7 @@ var trimExamples = []string{
 
 var trimCmd = &cobra.Command{
 	Use:           trimCmdName,
-	Short:         "Generate new summary reports from existing metrics collection by filtering to a specific time range",
+	Short:         "Filter existing metrics to a time range",
 	Long:          "",
 	Example:       strings.Join(trimExamples, "\n"),
 	RunE:          runTrimCmd,

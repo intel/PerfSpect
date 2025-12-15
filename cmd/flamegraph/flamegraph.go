@@ -30,7 +30,7 @@ var examples = []string{
 var Cmd = &cobra.Command{
 	Use:           cmdName,
 	Aliases:       []string{"flame"},
-	Short:         "Generate flamegraphs from target(s)",
+	Short:         "Collect flamegraph data from target(s)",
 	Long:          "",
 	Example:       strings.Join(examples, "\n"),
 	RunE:          runCmd,

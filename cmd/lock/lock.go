@@ -31,7 +31,7 @@ var examples = []string{
 
 var Cmd = &cobra.Command{
 	Use:           cmdName,
-	Short:         "Collect system information for kernel lock analysis from target(s)",
+	Short:         "Collect kernel lock data from target(s)",
 	Long:          "",
 	Example:       strings.Join(examples, "\n"),
 	RunE:          runCmd,

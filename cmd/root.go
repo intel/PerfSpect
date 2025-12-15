@@ -46,7 +46,7 @@ const (
 
 var examples = []string{
 	fmt.Sprintf("  Generate a configuration report:                             $ %s report", common.AppName),
-	fmt.Sprintf("  Monitor micro-architectural metrics:                         $ %s metrics", common.AppName),
+	fmt.Sprintf("  Collect micro-architectural metrics:                         $ %s metrics", common.AppName),
 	fmt.Sprintf("  Generate a configuration report on a remote target:          $ %s report --target 192.168.1.2 --user elaine --key ~/.ssh/id_rsa", common.AppName),
 	fmt.Sprintf("  Generate configuration reports for multiple remote targets:  $ %s report --targets ./targets.yaml", common.AppName),
 }
