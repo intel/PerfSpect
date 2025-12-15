@@ -4,7 +4,8 @@
 
 PerfSpect is a performance analysis tool for Linux systems written in Go. It provides several commands:
 - `metrics`: Collects CPU performance metrics using hardware performance counters
-- `report`: Generates system configuration and health (performance) from collected data
+- `report`: Generates system configuration and health reports from collected data
+- `benchmark`: Runs performance micro-benchmarks to evaluate system health
 - `telemetry`: Gathers system telemetry data
 - `flame`: Creates CPU flamegraphs
 - `lock`: Analyzes lock contention
