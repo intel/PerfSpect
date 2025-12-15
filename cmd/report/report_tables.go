@@ -1808,4 +1808,3 @@ func dimmTableHTMLRenderer(tableValues table.TableValues, targetName string) str
 	}
 	return report.RenderHTMLTable(socketTableHeaders, socketTableValues, "pure-table pure-table-bordered", [][]string{})
 }
-
