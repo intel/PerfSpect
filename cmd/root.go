@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"perfspect/cmd/config"
-	"perfspect/cmd/flame"
+	"perfspect/cmd/flamegraph"
 	"perfspect/cmd/lock"
 	"perfspect/cmd/metrics"
 	"perfspect/cmd/report"
@@ -46,7 +46,7 @@ const (
 
 var examples = []string{
 	fmt.Sprintf("  Generate a configuration report:                             $ %s report", common.AppName),
-	fmt.Sprintf("  Monitor micro-architectural metrics:                         $ %s metrics", common.AppName),
+	fmt.Sprintf("  Collect micro-architectural metrics:                         $ %s metrics", common.AppName),
 	fmt.Sprintf("  Generate a configuration report on a remote target:          $ %s report --target 192.168.1.2 --user elaine --key ~/.ssh/id_rsa", common.AppName),
 	fmt.Sprintf("  Generate configuration reports for multiple remote targets:  $ %s report --targets ./targets.yaml", common.AppName),
 }
@@ -116,7 +116,7 @@ Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
 	rootCmd.AddCommand(report.Cmd)
 	rootCmd.AddCommand(metrics.Cmd)
 	rootCmd.AddCommand(telemetry.Cmd)
-	rootCmd.AddCommand(flame.Cmd)
+	rootCmd.AddCommand(flamegraph.Cmd)
 	rootCmd.AddCommand(lock.Cmd)
 	rootCmd.AddCommand(config.Cmd)
 	rootCmd.AddGroup([]*cobra.Group{{ID: "other", Title: "Other Commands:"}}...)

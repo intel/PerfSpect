@@ -37,7 +37,7 @@ var examples = []string{
 
 var Cmd = &cobra.Command{
 	Use:           cmdName,
-	Short:         "Generate configuration report for target(s)",
+	Short:         "Collect configuration data from target(s)",
 	Example:       strings.Join(examples, "\n"),
 	RunE:          runCmd,
 	PreRunE:       validateFlags,

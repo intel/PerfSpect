@@ -1,5 +1,5 @@
-// Package flame is a subcommand of the root command. It is used to generate flamegraphs from target(s).
-package flame
+// Package flamegraph is a subcommand of the root command. It is used to generate flamegraphs from target(s).
+package flamegraph
 
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
@@ -19,7 +19,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-const cmdName = "flame"
+const cmdName = "flamegraph"
 
 var examples = []string{
 	fmt.Sprintf("  Flamegraph from local host:       $ %s %s", common.AppName, cmdName),
@@ -29,7 +29,8 @@ var examples = []string{
 
 var Cmd = &cobra.Command{
 	Use:           cmdName,
-	Short:         "Generate flamegraphs from target(s)",
+	Aliases:       []string{"flame"},
+	Short:         "Collect flamegraph data from target(s)",
 	Long:          "",
 	Example:       strings.Join(examples, "\n"),
 	RunE:          runCmd,

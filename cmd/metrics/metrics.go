@@ -1,4 +1,4 @@
-// Package metrics is a subcommand of the root command. It provides functionality to monitor core and uncore metrics on one target.
+// Package metrics is a subcommand of the root command. It provides functionality to collect performance metrics from target(s).
 package metrics
 
 // Copyright (C) 2021-2025 Intel Corporation
@@ -51,7 +51,7 @@ var examples = []string{
 
 var Cmd = &cobra.Command{
 	Use:           cmdName,
-	Short:         "Monitor core and uncore metrics from one target",
+	Short:         "Collect performance metrics from target(s)",
 	Long:          "",
 	Example:       strings.Join(examples, "\n"),
 	RunE:          runCmd,

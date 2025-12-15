@@ -27,7 +27,7 @@ Usage:
 | [`metrics`](#metrics-command) | CPU core and uncore metrics |
 | [`report`](#report-command) | System configuration and health |
 | [`telemetry`](#telemetry-command) | System telemetry |
-| [`flame`](#flame-command) | Software call-stacks as flamegraphs |
+| [`flamegraph`](#flamegraph-command) | Software call-stacks as flamegraphs |
 | [`lock`](#lock-command) | Software hot spot, cache-to-cache and lock contention |
 | [`config`](#config-command) | Modify system configuration |
 
@@ -109,10 +109,10 @@ The `telemetry` command reports CPU utilization, instruction mix, disk stats, ne
 
 ![screenshot of the CPU utilization chart from the HTML output of the telemetry command](docs/telemetry_html.png)
 
-#### Flame Command
-Software flamegraphs are useful in diagnosing software performance bottlenecks. Run `perfspect flame` to capture a system-wide software flamegraph.
+#### Flamegraph Command
+Software flamegraphs are useful in diagnosing software performance bottlenecks. Run `perfspect flamegraph` to capture a system-wide software flamegraph.
 
-![screenshot of a flame graph from the HTML output of the flame command](docs/flamegraph.png)
+![screenshot of a flamegraph from the HTML output of the flamegraph command](docs/flamegraph.png)
 
 #### Lock Command
 As systems contain more and more cores, it can be useful to analyze the Linux kernel lock overhead and potential false-sharing that impacts system scalability. Run `perfspect lock` to collect system-wide hot spot, cache-to-cache and lock contention information. Experienced performance engineers can analyze the collected information to identify bottlenecks.

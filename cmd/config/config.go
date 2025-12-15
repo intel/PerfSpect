@@ -36,7 +36,7 @@ var examples = []string{
 
 var Cmd = &cobra.Command{
 	Use:   cmdName,
-	Short: "Modify target(s) system configuration",
+	Short: "Modify system configuration on target(s)",
 	Long: `Sets system configuration items on target platform(s).
 
 USE CAUTION! Target may become unstable. It is up to the user to ensure that the requested configuration is valid for the target. There is not an automated way to revert the configuration changes. If all else fails, reboot the target.`,
