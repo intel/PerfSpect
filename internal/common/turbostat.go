@@ -240,6 +240,11 @@ func MaxTotalPackagePowerFromOutput(turbostatOutput string) string {
 				slog.Warn("unable to parse power value", slog.String("value", wattStr), slog.String("error", err.Error()))
 				continue
 			}
+			// Filter out anomalous high readings. Turbostat sometimes reports very high power values that are not realistic.
+			if watt > 10000 {
+				slog.Warn("ignoring anomalous high power reading", slog.String("value", wattStr))
+				continue
+			}
 			if watt > maxPower {
 				maxPower = watt
 			}
@@ -314,6 +319,11 @@ func MaxPackageTemperatureFromOutput(turbostatOutput string) string {
 			temp, err := strconv.ParseFloat(strings.TrimSpace(tempStr), 64)
 			if err != nil {
 				slog.Warn("unable to parse temperature value", slog.String("value", tempStr), slog.String("error", err.Error()))
+				continue
+			}
+			// Filter out anomalous high readings. Turbostat sometimes reports very high temperature values that are not realistic.
+			if temp > 200 {
+				slog.Warn("ignoring anomalous high temperature reading", slog.String("value", tempStr))
 				continue
 			}
 			if temp > maxTemp {
