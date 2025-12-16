@@ -23,7 +23,6 @@ var TableDefinitions = map[string]table.TableDefinition{
 			script.LscpuCacheScriptName,
 			script.LspciBitsScriptName,
 			script.LspciDevicesScriptName,
-			script.MaximumFrequencyScriptName,
 			script.SpecCoreFrequenciesScriptName,
 			script.MeminfoScriptName,
 			script.NicInfoScriptName,

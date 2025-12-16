@@ -49,7 +49,6 @@ const (
 	OpensslVersionScriptName         = "openssl version"
 	CpuidScriptName                  = "cpuid"
 	BaseFrequencyScriptName          = "base frequency"
-	MaximumFrequencyScriptName       = "maximum frequency"
 	ScalingDriverScriptName          = "scaling driver"
 	ScalingGovernorScriptName        = "scaling governor"
 	CstatesScriptName                = "c-states"
@@ -256,10 +255,6 @@ var scriptDefinitions = map[string]ScriptDefinition{
 	BaseFrequencyScriptName: {
 		Name:           BaseFrequencyScriptName,
 		ScriptTemplate: "cat /sys/devices/system/cpu/cpu0/cpufreq/base_frequency",
-	},
-	MaximumFrequencyScriptName: {
-		Name:           MaximumFrequencyScriptName,
-		ScriptTemplate: "cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq",
 	},
 	ScalingDriverScriptName: {
 		Name:           ScalingDriverScriptName,
