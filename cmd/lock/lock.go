@@ -195,7 +195,7 @@ func pullDataFiles(appContext common.AppContext, scriptOutputs map[string]script
 func runCmd(cmd *cobra.Command, args []string) error {
 	var tables []table.TableDefinition
 	if !flagNoSystemSummary {
-		tables = append(tables, common.TableDefinitions[common.BriefSysSummaryTableName])
+		tables = append(tables, common.TableDefinitions[common.SystemSummaryTableName])
 	}
 	tables = append(tables, tableDefinitions[KernelLockAnalysisTableName])
 	reportingCommand := common.ReportingCommand{

@@ -223,7 +223,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	var tables []table.TableDefinition
 	// add system summary table if not disabled
 	if !flagNoSystemSummary {
-		tables = append(tables, common.TableDefinitions[common.BriefSysSummaryTableName])
+		tables = append(tables, common.TableDefinitions[common.SystemSummaryTableName])
 	}
 	// add benchmark tables
 	selectedBenchmarkCount := 0
