@@ -13,85 +13,16 @@ import (
 	"strings"
 )
 
-const (
-	BankLocatorIdx = iota
-	LocatorIdx
-	ManufacturerIdx
-	PartIdx
-	SerialIdx
-	SizeIdx
-	TypeIdx
-	DetailIdx
-	SpeedIdx
-	RankIdx
-	ConfiguredSpeedIdx
-	DerivedSocketIdx
-	DerivedChannelIdx
-	DerivedSlotIdx
-)
-
-func dimmInfoFromDmiDecode(dmiDecodeOutput string) [][]string {
-	return common.ValsArrayFromDmiDecodeRegexSubmatch(
-		dmiDecodeOutput,
-		"17",
-		`^Bank Locator:\s*(.+?)$`,
-		`^Locator:\s*(.+?)$`,
-		`^Manufacturer:\s*(.+?)$`,
-		`^Part Number:\s*(.+?)\s*$`,
-		`^Serial Number:\s*(.+?)\s*$`,
-		`^Size:\s*(.+?)$`,
-		`^Type:\s*(.+?)$`,
-		`^Type Detail:\s*(.+?)$`,
-		`^Speed:\s*(.+?)$`,
-		`^Rank:\s*(.+?)$`,
-		`^Configured.*Speed:\s*(.+?)$`,
-	)
-}
-
-func installedMemoryFromOutput(outputs map[string]script.ScriptOutput) string {
-	dimmInfo := dimmInfoFromDmiDecode(outputs[script.DmidecodeScriptName].Stdout)
-	dimmTypeCount := make(map[string]int)
-	for _, dimm := range dimmInfo {
-		dimmKey := dimm[TypeIdx] + ":" + dimm[SizeIdx] + ":" + dimm[SpeedIdx] + ":" + dimm[ConfiguredSpeedIdx]
-		if count, ok := dimmTypeCount[dimmKey]; ok {
-			dimmTypeCount[dimmKey] = count + 1
-		} else {
-			dimmTypeCount[dimmKey] = 1
-		}
-	}
-	var summaries []string
-	re := regexp.MustCompile(`(\d+)\s*(\w*)`)
-	for dimmKey, count := range dimmTypeCount {
-		fields := strings.Split(dimmKey, ":")
-		match := re.FindStringSubmatch(fields[1]) // size field
-		if match != nil {
-			size, err := strconv.Atoi(match[1])
-			if err != nil {
-				slog.Warn("Don't recognize DIMM size format.", slog.String("field", fields[1]))
-				return ""
-			}
-			sum := count * size
-			unit := match[2]
-			dimmType := fields[0]
-			speed := strings.ReplaceAll(fields[2], " ", "")
-			configuredSpeed := strings.ReplaceAll(fields[3], " ", "")
-			summary := fmt.Sprintf("%d%s (%dx%d%s %s %s [%s])", sum, unit, count, size, unit, dimmType, speed, configuredSpeed)
-			summaries = append(summaries, summary)
-		}
-	}
-	return strings.Join(summaries, "; ")
-}
-
 func populatedChannelsFromOutput(outputs map[string]script.ScriptOutput) string {
 	channelsMap := make(map[string]bool)
-	dimmInfo := dimmInfoFromDmiDecode(outputs[script.DmidecodeScriptName].Stdout)
+	dimmInfo := common.DimmInfoFromDmiDecode(outputs[script.DmidecodeScriptName].Stdout)
 	derivedDimmFields := derivedDimmsFieldFromOutput(outputs)
 	if len(derivedDimmFields) != len(dimmInfo) {
 		slog.Warn("derivedDimmFields and dimmInfo have different lengths", slog.Int("derivedDimmFields", len(derivedDimmFields)), slog.Int("dimmInfo", len(dimmInfo)))
 		return ""
 	}
 	for i, dimm := range dimmInfo {
-		if !strings.Contains(dimm[SizeIdx], "No") {
+		if !strings.Contains(dimm[common.SizeIdx], "No") {
 			channelsMap[derivedDimmFields[i].socket+","+derivedDimmFields[i].channel] = true
 		}
 	}
@@ -109,7 +40,7 @@ type derivedFields struct {
 
 // derivedDimmsFieldFromOutput returns a slice of derived fields from the output of a script.
 func derivedDimmsFieldFromOutput(outputs map[string]script.ScriptOutput) []derivedFields {
-	dimmInfo := dimmInfoFromDmiDecode(outputs[script.DmidecodeScriptName].Stdout)
+	dimmInfo := common.DimmInfoFromDmiDecode(outputs[script.DmidecodeScriptName].Stdout)
 	var derivedFields []derivedFields
 	var err error
 	channels := channelsFromOutput(outputs)
@@ -159,11 +90,11 @@ func deriveDIMMInfoDell(dimms [][]string, channelsPerSocket int) ([]derivedField
 	derivedFields := make([]derivedFields, len(dimms))
 	re := regexp.MustCompile(`([ABCD])([1-9]\d*)`)
 	for i, dimm := range dimms {
-		if !strings.Contains(dimm[BankLocatorIdx], "Not Specified") {
+		if !strings.Contains(dimm[common.BankLocatorIdx], "Not Specified") {
 			err := fmt.Errorf("doesn't conform to expected Dell Bank Locator format")
 			return nil, err
 		}
-		match := re.FindStringSubmatch(dimm[LocatorIdx])
+		match := re.FindStringSubmatch(dimm[common.LocatorIdx])
 		if match == nil {
 			err := fmt.Errorf("doesn't conform to expected Dell Locator format")
 			return nil, err
@@ -223,8 +154,8 @@ func deriveDIMMInfoEC2(dimms [][]string, channelsPerSocket int) ([]derivedFields
 	c6ilocRe := regexp.MustCompile(`CPU(\d+)\s+Channel(\d+)\s+DIMM(\d+)`)
 	for i, dimm := range dimms {
 		// try c5.metal format
-		bankLocMatch := c5bankLocRe.FindStringSubmatch(dimm[BankLocatorIdx])
-		locMatch := c5locRe.FindStringSubmatch(dimm[LocatorIdx])
+		bankLocMatch := c5bankLocRe.FindStringSubmatch(dimm[common.BankLocatorIdx])
+		locMatch := c5locRe.FindStringSubmatch(dimm[common.LocatorIdx])
 		if locMatch != nil && bankLocMatch != nil {
 			var socket, channel, slot int
 			socket, _ = strconv.Atoi(bankLocMatch[1])
@@ -244,8 +175,8 @@ func deriveDIMMInfoEC2(dimms [][]string, channelsPerSocket int) ([]derivedFields
 			continue
 		}
 		// try c6i.metal format
-		bankLocMatch = c6ibankLocRe.FindStringSubmatch(dimm[BankLocatorIdx])
-		locMatch = c6ilocRe.FindStringSubmatch(dimm[LocatorIdx])
+		bankLocMatch = c6ibankLocRe.FindStringSubmatch(dimm[common.BankLocatorIdx])
+		locMatch = c6ilocRe.FindStringSubmatch(dimm[common.LocatorIdx])
 		if locMatch != nil && bankLocMatch != nil {
 			var socket, channel, slot int
 			socket, _ = strconv.Atoi(locMatch[1])
@@ -271,13 +202,13 @@ func deriveDIMMInfoHPE(dimms [][]string, numSockets int, channelsPerSocket int) 
 	slotsPerChannel := len(dimms) / (numSockets * channelsPerSocket)
 	re := regexp.MustCompile(`PROC ([1-9]\d*) DIMM ([1-9]\d*)`)
 	for i, dimm := range dimms {
-		if !strings.Contains(dimm[BankLocatorIdx], "Not Specified") {
-			err := fmt.Errorf("doesn't conform to expected HPE Bank Locator format: %s", dimm[BankLocatorIdx])
+		if !strings.Contains(dimm[common.BankLocatorIdx], "Not Specified") {
+			err := fmt.Errorf("doesn't conform to expected HPE Bank Locator format: %s", dimm[common.BankLocatorIdx])
 			return nil, err
 		}
-		match := re.FindStringSubmatch(dimm[LocatorIdx])
+		match := re.FindStringSubmatch(dimm[common.LocatorIdx])
 		if match == nil {
-			err := fmt.Errorf("doesn't conform to expected HPE Locator format: %s", dimm[LocatorIdx])
+			err := fmt.Errorf("doesn't conform to expected HPE Locator format: %s", dimm[common.LocatorIdx])
 			return nil, err
 		}
 		socket, err := strconv.Atoi(match[1])
@@ -625,18 +556,18 @@ func deriveDIMMInfoOther(dimms [][]string, channelsPerSocket int) ([]derivedFiel
 		err := fmt.Errorf("no DIMMs")
 		return nil, err
 	}
-	if len(dimms[0]) <= max(BankLocatorIdx, LocatorIdx) {
+	if len(dimms[0]) <= max(common.BankLocatorIdx, common.LocatorIdx) {
 		err := fmt.Errorf("DIMM data has insufficient fields")
 		return nil, err
 	}
-	dimmType, reBankLoc, reLoc := getDIMMParseInfo(dimms[0][BankLocatorIdx], dimms[0][LocatorIdx])
+	dimmType, reBankLoc, reLoc := getDIMMParseInfo(dimms[0][common.BankLocatorIdx], dimms[0][common.LocatorIdx])
 	if dimmType == DIMMTypeUNKNOWN {
 		err := fmt.Errorf("unknown DIMM identification format")
 		return nil, err
 	}
 	for i, dimm := range dimms {
 		var socket, slot int
-		socket, slot, err := getDIMMSocketSlot(dimmType, reBankLoc, reLoc, dimm[BankLocatorIdx], dimm[LocatorIdx])
+		socket, slot, err := getDIMMSocketSlot(dimmType, reBankLoc, reLoc, dimm[common.BankLocatorIdx], dimm[common.LocatorIdx])
 		if err != nil {
 			slog.Info("Couldn't extract socket and slot from DIMM info", slog.String("error", err.Error()))
 			return nil, nil

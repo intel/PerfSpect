@@ -289,3 +289,72 @@ func TDPFromOutput(outputs map[string]script.ScriptOutput) string {
 	}
 	return fmt.Sprint(msr/8) + "W"
 }
+
+const (
+	BankLocatorIdx = iota
+	LocatorIdx
+	ManufacturerIdx
+	PartIdx
+	SerialIdx
+	SizeIdx
+	TypeIdx
+	DetailIdx
+	SpeedIdx
+	RankIdx
+	ConfiguredSpeedIdx
+	DerivedSocketIdx
+	DerivedChannelIdx
+	DerivedSlotIdx
+)
+
+func DimmInfoFromDmiDecode(dmiDecodeOutput string) [][]string {
+	return ValsArrayFromDmiDecodeRegexSubmatch(
+		dmiDecodeOutput,
+		"17",
+		`^Bank Locator:\s*(.+?)$`,
+		`^Locator:\s*(.+?)$`,
+		`^Manufacturer:\s*(.+?)$`,
+		`^Part Number:\s*(.+?)\s*$`,
+		`^Serial Number:\s*(.+?)\s*$`,
+		`^Size:\s*(.+?)$`,
+		`^Type:\s*(.+?)$`,
+		`^Type Detail:\s*(.+?)$`,
+		`^Speed:\s*(.+?)$`,
+		`^Rank:\s*(.+?)$`,
+		`^Configured.*Speed:\s*(.+?)$`,
+	)
+}
+
+func InstalledMemoryFromOutput(outputs map[string]script.ScriptOutput) string {
+	dimmInfo := DimmInfoFromDmiDecode(outputs[script.DmidecodeScriptName].Stdout)
+	dimmTypeCount := make(map[string]int)
+	for _, dimm := range dimmInfo {
+		dimmKey := dimm[TypeIdx] + ":" + dimm[SizeIdx] + ":" + dimm[SpeedIdx] + ":" + dimm[ConfiguredSpeedIdx]
+		if count, ok := dimmTypeCount[dimmKey]; ok {
+			dimmTypeCount[dimmKey] = count + 1
+		} else {
+			dimmTypeCount[dimmKey] = 1
+		}
+	}
+	var summaries []string
+	re := regexp.MustCompile(`(\d+)\s*(\w*)`)
+	for dimmKey, count := range dimmTypeCount {
+		fields := strings.Split(dimmKey, ":")
+		match := re.FindStringSubmatch(fields[1]) // size field
+		if match != nil {
+			size, err := strconv.Atoi(match[1])
+			if err != nil {
+				slog.Warn("Don't recognize DIMM size format.", slog.String("field", fields[1]))
+				return ""
+			}
+			sum := count * size
+			unit := match[2]
+			dimmType := fields[0]
+			speed := strings.ReplaceAll(fields[2], " ", "")
+			configuredSpeed := strings.ReplaceAll(fields[3], " ", "")
+			summary := fmt.Sprintf("%d%s (%dx%d%s %s %s [%s])", sum, unit, count, size, unit, dimmType, speed, configuredSpeed)
+			summaries = append(summaries, summary)
+		}
+	}
+	return strings.Join(summaries, "; ")
+}

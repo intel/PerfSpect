@@ -994,7 +994,7 @@ func sstTFLPTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 
 func memoryTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	return []table.Field{
-		{Name: "Installed Memory", Values: []string{installedMemoryFromOutput(outputs)}},
+		{Name: "Installed Memory", Values: []string{common.InstalledMemoryFromOutput(outputs)}},
 		{Name: "MemTotal", Values: []string{common.ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^MemTotal:\s*(.+?)$`)}},
 		{Name: "MemFree", Values: []string{common.ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^MemFree:\s*(.+?)$`)}},
 		{Name: "MemAvailable", Values: []string{common.ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^MemAvailable:\s*(.+?)$`)}},
@@ -1670,7 +1670,7 @@ func systemSummaryTableValues(outputs map[string]script.ScriptOutput) []table.Fi
 		{Name: "Prefetchers", Values: []string{common.PrefetchersSummaryFromOutput(outputs)}},
 		{Name: "PPINs", Values: []string{ppinsFromOutput(outputs)}},
 		{Name: "Accelerators Available [used]", Values: []string{acceleratorSummaryFromOutput(outputs)}},
-		{Name: "Installed Memory", Values: []string{installedMemoryFromOutput(outputs)}},
+		{Name: "Installed Memory", Values: []string{common.InstalledMemoryFromOutput(outputs)}},
 		{Name: "Hugepagesize", Values: []string{common.ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^Hugepagesize:\s*(.+?)$`)}},
 		{Name: "Transparent Huge Pages", Values: []string{common.ValFromRegexSubmatch(outputs[script.TransparentHugePagesScriptName].Stdout, `.*\[(.*)\].*`)}},
 		{Name: "Automatic NUMA Balancing", Values: []string{numaBalancingFromOutput(outputs)}},
@@ -1691,57 +1691,57 @@ func systemSummaryTableValues(outputs map[string]script.ScriptOutput) []table.Fi
 	}
 }
 func dimmDetails(dimm []string) (details string) {
-	if strings.Contains(dimm[SizeIdx], "No") {
+	if strings.Contains(dimm[common.SizeIdx], "No") {
 		details = "No Module Installed"
 	} else {
 		// Intel PMEM modules may have serial number appended to end of part number...
 		// strip that off so it doesn't mess with color selection later
-		partNumber := dimm[PartIdx]
-		if strings.Contains(dimm[DetailIdx], "Synchronous Non-Volatile") &&
-			dimm[ManufacturerIdx] == "Intel" &&
-			strings.HasSuffix(dimm[PartIdx], dimm[SerialIdx]) {
-			partNumber = dimm[PartIdx][:len(dimm[PartIdx])-len(dimm[SerialIdx])]
+		partNumber := dimm[common.PartIdx]
+		if strings.Contains(dimm[common.DetailIdx], "Synchronous Non-Volatile") &&
+			dimm[common.ManufacturerIdx] == "Intel" &&
+			strings.HasSuffix(dimm[common.PartIdx], dimm[common.SerialIdx]) {
+			partNumber = dimm[common.PartIdx][:len(dimm[common.PartIdx])-len(dimm[common.SerialIdx])]
 		}
 		// example: "64GB DDR5 R2 Synchronous Registered (Buffered) Micron Technology MTC78ASF4G72PZ-2G6E1 6400 MT/s [6000 MT/s]"
 		details = fmt.Sprintf("%s %s %s R%s %s %s %s [%s]",
-			strings.ReplaceAll(dimm[SizeIdx], " ", ""),
-			dimm[TypeIdx],
-			dimm[DetailIdx],
-			dimm[RankIdx],
-			dimm[ManufacturerIdx],
+			strings.ReplaceAll(dimm[common.SizeIdx], " ", ""),
+			dimm[common.TypeIdx],
+			dimm[common.DetailIdx],
+			dimm[common.RankIdx],
+			dimm[common.ManufacturerIdx],
 			partNumber,
-			strings.ReplaceAll(dimm[SpeedIdx], " ", ""),
-			strings.ReplaceAll(dimm[ConfiguredSpeedIdx], " ", ""))
+			strings.ReplaceAll(dimm[common.SpeedIdx], " ", ""),
+			strings.ReplaceAll(dimm[common.ConfiguredSpeedIdx], " ", ""))
 	}
 	return
 }
 
 func dimmTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
-	if len(tableValues.Fields) <= max(DerivedSocketIdx, DerivedChannelIdx, DerivedSlotIdx) ||
-		len(tableValues.Fields[DerivedSocketIdx].Values) == 0 ||
-		len(tableValues.Fields[DerivedChannelIdx].Values) == 0 ||
-		len(tableValues.Fields[DerivedSlotIdx].Values) == 0 ||
-		tableValues.Fields[DerivedSocketIdx].Values[0] == "" ||
-		tableValues.Fields[DerivedChannelIdx].Values[0] == "" ||
-		tableValues.Fields[DerivedSlotIdx].Values[0] == "" {
+	if len(tableValues.Fields) <= max(common.DerivedSocketIdx, common.DerivedChannelIdx, common.DerivedSlotIdx) ||
+		len(tableValues.Fields[common.DerivedSocketIdx].Values) == 0 ||
+		len(tableValues.Fields[common.DerivedChannelIdx].Values) == 0 ||
+		len(tableValues.Fields[common.DerivedSlotIdx].Values) == 0 ||
+		tableValues.Fields[common.DerivedSocketIdx].Values[0] == "" ||
+		tableValues.Fields[common.DerivedChannelIdx].Values[0] == "" ||
+		tableValues.Fields[common.DerivedSlotIdx].Values[0] == "" {
 		return report.DefaultHTMLTableRendererFunc(tableValues)
 	}
 	htmlColors := []string{"lightgreen", "orange", "aqua", "lime", "yellow", "beige", "magenta", "violet", "salmon", "pink"}
 	var slotColorIndices = make(map[string]int)
 	// socket -> channel -> slot -> dimm details
 	var dimms = map[string]map[string]map[string]string{}
-	for dimmIdx := range tableValues.Fields[DerivedSocketIdx].Values {
-		if _, ok := dimms[tableValues.Fields[DerivedSocketIdx].Values[dimmIdx]]; !ok {
-			dimms[tableValues.Fields[DerivedSocketIdx].Values[dimmIdx]] = make(map[string]map[string]string)
+	for dimmIdx := range tableValues.Fields[common.DerivedSocketIdx].Values {
+		if _, ok := dimms[tableValues.Fields[common.DerivedSocketIdx].Values[dimmIdx]]; !ok {
+			dimms[tableValues.Fields[common.DerivedSocketIdx].Values[dimmIdx]] = make(map[string]map[string]string)
 		}
-		if _, ok := dimms[tableValues.Fields[DerivedSocketIdx].Values[dimmIdx]][tableValues.Fields[DerivedChannelIdx].Values[dimmIdx]]; !ok {
-			dimms[tableValues.Fields[DerivedSocketIdx].Values[dimmIdx]][tableValues.Fields[DerivedChannelIdx].Values[dimmIdx]] = make(map[string]string)
+		if _, ok := dimms[tableValues.Fields[common.DerivedSocketIdx].Values[dimmIdx]][tableValues.Fields[common.DerivedChannelIdx].Values[dimmIdx]]; !ok {
+			dimms[tableValues.Fields[common.DerivedSocketIdx].Values[dimmIdx]][tableValues.Fields[common.DerivedChannelIdx].Values[dimmIdx]] = make(map[string]string)
 		}
 		dimmValues := []string{}
 		for _, field := range tableValues.Fields {
 			dimmValues = append(dimmValues, field.Values[dimmIdx])
 		}
-		dimms[tableValues.Fields[DerivedSocketIdx].Values[dimmIdx]][tableValues.Fields[DerivedChannelIdx].Values[dimmIdx]][tableValues.Fields[DerivedSlotIdx].Values[dimmIdx]] = dimmDetails(dimmValues)
+		dimms[tableValues.Fields[common.DerivedSocketIdx].Values[dimmIdx]][tableValues.Fields[common.DerivedChannelIdx].Values[dimmIdx]][tableValues.Fields[common.DerivedSlotIdx].Values[dimmIdx]] = dimmDetails(dimmValues)
 	}
 
 	var socketTableHeaders = []string{"Socket", ""}
