@@ -65,7 +65,7 @@ func systemSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 		turboOnOff = "?"
 	}
 	// memory
-	installedMem = installedMemoryFromOutput(outputs)
+	installedMem = common.InstalledMemoryFromOutput(outputs)
 	// BIOS
 	biosVersion = common.ValFromRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, `^Version:\s*(.+?)$`)
 	// microcode

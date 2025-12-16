@@ -38,11 +38,16 @@ var TableDefinitions = map[string]table.TableDefinition{
 			script.ArmImplementerScriptName,
 			script.ArmPartScriptName,
 			script.ArmDmidecodePartScriptName,
+			script.DmidecodeScriptName,
 		},
 		FieldsFunc: briefSummaryTableValues},
 }
 
 func briefSummaryTableValues(outputs map[string]script.ScriptOutput) []table.Field {
+	memory := InstalledMemoryFromOutput(outputs) // Dmidecode, try this first
+	if memory == "" {
+		memory = ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^MemTotal:\s*(.+?)$`) // Meminfo as fallback
+	}
 	return []table.Field{
 		{Name: "Host Name", Values: []string{strings.TrimSpace(outputs[script.HostnameScriptName].Stdout)}},                                                                                   // Hostname
 		{Name: "Time", Values: []string{strings.TrimSpace(outputs[script.DateScriptName].Stdout)}},                                                                                            // Date
@@ -61,7 +66,7 @@ func briefSummaryTableValues(outputs map[string]script.ScriptOutput) []table.Fie
 		{Name: "All-core Maximum Frequency", Values: []string{AllCoreMaxFrequencyFromOutput(outputs)}, Description: "The highest speed all cores can reach simultaneously with Turbo Boost."}, // Lscpu, LspciBits, LspciDevices, SpecCoreFrequencies
 		{Name: "Energy Performance Bias", Values: []string{EPBFromOutput(outputs)}},                                                                                                           // EpbSource, EpbBIOS, EpbOS
 		{Name: "Efficiency Latency Control", Values: []string{ELCSummaryFromOutput(outputs)}},                                                                                                 // Elc
-		{Name: "MemTotal", Values: []string{ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^MemTotal:\s*(.+?)$`)}},                                                           // Meminfo
+		{Name: "Memory", Values: []string{memory}},                                                                                                                                            // Dmidecode,Meminfo
 		{Name: "NIC", Values: []string{NICSummaryFromOutput(outputs)}},                                                                                                                        // Lshw, NicInfo
 		{Name: "Disk", Values: []string{DiskSummaryFromOutput(outputs)}},                                                                                                                      // DiskInfo, Hdparm
 		{Name: "OS", Values: []string{OperatingSystemFromOutput(outputs)}},                                                                                                                    // EtcRelease
