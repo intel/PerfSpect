@@ -22,6 +22,7 @@ import (
 	"syscall"
 	"time"
 
+	"perfspect/cmd/benchmark"
 	"perfspect/cmd/config"
 	"perfspect/cmd/flamegraph"
 	"perfspect/cmd/lock"
@@ -114,6 +115,7 @@ Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 	rootCmd.AddGroup([]*cobra.Group{{ID: "primary", Title: "Commands:"}}...)
 	rootCmd.AddCommand(report.Cmd)
+	rootCmd.AddCommand(benchmark.Cmd)
 	rootCmd.AddCommand(metrics.Cmd)
 	rootCmd.AddCommand(telemetry.Cmd)
 	rootCmd.AddCommand(flamegraph.Cmd)

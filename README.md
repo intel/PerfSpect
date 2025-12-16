@@ -26,6 +26,7 @@ Usage:
 | ------- | ----------- |
 | [`metrics`](#metrics-command) | CPU core and uncore metrics |
 | [`report`](#report-command) | System configuration and health |
+| [`benchmark`](#benchmark-command) | Performance benchmarks |
 | [`telemetry`](#telemetry-command) | System telemetry |
 | [`flamegraph`](#flamegraph-command) | Software call-stacks as flamegraphs |
 | [`lock`](#lock-command) | Software hot spot, cache-to-cache and lock contention |
@@ -87,22 +88,31 @@ Vendor:       Intel Corporation
 Version:      EGSDCRB1.SYS.1752.P05.2401050248
 Release Date: 01/05/2024
 </pre>
-##### Report Benchmarks
-To assist in evaluating the health of target systems, the `report` command can run a series of micro-benchmarks by applying the `--benchmark` flag, for example, `perfspect report --benchmark all` The benchmark results will be reported along with the target's configuration details. 
+
+#### Benchmark Command
+The `benchmark` command runs performance micro-benchmarks to evaluate system health and performance characteristics. All benchmarks are run by default unless specific benchmarks are selected. A brief system summary is included in the output by default.
 
 > [!IMPORTANT]
 > Benchmarks should be run on idle systems to ensure accurate measurements and to avoid interfering with active workloads.
 
-| benchmark | Description |
+**Examples:**
+<pre>
+$ ./perfspect benchmark                  # Run all benchmarks with system summary
+$ ./perfspect benchmark --speed --power  # Run specific benchmarks
+$ ./perfspect benchmark --no-summary     # Exclude system summary from output
+</pre>
+
+See `perfspect benchmark -h` for all options.
+
+| Benchmark | Description |
 | --------- | ----------- |
-| all | runs all benchmarks |
 | speed | runs each [stress-ng](https://github.com/ColinIanKing/stress-ng) cpu-method for 1s each, reports the geo-metric mean of all results. |
 | power | runs stress-ng to load all cpus to 100% for 60s. Uses [turbostat](https://github.com/torvalds/linux/tree/master/tools/power/x86/turbostat) to measure power. |
 | temperature | runs the same micro benchmark as 'power', but extracts maximum temperature from turbostat output. |
 | frequency | runs [avx-turbo](https://github.com/travisdowns/avx-turbo) to measure scalar and AVX frequencies across processor's cores. **Note:** Runtime increases with core count.  |
 | memory | runs [Intel(r) Memory Latency Checker](https://www.intel.com/content/www/us/en/download/736633/intel-memory-latency-checker-intel-mlc.html) (MLC) to measure memory bandwidth and latency across a load range. **Note: MLC is not included with PerfSpect.** It can be downloaded from [here](https://www.intel.com/content/www/us/en/download/736633/intel-memory-latency-checker-intel-mlc.html). Once downloaded, extract the Linux executable and place it in the perfspect/tools/x86_64 directory. |
 | numa | runs Intel(r) Memory Latency Checker(MLC) to measure bandwidth between NUMA nodes. See Note above about downloading MLC. |
-| storage | runs [fio](https://github.com/axboe/fio) for 2 minutes in read/write mode with a single worker to measure single-thread read and write bandwidth. Use the --storage-dir flag to override the default location. Minimum 5GB disk space required to run test. |
+| storage | runs [fio](https://github.com/axboe/fio) for 2 minutes across multiple I/O patterns to measure storage latency, IOPs, and bandwidth. Use --storage-dir to override the default location (/tmp). Minimum 32GB disk space required. |
 
 #### Telemetry Command
 The `telemetry` command reports CPU utilization, instruction mix, disk stats, network stats, and more on the specified target(s). All telemetry types are collected by default. To choose telemetry types, see the additional command line options (`perfspect telemetry -h`).
