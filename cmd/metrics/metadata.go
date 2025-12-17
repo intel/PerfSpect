@@ -173,7 +173,7 @@ func (c *X86MetadataCollector) CollectMetadata(t target.Target, noRoot bool, noS
 			return Metadata{}, fmt.Errorf("failed to get system summary: %w", err)
 		}
 	} else {
-		metadata.SystemSummaryFields = [][]string{{"", "System Info Not Available"}}
+		metadata.SystemSummaryFields = [][]string{{"", "System Summary Not Available"}}
 	}
 	// Architecture
 	if metadata.Architecture, err = getArchitecture(scriptOutputs); err != nil {
@@ -352,7 +352,7 @@ func (c *ARMMetadataCollector) CollectMetadata(t target.Target, noRoot bool, noS
 			return Metadata{}, fmt.Errorf("failed to get system summary: %w", err)
 		}
 	} else {
-		metadata.SystemSummaryFields = [][]string{{"", "System Info Not Available"}}
+		metadata.SystemSummaryFields = [][]string{{"", "System Summary Not Available"}}
 	}
 	// Architecture
 	if metadata.Architecture, err = getArchitecture(scriptOutputs); err != nil {
@@ -555,7 +555,7 @@ BEGIN {
 	}
 	// add the system summary table scripts to the list
 	if !noSystemSummary {
-		for _, scriptName := range common.TableDefinitions[common.BriefSysSummaryTableName].ScriptNames {
+		for _, scriptName := range common.TableDefinitions[common.SystemSummaryTableName].ScriptNames {
 			scriptDef := script.GetScriptByName(scriptName)
 			metadataScripts = append(metadataScripts, scriptDef)
 		}
@@ -637,7 +637,7 @@ func ReadJSONFromFile(path string) (md Metadata, err error) {
 
 // getSystemSummary - retrieves the system summary from the target
 func getSystemSummary(scriptOutputs map[string]script.ScriptOutput) (summaryFields [][]string, err error) {
-	allTableValues, err := table.ProcessTables([]table.TableDefinition{common.TableDefinitions[common.BriefSysSummaryTableName]}, scriptOutputs)
+	allTableValues, err := table.ProcessTables([]table.TableDefinition{common.TableDefinitions[common.SystemSummaryTableName]}, scriptOutputs)
 	if err != nil {
 		err = fmt.Errorf("failed to process script outputs: %w", err)
 		return

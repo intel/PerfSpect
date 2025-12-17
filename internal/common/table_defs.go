@@ -9,12 +9,12 @@ import (
 	"strings"
 )
 
-const BriefSysSummaryTableName = "Brief System Summary"
+const SystemSummaryTableName = "System Summary"
 
 var TableDefinitions = map[string]table.TableDefinition{
-	BriefSysSummaryTableName: {
-		Name:      BriefSysSummaryTableName,
-		MenuLabel: BriefSysSummaryTableName,
+	SystemSummaryTableName: {
+		Name:      SystemSummaryTableName,
+		MenuLabel: SystemSummaryTableName,
 		HasRows:   false,
 		ScriptNames: []string{
 			script.HostnameScriptName,

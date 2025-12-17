@@ -629,12 +629,12 @@ func (mg *MetricGroup) loadHTMLTemplateValues(metadata Metadata, metricDefinitio
 	}
 	templateVals["METADATA"] = string(jsonMetadata)
 
-	// system info tab
-	jsonSystemInfo, err := json.Marshal(metadata.SystemSummaryFields)
+	// system summary tab
+	jsonSystemSummary, err := json.Marshal(metadata.SystemSummaryFields)
 	if err != nil {
 		return
 	}
-	templateVals["SYSTEMINFO"] = string(jsonSystemInfo)
+	templateVals["SYSTEMSUMMARY"] = string(jsonSystemSummary)
 	return
 }
 
