@@ -74,15 +74,6 @@ var (
 	flagNoCheckUpdate  bool
 )
 
-const (
-	flagDebugName          = "debug"
-	flagSyslogName         = "syslog"
-	flagLogStdOutName      = "log-stdout"
-	flagOutputDirName      = "output"
-	flagTargetTempRootName = "tempdir"
-	flagNoCheckUpdateName  = "noupdate"
-)
-
 func init() {
 	rootCmd.SetUsageTemplate(`Usage:{{if .Runnable}}
   {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
@@ -124,12 +115,12 @@ Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
 	rootCmd.AddGroup([]*cobra.Group{{ID: "other", Title: "Other Commands:"}}...)
 	rootCmd.AddCommand(updateCmd)
 	// Global (persistent) flags
-	rootCmd.PersistentFlags().BoolVar(&flagDebug, flagDebugName, false, "enable debug logging and retain temporary directories")
-	rootCmd.PersistentFlags().BoolVar(&flagSyslog, flagSyslogName, false, "write logs to syslog instead of a file")
-	rootCmd.PersistentFlags().BoolVar(&flagLogStdOut, flagLogStdOutName, false, "write logs to stdout")
-	rootCmd.PersistentFlags().StringVar(&flagOutputDir, flagOutputDirName, "", "override the output directory")
-	rootCmd.PersistentFlags().StringVar(&flagTargetTempRoot, flagTargetTempRootName, "", "override the temporary target directory, must exist and allow execution")
-	rootCmd.PersistentFlags().BoolVar(&flagNoCheckUpdate, flagNoCheckUpdateName, false, "skip application update check")
+	rootCmd.PersistentFlags().BoolVar(&flagDebug, common.FlagDebugName, false, "enable debug logging and retain temporary directories")
+	rootCmd.PersistentFlags().BoolVar(&flagSyslog, common.FlagSyslogName, false, "write logs to syslog instead of a file")
+	rootCmd.PersistentFlags().BoolVar(&flagLogStdOut, common.FlagLogStdOutName, false, "write logs to stdout")
+	rootCmd.PersistentFlags().StringVar(&flagOutputDir, common.FlagOutputDirName, "", "override the output directory")
+	rootCmd.PersistentFlags().StringVar(&flagTargetTempRoot, common.FlagTargetTempRootName, "", "override the temporary target directory, must exist and allow execution")
+	rootCmd.PersistentFlags().BoolVar(&flagNoCheckUpdate, common.FlagNoCheckUpdateName, false, "skip application update check")
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

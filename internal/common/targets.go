@@ -38,29 +38,29 @@ var (
 
 // target flag names
 const (
-	flagTargetsFileName = "targets"
-	flagTargetHostName  = "target"
-	flagTargetPortName  = "port"
-	flagTargetUserName  = "user"
-	flagTargetKeyName   = "key"
+	FlagTargetsFileName = "targets"
+	FlagTargetHostName  = "target"
+	FlagTargetPortName  = "port"
+	FlagTargetUserName  = "user"
+	FlagTargetKeyName   = "key"
 )
 
 var targetFlags = []Flag{
-	{Name: flagTargetHostName, Help: "host name or IP address of remote target"},
-	{Name: flagTargetPortName, Help: "port for SSH to remote target"},
-	{Name: flagTargetUserName, Help: "user name for SSH to remote target"},
-	{Name: flagTargetKeyName, Help: "private key file for SSH to remote target"},
-	{Name: flagTargetsFileName, Help: "file with remote target(s) connection details. See targets.yaml for format."},
+	{Name: FlagTargetHostName, Help: "host name or IP address of remote target"},
+	{Name: FlagTargetPortName, Help: "port for SSH to remote target"},
+	{Name: FlagTargetUserName, Help: "user name for SSH to remote target"},
+	{Name: FlagTargetKeyName, Help: "private key file for SSH to remote target"},
+	{Name: FlagTargetsFileName, Help: "file with remote target(s) connection details. See targets.yaml for format."},
 }
 
 func AddTargetFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(&flagTargetHost, flagTargetHostName, "", targetFlags[0].Help)
-	cmd.Flags().StringVar(&flagTargetPort, flagTargetPortName, "", targetFlags[1].Help)
-	cmd.Flags().StringVar(&flagTargetUser, flagTargetUserName, "", targetFlags[2].Help)
-	cmd.Flags().StringVar(&flagTargetKeyFile, flagTargetKeyName, "", targetFlags[3].Help)
-	cmd.Flags().StringVar(&flagTargetsFile, flagTargetsFileName, "", targetFlags[4].Help)
+	cmd.Flags().StringVar(&flagTargetHost, FlagTargetHostName, "", targetFlags[0].Help)
+	cmd.Flags().StringVar(&flagTargetPort, FlagTargetPortName, "", targetFlags[1].Help)
+	cmd.Flags().StringVar(&flagTargetUser, FlagTargetUserName, "", targetFlags[2].Help)
+	cmd.Flags().StringVar(&flagTargetKeyFile, FlagTargetKeyName, "", targetFlags[3].Help)
+	cmd.Flags().StringVar(&flagTargetsFile, FlagTargetsFileName, "", targetFlags[4].Help)
 
-	cmd.MarkFlagsMutuallyExclusive(flagTargetHostName, flagTargetsFileName)
+	cmd.MarkFlagsMutuallyExclusive(FlagTargetHostName, FlagTargetsFileName)
 }
 
 func GetTargetFlagGroup() FlagGroup {
@@ -72,13 +72,13 @@ func GetTargetFlagGroup() FlagGroup {
 
 func ValidateTargetFlags(cmd *cobra.Command) error {
 	if flagTargetsFile != "" && flagTargetHost != "" {
-		return fmt.Errorf("only one of --%s or --%s can be specified", flagTargetsFileName, flagTargetHostName)
+		return fmt.Errorf("only one of --%s or --%s can be specified", FlagTargetsFileName, FlagTargetHostName)
 	}
 	if flagTargetsFile != "" && (flagTargetPort != "" || flagTargetUser != "" || flagTargetKeyFile != "") {
-		return fmt.Errorf("if --%s is specified, --%s, --%s, and --%s must not be specified", flagTargetsFileName, flagTargetPortName, flagTargetUserName, flagTargetKeyName)
+		return fmt.Errorf("if --%s is specified, --%s, --%s, and --%s must not be specified", FlagTargetsFileName, FlagTargetPortName, FlagTargetUserName, FlagTargetKeyName)
 	}
 	if (flagTargetPort != "" || flagTargetUser != "" || flagTargetKeyFile != "") && flagTargetHost == "" {
-		return fmt.Errorf("if --%s, --%s, or --%s is specified, --%s must also be specified", flagTargetPortName, flagTargetUserName, flagTargetKeyName, flagTargetHostName)
+		return fmt.Errorf("if --%s, --%s, or --%s is specified, --%s must also be specified", FlagTargetPortName, FlagTargetUserName, FlagTargetKeyName, FlagTargetHostName)
 	}
 	// confirm that the targets file exists
 	if flagTargetsFile != "" {
@@ -136,7 +136,7 @@ func GetTargets(cmd *cobra.Command, needsElevatedPrivileges bool, failIfCantElev
 		return
 	}
 	targetTempDirRoot := tempDirFlag.Value.String()
-	flagTargetsFile, _ := cmd.Flags().GetString(flagTargetsFileName)
+	flagTargetsFile, _ := cmd.Flags().GetString(FlagTargetsFileName)
 	if flagTargetsFile != "" {
 		targets, targetErrs, err = getTargetsFromFile(flagTargetsFile, localTempDir)
 	} else {
@@ -185,10 +185,10 @@ func GetTargets(cmd *cobra.Command, needsElevatedPrivileges bool, failIfCantElev
 // - targetError: An error indicating a problem with the target host connection.
 // - err: An error object indicating any error that occurred during the function execution.
 func getSingleTarget(cmd *cobra.Command, needsElevatedPrivileges bool, failIfCantElevate bool, localTempDir string) (target.Target, error, error) {
-	targetHost, _ := cmd.Flags().GetString(flagTargetHostName)
-	targetPort, _ := cmd.Flags().GetString(flagTargetPortName)
-	targetUser, _ := cmd.Flags().GetString(flagTargetUserName)
-	targetKey, _ := cmd.Flags().GetString(flagTargetKeyName)
+	targetHost, _ := cmd.Flags().GetString(FlagTargetHostName)
+	targetPort, _ := cmd.Flags().GetString(FlagTargetPortName)
+	targetUser, _ := cmd.Flags().GetString(FlagTargetUserName)
+	targetKey, _ := cmd.Flags().GetString(FlagTargetKeyName)
 	if targetHost != "" {
 		return getRemoteTarget(targetHost, targetPort, targetUser, targetKey, needsElevatedPrivileges, failIfCantElevate, localTempDir)
 	} else {

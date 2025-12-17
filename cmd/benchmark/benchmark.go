@@ -206,7 +206,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 			return common.FlagValidationError(cmd, fmt.Sprintf("invalid storage directory name: %s", flagStorageDir))
 		}
 		// if no target is specified, i.e., we have a local target only, check if the directory exists
-		if !cmd.Flags().Lookup("targets").Changed && !cmd.Flags().Lookup("target").Changed {
+		if !cmd.Flags().Lookup(common.FlagTargetsFileName).Changed && !cmd.Flags().Lookup(common.FlagTargetHostName).Changed {
 			if _, err := os.Stat(flagStorageDir); os.IsNotExist(err) {
 				return common.FlagValidationError(cmd, fmt.Sprintf("storage dir does not exist: %s", flagStorageDir))
 			}

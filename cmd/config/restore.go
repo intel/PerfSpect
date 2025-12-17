@@ -157,7 +157,7 @@ func runRestoreCmd(cmd *cobra.Command, args []string) error {
 	cmdArgs := []string{"config"}
 
 	// copy target flags from restore command first
-	targetFlags := []string{"target", "targets", "user", "key", "port"}
+	targetFlags := []string{common.FlagTargetHostName, common.FlagTargetsFileName, common.FlagTargetUserName, common.FlagTargetKeyName, common.FlagTargetPortName}
 	for _, flagName := range targetFlags {
 		if flag := cmd.Flags().Lookup(flagName); flag != nil && flag.Changed {
 			cmdArgs = append(cmdArgs, fmt.Sprintf("--%s", flagName), flag.Value.String())
@@ -165,7 +165,7 @@ func runRestoreCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	// copy relevant global flags from root command next
-	globalFlags := []string{"debug", "output", "tempdir", "syslog", "log-stdout"}
+	globalFlags := []string{common.FlagDebugName, common.FlagOutputDirName, common.FlagTargetTempRootName, common.FlagSyslogName, common.FlagLogStdOutName}
 	for _, flagName := range globalFlags {
 		if flag := cmd.Root().PersistentFlags().Lookup(flagName); flag != nil && flag.Changed {
 			if flag.Value.Type() == "bool" {

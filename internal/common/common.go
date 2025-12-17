@@ -26,6 +26,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Flag names for flags defined in the root command, but sometimes used in other commands.
+const (
+	FlagDebugName          = "debug"
+	FlagSyslogName         = "syslog"
+	FlagLogStdOutName      = "log-stdout"
+	FlagOutputDirName      = "output"
+	FlagTargetTempRootName = "tempdir"
+	FlagNoCheckUpdateName  = "noupdate"
+)
+
 var AppName = filepath.Base(os.Args[0])
 
 // AppContext represents the application context that can be accessed from all commands.
