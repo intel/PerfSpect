@@ -168,7 +168,7 @@
       const [hasHighlightedMetrics, setHasHighlightedMetrics] = React.useState(false);
       const description = <<.DESCRIPTION>>
       const metadata = <<.METADATA>>
-      const system_info = <<.SYSTEMINFO>>
+      const system_summary = <<.SYSTEMSUMMARY>>
       
       // Check for highlighted metrics whenever current_metrics changes
       React.useEffect(() => {
@@ -701,7 +701,7 @@
               <Tab label="Memory" />
               <Tab label="Power" />
               <Tab label="All Metrics" />
-              <Tab label="System Info" />
+              <Tab label="System Summary" />
               <Tab label="Metadata" />
             </Tabs>
           </Box>
@@ -967,7 +967,7 @@
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {system_info && system_info.map(([key, value]) => (
+                    {system_summary && system_summary.map(([key, value]) => (
                       <TableRow key={key}>
                       <TableCell sx={{ fontFamily: 'Monospace' }} component="th" scope="row" >
                         {JSON.stringify(key)}

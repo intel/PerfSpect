@@ -313,9 +313,9 @@ func loadMetadataFromHTMLSummary(summaryHTMLPath string) (Metadata, error) {
 		return metadata, fmt.Errorf("failed to read summary HTML file: %w", err)
 	}
 
-	// assumes system_info comes after metadata in the file
+	// assumes system_summary comes after metadata in the file
 	const metadataPrefix = "const metadata = "
-	const systemInfoPrefix = "const system_info = "
+	const systemSummaryPrefix = "const system_summary = "
 	for line := range strings.SplitSeq(string(content), "\n") {
 		line = strings.TrimSpace(line)
 		if strings.HasPrefix(line, metadataPrefix) {
@@ -327,16 +327,16 @@ func loadMetadataFromHTMLSummary(summaryHTMLPath string) (Metadata, error) {
 			if err != nil {
 				return metadata, fmt.Errorf("failed to parse metadata JSON: %w", err)
 			}
-		} else if strings.HasPrefix(line, systemInfoPrefix) {
-			// system info
-			var systemInfo [][]string
-			jsonStart := len(systemInfoPrefix)
+		} else if strings.HasPrefix(line, systemSummaryPrefix) {
+			// system summary
+			var systemSummary [][]string
+			jsonStart := len(systemSummaryPrefix)
 			jsonString := strings.TrimSpace(line[jsonStart:])
-			err = json.Unmarshal([]byte(jsonString), &systemInfo)
+			err = json.Unmarshal([]byte(jsonString), &systemSummary)
 			if err != nil {
-				return metadata, fmt.Errorf("failed to parse system info JSON: %w", err)
+				return metadata, fmt.Errorf("failed to parse system summary JSON: %w", err)
 			}
-			metadata.SystemSummaryFields = systemInfo
+			metadata.SystemSummaryFields = systemSummary
 			return metadata, nil
 		}
 	}

@@ -173,7 +173,7 @@ func (c *X86MetadataCollector) CollectMetadata(t target.Target, noRoot bool, noS
 			return Metadata{}, fmt.Errorf("failed to get system summary: %w", err)
 		}
 	} else {
-		metadata.SystemSummaryFields = [][]string{{"", "System Info Not Available"}}
+		metadata.SystemSummaryFields = [][]string{{"", "System Summary Not Available"}}
 	}
 	// Architecture
 	if metadata.Architecture, err = getArchitecture(scriptOutputs); err != nil {
@@ -352,7 +352,7 @@ func (c *ARMMetadataCollector) CollectMetadata(t target.Target, noRoot bool, noS
 			return Metadata{}, fmt.Errorf("failed to get system summary: %w", err)
 		}
 	} else {
-		metadata.SystemSummaryFields = [][]string{{"", "System Info Not Available"}}
+		metadata.SystemSummaryFields = [][]string{{"", "System Summary Not Available"}}
 	}
 	// Architecture
 	if metadata.Architecture, err = getArchitecture(scriptOutputs); err != nil {
