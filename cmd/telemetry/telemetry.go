@@ -244,15 +244,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	if flagDuration < 0 {
 		return common.FlagValidationError(cmd, "duration must be 0 or greater")
 	}
-	target, err := cmd.Flags().GetString("target")
-	if err != nil {
-		panic("failed to get target flag")
-	}
-	targets, err := cmd.Flags().GetString("targets")
-	if err != nil {
-		panic("failed to get targets flag")
-	}
-	if flagDuration == 0 && (target != "" || targets != "") {
+	if flagDuration == 0 && (cmd.Flags().Lookup(common.FlagTargetsFileName).Changed || cmd.Flags().Lookup(common.FlagTargetHostName).Changed) {
 		return common.FlagValidationError(cmd, "duration must be greater than 0 when collecting from a remote target")
 	}
 	if flagInstrMixFrequency < 100000 { // 100,000 instructions is the minimum frequency
