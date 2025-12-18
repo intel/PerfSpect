@@ -21,7 +21,6 @@ import (
 	"perfspect/internal/target"
 	"perfspect/internal/util"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -192,7 +191,7 @@ func (rc *ReportingCommand) Run() error {
 			myTargets = slices.Delete(myTargets, indicesToRemove[i], indicesToRemove[i]+1)
 		}
 		// set up signal handler to help with cleaning up child processes on ctrl-c/SIGINT or SIGTERM
-		signalWg := configureSignalHandler(myTargets)
+		configureSignalHandler(myTargets)
 		// collect data from targets
 		orderedTargetScriptOutputs, err = outputsFromTargets(rc.Cmd, myTargets, rc.Tables, rc.ScriptParams, multiSpinner.Status, localTempDir)
 		if err != nil {
@@ -201,8 +200,6 @@ func (rc *ReportingCommand) Run() error {
 			rc.Cmd.SilenceUsage = true
 			return err
 		}
-		// wait for signal handler to complete, i.e., stop child processes
-		signalWg.Wait()
 		// stop the progress indicator
 		multiSpinner.Finish()
 		fmt.Println()
@@ -307,13 +304,10 @@ func (rc *ReportingCommand) Run() error {
 //
 // Returns:
 //   - *sync.WaitGroup: A wait group that can be used to wait for the signal handler to complete.
-func configureSignalHandler(myTargets []target.Target) *sync.WaitGroup {
-	var wg sync.WaitGroup
-	wg.Add(1)
+func configureSignalHandler(myTargets []target.Target) {
 	sigChannel := make(chan os.Signal, 1)
 	signal.Notify(sigChannel, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		defer wg.Done()
 		sig := <-sigChannel
 		slog.Debug("received signal", slog.String("signal", sig.String()))
 		// Scripts that are run in parallel using the parallel_master.sh script need to be handled specially
@@ -376,8 +370,6 @@ func configureSignalHandler(myTargets []target.Target) *sync.WaitGroup {
 			slog.Error("error sending signal to children", slog.String("error", err.Error()))
 		}
 	}()
-
-	return &wg
 }
 
 // DefaultInsightsFunc returns the insights table values from the table values
