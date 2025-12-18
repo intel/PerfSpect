@@ -65,22 +65,27 @@ type Target interface {
 	// RunCommand runs the specified command on the target.
 	// Arguments:
 	// - cmd: the command to run
-	// - timeout: the maximum time allowed for the command to run (zero means no timeout)
-	// - reuseSSHConnection: whether to reuse the SSH connection for the command (only relevant for RemoteTarget)
 	// It returns the standard output, standard error, exit code, and any error that occurred.
-	RunCommand(cmd *exec.Cmd, timeout int, reuseSSHConnection bool) (stdout string, stderr string, exitCode int, err error)
+	RunCommand(cmd *exec.Cmd) (stdout string, stderr string, exitCode int, err error)
+
+	// RunCommandEx runs the specified command on the target with additional options.
+	// Arguments:
+	// - cmd: the command to run
+	// - timeout: the maximum time allowed for the command to run (zero means no timeout)
+	// - newProcessGroup: whether to run the command in a new process group
+	// - remoteReuseSSHConnection: whether to reuse the SSH connection for the command (only relevant for RemoteTarget)
+	// It returns the standard output, standard error, exit code, and any error that occurred.
+	RunCommandEx(cmd *exec.Cmd, timeout int, newProcessGroup bool, remoteReuseSSHConnection bool) (stdout string, stderr string, exitCode int, err error)
 
 	// RunCommandStream runs the specified command on the target and streams the output to the provided channels.
 	// Arguments:
 	// - cmd: the command to run
-	// - timeout: the maximum time allowed for the command to run (zero means no timeout)
-	// - reuseSSHConnection: whether to reuse the SSH connection for the command (only relevant for RemoteTarget)
 	// - stdoutChannel: a channel to send the standard output of the command
 	// - stderrChannel: a channel to send the standard error of the command
 	// - exitcodeChannel: a channel to send the exit code of the command
 	// - cmdChannel: a channel to send the command that was run
 	// It returns any error that occurred.
-	RunCommandStream(cmd *exec.Cmd, timeout int, reuseSSHConnection bool, stdoutChannel chan []byte, stderrChannel chan []byte, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) error
+	RunCommandStream(cmd *exec.Cmd, stdoutChannel chan []byte, stderrChannel chan []byte, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) error
 
 	// PushFile transfers a file from the local system to the target.
 	// It returns any error that occurred.

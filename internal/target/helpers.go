@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -32,7 +33,7 @@ func installLkms(t Target, lkms []string) (installedLkms []string, err error) {
 	}
 	for _, lkm := range lkms {
 		slog.Debug("attempting to install kernel module", slog.String("lkm", lkm))
-		_, _, _, err := t.RunCommand(exec.Command("modprobe", "--first-time", lkm), 10, true) // #nosec G204
+		_, _, _, err := t.RunCommandEx(exec.Command("modprobe", "--first-time", lkm), 10, false, true) // #nosec G204
 		if err != nil {
 			slog.Debug("kernel module already installed or problem installing", slog.String("lkm", lkm), slog.String("error", err.Error()))
 			continue
@@ -60,7 +61,7 @@ func uninstallLkms(t Target, lkms []string) (err error) {
 	}
 	for _, lkm := range lkms {
 		slog.Debug("attempting to uninstall kernel module", slog.String("lkm", lkm))
-		_, _, _, err := t.RunCommand(exec.Command("modprobe", "-r", lkm), 10, true) // #nosec G204
+		_, _, _, err := t.RunCommandEx(exec.Command("modprobe", "-r", lkm), 10, false, true) // #nosec G204
 		if err != nil {
 			slog.Error("error uninstalling kernel module", slog.String("lkm", lkm), slog.String("error", err.Error()))
 			continue
@@ -77,13 +78,14 @@ func uninstallLkms(t Target, lkms []string) (err error) {
 //   - cmd: The command to execute, represented as an *exec.Cmd.
 //   - input: A string to be passed as input to the command's standard input.
 //   - timeout: The timeout in seconds for the command execution. If set to 0, no timeout is applied.
+//   - newProcessGroup: A boolean indicating whether to run the command in a new process group.
 //
 // Returns:
 //   - stdout: The standard output of the command as a string.
 //   - stderr: The standard error of the command as a string.
 //   - exitCode: The exit code of the command. If the command fails to execute, this may be undefined.
 //   - err: An error object if the command fails to execute or times out.
-func runLocalCommandWithInputWithTimeout(cmd *exec.Cmd, input string, timeout int) (stdout string, stderr string, exitCode int, err error) {
+func runLocalCommandWithInputWithTimeout(cmd *exec.Cmd, input string, timeout int, newProcessGroup bool) (stdout string, stderr string, exitCode int, err error) {
 	logInput := ""
 	if input != "" {
 		logInput = "******"
@@ -103,6 +105,10 @@ func runLocalCommandWithInputWithTimeout(cmd *exec.Cmd, input string, timeout in
 	var outbuf, errbuf strings.Builder
 	cmd.Stdout = &outbuf
 	cmd.Stderr = &errbuf
+	if newProcessGroup {
+		// isolate the command in its own process group, so that signals sent to perfspect don't affect it
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	}
 	err = cmd.Run()
 	stdout = outbuf.String()
 	stderr = errbuf.String()
@@ -203,7 +209,7 @@ func runLocalCommandWithInputWithTimeoutAsync(cmd *exec.Cmd, stdoutChannel chan 
 //   - err: An error if the command execution fails or if there is an issue retrieving the architecture.
 func getArchitecture(t Target) (arch string, err error) {
 	cmd := exec.Command("uname", "-m")
-	arch, _, _, err = t.RunCommand(cmd, 0, true)
+	arch, _, _, err = t.RunCommand(cmd)
 	if err != nil {
 		return
 	}

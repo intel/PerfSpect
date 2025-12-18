@@ -49,7 +49,7 @@ func getNMIWatchdog(myTarget target.Target) (setting string, err error) {
 		return
 	}
 	cmd := exec.Command(sysctl, "kernel.nmi_watchdog") // #nosec G204 // nosemgrep
-	stdout, _, _, err := myTarget.RunCommand(cmd, 0, true)
+	stdout, _, _, err := myTarget.RunCommand(cmd)
 	if err != nil {
 		return
 	}
@@ -88,7 +88,7 @@ func setNMIWatchdog(myTarget target.Target, setting string, localTempDir string)
 // findSysctl - gets a useable path to sysctl or error
 func findSysctl(myTarget target.Target) (path string, err error) {
 	cmd := exec.Command("which", "sysctl")
-	stdout, _, _, err := myTarget.RunCommand(cmd, 0, true)
+	stdout, _, _, err := myTarget.RunCommand(cmd)
 	if err == nil {
 		//found it
 		path = strings.TrimSpace(stdout)
@@ -97,7 +97,7 @@ func findSysctl(myTarget target.Target) (path string, err error) {
 	// didn't find it on the path, try being specific
 	sbinPath := "/usr/sbin/sysctl"
 	cmd = exec.Command("which", sbinPath)
-	_, _, _, err = myTarget.RunCommand(cmd, 0, true)
+	_, _, _, err = myTarget.RunCommand(cmd)
 	if err == nil {
 		// found it
 		path = sbinPath

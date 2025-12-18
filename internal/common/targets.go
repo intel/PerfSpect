@@ -495,7 +495,7 @@ func parseMountOutput(mountOutput string) ([]mountRecord, error) {
 // isDirNoExec checks if the target directory is on a file system that is mounted with noexec.
 func isDirNoExec(t target.Target, dir string) (bool, error) {
 	dfCmd := exec.Command("df", "-P", dir)
-	dfOutput, _, _, err := t.RunCommand(dfCmd, 0, true)
+	dfOutput, _, _, err := t.RunCommand(dfCmd)
 	if err != nil {
 		err = fmt.Errorf("failed to run df command: %w", err)
 		return false, err
@@ -509,7 +509,7 @@ func isDirNoExec(t target.Target, dir string) (bool, error) {
 		return false, err
 	}
 	mountCmd := exec.Command("mount")
-	mountOutput, _, _, err := t.RunCommand(mountCmd, 0, true)
+	mountOutput, _, _, err := t.RunCommand(mountCmd)
 	if err != nil {
 		err = fmt.Errorf("failed to run mount command: %w", err)
 		return false, err
@@ -553,7 +553,7 @@ func GetTargetVendor(t target.Target) (string, error) {
 	if vendor == "" {
 		cmd := exec.Command("bash", "-c", "lscpu | grep -i \"^Vendor ID:\" | awk '{print $NF}'")
 		var err error
-		vendor, _, _, err = t.RunCommand(cmd, 0, true)
+		vendor, _, _, err = t.RunCommand(cmd)
 		if err != nil {
 			return "", fmt.Errorf("failed to get target CPU vendor: %v", err)
 		}
@@ -568,7 +568,7 @@ func GetTargetFamily(t target.Target) (string, error) {
 	if family == "" {
 		cmd := exec.Command("bash", "-c", "lscpu | grep -i \"^CPU family:\" | awk '{print $NF}'")
 		var err error
-		family, _, _, err = t.RunCommand(cmd, 0, true)
+		family, _, _, err = t.RunCommand(cmd)
 		if err != nil {
 			return "", fmt.Errorf("failed to get target CPU family: %v", err)
 		}
@@ -583,7 +583,7 @@ func GetTargetModel(t target.Target) (string, error) {
 	if model == "" {
 		cmd := exec.Command("bash", "-c", "lscpu | grep -i \"^Model:\" | awk '{print $NF}'")
 		var err error
-		model, _, _, err = t.RunCommand(cmd, 0, true)
+		model, _, _, err = t.RunCommand(cmd)
 		if err != nil {
 			return "", fmt.Errorf("failed to get target CPU model: %v", err)
 		}
@@ -598,7 +598,7 @@ func GetTargetStepping(t target.Target) (string, error) {
 	if stepping == "" {
 		cmd := exec.Command("bash", "-c", "lscpu | grep -i \"^Stepping:\" | awk '{print $NF}'")
 		var err error
-		stepping, _, _, err = t.RunCommand(cmd, 0, true)
+		stepping, _, _, err = t.RunCommand(cmd)
 		if err != nil {
 			return "", fmt.Errorf("failed to get target CPU stepping: %v", err)
 		}

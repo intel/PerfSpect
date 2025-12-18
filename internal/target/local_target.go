@@ -20,14 +20,22 @@ func (t *LocalTarget) SetSudo(sudo string) {
 	t.canElevate = 0
 }
 
-// RunCommand executes the given command with a timeout and returns the standard output,
-// standard error, exit code, and any error that occurred.
-func (t *LocalTarget) RunCommand(cmd *exec.Cmd, timeout int, argNotUsed bool) (stdout string, stderr string, exitCode int, err error) {
+// RunCommand executes the given command on the local target
+func (t *LocalTarget) RunCommand(cmd *exec.Cmd) (stdout string, stderr string, exitCode int, err error) {
 	input := ""
 	if t.sudo != "" && len(cmd.Args) > 2 && cmd.Args[0] == "sudo" && strings.HasPrefix(cmd.Args[1], "-") && strings.Contains(cmd.Args[1], "S") { // 'sudo -S' gets password from stdin
 		input = t.sudo + "\n"
 	}
-	return runLocalCommandWithInputWithTimeout(cmd, input, timeout)
+	return runLocalCommandWithInputWithTimeout(cmd, input, 0, false)
+}
+
+// RunCommandEx executes a command on the local target with additional options.
+func (t *LocalTarget) RunCommandEx(cmd *exec.Cmd, timeout int, newProcessGroup bool, remoteReuseSSHConnection bool) (stdout string, stderr string, exitCode int, err error) {
+	input := ""
+	if t.sudo != "" && len(cmd.Args) > 2 && cmd.Args[0] == "sudo" && strings.HasPrefix(cmd.Args[1], "-") && strings.Contains(cmd.Args[1], "S") { // 'sudo -S' gets password from stdin
+		input = t.sudo + "\n"
+	}
+	return runLocalCommandWithInputWithTimeout(cmd, input, timeout, newProcessGroup)
 }
 
 // RunCommandStream runs the given command asynchronously on the target.
@@ -36,10 +44,10 @@ func (t *LocalTarget) RunCommand(cmd *exec.Cmd, timeout int, argNotUsed bool) (s
 // and the exit code is sent to the exitcodeChannel.
 // The timeout parameter specifies the maximum time allowed for the command to run.
 // Returns an error if there was a problem running the command.
-func (t *LocalTarget) RunCommandStream(cmd *exec.Cmd, timeout int, argNotUsed bool, stdoutChannel chan []byte, stderrChannel chan []byte, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) (err error) {
+func (t *LocalTarget) RunCommandStream(cmd *exec.Cmd, stdoutChannel chan []byte, stderrChannel chan []byte, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) (err error) {
 	localCommand := cmd
 	cmdChannel <- localCommand
-	err = runLocalCommandWithInputWithTimeoutAsync(localCommand, stdoutChannel, stderrChannel, exitcodeChannel, "", timeout)
+	err = runLocalCommandWithInputWithTimeoutAsync(localCommand, stdoutChannel, stderrChannel, exitcodeChannel, "", 0)
 	return
 }
 
@@ -174,14 +182,14 @@ func (t *LocalTarget) CanElevatePrivileges() bool {
 				slog.Error("error writing sudo password", slog.String("error", err.Error()))
 			}
 		}()
-		_, _, _, err := t.RunCommand(cmd, 0, true)
+		_, _, _, err := t.RunCommand(cmd)
 		if err == nil {
 			t.canElevate = 1
 			return true // sudo password works
 		}
 	}
 	cmd := exec.Command("sudo", "-kS", "ls")
-	_, _, _, err := t.RunCommand(cmd, 0, true)
+	_, _, _, err := t.RunCommand(cmd)
 	if err == nil { // true - passwordless sudo works
 		t.canElevate = 1
 		return true

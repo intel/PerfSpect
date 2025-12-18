@@ -6,10 +6,12 @@ package common
 // SPDX-License-Identifier: BSD-3-Clause
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"perfspect/internal/progress"
@@ -19,7 +21,9 @@ import (
 	"perfspect/internal/target"
 	"perfspect/internal/util"
 	"strings"
+	"sync"
 	"syscall"
+	"time"
 
 	"slices"
 
@@ -118,22 +122,6 @@ func (rc *ReportingCommand) Run() error {
 	localTempDir := appContext.LocalTempDir
 	outputDir := appContext.OutputDir
 	logFilePath := appContext.LogFilePath
-	// handle signals
-	// child processes will exit when the signals are received which will
-	// allow this app to exit normally
-	sigChannel := make(chan os.Signal, 1)
-	signal.Notify(sigChannel, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		sig := <-sigChannel
-		slog.Info("received signal", slog.String("signal", sig.String()))
-		// when perfspect receives ctrl-c while in the shell, the shell makes sure to propogate the
-		// signal to all our children. But when perfspect is run in the background or disowned and
-		// then receives SIGINT, e.g., from a script, we need to send the signal to our children
-		err := util.SignalChildren(syscall.SIGINT)
-		if err != nil {
-			slog.Error("error sending signal to children", slog.String("error", err.Error()))
-		}
-	}()
 	// create output directory
 	err := util.CreateDirectoryIfNotExists(outputDir, 0755) // #nosec G301
 	if err != nil {
@@ -144,8 +132,8 @@ func (rc *ReportingCommand) Run() error {
 		return err
 	}
 
-	var orderedTargetScriptOutputs []TargetScriptOutputs
 	var myTargets []target.Target
+	var orderedTargetScriptOutputs []TargetScriptOutputs
 	if FlagInput != "" {
 		var err error
 		orderedTargetScriptOutputs, err = outputsFromInput(rc.Tables, rc.SummaryTableName)
@@ -203,6 +191,8 @@ func (rc *ReportingCommand) Run() error {
 		for i := len(indicesToRemove) - 1; i >= 0; i-- {
 			myTargets = slices.Delete(myTargets, indicesToRemove[i], indicesToRemove[i]+1)
 		}
+		// set up signal handler to help with cleaning up child processes on ctrl-c/SIGINT or SIGTERM
+		signalWg := configureSignalHandler(myTargets)
 		// collect data from targets
 		orderedTargetScriptOutputs, err = outputsFromTargets(rc.Cmd, myTargets, rc.Tables, rc.ScriptParams, multiSpinner.Status, localTempDir)
 		if err != nil {
@@ -211,6 +201,8 @@ func (rc *ReportingCommand) Run() error {
 			rc.Cmd.SilenceUsage = true
 			return err
 		}
+		// wait for signal handler to complete, i.e., stop child processes
+		signalWg.Wait()
 		// stop the progress indicator
 		multiSpinner.Finish()
 		fmt.Println()
@@ -297,6 +289,95 @@ func (rc *ReportingCommand) Run() error {
 		fmt.Println()
 	}
 	return nil
+}
+
+// configureSignalHandler sets up a signal handler to catch SIGINT and SIGTERM
+//
+// When perfspect receives ctrl-c while in the shell, the shell propogates the
+// signal to all our children. But when perfspect is run in the background or disowned and
+// then receives SIGINT, e.g., from a script, we need to send the signal to our children
+//
+// Also, when running scripts in parallel using the parallel_master.sh script, we need to
+// send the signal to the parallel_master.sh script on each target so that it can clean up
+// its child processes. This is because the parallel_master.sh script is run in its own process group
+// and does not receive the signal when perfspect receives it.
+//
+// Parameters:
+//   - myTargets: The list of targets to send the signal to.
+//
+// Returns:
+//   - *sync.WaitGroup: A wait group that can be used to wait for the signal handler to complete.
+func configureSignalHandler(myTargets []target.Target) *sync.WaitGroup {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	sigChannel := make(chan os.Signal, 1)
+	signal.Notify(sigChannel, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		defer wg.Done()
+		sig := <-sigChannel
+		slog.Debug("received signal", slog.String("signal", sig.String()))
+		// Scripts that are run in parallel using the parallel_master.sh script need to be handled specially
+		// because they are run in their own process group, we need to send the signal to the parallel_master.sh script.
+		// For every target, look for the parallel_master script PID file and send SIGINT to it.
+		for _, t := range myTargets {
+			pidFilePath := filepath.Join(t.GetTempDirectory(), "parallel_master.pid")
+			stdout, _, exitcode, err := t.RunCommandEx(exec.Command("cat", pidFilePath), 10, false, true) // #nosec G204
+			if err != nil {
+				slog.Error("error sending signal to target parallel_master script", slog.String("target", t.GetName()), slog.String("error", err.Error()))
+			}
+			if exitcode == 0 {
+				pidStr := strings.TrimSpace(stdout)
+				_, _, _, err := t.RunCommandEx(exec.Command("sudo", "kill", "-SIGINT", pidStr), 10, false, true) // #nosec G204
+				if err != nil {
+					slog.Error("error sending signal to target parallel_master script", slog.String("target", t.GetName()), slog.String("error", err.Error()))
+				}
+			}
+		}
+		// now wait until all parallel_master scripts have exited
+		slog.Debug("waiting for parallel_master scripts to exit")
+		for _, t := range myTargets {
+			// create a per-target timeout context
+			targetTimeout := 2 * time.Second
+			ctx, cancel := context.WithTimeout(context.Background(), targetTimeout)
+			timedOut := false
+			pidFilePath := filepath.Join(t.GetTempDirectory(), "parallel_master.pid")
+			for {
+				// check for timeout
+				select {
+				case <-ctx.Done():
+					slog.Warn("signal handler cleanup timeout exceeded for target", slog.String("target", t.GetName()))
+					timedOut = true
+				default:
+				}
+				if timedOut {
+					break
+				}
+				// read the pid file
+				stdout, _, exitcode, err := t.RunCommandEx(exec.Command("cat", pidFilePath), 0, false, true) // #nosec G204
+				if err != nil || exitcode != 0 {
+					// pid file doesn't exist
+					break
+				}
+				pidStr := strings.TrimSpace(stdout)
+				// determine if the process still exists
+				_, _, exitcode, err = t.RunCommandEx(exec.Command("ps", "-p", pidStr), 0, false, true) // #nosec G204
+				if err != nil || exitcode != 0 {
+					break // process no longer exists, script has exited
+				}
+				// sleep for a short time before checking again
+				time.Sleep(250 * time.Millisecond)
+			}
+			cancel()
+		}
+
+		// send SIGINT to perfspect's children
+		err := util.SignalChildren(syscall.SIGINT)
+		if err != nil {
+			slog.Error("error sending signal to children", slog.String("error", err.Error()))
+		}
+	}()
+
+	return &wg
 }
 
 // DefaultInsightsFunc returns the insights table values from the table values

@@ -122,7 +122,7 @@ func init() {
 	Cmd.Flags().StringVar(&common.FlagInput, common.FlagInputName, "", "")
 	Cmd.Flags().BoolVar(&flagAll, flagAllName, true, "")
 	Cmd.Flags().StringSliceVar(&common.FlagFormat, common.FlagFormatName, []string{report.FormatAll}, "")
-	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 30, "")
+	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 0, "")
 	Cmd.Flags().IntVar(&flagInterval, flagIntervalName, 2, "")
 	Cmd.Flags().IntVar(&flagInstrMixPid, flagInstrMixPidName, 0, "")
 	Cmd.Flags().IntVar(&flagInstrMixFrequency, flagInstrMixFrequencyName, instrmixFrequencyDefaultSystemWide, "")
@@ -244,9 +244,9 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	if flagDuration < 0 {
 		return common.FlagValidationError(cmd, "duration must be 0 or greater")
 	}
-	if flagDuration == 0 && (cmd.Flags().Lookup(common.FlagTargetsFileName).Changed || cmd.Flags().Lookup(common.FlagTargetHostName).Changed) {
-		return common.FlagValidationError(cmd, "duration must be greater than 0 when collecting from a remote target")
-	}
+	// if flagDuration == 0 && (cmd.Flags().Lookup(common.FlagTargetsFileName).Changed || cmd.Flags().Lookup(common.FlagTargetHostName).Changed) {
+	// 	return common.FlagValidationError(cmd, "duration must be greater than 0 when collecting from a remote target")
+	// }
 	if flagInstrMixFrequency < 100000 { // 100,000 instructions is the minimum frequency
 		return common.FlagValidationError(cmd, "instruction mix frequency must be 100,000 or greater to limit overhead")
 	}
