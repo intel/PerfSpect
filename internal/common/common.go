@@ -191,7 +191,7 @@ func (rc *ReportingCommand) Run() error {
 			myTargets = slices.Delete(myTargets, indicesToRemove[i], indicesToRemove[i]+1)
 		}
 		// set up signal handler to help with cleaning up child processes on ctrl-c/SIGINT or SIGTERM
-		configureSignalHandler(myTargets)
+		configureSignalHandler(myTargets, multiSpinner.Status)
 		// collect data from targets
 		orderedTargetScriptOutputs, err = outputsFromTargets(rc.Cmd, myTargets, rc.Tables, rc.ScriptParams, multiSpinner.Status, localTempDir)
 		if err != nil {
@@ -301,10 +301,11 @@ func (rc *ReportingCommand) Run() error {
 //
 // Parameters:
 //   - myTargets: The list of targets to send the signal to.
+//   - statusFunc: A function to update the status of the progress indicator.
 //
 // Returns:
 //   - *sync.WaitGroup: A wait group that can be used to wait for the signal handler to complete.
-func configureSignalHandler(myTargets []target.Target) {
+func configureSignalHandler(myTargets []target.Target, statusFunc progress.MultiSpinnerUpdateFunc) {
 	sigChannel := make(chan os.Signal, 1)
 	signal.Notify(sigChannel, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -314,6 +315,9 @@ func configureSignalHandler(myTargets []target.Target) {
 		// because they are run in their own process group, we need to send the signal to the parallel_master.sh script.
 		// For every target, look for the parallel_master script PID file and send SIGINT to it.
 		for _, t := range myTargets {
+			if statusFunc != nil {
+				_ = statusFunc(t.GetName(), "Signal received, cleaning up...")
+			}
 			pidFilePath := filepath.Join(t.GetTempDirectory(), "parallel_master.pid")
 			stdout, _, exitcode, err := t.RunCommandEx(exec.Command("cat", pidFilePath), 10, false, true) // #nosec G204
 			if err != nil {
@@ -331,7 +335,7 @@ func configureSignalHandler(myTargets []target.Target) {
 		slog.Debug("waiting for parallel_master scripts to exit")
 		for _, t := range myTargets {
 			// create a per-target timeout context
-			targetTimeout := 2 * time.Second
+			targetTimeout := 10 * time.Second
 			ctx, cancel := context.WithTimeout(context.Background(), targetTimeout)
 			timedOut := false
 			pidFilePath := filepath.Join(t.GetTempDirectory(), "parallel_master.pid")
@@ -339,6 +343,9 @@ func configureSignalHandler(myTargets []target.Target) {
 				// check for timeout
 				select {
 				case <-ctx.Done():
+					if statusFunc != nil {
+						_ = statusFunc(t.GetName(), "cleanup timeout exceeded")
+					}
 					slog.Warn("signal handler cleanup timeout exceeded for target", slog.String("target", t.GetName()))
 					timedOut = true
 				default:
@@ -359,7 +366,7 @@ func configureSignalHandler(myTargets []target.Target) {
 					break // process no longer exists, script has exited
 				}
 				// sleep for a short time before checking again
-				time.Sleep(250 * time.Millisecond)
+				time.Sleep(500 * time.Millisecond)
 			}
 			cancel()
 		}
