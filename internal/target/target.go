@@ -72,7 +72,10 @@ type Target interface {
 	// Arguments:
 	// - cmd: the command to run
 	// - timeout: the maximum time allowed for the command to run (zero means no timeout)
-	// - newProcessGroup: whether to run the command in a new process group
+	// - newProcessGroup: whether to run the command in a new process group. . When true, the
+	//   command is isolated from terminal and parent-process signals (for example, Ctrl-C),
+	//   which is useful for long-running or background workloads that should not be
+	//   interrupted when the caller's terminal session receives a signal.
 	// - remoteReuseSSHConnection: whether to reuse the SSH connection for the command (only relevant for RemoteTarget)
 	// It returns the standard output, standard error, exit code, and any error that occurred.
 	RunCommandEx(cmd *exec.Cmd, timeout int, newProcessGroup bool, remoteReuseSSHConnection bool) (stdout string, stderr string, exitCode int, err error)
