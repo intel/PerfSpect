@@ -319,13 +319,13 @@ func configureSignalHandler(myTargets []target.Target, statusFunc progress.Multi
 				_ = statusFunc(t.GetName(), "Signal received, cleaning up...")
 			}
 			pidFilePath := filepath.Join(t.GetTempDirectory(), "parallel_master.pid")
-			stdout, _, exitcode, err := t.RunCommandEx(exec.Command("cat", pidFilePath), 10, false, true) // #nosec G204
+			stdout, _, exitcode, err := t.RunCommandEx(exec.Command("cat", pidFilePath), 5, false, true) // #nosec G204
 			if err != nil {
-				slog.Error("error sending signal to target parallel_master script", slog.String("target", t.GetName()), slog.String("error", err.Error()))
+				slog.Error("error retrieving target parallel_master script PID", slog.String("target", t.GetName()), slog.String("error", err.Error()))
 			}
 			if exitcode == 0 {
 				pidStr := strings.TrimSpace(stdout)
-				_, _, _, err := t.RunCommandEx(exec.Command("sudo", "kill", "-SIGINT", pidStr), 10, false, true) // #nosec G204
+				_, _, _, err := t.RunCommandEx(exec.Command("sudo", "kill", "-SIGINT", pidStr), 5, false, true) // #nosec G204
 				if err != nil {
 					slog.Error("error sending signal to target parallel_master script", slog.String("target", t.GetName()), slog.String("error", err.Error()))
 				}
@@ -354,14 +354,14 @@ func configureSignalHandler(myTargets []target.Target, statusFunc progress.Multi
 					break
 				}
 				// read the pid file
-				stdout, _, exitcode, err := t.RunCommandEx(exec.Command("cat", pidFilePath), 0, false, true) // #nosec G204
+				stdout, _, exitcode, err := t.RunCommandEx(exec.Command("cat", pidFilePath), 5, false, true) // #nosec G204
 				if err != nil || exitcode != 0 {
 					// pid file doesn't exist
 					break
 				}
 				pidStr := strings.TrimSpace(stdout)
 				// determine if the process still exists
-				_, _, exitcode, err = t.RunCommandEx(exec.Command("ps", "-p", pidStr), 0, false, true) // #nosec G204
+				_, _, exitcode, err = t.RunCommandEx(exec.Command("ps", "-p", pidStr), 5, false, true) // #nosec G204
 				if err != nil || exitcode != 0 {
 					break // process no longer exists, script has exited
 				}

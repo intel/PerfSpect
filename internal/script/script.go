@@ -328,6 +328,7 @@ handle_sigint() {
     kill_script "$s"
   done
   print_summary
+  rm -f parallel_master.pid
   exit 0
 }
 
@@ -336,6 +337,7 @@ trap handle_sigint SIGINT
 start_scripts
 wait_for_scripts
 print_summary
+rm -f parallel_master.pid
 `
 	tmpl, err := template.New("master").Parse(masterScriptTemplate)
 	if err != nil {
