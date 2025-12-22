@@ -72,7 +72,7 @@ type Target interface {
 	// Arguments:
 	// - cmd: the command to run
 	// - timeout: the maximum time allowed for the command to run (zero means no timeout)
-	// - newProcessGroup: whether to run the command in a new process group. . When true, the
+	// - newProcessGroup: whether to run the command in a new process group. When true, the
 	//   command is isolated from terminal and parent-process signals (for example, Ctrl-C),
 	//   which is useful for long-running or background workloads that should not be
 	//   interrupted when the caller's terminal session receives a signal.
