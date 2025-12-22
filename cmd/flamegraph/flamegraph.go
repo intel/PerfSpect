@@ -156,18 +156,18 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		}
 	}
 	if flagDuration < 0 {
-		return common.FlagValidationError(cmd, "duration must be greater than or equal to 0")
+		return common.FlagValidationError(cmd, "duration must 0 or greater")
 	}
 	if flagFrequency <= 0 {
-		return common.FlagValidationError(cmd, "frequency must be greater than 0")
+		return common.FlagValidationError(cmd, "frequency must be 1 or greater")
 	}
 	for _, pid := range flagPids {
 		if pid < 0 {
-			return common.FlagValidationError(cmd, "PID must be greater than or equal to 0")
+			return common.FlagValidationError(cmd, "PID must be 0 or greater")
 		}
 	}
 	if flagMaxDepth < 0 {
-		return common.FlagValidationError(cmd, "max depth must be greater than or equal to 0")
+		return common.FlagValidationError(cmd, "max depth must be 0 or greater")
 	}
 	// common target flags
 	if err := common.ValidateTargetFlags(cmd); err != nil {
