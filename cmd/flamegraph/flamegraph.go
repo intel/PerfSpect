@@ -156,7 +156,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		}
 	}
 	if flagDuration < 0 {
-		return common.FlagValidationError(cmd, "duration must 0 or greater")
+		return common.FlagValidationError(cmd, "duration must be 0 or greater")
 	}
 	if flagFrequency <= 0 {
 		return common.FlagValidationError(cmd, "frequency must be 1 or greater")
