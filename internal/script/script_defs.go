@@ -1525,7 +1525,7 @@ finalize() {
     stop_profiling
     collapse_perf_data
     print_results
-	rm -f primary_collection_script.pid
+    rm -f primary_collection_script.pid
     exit 0
 }
 
