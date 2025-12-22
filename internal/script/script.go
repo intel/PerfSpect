@@ -166,7 +166,13 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 		} else {
 			cmd = exec.Command("bash", scriptPath) // #nosec G204
 		}
-		stdout, stderr, exitcode, err := myTarget.RunCommandEx(cmd, 0, false, false)
+		// if the script is tagged with NeedsKill, we run it in a new process group so that tty/terminal signals, e.g., Ctrl-C, are not sent to the command. This is
+		// necessary to allow the script to handle signals itself and clean up as needed. The
+		// signal handler in perfspect will send the signal to the script on each target so that it can clean up
+		// as needed.
+		newProcessGroup := script.NeedsKill
+		reuseSSHConnection := false // don't reuse ssh connection on long-running commands, makes it difficult to kill the command
+		stdout, stderr, exitcode, err := myTarget.RunCommandEx(cmd, 0, newProcessGroup, reuseSSHConnection)
 		if err != nil {
 			slog.Warn("error running script on target", slog.String("name", script.Name), slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitcode", exitcode), slog.String("error", err.Error()))
 		}
@@ -255,7 +261,7 @@ script_dir={{.TargetTempDir}}
 cd "$script_dir"
 
 # write our pid to a file so that perfspect can send us a signal if needed
-echo $$ > parallel_master.pid
+echo $$ > primary_collection_script.pid
 
 declare -a scripts=()
 declare -A needs_kill=()
@@ -328,7 +334,7 @@ handle_sigint() {
     kill_script "$s"
   done
   print_summary
-  rm -f parallel_master.pid
+  rm -f primary_collection_script.pid
   exit 0
 }
 
@@ -337,7 +343,7 @@ trap handle_sigint SIGINT
 start_scripts
 wait_for_scripts
 print_summary
-rm -f parallel_master.pid
+rm -f primary_collection_script.pid
 `
 	tmpl, err := template.New("master").Parse(masterScriptTemplate)
 	if err != nil {

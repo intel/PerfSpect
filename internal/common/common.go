@@ -311,34 +311,34 @@ func configureSignalHandler(myTargets []target.Target, statusFunc progress.Multi
 	go func() {
 		sig := <-sigChannel
 		slog.Debug("received signal", slog.String("signal", sig.String()))
-		// Scripts that are run in parallel using the parallel_master.sh script need to be handled specially
-		// because they are run in their own process group, we need to send the signal to the parallel_master.sh script.
-		// For every target, look for the parallel_master script PID file and send SIGINT to it.
+		// Scripts that are run in parallel using the parallel_master.sh script and a few other sequential scripts need to be handled specially
+		// because they are run in their own process group, we need to send the signal directly to the PID of the script.
+		// For every target, look for the primary_collection_script PID file and send SIGINT to it.
 		for _, t := range myTargets {
 			if statusFunc != nil {
 				_ = statusFunc(t.GetName(), "Signal received, cleaning up...")
 			}
-			pidFilePath := filepath.Join(t.GetTempDirectory(), "parallel_master.pid")
+			pidFilePath := filepath.Join(t.GetTempDirectory(), "primary_collection_script.pid")
 			stdout, _, exitcode, err := t.RunCommandEx(exec.Command("cat", pidFilePath), 5, false, true) // #nosec G204
 			if err != nil {
-				slog.Error("error retrieving target parallel_master script PID", slog.String("target", t.GetName()), slog.String("error", err.Error()))
+				slog.Error("error retrieving target primary_collection_script PID", slog.String("target", t.GetName()), slog.String("error", err.Error()))
 			}
 			if exitcode == 0 {
 				pidStr := strings.TrimSpace(stdout)
 				_, _, _, err := t.RunCommandEx(exec.Command("sudo", "kill", "-SIGINT", pidStr), 5, false, true) // #nosec G204
 				if err != nil {
-					slog.Error("error sending signal to target parallel_master script", slog.String("target", t.GetName()), slog.String("error", err.Error()))
+					slog.Error("error sending signal to target primary_collection_script", slog.String("target", t.GetName()), slog.String("error", err.Error()))
 				}
 			}
 		}
-		// now wait until all parallel_master scripts have exited
-		slog.Debug("waiting for parallel_master scripts to exit")
+		// now wait until all primary collection scripts have exited
+		slog.Debug("waiting for primary_collection_script scripts to exit")
 		for _, t := range myTargets {
 			// create a per-target timeout context
 			targetTimeout := 10 * time.Second
 			ctx, cancel := context.WithTimeout(context.Background(), targetTimeout)
 			timedOut := false
-			pidFilePath := filepath.Join(t.GetTempDirectory(), "parallel_master.pid")
+			pidFilePath := filepath.Join(t.GetTempDirectory(), "primary_collection_script.pid")
 			for {
 				// check for timeout
 				select {
@@ -634,7 +634,8 @@ func outputsFromTargets(cmd *cobra.Command, myTargets []target.Target, tables []
 			scriptsToRunOnTarget = append(scriptsToRunOnTarget, script)
 		}
 		// run the selected scripts on the target
-		go collectOnTarget(target, scriptsToRunOnTarget, localTempDir, scriptParams["Duration"], cmd.Name() == "telemetry", channelTargetScriptOutputs, channelError, statusUpdate)
+		ctrlCToStop := cmd.Name() == "telemetry" || cmd.Name() == "flamegraph"
+		go collectOnTarget(target, scriptsToRunOnTarget, localTempDir, scriptParams["Duration"], ctrlCToStop, channelTargetScriptOutputs, channelError, statusUpdate)
 	}
 	// wait for scripts to run on all targets
 	var allTargetScriptOutputs []TargetScriptOutputs
@@ -711,10 +712,10 @@ func elevatedPrivilegesRequired(tables []table.TableDefinition) bool {
 }
 
 // collectOnTarget runs the scripts on the target and sends the results to the appropriate channels
-func collectOnTarget(myTarget target.Target, scriptsToRun []script.ScriptDefinition, localTempDir string, duration string, isTelemetry bool, channelTargetScriptOutputs chan TargetScriptOutputs, channelError chan error, statusUpdate progress.MultiSpinnerUpdateFunc) {
+func collectOnTarget(myTarget target.Target, scriptsToRun []script.ScriptDefinition, localTempDir string, duration string, ctrlCToStop bool, channelTargetScriptOutputs chan TargetScriptOutputs, channelError chan error, statusUpdate progress.MultiSpinnerUpdateFunc) {
 	// run the scripts on the target
 	status := "collecting data"
-	if isTelemetry && duration == "0" { // telemetry is the only command that uses this common code that can run indefinitely
+	if ctrlCToStop && duration == "0" {
 		status += ", press Ctrl+c to stop"
 	} else if duration != "0" && duration != "" {
 		status += fmt.Sprintf(" for %s seconds", duration)

@@ -59,7 +59,7 @@ const (
 func init() {
 	Cmd.Flags().StringVar(&common.FlagInput, common.FlagInputName, "", "")
 	Cmd.Flags().StringSliceVar(&common.FlagFormat, common.FlagFormatName, []string{report.FormatAll}, "")
-	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 30, "")
+	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 0, "")
 	Cmd.Flags().IntVar(&flagFrequency, flagFrequencyName, 11, "")
 	Cmd.Flags().IntSliceVar(&flagPids, flagPidsName, nil, "")
 	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
@@ -100,7 +100,7 @@ func getFlagGroups() []common.FlagGroup {
 	flags := []common.Flag{
 		{
 			Name: flagDurationName,
-			Help: "number of seconds to run the collection",
+			Help: "number of seconds to run the collection. If 0, the collection will run indefinitely. Ctrl+c to stop.",
 		},
 		{
 			Name: flagFrequencyName,
@@ -155,8 +155,8 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 			return common.FlagValidationError(cmd, fmt.Sprintf("input file %s does not exist", common.FlagInput))
 		}
 	}
-	if flagDuration <= 0 {
-		return common.FlagValidationError(cmd, "duration must be greater than 0")
+	if flagDuration < 0 {
+		return common.FlagValidationError(cmd, "duration must be greater than or equal to 0")
 	}
 	if flagFrequency <= 0 {
 		return common.FlagValidationError(cmd, "frequency must be greater than 0")
