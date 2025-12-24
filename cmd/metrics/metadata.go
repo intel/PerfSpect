@@ -692,7 +692,7 @@ func getUncoreDeviceIDs(isAMDArchitecture bool, scriptOutputs map[string]script.
 // getCPUInfo - reads and returns all data from /proc/cpuinfo
 func getCPUInfo(t target.Target) (cpuInfo []map[string]string, err error) {
 	cmd := exec.Command("cat", "/proc/cpuinfo")
-	stdout, stderr, exitcode, err := t.RunCommand(cmd, 0, true)
+	stdout, stderr, exitcode, err := t.RunCommand(cmd)
 	if err != nil {
 		err = fmt.Errorf("failed to get cpuinfo: %s, %d, %v", stderr, exitcode, err)
 		return
@@ -717,7 +717,7 @@ func getCPUInfo(t target.Target) (cpuInfo []map[string]string, err error) {
 // getLscpu - runs lscpu on the target and returns the output
 func getLscpu(t target.Target) (output string, err error) {
 	cmd := exec.Command("lscpu")
-	output, stderr, exitcode, err := t.RunCommand(cmd, 0, true)
+	output, stderr, exitcode, err := t.RunCommand(cmd)
 	if err != nil || exitcode != 0 {
 		err = fmt.Errorf("failed to run lscpu: %s, %d, %v", stderr, exitcode, err)
 		return

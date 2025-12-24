@@ -22,23 +22,16 @@ func (t *RemoteTarget) SetSshPass(sshPass string) {
 	t.sshPass = sshPass
 }
 
-// RunCommand executes a command on the remote target using SSH. It prepares the
-// local command to be executed, optionally reusing an existing SSH connection,
-// and runs it with a specified timeout.
-//
-// Parameters:
-//   - cmd: The command to be executed, represented as an *exec.Cmd.
-//   - timeout: The maximum duration (in seconds) to wait for the command to complete.
-//   - reuseSSHConnection: A boolean indicating whether to reuse an existing SSH connection.
-//
-// Returns:
-//   - stdout: The standard output of the executed command.
-//   - stderr: The standard error output of the executed command.
-//   - exitCode: The exit code returned by the command.
-//   - err: An error object if the command execution fails.
-func (t *RemoteTarget) RunCommand(cmd *exec.Cmd, timeout int, reuseSSHConnection bool) (stdout string, stderr string, exitCode int, err error) {
+// RunCommand executes a command on the remote target using SSH.
+func (t *RemoteTarget) RunCommand(cmd *exec.Cmd) (stdout string, stderr string, exitCode int, err error) {
+	localCommand := t.prepareLocalCommand(cmd, true)
+	return runLocalCommandWithInputWithTimeout(localCommand, "", 0, false)
+}
+
+// RunCommandEx executes a command on the remote target using SSH with additional options.
+func (t *RemoteTarget) RunCommandEx(cmd *exec.Cmd, timeout int, newProcessGroup bool, reuseSSHConnection bool) (stdout string, stderr string, exitCode int, err error) {
 	localCommand := t.prepareLocalCommand(cmd, reuseSSHConnection)
-	return runLocalCommandWithInputWithTimeout(localCommand, "", timeout)
+	return runLocalCommandWithInputWithTimeout(localCommand, "", timeout, newProcessGroup)
 }
 
 // RunCommandStream executes a command asynchronously on a remote target.
@@ -48,8 +41,6 @@ func (t *RemoteTarget) RunCommand(cmd *exec.Cmd, timeout int, reuseSSHConnection
 //
 // Parameters:
 //   - cmd: The command to be executed, represented as an *exec.Cmd.
-//   - timeout: The maximum duration (in seconds) to allow the command to run.
-//   - reuseSSHConnection: A boolean indicating whether to reuse an existing SSH connection.
 //   - stdoutChannel: A channel to send the standard output of the command.
 //   - stderrChannel: A channel to send the standard error of the command.
 //   - exitcodeChannel: A channel to send the exit code of the command.
@@ -57,10 +48,10 @@ func (t *RemoteTarget) RunCommand(cmd *exec.Cmd, timeout int, reuseSSHConnection
 //
 // Returns:
 //   - err: An error object if the command fails to execute or times out.
-func (t *RemoteTarget) RunCommandStream(cmd *exec.Cmd, timeout int, reuseSSHConnection bool, stdoutChannel chan []byte, stderrChannel chan []byte, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) (err error) {
-	localCommand := t.prepareLocalCommand(cmd, reuseSSHConnection)
+func (t *RemoteTarget) RunCommandStream(cmd *exec.Cmd, stdoutChannel chan []byte, stderrChannel chan []byte, exitcodeChannel chan int, cmdChannel chan *exec.Cmd) (err error) {
+	localCommand := t.prepareLocalCommand(cmd, false)
 	cmdChannel <- localCommand
-	err = runLocalCommandWithInputWithTimeoutAsync(localCommand, stdoutChannel, stderrChannel, exitcodeChannel, "", timeout)
+	err = runLocalCommandWithInputWithTimeoutAsync(localCommand, stdoutChannel, stderrChannel, exitcodeChannel, "", 0)
 	return
 }
 
@@ -96,7 +87,7 @@ func (t *RemoteTarget) CreateTempDirectory(rootDir string) (tempDir string, err 
 		root = fmt.Sprintf("--tmpdir=%s", rootDir)
 	}
 	cmd := exec.Command("mktemp", "-d", "-t", root, "perfspect.tmp.XXXXXXXXXX", "|", "xargs", "realpath") // #nosec G204
-	tempDir, _, _, err = t.RunCommand(cmd, 0, true)
+	tempDir, _, _, err = t.RunCommand(cmd)
 	if err != nil {
 		return
 	}
@@ -158,14 +149,14 @@ func (t *RemoteTarget) PullFile(srcPath string, dstDir string) error {
 func (t *RemoteTarget) CreateDirectory(baseDir string, targetDir string) (dir string, err error) {
 	dir = filepath.Join(baseDir, targetDir)
 	cmd := exec.Command("mkdir", dir)
-	_, _, _, err = t.RunCommand(cmd, 0, true)
+	_, _, _, err = t.RunCommand(cmd)
 	return
 }
 
 func (t *RemoteTarget) RemoveDirectory(targetDir string) (err error) {
 	if targetDir != "" {
 		cmd := exec.Command("rm", "-rf", targetDir)
-		_, _, _, err = t.RunCommand(cmd, 0, true)
+		_, _, _, err = t.RunCommand(cmd)
 	}
 	return
 }
@@ -173,7 +164,7 @@ func (t *RemoteTarget) RemoveDirectory(targetDir string) (err error) {
 // CanConnect checks if the target is reachable.
 func (t *RemoteTarget) CanConnect() bool {
 	cmd := exec.Command("exit", "0")
-	_, _, _, err := t.RunCommand(cmd, 5, true)
+	_, _, _, err := t.RunCommand(cmd)
 	return err == nil
 }
 
@@ -188,7 +179,7 @@ func (t *RemoteTarget) CanElevatePrivileges() bool {
 		return true
 	}
 	cmd := exec.Command("sudo", "-kS", "ls")
-	_, _, _, err := t.RunCommand(cmd, 0, true)
+	_, _, _, err := t.RunCommand(cmd)
 	if err == nil { // true - passwordless sudo works
 		t.canElevate = 1
 		return true
@@ -219,7 +210,7 @@ func (t *RemoteTarget) GetName() (host string) {
 func (t *RemoteTarget) GetUserPath() (string, error) {
 	if t.userPath == "" {
 		cmd := exec.Command("echo", "$PATH")
-		stdout, _, _, err := t.RunCommand(cmd, 0, true)
+		stdout, _, _, err := t.RunCommand(cmd)
 		if err != nil {
 			return "", err
 		}
@@ -449,6 +440,6 @@ func (t *RemoteTarget) prepareAndRunSCPCommand(srcPath string, dstDir string, is
 	if usePass {
 		localCommand.Env = append(localCommand.Env, "SSHPASS="+t.sshPass)
 	}
-	stdout, stderr, exitCode, err = runLocalCommandWithInputWithTimeout(localCommand, "", 0)
+	stdout, stderr, exitCode, err = runLocalCommandWithInputWithTimeout(localCommand, "", 0, false)
 	return
 }

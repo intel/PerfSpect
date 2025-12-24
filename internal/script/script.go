@@ -125,7 +125,14 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 		} else {
 			cmd = exec.Command("bash", path.Join(myTarget.GetTempDirectory(), masterScriptName)) // #nosec G204
 		}
-		stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, false) // don't reuse ssh connection on long-running commands, makes it difficult to kill the command
+		timeout := 0 // no timeout
+		// We run parallel_master in a new process group so that tty/terminal signals, e.g., Ctrl-C, are not sent to the command. This is
+		// necessary to allow the master script to handle signals itself and propagate them to the child scripts as needed. The
+		// signal handler in perfspect will send the signal to the parallel_master.sh script on each target so that it can clean up
+		// its child processes.
+		newProcessGroup := true
+		reuseSSHConnection := false // don't reuse ssh connection on long-running commands, makes it difficult to kill the command
+		stdout, stderr, exitcode, err := myTarget.RunCommandEx(cmd, timeout, newProcessGroup, reuseSSHConnection)
 		if err != nil {
 			slog.Error("error running master script on target", slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitcode", exitcode), slog.String("error", err.Error()))
 			return nil, err
@@ -159,7 +166,13 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 		} else {
 			cmd = exec.Command("bash", scriptPath) // #nosec G204
 		}
-		stdout, stderr, exitcode, err := myTarget.RunCommand(cmd, 0, false)
+		// if the script is tagged with NeedsKill, we run it in a new process group so that tty/terminal signals, e.g., Ctrl-C, are not sent to the command. This is
+		// necessary to allow the script to handle signals itself and clean up as needed. The
+		// signal handler in perfspect will send the signal to the script on each target so that it can clean up
+		// as needed.
+		newProcessGroup := script.NeedsKill
+		reuseSSHConnection := false // don't reuse ssh connection on long-running commands, makes it difficult to kill the command
+		stdout, stderr, exitcode, err := myTarget.RunCommandEx(cmd, 0, newProcessGroup, reuseSSHConnection)
 		if err != nil {
 			slog.Warn("error running script on target", slog.String("name", script.Name), slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitcode", exitcode), slog.String("error", err.Error()))
 		}
@@ -189,7 +202,7 @@ func RunScriptStream(myTarget target.Target, script ScriptDefinition, localTempD
 		}()
 	}
 	cmd := prepareCommand(script, myTarget.GetTempDirectory())
-	err = myTarget.RunCommandStream(cmd, 0, false, stdoutChannel, stderrChannel, exitcodeChannel, cmdChannel)
+	err = myTarget.RunCommandStream(cmd, stdoutChannel, stderrChannel, exitcodeChannel, cmdChannel)
 	errorChannel <- err
 }
 
@@ -246,6 +259,9 @@ set -o pipefail
 
 script_dir={{.TargetTempDir}}
 cd "$script_dir"
+
+# write our pid to a file so that perfspect can send us a signal if needed
+echo $$ > primary_collection_script.pid
 
 declare -a scripts=()
 declare -A needs_kill=()
@@ -318,6 +334,7 @@ handle_sigint() {
     kill_script "$s"
   done
   print_summary
+  rm -f primary_collection_script.pid
   exit 0
 }
 
@@ -326,6 +343,7 @@ trap handle_sigint SIGINT
 start_scripts
 wait_for_scripts
 print_summary
+rm -f primary_collection_script.pid
 `
 	tmpl, err := template.New("master").Parse(masterScriptTemplate)
 	if err != nil {
