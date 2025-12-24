@@ -302,9 +302,6 @@ func (rc *ReportingCommand) Run() error {
 // Parameters:
 //   - myTargets: The list of targets to send the signal to.
 //   - statusFunc: A function to update the status of the progress indicator.
-//
-// Returns:
-//   - *sync.WaitGroup: A wait group that can be used to wait for the signal handler to complete.
 func configureSignalHandler(myTargets []target.Target, statusFunc progress.MultiSpinnerUpdateFunc) {
 	sigChannel := make(chan os.Signal, 1)
 	signal.Notify(sigChannel, syscall.SIGINT, syscall.SIGTERM)
