@@ -609,9 +609,13 @@ func instructionTelemetryTableValues(outputs map[string]script.ScriptOutput) []t
 	// first two lines are not part of the CSV output, they are the start time and interval
 	var startTime time.Time
 	var interval int
+	if len(outputs[script.InstructionTelemetryScriptName].Stdout) == 0 {
+		slog.Warn("instruction mix output is empty")
+		return []table.Field{}
+	}
 	lines := strings.Split(outputs[script.InstructionTelemetryScriptName].Stdout, "\n")
 	if len(lines) < 4 {
-		slog.Warn("no data found in instruction mix output")
+		slog.Warn("no data lines found in instruction mix output")
 		return []table.Field{}
 	}
 	// TIME

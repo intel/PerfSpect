@@ -53,7 +53,7 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 	var concurrentScripts []ScriptDefinition
 	for _, script := range scripts {
 		if script.Superuser && !canElevate {
-			slog.Debug("skipping script because it requires superuser privileges and the user cannot elevate privileges on target", slog.String("script", script.Name))
+			slog.Warn("skipping script because it requires superuser privileges and the user cannot elevate privileges on target", slog.String("script", script.Name))
 			continue
 		}
 		if script.Sequential {
@@ -62,14 +62,16 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 			concurrentScripts = append(concurrentScripts, script)
 		}
 	}
+	if len(sequentialScripts) == 0 && len(concurrentScripts) == 0 {
+		return nil, fmt.Errorf("no scripts to run on target")
+	}
 	// prepare target to run scripts by copying scripts and dependencies to target and installing LKMs
 	if statusUpdate != nil {
 		_ = statusUpdate(myTarget.GetName(), "preparing to collect data")
 	}
 	installedLkms, err := prepareTargetToRunScripts(myTarget, append(sequentialScripts, concurrentScripts...), localTempDir, false)
 	if err != nil {
-		err = fmt.Errorf("error while preparing target to run scripts: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("error while preparing target to run scripts: %v", err)
 	}
 	if len(installedLkms) > 0 {
 		defer func() {

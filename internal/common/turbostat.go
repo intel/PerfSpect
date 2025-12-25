@@ -91,19 +91,18 @@ func parseTurbostatOutput(output string) ([]map[string]string, error) {
 // The "platform" rows are those where Package, Die, Core, and CPU are all "-".
 // The first column is the sample time, and the rest are the values for the specified fields.
 func TurbostatPlatformRows(turboStatScriptOutput string, fieldNames []string) ([][]string, error) {
+	if turboStatScriptOutput == "" {
+		return nil, fmt.Errorf("turbostat output is empty")
+	}
 	if len(fieldNames) == 0 {
-		err := fmt.Errorf("no field names provided")
-		slog.Error(err.Error())
-		return nil, err
+		return nil, fmt.Errorf("no field names provided")
 	}
 	rows, err := parseTurbostatOutput(turboStatScriptOutput)
 	if err != nil {
-		err := fmt.Errorf("unable to parse turbostat output: %w", err)
-		return nil, err
+		return nil, fmt.Errorf("unable to parse turbostat output: %w", err)
 	}
 	if len(rows) == 0 {
-		slog.Warn("no platform rows found in turbostat output")
-		return nil, nil
+		return nil, fmt.Errorf("no platform rows found in turbostat output")
 	}
 	// filter the rows to the summary rows only
 	var fieldValues [][]string
@@ -145,18 +144,18 @@ func isPlatformRow(row map[string]string) bool {
 // for each package, for the specified field names.
 // The first column is the sample time, and the rest are the values for the specified fields.
 func TurbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([][][]string, error) {
+	if turboStatScriptOutput == "" {
+		return nil, fmt.Errorf("turbostat output is empty")
+	}
 	if len(fieldNames) == 0 {
-		err := fmt.Errorf("no field names provided")
-		return nil, err
+		return nil, fmt.Errorf("no field names provided")
 	}
 	rows, err := parseTurbostatOutput(turboStatScriptOutput)
 	if err != nil {
-		err := fmt.Errorf("unable to parse turbostat output: %w", err)
-		return nil, err
+		return nil, fmt.Errorf("unable to parse turbostat output: %w", err)
 	}
 	if len(rows) == 0 {
-		slog.Warn("no package rows found in turbostat output")
-		return nil, nil
+		return nil, fmt.Errorf("no package rows found in turbostat output")
 	}
 	var packageRows [][][]string
 	for _, row := range rows {
@@ -195,8 +194,7 @@ func TurbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([]
 		}
 	}
 	if len(packageRows) == 0 {
-		err := fmt.Errorf("no data found in turbostat output for fields: %s", fieldNames)
-		return nil, err
+		return nil, fmt.Errorf("no data found in turbostat output for fields: %s", fieldNames)
 	}
 	return packageRows, nil
 }

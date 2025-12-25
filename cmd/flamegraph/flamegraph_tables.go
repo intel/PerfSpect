@@ -41,6 +41,10 @@ func callStackFrequencyTableValues(outputs map[string]script.ScriptOutput) []tab
 }
 
 func javaFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
+	if outputs[script.CollapsedCallStacksScriptName].Stdout == "" {
+		slog.Warn("collapsed call stack output is empty")
+		return ""
+	}
 	sections := common.GetSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
 	if len(sections) == 0 {
 		slog.Warn("no sections in collapsed call stack output")
@@ -79,6 +83,10 @@ func javaFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
 }
 
 func nativeFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
+	if outputs[script.CollapsedCallStacksScriptName].Stdout == "" {
+		slog.Warn("collapsed call stack output is empty")
+		return ""
+	}
 	sections := common.GetSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
 	if len(sections) == 0 {
 		slog.Warn("no sections in collapsed call stack output")
@@ -104,6 +112,10 @@ func nativeFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
 }
 
 func maxRenderDepthFromOutput(outputs map[string]script.ScriptOutput) string {
+	if outputs[script.CollapsedCallStacksScriptName].Stdout == "" {
+		slog.Warn("collapsed call stack output is empty")
+		return ""
+	}
 	sections := common.GetSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
 	if len(sections) == 0 {
 		slog.Warn("no sections in collapsed call stack output")
