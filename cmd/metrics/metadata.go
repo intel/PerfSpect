@@ -157,7 +157,7 @@ func (c *X86MetadataCollector) CollectMetadata(t target.Target, noRoot bool, noS
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to get number of general purpose counters: %v", err)
 	}
-	// the rest of the metadata is retrieved by running scripts in parallel
+	// the rest of the metadata is retrieved by running scripts concurrently
 	metadataScripts, err := getMetadataScripts(noRoot, noSystemSummary, metadata.NumGeneralPurposeCounters)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to get metadata scripts: %v", err)
@@ -336,7 +336,7 @@ func (c *ARMMetadataCollector) CollectMetadata(t target.Target, noRoot bool, noS
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to get number of general purpose counters: %v", err)
 	}
-	// the rest of the metadata is retrieved by running scripts in parallel and then parsing the output
+	// the rest of the metadata is retrieved by running scripts concurrently and then parsing the output
 	metadataScripts, err := getMetadataScripts(noRoot, noSystemSummary, metadata.NumGeneralPurposeCounters)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to get metadata scripts: %v", err)
@@ -393,7 +393,7 @@ func (c *ARMMetadataCollector) CollectMetadata(t target.Target, noRoot bool, noS
 }
 
 func getMetadataScripts(noRoot bool, noSystemSummary bool, numGPCounters int) (metadataScripts []script.ScriptDefinition, err error) {
-	// reduce startup time by running the metadata scripts in parallel
+	// reduce startup time by running the metadata scripts concurrently
 	metadataScriptDefs := []script.ScriptDefinition{
 		{
 			Name:           "get architecture",

@@ -23,6 +23,8 @@ import (
 //go:embed resources
 var Resources embed.FS
 
+const ControllerPIDFileName = "controller.pid"
+
 type ScriptOutput struct {
 	ScriptDefinition
 	Stdout   string
@@ -45,10 +47,10 @@ func RunScript(myTarget target.Target, script ScriptDefinition, localTempDir str
 
 // RunScripts runs a list of scripts on a target and returns the outputs of each script as a map with the script name as the key.
 func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScriptErrors bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc, collectingStatus string) (map[string]ScriptOutput, error) {
-	// drop scripts that should not be run and separate scripts that must run sequentially from those that can be run in parallel
+	// drop scripts that should not be run and separate scripts that must run sequentially from those that can be run concurrently
 	canElevate := myTarget.CanElevatePrivileges()
 	var sequentialScripts []ScriptDefinition
-	var parallelScripts []ScriptDefinition
+	var concurrentScripts []ScriptDefinition
 	for _, script := range scripts {
 		if script.Superuser && !canElevate {
 			slog.Debug("skipping script because it requires superuser privileges and the user cannot elevate privileges on target", slog.String("script", script.Name))
@@ -57,14 +59,14 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 		if script.Sequential {
 			sequentialScripts = append(sequentialScripts, script)
 		} else {
-			parallelScripts = append(parallelScripts, script)
+			concurrentScripts = append(concurrentScripts, script)
 		}
 	}
 	// prepare target to run scripts by copying scripts and dependencies to target and installing LKMs
 	if statusUpdate != nil {
 		_ = statusUpdate(myTarget.GetName(), "preparing to collect data")
 	}
-	installedLkms, err := prepareTargetToRunScripts(myTarget, append(sequentialScripts, parallelScripts...), localTempDir, false)
+	installedLkms, err := prepareTargetToRunScripts(myTarget, append(sequentialScripts, concurrentScripts...), localTempDir, false)
 	if err != nil {
 		err = fmt.Errorf("error while preparing target to run scripts: %v", err)
 		return nil, err
@@ -80,107 +82,66 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 	if statusUpdate != nil {
 		_ = statusUpdate(myTarget.GetName(), collectingStatus)
 	}
-	// if there's only 1 parallel script, run it sequentially
-	if len(parallelScripts) == 1 {
-		slog.Debug("running single parallel script sequentially", slog.String("script", parallelScripts[0].Name))
-		sequentialScripts = append(sequentialScripts, parallelScripts...)
-		parallelScripts = nil
-	}
 	scriptOutputs := make(map[string]ScriptOutput)
-	// run parallel scripts
-	if len(parallelScripts) > 0 {
-		// form one master script that calls all the parallel scripts in the background
-		masterScriptName := "parallel_master.sh"
-		masterScript, needsElevatedPrivileges, err := formMasterScript(myTarget.GetTempDirectory(), parallelScripts)
-		if err != nil {
-			err = fmt.Errorf("error forming master script: %v", err)
-			return nil, err
-		}
-		// write master script to local file
-		masterScriptPath := path.Join(localTempDir, myTarget.GetName(), masterScriptName)
-		err = os.WriteFile(masterScriptPath, []byte(masterScript), 0600)
-		if err != nil {
-			err = fmt.Errorf("error writing master script to local file: %v", err)
-			return nil, err
-		}
-		// copy master script to target
-		err = myTarget.PushFile(masterScriptPath, myTarget.GetTempDirectory())
-		if err != nil {
-			err = fmt.Errorf("error copying script to target: %v", err)
-			return nil, err
-		}
-		// run master script on target
-		// if the master script requires elevated privileges, we run it with sudo
-		// Note: adding 'sudo' to the individual scripts inside the master script
-		// instigates a known bug in the terminal that corrupts the tty settings:
-		// https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1043320
-		var cmd *exec.Cmd
-		if needsElevatedPrivileges && !canElevate {
-			// this shouldn't happen because we already filtered out the scripts that require elevated privileges if the user cannot elevate privileges on the target
-			err = fmt.Errorf("master script requires elevated privileges but the user cannot elevate privileges on target")
-			return nil, err
-		} else if needsElevatedPrivileges && !myTarget.IsSuperUser() {
-			// run master script with sudo, "-S" to read password from stdin. Note: password won't be asked for if password-less sudo is configured.
-			cmd = exec.Command("sudo", "-S", "bash", path.Join(myTarget.GetTempDirectory(), masterScriptName)) // #nosec G204
-		} else {
-			cmd = exec.Command("bash", path.Join(myTarget.GetTempDirectory(), masterScriptName)) // #nosec G204
-		}
-		timeout := 0 // no timeout
-		// We run parallel_master in a new process group so that tty/terminal signals, e.g., Ctrl-C, are not sent to the command. This is
-		// necessary to allow the master script to handle signals itself and propagate them to the child scripts as needed. The
-		// signal handler in perfspect will send the signal to the parallel_master.sh script on each target so that it can clean up
-		// its child processes.
-		newProcessGroup := true
-		reuseSSHConnection := false // don't reuse ssh connection on long-running commands, makes it difficult to kill the command
-		stdout, stderr, exitcode, err := myTarget.RunCommandEx(cmd, timeout, newProcessGroup, reuseSSHConnection)
-		if err != nil {
-			slog.Error("error running master script on target", slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitcode", exitcode), slog.String("error", err.Error()))
-			return nil, err
-		}
-		// parse output of master script
-		parallelScriptOutputs := parseMasterScriptOutput(stdout)
-		for _, scriptOutput := range parallelScriptOutputs {
-			// find associated parallel script
-			scriptIdx := -1
-			for i, script := range parallelScripts {
-				if script.Name == scriptOutput.Name {
-					scriptIdx = i
-					break
-				}
-			}
-			scriptOutput.ScriptTemplate = parallelScripts[scriptIdx].ScriptTemplate
-			scriptOutputs[scriptOutput.Name] = scriptOutput
-		}
+	// form a unified controller script that runs all scripts (both concurrent and sequential phases)
+	controllerScriptName := "controller.sh"
+	controllerScript, needsElevatedPrivileges, err := formControllerScript(myTarget.GetTempDirectory(), concurrentScripts, sequentialScripts)
+	if err != nil {
+		err = fmt.Errorf("error forming controller script: %v", err)
+		return nil, err
 	}
-	// run sequential scripts
-	for _, script := range sequentialScripts {
-		var cmd *exec.Cmd
-		scriptPath := path.Join(myTarget.GetTempDirectory(), scriptNameToFilename(script.Name))
-		if script.Superuser && !canElevate {
-			// this shouldn't happen because we already filtered out the scripts that require elevated privileges if the user cannot elevate privileges on the target
-			err = fmt.Errorf("script requires elevated privileges but the user cannot elevate privileges on target")
-			return nil, err
-		} else if script.Superuser && !myTarget.IsSuperUser() {
-			// run script with sudo, "-S" to read password from stdin. Note: password won't be asked for if password-less sudo is configured.
-			cmd = exec.Command("sudo", "-S", "bash", scriptPath) // #nosec G204
-		} else {
-			cmd = exec.Command("bash", scriptPath) // #nosec G204
+	// write controller script to local file
+	controllerScriptPath := path.Join(localTempDir, myTarget.GetName(), controllerScriptName)
+	err = os.WriteFile(controllerScriptPath, []byte(controllerScript), 0600)
+	if err != nil {
+		err = fmt.Errorf("error writing controller script to local file: %v", err)
+		return nil, err
+	}
+	// copy controller script to target
+	err = myTarget.PushFile(controllerScriptPath, myTarget.GetTempDirectory())
+	if err != nil {
+		err = fmt.Errorf("error copying script to target: %v", err)
+		return nil, err
+	}
+	// run controller script on target
+	// if the controller script requires elevated privileges, we run it with sudo
+	// Note: adding 'sudo' to the individual scripts inside the controller script
+	// instigates a known bug in the terminal that corrupts the tty settings:
+	// https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1043320
+	var cmd *exec.Cmd
+	if needsElevatedPrivileges && !canElevate {
+		// this shouldn't happen because we already filtered out the scripts that require elevated privileges if the user cannot elevate privileges on the target
+		err = fmt.Errorf("controller script requires elevated privileges but the user cannot elevate privileges on target")
+		return nil, err
+	} else if needsElevatedPrivileges && !myTarget.IsSuperUser() {
+		// run controller script with sudo, "-S" to read password from stdin. Note: password won't be asked for if password-less sudo is configured.
+		cmd = exec.Command("sudo", "-S", "bash", path.Join(myTarget.GetTempDirectory(), controllerScriptName)) // #nosec G204
+	} else {
+		cmd = exec.Command("bash", path.Join(myTarget.GetTempDirectory(), controllerScriptName)) // #nosec G204
+	}
+	timeout := 0 // no timeout
+	// We run controller in a new process group so that tty/terminal signals, e.g., Ctrl-C, are not sent to the command. This is
+	// necessary to allow the controller script to handle signals itself and propagate them to all child scripts as needed. The
+	// signal handler in perfspect will send the signal to the controller.sh script on each target so that it can clean up
+	// its child processes.
+	newProcessGroup := true
+	reuseSSHConnection := false // don't reuse ssh connection on long-running commands, makes it difficult to kill the command
+	stdout, stderr, exitcode, err := myTarget.RunCommandEx(cmd, timeout, newProcessGroup, reuseSSHConnection)
+	if err != nil {
+		slog.Error("error running controller script on target", slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitcode", exitcode), slog.String("error", err.Error()))
+		return nil, err
+	}
+	// parse output of controller script
+	allScriptOutputs := parseControllerScriptOutput(stdout)
+	for _, scriptOutput := range allScriptOutputs {
+		// find associated script (concurrent or sequential)
+		for _, script := range append(concurrentScripts, sequentialScripts...) {
+			if script.Name == scriptOutput.Name {
+				scriptOutput.ScriptTemplate = script.ScriptTemplate
+				scriptOutputs[scriptOutput.Name] = scriptOutput
+				break
+			}
 		}
-		// if the script is tagged with NeedsKill, we run it in a new process group so that tty/terminal signals, e.g., Ctrl-C, are not sent to the command. This is
-		// necessary to allow the script to handle signals itself and clean up as needed. The
-		// signal handler in perfspect will send the signal to the script on each target so that it can clean up
-		// as needed.
-		newProcessGroup := script.NeedsKill
-		reuseSSHConnection := false // don't reuse ssh connection on long-running commands, makes it difficult to kill the command
-		stdout, stderr, exitcode, err := myTarget.RunCommandEx(cmd, 0, newProcessGroup, reuseSSHConnection)
-		if err != nil {
-			slog.Warn("error running script on target", slog.String("name", script.Name), slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitcode", exitcode), slog.String("error", err.Error()))
-		}
-		scriptOutputs[script.Name] = ScriptOutput{ScriptDefinition: script, Stdout: stdout, Stderr: stderr, Exitcode: exitcode}
-		if !ignoreScriptErrors {
-			return scriptOutputs, err
-		}
-		err = nil
 	}
 	return scriptOutputs, nil
 }
@@ -229,31 +190,49 @@ func scriptNameToFilename(name string) string {
 	return sanitizeScriptName(name) + ".sh"
 }
 
-// formMasterScript forms a master script that runs all parallel scripts in the background, waits for them to finish, then prints the output of each script.
-// Return values are the master script and a boolean indicating whether the master script requires elevated privileges.
-func formMasterScript(targetTempDirectory string, parallelScripts []ScriptDefinition) (string, bool, error) {
-	// data model for template
+// formControllerScript forms a controller script that runs all scripts in two phases:
+// first all concurrent scripts together in the background, then all sequential scripts one-by-one.
+// It handles signals and cleanup for both phases uniformly.
+// Return values are the controller script and a boolean indicating whether the controller script requires elevated privileges.
+func formControllerScript(targetTempDirectory string, concurrentScripts []ScriptDefinition, sequentialScripts []ScriptDefinition) (string, bool, error) {
+	// tplScript holds the minimal per-script fields passed into the
+	// template that renders the shell controller script.
+	// Primarily carries the sanitized script name used for filenames and
+	// template keys (e.g., ${s}.sh, ${s}.stdout, pids[$s]), while the original
+	// Name is kept for readable summary output.
 	type tplScript struct {
 		Name      string
 		Sanitized string
-		NeedsKill bool
-		Superuser bool
 	}
-	data := struct {
-		TargetTempDir string
-		Scripts       []tplScript
+	// tplData holds all data passed into the controller script template.
+	tplData := struct {
+		TargetTempDir     string
+		ControllerPIDFile string
+		ConcurrentScripts []tplScript
+		SequentialScripts []tplScript
 	}{}
-	data.TargetTempDir = targetTempDirectory
+	// populate tplData
+	tplData.TargetTempDir = targetTempDirectory
+	tplData.ControllerPIDFile = ControllerPIDFileName
 	needsElevated := false
-	for _, s := range parallelScripts {
+	for _, s := range concurrentScripts {
 		if s.Superuser {
 			needsElevated = true
 		}
-		data.Scripts = append(data.Scripts, tplScript{
-			Name: s.Name, Sanitized: sanitizeScriptName(s.Name), NeedsKill: s.NeedsKill, Superuser: s.Superuser,
+		tplData.ConcurrentScripts = append(tplData.ConcurrentScripts, tplScript{
+			Name: s.Name, Sanitized: sanitizeScriptName(s.Name),
 		})
 	}
-	const masterScriptTemplate = `#!/usr/bin/env bash
+	for _, s := range sequentialScripts {
+		if s.Superuser {
+			needsElevated = true
+		}
+		tplData.SequentialScripts = append(tplData.SequentialScripts, tplScript{
+			Name: s.Name, Sanitized: sanitizeScriptName(s.Name),
+		})
+	}
+	// define controller script template
+	const controllerScriptTemplate = `#!/usr/bin/env bash
 set -o errexit
 set -o pipefail
 
@@ -261,24 +240,53 @@ script_dir={{.TargetTempDir}}
 cd "$script_dir"
 
 # write our pid to a file so that perfspect can send us a signal if needed
-echo $$ > primary_collection_script.pid
+echo $$ > {{.ControllerPIDFile}}
 
-declare -a scripts=()
-declare -A needs_kill=()
+declare -a concurrent_scripts=()
+declare -a sequential_scripts=()
 declare -A pids=()
 declare -A exitcodes=()
 declare -A orig_names=()
+current_seq_pid=""
 
-{{- range .Scripts}}
-scripts+=({{ .Sanitized }})
-needs_kill[{{ .Sanitized }}]={{ if .NeedsKill }}1{{ else }}0{{ end }}
+ensure_trailing_newline() {
+    local f="$1"
+    if [ ! -f "$f" ]; then return; fi
+    cat "$f" || true
+    if [ -s "$f" ]; then
+        if [ "$(tail -c 1 "$f" 2>/dev/null | wc -l)" -eq 0 ]; then echo; fi
+    fi
+}
+
+{{- range .ConcurrentScripts}}
+concurrent_scripts+=({{ .Sanitized }})
+orig_names[{{ .Sanitized }}]="{{ .Name }}"
+{{ end }}
+{{- range .SequentialScripts}}
+sequential_scripts+=({{ .Sanitized }})
 orig_names[{{ .Sanitized }}]="{{ .Name }}"
 {{ end }}
 
-start_scripts() {
-  for s in "${scripts[@]}"; do
-    bash "$script_dir/${s}.sh" > "$script_dir/${s}.stdout" 2> "$script_dir/${s}.stderr" &
+start_concurrent_scripts() {
+  for s in "${concurrent_scripts[@]}"; do
+    setsid bash "$script_dir/${s}.sh" > "$script_dir/${s}.stdout" 2> "$script_dir/${s}.stderr" &
     pids[$s]=$!
+  done
+}
+
+run_sequential_scripts() {
+  for s in "${sequential_scripts[@]}"; do
+    current_seq_pid=""
+    setsid bash "$script_dir/${s}.sh" > "$script_dir/${s}.stdout" 2> "$script_dir/${s}.stderr" &
+    current_seq_pid=$!
+    pids[$s]=$current_seq_pid
+    if wait "$current_seq_pid"; then
+      exitcodes[$s]=0
+    else
+      ec=$?
+      exitcodes[$s]=$ec
+    fi
+    current_seq_pid=""
   done
 }
 
@@ -287,28 +295,18 @@ kill_script() {
   local pid="${pids[$s]:-}"
   [[ -z "$pid" ]] && return 0
   if ! ps -p "$pid" > /dev/null 2>&1; then return 0; fi
-  if [[ "${needs_kill[$s]}" == "1" && -f "${s}_cmd.pid" ]]; then
-    local bgpid
-    bgpid="$(cat "${s}_cmd.pid" 2>/dev/null || true)"
-    if [[ -n "$bgpid" && $(ps -p "$bgpid" -o pid= 2>/dev/null) ]]; then
-      kill -SIGINT "$bgpid" 2>/dev/null || true
-      sleep 0.5
-      if ps -p "$bgpid" > /dev/null 2>&1; then
-        kill -SIGKILL "$bgpid" 2>/dev/null || true
-        exitcodes[$s]=137
-      else
-        exitcodes[$s]=0
-      fi
-    fi
-  else
-    kill -SIGINT "$pid" 2>/dev/null || true
-    wait "$pid" 2>/dev/null || true
-    if [[ -z "${exitcodes[$s]:-}" ]]; then exitcodes[$s]=130; fi
-  fi
+  # Send signal to the process group (negative PID)
+  kill -SIGINT -"$pid" 2>/dev/null || true
+  # Give it a moment to clean up
+  sleep 0.1
+  # Force kill the process group if still alive
+  kill -SIGKILL -"$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  if [[ -z "${exitcodes[$s]:-}" ]]; then exitcodes[$s]=130; fi
 }
 
-wait_for_scripts() {
-  for s in "${scripts[@]}"; do
+wait_for_concurrent_scripts() {
+  for s in "${concurrent_scripts[@]}"; do
     if wait "${pids[$s]}"; then
       exitcodes[$s]=0
     else
@@ -319,50 +317,63 @@ wait_for_scripts() {
 }
 
 print_summary() {
-  for s in "${scripts[@]}"; do
+  local all_scripts=("${concurrent_scripts[@]}" "${sequential_scripts[@]}")
+  for s in "${all_scripts[@]}"; do
     echo "<---------------------->"
     echo "SCRIPT NAME: ${orig_names[$s]}"
-    echo "STDOUT:"; cat "$script_dir/${s}.stdout" || true
-    echo "STDERR:"; cat "$script_dir/${s}.stderr" || true
+    echo "STDOUT:"; ensure_trailing_newline "$script_dir/${s}.stdout"
+    echo "STDERR:"; ensure_trailing_newline "$script_dir/${s}.stderr"
     echo "EXIT CODE: ${exitcodes[$s]:-1}"
   done
 }
 
 handle_sigint() {
   echo "Received SIGINT; attempting graceful shutdown" >&2
-  for s in "${scripts[@]}"; do
+  # kill all running concurrent scripts
+  for s in "${concurrent_scripts[@]}"; do
     kill_script "$s"
   done
+  # kill current sequential script if running
+  if [[ -n "$current_seq_pid" ]]; then
+    kill -SIGINT -"$current_seq_pid" 2>/dev/null || true
+    sleep 0.1
+    kill -SIGKILL -"$current_seq_pid" 2>/dev/null || true
+    wait "$current_seq_pid" 2>/dev/null || true
+  fi
   print_summary
-  rm -f primary_collection_script.pid
+  rm -f {{.ControllerPIDFile}}
   exit 0
 }
 
 trap handle_sigint SIGINT
 
-start_scripts
-wait_for_scripts
+# run concurrent scripts first
+start_concurrent_scripts
+wait_for_concurrent_scripts
+# then run sequential scripts
+run_sequential_scripts
 print_summary
-rm -f primary_collection_script.pid
+rm -f {{.ControllerPIDFile}}
 `
-	tmpl, err := template.New("master").Parse(masterScriptTemplate)
+	// render controller script template
+	tmpl, err := template.New("controller").Parse(controllerScriptTemplate)
 	if err != nil {
-		slog.Error("failed to parse master script template", slog.String("error", err.Error()))
+		slog.Error("failed to parse controller script template", slog.String("error", err.Error()))
 		return "", needsElevated, err
 	}
 	var out strings.Builder
-	if err = tmpl.Execute(&out, data); err != nil {
-		slog.Error("failed to execute master script template", slog.String("error", err.Error()))
+	if err = tmpl.Execute(&out, tplData); err != nil {
+		slog.Error("failed to execute controller script template", slog.String("error", err.Error()))
 		return "", needsElevated, err
 	}
 	return out.String(), needsElevated, nil
 }
 
-// parseMasterScriptOutput parses the output of the master script that runs all parallel scripts in the background.
+// parseControllerScriptOutput parses the output of the controller script that runs all scripts (concurrent and sequential).
 // It returns a list of ScriptOutput objects, one for each script that was run.
-func parseMasterScriptOutput(masterScriptOutput string) (scriptOutputs []ScriptOutput) {
-	// split output of master script into individual script outputs
-	for output := range strings.SplitSeq(masterScriptOutput, "<---------------------->\n") {
+func parseControllerScriptOutput(controllerScriptOutput string) (scriptOutputs []ScriptOutput) {
+	// split output of controller script into individual script outputs
+	for output := range strings.SplitSeq(controllerScriptOutput, "<---------------------->\n") {
 		lines := strings.Split(output, "\n")
 		if len(lines) < 4 { // minimum lines for a script output
 			continue

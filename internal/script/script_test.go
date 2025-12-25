@@ -219,7 +219,7 @@ func TestFormMasterScriptTemplateStructure(t *testing.T) {
 		{Name: "alpha script", Superuser: false},
 		{Name: "beta-script", Superuser: true},
 	}
-	master, elevated, err := formMasterScript("/tmp/targetdir", scripts)
+	master, elevated, err := formControllerScript("/tmp/targetdir", scripts, nil)
 	if err != nil {
 		t.Fatalf("error forming master script: %v", err)
 	}
@@ -231,7 +231,7 @@ func TestFormMasterScriptTemplateStructure(t *testing.T) {
 		t.Errorf("master script missing shebang")
 	}
 	// Functions present
-	for _, fn := range []string{"start_scripts()", "kill_script()", "wait_for_scripts()", "print_summary()", "handle_sigint()"} {
+	for _, fn := range []string{"start_concurrent_scripts()", "run_sequential_scripts()", "kill_script()", "wait_for_concurrent_scripts()", "print_summary()", "handle_sigint()"} {
 		if !strings.Contains(master, fn) {
 			t.Errorf("expected function %s in master script", fn)
 		}
@@ -254,7 +254,7 @@ func TestFormMasterScriptTemplateStructure(t *testing.T) {
 
 func TestFormMasterScriptNeedsElevatedFlag(t *testing.T) {
 	scripts := []ScriptDefinition{{Name: "user", Superuser: false}, {Name: "also user", Superuser: false}}
-	_, elevated, err := formMasterScript("/tmp/dir", scripts)
+	_, elevated, err := formControllerScript("/tmp/dir", scripts, nil)
 	if err != nil {
 		t.Fatalf("error forming master script: %v", err)
 	}
@@ -264,7 +264,7 @@ func TestFormMasterScriptNeedsElevatedFlag(t *testing.T) {
 }
 
 func TestFormMasterScriptEmptyScripts(t *testing.T) {
-	master, elevated, err := formMasterScript("/tmp/dir", nil)
+	master, elevated, err := formControllerScript("/tmp/dir", nil, nil)
 	if err != nil {
 		t.Fatalf("error forming master script: %v", err)
 	}
@@ -272,7 +272,7 @@ func TestFormMasterScriptEmptyScripts(t *testing.T) {
 		t.Fatalf("expected elevated=false with empty slice")
 	}
 	// Should still contain core function definitions even if no scripts.
-	if !strings.Contains(master, "start_scripts()") || !strings.Contains(master, "print_summary()") {
+	if !strings.Contains(master, "start_concurrent_scripts()") || !strings.Contains(master, "print_summary()") {
 		t.Errorf("template missing expected functions for empty slice")
 	}
 	t.Logf("MASTER SCRIPT EMPTY:\n%s", master)
@@ -291,7 +291,7 @@ func TestFormMasterScriptExecutionIntegration(t *testing.T) {
 	// Integration test: create temp directory, stub two child scripts, run master script, parse output.
 	tmp := t.TempDir()
 	scripts := []ScriptDefinition{{Name: "alpha script"}, {Name: "beta-script"}}
-	master, elevated, err := formMasterScript(tmp, scripts)
+	master, elevated, err := formControllerScript(tmp, scripts, nil)
 	if err != nil {
 		t.Fatalf("error forming master script: %v", err)
 	}
@@ -308,7 +308,7 @@ func TestFormMasterScriptExecutionIntegration(t *testing.T) {
 		}
 	}
 	// Write master script.
-	masterPath := filepath.Join(tmp, "parallel_master.sh")
+	masterPath := filepath.Join(tmp, "concurrent_master.sh")
 	if err := os.WriteFile(masterPath, []byte(master), 0o700); err != nil {
 		t.Fatalf("failed writing master script: %v", err)
 	}
@@ -319,7 +319,7 @@ func TestFormMasterScriptExecutionIntegration(t *testing.T) {
 		content, _ := os.ReadFile(masterPath)
 		t.Fatalf("error executing master script: %v\nstdout+stderr: %s\nMASTER SCRIPT:\n%s", err, out, string(content))
 	}
-	parsed := parseMasterScriptOutput(out)
+	parsed := parseControllerScriptOutput(out)
 	if len(parsed) != 2 {
 		t.Fatalf("expected 2 parsed script outputs, got %d", len(parsed))
 	}

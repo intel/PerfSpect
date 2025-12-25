@@ -221,7 +221,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 // prepareTarget prepares the target for configuration changes
 // almost all set scripts require the msr kernel module to be loaded and
 // use wrmsr and rdmsr, so we do that here so that the goroutines for the
-// set scripts can run in parallel without conflicts
+// set scripts can run concurrently without conflicts
 func prepareTarget(myTarget target.Target, localTempDir string) (err error) {
 	prepareScript := script.ScriptDefinition{
 		Name:           "prepare-target",
