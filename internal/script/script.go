@@ -164,14 +164,16 @@ func RunScriptStream(myTarget target.Target, script ScriptDefinition, localTempD
 			}
 		}()
 	}
-	cmd := prepareCommand(script, myTarget.GetTempDirectory())
+	cmd := prepareCommand(script, myTarget)
 	err = myTarget.RunCommandStream(cmd, stdoutChannel, stderrChannel, exitcodeChannel, cmdChannel)
 	errorChannel <- err
 }
 
-func prepareCommand(script ScriptDefinition, targetTempDirectory string) (cmd *exec.Cmd) {
-	scriptPath := path.Join(targetTempDirectory, scriptNameToFilename(script.Name))
-	if script.Superuser {
+// prepareCommand prepares the command to run the specified script on the target.
+// If the script requires superuser privileges and the target's user is not already superuser, run with sudo.
+func prepareCommand(script ScriptDefinition, myTarget target.Target) (cmd *exec.Cmd) {
+	scriptPath := path.Join(myTarget.GetTempDirectory(), scriptNameToFilename(script.Name))
+	if script.Superuser && !myTarget.IsSuperUser() {
 		cmd = exec.Command("sudo", "bash", scriptPath) // #nosec G204
 	} else {
 		cmd = exec.Command("bash", scriptPath) // #nosec G204
