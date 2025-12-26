@@ -35,6 +35,9 @@ type ScriptOutput struct {
 // RunScript runs a script on the specified target and returns the output.
 func RunScript(myTarget target.Target, script ScriptDefinition, localTempDir string) (ScriptOutput, error) {
 	scriptOutputs, err := RunScripts(myTarget, []ScriptDefinition{script}, false, localTempDir, nil, "")
+	if err != nil {
+		return ScriptOutput{}, err
+	}
 	if scriptOutputs == nil {
 		return ScriptOutput{}, err
 	}
@@ -46,7 +49,7 @@ func RunScript(myTarget target.Target, script ScriptDefinition, localTempDir str
 }
 
 // RunScripts runs a list of scripts on a target and returns the outputs of each script as a map with the script name as the key.
-func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScriptErrors bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc, collectingStatus string) (map[string]ScriptOutput, error) {
+func RunScripts(myTarget target.Target, scripts []ScriptDefinition, continueOnScriptError bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc, collectingStatus string) (map[string]ScriptOutput, error) {
 	// drop scripts that should not be run and separate scripts that must run sequentially from those that can be run concurrently
 	canElevate := myTarget.CanElevatePrivileges()
 	var sequentialScripts []ScriptDefinition
@@ -87,7 +90,7 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, ignoreScript
 	scriptOutputs := make(map[string]ScriptOutput)
 	// form a unified controller script that runs all scripts (both concurrent and sequential phases)
 	controllerScriptName := "controller.sh"
-	controllerScript, needsElevatedPrivileges, err := formControllerScript(myTarget.GetTempDirectory(), concurrentScripts, sequentialScripts)
+	controllerScript, needsElevatedPrivileges, err := formControllerScript(myTarget.GetTempDirectory(), concurrentScripts, sequentialScripts, continueOnScriptError)
 	if err != nil {
 		err = fmt.Errorf("error forming controller script: %v", err)
 		return nil, err
@@ -197,8 +200,10 @@ func scriptNameToFilename(name string) string {
 // formControllerScript forms a controller script that runs all scripts in two phases:
 // first all concurrent scripts together in the background, then all sequential scripts one-by-one.
 // It handles signals and cleanup for both phases uniformly.
+// If continueOnScriptError is false, when running sequential scripts, the controller script will stop executing further
+// sequential scripts upon the first script failure and return an error.
 // Return values are the controller script and a boolean indicating whether the controller script requires elevated privileges.
-func formControllerScript(targetTempDirectory string, concurrentScripts []ScriptDefinition, sequentialScripts []ScriptDefinition) (string, bool, error) {
+func formControllerScript(targetTempDirectory string, concurrentScripts []ScriptDefinition, sequentialScripts []ScriptDefinition, continueOnScriptError bool) (string, bool, error) {
 	// tplScript holds the minimal per-script fields passed into the
 	// template that renders the shell controller script.
 	// Primarily carries the sanitized script name used for filenames and
@@ -210,14 +215,16 @@ func formControllerScript(targetTempDirectory string, concurrentScripts []Script
 	}
 	// tplData holds all data passed into the controller script template.
 	tplData := struct {
-		TargetTempDir     string
-		ControllerPIDFile string
-		ConcurrentScripts []tplScript
-		SequentialScripts []tplScript
+		TargetTempDir         string
+		ControllerPIDFile     string
+		ConcurrentScripts     []tplScript
+		SequentialScripts     []tplScript
+		ContinueOnScriptError bool
 	}{}
 	// populate tplData
 	tplData.TargetTempDir = targetTempDirectory
 	tplData.ControllerPIDFile = ControllerPIDFileName
+	tplData.ContinueOnScriptError = continueOnScriptError
 	needsElevated := false
 	for _, s := range concurrentScripts {
 		if s.Superuser {
@@ -252,6 +259,8 @@ declare -A pids=()
 declare -A exitcodes=()
 declare -A orig_names=()
 current_seq_pid=""
+
+continue_on_script_error={{if .ContinueOnScriptError}}1{{else}}0{{end}}
 
 ensure_trailing_newline() {
     local f="$1"
@@ -289,6 +298,10 @@ run_sequential_scripts() {
     else
       ec=$?
       exitcodes[$s]=$ec
+      if [ "$continue_on_script_error" -eq 0 ]; then
+        echo "Script '${orig_names[$s]}' failed with exit code $ec; stopping further sequential scripts." >&2
+        exit $ec
+      fi
     fi
     current_seq_pid=""
   done

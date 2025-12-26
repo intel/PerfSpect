@@ -815,7 +815,7 @@ func RunScript(t target.Target, s script.ScriptDefinition, localTempDir string, 
 	return script.RunScript(t, s, localTempDir)
 }
 
-func RunScripts(t target.Target, s []script.ScriptDefinition, ignoreScriptErrors bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc, collectingStatusMsg string, noRoot bool) (map[string]script.ScriptOutput, error) {
+func RunScripts(t target.Target, s []script.ScriptDefinition, continueOnScriptError bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc, collectingStatusMsg string, noRoot bool) (map[string]script.ScriptOutput, error) {
 	supportedScripts, err := FilterScriptsForTarget(t, s, localTempDir, noRoot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check if scripts are supported on target %v", err)
@@ -823,7 +823,7 @@ func RunScripts(t target.Target, s []script.ScriptDefinition, ignoreScriptErrors
 	if len(supportedScripts) == 0 {
 		return nil, fmt.Errorf("zero scripts are supported on target %s", t.GetName())
 	}
-	return script.RunScripts(t, supportedScripts, ignoreScriptErrors, localTempDir, statusUpdate, collectingStatusMsg)
+	return script.RunScripts(t, supportedScripts, continueOnScriptError, localTempDir, statusUpdate, collectingStatusMsg)
 }
 
 func RunScriptStream(t target.Target, s script.ScriptDefinition, localTempDir string, stdoutChannel chan []byte, stderrChannel chan []byte, exitcodeChannel chan int, errorChannel chan error, cmdChannel chan *exec.Cmd, noRoot bool) {

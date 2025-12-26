@@ -219,7 +219,7 @@ func TestFormMasterScriptTemplateStructure(t *testing.T) {
 		{Name: "alpha script", Superuser: false},
 		{Name: "beta-script", Superuser: true},
 	}
-	master, elevated, err := formControllerScript("/tmp/targetdir", scripts, nil)
+	master, elevated, err := formControllerScript("/tmp/targetdir", scripts, nil, false)
 	if err != nil {
 		t.Fatalf("error forming master script: %v", err)
 	}
@@ -254,7 +254,7 @@ func TestFormMasterScriptTemplateStructure(t *testing.T) {
 
 func TestFormMasterScriptNeedsElevatedFlag(t *testing.T) {
 	scripts := []ScriptDefinition{{Name: "user", Superuser: false}, {Name: "also user", Superuser: false}}
-	_, elevated, err := formControllerScript("/tmp/dir", scripts, nil)
+	_, elevated, err := formControllerScript("/tmp/dir", scripts, nil, false)
 	if err != nil {
 		t.Fatalf("error forming master script: %v", err)
 	}
@@ -264,7 +264,7 @@ func TestFormMasterScriptNeedsElevatedFlag(t *testing.T) {
 }
 
 func TestFormMasterScriptEmptyScripts(t *testing.T) {
-	master, elevated, err := formControllerScript("/tmp/dir", nil, nil)
+	master, elevated, err := formControllerScript("/tmp/dir", nil, nil, false)
 	if err != nil {
 		t.Fatalf("error forming master script: %v", err)
 	}
@@ -291,7 +291,7 @@ func TestFormMasterScriptExecutionIntegration(t *testing.T) {
 	// Integration test: create temp directory, stub two child scripts, run master script, parse output.
 	tmp := t.TempDir()
 	scripts := []ScriptDefinition{{Name: "alpha script"}, {Name: "beta-script"}}
-	master, elevated, err := formControllerScript(tmp, scripts, nil)
+	master, elevated, err := formControllerScript(tmp, scripts, nil, false)
 	if err != nil {
 		t.Fatalf("error forming master script: %v", err)
 	}
