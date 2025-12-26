@@ -98,7 +98,7 @@ func TestTurbostatPlatformRows(t *testing.T) {
 			fieldNames:      []string{"Avg_MHz", "Busy%"},
 			wantFirst:       nil,
 			wantLen:         0,
-			expectErr:       false,
+			expectErr:       true,
 		},
 		{
 			name:            "No output",
@@ -106,7 +106,7 @@ func TestTurbostatPlatformRows(t *testing.T) {
 			fieldNames:      []string{"Avg_MHz", "Busy%"},
 			wantFirst:       nil,
 			wantLen:         0,
-			expectErr:       false,
+			expectErr:       true,
 		},
 		{
 			name:            "Only time and interval, no turbostat data",
@@ -114,7 +114,7 @@ func TestTurbostatPlatformRows(t *testing.T) {
 			fieldNames:      []string{"Avg_MHz", "Busy%"},
 			wantFirst:       nil,
 			wantLen:         0,
-			expectErr:       false,
+			expectErr:       true,
 		},
 	}
 
@@ -547,7 +547,7 @@ X       0       0       1000    10
 			turbostatOutput: "",
 			fieldNames:      []string{"Avg_MHz"},
 			want:            nil,
-			wantErr:         false,
+			wantErr:         true,
 		},
 		{
 			name: "Only headers, no data",
@@ -558,7 +558,7 @@ Package Core    CPU     Avg_MHz Busy%
 `,
 			fieldNames: []string{"Avg_MHz"},
 			want:       nil,
-			wantErr:    false,
+			wantErr:    true,
 		},
 	}
 

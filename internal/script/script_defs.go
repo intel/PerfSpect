@@ -21,7 +21,6 @@ type ScriptDefinition struct {
 	Depends            []string // binary dependencies that must be available for the script to run
 	Superuser          bool     // requires sudo or root
 	Sequential         bool     // run script sequentially (not at the same time as others)
-	NeedsKill          bool     // process/script needs to be killed after run without a duration specified, i.e., it doesn't stop through SIGINT
 }
 
 // script names, these must be unique
@@ -1274,14 +1273,11 @@ duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
 	count=$((duration / interval))
 fi
-LC_TIME=C mpstat -u -T -I SCPU -P ALL $interval $count &
-echo $! > {{.ScriptName}}_cmd.pid
-wait
+LC_TIME=C mpstat -u -T -I SCPU -P ALL $interval $count
 `,
 		Superuser: true,
 		Lkms:      []string{},
 		Depends:   []string{"mpstat"},
-		NeedsKill: true,
 	},
 	IostatTelemetryScriptName: {
 		Name: IostatTelemetryScriptName,
@@ -1290,14 +1286,11 @@ duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
 	count=$((duration / interval))
 fi
-S_TIME_FORMAT=ISO iostat -d -t $interval $count | sed '/^loop/d' &
-echo $! > {{.ScriptName}}_cmd.pid
-wait
+S_TIME_FORMAT=ISO iostat -d -t $interval $count | sed '/^loop/d'
 `,
 		Superuser: true,
 		Lkms:      []string{},
 		Depends:   []string{"iostat"},
-		NeedsKill: true,
 	},
 	MemoryTelemetryScriptName: {
 		Name: MemoryTelemetryScriptName,
@@ -1306,14 +1299,11 @@ duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
 	count=$((duration / interval))
 fi
-LC_TIME=C sar -r $interval $count &
-echo $! > {{.ScriptName}}_cmd.pid
-wait
+LC_TIME=C sar -r $interval $count
 `,
 		Superuser: true,
 		Lkms:      []string{},
 		Depends:   []string{"sar", "sadc"},
-		NeedsKill: true,
 	},
 	NetworkTelemetryScriptName: {
 		Name: NetworkTelemetryScriptName,
@@ -1322,14 +1312,11 @@ duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
 	count=$((duration / interval))
 fi
-LC_TIME=C sar -n DEV $interval $count &
-echo $! > {{.ScriptName}}_cmd.pid
-wait
+LC_TIME=C sar -n DEV $interval $count
 `,
 		Superuser: true,
 		Lkms:      []string{},
 		Depends:   []string{"sar", "sadc"},
-		NeedsKill: true,
 	},
 	TurbostatTelemetryScriptName: {
 		Name:          TurbostatTelemetryScriptName,
@@ -1344,19 +1331,40 @@ else
 fi
 echo TIME: $(date +"%H:%M:%S")
 echo INTERVAL: $interval
-turbostat -i $interval $count &
-echo $! > {{.ScriptName}}_cmd.pid
-wait
+turbostat -i $interval $count
 `,
 		Superuser: true,
 		Lkms:      []string{"msr"},
 		Depends:   []string{"turbostat"},
-		NeedsKill: true,
 	},
 	InstructionTelemetryScriptName: {
 		Name: InstructionTelemetryScriptName,
 		ScriptTemplate: `interval={{.Interval}}
 duration={{.Duration}}
+pid={{.InstrMixPID}}
+
+cleanup_done=0
+
+finalize() {
+    if [ $cleanup_done -eq 1 ]; then
+        return
+    fi
+    cleanup_done=1
+    
+    # Explicitly write to fd 2 to ensure it reaches stderr
+    echo "Finalizing instruction mix telemetry (pw_pid=$pw_pid)..." 1>&2
+    
+    # kill the processwatch pipeline process group if it is still running
+    if [ -n "${pw_pid:-}" ] && [ "$pw_pid" -gt 0 ]; then
+        # Try SIGTERM first
+        kill -TERM -"$pw_pid" 2>/dev/null || true
+        sleep 0.1
+        # Then SIGKILL if needed
+        kill -KILL -"$pw_pid" 2>/dev/null || true
+    fi
+}
+trap finalize INT TERM EXIT
+
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
     count=$((duration / interval))
     arg_count="-n $count"
@@ -1364,13 +1372,13 @@ fi
 if [ $interval -ne 0 ]; then
     arg_interval="-i $interval"
 fi
-echo TIME: $(date +"%H:%M:%S")
+echo TIME: "$(date +"%H:%M:%S")"
 echo INTERVAL: $interval
 # if no PID specified, increase the sampling interval (defaults to 100,000) to reduce overhead
-if [ {{.InstrMixPID}} -eq 0 ]; then
+if [ $pid -eq 0 ]; then
     arg_sampling_rate="-s {{.InstrMixFrequency}}"
 else
-    arg_pid="-p {{.InstrMixPID}}"
+    arg_pid="-p $pid"
 fi
 # -c: CSV output, -a: all categories, -p: PID, -s: sampling rate, -i: interval, -n: count
 # example output:
@@ -1379,34 +1387,28 @@ fi
 # 0,2038501,stress-ng-cpu,0.000000,0.000000,0.000000,0.000000
 # We only need the header line and the subsequent "ALL" lines (for each interval)
 # Filter output: keep header (NR==1) and lines where 2nd and 3rd columns are ALL
-processwatch -c -a $arg_pid $arg_sampling_rate $arg_interval $arg_count | awk -F',' 'NR==1 || ($2=="ALL" && $3=="ALL")' &
-echo $! > {{.ScriptName}}_cmd.pid
-wait
+( processwatch -c -a "$arg_pid" "$arg_sampling_rate" "$arg_interval" "$arg_count" | awk -F',' 'NR==1 || ($2=="ALL" && $3=="ALL")' ) &
+pw_pid=$!
+# wait for processwatch subshell to finish. It will finish naturally if a duration is provided,
+# otherwise it will be killed in the finalize() function upon receiving a signal.
+wait $pw_pid 2>/dev/null || true
+finalize
 `,
 		Superuser: true,
 		Lkms:      []string{"msr"},
 		Depends:   []string{"processwatch"},
-		NeedsKill: true,
 	},
 	GaudiTelemetryScriptName: {
 		Name: GaudiTelemetryScriptName,
 		ScriptTemplate: `
 if command -v {{.GaudiHlsmiPath}} &> /dev/null; then
-    {{.GaudiHlsmiPath}} --query-aip=timestamp,name,temperature.aip,module_id,utilization.aip,memory.total,memory.free,memory.used,power.draw --format=csv,nounits -l {{.Interval}} &
-    echo $! > {{.ScriptName}}_cmd.pid
-    # if duration is set, sleep for the duration then kill the process
-    if [ {{.Duration}} -ne 0 ]; then
-        sleep {{.Duration}}
-        kill -SIGINT $(cat {{.ScriptName}}_cmd.pid)
-    fi
-    wait
+    {{.GaudiHlsmiPath}} --query-aip=timestamp,name,temperature.aip,module_id,utilization.aip,memory.total,memory.free,memory.used,power.draw --format=csv,nounits -l {{.Interval}} -d {{.Duration}}
 else
     echo "hl-smi not found at {{.GaudiHlsmiPath}}" >&2
     exit 1
 fi
 `,
 		Superuser: true,
-		NeedsKill: true,
 	},
 	PDUTelemetryScriptName: {
 		Name: PDUTelemetryScriptName,
@@ -1441,7 +1443,6 @@ for ((i=0; i<count; i++)); do
 done
 `,
 		Superuser: false,
-		NeedsKill: false,
 	},
 	// flamegraph scripts
 	CollapsedCallStacksScriptName: {
@@ -1451,9 +1452,6 @@ pids={{.PIDs}}
 duration={{.Duration}}
 frequency={{.Frequency}}
 maxdepth={{.MaxDepth}}
-
-# write our pid to a file so that perfspect can send us a signal if needed
-echo $$ > primary_collection_script.pid
 
 ap_interval=0
 if [ "$frequency" -ne 0 ]; then
@@ -1525,7 +1523,7 @@ finalize() {
     stop_profiling
     collapse_perf_data
     print_results
-    rm -f primary_collection_script.pid
+    rm -f controller.pid
     exit 0
 }
 
@@ -1600,7 +1598,6 @@ wait
 		Superuser:  true,
 		Sequential: true,
 		Depends:    []string{"async-profiler", "perf", "stackcollapse-perf"},
-		NeedsKill:  true,
 	},
 	// lock analysis scripts
 	ProfileKernelLockScriptName: {
