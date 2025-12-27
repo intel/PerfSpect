@@ -70,9 +70,7 @@ func getPerfCommandArgs(pids []string, cgroups []string, timeout int, eventGroup
 	case scopeCgroup:
 		args = append(args, "--for-each-cgroup", strings.Join(cgroups, ",")) // collect only for these cgroups
 	}
-	// -e: event groups to collect
-	//args = append(args, "-e")
-	//var groups []string
+	// add event groups
 	for _, group := range eventGroups {
 		var events []string
 		for _, event := range group {
@@ -80,13 +78,11 @@ func getPerfCommandArgs(pids []string, cgroups []string, timeout int, eventGroup
 		}
 		formattedGroup := fmt.Sprintf("'{%s}'", strings.Join(events, ","))
 		args = append(args, "-e", formattedGroup)
-		//groups = append(groups, fmt.Sprintf("{%s}", strings.Join(events, ",")))
 	}
-	//args = append(args, fmt.Sprintf("'%s'", strings.Join(groups, ",")))
-	if len(argsApplication) > 0 {
-		// add application args
+	if len(argsWorkload) > 0 {
+		// add workload args
 		args = append(args, "--")
-		args = append(args, argsApplication...)
+		args = append(args, argsWorkload...)
 	} else if flagScope != scopeCgroup && timeout != 0 {
 		// add timeout
 		args = append(args, "sleep", fmt.Sprintf("%d", timeout))
