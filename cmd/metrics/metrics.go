@@ -44,7 +44,7 @@ var examples = []string{
 	fmt.Sprintf("  Metrics from remote host:                 $ %s %s --target 192.168.1.1 --user fred --key fred_key", common.AppName, cmdName),
 	fmt.Sprintf("  Metrics for \"hot\" processes:              $ %s %s --scope process", common.AppName, cmdName),
 	fmt.Sprintf("  Metrics for specified processes:          $ %s %s --scope process --pids 1234,6789", common.AppName, cmdName),
-	fmt.Sprintf("  Start application and collect metrics:    $ %s %s -- /path/to/myapp arg1 arg2", common.AppName, cmdName),
+	fmt.Sprintf("  Start workload and collect metrics:       $ %s %s -- /path/to/workload arg1 arg2", common.AppName, cmdName),
 	fmt.Sprintf("  Metrics adjusted for transaction rate:    $ %s %s --txnrate 100", common.AppName, cmdName),
 	fmt.Sprintf("  \"Live\" metrics:                           $ %s %s --live", common.AppName, cmdName),
 }
@@ -159,7 +159,7 @@ var (
 	flagPrometheusServerAddr string
 
 	// positional arguments
-	argsApplication []string
+	argsWorkload []string
 )
 
 const (
@@ -404,29 +404,32 @@ func getFlagGroups() []common.FlagGroup {
 }
 
 func validateFlags(cmd *cobra.Command, args []string) error {
-	// some flags will not be valid if an application argument is provided
+	// some flags will not be valid if a workload is provided
 	if len(args) > 0 {
-		argsApplication = args
+		argsWorkload = args
+		if cmd.Flags().Lookup(flagScopeName).Changed {
+			return common.FlagValidationError(cmd, "scope is not supported with a workload")
+		}
 		if cmd.Flags().Lookup(flagDurationName).Changed {
-			return common.FlagValidationError(cmd, "duration is not supported with an application argument")
+			return common.FlagValidationError(cmd, "duration is not supported with a workload")
 		}
 		if cmd.Flags().Lookup(flagPidListName).Changed {
-			return common.FlagValidationError(cmd, "pids are not supported with an application argument")
+			return common.FlagValidationError(cmd, "pids are not supported with a workload")
 		}
 		if cmd.Flags().Lookup(flagCidListName).Changed {
-			return common.FlagValidationError(cmd, "cids are not supported with an application argument")
+			return common.FlagValidationError(cmd, "cids are not supported with a workload")
 		}
 		if cmd.Flags().Lookup(flagFilterName).Changed {
-			return common.FlagValidationError(cmd, "filter is not supported with an application argument")
+			return common.FlagValidationError(cmd, "filter is not supported with a workload")
 		}
 		if cmd.Flags().Lookup(flagRefreshName).Changed {
-			return common.FlagValidationError(cmd, "refresh is not supported with an application argument")
+			return common.FlagValidationError(cmd, "refresh is not supported with a workload")
 		}
 		if cmd.Flags().Lookup(flagCountName).Changed {
-			return common.FlagValidationError(cmd, "count is not supported with an application argument")
+			return common.FlagValidationError(cmd, "count is not supported with a workload")
 		}
 		if cmd.Flags().Lookup(flagCpuRangeName).Changed {
-			return common.FlagValidationError(cmd, "CPU range is not supported with an application argument")
+			return common.FlagValidationError(cmd, "CPU range is not supported with a workload")
 		}
 	}
 	// confirm valid duration
@@ -1065,8 +1068,10 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	for i := range targetContexts {
 		if targetContexts[i].err == nil {
 			finalMessage := "collecting metrics"
-			if flagDuration == 0 {
-				finalMessage += ", press Ctrl+C to stop"
+			if len(argsWorkload) > 0 {
+				finalMessage += ", press Ctrl+c to stop or wait for workload to exit"
+			} else if flagDuration == 0 {
+				finalMessage += ", press Ctrl+c to stop"
 			} else {
 				finalMessage += fmt.Sprintf(" for %d seconds", flagDuration)
 			}
@@ -1321,7 +1326,7 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 	printCompleteChannel := make(chan []string)
 	// get current time for use in setting timestamps on output
 	targetContext.metadata.CollectionStartTime = time.Now() // save the start time in the metadata for use when using the --input option to process raw data
-	targetContext.metadata.WithWorkload = len(argsApplication) > 0
+	targetContext.metadata.WithWorkload = len(argsWorkload) > 0
 	go printMetricsAsync(targetContext, localOutputDir, frameChannel, printCompleteChannel)
 	var err error
 	for !signalMgr.shouldStop() {
@@ -1412,6 +1417,13 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, perfComma
 	}
 	// start goroutine to run perf, output will be streamed back in provided channels
 	go common.RunScriptStream(myTarget, perfStatScript, localTempDir, stdoutChannel, stderrChannel, exitcodeChannel, scriptErrorChannel, cmdChannel, flagNoRoot)
+	// Drain stdout to avoid blocking if the workload writes to stdout.
+	// perf stat emits event lines on stderr; stdout is not used by our pipeline.
+	go func() {
+		for range stdoutChannel {
+			// discard
+		}
+	}()
 	select {
 	case <-cmdChannel:
 	case err := <-scriptErrorChannel:
