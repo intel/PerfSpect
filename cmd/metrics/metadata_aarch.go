@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"math"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -263,9 +264,11 @@ func getCPUSocketMapFromSysfs(t target.Target, socketCount, coresPerSocket, thre
 	cpuSocketMap := make(map[int]int, totalCPUs)
 
 	// Read physical_package_id for each CPU from sysfs
+	// Output format: "cpuN socketID" per line (e.g., "0 60", "10 60")
+	// This avoids relying on glob order which is lexicographic, not numeric
 	getScript := script.ScriptDefinition{
 		Name:           "get cpu socket map",
-		ScriptTemplate: "for cpu in /sys/devices/system/cpu/cpu[0-9]*; do cat $cpu/topology/physical_package_id 2>/dev/null; done",
+		ScriptTemplate: `for cpu in /sys/devices/system/cpu/cpu[0-9]*; do cpunum="${cpu##*cpu}"; echo "$cpunum $(cat $cpu/topology/physical_package_id 2>/dev/null)"; done`,
 		Superuser:      false,
 		Architectures:  []string{cpus.ARMArchitecture},
 	}
@@ -280,13 +283,43 @@ func getCPUSocketMapFromSysfs(t target.Target, socketCount, coresPerSocket, thre
 	}
 
 	lines := strings.Split(strings.TrimSpace(scriptOutput.Stdout), "\n")
-	for cpuID, line := range lines {
-		socketID, parseErr := strconv.Atoi(strings.TrimSpace(line))
-		if parseErr != nil {
-			// If we can't parse, assume socket 0
+
+	// First pass: parse "cpuID socketID" pairs and collect unique socket IDs
+	rawSocketMap := make(map[int]int, len(lines))
+	uniqueSockets := make(map[int]struct{})
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) != 2 {
+			continue
+		}
+		cpuID, err := strconv.Atoi(fields[0])
+		if err != nil {
+			continue
+		}
+		socketID, err := strconv.Atoi(fields[1])
+		if err != nil {
 			socketID = 0
 		}
-		cpuSocketMap[cpuID] = socketID
+		rawSocketMap[cpuID] = socketID
+		uniqueSockets[socketID] = struct{}{}
+	}
+
+	// Build a mapping from raw socket IDs to normalized (0-indexed) IDs
+	// This handles ARM platforms that report non-zero socket IDs (e.g., 60 instead of 0)
+	sortedSockets := make([]int, 0, len(uniqueSockets))
+	for s := range uniqueSockets {
+		sortedSockets = append(sortedSockets, s)
+	}
+	sort.Ints(sortedSockets)
+
+	socketNormalize := make(map[int]int, len(sortedSockets))
+	for i, s := range sortedSockets {
+		socketNormalize[s] = i
+	}
+
+	// Second pass: assign normalized socket IDs
+	for cpuID, rawSocket := range rawSocketMap {
+		cpuSocketMap[cpuID] = socketNormalize[rawSocket]
 	}
 
 	return cpuSocketMap, nil
