@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
-	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -74,7 +73,7 @@ func (c *ARMMetadataCollector) CollectMetadata(t target.Target, noRoot bool, noS
 	}
 
 	// CPUSocketMap - create a map of CPU to socket ID
-	metadata.CPUSocketMap, err = getCPUSocketMapFromSysfs(t, metadata.SocketCount, metadata.CoresPerSocket, metadata.ThreadsPerCore)
+	metadata.CPUSocketMap, err = getCPUSocketMapFromSysfs(t, metadata.SocketCount, metadata.CoresPerSocket, metadata.ThreadsPerCore, localTempDir)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to build CPU socket map: %v", err)
 	}
@@ -259,23 +258,28 @@ func getARMCPUID(scriptOutputs map[string]script.ScriptOutput) (cpuid string, er
 
 // getCPUSocketMapFromSysfs builds a CPU to socket map by reading from sysfs.
 // This handles multi-socket ARM systems correctly.
-func getCPUSocketMapFromSysfs(t target.Target, socketCount, coresPerSocket, threadsPerCore int) (map[int]int, error) {
+func getCPUSocketMapFromSysfs(t target.Target, socketCount, coresPerSocket, threadsPerCore int, localTempDir string) (map[int]int, error) {
 	totalCPUs := socketCount * coresPerSocket * threadsPerCore
 	cpuSocketMap := make(map[int]int, totalCPUs)
 
 	// Read physical_package_id for each CPU from sysfs
-	cmd := exec.Command("sh", "-c", "for cpu in /sys/devices/system/cpu/cpu[0-9]*; do cat $cpu/topology/physical_package_id 2>/dev/null; done")
-	stdout, stderr, exitcode, err := t.RunCommand(cmd)
-	if err != nil || exitcode != 0 {
+	getScript := script.ScriptDefinition{
+		Name:           "get cpu socket map",
+		ScriptTemplate: "for cpu in /sys/devices/system/cpu/cpu[0-9]*; do cat $cpu/topology/physical_package_id 2>/dev/null; done",
+		Superuser:      false,
+		Architectures:  []string{cpus.ARMArchitecture},
+	}
+	scriptOutput, err := common.RunScript(t, getScript, localTempDir, false)
+	if err != nil || scriptOutput.Exitcode != 0 {
 		// Fallback: assume single socket if sysfs read fails
-		slog.Debug("failed to read CPU topology from sysfs, assuming single socket", slog.String("stderr", stderr))
+		slog.Debug("failed to read CPU topology from sysfs, assuming single socket", slog.String("stderr", scriptOutput.Stderr))
 		for i := range totalCPUs {
 			cpuSocketMap[i] = 0
 		}
 		return cpuSocketMap, nil
 	}
 
-	lines := strings.Split(strings.TrimSpace(stdout), "\n")
+	lines := strings.Split(strings.TrimSpace(scriptOutput.Stdout), "\n")
 	for cpuID, line := range lines {
 		socketID, parseErr := strconv.Atoi(strings.TrimSpace(line))
 		if parseErr != nil {
