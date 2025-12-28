@@ -49,7 +49,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for a detailed overview of the codebase
 make test
 
 # Run specific test
-go test -v ./internal/common/... -run TestName
+go test -v ./internal/extract/... -run TestName
 
 # Test locally
 ./perfspect report
@@ -68,7 +68,7 @@ go test -v ./internal/common/... -run TestName
 package yourcommand
 
 import (
-    "perfspect/internal/common"
+    "perfspect/internal/workflow"
     "perfspect/internal/table"
     "github.com/spf13/cobra"
 )
@@ -82,12 +82,12 @@ var Cmd = &cobra.Command{
 
 func init() {
     // Add command-specific flags here
-    common.AddTargetFlags(Cmd)
-    common.AddFormatFlag(Cmd)
+    workflow.AddTargetFlags(Cmd)
+    workflow.AddFormatFlag(Cmd)
 }
 
 func runYourCommand(cmd *cobra.Command, args []string) error {
-    rc := common.ReportingCommand{
+    rc := workflow.ReportingCommand{
         Cmd:    cmd,
         Tables: yourTables,  // Define tables for data collection
     }

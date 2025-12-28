@@ -1,20 +1,21 @@
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
-package report
+package extract
 
 import (
-	"perfspect/internal/common"
 	"perfspect/internal/script"
 )
 
+// ISA represents an instruction set architecture extension.
 type ISA struct {
 	Name     string
 	FullName string
 	CPUID    string
 }
 
-var isas = []ISA{
+// ISADefinitions contains all known ISA extension definitions.
+var ISADefinitions = []ISA{
 	{"AES", "Advanced Encryption Standard New Instructions (AES-NI)", "AES instruction"},
 	{"AMX", "Advanced Matrix Extensions (AMX)", "AMX-BF16: tile bfloat16 support"},
 	{"AMX-COMPLEX", "AMX-COMPLEX Instruction", "AMX-COMPLEX instructions"},
@@ -39,25 +40,28 @@ var isas = []ISA{
 	{"WAITPKG", "UMONITOR, UMWAIT, TPAUSE Instructions", "WAITPKG instructions"},
 }
 
-func isaFullNames() []string {
+// ISAFullNames returns the full names of all ISA extensions.
+func ISAFullNames() []string {
 	var names []string
-	for _, isa := range isas {
+	for _, isa := range ISADefinitions {
 		names = append(names, isa.FullName)
 	}
 	return names
 }
 
-func yesIfTrue(val string) string {
+// YesIfTrue converts a boolean string to "Yes" or "No".
+func YesIfTrue(val string) string {
 	if val == "true" {
 		return "Yes"
 	}
 	return "No"
 }
 
-func isaSupportedFromOutput(outputs map[string]script.ScriptOutput) []string {
+// ISASupportedFromOutput returns ISA support status from cpuid output.
+func ISASupportedFromOutput(outputs map[string]script.ScriptOutput) []string {
 	var supported []string
-	for _, isa := range isas {
-		oneSupported := yesIfTrue(common.ValFromRegexSubmatch(outputs[script.CpuidScriptName].Stdout, isa.CPUID+`\s*= (.+?)$`))
+	for _, isa := range ISADefinitions {
+		oneSupported := YesIfTrue(ValFromRegexSubmatch(outputs[script.CpuidScriptName].Stdout, isa.CPUID+`\s*= (.+?)$`))
 		supported = append(supported, oneSupported)
 	}
 	return supported

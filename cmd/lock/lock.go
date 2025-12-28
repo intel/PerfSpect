@@ -7,15 +7,17 @@ package lock
 import (
 	"fmt"
 	"path/filepath"
-	"perfspect/internal/common"
+	"slices"
+	"strconv"
+	"strings"
+
+	"perfspect/internal/app"
 	"perfspect/internal/progress"
 	"perfspect/internal/report"
 	"perfspect/internal/script"
 	"perfspect/internal/table"
 	"perfspect/internal/target"
-	"slices"
-	"strconv"
-	"strings"
+	"perfspect/internal/workflow"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -24,9 +26,9 @@ import (
 const cmdName = "lock"
 
 var examples = []string{
-	fmt.Sprintf("  Lock inspect from local host:       $ %s %s", common.AppName, cmdName),
-	fmt.Sprintf("  Lock inspect from remote target:    $ %s %s --target 192.168.1.1 --user fred --key fred_key", common.AppName, cmdName),
-	fmt.Sprintf("  Lock inspect from multiple targets: $ %s %s --targets targets.yaml", common.AppName, cmdName),
+	fmt.Sprintf("  Lock inspect from local host:       $ %s %s", app.Name, cmdName),
+	fmt.Sprintf("  Lock inspect from remote target:    $ %s %s --target 192.168.1.1 --user fred --key fred_key", app.Name, cmdName),
+	fmt.Sprintf("  Lock inspect from multiple targets: $ %s %s --targets targets.yaml", app.Name, cmdName),
 }
 
 var Cmd = &cobra.Command{
@@ -57,14 +59,14 @@ const (
 )
 
 func init() {
-	Cmd.Flags().StringVar(&common.FlagInput, common.FlagInputName, "", "")
-	Cmd.Flags().StringSliceVar(&flagFormat, common.FlagFormatName, []string{report.FormatAll}, "")
+	Cmd.Flags().StringVar(&app.FlagInput, app.FlagInputName, "", "")
+	Cmd.Flags().StringSliceVar(&flagFormat, app.FlagFormatName, []string{report.FormatAll}, "")
 	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 10, "")
 	Cmd.Flags().IntVar(&flagFrequency, flagFrequencyName, 11, "")
 	Cmd.PersistentFlags().BoolVar(&flagPackage, flagPackageName, false, "")
 	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
 
-	common.AddTargetFlags(Cmd)
+	workflow.AddTargetFlags(Cmd)
 
 	Cmd.SetUsageFunc(usageFunc)
 }
@@ -94,9 +96,9 @@ func usageFunc(cmd *cobra.Command) error {
 	return nil
 }
 
-func getFlagGroups() []common.FlagGroup {
-	var groups []common.FlagGroup
-	flags := []common.Flag{
+func getFlagGroups() []app.FlagGroup {
+	var groups []app.FlagGroup
+	flags := []app.Flag{
 		{
 			Name: flagDurationName,
 			Help: "number of seconds to run the collection",
@@ -110,7 +112,7 @@ func getFlagGroups() []common.FlagGroup {
 			Help: "create raw data package",
 		},
 		{
-			Name: common.FlagFormatName,
+			Name: app.FlagFormatName,
 			Help: fmt.Sprintf("choose output format(s) from: %s", strings.Join(append([]string{report.FormatAll}, report.FormatHtml, report.FormatTxt), ", ")),
 		},
 		{
@@ -118,11 +120,11 @@ func getFlagGroups() []common.FlagGroup {
 			Help: "do not include system summary table in report",
 		},
 	}
-	groups = append(groups, common.FlagGroup{
+	groups = append(groups, app.FlagGroup{
 		GroupName: "Options",
 		Flags:     flags,
 	})
-	groups = append(groups, common.GetTargetFlagGroup())
+	groups = append(groups, workflow.GetTargetFlagGroup())
 
 	return groups
 }
@@ -132,18 +134,18 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	formatOptions := append([]string{report.FormatAll}, report.FormatHtml, report.FormatTxt)
 	for _, format := range flagFormat {
 		if !slices.Contains(formatOptions, format) {
-			return common.FlagValidationError(cmd, fmt.Sprintf("format options are: %s", strings.Join(formatOptions, ", ")))
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("format options are: %s", strings.Join(formatOptions, ", ")))
 		}
 	}
 	if flagDuration <= 0 {
-		return common.FlagValidationError(cmd, "duration must be greater than 0")
+		return workflow.FlagValidationError(cmd, "duration must be greater than 0")
 	}
 	if flagFrequency <= 0 {
-		return common.FlagValidationError(cmd, "frequency must be greater than 0")
+		return workflow.FlagValidationError(cmd, "frequency must be greater than 0")
 	}
 	// common target flags
-	if err := common.ValidateTargetFlags(cmd); err != nil {
-		return common.FlagValidationError(cmd, err.Error())
+	if err := workflow.ValidateTargetFlags(cmd); err != nil {
+		return workflow.FlagValidationError(cmd, err.Error())
 	}
 	return nil
 }
@@ -164,7 +166,7 @@ func formalizeOutputFormat(outputFormat []string) []string {
 	return result
 }
 
-func pullDataFiles(appContext common.AppContext, scriptOutputs map[string]script.ScriptOutput, myTarget target.Target, statusUpdate progress.MultiSpinnerUpdateFunc) error {
+func pullDataFiles(appContext app.Context, scriptOutputs map[string]script.ScriptOutput, myTarget target.Target, statusUpdate progress.MultiSpinnerUpdateFunc) error {
 	localOutputDir := appContext.OutputDir
 	tableValues := table.GetValuesForTable(tableDefinitions[KernelLockAnalysisTableName], scriptOutputs)
 	found := false
@@ -195,10 +197,10 @@ func pullDataFiles(appContext common.AppContext, scriptOutputs map[string]script
 func runCmd(cmd *cobra.Command, args []string) error {
 	var tables []table.TableDefinition
 	if !flagNoSystemSummary {
-		tables = append(tables, common.TableDefinitions[common.SystemSummaryTableName])
+		tables = append(tables, app.TableDefinitions[app.SystemSummaryTableName])
 	}
 	tables = append(tables, tableDefinitions[KernelLockAnalysisTableName])
-	reportingCommand := common.ReportingCommand{
+	reportingCommand := workflow.ReportingCommand{
 		Cmd:            cmd,
 		ReportNamePost: "lock",
 		ScriptParams: map[string]string{
@@ -214,11 +216,11 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		reportingCommand.AdhocFunc = pullDataFiles
 	}
 
-	// The common.FlagFormat designed to hold the output formats, but as a global variable,
+	// The app.FlagFormat designed to hold the output formats, but as a global variable,
 	// it would be overwrite by other command's initialization function. So the current
 	// workaround is to make an assignment to ensure the current command's output format
 	// flag takes effect as expected.
-	common.FlagFormat = formalizeOutputFormat(flagFormat)
+	app.FlagFormat = formalizeOutputFormat(flagFormat)
 
 	report.RegisterHTMLRenderer(KernelLockAnalysisTableName, kernelLockAnalysisHTMLRenderer)
 

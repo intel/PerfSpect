@@ -14,7 +14,8 @@ import (
 	"strconv"
 	"strings"
 
-	"perfspect/internal/common"
+	"perfspect/internal/workflow"
+
 	"perfspect/internal/cpus"
 	"perfspect/internal/progress"
 	"perfspect/internal/script"
@@ -80,7 +81,7 @@ func (c *ARMMetadataCollector) CollectMetadata(t target.Target, noRoot bool, noS
 	}
 
 	// Microarchitecture
-	metadata.Microarchitecture, err = common.GetTargetMicroArchitecture(t, localTempDir, noRoot)
+	metadata.Microarchitecture, err = workflow.GetTargetMicroArchitecture(t, localTempDir, noRoot)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to get ARM microarchitecture: %v", err)
 	}
@@ -97,7 +98,7 @@ func (c *ARMMetadataCollector) CollectMetadata(t target.Target, noRoot bool, noS
 		return Metadata{}, fmt.Errorf("failed to get metadata scripts: %v", err)
 	}
 
-	scriptOutputs, err := common.RunScripts(t, metadataScripts, true, localTempDir, nil, "", noRoot) // nosemgrep
+	scriptOutputs, err := workflow.RunScripts(t, metadataScripts, true, localTempDir, nil, "", noRoot) // nosemgrep
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to run metadata scripts: %v", err)
 	}
@@ -166,7 +167,7 @@ func getNumGPCountersARM(t target.Target, localTempDir string, noRoot bool) (num
 		Superuser:      !noRoot,
 		Architectures:  []string{cpus.ARMArchitecture},
 	}
-	scriptOutput, err := common.RunScript(t, getScript, localTempDir, noRoot)
+	scriptOutput, err := workflow.RunScript(t, getScript, localTempDir, noRoot)
 	if err != nil {
 		err = fmt.Errorf("failed to run pmu driver version script: %v", err)
 		return
@@ -272,7 +273,7 @@ func getCPUSocketMapFromSysfs(t target.Target, socketCount, coresPerSocket, thre
 		Superuser:      false,
 		Architectures:  []string{cpus.ARMArchitecture},
 	}
-	scriptOutput, err := common.RunScript(t, getScript, localTempDir, false)
+	scriptOutput, err := workflow.RunScript(t, getScript, localTempDir, false)
 	if err != nil || scriptOutput.Exitcode != 0 {
 		// Fallback: assume single socket if sysfs read fails
 		slog.Debug("failed to read CPU topology from sysfs, assuming single socket", slog.String("stderr", scriptOutput.Stderr))

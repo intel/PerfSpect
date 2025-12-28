@@ -11,7 +11,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"perfspect/internal/common"
+	"perfspect/internal/app"
+	"perfspect/internal/workflow"
+
 	"perfspect/internal/util"
 
 	"github.com/spf13/cobra"
@@ -84,43 +86,43 @@ func validateTrimFlags(cmd *cobra.Command, args []string) error {
 	// Check input file or directory exists
 	if _, err := os.Stat(flagTrimInput); err != nil {
 		if os.IsNotExist(err) {
-			return common.FlagValidationError(cmd, fmt.Sprintf("input file or directory does not exist: %s", flagTrimInput))
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("input file or directory does not exist: %s", flagTrimInput))
 		}
-		return common.FlagValidationError(cmd, fmt.Sprintf("failed to access input file or directory: %v", err))
+		return workflow.FlagValidationError(cmd, fmt.Sprintf("failed to access input file or directory: %v", err))
 	}
 
 	// Check that at least one time parameter is provided
 	if flagTrimStartTime == 0 && flagTrimEndTime == 0 && flagTrimStartOffset == 0 && flagTrimEndOffset == 0 {
-		return common.FlagValidationError(cmd, "at least one time parameter must be specified (--start-time, --end-time, --start-offset, or --end-offset)")
+		return workflow.FlagValidationError(cmd, "at least one time parameter must be specified (--start-time, --end-time, --start-offset, or --end-offset)")
 	}
 
 	// Check that both absolute time and offset are not specified for start
 	if flagTrimStartTime != 0 && flagTrimStartOffset != 0 {
-		return common.FlagValidationError(cmd, "cannot specify both --start-time and --start-offset")
+		return workflow.FlagValidationError(cmd, "cannot specify both --start-time and --start-offset")
 	}
 
 	// Check that both absolute time and offset are not specified for end
 	if flagTrimEndTime != 0 && flagTrimEndOffset != 0 {
-		return common.FlagValidationError(cmd, "cannot specify both --end-time and --end-offset")
+		return workflow.FlagValidationError(cmd, "cannot specify both --end-time and --end-offset")
 	}
 
 	// Check for negative values
 	if flagTrimStartTime < 0 {
-		return common.FlagValidationError(cmd, "--start-time cannot be negative")
+		return workflow.FlagValidationError(cmd, "--start-time cannot be negative")
 	}
 	if flagTrimEndTime < 0 {
-		return common.FlagValidationError(cmd, "--end-time cannot be negative")
+		return workflow.FlagValidationError(cmd, "--end-time cannot be negative")
 	}
 	if flagTrimStartOffset < 0 {
-		return common.FlagValidationError(cmd, "--start-offset cannot be negative")
+		return workflow.FlagValidationError(cmd, "--start-offset cannot be negative")
 	}
 	if flagTrimEndOffset < 0 {
-		return common.FlagValidationError(cmd, "--end-offset cannot be negative")
+		return workflow.FlagValidationError(cmd, "--end-offset cannot be negative")
 	}
 
 	// Check that absolute times are in order if both specified
 	if flagTrimStartTime != 0 && flagTrimEndTime != 0 && flagTrimStartTime >= flagTrimEndTime {
-		return common.FlagValidationError(cmd, "--start-time must be less than --end-time")
+		return workflow.FlagValidationError(cmd, "--start-time must be less than --end-time")
 	}
 
 	return nil
@@ -129,7 +131,7 @@ func validateTrimFlags(cmd *cobra.Command, args []string) error {
 // runTrimCmd executes the trim command
 func runTrimCmd(cmd *cobra.Command, args []string) error {
 	// appContext is the application context that holds common data and resources.
-	appContext := cmd.Parent().Context().Value(common.AppContext{}).(common.AppContext)
+	appContext := cmd.Parent().Context().Value(app.Context{}).(app.Context)
 	outputDir := appContext.OutputDir
 
 	// flagTrimInput can be a file or directory

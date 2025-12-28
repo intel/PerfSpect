@@ -12,10 +12,11 @@ import (
 	"strconv"
 	"strings"
 
-	"perfspect/internal/common"
+	"perfspect/internal/app"
 	"perfspect/internal/report"
 	"perfspect/internal/script"
 	"perfspect/internal/table"
+	"perfspect/internal/workflow"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -26,10 +27,10 @@ import (
 const cmdName = "telemetry"
 
 var examples = []string{
-	fmt.Sprintf("  Telemetry from local host:       $ %s %s", common.AppName, cmdName),
-	fmt.Sprintf("  Telemetry from remote target:    $ %s %s --target 192.168.1.1 --user fred --key fred_key", common.AppName, cmdName),
-	fmt.Sprintf("  Memory telemetry for 60 seconds: $ %s %s --memory --duration 60", common.AppName, cmdName),
-	fmt.Sprintf("  Telemetry from multiple targets: $ %s %s --targets targets.yaml", common.AppName, cmdName),
+	fmt.Sprintf("  Telemetry from local host:       $ %s %s", app.Name, cmdName),
+	fmt.Sprintf("  Telemetry from remote target:    $ %s %s --target 192.168.1.1 --user fred --key fred_key", app.Name, cmdName),
+	fmt.Sprintf("  Memory telemetry for 60 seconds: $ %s %s --memory --duration 60", app.Name, cmdName),
+	fmt.Sprintf("  Telemetry from multiple targets: $ %s %s --targets targets.yaml", app.Name, cmdName),
 }
 
 var Cmd = &cobra.Command{
@@ -95,7 +96,7 @@ const (
 
 var telemetrySummaryTableName = "Telemetry Summary"
 
-var categories = []common.Category{
+var categories = []app.Category{
 	{FlagName: flagCPUName, FlagVar: &flagCPU, DefaultValue: false, Help: "monitor cpu utilization", Tables: []table.TableDefinition{tableDefinitions[CPUUtilizationTelemetryTableName], tableDefinitions[UtilizationCategoriesTelemetryTableName]}},
 	{FlagName: flagIPCName, FlagVar: &flagIPC, DefaultValue: false, Help: "monitor IPC", Tables: []table.TableDefinition{tableDefinitions[IPCTelemetryTableName]}},
 	{FlagName: flagC6Name, FlagVar: &flagC6, DefaultValue: false, Help: "monitor C6 residency", Tables: []table.TableDefinition{tableDefinitions[C6TelemetryTableName]}},
@@ -119,16 +120,16 @@ func init() {
 	for _, cat := range categories {
 		Cmd.Flags().BoolVar(cat.FlagVar, cat.FlagName, cat.DefaultValue, cat.Help)
 	}
-	Cmd.Flags().StringVar(&common.FlagInput, common.FlagInputName, "", "")
+	Cmd.Flags().StringVar(&app.FlagInput, app.FlagInputName, "", "")
 	Cmd.Flags().BoolVar(&flagAll, flagAllName, true, "")
-	Cmd.Flags().StringSliceVar(&common.FlagFormat, common.FlagFormatName, []string{report.FormatAll}, "")
+	Cmd.Flags().StringSliceVar(&app.FlagFormat, app.FlagFormatName, []string{report.FormatAll}, "")
 	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 0, "")
 	Cmd.Flags().IntVar(&flagInterval, flagIntervalName, 2, "")
 	Cmd.Flags().IntVar(&flagInstrMixPid, flagInstrMixPidName, 0, "")
 	Cmd.Flags().IntVar(&flagInstrMixFrequency, flagInstrMixFrequencyName, instrmixFrequencyDefaultSystemWide, "")
 	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
 
-	common.AddTargetFlags(Cmd)
+	workflow.AddTargetFlags(Cmd)
 
 	Cmd.SetUsageFunc(usageFunc)
 }
@@ -158,27 +159,27 @@ func usageFunc(cmd *cobra.Command) error {
 	return nil
 }
 
-func getFlagGroups() []common.FlagGroup {
-	var groups []common.FlagGroup
-	flags := []common.Flag{
+func getFlagGroups() []app.FlagGroup {
+	var groups []app.FlagGroup
+	flags := []app.Flag{
 		{
 			Name: flagAllName,
 			Help: "collect telemetry for all categories",
 		},
 	}
 	for _, cat := range categories {
-		flags = append(flags, common.Flag{
+		flags = append(flags, app.Flag{
 			Name: cat.FlagName,
 			Help: cat.Help,
 		})
 	}
-	groups = append(groups, common.FlagGroup{
+	groups = append(groups, app.FlagGroup{
 		GroupName: "Categories",
 		Flags:     flags,
 	})
-	flags = []common.Flag{
+	flags = []app.Flag{
 		{
-			Name: common.FlagFormatName,
+			Name: app.FlagFormatName,
 			Help: fmt.Sprintf("choose output format(s) from: %s", strings.Join(append([]string{report.FormatAll}, report.FormatOptions...), ", ")),
 		},
 		{
@@ -202,18 +203,18 @@ func getFlagGroups() []common.FlagGroup {
 			Help: "do not include system summary table in report",
 		},
 	}
-	groups = append(groups, common.FlagGroup{
+	groups = append(groups, app.FlagGroup{
 		GroupName: "Other Options",
 		Flags:     flags,
 	})
-	groups = append(groups, common.GetTargetFlagGroup())
-	flags = []common.Flag{
+	groups = append(groups, workflow.GetTargetFlagGroup())
+	flags = []app.Flag{
 		{
-			Name: common.FlagInputName,
+			Name: app.FlagInputName,
 			Help: "\".raw\" file, or directory containing \".raw\" files. Will skip data collection and use raw data for reports.",
 		},
 	}
-	groups = append(groups, common.FlagGroup{
+	groups = append(groups, app.FlagGroup{
 		GroupName: "Advanced Options",
 		Flags:     flags,
 	})
@@ -231,29 +232,29 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		}
 	}
 	// validate format options
-	for _, format := range common.FlagFormat {
+	for _, format := range app.FlagFormat {
 		formatOptions := []string{report.FormatAll}
 		formatOptions = append(formatOptions, report.FormatOptions...)
 		if !slices.Contains(formatOptions, format) {
-			return common.FlagValidationError(cmd, fmt.Sprintf("format options are: %s", strings.Join(formatOptions, ", ")))
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("format options are: %s", strings.Join(formatOptions, ", ")))
 		}
 	}
 	if flagInterval < 1 {
-		return common.FlagValidationError(cmd, "interval must be 1 or greater")
+		return workflow.FlagValidationError(cmd, "interval must be 1 or greater")
 	}
 	if flagDuration < 0 {
-		return common.FlagValidationError(cmd, "duration must be 0 or greater")
+		return workflow.FlagValidationError(cmd, "duration must be 0 or greater")
 	}
 	if flagInstrMixFrequency < 100000 { // 100,000 instructions is the minimum frequency
-		return common.FlagValidationError(cmd, "instruction mix frequency must be 100,000 or greater to limit overhead")
+		return workflow.FlagValidationError(cmd, "instruction mix frequency must be 100,000 or greater to limit overhead")
 	}
 	// warn if instruction mix frequency is low when collecting system wide
 	if flagInstrMix && flagInstrMixPid == 0 && flagInstrMixFrequency < instrmixFrequencyDefaultSystemWide {
 		slog.Warn("instruction mix frequency is set to a value lower than default for system wide collection, consider using a higher frequency to limit collection overhead", slog.Int("frequency", flagInstrMixFrequency))
 	}
 	// common target flags
-	if err := common.ValidateTargetFlags(cmd); err != nil {
-		return common.FlagValidationError(cmd, err.Error())
+	if err := workflow.ValidateTargetFlags(cmd); err != nil {
+		return workflow.FlagValidationError(cmd, err.Error())
 	}
 	return nil
 }
@@ -262,7 +263,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	var tables []table.TableDefinition
 	// add system summary table if not disabled
 	if !flagNoSystemSummary {
-		tables = append(tables, common.TableDefinitions[common.SystemSummaryTableName])
+		tables = append(tables, app.TableDefinitions[app.SystemSummaryTableName])
 	}
 	// add category tables
 	for _, cat := range categories {
@@ -293,16 +294,16 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		tables = append(tables, tableDefinitions[PDUTelemetryTableName])
 	}
 	// include telemetry summary table if all telemetry options are selected
-	var summaryFunc common.SummaryFunc
+	var summaryFunc app.SummaryFunc
 	if flagAll {
 		summaryFunc = summaryFromTableValues
 	}
 	// include insights table if all categories are selected
-	var insightsFunc common.InsightsFunc
+	var insightsFunc app.InsightsFunc
 	if flagAll {
-		insightsFunc = common.DefaultInsightsFunc
+		insightsFunc = workflow.DefaultInsightsFunc
 	}
-	reportingCommand := common.ReportingCommand{
+	reportingCommand := workflow.ReportingCommand{
 		Cmd:            cmd,
 		ReportNamePost: "telem",
 		ScriptParams: map[string]string{

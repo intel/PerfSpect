@@ -1,16 +1,17 @@
-package common
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+package extract
 
 import (
 	"fmt"
 	"log/slog"
+	"strconv"
+	"strings"
+
 	"perfspect/internal/cpus"
 	"perfspect/internal/script"
 	"perfspect/internal/util"
-	"strconv"
-	"strings"
 )
 
 // GetL3MSRMB returns the L3 cache size per cache instance (per socket on Intel) and total in MB from MSR.
@@ -106,13 +107,7 @@ func L3FromOutput(outputs map[string]script.ScriptOutput) string {
 }
 
 // L3PerCoreFromOutput calculates the amount of L3 cache (in MiB) available per core
-// based on the provided script outputs. It first checks if the host is virtualized,
-// in which case it returns an empty string since the calculation is not applicable.
-// It parses the number of cores per socket and the number of sockets from the lscpu
-// output. It attempts to retrieve the total L3 cache size using MSR data, falling
-// back to parsing lscpu output if necessary. The result is formatted as a string
-// with up to three decimal places, followed by " MiB". If any required data cannot
-// be parsed, it logs an error and returns an empty string.
+// based on the provided script outputs.
 func L3PerCoreFromOutput(outputs map[string]script.ScriptOutput) string {
 	virtualization := ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Virtualization.*:\s*(.+?)$`)
 	if virtualization == "full" {
@@ -159,7 +154,8 @@ func FormatCacheSizeMB(size float64) string {
 	return fmt.Sprintf("%sM", val)
 }
 
-type lscpuCacheEntry struct {
+// LscpuCacheEntry represents a cache entry from lscpu output.
+type LscpuCacheEntry struct {
 	Name          string
 	OneSize       string
 	AllSize       string
@@ -172,13 +168,7 @@ type lscpuCacheEntry struct {
 }
 
 // ParseLscpuCacheOutput parses the output of `lscpu -C` (text/tabular)
-// Example output:
-// NAME ONE-SIZE ALL-SIZE WAYS TYPE        LEVEL   SETS PHY-LINE COHERENCY-SIZE
-// L1d       48K     8.1M   12 Data            1     64        1             64
-// L1i       64K    10.8M   16 Instruction     1     64        1             64
-// L2         2M     344M   16 Unified         2   2048        1             64
-// L3       336M     672M   16 Unified         3 344064        1             64
-func ParseLscpuCacheOutput(LscpuCacheOutput string) (map[string]lscpuCacheEntry, error) {
+func ParseLscpuCacheOutput(LscpuCacheOutput string) (map[string]LscpuCacheEntry, error) {
 	trimmed := strings.TrimSpace(LscpuCacheOutput)
 	if trimmed == "" {
 		slog.Warn("lscpu cache output is empty")
@@ -198,7 +188,7 @@ func ParseLscpuCacheOutput(LscpuCacheOutput string) (map[string]lscpuCacheEntry,
 	for i, h := range headerCols {
 		idx[strings.ToLower(strings.TrimSpace(h))] = i
 	}
-	out := map[string]lscpuCacheEntry{}
+	out := map[string]LscpuCacheEntry{}
 	for _, line := range lines[1:] {
 		l := strings.TrimSpace(line)
 		if l == "" {
@@ -208,7 +198,7 @@ func ParseLscpuCacheOutput(LscpuCacheOutput string) (map[string]lscpuCacheEntry,
 		if len(cols) < 4 {
 			continue
 		}
-		entry := lscpuCacheEntry{}
+		entry := LscpuCacheEntry{}
 		if i, ok := idx["name"]; ok && i < len(cols) {
 			entry.Name = cols[i]
 		}
@@ -244,13 +234,12 @@ func ParseLscpuCacheOutput(LscpuCacheOutput string) (map[string]lscpuCacheEntry,
 	return out, nil
 }
 
-// L1l2CacheSizeFromLscpuCache extracts the data cache size from the provided lscpuCacheEntry.
-func L1l2CacheSizeFromLscpuCache(entry lscpuCacheEntry) string {
+// L1l2CacheSizeFromLscpuCache extracts the data cache size from the provided LscpuCacheEntry.
+func L1l2CacheSizeFromLscpuCache(entry LscpuCacheEntry) string {
 	return entry.OneSize
 }
 
 // parseCacheSizeToMB parses a cache size string (e.g., "32K", "2M", "1G") and converts it to megabytes.
-// The input string can have optional "B" suffix and supports K, M, G units.
 func parseCacheSizeToMB(sizeString, fieldName string) (float64, error) {
 	if sizeString == "" {
 		return 0, fmt.Errorf("%s is empty", fieldName)
@@ -279,12 +268,12 @@ func parseCacheSizeToMB(sizeString, fieldName string) (float64, error) {
 	return sizeVal * multiplier, nil
 }
 
-// l3CacheTotalSizeFromLscpuCacheMB extracts the total L3 cache size in megabytes from the provided lscpuCacheEntry.
-func l3CacheTotalSizeFromLscpuCacheMB(entry lscpuCacheEntry) (float64, error) {
+// l3CacheTotalSizeFromLscpuCacheMB extracts the total L3 cache size in megabytes from the provided LscpuCacheEntry.
+func l3CacheTotalSizeFromLscpuCacheMB(entry LscpuCacheEntry) (float64, error) {
 	return parseCacheSizeToMB(entry.AllSize, "L3 cache all-size")
 }
 
-// l3CacheInstanceSizeFromLscpuCacheMB extracts the L3 cache instance size in megabytes from the provided lscpuCacheEntry.
-func l3CacheInstanceSizeFromLscpuCacheMB(entry lscpuCacheEntry) (float64, error) {
+// l3CacheInstanceSizeFromLscpuCacheMB extracts the L3 cache instance size in megabytes from the provided LscpuCacheEntry.
+func l3CacheInstanceSizeFromLscpuCacheMB(entry LscpuCacheEntry) (float64, error) {
 	return parseCacheSizeToMB(entry.OneSize, "L3 cache one-size")
 }

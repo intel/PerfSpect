@@ -29,7 +29,7 @@ import (
 	"perfspect/cmd/metrics"
 	"perfspect/cmd/report"
 	"perfspect/cmd/telemetry"
-	"perfspect/internal/common"
+	"perfspect/internal/app"
 	"perfspect/internal/util"
 
 	"github.com/pkg/errors"
@@ -46,17 +46,17 @@ const (
 )
 
 var examples = []string{
-	fmt.Sprintf("  Generate a configuration report:                             $ %s report", common.AppName),
-	fmt.Sprintf("  Collect micro-architectural metrics:                         $ %s metrics", common.AppName),
-	fmt.Sprintf("  Generate a configuration report on a remote target:          $ %s report --target 192.168.1.2 --user elaine --key ~/.ssh/id_rsa", common.AppName),
-	fmt.Sprintf("  Generate configuration reports for multiple remote targets:  $ %s report --targets ./targets.yaml", common.AppName),
+	fmt.Sprintf("  Generate a configuration report:                             $ %s report", app.Name),
+	fmt.Sprintf("  Collect micro-architectural metrics:                         $ %s metrics", app.Name),
+	fmt.Sprintf("  Generate a configuration report on a remote target:          $ %s report --target 192.168.1.2 --user elaine --key ~/.ssh/id_rsa", app.Name),
+	fmt.Sprintf("  Generate configuration reports for multiple remote targets:  $ %s report --targets ./targets.yaml", app.Name),
 }
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:                common.AppName,
-	Short:              common.AppName,
-	Long:               fmt.Sprintf(`%s (%s) is a multi-function utility for performance engineers analyzing software running on Intel Xeon platforms.`, LongAppName, common.AppName),
+	Use:                app.Name,
+	Short:              app.Name,
+	Long:               fmt.Sprintf(`%s (%s) is a multi-function utility for performance engineers analyzing software running on Intel Xeon platforms.`, LongAppName, app.Name),
 	Example:            strings.Join(examples, "\n"),
 	PersistentPreRunE:  initializeApplication, // will only be run if command has a 'Run' function
 	PersistentPostRunE: terminateApplication,  // ...
@@ -115,12 +115,12 @@ Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
 	rootCmd.AddGroup([]*cobra.Group{{ID: "other", Title: "Other Commands:"}}...)
 	rootCmd.AddCommand(updateCmd)
 	// Global (persistent) flags
-	rootCmd.PersistentFlags().BoolVar(&flagDebug, common.FlagDebugName, false, "enable debug logging and retain temporary directories")
-	rootCmd.PersistentFlags().BoolVar(&flagSyslog, common.FlagSyslogName, false, "write logs to syslog instead of a file")
-	rootCmd.PersistentFlags().BoolVar(&flagLogStdOut, common.FlagLogStdOutName, false, "write logs to stdout")
-	rootCmd.PersistentFlags().StringVar(&flagOutputDir, common.FlagOutputDirName, "", "override the output directory")
-	rootCmd.PersistentFlags().StringVar(&flagTargetTempRoot, common.FlagTargetTempRootName, "", "override the temporary target directory, must exist and allow execution")
-	rootCmd.PersistentFlags().BoolVar(&flagNoCheckUpdate, common.FlagNoCheckUpdateName, false, "skip application update check")
+	rootCmd.PersistentFlags().BoolVar(&flagDebug, app.FlagDebugName, false, "enable debug logging and retain temporary directories")
+	rootCmd.PersistentFlags().BoolVar(&flagSyslog, app.FlagSyslogName, false, "write logs to syslog instead of a file")
+	rootCmd.PersistentFlags().BoolVar(&flagLogStdOut, app.FlagLogStdOutName, false, "write logs to stdout")
+	rootCmd.PersistentFlags().StringVar(&flagOutputDir, app.FlagOutputDirName, "", "override the output directory")
+	rootCmd.PersistentFlags().StringVar(&flagTargetTempRoot, app.FlagTargetTempRootName, "", "override the temporary target directory, must exist and allow execution")
+	rootCmd.PersistentFlags().BoolVar(&flagNoCheckUpdate, app.FlagNoCheckUpdateName, false, "skip application update check")
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -152,7 +152,7 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 		}
 	} else {
 		// set output dir path to app name + timestamp
-		outputDirName := common.AppName + "_" + timestamp
+		outputDirName := app.Name + "_" + timestamp
 		var err error
 		// outputDir will be in current working directory
 		outputDir, err = util.AbsPath(outputDirName)
@@ -186,16 +186,16 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 	} else { // log to file
 		// open log file in current directory
 		var err error
-		gLogFile, err = os.OpenFile(common.AppName+".log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644) // #nosec G302
+		gLogFile, err = os.OpenFile(app.Name+".log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644) // #nosec G302
 		if err != nil {
 			fmt.Printf("Error: failed to open log file: %v\n", err)
 			os.Exit(1)
 		}
 		slog.SetDefault(slog.New(slog.NewTextHandler(gLogFile, &logOpts)))
 	}
-	slog.Info("Starting up", slog.String("app", common.AppName), slog.String("version", gVersion), slog.Int("PID", os.Getpid()), slog.String("arguments", strings.Join(os.Args, " ")))
+	slog.Info("Starting up", slog.String("app", app.Name), slog.String("version", gVersion), slog.Int("PID", os.Getpid()), slog.String("arguments", strings.Join(os.Args, " ")))
 	// creat local temp directory
-	localTempDir, err := os.MkdirTemp(os.TempDir(), fmt.Sprintf("%s.tmp.", common.AppName))
+	localTempDir, err := os.MkdirTemp(os.TempDir(), fmt.Sprintf("%s.tmp.", app.Name))
 	if err != nil {
 		fmt.Printf("Error: failed to create temp dir: %v\n", err)
 		os.Exit(1)
@@ -208,8 +208,8 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 	cmd.Parent().SetContext(
 		context.WithValue(
 			context.Background(),
-			common.AppContext{},
-			common.AppContext{
+			app.Context{},
+			app.Context{
 				Timestamp:      timestamp,
 				OutputDir:      outputDir,
 				LocalTempDir:   localTempDir,
@@ -240,7 +240,7 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			slog.Error(err.Error())
 		} else if updateAvailable {
-			fmt.Fprintf(os.Stderr, "A new version (%s) of %s is available!\nPlease run '%s update' to update to the latest version.\n\n", latestManifest.Version, common.AppName, common.AppName)
+			fmt.Fprintf(os.Stderr, "A new version (%s) of %s is available!\nPlease run '%s update' to update to the latest version.\n\n", latestManifest.Version, app.Name, app.Name)
 		} else {
 			slog.Debug("No updates available")
 		}
@@ -258,9 +258,9 @@ func terminateApplication(cmd *cobra.Command, args []string) error {
 		ctx = cmd.Parent().Context()
 	}
 	if ctx != nil {
-		ctxValue := ctx.Value(common.AppContext{})
+		ctxValue := ctx.Value(app.Context{})
 		if ctxValue != nil {
-			if appContext, ok := ctxValue.(common.AppContext); ok {
+			if appContext, ok := ctxValue.(app.Context); ok {
 				// clean up temp directory if debug flag is not set
 				if appContext.LocalTempDir != "" && !flagDebug {
 					err := os.RemoveAll(appContext.LocalTempDir)
@@ -268,7 +268,7 @@ func terminateApplication(cmd *cobra.Command, args []string) error {
 						slog.Error("error cleaning up temp directory", slog.String("tempDir", appContext.LocalTempDir), slog.String("error", err.Error()))
 					}
 				}
-				slog.Info("Shutting down", slog.String("app", common.AppName), slog.String("version", gVersion), slog.Int("PID", os.Getpid()), slog.String("arguments", strings.Join(os.Args, " ")))
+				slog.Info("Shutting down", slog.String("app", app.Name), slog.String("version", gVersion), slog.Int("PID", os.Getpid()), slog.String("arguments", strings.Join(os.Args, " ")))
 				if gLogFile != nil {
 					err := gLogFile.Close()
 					if err != nil {
@@ -332,7 +332,7 @@ var updateCmd = &cobra.Command{
 		if !onIntelNetwork() {
 			return fmt.Errorf("update command is only available on the Intel network")
 		}
-		appContext := cmd.Parent().Context().Value(common.AppContext{}).(common.AppContext)
+		appContext := cmd.Parent().Context().Value(app.Context{}).(app.Context)
 		localTempDir := appContext.LocalTempDir
 		updateAvailable, latestManifest, err := checkForUpdates(gVersion)
 		if err != nil {
@@ -340,7 +340,7 @@ var updateCmd = &cobra.Command{
 			fmt.Printf("Error: update check failed: %v\n", err)
 			return err
 		} else if updateAvailable {
-			fmt.Printf("Updating %s to version %s...\n", common.AppName, latestManifest.Version)
+			fmt.Printf("Updating %s to version %s...\n", app.Name, latestManifest.Version)
 			err = updateApp(latestManifest, localTempDir)
 			if err != nil {
 				slog.Error("Failed to update application", slog.String("error", err.Error()))
@@ -349,7 +349,7 @@ var updateCmd = &cobra.Command{
 			}
 		} else {
 			slog.Info("No updates available")
-			fmt.Printf("No updates available for %s.\n", common.AppName)
+			fmt.Printf("No updates available for %s.\n", app.Name)
 		}
 		return nil
 	},

@@ -3,14 +3,16 @@ module perfspect
 go 1.25
 
 replace (
-	perfspect/internal/common => ./internal/common
-	perfspect/internal/cpudb => ./internal/cpudb
+	perfspect/internal/app => ./internal/app
+	perfspect/internal/cpus => ./internal/cpus
+	perfspect/internal/extract => ./internal/extract
 	perfspect/internal/progress => ./internal/progress
 	perfspect/internal/report => ./internal/report
 	perfspect/internal/script => ./internal/script
 	perfspect/internal/table => ./internal/table
 	perfspect/internal/target => ./internal/target
 	perfspect/internal/util => ./internal/util
+	perfspect/internal/workflow => ./internal/workflow
 )
 
 require (

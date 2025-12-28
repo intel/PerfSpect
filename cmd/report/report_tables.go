@@ -14,8 +14,8 @@ import (
 	"strconv"
 	"strings"
 
-	"perfspect/internal/common"
 	"perfspect/internal/cpus"
+	"perfspect/internal/extract"
 	"perfspect/internal/report"
 	"perfspect/internal/script"
 	"perfspect/internal/table"
@@ -470,15 +470,15 @@ var tableDefinitions = map[string]table.TableDefinition{
 func hostTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	hostName := strings.TrimSpace(outputs[script.HostnameScriptName].Stdout)
 	time := strings.TrimSpace(outputs[script.DateScriptName].Stdout)
-	system := common.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Manufacturer:\s*(.+?)$`) +
-		" " + common.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Product Name:\s*(.+?)$`) +
-		", " + common.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Version:\s*(.+?)$`)
-	baseboard := common.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Manufacturer:\s*(.+?)$`) +
-		" " + common.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Product Name:\s*(.+?)$`) +
-		", " + common.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Version:\s*(.+?)$`)
-	chassis := common.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Manufacturer:\s*(.+?)$`) +
-		" " + common.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Type:\s*(.+?)$`) +
-		", " + common.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Version:\s*(.+?)$`)
+	system := extract.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Manufacturer:\s*(.+?)$`) +
+		" " + extract.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Product Name:\s*(.+?)$`) +
+		", " + extract.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Version:\s*(.+?)$`)
+	baseboard := extract.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Manufacturer:\s*(.+?)$`) +
+		" " + extract.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Product Name:\s*(.+?)$`) +
+		", " + extract.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Version:\s*(.+?)$`)
+	chassis := extract.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Manufacturer:\s*(.+?)$`) +
+		" " + extract.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Type:\s*(.+?)$`) +
+		", " + extract.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Version:\s*(.+?)$`)
 	return []table.Field{
 		{Name: "Host Name", Values: []string{hostName}},
 		{Name: "Time", Values: []string{time}},
@@ -489,7 +489,7 @@ func hostTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 }
 
 func pcieSlotsTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	fieldValues := common.ValsArrayFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "9",
+	fieldValues := extract.ValsArrayFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "9",
 		[]string{
 			`^Designation:\s*(.+?)$`,
 			`^Type:\s*(.+?)$`,
@@ -522,7 +522,7 @@ func biosTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 		{Name: "Version"},
 		{Name: "Release Date"},
 	}
-	fieldValues := common.ValsArrayFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "0",
+	fieldValues := extract.ValsArrayFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "0",
 		[]string{
 			`^Vendor:\s*(.+?)$`,
 			`^Version:\s*(.+?)$`,
@@ -543,72 +543,72 @@ func biosTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 
 func operatingSystemTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	return []table.Field{
-		{Name: "OS", Values: []string{common.OperatingSystemFromOutput(outputs)}},
-		{Name: "Kernel", Values: []string{common.ValFromRegexSubmatch(outputs[script.UnameScriptName].Stdout, `^Linux \S+ (\S+)`)}},
+		{Name: "OS", Values: []string{extract.OperatingSystemFromOutput(outputs)}},
+		{Name: "Kernel", Values: []string{extract.ValFromRegexSubmatch(outputs[script.UnameScriptName].Stdout, `^Linux \S+ (\S+)`)}},
 		{Name: "Boot Parameters", Values: []string{strings.TrimSpace(outputs[script.ProcCmdlineScriptName].Stdout)}},
-		{Name: "Microcode", Values: []string{common.ValFromRegexSubmatch(outputs[script.ProcCpuinfoScriptName].Stdout, `^microcode.*:\s*(.+?)$`)}},
+		{Name: "Microcode", Values: []string{extract.ValFromRegexSubmatch(outputs[script.ProcCpuinfoScriptName].Stdout, `^microcode.*:\s*(.+?)$`)}},
 	}
 }
 
 func softwareVersionTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	return []table.Field{
-		{Name: "GCC", Values: []string{common.ValFromRegexSubmatch(outputs[script.GccVersionScriptName].Stdout, `^(gcc .*)$`)}},
-		{Name: "GLIBC", Values: []string{common.ValFromRegexSubmatch(outputs[script.GlibcVersionScriptName].Stdout, `^(ldd .*)`)}},
-		{Name: "Binutils", Values: []string{common.ValFromRegexSubmatch(outputs[script.BinutilsVersionScriptName].Stdout, `^(GNU ld .*)$`)}},
-		{Name: "Python", Values: []string{common.ValFromRegexSubmatch(outputs[script.PythonVersionScriptName].Stdout, `^(Python .*)$`)}},
-		{Name: "Python3", Values: []string{common.ValFromRegexSubmatch(outputs[script.Python3VersionScriptName].Stdout, `^(Python 3.*)$`)}},
-		{Name: "Java", Values: []string{common.ValFromRegexSubmatch(outputs[script.JavaVersionScriptName].Stdout, `^(openjdk .*)$`)}},
-		{Name: "OpenSSL", Values: []string{common.ValFromRegexSubmatch(outputs[script.OpensslVersionScriptName].Stdout, `^(OpenSSL .*)$`)}},
+		{Name: "GCC", Values: []string{extract.ValFromRegexSubmatch(outputs[script.GccVersionScriptName].Stdout, `^(gcc .*)$`)}},
+		{Name: "GLIBC", Values: []string{extract.ValFromRegexSubmatch(outputs[script.GlibcVersionScriptName].Stdout, `^(ldd .*)`)}},
+		{Name: "Binutils", Values: []string{extract.ValFromRegexSubmatch(outputs[script.BinutilsVersionScriptName].Stdout, `^(GNU ld .*)$`)}},
+		{Name: "Python", Values: []string{extract.ValFromRegexSubmatch(outputs[script.PythonVersionScriptName].Stdout, `^(Python .*)$`)}},
+		{Name: "Python3", Values: []string{extract.ValFromRegexSubmatch(outputs[script.Python3VersionScriptName].Stdout, `^(Python 3.*)$`)}},
+		{Name: "Java", Values: []string{extract.ValFromRegexSubmatch(outputs[script.JavaVersionScriptName].Stdout, `^(openjdk .*)$`)}},
+		{Name: "OpenSSL", Values: []string{extract.ValFromRegexSubmatch(outputs[script.OpensslVersionScriptName].Stdout, `^(OpenSSL .*)$`)}},
 	}
 }
 
 func cpuTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	var l1d, l1i, l2 string
-	lscpuCache, err := common.ParseLscpuCacheOutput(outputs[script.LscpuCacheScriptName].Stdout)
+	lscpuCache, err := extract.ParseLscpuCacheOutput(outputs[script.LscpuCacheScriptName].Stdout)
 	if err != nil {
 		slog.Warn("failed to parse lscpu cache output", "error", err)
 	} else {
 		if _, ok := lscpuCache["L1d"]; ok {
-			l1d = common.L1l2CacheSizeFromLscpuCache(lscpuCache["L1d"])
+			l1d = extract.L1l2CacheSizeFromLscpuCache(lscpuCache["L1d"])
 		}
 		if _, ok := lscpuCache["L1i"]; ok {
-			l1i = common.L1l2CacheSizeFromLscpuCache(lscpuCache["L1i"])
+			l1i = extract.L1l2CacheSizeFromLscpuCache(lscpuCache["L1i"])
 		}
 		if _, ok := lscpuCache["L2"]; ok {
-			l2 = common.L1l2CacheSizeFromLscpuCache(lscpuCache["L2"])
+			l2 = extract.L1l2CacheSizeFromLscpuCache(lscpuCache["L2"])
 		}
 	}
 	return []table.Field{
-		{Name: "CPU Model", Values: []string{common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^[Mm]odel name:\s*(.+)$`)}},
-		{Name: "Architecture", Values: []string{common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Architecture:\s*(.+)$`)}},
-		{Name: "Microarchitecture", Values: []string{common.UarchFromOutput(outputs)}},
-		{Name: "Family", Values: []string{common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU family:\s*(.+)$`)}},
-		{Name: "Model", Values: []string{common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Model:\s*(.+)$`)}},
-		{Name: "Stepping", Values: []string{common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Stepping:\s*(.+)$`)}},
-		{Name: "Base Frequency", Values: []string{common.BaseFrequencyFromOutput(outputs)}, Description: "The minimum guaranteed speed of a single core under standard conditions."},
-		{Name: "Maximum Frequency", Values: []string{common.MaxFrequencyFromOutput(outputs)}, Description: "The highest speed a single core can reach with Turbo Boost."},
-		{Name: "All-core Maximum Frequency", Values: []string{common.AllCoreMaxFrequencyFromOutput(outputs)}, Description: "The highest speed all cores can reach simultaneously with Turbo Boost."},
-		{Name: "CPUs", Values: []string{common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU\(s\):\s*(.+)$`)}},
-		{Name: "On-line CPU List", Values: []string{common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^On-line CPU\(s\) list:\s*(.+)$`)}},
-		{Name: "Hyperthreading", Values: []string{common.HyperthreadingFromOutput(outputs)}},
-		{Name: "Cores per Socket", Values: []string{common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)}},
-		{Name: "Sockets", Values: []string{common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)}},
-		{Name: "NUMA Nodes", Values: []string{common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^NUMA node\(s\):\s*(.+)$`)}},
-		{Name: "NUMA CPU List", Values: []string{numaCPUListFromOutput(outputs)}},
+		{Name: "CPU Model", Values: []string{extract.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^[Mm]odel name:\s*(.+)$`)}},
+		{Name: "Architecture", Values: []string{extract.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Architecture:\s*(.+)$`)}},
+		{Name: "Microarchitecture", Values: []string{extract.UarchFromOutput(outputs)}},
+		{Name: "Family", Values: []string{extract.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU family:\s*(.+)$`)}},
+		{Name: "Model", Values: []string{extract.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Model:\s*(.+)$`)}},
+		{Name: "Stepping", Values: []string{extract.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Stepping:\s*(.+)$`)}},
+		{Name: "Base Frequency", Values: []string{extract.BaseFrequencyFromOutput(outputs)}, Description: "The minimum guaranteed speed of a single core under standard conditions."},
+		{Name: "Maximum Frequency", Values: []string{extract.MaxFrequencyFromOutput(outputs)}, Description: "The highest speed a single core can reach with Turbo Boost."},
+		{Name: "All-core Maximum Frequency", Values: []string{extract.AllCoreMaxFrequencyFromOutput(outputs)}, Description: "The highest speed all cores can reach simultaneously with Turbo Boost."},
+		{Name: "CPUs", Values: []string{extract.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU\(s\):\s*(.+)$`)}},
+		{Name: "On-line CPU List", Values: []string{extract.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^On-line CPU\(s\) list:\s*(.+)$`)}},
+		{Name: "Hyperthreading", Values: []string{extract.HyperthreadingFromOutput(outputs)}},
+		{Name: "Cores per Socket", Values: []string{extract.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)}},
+		{Name: "Sockets", Values: []string{extract.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)}},
+		{Name: "NUMA Nodes", Values: []string{extract.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^NUMA node\(s\):\s*(.+)$`)}},
+		{Name: "NUMA CPU List", Values: []string{extract.NumaCPUListFromOutput(outputs)}},
 		{Name: "L1d Cache", Values: []string{l1d}, Description: "The size of the L1 data cache for one core."},
 		{Name: "L1i Cache", Values: []string{l1i}, Description: "The size of the L1 instruction cache for one core."},
 		{Name: "L2 Cache", Values: []string{l2}, Description: "The size of the L2 cache for one core."},
-		{Name: "L3 Cache (instance/total)", Values: []string{common.L3FromOutput(outputs)}, Description: "The size of one L3 cache instance and the total L3 cache size for the system."},
-		{Name: "L3 per Core", Values: []string{common.L3PerCoreFromOutput(outputs)}, Description: "The L3 cache size per core."},
-		{Name: "Memory Channels", Values: []string{channelsFromOutput(outputs)}},
-		{Name: "Intel Turbo Boost", Values: []string{turboEnabledFromOutput(outputs)}},
-		{Name: "Virtualization", Values: []string{common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Virtualization:\s*(.+)$`)}},
-		{Name: "PPINs", Values: []string{ppinsFromOutput(outputs)}},
+		{Name: "L3 Cache (instance/total)", Values: []string{extract.L3FromOutput(outputs)}, Description: "The size of one L3 cache instance and the total L3 cache size for the system."},
+		{Name: "L3 per Core", Values: []string{extract.L3PerCoreFromOutput(outputs)}, Description: "The L3 cache size per core."},
+		{Name: "Memory Channels", Values: []string{extract.ChannelsFromOutput(outputs)}},
+		{Name: "Intel Turbo Boost", Values: []string{extract.TurboEnabledFromOutput(outputs)}},
+		{Name: "Virtualization", Values: []string{extract.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Virtualization:\s*(.+)$`)}},
+		{Name: "PPINs", Values: []string{extract.PPINsFromOutput(outputs)}},
 	}
 }
 
 func prefetcherTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	prefetchers := common.PrefetchersFromOutput(outputs)
+	prefetchers := extract.PrefetchersFromOutput(outputs)
 	if len(prefetchers) == 0 {
 		return []table.Field{}
 	}
@@ -696,8 +696,8 @@ func cpuTableInsights(outputs map[string]script.ScriptOutput, tableValues table.
 
 func isaTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	fields := []table.Field{}
-	supported := isaSupportedFromOutput(outputs)
-	for i, isa := range isaFullNames() {
+	supported := extract.ISASupportedFromOutput(outputs)
+	for i, isa := range extract.ISAFullNames() {
 		fields = append(fields, table.Field{
 			Name:   isa,
 			Values: []string{supported[i]},
@@ -707,16 +707,16 @@ func isaTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 }
 
 func acceleratorTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	names := acceleratorNames()
+	names := extract.AcceleratorNames()
 	if len(names) == 0 {
 		return []table.Field{}
 	}
 	return []table.Field{
 		{Name: "Name", Values: names},
-		{Name: "Count", Values: acceleratorCountsFromOutput(outputs)},
-		{Name: "Work Queues", Values: acceleratorWorkQueuesFromOutput(outputs)},
-		{Name: "Full Name", Values: acceleratorFullNamesFromYaml()},
-		{Name: "Description", Values: acceleratorDescriptionsFromYaml()},
+		{Name: "Count", Values: extract.AcceleratorCountsFromOutput(outputs)},
+		{Name: "Work Queues", Values: extract.AcceleratorWorkQueuesFromOutput(outputs)},
+		{Name: "Full Name", Values: extract.AcceleratorFullNames()},
+		{Name: "Description", Values: extract.AcceleratorDescriptions()},
 	}
 }
 
@@ -758,9 +758,9 @@ func acceleratorTableInsights(outputs map[string]script.ScriptOutput, tableValue
 
 func powerTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	return []table.Field{
-		{Name: "TDP", Values: []string{common.TDPFromOutput(outputs)}},
-		{Name: "Energy Performance Bias", Values: []string{common.EPBFromOutput(outputs)}},
-		{Name: "Energy Performance Preference", Values: []string{common.EPPFromOutput(outputs)}},
+		{Name: "TDP", Values: []string{extract.TDPFromOutput(outputs)}},
+		{Name: "Energy Performance Bias", Values: []string{extract.EPBFromOutput(outputs)}},
+		{Name: "Energy Performance Preference", Values: []string{extract.EPPFromOutput(outputs)}},
 		{Name: "Scaling Governor", Values: []string{strings.TrimSpace(outputs[script.ScalingGovernorScriptName].Stdout)}},
 		{Name: "Scaling Driver", Values: []string{strings.TrimSpace(outputs[script.ScalingDriverScriptName].Stdout)}},
 	}
@@ -790,7 +790,7 @@ func powerTableInsights(outputs map[string]script.ScriptOutput, tableValues tabl
 }
 
 func cstateTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	cstates := common.CstatesFromOutput(outputs)
+	cstates := extract.CstatesFromOutput(outputs)
 	if len(cstates) == 0 {
 		return []table.Field{}
 	}
@@ -806,32 +806,32 @@ func cstateTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 }
 
 func uncoreTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	uarch := common.UarchFromOutput(outputs)
+	uarch := extract.UarchFromOutput(outputs)
 	if uarch == "" {
 		slog.Error("failed to get uarch from script outputs")
 		return []table.Field{}
 	}
 	if strings.Contains(uarch, cpus.UarchSRF) || strings.Contains(uarch, cpus.UarchGNR) || strings.Contains(uarch, cpus.UarchCWF) {
 		return []table.Field{
-			{Name: "Min Frequency (Compute)", Values: []string{common.UncoreMinMaxDieFrequencyFromOutput(false, true, outputs)}},
-			{Name: "Min Frequency (I/O)", Values: []string{common.UncoreMinMaxDieFrequencyFromOutput(false, false, outputs)}},
-			{Name: "Max Frequency (Compute)", Values: []string{common.UncoreMinMaxDieFrequencyFromOutput(true, true, outputs)}},
-			{Name: "Max Frequency (I/O)", Values: []string{common.UncoreMinMaxDieFrequencyFromOutput(true, false, outputs)}},
-			{Name: "CHA Count", Values: []string{chaCountFromOutput(outputs)}},
+			{Name: "Min Frequency (Compute)", Values: []string{extract.UncoreMinMaxDieFrequencyFromOutput(false, true, outputs)}},
+			{Name: "Min Frequency (I/O)", Values: []string{extract.UncoreMinMaxDieFrequencyFromOutput(false, false, outputs)}},
+			{Name: "Max Frequency (Compute)", Values: []string{extract.UncoreMinMaxDieFrequencyFromOutput(true, true, outputs)}},
+			{Name: "Max Frequency (I/O)", Values: []string{extract.UncoreMinMaxDieFrequencyFromOutput(true, false, outputs)}},
+			{Name: "CHA Count", Values: []string{extract.ChaCountFromOutput(outputs)}},
 		}
 	} else { // field counts need to match for the all_hosts reports to work properly
 		return []table.Field{
-			{Name: "Min Frequency", Values: []string{common.UncoreMinFrequencyFromOutput(outputs)}},
+			{Name: "Min Frequency", Values: []string{extract.UncoreMinFrequencyFromOutput(outputs)}},
 			{Name: "N/A", Values: []string{""}},
-			{Name: "Max Frequency", Values: []string{common.UncoreMaxFrequencyFromOutput(outputs)}},
+			{Name: "Max Frequency", Values: []string{extract.UncoreMaxFrequencyFromOutput(outputs)}},
 			{Name: "N/A", Values: []string{""}},
-			{Name: "CHA Count", Values: []string{chaCountFromOutput(outputs)}},
+			{Name: "CHA Count", Values: []string{extract.ChaCountFromOutput(outputs)}},
 		}
 	}
 }
 
 func elcTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	return common.ELCFieldValuesFromOutput(outputs)
+	return extract.ELCFieldValuesFromOutput(outputs)
 }
 
 func elcTableInsights(outputs map[string]script.ScriptOutput, tableValues table.TableValues) []table.Insight {
@@ -871,7 +871,7 @@ func elcTableInsights(outputs map[string]script.ScriptOutput, tableValues table.
 			}
 		}
 		// if epb is not set to 'Performance (0)' and ELC mode is set to 'Latency Optimized', suggest setting epb to 'Performance (0)'
-		epb := common.EPBFromOutput(outputs)
+		epb := extract.EPBFromOutput(outputs)
 		if epb != "" && epb != "Performance (0)" && firstMode == "Latency Optimized" {
 			insights = append(insights, table.Insight{
 				Recommendation: "Consider setting Energy Performance Bias to 'Performance (0)' to allow Latency Optimized mode to operate as designed.",
@@ -883,7 +883,7 @@ func elcTableInsights(outputs map[string]script.ScriptOutput, tableValues table.
 }
 
 func maximumFrequencyTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	frequencyBuckets, err := common.GetSpecFrequencyBuckets(outputs)
+	frequencyBuckets, err := extract.GetSpecFrequencyBuckets(outputs)
 	if err != nil {
 		slog.Warn("unable to get spec core frequencies", slog.String("error", err.Error()))
 		return []table.Field{}
@@ -994,19 +994,19 @@ func sstTFLPTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 
 func memoryTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	return []table.Field{
-		{Name: "Installed Memory", Values: []string{common.InstalledMemoryFromOutput(outputs)}},
-		{Name: "MemTotal", Values: []string{common.ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^MemTotal:\s*(.+?)$`)}},
-		{Name: "MemFree", Values: []string{common.ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^MemFree:\s*(.+?)$`)}},
-		{Name: "MemAvailable", Values: []string{common.ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^MemAvailable:\s*(.+?)$`)}},
-		{Name: "Buffers", Values: []string{common.ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^Buffers:\s*(.+?)$`)}},
-		{Name: "Cached", Values: []string{common.ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^Cached:\s*(.+?)$`)}},
-		{Name: "HugePages_Total", Values: []string{common.ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^HugePages_Total:\s*(.+?)$`)}},
-		{Name: "Hugepagesize", Values: []string{common.ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^Hugepagesize:\s*(.+?)$`)}},
-		{Name: "Transparent Huge Pages", Values: []string{common.ValFromRegexSubmatch(outputs[script.TransparentHugePagesScriptName].Stdout, `.*\[(.*)\].*`)}},
-		{Name: "Automatic NUMA Balancing", Values: []string{numaBalancingFromOutput(outputs)}},
-		{Name: "Populated Memory Channels", Values: []string{populatedChannelsFromOutput(outputs)}},
+		{Name: "Installed Memory", Values: []string{extract.InstalledMemoryFromOutput(outputs)}},
+		{Name: "MemTotal", Values: []string{extract.ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^MemTotal:\s*(.+?)$`)}},
+		{Name: "MemFree", Values: []string{extract.ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^MemFree:\s*(.+?)$`)}},
+		{Name: "MemAvailable", Values: []string{extract.ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^MemAvailable:\s*(.+?)$`)}},
+		{Name: "Buffers", Values: []string{extract.ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^Buffers:\s*(.+?)$`)}},
+		{Name: "Cached", Values: []string{extract.ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^Cached:\s*(.+?)$`)}},
+		{Name: "HugePages_Total", Values: []string{extract.ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^HugePages_Total:\s*(.+?)$`)}},
+		{Name: "Hugepagesize", Values: []string{extract.ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^Hugepagesize:\s*(.+?)$`)}},
+		{Name: "Transparent Huge Pages", Values: []string{extract.ValFromRegexSubmatch(outputs[script.TransparentHugePagesScriptName].Stdout, `.*\[(.*)\].*`)}},
+		{Name: "Automatic NUMA Balancing", Values: []string{extract.NumaBalancingFromOutput(outputs)}},
+		{Name: "Populated Memory Channels", Values: []string{extract.PopulatedChannelsFromOutput(outputs)}},
 		{Name: "Total Memory Encryption (TME)", Values: []string{strings.TrimSpace(outputs[script.TmeScriptName].Stdout)}},
-		{Name: "Clustering Mode", Values: []string{clusteringModeFromOutput(outputs)}},
+		{Name: "Clustering Mode", Values: []string{extract.ClusteringModeFromOutput(outputs)}},
 	}
 }
 
@@ -1019,13 +1019,13 @@ func memoryTableInsights(outputs map[string]script.ScriptOutput, tableValues tab
 	} else {
 		populatedChannels := tableValues.Fields[populatedChannelsIndex].Values[0]
 		if populatedChannels != "" {
-			uarch := common.UarchFromOutput(outputs)
+			uarch := extract.UarchFromOutput(outputs)
 			if uarch != "" {
 				cpu, err := cpus.GetCPUByMicroArchitecture(uarch)
 				if err != nil {
 					slog.Warn(err.Error())
 				} else {
-					sockets := common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)
+					sockets := extract.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)
 					socketCount, err := strconv.Atoi(sockets)
 					if err != nil {
 						slog.Warn(err.Error())
@@ -1043,7 +1043,7 @@ func memoryTableInsights(outputs map[string]script.ScriptOutput, tableValues tab
 		}
 	}
 	// check if NUMA balancing is not enabled (when there are multiple NUMA nodes)
-	nodes := common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^NUMA node\(s\):\s*(.+)$`)
+	nodes := extract.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^NUMA node\(s\):\s*(.+)$`)
 	nodeCount, err := strconv.Atoi(nodes)
 	if err != nil {
 		slog.Warn(err.Error())
@@ -1068,7 +1068,7 @@ func memoryTableInsights(outputs map[string]script.ScriptOutput, tableValues tab
 }
 
 func dimmTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	dimmFieldValues := common.ValsArrayFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "17",
+	dimmFieldValues := extract.ValsArrayFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "17",
 		[]string{
 			`^Bank Locator:\s*(.+?)$`,
 			`^Locator:\s*(.+?)$`,
@@ -1107,7 +1107,7 @@ func dimmTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 			fields[fieldIndex].Values = append(fields[fieldIndex].Values, dimmFieldValues[dimmIndex][fieldIndex])
 		}
 	}
-	derivedDimmFieldValues := derivedDimmsFieldFromOutput(outputs)
+	derivedDimmFieldValues := extract.DerivedDimmsFieldFromOutput(outputs)
 	if len(dimmFieldValues) != len(derivedDimmFieldValues) {
 		slog.Warn("unable to derive socket, channel, and slot for all DIMMs")
 		// fill with empty strings
@@ -1116,9 +1116,9 @@ func dimmTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 		fields[13].Values = append(fields[13].Values, make([]string, len(dimmFieldValues))...)
 	} else {
 		for i := range derivedDimmFieldValues {
-			fields[11].Values = append(fields[11].Values, derivedDimmFieldValues[i].socket)
-			fields[12].Values = append(fields[12].Values, derivedDimmFieldValues[i].channel)
-			fields[13].Values = append(fields[13].Values, derivedDimmFieldValues[i].slot)
+			fields[11].Values = append(fields[11].Values, derivedDimmFieldValues[i].Socket)
+			fields[12].Values = append(fields[12].Values, derivedDimmFieldValues[i].Channel)
+			fields[13].Values = append(fields[13].Values, derivedDimmFieldValues[i].Slot)
 		}
 	}
 	return fields
@@ -1166,7 +1166,7 @@ func dimmTableInsights(outputs map[string]script.ScriptOutput, tableValues table
 }
 
 func nicTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	allNicsInfo := common.ParseNicInfo(outputs[script.NicInfoScriptName].Stdout)
+	allNicsInfo := extract.ParseNicInfo(outputs[script.NicInfoScriptName].Stdout)
 	if len(allNicsInfo) == 0 {
 		return []table.Field{}
 	}
@@ -1232,7 +1232,7 @@ func nicTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 }
 
 func nicPacketSteeringTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	allNicsInfo := common.ParseNicInfo(outputs[script.NicInfoScriptName].Stdout)
+	allNicsInfo := extract.ParseNicInfo(outputs[script.NicInfoScriptName].Stdout)
 	if len(allNicsInfo) == 0 {
 		return []table.Field{}
 	}
@@ -1294,7 +1294,7 @@ func formatQueueCPUMappings(mappings map[string]string, prefix string) string {
 }
 
 func nicCpuAffinityTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	nicIRQMappings := common.NICIrqMappingsFromOutput(outputs)
+	nicIRQMappings := extract.NICIrqMappingsFromOutput(outputs)
 	if len(nicIRQMappings) == 0 {
 		return []table.Field{}
 	}
@@ -1348,7 +1348,7 @@ func networkConfigTableValues(outputs map[string]script.ScriptOutput) []table.Fi
 }
 
 func diskTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	allDisksInfo := common.DiskInfoFromOutput(outputs)
+	allDisksInfo := extract.DiskInfoFromOutput(outputs)
 	if len(allDisksInfo) == 0 {
 		return []table.Field{}
 	}
@@ -1388,7 +1388,7 @@ func diskTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 }
 
 func filesystemTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	return filesystemFieldValuesFromOutput(outputs)
+	return extract.FilesystemFieldValuesFromOutput(outputs)
 }
 
 func filesystemTableInsights(outputs map[string]script.ScriptOutput, tableValues table.TableValues) []table.Insight {
@@ -1410,7 +1410,7 @@ func filesystemTableInsights(outputs map[string]script.ScriptOutput, tableValues
 }
 
 func gpuTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	gpuInfos := gpuInfoFromOutput(outputs)
+	gpuInfos := extract.GPUInfoFromOutput(outputs)
 	if len(gpuInfos) == 0 {
 		return []table.Field{}
 	}
@@ -1428,7 +1428,7 @@ func gpuTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 }
 
 func gaudiTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	gaudiInfos := gaudiInfoFromOutput(outputs)
+	gaudiInfos := extract.GaudiInfoFromOutput(outputs)
 	if len(gaudiInfos) == 0 {
 		return []table.Field{}
 	}
@@ -1458,7 +1458,7 @@ func gaudiTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 }
 
 func cxlTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	cxlDevices := getPCIDevices("CXL", outputs)
+	cxlDevices := extract.GetPCIDevices("CXL", outputs)
 	if len(cxlDevices) == 0 {
 		return []table.Field{}
 	}
@@ -1486,7 +1486,7 @@ func cxlTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 
 func cveTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	fields := []table.Field{}
-	cves := cveInfoFromOutput(outputs)
+	cves := extract.CVEInfoFromOutput(outputs)
 	for _, cve := range cves {
 		fields = append(fields, table.Field{Name: cve[0], Values: []string{cve[1]}})
 	}
@@ -1622,31 +1622,31 @@ func kernelLogTableValues(outputs map[string]script.ScriptOutput) []table.Field 
 func pmuTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	return []table.Field{
 		{Name: "PMU Driver Version", Values: []string{strings.TrimSpace(outputs[script.PMUDriverVersionScriptName].Stdout)}},
-		{Name: "cpu_cycles", Values: []string{common.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0x30a (.*)$`)}},
-		{Name: "instructions", Values: []string{common.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0x309 (.*)$`)}},
-		{Name: "ref_cycles", Values: []string{common.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0x30b (.*)$`)}},
-		{Name: "topdown_slots", Values: []string{common.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0x30c (.*)$`)}},
-		{Name: "gen_programmable_1", Values: []string{common.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0xc1 (.*)$`)}},
-		{Name: "gen_programmable_2", Values: []string{common.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0xc2 (.*)$`)}},
-		{Name: "gen_programmable_3", Values: []string{common.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0xc3 (.*)$`)}},
-		{Name: "gen_programmable_4", Values: []string{common.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0xc4 (.*)$`)}},
-		{Name: "gen_programmable_5", Values: []string{common.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0xc5 (.*)$`)}},
-		{Name: "gen_programmable_6", Values: []string{common.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0xc6 (.*)$`)}},
-		{Name: "gen_programmable_7", Values: []string{common.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0xc7 (.*)$`)}},
-		{Name: "gen_programmable_8", Values: []string{common.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0xc8 (.*)$`)}},
+		{Name: "cpu_cycles", Values: []string{extract.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0x30a (.*)$`)}},
+		{Name: "instructions", Values: []string{extract.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0x309 (.*)$`)}},
+		{Name: "ref_cycles", Values: []string{extract.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0x30b (.*)$`)}},
+		{Name: "topdown_slots", Values: []string{extract.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0x30c (.*)$`)}},
+		{Name: "gen_programmable_1", Values: []string{extract.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0xc1 (.*)$`)}},
+		{Name: "gen_programmable_2", Values: []string{extract.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0xc2 (.*)$`)}},
+		{Name: "gen_programmable_3", Values: []string{extract.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0xc3 (.*)$`)}},
+		{Name: "gen_programmable_4", Values: []string{extract.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0xc4 (.*)$`)}},
+		{Name: "gen_programmable_5", Values: []string{extract.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0xc5 (.*)$`)}},
+		{Name: "gen_programmable_6", Values: []string{extract.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0xc6 (.*)$`)}},
+		{Name: "gen_programmable_7", Values: []string{extract.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0xc7 (.*)$`)}},
+		{Name: "gen_programmable_8", Values: []string{extract.ValFromRegexSubmatch(outputs[script.PMUBusyScriptName].Stdout, `^0xc8 (.*)$`)}},
 	}
 }
 
 func systemSummaryTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	system := common.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Manufacturer:\s*(.+?)$`) +
-		" " + common.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Product Name:\s*(.+?)$`) +
-		", " + common.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Version:\s*(.+?)$`)
-	baseboard := common.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Manufacturer:\s*(.+?)$`) +
-		" " + common.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Product Name:\s*(.+?)$`) +
-		", " + common.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Version:\s*(.+?)$`)
-	chassis := common.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Manufacturer:\s*(.+?)$`) +
-		" " + common.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Type:\s*(.+?)$`) +
-		", " + common.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Version:\s*(.+?)$`)
+	system := extract.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Manufacturer:\s*(.+?)$`) +
+		" " + extract.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Product Name:\s*(.+?)$`) +
+		", " + extract.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "1", `^Version:\s*(.+?)$`)
+	baseboard := extract.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Manufacturer:\s*(.+?)$`) +
+		" " + extract.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Product Name:\s*(.+?)$`) +
+		", " + extract.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "2", `^Version:\s*(.+?)$`)
+	chassis := extract.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Manufacturer:\s*(.+?)$`) +
+		" " + extract.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Type:\s*(.+?)$`) +
+		", " + extract.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "3", `^Version:\s*(.+?)$`)
 
 	return []table.Field{
 		{Name: "Host Name", Values: []string{strings.TrimSpace(outputs[script.HostnameScriptName].Stdout)}},
@@ -1654,94 +1654,94 @@ func systemSummaryTableValues(outputs map[string]script.ScriptOutput) []table.Fi
 		{Name: "System", Values: []string{system}},
 		{Name: "Baseboard", Values: []string{baseboard}},
 		{Name: "Chassis", Values: []string{chassis}},
-		{Name: "CPU Model", Values: []string{common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^[Mm]odel name:\s*(.+)$`)}},
-		{Name: "Architecture", Values: []string{common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Architecture:\s*(.+)$`)}},
-		{Name: "Microarchitecture", Values: []string{common.UarchFromOutput(outputs)}},
-		{Name: "L3 Cache (instance/total)", Values: []string{common.L3FromOutput(outputs)}, Description: "The size of one L3 cache instance and the total L3 cache size for the system."},
-		{Name: "Cores per Socket", Values: []string{common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)}},
-		{Name: "Sockets", Values: []string{common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)}},
-		{Name: "Hyperthreading", Values: []string{common.HyperthreadingFromOutput(outputs)}},
-		{Name: "CPUs", Values: []string{common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU\(s\):\s*(.+)$`)}},
-		{Name: "Intel Turbo Boost", Values: []string{turboEnabledFromOutput(outputs)}},
-		{Name: "Base Frequency", Values: []string{common.BaseFrequencyFromOutput(outputs)}, Description: "The minimum guaranteed speed of a single core under standard conditions."},
-		{Name: "Maximum Frequency", Values: []string{common.MaxFrequencyFromOutput(outputs)}, Description: "The highest speed a single core can reach with Turbo Boost."},
-		{Name: "All-core Maximum Frequency", Values: []string{common.AllCoreMaxFrequencyFromOutput(outputs)}, Description: "The highest speed all cores can reach simultaneously with Turbo Boost."},
-		{Name: "NUMA Nodes", Values: []string{common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^NUMA node\(s\):\s*(.+)$`)}},
-		{Name: "Prefetchers", Values: []string{common.PrefetchersSummaryFromOutput(outputs)}},
-		{Name: "PPINs", Values: []string{ppinsFromOutput(outputs)}},
-		{Name: "Accelerators Available [used]", Values: []string{acceleratorSummaryFromOutput(outputs)}},
-		{Name: "Installed Memory", Values: []string{common.InstalledMemoryFromOutput(outputs)}},
-		{Name: "Hugepagesize", Values: []string{common.ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^Hugepagesize:\s*(.+?)$`)}},
-		{Name: "Transparent Huge Pages", Values: []string{common.ValFromRegexSubmatch(outputs[script.TransparentHugePagesScriptName].Stdout, `.*\[(.*)\].*`)}},
-		{Name: "Automatic NUMA Balancing", Values: []string{numaBalancingFromOutput(outputs)}},
-		{Name: "NIC", Values: []string{common.NICSummaryFromOutput(outputs)}},
-		{Name: "Disk", Values: []string{common.DiskSummaryFromOutput(outputs)}},
-		{Name: "BIOS", Values: []string{common.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "0", `^Version:\s*(.+?)$`)}},
-		{Name: "Microcode", Values: []string{common.ValFromRegexSubmatch(outputs[script.ProcCpuinfoScriptName].Stdout, `^microcode.*:\s*(.+?)$`)}},
-		{Name: "OS", Values: []string{common.OperatingSystemFromOutput(outputs)}},
-		{Name: "Kernel", Values: []string{common.ValFromRegexSubmatch(outputs[script.UnameScriptName].Stdout, `^Linux \S+ (\S+)`)}},
-		{Name: "TDP", Values: []string{common.TDPFromOutput(outputs)}},
-		{Name: "Energy Performance Bias", Values: []string{common.EPBFromOutput(outputs)}},
+		{Name: "CPU Model", Values: []string{extract.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^[Mm]odel name:\s*(.+)$`)}},
+		{Name: "Architecture", Values: []string{extract.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Architecture:\s*(.+)$`)}},
+		{Name: "Microarchitecture", Values: []string{extract.UarchFromOutput(outputs)}},
+		{Name: "L3 Cache (instance/total)", Values: []string{extract.L3FromOutput(outputs)}, Description: "The size of one L3 cache instance and the total L3 cache size for the system."},
+		{Name: "Cores per Socket", Values: []string{extract.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)}},
+		{Name: "Sockets", Values: []string{extract.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)}},
+		{Name: "Hyperthreading", Values: []string{extract.HyperthreadingFromOutput(outputs)}},
+		{Name: "CPUs", Values: []string{extract.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^CPU\(s\):\s*(.+)$`)}},
+		{Name: "Intel Turbo Boost", Values: []string{extract.TurboEnabledFromOutput(outputs)}},
+		{Name: "Base Frequency", Values: []string{extract.BaseFrequencyFromOutput(outputs)}, Description: "The minimum guaranteed speed of a single core under standard conditions."},
+		{Name: "Maximum Frequency", Values: []string{extract.MaxFrequencyFromOutput(outputs)}, Description: "The highest speed a single core can reach with Turbo Boost."},
+		{Name: "All-core Maximum Frequency", Values: []string{extract.AllCoreMaxFrequencyFromOutput(outputs)}, Description: "The highest speed all cores can reach simultaneously with Turbo Boost."},
+		{Name: "NUMA Nodes", Values: []string{extract.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^NUMA node\(s\):\s*(.+)$`)}},
+		{Name: "Prefetchers", Values: []string{extract.PrefetchersSummaryFromOutput(outputs)}},
+		{Name: "PPINs", Values: []string{extract.PPINsFromOutput(outputs)}},
+		{Name: "Accelerators Available [used]", Values: []string{extract.AcceleratorSummaryFromOutput(outputs)}},
+		{Name: "Installed Memory", Values: []string{extract.InstalledMemoryFromOutput(outputs)}},
+		{Name: "Hugepagesize", Values: []string{extract.ValFromRegexSubmatch(outputs[script.MeminfoScriptName].Stdout, `^Hugepagesize:\s*(.+?)$`)}},
+		{Name: "Transparent Huge Pages", Values: []string{extract.ValFromRegexSubmatch(outputs[script.TransparentHugePagesScriptName].Stdout, `.*\[(.*)\].*`)}},
+		{Name: "Automatic NUMA Balancing", Values: []string{extract.NumaBalancingFromOutput(outputs)}},
+		{Name: "NIC", Values: []string{extract.NICSummaryFromOutput(outputs)}},
+		{Name: "Disk", Values: []string{extract.DiskSummaryFromOutput(outputs)}},
+		{Name: "BIOS", Values: []string{extract.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "0", `^Version:\s*(.+?)$`)}},
+		{Name: "Microcode", Values: []string{extract.ValFromRegexSubmatch(outputs[script.ProcCpuinfoScriptName].Stdout, `^microcode.*:\s*(.+?)$`)}},
+		{Name: "OS", Values: []string{extract.OperatingSystemFromOutput(outputs)}},
+		{Name: "Kernel", Values: []string{extract.ValFromRegexSubmatch(outputs[script.UnameScriptName].Stdout, `^Linux \S+ (\S+)`)}},
+		{Name: "TDP", Values: []string{extract.TDPFromOutput(outputs)}},
+		{Name: "Energy Performance Bias", Values: []string{extract.EPBFromOutput(outputs)}},
 		{Name: "Scaling Governor", Values: []string{strings.TrimSpace(outputs[script.ScalingGovernorScriptName].Stdout)}},
 		{Name: "Scaling Driver", Values: []string{strings.TrimSpace(outputs[script.ScalingDriverScriptName].Stdout)}},
-		{Name: "C-states", Values: []string{common.CstatesSummaryFromOutput(outputs)}},
-		{Name: "Efficiency Latency Control", Values: []string{common.ELCSummaryFromOutput(outputs)}},
-		{Name: "CVEs", Values: []string{cveSummaryFromOutput(outputs)}},
-		{Name: "System Summary", Values: []string{systemSummaryFromOutput(outputs)}},
+		{Name: "C-states", Values: []string{extract.CstatesSummaryFromOutput(outputs)}},
+		{Name: "Efficiency Latency Control", Values: []string{extract.ELCSummaryFromOutput(outputs)}},
+		{Name: "CVEs", Values: []string{extract.CVESummaryFromOutput(outputs)}},
+		{Name: "System Summary", Values: []string{extract.SystemSummaryFromOutput(outputs)}},
 	}
 }
 func dimmDetails(dimm []string) (details string) {
-	if strings.Contains(dimm[common.SizeIdx], "No") {
+	if strings.Contains(dimm[extract.SizeIdx], "No") {
 		details = "No Module Installed"
 	} else {
 		// Intel PMEM modules may have serial number appended to end of part number...
 		// strip that off so it doesn't mess with color selection later
-		partNumber := dimm[common.PartIdx]
-		if strings.Contains(dimm[common.DetailIdx], "Synchronous Non-Volatile") &&
-			dimm[common.ManufacturerIdx] == "Intel" &&
-			strings.HasSuffix(dimm[common.PartIdx], dimm[common.SerialIdx]) {
-			partNumber = dimm[common.PartIdx][:len(dimm[common.PartIdx])-len(dimm[common.SerialIdx])]
+		partNumber := dimm[extract.PartIdx]
+		if strings.Contains(dimm[extract.DetailIdx], "Synchronous Non-Volatile") &&
+			dimm[extract.ManufacturerIdx] == "Intel" &&
+			strings.HasSuffix(dimm[extract.PartIdx], dimm[extract.SerialIdx]) {
+			partNumber = dimm[extract.PartIdx][:len(dimm[extract.PartIdx])-len(dimm[extract.SerialIdx])]
 		}
 		// example: "64GB DDR5 R2 Synchronous Registered (Buffered) Micron Technology MTC78ASF4G72PZ-2G6E1 6400 MT/s [6000 MT/s]"
 		details = fmt.Sprintf("%s %s %s R%s %s %s %s [%s]",
-			strings.ReplaceAll(dimm[common.SizeIdx], " ", ""),
-			dimm[common.TypeIdx],
-			dimm[common.DetailIdx],
-			dimm[common.RankIdx],
-			dimm[common.ManufacturerIdx],
+			strings.ReplaceAll(dimm[extract.SizeIdx], " ", ""),
+			dimm[extract.TypeIdx],
+			dimm[extract.DetailIdx],
+			dimm[extract.RankIdx],
+			dimm[extract.ManufacturerIdx],
 			partNumber,
-			strings.ReplaceAll(dimm[common.SpeedIdx], " ", ""),
-			strings.ReplaceAll(dimm[common.ConfiguredSpeedIdx], " ", ""))
+			strings.ReplaceAll(dimm[extract.SpeedIdx], " ", ""),
+			strings.ReplaceAll(dimm[extract.ConfiguredSpeedIdx], " ", ""))
 	}
 	return
 }
 
 func dimmTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
-	if len(tableValues.Fields) <= max(common.DerivedSocketIdx, common.DerivedChannelIdx, common.DerivedSlotIdx) ||
-		len(tableValues.Fields[common.DerivedSocketIdx].Values) == 0 ||
-		len(tableValues.Fields[common.DerivedChannelIdx].Values) == 0 ||
-		len(tableValues.Fields[common.DerivedSlotIdx].Values) == 0 ||
-		tableValues.Fields[common.DerivedSocketIdx].Values[0] == "" ||
-		tableValues.Fields[common.DerivedChannelIdx].Values[0] == "" ||
-		tableValues.Fields[common.DerivedSlotIdx].Values[0] == "" {
+	if len(tableValues.Fields) <= max(extract.DerivedSocketIdx, extract.DerivedChannelIdx, extract.DerivedSlotIdx) ||
+		len(tableValues.Fields[extract.DerivedSocketIdx].Values) == 0 ||
+		len(tableValues.Fields[extract.DerivedChannelIdx].Values) == 0 ||
+		len(tableValues.Fields[extract.DerivedSlotIdx].Values) == 0 ||
+		tableValues.Fields[extract.DerivedSocketIdx].Values[0] == "" ||
+		tableValues.Fields[extract.DerivedChannelIdx].Values[0] == "" ||
+		tableValues.Fields[extract.DerivedSlotIdx].Values[0] == "" {
 		return report.DefaultHTMLTableRendererFunc(tableValues)
 	}
 	htmlColors := []string{"lightgreen", "orange", "aqua", "lime", "yellow", "beige", "magenta", "violet", "salmon", "pink"}
 	var slotColorIndices = make(map[string]int)
 	// socket -> channel -> slot -> dimm details
 	var dimms = map[string]map[string]map[string]string{}
-	for dimmIdx := range tableValues.Fields[common.DerivedSocketIdx].Values {
-		if _, ok := dimms[tableValues.Fields[common.DerivedSocketIdx].Values[dimmIdx]]; !ok {
-			dimms[tableValues.Fields[common.DerivedSocketIdx].Values[dimmIdx]] = make(map[string]map[string]string)
+	for dimmIdx := range tableValues.Fields[extract.DerivedSocketIdx].Values {
+		if _, ok := dimms[tableValues.Fields[extract.DerivedSocketIdx].Values[dimmIdx]]; !ok {
+			dimms[tableValues.Fields[extract.DerivedSocketIdx].Values[dimmIdx]] = make(map[string]map[string]string)
 		}
-		if _, ok := dimms[tableValues.Fields[common.DerivedSocketIdx].Values[dimmIdx]][tableValues.Fields[common.DerivedChannelIdx].Values[dimmIdx]]; !ok {
-			dimms[tableValues.Fields[common.DerivedSocketIdx].Values[dimmIdx]][tableValues.Fields[common.DerivedChannelIdx].Values[dimmIdx]] = make(map[string]string)
+		if _, ok := dimms[tableValues.Fields[extract.DerivedSocketIdx].Values[dimmIdx]][tableValues.Fields[extract.DerivedChannelIdx].Values[dimmIdx]]; !ok {
+			dimms[tableValues.Fields[extract.DerivedSocketIdx].Values[dimmIdx]][tableValues.Fields[extract.DerivedChannelIdx].Values[dimmIdx]] = make(map[string]string)
 		}
 		dimmValues := []string{}
 		for _, field := range tableValues.Fields {
 			dimmValues = append(dimmValues, field.Values[dimmIdx])
 		}
-		dimms[tableValues.Fields[common.DerivedSocketIdx].Values[dimmIdx]][tableValues.Fields[common.DerivedChannelIdx].Values[dimmIdx]][tableValues.Fields[common.DerivedSlotIdx].Values[dimmIdx]] = dimmDetails(dimmValues)
+		dimms[tableValues.Fields[extract.DerivedSocketIdx].Values[dimmIdx]][tableValues.Fields[extract.DerivedChannelIdx].Values[dimmIdx]][tableValues.Fields[extract.DerivedSlotIdx].Values[dimmIdx]] = dimmDetails(dimmValues)
 	}
 
 	var socketTableHeaders = []string{"Socket", ""}

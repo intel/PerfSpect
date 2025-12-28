@@ -13,7 +13,9 @@ import (
 	"regexp"
 	"strings"
 
-	"perfspect/internal/common"
+	"perfspect/internal/app"
+	"perfspect/internal/workflow"
+
 	"perfspect/internal/script"
 	"perfspect/internal/target"
 )
@@ -94,7 +96,7 @@ func GetHotProcesses(myTarget target.Target, maxProcesses int, filter string) (p
 		comm := match[3]
 		cmd := match[4]
 		// skip processes that match the name of this program
-		if strings.Contains(cmd, filepath.Base(common.AppName)) {
+		if strings.Contains(cmd, filepath.Base(app.Name)) {
 			slog.Debug("Skipping self", slog.String("PID", pid))
 			continue
 		}
@@ -158,7 +160,7 @@ done | sort -nr | head -n %d
 `, filter, maxCgroups),
 		Superuser: true,
 	}
-	output, err := common.RunScript(myTarget, hotCgroupsScript, localTempDir, flagNoRoot)
+	output, err := workflow.RunScript(myTarget, hotCgroupsScript, localTempDir, flagNoRoot)
 	if err != nil {
 		err = fmt.Errorf("failed to get hot cgroups: %v", err)
 		return
@@ -219,7 +221,7 @@ echo $cgroup_path
 `, cid),
 		Superuser: true,
 	}
-	output, err := common.RunScript(myTarget, cgroupScript, localTempDir, flagNoRoot)
+	output, err := workflow.RunScript(myTarget, cgroupScript, localTempDir, flagNoRoot)
 	if err != nil {
 		err = fmt.Errorf("failed to get cgroup: %v", err)
 		return

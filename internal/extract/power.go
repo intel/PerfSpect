@@ -1,7 +1,7 @@
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
-package common
+package extract
 
 import (
 	"encoding/csv"
@@ -15,25 +15,15 @@ import (
 )
 
 // EPPFromOutput gets EPP value from script outputs
-// IF 0x774[42] is '1' AND 0x774[60] is '0'
-// THEN
-//
-//	get EPP from 0x772 (package)
-//
-// ELSE
-//
-//	get EPP from 0x774 (per core)
 func EPPFromOutput(outputs map[string]script.ScriptOutput) string {
-	// if we couldn't get the EPP values, return empty string
 	if outputs[script.EppValidScriptName].Exitcode != 0 || len(outputs[script.EppValidScriptName].Stdout) == 0 ||
 		outputs[script.EppPackageControlScriptName].Exitcode != 0 || len(outputs[script.EppPackageControlScriptName].Stdout) == 0 ||
 		outputs[script.EppPackageScriptName].Exitcode != 0 || len(outputs[script.EppPackageScriptName].Stdout) == 0 {
 		slog.Warn("EPP scripts failed or produced no output")
 		return ""
 	}
-	// check if the epp valid bit is set and consistent across all cores
 	var eppValid string
-	for i, line := range strings.Split(outputs[script.EppValidScriptName].Stdout, "\n") { // MSR 0x774, bit 60
+	for i, line := range strings.Split(outputs[script.EppValidScriptName].Stdout, "\n") {
 		if line == "" {
 			continue
 		}
@@ -51,9 +41,8 @@ func EPPFromOutput(outputs map[string]script.ScriptOutput) string {
 			return "inconsistent"
 		}
 	}
-	// check if epp package control bit is set and consistent across all cores
 	var eppPkgCtrl string
-	for i, line := range strings.Split(outputs[script.EppPackageControlScriptName].Stdout, "\n") { // MSR 0x774, bit 42
+	for i, line := range strings.Split(outputs[script.EppPackageControlScriptName].Stdout, "\n") {
 		if line == "" {
 			continue
 		}
@@ -72,7 +61,7 @@ func EPPFromOutput(outputs map[string]script.ScriptOutput) string {
 		}
 	}
 	if eppPkgCtrl == "1" && eppValid == "0" {
-		eppPackage := strings.TrimSpace(outputs[script.EppPackageScriptName].Stdout) // MSR 0x772, bits 24-31  (package)
+		eppPackage := strings.TrimSpace(outputs[script.EppPackageScriptName].Stdout)
 		msr, err := strconv.ParseInt(eppPackage, 16, 0)
 		if err != nil {
 			slog.Error("failed to parse EPP package value", slog.String("error", err.Error()), slog.String("epp", eppPackage))
@@ -81,7 +70,7 @@ func EPPFromOutput(outputs map[string]script.ScriptOutput) string {
 		return eppValToLabel(int(msr))
 	} else {
 		var epp string
-		for i, line := range strings.Split(outputs[script.EppScriptName].Stdout, "\n") { // MSR 0x774, bits 24-31 (per-core)
+		for i, line := range strings.Split(outputs[script.EppScriptName].Stdout, "\n") {
 			if line == "" {
 				continue
 			}
@@ -122,6 +111,7 @@ func EPBFromOutput(outputs map[string]script.ScriptOutput) string {
 	return epbValToLabel(int(msr))
 }
 
+// ELCSummaryFromOutput returns a summary of Efficiency Latency Control settings.
 func ELCSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 	fieldValues := ELCFieldValuesFromOutput(outputs)
 	if len(fieldValues) < 10 || len(fieldValues[9].Values) == 0 {
@@ -136,6 +126,7 @@ func ELCSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 	return summary
 }
 
+// C6FromOutput returns the C6 C-state status.
 func C6FromOutput(outputs map[string]script.ScriptOutput) string {
 	cstatesInfo := CstatesFromOutput(outputs)
 	if cstatesInfo == nil {
@@ -149,6 +140,7 @@ func C6FromOutput(outputs map[string]script.ScriptOutput) string {
 	return ""
 }
 
+// CstatesSummaryFromOutput returns a summary of all C-state statuses.
 func CstatesSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 	cstatesInfo := CstatesFromOutput(outputs)
 	if cstatesInfo == nil {
@@ -161,11 +153,13 @@ func CstatesSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 	return strings.Join(summaryParts, ", ")
 }
 
+// CstateInfo represents a C-state name and status.
 type CstateInfo struct {
 	Name   string
 	Status string
 }
 
+// CstatesFromOutput extracts C-state information from script outputs.
 func CstatesFromOutput(outputs map[string]script.ScriptOutput) []CstateInfo {
 	var cstatesInfo []CstateInfo
 	output := outputs[script.CstatesScriptName].Stdout
@@ -182,6 +176,7 @@ func CstatesFromOutput(outputs map[string]script.ScriptOutput) []CstateInfo {
 	return cstatesInfo
 }
 
+// ELCFieldValuesFromOutput extracts Efficiency Latency Control field values.
 func ELCFieldValuesFromOutput(outputs map[string]script.ScriptOutput) (fieldValues []table.Field) {
 	if outputs[script.ElcScriptName].Stdout == "" {
 		return
@@ -194,19 +189,15 @@ func ELCFieldValuesFromOutput(outputs map[string]script.ScriptOutput) (fieldValu
 	if len(rows) < 2 {
 		return
 	}
-	// first row is headers
 	for fieldNamesIndex, fieldName := range rows[0] {
 		values := []string{}
-		// value rows
 		for _, row := range rows[1:] {
 			values = append(values, row[fieldNamesIndex])
 		}
 		fieldValues = append(fieldValues, table.Field{Name: fieldName, Values: values})
 	}
 
-	// let's add an interpretation of the values in an additional column
 	values := []string{}
-	// value rows
 	for _, row := range rows[1:] {
 		var mode string
 		if len(row) > 7 && row[2] == "IO" {
@@ -217,7 +208,7 @@ func ELCFieldValuesFromOutput(outputs map[string]script.ScriptOutput) (fieldValu
 			} else {
 				mode = "Custom"
 			}
-		} else if len(row) > 5 { // COMPUTE
+		} else if len(row) > 5 {
 			switch row[5] {
 			case "0":
 				mode = "Latency Optimized"
@@ -231,6 +222,16 @@ func ELCFieldValuesFromOutput(outputs map[string]script.ScriptOutput) (fieldValu
 	}
 	fieldValues = append(fieldValues, table.Field{Name: "Mode", Values: values})
 	return
+}
+
+// TDPFromOutput returns the TDP (Thermal Design Power) from script outputs.
+func TDPFromOutput(outputs map[string]script.ScriptOutput) string {
+	msrHex := strings.TrimSpace(outputs[script.PackagePowerLimitName].Stdout)
+	msr, err := strconv.ParseInt(msrHex, 16, 0)
+	if err != nil || msr == 0 {
+		return ""
+	}
+	return fmt.Sprint(msr/8) + "W"
 }
 
 func epbValToLabel(msr int) string {

@@ -11,7 +11,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"perfspect/internal/common"
+	"perfspect/internal/workflow"
+
 	"perfspect/internal/script"
 	"perfspect/internal/target"
 )
@@ -65,7 +66,7 @@ func setNMIWatchdog(myTarget target.Target, setting string, localTempDir string)
 	if sysctl, err = findSysctl(myTarget); err != nil {
 		return
 	}
-	_, err = common.RunScript(myTarget, script.ScriptDefinition{
+	_, err = workflow.RunScript(myTarget, script.ScriptDefinition{
 		Name:           "set NMI watchdog",
 		ScriptTemplate: fmt.Sprintf("%s kernel.nmi_watchdog=%s", sysctl, setting),
 		Superuser:      true},

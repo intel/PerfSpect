@@ -1,4 +1,4 @@
-package common
+package extract
 
 import (
 	"reflect"

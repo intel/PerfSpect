@@ -1,34 +1,27 @@
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
-package common
+package extract
 
 import (
 	"fmt"
 	"log/slog"
-	"perfspect/internal/cpus"
-	"perfspect/internal/script"
 	"slices"
 	"strconv"
 	"strings"
+
+	"perfspect/internal/cpus"
+	"perfspect/internal/script"
 )
 
-// prefetchers are enabled when associated bit in msr is 0
-
-type PrefetcherDefinition struct {
-	ShortName   string
-	Description string
-	Msr         int
-	Bit         int
-	Uarchs      []string
-}
-
+// MSR addresses for prefetcher control
 const (
 	MsrPrefetchControl = 0x1a4
 	MsrPrefetchers     = 0x6d
 	MsrAtomPrefTuning1 = 0x1320
 )
 
+// Prefetcher short names
 const (
 	PrefetcherL2HWName      = "L2 HW"
 	PrefetcherL2AdjName     = "L2 Adj"
@@ -43,6 +36,16 @@ const (
 	PrefetcherLLCStreamName = "LLC Stream"
 )
 
+// PrefetcherDefinition represents a prefetcher configuration.
+type PrefetcherDefinition struct {
+	ShortName   string
+	Description string
+	Msr         int
+	Bit         int
+	Uarchs      []string
+}
+
+// PrefetcherDefinitions contains all known prefetcher definitions.
 var PrefetcherDefinitions = []PrefetcherDefinition{
 	{
 		ShortName:   PrefetcherL2HWName,
@@ -124,7 +127,6 @@ var PrefetcherDefinitions = []PrefetcherDefinition{
 }
 
 // GetPrefetcherDefByName returns the Prefetcher definition by its short name.
-// It returns error if the Prefetcher is not found.
 func GetPrefetcherDefByName(name string) (PrefetcherDefinition, error) {
 	for _, p := range PrefetcherDefinitions {
 		if p.ShortName == name {
@@ -139,6 +141,7 @@ func GetPrefetcherDefinitions() []PrefetcherDefinition {
 	return PrefetcherDefinitions
 }
 
+// IsPrefetcherEnabled checks if a prefetcher is enabled based on MSR value and bit position.
 func IsPrefetcherEnabled(msrValue string, bit int) (bool, error) {
 	if msrValue == "" {
 		return false, fmt.Errorf("msrValue is empty")
@@ -152,11 +155,11 @@ func IsPrefetcherEnabled(msrValue string, bit int) (bool, error) {
 	return bitMask&msrInt == 0, nil
 }
 
+// PrefetchersFromOutput extracts prefetcher status from script outputs.
 func PrefetchersFromOutput(outputs map[string]script.ScriptOutput) [][]string {
 	out := make([][]string, 0)
 	uarch := UarchFromOutput(outputs)
 	if uarch == "" {
-		// uarch is required
 		return [][]string{}
 	}
 	for _, pf := range PrefetcherDefinitions {
@@ -194,10 +197,10 @@ func PrefetchersFromOutput(outputs map[string]script.ScriptOutput) [][]string {
 	return out
 }
 
+// PrefetchersSummaryFromOutput returns a summary of all prefetcher statuses.
 func PrefetchersSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 	uarch := UarchFromOutput(outputs)
 	if uarch == "" {
-		// uarch is required
 		return ""
 	}
 	var prefList []string

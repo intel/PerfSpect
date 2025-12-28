@@ -1,4 +1,4 @@
-package common
+package extract
 
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
@@ -10,12 +10,12 @@ import (
 func TestAssignCardAndPort(t *testing.T) {
 	tests := []struct {
 		name     string
-		nics     []nicInfo
+		nics     []NicInfo
 		expected map[string]string // map of NIC name to expected "Card / Port"
 	}{
 		{
 			name: "Two cards with two ports each",
-			nics: []nicInfo{
+			nics: []NicInfo{
 				{Name: "eth2", Bus: "0000:32:00.0"},
 				{Name: "eth3", Bus: "0000:32:00.1"},
 				{Name: "eth0", Bus: "0000:c0:00.0"},
@@ -30,7 +30,7 @@ func TestAssignCardAndPort(t *testing.T) {
 		},
 		{
 			name: "Single card with four ports",
-			nics: []nicInfo{
+			nics: []NicInfo{
 				{Name: "eth0", Bus: "0000:19:00.0"},
 				{Name: "eth1", Bus: "0000:19:00.1"},
 				{Name: "eth2", Bus: "0000:19:00.2"},
@@ -45,7 +45,7 @@ func TestAssignCardAndPort(t *testing.T) {
 		},
 		{
 			name: "Three different cards",
-			nics: []nicInfo{
+			nics: []NicInfo{
 				{Name: "eth0", Bus: "0000:19:00.0"},
 				{Name: "eth1", Bus: "0000:1a:00.0"},
 				{Name: "eth2", Bus: "0000:1b:00.0"},
@@ -58,7 +58,7 @@ func TestAssignCardAndPort(t *testing.T) {
 		},
 		{
 			name: "Empty bus address should not assign card/port",
-			nics: []nicInfo{
+			nics: []NicInfo{
 				{Name: "eth0", Bus: ""},
 			},
 			expected: map[string]string{
@@ -118,7 +118,7 @@ version: 5.1.0-k
 firmware-version: 0x800009e0
 MAC Address: aa:bb:cc:dd:ee:00
 NUMA Node: 0
-CPU Affinity: 
+CPU Affinity:
 IRQ Balance: Enabled
 rx-usecs: 1
 tx-usecs: 1
@@ -137,7 +137,7 @@ version: 5.1.0-k
 firmware-version: 0x800009e0
 MAC Address: aa:bb:cc:dd:ee:01
 NUMA Node: 0
-CPU Affinity: 
+CPU Affinity:
 IRQ Balance: Enabled
 rx-usecs: 1
 tx-usecs: 1
@@ -156,7 +156,7 @@ version: K_5.19.0-41-generic_5.1.9
 firmware-version: 4.40 0x8001c967 1.3534.0
 MAC Address: aa:bb:cc:dd:ee:82
 NUMA Node: 1
-CPU Affinity: 
+CPU Affinity:
 IRQ Balance: Enabled
 rx-usecs: 1
 tx-usecs: 1
@@ -175,7 +175,7 @@ version: K_5.19.0-41-generic_5.1.9
 firmware-version: 4.40 0x8001c967 1.3534.0
 MAC Address: aa:bb:cc:dd:ee:83
 NUMA Node: 1
-CPU Affinity: 
+CPU Affinity:
 IRQ Balance: Enabled
 rx-usecs: 1
 tx-usecs: 1
