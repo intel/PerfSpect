@@ -9,7 +9,7 @@ import (
 	texttemplate "text/template" // nosemgrep
 )
 
-// script_defs.go defines the bash scripts that are used to collect information from target systems
+// scripts.go defines the bash scripts that are used to collect information from target systems
 
 type ScriptDefinition struct {
 	Name               string   // just a name
