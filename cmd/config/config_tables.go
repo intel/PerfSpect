@@ -1,12 +1,13 @@
-package config
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+package config
 
 import (
 	"fmt"
 	"log/slog"
-	"perfspect/internal/common"
+	"perfspect/internal/extract"
+
 	"perfspect/internal/cpus"
 	"perfspect/internal/script"
 	"perfspect/internal/table"
@@ -56,7 +57,7 @@ var tableDefinitions = map[string]table.TableDefinition{
 }
 
 func configurationTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	uarch := common.UarchFromOutput(outputs)
+	uarch := extract.UarchFromOutput(outputs)
 	if uarch == "" {
 		slog.Error("failed to get uarch from script outputs")
 		return []table.Field{}
@@ -65,51 +66,51 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []table.Fi
 	// command implements its own print logic and uses the Description field to show the command line
 	// argument for each config item.
 	fields := []table.Field{
-		{Name: "Cores per Socket", Description: "--cores <N>", Values: []string{common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)}},
+		{Name: "Cores per Socket", Description: "--cores <N>", Values: []string{extract.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Core\(s\) per socket:\s*(.+)$`)}},
 		{Name: "L3 Cache", Description: "--llc <MB>", Values: []string{l3InstanceFromOutput(outputs)}},
-		{Name: "Package Power / TDP", Description: "--tdp <Watts>", Values: []string{common.TDPFromOutput(outputs)}},
+		{Name: "Package Power / TDP", Description: "--tdp <Watts>", Values: []string{extract.TDPFromOutput(outputs)}},
 		{Name: "Core SSE Frequency", Description: "--core-max <GHz>", Values: []string{sseFrequenciesFromOutput(outputs)}},
 	}
 	if strings.Contains(uarch, cpus.UarchSRF) || strings.Contains(uarch, cpus.UarchGNR) || strings.Contains(uarch, cpus.UarchCWF) {
 		fields = append(fields, []table.Field{
-			{Name: "Uncore Max Frequency (Compute)", Description: "--uncore-max-compute <GHz>", Values: []string{common.UncoreMinMaxDieFrequencyFromOutput(true, true, outputs)}},
-			{Name: "Uncore Min Frequency (Compute)", Description: "--uncore-min-compute <GHz>", Values: []string{common.UncoreMinMaxDieFrequencyFromOutput(false, true, outputs)}},
-			{Name: "Uncore Max Frequency (I/O)", Description: "--uncore-max-io <GHz>", Values: []string{common.UncoreMinMaxDieFrequencyFromOutput(true, false, outputs)}},
-			{Name: "Uncore Min Frequency (I/O)", Description: "--uncore-min-io <GHz>", Values: []string{common.UncoreMinMaxDieFrequencyFromOutput(false, false, outputs)}},
+			{Name: "Uncore Max Frequency (Compute)", Description: "--uncore-max-compute <GHz>", Values: []string{extract.UncoreMinMaxDieFrequencyFromOutput(true, true, outputs)}},
+			{Name: "Uncore Min Frequency (Compute)", Description: "--uncore-min-compute <GHz>", Values: []string{extract.UncoreMinMaxDieFrequencyFromOutput(false, true, outputs)}},
+			{Name: "Uncore Max Frequency (I/O)", Description: "--uncore-max-io <GHz>", Values: []string{extract.UncoreMinMaxDieFrequencyFromOutput(true, false, outputs)}},
+			{Name: "Uncore Min Frequency (I/O)", Description: "--uncore-min-io <GHz>", Values: []string{extract.UncoreMinMaxDieFrequencyFromOutput(false, false, outputs)}},
 		}...)
 	} else {
 		fields = append(fields, []table.Field{
-			{Name: "Uncore Max Frequency", Description: "--uncore-max <GHz>", Values: []string{common.UncoreMaxFrequencyFromOutput(outputs)}},
-			{Name: "Uncore Min Frequency", Description: "--uncore-min <GHz>", Values: []string{common.UncoreMinFrequencyFromOutput(outputs)}},
+			{Name: "Uncore Max Frequency", Description: "--uncore-max <GHz>", Values: []string{extract.UncoreMaxFrequencyFromOutput(outputs)}},
+			{Name: "Uncore Min Frequency", Description: "--uncore-min <GHz>", Values: []string{extract.UncoreMinFrequencyFromOutput(outputs)}},
 		}...)
 	}
 	fields = append(fields, []table.Field{
-		{Name: "Energy Performance Bias", Description: "--epb <0-15>", Values: []string{common.EPBFromOutput(outputs)}},
-		{Name: "Energy Performance Preference", Description: "--epp <0-255>", Values: []string{common.EPPFromOutput(outputs)}},
+		{Name: "Energy Performance Bias", Description: "--epb <0-15>", Values: []string{extract.EPBFromOutput(outputs)}},
+		{Name: "Energy Performance Preference", Description: "--epp <0-255>", Values: []string{extract.EPPFromOutput(outputs)}},
 		{Name: "Scaling Governor", Description: "--gov <performance|powersave>", Values: []string{strings.TrimSpace(outputs[script.ScalingGovernorScriptName].Stdout)}},
 	}...)
 	// add ELC (for SRF, CWF and GNR only)
 	if strings.Contains(uarch, cpus.UarchSRF) || strings.Contains(uarch, cpus.UarchGNR) || strings.Contains(uarch, cpus.UarchCWF) {
-		fields = append(fields, table.Field{Name: "Efficiency Latency Control", Description: "--elc <default|latency-optimized>", Values: []string{common.ELCSummaryFromOutput(outputs)}})
+		fields = append(fields, table.Field{Name: "Efficiency Latency Control", Description: "--elc <default|latency-optimized>", Values: []string{extract.ELCSummaryFromOutput(outputs)}})
 	}
 	// add prefetchers
-	for _, pf := range common.PrefetcherDefinitions {
+	for _, pf := range extract.PrefetcherDefinitions {
 		if slices.Contains(pf.Uarchs, "all") || slices.Contains(pf.Uarchs, uarch[:3]) {
 			var scriptName string
 			switch pf.Msr {
-			case common.MsrPrefetchControl:
+			case extract.MsrPrefetchControl:
 				scriptName = script.PrefetchControlName
-			case common.MsrPrefetchers:
+			case extract.MsrPrefetchers:
 				scriptName = script.PrefetchersName
-			case common.MsrAtomPrefTuning1:
+			case extract.MsrAtomPrefTuning1:
 				scriptName = script.PrefetchersAtomName
 			default:
 				slog.Error("unknown msr for prefetcher", slog.String("msr", fmt.Sprintf("0x%x", pf.Msr)))
 				continue
 			}
-			msrVal := common.ValFromRegexSubmatch(outputs[scriptName].Stdout, `^([0-9a-fA-F]+)`)
+			msrVal := extract.ValFromRegexSubmatch(outputs[scriptName].Stdout, `^([0-9a-fA-F]+)`)
 			var enabledDisabled string
-			enabled, err := common.IsPrefetcherEnabled(msrVal, pf.Bit)
+			enabled, err := extract.IsPrefetcherEnabled(msrVal, pf.Bit)
 			if err != nil {
 				slog.Warn("error checking prefetcher enabled status", slog.String("error", err.Error()))
 				continue
@@ -128,7 +129,7 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []table.Fi
 		}
 	}
 	// add C6
-	c6 := common.C6FromOutput(outputs)
+	c6 := extract.C6FromOutput(outputs)
 	if c6 != "" {
 		fields = append(fields, table.Field{Name: "C6", Description: "--c6 <enable|disable>", Values: []string{c6}})
 	}
@@ -142,27 +143,27 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []table.Fi
 
 // l3InstanceFromOutput retrieves the L3 cache size per instance (per socket on Intel) in megabytes
 func l3InstanceFromOutput(outputs map[string]script.ScriptOutput) string {
-	l3InstanceMB, _, err := common.GetL3MSRMB(outputs)
+	l3InstanceMB, _, err := extract.GetL3MSRMB(outputs)
 	if err != nil {
 		slog.Debug("Could not get L3 size from MSR, falling back to lscpu", slog.String("error", err.Error()))
-		l3InstanceMB, _, err = common.GetL3LscpuMB(outputs)
+		l3InstanceMB, _, err = extract.GetL3LscpuMB(outputs)
 		if err != nil {
 			slog.Warn("Could not get L3 size from lscpu", slog.String("error", err.Error()))
 			return ""
 		}
 	}
-	return common.FormatCacheSizeMB(l3InstanceMB)
+	return extract.FormatCacheSizeMB(l3InstanceMB)
 }
 
 // sseFrequenciesFromOutput gets the bucketed SSE frequencies from the output
 // and returns a compact string representation with consolidated ranges, e.g.:
 // "1-40/3.5, 41-60/3.4, 61-86/3.2"
 func sseFrequenciesFromOutput(outputs map[string]script.ScriptOutput) string {
-	specCoreFrequencies, err := common.GetSpecFrequencyBuckets(outputs)
+	specCoreFrequencies, err := extract.GetSpecFrequencyBuckets(outputs)
 	if err != nil {
 		return ""
 	}
-	sseFreqs := common.GetSSEFreqsFromBuckets(specCoreFrequencies)
+	sseFreqs := extract.GetSSEFreqsFromBuckets(specCoreFrequencies)
 	if len(sseFreqs) < 1 {
 		return ""
 	}

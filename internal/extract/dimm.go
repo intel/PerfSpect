@@ -1,29 +1,90 @@
-package report
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+package extract
 
 import (
 	"fmt"
 	"log/slog"
-	"perfspect/internal/common"
-	"perfspect/internal/script"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"perfspect/internal/script"
 )
 
-func populatedChannelsFromOutput(outputs map[string]script.ScriptOutput) string {
+// DerivedDIMMFields holds derived socket, channel, and slot information for a DIMM.
+type DerivedDIMMFields struct {
+	Socket  string
+	Channel string
+	Slot    string
+}
+
+// DIMM info field indices
+const (
+	BankLocatorIdx = iota
+	LocatorIdx
+	ManufacturerIdx
+	PartIdx
+	SerialIdx
+	SizeIdx
+	TypeIdx
+	DetailIdx
+	SpeedIdx
+	RankIdx
+	ConfiguredSpeedIdx
+	DerivedSocketIdx
+	DerivedChannelIdx
+	DerivedSlotIdx
+)
+
+// InstalledMemoryFromOutput returns a summary of installed memory from script outputs.
+func InstalledMemoryFromOutput(outputs map[string]script.ScriptOutput) string {
+	dimmInfo := DimmInfoFromDmiDecode(outputs[script.DmidecodeScriptName].Stdout)
+	dimmTypeCount := make(map[string]int)
+	for _, dimm := range dimmInfo {
+		dimmKey := dimm[TypeIdx] + ":" + dimm[SizeIdx] + ":" + dimm[SpeedIdx] + ":" + dimm[ConfiguredSpeedIdx]
+		if count, ok := dimmTypeCount[dimmKey]; ok {
+			dimmTypeCount[dimmKey] = count + 1
+		} else {
+			dimmTypeCount[dimmKey] = 1
+		}
+	}
+	var summaries []string
+	re := regexp.MustCompile(`(\d+)\s*(\w*)`)
+	for dimmKey, count := range dimmTypeCount {
+		fields := strings.Split(dimmKey, ":")
+		match := re.FindStringSubmatch(fields[1]) // size field
+		if match != nil {
+			size, err := strconv.Atoi(match[1])
+			if err != nil {
+				slog.Warn("Don't recognize DIMM size format.", slog.String("field", fields[1]))
+				return ""
+			}
+			sum := count * size
+			unit := match[2]
+			dimmType := fields[0]
+			speed := strings.ReplaceAll(fields[2], " ", "")
+			configuredSpeed := strings.ReplaceAll(fields[3], " ", "")
+			summary := fmt.Sprintf("%d%s (%dx%d%s %s %s [%s])", sum, unit, count, size, unit, dimmType, speed, configuredSpeed)
+			summaries = append(summaries, summary)
+		}
+	}
+	return strings.Join(summaries, "; ")
+}
+
+// PopulatedChannelsFromOutput returns the number of populated memory channels.
+func PopulatedChannelsFromOutput(outputs map[string]script.ScriptOutput) string {
 	channelsMap := make(map[string]bool)
-	dimmInfo := common.DimmInfoFromDmiDecode(outputs[script.DmidecodeScriptName].Stdout)
-	derivedDimmFields := derivedDimmsFieldFromOutput(outputs)
+	dimmInfo := DimmInfoFromDmiDecode(outputs[script.DmidecodeScriptName].Stdout)
+	derivedDimmFields := DerivedDimmsFieldFromOutput(outputs)
 	if len(derivedDimmFields) != len(dimmInfo) {
 		slog.Warn("derivedDimmFields and dimmInfo have different lengths", slog.Int("derivedDimmFields", len(derivedDimmFields)), slog.Int("dimmInfo", len(dimmInfo)))
 		return ""
 	}
 	for i, dimm := range dimmInfo {
-		if !strings.Contains(dimm[common.SizeIdx], "No") {
-			channelsMap[derivedDimmFields[i].socket+","+derivedDimmFields[i].channel] = true
+		if !strings.Contains(dimm[SizeIdx], "No") {
+			channelsMap[derivedDimmFields[i].Socket+","+derivedDimmFields[i].Channel] = true
 		}
 	}
 	if len(channelsMap) > 0 {
@@ -32,24 +93,18 @@ func populatedChannelsFromOutput(outputs map[string]script.ScriptOutput) string 
 	return ""
 }
 
-type derivedFields struct {
-	socket  string
-	channel string
-	slot    string
-}
-
-// derivedDimmsFieldFromOutput returns a slice of derived fields from the output of a script.
-func derivedDimmsFieldFromOutput(outputs map[string]script.ScriptOutput) []derivedFields {
-	dimmInfo := common.DimmInfoFromDmiDecode(outputs[script.DmidecodeScriptName].Stdout)
-	var derivedFields []derivedFields
+// DerivedDimmsFieldFromOutput returns a slice of derived fields from the output of a script.
+func DerivedDimmsFieldFromOutput(outputs map[string]script.ScriptOutput) []DerivedDIMMFields {
+	dimmInfo := DimmInfoFromDmiDecode(outputs[script.DmidecodeScriptName].Stdout)
+	var derivedFields []DerivedDIMMFields
 	var err error
-	channels := channelsFromOutput(outputs)
+	channels := ChannelsFromOutput(outputs)
 	numChannels, err := strconv.Atoi(channels)
 	if err != nil || numChannels == 0 {
 		return nil
 	}
-	platformVendor := common.ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "0", `Vendor:\s*(.*)`)
-	numSockets, err := strconv.Atoi(common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(.*:\s*(.+?)$`))
+	platformVendor := ValFromDmiDecodeRegexSubmatch(outputs[script.DmidecodeScriptName].Stdout, "0", `Vendor:\s*(.*)`)
+	numSockets, err := strconv.Atoi(ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(.*:\s*(.+?)$`))
 	if err != nil || numSockets == 0 {
 		return nil
 	}
@@ -86,15 +141,15 @@ func derivedDimmsFieldFromOutput(outputs map[string]script.ScriptOutput) []deriv
 * "Bank Locator" for all DIMMs is "Not Specified" and "Locator" is A1-A12 and B1-B12.
 * A1 and A7 are channel 0, A2 and A8 are channel 1, etc.
  */
-func deriveDIMMInfoDell(dimms [][]string, channelsPerSocket int) ([]derivedFields, error) {
-	derivedFields := make([]derivedFields, len(dimms))
+func deriveDIMMInfoDell(dimms [][]string, channelsPerSocket int) ([]DerivedDIMMFields, error) {
+	derivedFields := make([]DerivedDIMMFields, len(dimms))
 	re := regexp.MustCompile(`([ABCD])([1-9]\d*)`)
 	for i, dimm := range dimms {
-		if !strings.Contains(dimm[common.BankLocatorIdx], "Not Specified") {
+		if !strings.Contains(dimm[BankLocatorIdx], "Not Specified") {
 			err := fmt.Errorf("doesn't conform to expected Dell Bank Locator format")
 			return nil, err
 		}
-		match := re.FindStringSubmatch(dimm[common.LocatorIdx])
+		match := re.FindStringSubmatch(dimm[LocatorIdx])
 		if match == nil {
 			err := fmt.Errorf("doesn't conform to expected Dell Locator format")
 			return nil, err
@@ -108,18 +163,18 @@ func deriveDIMMInfoDell(dimms [][]string, channelsPerSocket int) ([]derivedField
 		}
 		// Socket
 		// A = 0, B = 1, C = 2, D = 3
-		derivedFields[i].socket = fmt.Sprintf("%d", int(alpha[0])-int('A'))
+		derivedFields[i].Socket = fmt.Sprintf("%d", int(alpha[0])-int('A'))
 		// Slot
 		if numeric <= channelsPerSocket {
-			derivedFields[i].slot = "0"
+			derivedFields[i].Slot = "0"
 		} else {
-			derivedFields[i].slot = "1"
+			derivedFields[i].Slot = "1"
 		}
 		// Channel
 		if numeric <= channelsPerSocket {
-			derivedFields[i].channel = fmt.Sprintf("%d", numeric-1)
+			derivedFields[i].Channel = fmt.Sprintf("%d", numeric-1)
 		} else {
-			derivedFields[i].channel = fmt.Sprintf("%d", numeric-(channelsPerSocket+1))
+			derivedFields[i].Channel = fmt.Sprintf("%d", numeric-(channelsPerSocket+1))
 		}
 	}
 	return derivedFields, nil
@@ -146,16 +201,16 @@ func deriveDIMMInfoDell(dimms [][]string, channelsPerSocket int) ([]derivedField
  * 		NODE 7			CPU1 Channel7 DIMM0
  * 		NODE 7			CPU1 Channel7 DIMM1
  */
-func deriveDIMMInfoEC2(dimms [][]string, channelsPerSocket int) ([]derivedFields, error) {
-	derivedFields := make([]derivedFields, len(dimms))
+func deriveDIMMInfoEC2(dimms [][]string, channelsPerSocket int) ([]DerivedDIMMFields, error) {
+	derivedFields := make([]DerivedDIMMFields, len(dimms))
 	c5bankLocRe := regexp.MustCompile(`NODE\s+([1-9])`)
 	c5locRe := regexp.MustCompile(`DIMM_(.)(.)`)
 	c6ibankLocRe := regexp.MustCompile(`NODE\s+(\d+)`)
 	c6ilocRe := regexp.MustCompile(`CPU(\d+)\s+Channel(\d+)\s+DIMM(\d+)`)
 	for i, dimm := range dimms {
 		// try c5.metal format
-		bankLocMatch := c5bankLocRe.FindStringSubmatch(dimm[common.BankLocatorIdx])
-		locMatch := c5locRe.FindStringSubmatch(dimm[common.LocatorIdx])
+		bankLocMatch := c5bankLocRe.FindStringSubmatch(dimm[BankLocatorIdx])
+		locMatch := c5locRe.FindStringSubmatch(dimm[LocatorIdx])
 		if locMatch != nil && bankLocMatch != nil {
 			var socket, channel, slot int
 			socket, _ = strconv.Atoi(bankLocMatch[1])
@@ -169,22 +224,22 @@ func deriveDIMMInfoEC2(dimms [][]string, channelsPerSocket int) ([]derivedFields
 				return nil, err
 			}
 			slot, _ = strconv.Atoi(locMatch[2])
-			derivedFields[i].socket = fmt.Sprintf("%d", socket)
-			derivedFields[i].channel = fmt.Sprintf("%d", channel)
-			derivedFields[i].slot = fmt.Sprintf("%d", slot)
+			derivedFields[i].Socket = fmt.Sprintf("%d", socket)
+			derivedFields[i].Channel = fmt.Sprintf("%d", channel)
+			derivedFields[i].Slot = fmt.Sprintf("%d", slot)
 			continue
 		}
 		// try c6i.metal format
-		bankLocMatch = c6ibankLocRe.FindStringSubmatch(dimm[common.BankLocatorIdx])
-		locMatch = c6ilocRe.FindStringSubmatch(dimm[common.LocatorIdx])
+		bankLocMatch = c6ibankLocRe.FindStringSubmatch(dimm[BankLocatorIdx])
+		locMatch = c6ilocRe.FindStringSubmatch(dimm[LocatorIdx])
 		if locMatch != nil && bankLocMatch != nil {
 			var socket, channel, slot int
 			socket, _ = strconv.Atoi(locMatch[1])
 			channel, _ = strconv.Atoi(locMatch[2])
 			slot, _ = strconv.Atoi(locMatch[3])
-			derivedFields[i].socket = fmt.Sprintf("%d", socket)
-			derivedFields[i].channel = fmt.Sprintf("%d", channel)
-			derivedFields[i].slot = fmt.Sprintf("%d", slot)
+			derivedFields[i].Socket = fmt.Sprintf("%d", socket)
+			derivedFields[i].Channel = fmt.Sprintf("%d", channel)
+			derivedFields[i].Slot = fmt.Sprintf("%d", slot)
 			continue
 		}
 		err := fmt.Errorf("doesn't conform to expected EC2 format")
@@ -197,18 +252,18 @@ func deriveDIMMInfoEC2(dimms [][]string, channelsPerSocket int) ([]derivedFields
 * Locator field has these: PROC 1 DIMM 1, PROC 1 DIMM 2, etc...
 * DIMM/slot numbering on board follows logic shown below
  */
-func deriveDIMMInfoHPE(dimms [][]string, numSockets int, channelsPerSocket int) ([]derivedFields, error) {
-	derivedFields := make([]derivedFields, len(dimms))
+func deriveDIMMInfoHPE(dimms [][]string, numSockets int, channelsPerSocket int) ([]DerivedDIMMFields, error) {
+	derivedFields := make([]DerivedDIMMFields, len(dimms))
 	slotsPerChannel := len(dimms) / (numSockets * channelsPerSocket)
 	re := regexp.MustCompile(`PROC ([1-9]\d*) DIMM ([1-9]\d*)`)
 	for i, dimm := range dimms {
-		if !strings.Contains(dimm[common.BankLocatorIdx], "Not Specified") {
-			err := fmt.Errorf("doesn't conform to expected HPE Bank Locator format: %s", dimm[common.BankLocatorIdx])
+		if !strings.Contains(dimm[BankLocatorIdx], "Not Specified") {
+			err := fmt.Errorf("doesn't conform to expected HPE Bank Locator format: %s", dimm[BankLocatorIdx])
 			return nil, err
 		}
-		match := re.FindStringSubmatch(dimm[common.LocatorIdx])
+		match := re.FindStringSubmatch(dimm[LocatorIdx])
 		if match == nil {
-			err := fmt.Errorf("doesn't conform to expected HPE Locator format: %s", dimm[common.LocatorIdx])
+			err := fmt.Errorf("doesn't conform to expected HPE Locator format: %s", dimm[LocatorIdx])
 			return nil, err
 		}
 		socket, err := strconv.Atoi(match[1])
@@ -217,21 +272,21 @@ func deriveDIMMInfoHPE(dimms [][]string, numSockets int, channelsPerSocket int) 
 			return nil, err
 		}
 		socket -= 1
-		derivedFields[i].socket = fmt.Sprintf("%d", socket)
+		derivedFields[i].Socket = fmt.Sprintf("%d", socket)
 		dimmNum, err := strconv.Atoi(match[2])
 		if err != nil {
 			err := fmt.Errorf("failed to parse DIMM number: %s", match[2])
 			return nil, err
 		}
 		channel := (dimmNum - 1) / slotsPerChannel
-		derivedFields[i].channel = fmt.Sprintf("%d", channel)
+		derivedFields[i].Channel = fmt.Sprintf("%d", channel)
 		var slot int
 		if (dimmNum < channelsPerSocket && dimmNum%2 != 0) || (dimmNum > channelsPerSocket && dimmNum%2 == 0) {
 			slot = 0
 		} else {
 			slot = 1
 		}
-		derivedFields[i].slot = fmt.Sprintf("%d", slot)
+		derivedFields[i].Slot = fmt.Sprintf("%d", slot)
 	}
 	return derivedFields, nil
 }
@@ -242,51 +297,51 @@ This method is inherently unreliable/incomplete as each OEM can set
 these fields as they see fit.
 Returns None when there's no match.
 */
-func getDIMMSocketSlot(dimmType DIMMType, reBankLoc *regexp.Regexp, reLoc *regexp.Regexp, bankLocator string, locator string) (socket int, slot int, err error) {
+func getDIMMSocketSlot(dimmType dimmType, reBankLoc *regexp.Regexp, reLoc *regexp.Regexp, bankLocator string, locator string) (socket int, slot int, err error) {
 	switch dimmType {
-	case DIMMType0:
+	case dimmType0:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
 			slot, _ = strconv.Atoi(match[3])
 		}
 		return
-	case DIMMType1:
+	case dimmType1:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
 			slot, _ = strconv.Atoi(match[3])
 			return
 		}
-	case DIMMType2:
+	case dimmType2:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
 			slot, _ = strconv.Atoi(match[3])
 			return
 		}
-	case DIMMType3:
+	case dimmType3:
 		match := reBankLoc.FindStringSubmatch(bankLocator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
 			slot, _ = strconv.Atoi(match[3])
 			return
 		}
-	case DIMMType4:
+	case dimmType4:
 		match := reBankLoc.FindStringSubmatch(bankLocator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
 			slot, _ = strconv.Atoi(match[4])
 			return
 		}
-	case DIMMType5:
+	case dimmType5:
 		match := reBankLoc.FindStringSubmatch(bankLocator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
 			slot, _ = strconv.Atoi(match[3])
 			return
 		}
-	case DIMMType6:
+	case dimmType6:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
@@ -295,7 +350,7 @@ func getDIMMSocketSlot(dimmType DIMMType, reBankLoc *regexp.Regexp, reLoc *regex
 			slot -= 1
 			return
 		}
-	case DIMMType7:
+	case dimmType7:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
@@ -303,7 +358,7 @@ func getDIMMSocketSlot(dimmType DIMMType, reBankLoc *regexp.Regexp, reLoc *regex
 			slot -= 1
 			return
 		}
-	case DIMMType8:
+	case dimmType8:
 		match := reBankLoc.FindStringSubmatch(bankLocator)
 		if match != nil {
 			match2 := reLoc.FindStringSubmatch(locator)
@@ -315,28 +370,28 @@ func getDIMMSocketSlot(dimmType DIMMType, reBankLoc *regexp.Regexp, reLoc *regex
 				return
 			}
 		}
-	case DIMMType9:
+	case dimmType9:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
 			slot, _ = strconv.Atoi(match[2])
 			return
 		}
-	case DIMMType10:
+	case dimmType10:
 		match := reBankLoc.FindStringSubmatch(bankLocator)
 		if match != nil {
 			socket = 0
 			slot, _ = strconv.Atoi(match[2])
 			return
 		}
-	case DIMMType11:
+	case dimmType11:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket = 0
 			slot, _ = strconv.Atoi(match[2])
 			return
 		}
-	case DIMMType12:
+	case dimmType12:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
@@ -345,7 +400,7 @@ func getDIMMSocketSlot(dimmType DIMMType, reBankLoc *regexp.Regexp, reLoc *regex
 			slot = slot - 1
 			return
 		}
-	case DIMMType13:
+	case dimmType13:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
@@ -353,14 +408,14 @@ func getDIMMSocketSlot(dimmType DIMMType, reBankLoc *regexp.Regexp, reLoc *regex
 			slot = slot - 1
 			return
 		}
-	case DIMMType14:
+	case dimmType14:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
 			slot = 0
 			return
 		}
-	case DIMMType15:
+	case dimmType15:
 		match := reLoc.FindStringSubmatch(locator)
 		if match != nil {
 			socket, _ = strconv.Atoi(match[1])
@@ -372,50 +427,50 @@ func getDIMMSocketSlot(dimmType DIMMType, reBankLoc *regexp.Regexp, reLoc *regex
 	return
 }
 
-type DIMMType int
+type dimmType int
 
 const (
-	DIMMTypeUNKNOWN          = -1
-	DIMMType0       DIMMType = iota
-	DIMMType1
-	DIMMType2
-	DIMMType3
-	DIMMType4
-	DIMMType5
-	DIMMType6
-	DIMMType7
-	DIMMType8
-	DIMMType9
-	DIMMType10
-	DIMMType11
-	DIMMType12
-	DIMMType13
-	DIMMType14
-	DIMMType15
+	dimmTypeUNKNOWN          = -1
+	dimmType0       dimmType = iota
+	dimmType1
+	dimmType2
+	dimmType3
+	dimmType4
+	dimmType5
+	dimmType6
+	dimmType7
+	dimmType8
+	dimmType9
+	dimmType10
+	dimmType11
+	dimmType12
+	dimmType13
+	dimmType14
+	dimmType15
 )
 
-func getDIMMParseInfo(bankLocator string, locator string) (dimmType DIMMType, reBankLoc *regexp.Regexp, reLoc *regexp.Regexp) {
-	dimmType = DIMMTypeUNKNOWN
+func getDIMMParseInfo(bankLocator string, locator string) (dt dimmType, reBankLoc *regexp.Regexp, reLoc *regexp.Regexp) {
+	dt = dimmTypeUNKNOWN
 	// Inspur ICX 2s system
 	// Needs to be before next regex pattern to differentiate
 	reLoc = regexp.MustCompile(`CPU([0-9])_C([0-9])D([0-9])`)
 	if reLoc.FindStringSubmatch(locator) != nil {
-		dimmType = DIMMType0
+		dt = dimmType0
 		return
 	}
 	reLoc = regexp.MustCompile(`CPU([0-9])_([A-Z])([0-9])`)
 	if reLoc.FindStringSubmatch(locator) != nil {
-		dimmType = DIMMType1
+		dt = dimmType1
 		return
 	}
 	reLoc = regexp.MustCompile(`CPU([0-9])_MC._DIMM_([A-Z])([0-9])`)
 	if reLoc.FindStringSubmatch(locator) != nil {
-		dimmType = DIMMType2
+		dt = dimmType2
 		return
 	}
 	reBankLoc = regexp.MustCompile(`NODE ([0-9]) CHANNEL ([0-9]) DIMM ([0-9])`)
 	if reBankLoc.FindStringSubmatch(bankLocator) != nil {
-		dimmType = DIMMType3
+		dt = dimmType3
 		return
 	}
 	/* Added for SuperMicro X13DET-B (SPR). Must be before Type4 because Type4 matches, but data in BankLoc is invalid.
@@ -429,17 +484,17 @@ func getDIMMParseInfo(bankLocator string, locator string) (dimmType DIMMType, re
 	 */
 	reLoc = regexp.MustCompile(`P([1,2])-DIMM([A-L])([1,2])`)
 	if reLoc.FindStringSubmatch(locator) != nil {
-		dimmType = DIMMType12
+		dt = dimmType12
 		return
 	}
 	reBankLoc = regexp.MustCompile(`P([0-9])_Node([0-9])_Channel([0-9])_Dimm([0-9])`)
 	if reBankLoc.FindStringSubmatch(bankLocator) != nil {
-		dimmType = DIMMType4
+		dt = dimmType4
 		return
 	}
 	reBankLoc = regexp.MustCompile(`_Node([0-9])_Channel([0-9])_Dimm([0-9])`)
 	if reBankLoc.FindStringSubmatch(bankLocator) != nil {
-		dimmType = DIMMType5
+		dt = dimmType5
 		return
 	}
 	/* SKX SDP
@@ -450,7 +505,7 @@ func getDIMMParseInfo(bankLocator string, locator string) (dimmType DIMMType, re
 	if reLoc.FindStringSubmatch(locator) != nil {
 		reBankLoc = regexp.MustCompile(`NODE ([1-8])`)
 		if reBankLoc.FindStringSubmatch(bankLocator) != nil {
-			dimmType = DIMMType6
+			dt = dimmType6
 			return
 		}
 	}
@@ -462,7 +517,7 @@ func getDIMMParseInfo(bankLocator string, locator string) (dimmType DIMMType, re
 	if reLoc.FindStringSubmatch(locator) != nil {
 		reBankLoc = regexp.MustCompile(`NODE ([0-9]+)`)
 		if reBankLoc.FindStringSubmatch(bankLocator) != nil {
-			dimmType = DIMMType7
+			dt = dimmType7
 			return
 		}
 	}
@@ -470,7 +525,7 @@ func getDIMMParseInfo(bankLocator string, locator string) (dimmType DIMMType, re
 	if reBankLoc.FindStringSubmatch(bankLocator) != nil {
 		reLoc = regexp.MustCompile(`DIMM_([A-Z])([1-9]\d*)`)
 		if reLoc.FindStringSubmatch(locator) != nil {
-			dimmType = DIMMType8
+			dt = dimmType8
 			return
 		}
 	}
@@ -483,7 +538,7 @@ func getDIMMParseInfo(bankLocator string, locator string) (dimmType DIMMType, re
 	 */
 	reLoc = regexp.MustCompile(`DIMM_P([0-1])_[A-Z]([0-1])`)
 	if reLoc.FindStringSubmatch(locator) != nil {
-		dimmType = DIMMType9
+		dt = dimmType9
 		return
 	}
 	/* my NUC
@@ -492,7 +547,7 @@ func getDIMMParseInfo(bankLocator string, locator string) (dimmType DIMMType, re
 	 */
 	reBankLoc = regexp.MustCompile(`CHANNEL ([A-D]) DIMM([0-9])`)
 	if reBankLoc.FindStringSubmatch(bankLocator) != nil {
-		dimmType = DIMMType10
+		dt = dimmType10
 		return
 	}
 	/* Alder Lake Client Desktop
@@ -501,7 +556,7 @@ func getDIMMParseInfo(bankLocator string, locator string) (dimmType DIMMType, re
 	 */
 	reLoc = regexp.MustCompile(`Controller([0-1]).*DIMM([0-1])`)
 	if reLoc.FindStringSubmatch(locator) != nil {
-		dimmType = DIMMType11
+		dt = dimmType11
 		return
 	}
 	/* BIRCHSTREAM
@@ -515,7 +570,7 @@ func getDIMMParseInfo(bankLocator string, locator string) (dimmType DIMMType, re
 	 */
 	reLoc = regexp.MustCompile(`CPU([\d])_DIMM_([A-H])([1-2])`)
 	if reLoc.FindStringSubmatch(locator) != nil {
-		dimmType = DIMMType13
+		dt = dimmType13
 		return
 	}
 	/* BIRCHSTREAM GRANITE RAPIDS AP/X3
@@ -529,7 +584,7 @@ func getDIMMParseInfo(bankLocator string, locator string) (dimmType DIMMType, re
 	 */
 	reLoc = regexp.MustCompile(`CPU([\d])_DIMM_([A-L])`)
 	if reLoc.FindStringSubmatch(locator) != nil {
-		dimmType = DIMMType14
+		dt = dimmType14
 		return
 	}
 	/* FOREST CITY PLATFORM FOR SRF AND GNR
@@ -543,31 +598,31 @@ func getDIMMParseInfo(bankLocator string, locator string) (dimmType DIMMType, re
 	 */
 	reLoc = regexp.MustCompile(`CPU([\d]) CH([0-7])/D([0-1])`)
 	if reLoc.FindStringSubmatch(locator) != nil {
-		dimmType = DIMMType15
+		dt = dimmType15
 		return
 	}
 	return
 }
 
-func deriveDIMMInfoOther(dimms [][]string, channelsPerSocket int) ([]derivedFields, error) {
-	derivedFields := make([]derivedFields, len(dimms))
+func deriveDIMMInfoOther(dimms [][]string, channelsPerSocket int) ([]DerivedDIMMFields, error) {
+	derivedFields := make([]DerivedDIMMFields, len(dimms))
 	previousSocket, channel := -1, 0
 	if len(dimms) == 0 {
 		err := fmt.Errorf("no DIMMs")
 		return nil, err
 	}
-	if len(dimms[0]) <= max(common.BankLocatorIdx, common.LocatorIdx) {
+	if len(dimms[0]) <= max(BankLocatorIdx, LocatorIdx) {
 		err := fmt.Errorf("DIMM data has insufficient fields")
 		return nil, err
 	}
-	dimmType, reBankLoc, reLoc := getDIMMParseInfo(dimms[0][common.BankLocatorIdx], dimms[0][common.LocatorIdx])
-	if dimmType == DIMMTypeUNKNOWN {
+	dt, reBankLoc, reLoc := getDIMMParseInfo(dimms[0][BankLocatorIdx], dimms[0][LocatorIdx])
+	if dt == dimmTypeUNKNOWN {
 		err := fmt.Errorf("unknown DIMM identification format")
 		return nil, err
 	}
 	for i, dimm := range dimms {
 		var socket, slot int
-		socket, slot, err := getDIMMSocketSlot(dimmType, reBankLoc, reLoc, dimm[common.BankLocatorIdx], dimm[common.LocatorIdx])
+		socket, slot, err := getDIMMSocketSlot(dt, reBankLoc, reLoc, dimm[BankLocatorIdx], dimm[LocatorIdx])
 		if err != nil {
 			slog.Info("Couldn't extract socket and slot from DIMM info", slog.String("error", err.Error()))
 			return nil, nil
@@ -583,9 +638,28 @@ func deriveDIMMInfoOther(dimms [][]string, channelsPerSocket int) ([]derivedFiel
 			return nil, err
 		}
 		previousSocket = socket
-		derivedFields[i].socket = fmt.Sprintf("%d", socket)
-		derivedFields[i].channel = fmt.Sprintf("%d", channel)
-		derivedFields[i].slot = fmt.Sprintf("%d", slot)
+		derivedFields[i].Socket = fmt.Sprintf("%d", socket)
+		derivedFields[i].Channel = fmt.Sprintf("%d", channel)
+		derivedFields[i].Slot = fmt.Sprintf("%d", slot)
 	}
 	return derivedFields, nil
+}
+
+// DimmInfoFromDmiDecode extracts DIMM information from DMI decode output.
+func DimmInfoFromDmiDecode(dmiDecodeOutput string) [][]string {
+	return ValsArrayFromDmiDecodeRegexSubmatch(
+		dmiDecodeOutput,
+		"17",
+		`^Bank Locator:\s*(.+?)$`,
+		`^Locator:\s*(.+?)$`,
+		`^Manufacturer:\s*(.+?)$`,
+		`^Part Number:\s*(.+?)\s*$`,
+		`^Serial Number:\s*(.+?)\s*$`,
+		`^Size:\s*(.+?)$`,
+		`^Type:\s*(.+?)$`,
+		`^Type Detail:\s*(.+?)$`,
+		`^Speed:\s*(.+?)$`,
+		`^Rank:\s*(.+?)$`,
+		`^Configured.*Speed:\s*(.+?)$`,
+	)
 }

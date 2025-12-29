@@ -16,7 +16,7 @@ PerfSpect is a performance analysis tool for Linux systems. It collects system c
           ▼                                                    ▼
 ┌───────────────────────────────────────┐    ┌────────────────────────────┐
 │       ReportingCommand Framework      │    │    Custom Command Logic    │
-│       (internal/common/common.go)     │    │                            │
+│       (internal/workflow/)            │    │                            │
 │                                       │    │  metrics: Loader pattern,  │
 │  Used by: report, benchmark,          │    │    perf event collection,  │
 │    telemetry, flamegraph, lock        │    │    real-time processing    │
@@ -58,7 +58,9 @@ perfspect/
 │   ├── lock/            # Lock contention analysis
 │   └── config/          # System configuration commands
 ├── internal/            # Internal packages
-│   ├── common/          # Shared types and ReportingCommand framework
+│   ├── app/             # Application context and shared types
+│   ├── extract/         # Data extraction functions from script outputs
+│   ├── workflow/        # Workflow orchestration for reporting commands
 │   ├── target/          # Target abstraction (local/remote)
 │   ├── script/          # Script execution framework
 │   ├── report/          # Report generation (txt, json, html, xlsx)
@@ -66,7 +68,7 @@ perfspect/
 │   ├── cpus/            # CPU architecture detection
 │   ├── progress/        # Progress indicator (multi-spinner)
 │   └── util/            # General utilities
-└── tools/               # External binaries for target systems
+└── tools/               # Binaries used by scripts (embedded at build time)
 ```
 
 ## Key Abstractions
@@ -91,7 +93,7 @@ type Target interface {
 - `LocalTarget`: Executes commands directly on the local machine
 - `RemoteTarget`: Executes commands via SSH on remote machines
 
-### 2. ReportingCommand (`internal/common/common.go`)
+### 2. ReportingCommand (`internal/workflow/workflow.go`)
 
 Most commands (`report`, `telemetry`, `flamegraph`, `lock`) follow the same workflow. The `ReportingCommand` struct encapsulates this common flow:
 
@@ -118,7 +120,7 @@ type ReportingCommand struct {
 
 ### 3. Script Engine (`internal/script/`)
 
-Scripts are embedded in the binary using `//go:embed` and executed on targets via a controller script that manages concurrent/sequential execution and signal handling.
+Collection scripts are defined in `internal/script/scripts.go`. Script dependencies, i.e., tools used by the scripts to collect data, are in `internal/script/resources/` and embedded in the binary using `//go:embed`. The scripts are executed on targets via a controller script that manages concurrent/sequential execution and signal handling.
 
 **Key concepts:**
 - `ScriptDefinition`: Defines a script (template, dependencies, required privileges)
@@ -179,7 +181,7 @@ The `NewLoader()` factory function returns the appropriate loader based on CPU m
    - Creates ReportingCommand with table definitions
    - Calls rc.Run()
 
-3. internal/common/common.go (ReportingCommand.Run):
+3. internal/workflow/workflow.go (ReportingCommand.Run):
    - Creates RemoteTarget from flags
    - Validates connectivity and privileges
    - Calls outputsFromTargets()
@@ -196,7 +198,7 @@ The `NewLoader()` factory function returns the appropriate loader based on CPU m
 
 6. Back in Run():
    - Calls createReports() with collected data
-   - internal/table/ processes tables, extracts field values
+   - internal/table/ processes tables using internal/extract/ helper functions
    - internal/report/ generates reports in requested formats
 
 7. Output:
@@ -229,7 +231,7 @@ make test       # Run unit tests
 make check      # Run all code quality checks (format, vet, lint)
 ```
 
-Test files are colocated with source files (e.g., `common_test.go` alongside `common.go`).
+Test files are colocated with source files (e.g., `extract_test.go` alongside `extract.go`).
 
 ## Functional Testing
 Functional tests are located in an Intel internal GitHub repository. The tests run against various Linux distributions and CPU architectures on internal servers and public cloud systems to validate end-to-end functionality.

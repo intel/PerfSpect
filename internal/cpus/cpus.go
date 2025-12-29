@@ -1,9 +1,9 @@
+// Copyright (C) 2021-2025 Intel Corporation
+// SPDX-License-Identifier: BSD-3-Clause
+
 // Package cpus provides CPU definitions and lookup utilities for microarchitecture,
 // family, model, and stepping, supporting both x86 and ARM architectures.
 package cpus
-
-// Copyright (C) 2021-2025 Intel Corporation
-// SPDX-License-Identifier: BSD-3-Clause
 
 import (
 	"fmt"

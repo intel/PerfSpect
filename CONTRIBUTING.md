@@ -13,9 +13,9 @@ Thank you for your interest in contributing to PerfSpect! This document provides
 ### Building
 
 ```bash
-make              # Build the binary
-make test         # Run unit tests
-make check        # Run all code quality checks
+builder/build.sh       # Complete build, requires Docker
+make                   # Build the x86 binary
+make check             # Run all code quality checks, including unit tests
 ```
 
 ### Project Structure
@@ -49,7 +49,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for a detailed overview of the codebase
 make test
 
 # Run specific test
-go test -v ./internal/common/... -run TestName
+go test -v ./internal/extract/... -run TestName
 
 # Test locally
 ./perfspect report
@@ -68,7 +68,7 @@ go test -v ./internal/common/... -run TestName
 package yourcommand
 
 import (
-    "perfspect/internal/common"
+    "perfspect/internal/workflow"
     "perfspect/internal/table"
     "github.com/spf13/cobra"
 )
@@ -82,12 +82,12 @@ var Cmd = &cobra.Command{
 
 func init() {
     // Add command-specific flags here
-    common.AddTargetFlags(Cmd)
-    common.AddFormatFlag(Cmd)
+    workflow.AddTargetFlags(Cmd)
+    workflow.AddFormatFlag(Cmd)
 }
 
 func runYourCommand(cmd *cobra.Command, args []string) error {
-    rc := common.ReportingCommand{
+    rc := workflow.ReportingCommand{
         Cmd:    cmd,
         Tables: yourTables,  // Define tables for data collection
     }
@@ -116,20 +116,15 @@ Tables define what data to collect. Add to the relevant command's table definiti
 
 ```go
 {
-    Name:        "Your Table Name",
-    Category:    "Category",
-    ScriptNames: []string{"script_that_provides_data"},
-    Fields: []table.FieldDefinition{
-        {
-            Name: "Field Name",
-            ValuesFunc: func(outputs map[string]script.ScriptOutput) []string {
-                // Parse script output and return field values
-                output := outputs["script_that_provides_data"]
-                // ... extraction logic ...
-                return []string{value}
-            },
-        },
-    },
+    YourTableName: {
+        Name:        YourTableName,
+        ScriptNames: []string{script.YourScriptName},
+        FieldsFunc: YourTableValues},
+}
+func YourTableValues() []table.FieldDefinition {
+    return []table.FieldDefinition{
+        // Define fields here
+    }
 }
 ```
 
@@ -139,9 +134,8 @@ Tables define what data to collect. Add to the relevant command's table definiti
 
 ```go
 var YourScript = ScriptDefinition{
-    Name:           "your_script",
-    ScriptTemplate: `#!/bin/bash
-# Your script content
+    Name:           YourScriptName,
+    ScriptTemplate: `# Your script content
 echo "output"
 `,
     Superuser:  false,  // true if requires root
@@ -152,7 +146,7 @@ echo "output"
 
 2. Reference in your table's `ScriptNames`
 
-3. If the script needs external binaries, add them to `tools/` or embed in `internal/script/resources/`
+3. If the script needs external binaries, add them to `tools/`. Post build they will be embedded in `internal/script/resources/`
 
 ### Adding Metrics for a New CPU
 
@@ -166,7 +160,7 @@ const UarchYourCPU = "YourCPU"
 
 3. Choose appropriate loader or implement new one in `cmd/metrics/loader.go`
 
-4. Add metric/event definitions to `cmd/metrics/resources/events/` and `cmd/metrics/resources/metrics/`
+4. Add metric/event definitions to the associated loader directory in `cmd/metrics/resources`
 
 5. Update `NewLoader()` switch statement
 

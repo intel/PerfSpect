@@ -1,7 +1,7 @@
-package metrics
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+package metrics
 
 // metadata_x86.go contains x86_64 (Intel/AMD) metadata collection logic.
 
@@ -12,7 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"perfspect/internal/common"
+	"perfspect/internal/workflow"
+
 	"perfspect/internal/cpus"
 	"perfspect/internal/progress"
 	"perfspect/internal/script"
@@ -79,7 +80,7 @@ func (c *X86MetadataCollector) CollectMetadata(t target.Target, noRoot bool, noS
 	}
 
 	// CPU microarchitecture
-	metadata.Microarchitecture, err = common.GetTargetMicroArchitecture(t, localTempDir, noRoot)
+	metadata.Microarchitecture, err = workflow.GetTargetMicroArchitecture(t, localTempDir, noRoot)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to get x86 microarchitecture: %v", err)
 	}
@@ -96,7 +97,7 @@ func (c *X86MetadataCollector) CollectMetadata(t target.Target, noRoot bool, noS
 		return Metadata{}, fmt.Errorf("failed to get metadata scripts: %v", err)
 	}
 
-	scriptOutputs, err := common.RunScripts(t, metadataScripts, true, localTempDir, statusUpdate, "collecting metadata", noRoot) // nosemgrep
+	scriptOutputs, err := workflow.RunScripts(t, metadataScripts, true, localTempDir, statusUpdate, "collecting metadata", noRoot) // nosemgrep
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to run metadata scripts: %v", err)
 	}

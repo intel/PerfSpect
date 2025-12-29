@@ -1,10 +1,8 @@
-/*
-Package util includes utility/helper functions that may be useful to other modules.
-*/
-package util
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+// Package util includes utility/helper functions that may be useful to other modules.
+package util
 
 import (
 	"archive/tar"

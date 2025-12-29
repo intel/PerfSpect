@@ -1,10 +1,11 @@
-package lock
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
+package lock
+
 import (
-	"perfspect/internal/common"
+	"perfspect/internal/extract"
+
 	"perfspect/internal/script"
 	"perfspect/internal/table"
 	"strings"
@@ -28,12 +29,12 @@ var tableDefinitions = map[string]table.TableDefinition{
 
 func kernelLockAnalysisTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	fields := []table.Field{
-		{Name: "Hotspot without Callstack", Values: []string{common.SectionValueFromOutput(outputs[script.ProfileKernelLockScriptName].Stdout, "perf_hotspot_no_children")}},
-		{Name: "Hotspot with Callstack", Values: []string{common.SectionValueFromOutput(outputs[script.ProfileKernelLockScriptName].Stdout, "perf_hotspot_callgraph")}},
-		{Name: "Cache2Cache without Callstack", Values: []string{common.SectionValueFromOutput(outputs[script.ProfileKernelLockScriptName].Stdout, "perf_c2c_no_children")}},
-		{Name: "Cache2Cache with CallStack", Values: []string{common.SectionValueFromOutput(outputs[script.ProfileKernelLockScriptName].Stdout, "perf_c2c_callgraph")}},
-		{Name: "Lock Contention", Values: []string{common.SectionValueFromOutput(outputs[script.ProfileKernelLockScriptName].Stdout, "perf_lock_contention")}},
-		{Name: "Perf Package Path", Values: []string{strings.TrimSpace(common.SectionValueFromOutput(outputs[script.ProfileKernelLockScriptName].Stdout, "perf_package_path"))}},
+		{Name: "Hotspot without Callstack", Values: []string{extract.SectionValueFromOutput(outputs[script.ProfileKernelLockScriptName].Stdout, "perf_hotspot_no_children")}},
+		{Name: "Hotspot with Callstack", Values: []string{extract.SectionValueFromOutput(outputs[script.ProfileKernelLockScriptName].Stdout, "perf_hotspot_callgraph")}},
+		{Name: "Cache2Cache without Callstack", Values: []string{extract.SectionValueFromOutput(outputs[script.ProfileKernelLockScriptName].Stdout, "perf_c2c_no_children")}},
+		{Name: "Cache2Cache with CallStack", Values: []string{extract.SectionValueFromOutput(outputs[script.ProfileKernelLockScriptName].Stdout, "perf_c2c_callgraph")}},
+		{Name: "Lock Contention", Values: []string{extract.SectionValueFromOutput(outputs[script.ProfileKernelLockScriptName].Stdout, "perf_lock_contention")}},
+		{Name: "Perf Package Path", Values: []string{strings.TrimSpace(extract.SectionValueFromOutput(outputs[script.ProfileKernelLockScriptName].Stdout, "perf_package_path"))}},
 	}
 	return fields
 }

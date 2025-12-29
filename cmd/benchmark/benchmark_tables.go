@@ -1,7 +1,7 @@
-package benchmark
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+package benchmark
 
 import (
 	"fmt"
@@ -9,7 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"perfspect/internal/common"
+	"perfspect/internal/extract"
+
 	"perfspect/internal/cpus"
 	"perfspect/internal/script"
 	"perfspect/internal/table"
@@ -106,14 +107,14 @@ func speedBenchmarkTableValues(outputs map[string]script.ScriptOutput) []table.F
 
 func powerBenchmarkTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	return []table.Field{
-		{Name: "Maximum Power", Values: []string{common.MaxTotalPackagePowerFromOutput(outputs[script.PowerBenchmarkScriptName].Stdout)}},
-		{Name: "Minimum Power", Values: []string{common.MinTotalPackagePowerFromOutput(outputs[script.IdlePowerBenchmarkScriptName].Stdout)}},
+		{Name: "Maximum Power", Values: []string{extract.MaxTotalPackagePowerFromOutput(outputs[script.PowerBenchmarkScriptName].Stdout)}},
+		{Name: "Minimum Power", Values: []string{extract.MinTotalPackagePowerFromOutput(outputs[script.IdlePowerBenchmarkScriptName].Stdout)}},
 	}
 }
 
 func temperatureBenchmarkTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	return []table.Field{
-		{Name: "Maximum Temperature", Values: []string{common.MaxPackageTemperatureFromOutput(outputs[script.PowerBenchmarkScriptName].Stdout)}},
+		{Name: "Maximum Temperature", Values: []string{extract.MaxPackageTemperatureFromOutput(outputs[script.PowerBenchmarkScriptName].Stdout)}},
 	}
 }
 
@@ -135,10 +136,10 @@ func frequencyBenchmarkTableValues(outputs map[string]script.ScriptOutput) []tab
 	}
 	// get the spec core frequencies from the spec output
 	var specSSEFreqs []string
-	frequencyBuckets, err := common.GetSpecFrequencyBuckets(outputs)
+	frequencyBuckets, err := extract.GetSpecFrequencyBuckets(outputs)
 	if err == nil && len(frequencyBuckets) >= 2 {
 		// get the frequencies from the buckets
-		specSSEFreqs, err = common.ExpandTurboFrequencies(frequencyBuckets, "sse")
+		specSSEFreqs, err = extract.ExpandTurboFrequencies(frequencyBuckets, "sse")
 		if err != nil {
 			slog.Error("unable to convert buckets to counts", slog.String("error", err.Error()))
 			return []table.Field{}
@@ -231,7 +232,7 @@ func memoryBenchmarkTableValues(outputs map[string]script.ScriptOutput) []table.
 	 00008	261.54	 225073.3
 	 ...
 	*/
-	latencyBandwidthPairs := common.ValsArrayFromRegexSubmatch(outputs[script.MemoryBenchmarkScriptName].Stdout, `\s*[0-9]*\s*([0-9]*\.[0-9]+)\s*([0-9]*\.[0-9]+)`)
+	latencyBandwidthPairs := extract.ValsArrayFromRegexSubmatch(outputs[script.MemoryBenchmarkScriptName].Stdout, `\s*[0-9]*\s*([0-9]*\.[0-9]+)\s*([0-9]*\.[0-9]+)`)
 	for _, latencyBandwidth := range latencyBandwidthPairs {
 		latency := latencyBandwidth[0]
 		bandwidth, err := strconv.ParseFloat(latencyBandwidth[1], 32)
@@ -259,7 +260,7 @@ func numaBenchmarkTableValues(outputs map[string]script.ScriptOutput) []table.Fi
 	       0	175610.3	 55579.7
 	       1	 55575.2	175656.7
 	*/
-	nodeBandwidthsPairs := common.ValsArrayFromRegexSubmatch(outputs[script.NumaBenchmarkScriptName].Stdout, `^\s+(\d)\s+(\d.*)$`)
+	nodeBandwidthsPairs := extract.ValsArrayFromRegexSubmatch(outputs[script.NumaBenchmarkScriptName].Stdout, `^\s+(\d)\s+(\d.*)$`)
 	// add 1 field per numa node
 	for _, nodeBandwidthsPair := range nodeBandwidthsPairs {
 		fields = append(fields, table.Field{Name: nodeBandwidthsPair[0]})

@@ -1,4 +1,7 @@
-package common
+// Copyright (C) 2021-2025 Intel Corporation
+// SPDX-License-Identifier: BSD-3-Clause
+
+package extract
 
 import (
 	"fmt"
@@ -9,14 +12,7 @@ import (
 	"time"
 )
 
-// Copyright (C) 2021-2025 Intel Corporation
-// SPDX-License-Identifier: BSD-3-Clause
-
 // parseTurbostatOutput parses turbostat output text into a slice of maps.
-// Each map represents a row, with column names as keys and values as strings.
-// Adds a "timestamp" key to each row, if TIME and INTERVAL are included in
-// the output by the collection script.
-// Only the Summary and Packages rows are returned, i.e., rows for individual cores/CPUs are ignored.
 func parseTurbostatOutput(output string) ([]map[string]string, error) {
 	var (
 		headers    []string
@@ -42,7 +38,6 @@ func parseTurbostatOutput(output string) ([]map[string]string, error) {
 		}
 		if val, found := strings.CutPrefix(line, "TIME:"); found {
 			val = strings.TrimSpace(val)
-			// Try to parse as HH:MM:SS
 			var err error
 			timestamp, err = time.Parse("15:04:05", val)
 			if err != nil {
@@ -52,14 +47,11 @@ func parseTurbostatOutput(output string) ([]map[string]string, error) {
 			timeParsed = true
 			continue
 		}
-		// parse the fields in the line
 		fields := strings.Fields(line)
-		// if this is a header line
 		if len(fields) >= 1 && slices.Contains([]string{"package", "die", "node", "core", "cpu"}, strings.ToLower(fields[0])) {
 			if len(headers) == 0 {
-				headers = fields // first line with a column name is the header
+				headers = fields
 			} else {
-				// bump the timestamp to the next interval
 				if timeParsed && interval > 0 {
 					timestamp = timestamp.Add(time.Duration(interval) * time.Second)
 				}
@@ -67,16 +59,15 @@ func parseTurbostatOutput(output string) ([]map[string]string, error) {
 			continue
 		}
 		if len(headers) == 0 {
-			continue // skip data lines before first header
+			continue
 		}
 		if len(fields) != len(headers) {
-			continue // skip core lines
+			continue
 		}
 		row := make(map[string]string, len(headers))
 		for i, h := range headers {
 			row[h] = fields[i]
 		}
-		// Add timestamp to row
 		if timeParsed && interval > 0 {
 			row["timestamp"] = timestamp.Format("15:04:05")
 		}
@@ -87,9 +78,7 @@ func parseTurbostatOutput(output string) ([]map[string]string, error) {
 }
 
 // TurbostatPlatformRows parses the output of the turbostat script and returns the rows
-// for the platform (summary) only, for the specified field names.
-// The "platform" rows are those where Package, Die, Core, and CPU are all "-".
-// The first column is the sample time, and the rest are the values for the specified fields.
+// for the platform (summary) only.
 func TurbostatPlatformRows(turboStatScriptOutput string, fieldNames []string) ([][]string, error) {
 	if turboStatScriptOutput == "" {
 		return nil, fmt.Errorf("turbostat output is empty")
@@ -104,18 +93,16 @@ func TurbostatPlatformRows(turboStatScriptOutput string, fieldNames []string) ([
 	if len(rows) == 0 {
 		return nil, fmt.Errorf("no platform rows found in turbostat output")
 	}
-	// filter the rows to the summary rows only
 	var fieldValues [][]string
 	for _, row := range rows {
 		if !isPlatformRow(row) {
 			continue
 		}
-		// this is a summary row, extract the values for the specified fields
-		rowValues := make([]string, len(fieldNames)+1) // +1 for the sample time
-		rowValues[0] = row["timestamp"]                // first column is the sample time
+		rowValues := make([]string, len(fieldNames)+1)
+		rowValues[0] = row["timestamp"]
 		for i, fieldName := range fieldNames {
 			if value, ok := row[fieldName]; ok {
-				rowValues[i+1] = value // +1 for the sample time
+				rowValues[i+1] = value
 			} else {
 				return nil, fmt.Errorf("field %s not found in turbostat output", fieldName)
 			}
@@ -129,8 +116,6 @@ func TurbostatPlatformRows(turboStatScriptOutput string, fieldNames []string) ([
 	return fieldValues, nil
 }
 
-// isPlatformRow returns true if the row represents a platform (summary) row.
-// only consider rows where Package, Die, Node, Core, and CPU are "-" (or don't exist), these rows contain the sum of all packages
 func isPlatformRow(row map[string]string) bool {
 	for _, header := range []string{"Package", "Die", "Node", "Core", "CPU"} {
 		if val, ok := row[header]; ok && val != "-" {
@@ -141,8 +126,7 @@ func isPlatformRow(row map[string]string) bool {
 }
 
 // TurbostatPackageRows parses the output of the turbostat script and returns the rows
-// for each package, for the specified field names.
-// The first column is the sample time, and the rest are the values for the specified fields.
+// for each package.
 func TurbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([][][]string, error) {
 	if turboStatScriptOutput == "" {
 		return nil, fmt.Errorf("turbostat output is empty")
@@ -159,24 +143,21 @@ func TurbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([]
 	}
 	var packageRows [][][]string
 	for _, row := range rows {
-		// not all instances of turbostat output include a Package column
-		// if it is missing assume 1 package, set it to 0 for rows where CPU is 0
 		if _, ok := row["Package"]; !ok {
 			if row["CPU"] == "0" {
 				row["Package"] = "0"
 			} else {
-				continue // skip rows that are not package rows
+				continue
 			}
 		}
 		if !isPackageRow(row) {
 			continue
 		}
-		// this is a package row, extract the values for the specified fields
-		rowValues := make([]string, len(fieldNames)+1) // +1 for the sample time
-		rowValues[0] = row["timestamp"]                // first column is the sample time
+		rowValues := make([]string, len(fieldNames)+1)
+		rowValues[0] = row["timestamp"]
 		for i, fieldName := range fieldNames {
 			if value, ok := row[fieldName]; ok {
-				rowValues[i+1] = value // +1 for the sample time
+				rowValues[i+1] = value
 			} else {
 				return nil, fmt.Errorf("field %s not found in turbostat output", fieldName)
 			}
@@ -185,11 +166,9 @@ func TurbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([]
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse package number: %s", row["Package"])
 		}
-		// if we have a new package, start a new package row
 		if len(packageRows) < packageNum+1 {
 			packageRows = append(packageRows, [][]string{rowValues})
 		} else {
-			// append to the associated package row
 			packageRows[packageNum] = append(packageRows[packageNum], rowValues)
 		}
 	}
@@ -199,8 +178,6 @@ func TurbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([]
 	return packageRows, nil
 }
 
-// isPackageRow returns true if the row represents a package row.
-// only consider rows where Package is not "-" or empty
 func isPackageRow(row map[string]string) bool {
 	if val, ok := row["Package"]; ok && val != "-" {
 		return true
@@ -221,7 +198,6 @@ func MaxTotalPackagePowerFromOutput(turbostatOutput string) string {
 	var maxPower float64
 	var ignoredFirstReading bool
 	for _, row := range rows {
-		// only consider rows where CPU, Package, or Core is "-", these rows contain the sum of all packgaes
 		if row["CPU"] != "-" && row["CPU"] != "" ||
 			row["Package"] != "-" && row["Package"] != "" ||
 			row["Core"] != "-" && row["Core"] != "" {
@@ -229,7 +205,6 @@ func MaxTotalPackagePowerFromOutput(turbostatOutput string) string {
 		}
 		if wattStr, ok := row["PkgWatt"]; ok {
 			if !ignoredFirstReading {
-				// skip the first reading, it is usually not representative of the system state
 				ignoredFirstReading = true
 				continue
 			}
@@ -238,7 +213,6 @@ func MaxTotalPackagePowerFromOutput(turbostatOutput string) string {
 				slog.Warn("unable to parse power value", slog.String("value", wattStr), slog.String("error", err.Error()))
 				continue
 			}
-			// Filter out anomalous high readings. Turbostat sometimes reports very high power values that are not realistic.
 			if watt > 10000 {
 				slog.Warn("ignoring anomalous high power reading", slog.String("value", wattStr))
 				continue
@@ -266,7 +240,6 @@ func MinTotalPackagePowerFromOutput(turbostatOutput string) string {
 	}
 	var minPower float64
 	for _, row := range rows {
-		// only consider rows where CPU, Package, or Core is "-", these rows contain the sum of all packgaes
 		if row["CPU"] != "-" && row["CPU"] != "" ||
 			row["Package"] != "-" && row["Package"] != "" ||
 			row["Core"] != "-" && row["Core"] != "" {
@@ -302,7 +275,6 @@ func MaxPackageTemperatureFromOutput(turbostatOutput string) string {
 	var maxTemp float64
 	var ignoredFirstReading bool
 	for _, row := range rows {
-		// only consider rows where CPU, Package, or Core is "-", these rows contain the sum of all packgaes
 		if row["CPU"] != "-" && row["CPU"] != "" ||
 			row["Package"] != "-" && row["Package"] != "" ||
 			row["Core"] != "-" && row["Core"] != "" {
@@ -310,7 +282,6 @@ func MaxPackageTemperatureFromOutput(turbostatOutput string) string {
 		}
 		if tempStr, ok := row["PkgTmp"]; ok {
 			if !ignoredFirstReading {
-				// skip the first reading, it is usually not representative of the system state
 				ignoredFirstReading = true
 				continue
 			}
@@ -319,7 +290,6 @@ func MaxPackageTemperatureFromOutput(turbostatOutput string) string {
 				slog.Warn("unable to parse temperature value", slog.String("value", tempStr), slog.String("error", err.Error()))
 				continue
 			}
-			// Filter out anomalous high readings. Turbostat sometimes reports very high temperature values that are not realistic.
 			if temp > 200 {
 				slog.Warn("ignoring anomalous high temperature reading", slog.String("value", tempStr))
 				continue

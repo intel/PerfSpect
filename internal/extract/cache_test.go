@@ -1,7 +1,7 @@
-package common
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+package extract
 
 import (
 	"testing"
@@ -52,14 +52,14 @@ func TestParseLscpuCacheOutput(t *testing.T) {
 		input          string
 		expectedError  bool
 		expectedLength int
-		expectedL3     lscpuCacheEntry
+		expectedL3     LscpuCacheEntry
 	}{
 		{
 			name:           "Typical table output",
 			input:          "NAME ONE-SIZE ALL-SIZE WAYS TYPE LEVEL SETS PHY-LINE COHERENCY-SIZE\nL1d 48K 8.1M 12 Data 1 64 1 64\nL1i 64K 10.8M 16 Instruction 1 64 1 64\nL2 2M 344M 16 Unified 2 2048 1 64\nL3 336M 672M 16 Unified 3 344064 1 64",
 			expectedError:  false,
 			expectedLength: 4,
-			expectedL3: lscpuCacheEntry{
+			expectedL3: LscpuCacheEntry{
 				Name:          "L3",
 				OneSize:       "336M",
 				AllSize:       "672M",
@@ -76,7 +76,7 @@ func TestParseLscpuCacheOutput(t *testing.T) {
 			input:          "NAME ONE-SIZE ALL-SIZE WAYS TYPE LEVEL\nL3 320M 640M 20 Unified 3",
 			expectedError:  false,
 			expectedLength: 1,
-			expectedL3: lscpuCacheEntry{
+			expectedL3: LscpuCacheEntry{
 				Name:    "L3",
 				OneSize: "320M",
 				AllSize: "640M",

@@ -1,8 +1,8 @@
-// Package report provides functions to generate reports in various formats such as txt, json, html, xlsx.
-package report
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+// Package report provides functions to generate reports in various formats such as txt, json, html, xlsx.
+package report
 
 import (
 	"fmt"

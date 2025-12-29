@@ -1,8 +1,8 @@
-// Package config is a subcommand of the root command. It sets system configuration items on target platform(s).
-package config
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+// Package config is a subcommand of the root command. It sets system configuration items on target platform(s).
+package config
 
 import (
 	"bufio"
@@ -11,7 +11,9 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"perfspect/internal/common"
+	"perfspect/internal/app"
+	"perfspect/internal/workflow"
+
 	"perfspect/internal/progress"
 	"regexp"
 	"slices"
@@ -32,9 +34,9 @@ type flagValue struct {
 }
 
 var restoreExamples = []string{
-	fmt.Sprintf("  Restore config from file on local host:     $ %s %s %s gnr_config.txt", common.AppName, cmdName, restoreCmdName),
-	fmt.Sprintf("  Restore config on remote target:            $ %s %s %s gnr_config.txt --target 192.168.1.1 --user fred --key fred_key", common.AppName, cmdName, restoreCmdName),
-	fmt.Sprintf("  Restore config without confirmation:        $ %s %s %s gnr_config.txt --yes", common.AppName, cmdName, restoreCmdName),
+	fmt.Sprintf("  Restore config from file on local host:     $ %s %s %s gnr_config.txt", app.Name, cmdName, restoreCmdName),
+	fmt.Sprintf("  Restore config on remote target:            $ %s %s %s gnr_config.txt --target 192.168.1.1 --user fred --key fred_key", app.Name, cmdName, restoreCmdName),
+	fmt.Sprintf("  Restore config without confirmation:        $ %s %s %s gnr_config.txt --yes", app.Name, cmdName, restoreCmdName),
 }
 
 var RestoreCmd = &cobra.Command{
@@ -64,7 +66,7 @@ func init() {
 
 	RestoreCmd.Flags().BoolVar(&flagRestoreYes, flagRestoreYesName, false, "skip confirmation prompt")
 
-	common.AddTargetFlags(RestoreCmd)
+	workflow.AddTargetFlags(RestoreCmd)
 
 	RestoreCmd.SetUsageFunc(restoreUsageFunc)
 }
@@ -78,7 +80,7 @@ func restoreUsageFunc(cmd *cobra.Command) error {
 	cmd.Print("  General Options:\n")
 	cmd.Printf("    --%-20s %s\n", flagRestoreYesName, "skip confirmation prompt")
 
-	targetFlagGroup := common.GetTargetFlagGroup()
+	targetFlagGroup := workflow.GetTargetFlagGroup()
 	cmd.Printf("  %s:\n", targetFlagGroup.GroupName)
 	for _, flag := range targetFlagGroup.Flags {
 		cmd.Printf("    --%-20s %s\n", flag.Name, flag.Help)
@@ -98,15 +100,15 @@ func restoreUsageFunc(cmd *cobra.Command) error {
 func validateRestoreFlags(cmd *cobra.Command, args []string) error {
 	// validate that the file exists
 	if len(args) != 1 {
-		return common.FlagValidationError(cmd, "restore requires exactly one argument: the path to the configuration file")
+		return workflow.FlagValidationError(cmd, "restore requires exactly one argument: the path to the configuration file")
 	}
 	filePath := args[0]
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		return common.FlagValidationError(cmd, fmt.Sprintf("configuration file does not exist: %s", filePath))
+		return workflow.FlagValidationError(cmd, fmt.Sprintf("configuration file does not exist: %s", filePath))
 	}
 	// validate common target flags
-	if err := common.ValidateTargetFlags(cmd); err != nil {
-		return common.FlagValidationError(cmd, err.Error())
+	if err := workflow.ValidateTargetFlags(cmd); err != nil {
+		return workflow.FlagValidationError(cmd, err.Error())
 	}
 	return nil
 }
@@ -157,7 +159,7 @@ func runRestoreCmd(cmd *cobra.Command, args []string) error {
 	cmdArgs := []string{"config"}
 
 	// copy target flags from restore command first
-	targetFlags := []string{common.FlagTargetHostName, common.FlagTargetsFileName, common.FlagTargetUserName, common.FlagTargetKeyName, common.FlagTargetPortName}
+	targetFlags := []string{workflow.FlagTargetHostName, workflow.FlagTargetsFileName, workflow.FlagTargetUserName, workflow.FlagTargetKeyName, workflow.FlagTargetPortName}
 	for _, flagName := range targetFlags {
 		if flag := cmd.Flags().Lookup(flagName); flag != nil && flag.Changed {
 			cmdArgs = append(cmdArgs, fmt.Sprintf("--%s", flagName), flag.Value.String())
@@ -165,7 +167,7 @@ func runRestoreCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	// copy relevant global flags from root command next
-	globalFlags := []string{common.FlagDebugName, common.FlagOutputDirName, common.FlagTargetTempRootName, common.FlagSyslogName, common.FlagLogStdOutName}
+	globalFlags := []string{app.FlagDebugName, app.FlagOutputDirName, app.FlagTargetTempRootName, app.FlagSyslogName, app.FlagLogStdOutName}
 	for _, flagName := range globalFlags {
 		if flag := cmd.Root().PersistentFlags().Lookup(flagName); flag != nil && flag.Changed {
 			if flag.Value.Type() == "bool" {

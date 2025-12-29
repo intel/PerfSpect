@@ -1,13 +1,14 @@
-package flamegraph
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+package flamegraph
 
 import (
 	"fmt"
 	"log/slog"
 	"math"
-	"perfspect/internal/common"
+	"perfspect/internal/extract"
+
 	"perfspect/internal/script"
 	"perfspect/internal/table"
 	"regexp"
@@ -45,7 +46,7 @@ func javaFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
 		slog.Warn("collapsed call stack output is empty")
 		return ""
 	}
-	sections := common.GetSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
+	sections := extract.GetSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
 	if len(sections) == 0 {
 		slog.Warn("no sections in collapsed call stack output")
 		return ""
@@ -87,7 +88,7 @@ func nativeFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
 		slog.Warn("collapsed call stack output is empty")
 		return ""
 	}
-	sections := common.GetSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
+	sections := extract.GetSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
 	if len(sections) == 0 {
 		slog.Warn("no sections in collapsed call stack output")
 		return ""
@@ -116,7 +117,7 @@ func maxRenderDepthFromOutput(outputs map[string]script.ScriptOutput) string {
 		slog.Warn("collapsed call stack output is empty")
 		return ""
 	}
-	sections := common.GetSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
+	sections := extract.GetSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
 	if len(sections) == 0 {
 		slog.Warn("no sections in collapsed call stack output")
 		return ""

@@ -1,7 +1,7 @@
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
-package report
+package extract
 
 import (
 	"log/slog"
@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 
-	"perfspect/internal/common"
 	"perfspect/internal/script"
 )
 
@@ -21,13 +20,15 @@ import (
 //
 //   The devid field will be interpreted as a regular expression.
 
+// GPUDefinition represents an Intel GPU device definition.
 type GPUDefinition struct {
 	Model string
 	MfgID string
 	DevID string
 }
 
-var gpuDefinitions = []GPUDefinition{
+// GPUDefinitions contains all known Intel GPU definitions.
+var GPUDefinitions = []GPUDefinition{
 	{
 		Model: "ATS-P",
 		MfgID: "8086",
@@ -135,22 +136,24 @@ var gpuDefinitions = []GPUDefinition{
 	},
 }
 
+// GPU represents a graphics processing unit found in the system.
 type GPU struct {
 	Manufacturer string
 	Model        string
 	PCIID        string
 }
 
-func gpuInfoFromOutput(outputs map[string]script.ScriptOutput) []GPU {
+// GPUInfoFromOutput returns GPU information from lshw output.
+func GPUInfoFromOutput(outputs map[string]script.ScriptOutput) []GPU {
 	gpus := []GPU{}
-	gpusLshw := common.ValsArrayFromRegexSubmatch(outputs[script.LshwScriptName].Stdout, `^pci.*?\s+display\s+(\w+).*?\s+\[(\w+):(\w+)]$`)
+	gpusLshw := ValsArrayFromRegexSubmatch(outputs[script.LshwScriptName].Stdout, `^pci.*?\s+display\s+(\w+).*?\s+\[(\w+):(\w+)]$`)
 	idxMfgName := 0
 	idxMfgID := 1
 	idxDevID := 2
 	for _, gpu := range gpusLshw {
 		// Find GPU in GPU defs, note the model
 		var model string
-		for _, intelGPU := range gpuDefinitions {
+		for _, intelGPU := range GPUDefinitions {
 			if gpu[idxMfgID] == intelGPU.MfgID {
 				model = intelGPU.Model
 				break
@@ -173,6 +176,7 @@ func gpuInfoFromOutput(outputs map[string]script.ScriptOutput) []GPU {
 	return gpus
 }
 
+// Gaudi represents an Intel Gaudi accelerator.
 type Gaudi struct {
 	ModuleID          string
 	Microarchitecture string
@@ -185,7 +189,8 @@ type Gaudi struct {
 	NUMA              string
 }
 
-func gaudiInfoFromOutput(outputs map[string]script.ScriptOutput) []Gaudi {
+// GaudiInfoFromOutput returns Gaudi accelerator information from script output.
+func GaudiInfoFromOutput(outputs map[string]script.ScriptOutput) []Gaudi {
 	gaudis := []Gaudi{}
 	for i, line := range strings.Split(outputs[script.GaudiInfoScriptName].Stdout, "\n") {
 		if line == "" || i == 0 { // skip blank lines and header
@@ -207,7 +212,7 @@ func gaudiInfoFromOutput(outputs map[string]script.ScriptOutput) []Gaudi {
 		gaudis[i].Microarchitecture = strings.TrimSpace(outputs[script.GaudiArchitectureScriptName].Stdout)
 	}
 	// get NUMA affinity
-	numaAffinities := common.ValsArrayFromRegexSubmatch(outputs[script.GaudiNumaScriptName].Stdout, `^(\d+)\s+(\d+)\s+$`)
+	numaAffinities := ValsArrayFromRegexSubmatch(outputs[script.GaudiNumaScriptName].Stdout, `^(\d+)\s+(\d+)\s+$`)
 	if len(numaAffinities) != len(gaudis) {
 		slog.Error("number of gaudis in gaudi info and numa output do not match", slog.Int("gaudis", len(gaudis)), slog.Int("numaAffinities", len(numaAffinities)))
 		return nil
@@ -281,8 +286,8 @@ func gaudiInfoFromOutput(outputs map[string]script.ScriptOutput) []Gaudi {
 	return gaudis
 }
 
-// return all PCI Devices of specified class
-func getPCIDevices(class string, outputs map[string]script.ScriptOutput) (devices []map[string]string) {
+// GetPCIDevices returns all PCI Devices of specified class from lspci output.
+func GetPCIDevices(class string, outputs map[string]script.ScriptOutput) (devices []map[string]string) {
 	device := make(map[string]string)
 	re := regexp.MustCompile(`^(\w+):\s+(.*)$`)
 	for line := range strings.SplitSeq(outputs[script.LspciVmmScriptName].Stdout, "\n") {

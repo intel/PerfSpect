@@ -1,3 +1,6 @@
+// Copyright (C) 2021-2025 Intel Corporation
+// SPDX-License-Identifier: BSD-3-Clause
+
 package metrics
 
 import (
@@ -5,9 +8,6 @@ import (
 	"log/slog"
 	"strings"
 )
-
-// Copyright (C) 2021-2025 Intel Corporation
-// SPDX-License-Identifier: BSD-3-Clause
 
 type OtherEvent struct {
 	EventName string

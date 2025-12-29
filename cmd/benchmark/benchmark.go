@@ -1,8 +1,8 @@
-// Package benchmark is a subcommand of the root command. It runs performance benchmarks on target(s).
-package benchmark
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+// Package benchmark is a subcommand of the root command. It runs performance benchmarks on target(s).
+package benchmark
 
 import (
 	"fmt"
@@ -16,7 +16,10 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/xuri/excelize/v2"
 
-	"perfspect/internal/common"
+	"perfspect/internal/app"
+	"perfspect/internal/extract"
+	"perfspect/internal/workflow"
+
 	"perfspect/internal/cpus"
 	"perfspect/internal/report"
 	"perfspect/internal/script"
@@ -27,10 +30,10 @@ import (
 const cmdName = "benchmark"
 
 var examples = []string{
-	fmt.Sprintf("  Run all benchmarks:        $ %s %s", common.AppName, cmdName),
-	fmt.Sprintf("  Run specific benchmarks:   $ %s %s --speed --power", common.AppName, cmdName),
-	fmt.Sprintf("  Benchmark remote target:   $ %s %s --target 192.168.1.1 --user fred --key fred_key", common.AppName, cmdName),
-	fmt.Sprintf("  Benchmark multiple targets:$ %s %s --targets targets.yaml", common.AppName, cmdName),
+	fmt.Sprintf("  Run all benchmarks:        $ %s %s", app.Name, cmdName),
+	fmt.Sprintf("  Run specific benchmarks:   $ %s %s --speed --power", app.Name, cmdName),
+	fmt.Sprintf("  Benchmark remote target:   $ %s %s --target 192.168.1.1 --user fred --key fred_key", app.Name, cmdName),
+	fmt.Sprintf("  Benchmark multiple targets:$ %s %s --targets targets.yaml", app.Name, cmdName),
 }
 
 var Cmd = &cobra.Command{
@@ -81,7 +84,7 @@ const (
 
 var benchmarkSummaryTableName = "Benchmark Summary"
 
-var categories = []common.Category{
+var categories = []app.Category{
 	{FlagName: flagSpeedName, FlagVar: &flagSpeed, DefaultValue: false, Help: "CPU speed benchmark", Tables: []table.TableDefinition{tableDefinitions[SpeedBenchmarkTableName]}},
 	{FlagName: flagPowerName, FlagVar: &flagPower, DefaultValue: false, Help: "power consumption benchmark", Tables: []table.TableDefinition{tableDefinitions[PowerBenchmarkTableName]}},
 	{FlagName: flagTemperatureName, FlagVar: &flagTemperature, DefaultValue: false, Help: "temperature benchmark", Tables: []table.TableDefinition{tableDefinitions[TemperatureBenchmarkTableName]}},
@@ -97,13 +100,13 @@ func init() {
 		Cmd.Flags().BoolVar(benchmark.FlagVar, benchmark.FlagName, benchmark.DefaultValue, benchmark.Help)
 	}
 	// set up other flags
-	Cmd.Flags().StringVar(&common.FlagInput, common.FlagInputName, "", "")
+	Cmd.Flags().StringVar(&app.FlagInput, app.FlagInputName, "", "")
 	Cmd.Flags().BoolVar(&flagAll, flagAllName, true, "")
-	Cmd.Flags().StringSliceVar(&common.FlagFormat, common.FlagFormatName, []string{report.FormatAll}, "")
+	Cmd.Flags().StringSliceVar(&app.FlagFormat, app.FlagFormatName, []string{report.FormatAll}, "")
 	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
 	Cmd.Flags().StringVar(&flagStorageDir, flagStorageDirName, "/tmp", "")
 
-	common.AddTargetFlags(Cmd)
+	workflow.AddTargetFlags(Cmd)
 
 	Cmd.SetUsageFunc(usageFunc)
 }
@@ -133,25 +136,25 @@ func usageFunc(cmd *cobra.Command) error {
 	return nil
 }
 
-func getFlagGroups() []common.FlagGroup {
-	var groups []common.FlagGroup
-	flags := []common.Flag{
+func getFlagGroups() []app.FlagGroup {
+	var groups []app.FlagGroup
+	flags := []app.Flag{
 		{
 			Name: flagAllName,
 			Help: "run all benchmarks",
 		},
 	}
 	for _, benchmark := range categories {
-		flags = append(flags, common.Flag{
+		flags = append(flags, app.Flag{
 			Name: benchmark.FlagName,
 			Help: benchmark.Help,
 		})
 	}
-	groups = append(groups, common.FlagGroup{
+	groups = append(groups, app.FlagGroup{
 		GroupName: "Benchmark Options",
 		Flags:     flags,
 	})
-	flags = []common.Flag{
+	flags = []app.Flag{
 		{
 			Name: flagNoSystemSummaryName,
 			Help: "do not include system summary in output",
@@ -161,22 +164,22 @@ func getFlagGroups() []common.FlagGroup {
 			Help: "existing directory where storage performance benchmark data will be temporarily stored",
 		},
 		{
-			Name: common.FlagFormatName,
+			Name: app.FlagFormatName,
 			Help: fmt.Sprintf("choose output format(s) from: %s", strings.Join(append([]string{report.FormatAll}, report.FormatOptions...), ", ")),
 		},
 	}
-	groups = append(groups, common.FlagGroup{
+	groups = append(groups, app.FlagGroup{
 		GroupName: "Other Options",
 		Flags:     flags,
 	})
-	groups = append(groups, common.GetTargetFlagGroup())
-	flags = []common.Flag{
+	groups = append(groups, workflow.GetTargetFlagGroup())
+	flags = []app.Flag{
 		{
-			Name: common.FlagInputName,
+			Name: app.FlagInputName,
 			Help: "\".raw\" file, or directory containing \".raw\" files. Will skip data collection and use raw data for reports.",
 		},
 	}
-	groups = append(groups, common.FlagGroup{
+	groups = append(groups, app.FlagGroup{
 		GroupName: "Advanced Options",
 		Flags:     flags,
 	})
@@ -194,27 +197,27 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		}
 	}
 	// validate format options
-	for _, format := range common.FlagFormat {
+	for _, format := range app.FlagFormat {
 		formatOptions := append([]string{report.FormatAll}, report.FormatOptions...)
 		if !slices.Contains(formatOptions, format) {
-			return common.FlagValidationError(cmd, fmt.Sprintf("format options are: %s", strings.Join(formatOptions, ", ")))
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("format options are: %s", strings.Join(formatOptions, ", ")))
 		}
 	}
 	// validate storage dir
 	if flagStorageDir != "" {
 		if !util.IsValidDirectoryName(flagStorageDir) {
-			return common.FlagValidationError(cmd, fmt.Sprintf("invalid storage directory name: %s", flagStorageDir))
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("invalid storage directory name: %s", flagStorageDir))
 		}
 		// if no target is specified, i.e., we have a local target only, check if the directory exists
-		if !cmd.Flags().Lookup(common.FlagTargetsFileName).Changed && !cmd.Flags().Lookup(common.FlagTargetHostName).Changed {
+		if !cmd.Flags().Lookup(workflow.FlagTargetsFileName).Changed && !cmd.Flags().Lookup(workflow.FlagTargetHostName).Changed {
 			if _, err := os.Stat(flagStorageDir); os.IsNotExist(err) {
-				return common.FlagValidationError(cmd, fmt.Sprintf("storage dir does not exist: %s", flagStorageDir))
+				return workflow.FlagValidationError(cmd, fmt.Sprintf("storage dir does not exist: %s", flagStorageDir))
 			}
 		}
 	}
 	// common target flags
-	if err := common.ValidateTargetFlags(cmd); err != nil {
-		return common.FlagValidationError(cmd, err.Error())
+	if err := workflow.ValidateTargetFlags(cmd); err != nil {
+		return workflow.FlagValidationError(cmd, err.Error())
 	}
 	return nil
 }
@@ -223,7 +226,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	var tables []table.TableDefinition
 	// add system summary table if not disabled
 	if !flagNoSystemSummary {
-		tables = append(tables, common.TableDefinitions[common.SystemSummaryTableName])
+		tables = append(tables, app.TableDefinitions[app.SystemSummaryTableName])
 	}
 	// add benchmark tables
 	selectedBenchmarkCount := 0
@@ -234,12 +237,12 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		}
 	}
 	// include benchmark summary table if all benchmarks are selected
-	var summaryFunc common.SummaryFunc
+	var summaryFunc app.SummaryFunc
 	if selectedBenchmarkCount == len(categories) {
 		summaryFunc = benchmarkSummaryFromTableValues
 	}
 
-	reportingCommand := common.ReportingCommand{
+	reportingCommand := workflow.ReportingCommand{
 		Cmd:                    cmd,
 		ScriptParams:           map[string]string{"StorageDir": flagStorageDir},
 		Tables:                 tables,
@@ -312,8 +315,8 @@ func benchmarkSummaryFromTableValues(allTableValues []table.TableValues, outputs
 			{Name: "Minimum Power", Values: []string{getValueFromTableValues(getTableValues(allTableValues, PowerBenchmarkTableName), "Minimum Power", 0)}},
 			{Name: "Memory Peak Bandwidth", Values: []string{maxMemBW}},
 			{Name: "Memory Minimum Latency", Values: []string{minLatency}},
-			{Name: "Microarchitecture", Values: []string{common.UarchFromOutput(outputs)}},
-			{Name: "Sockets", Values: []string{common.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)}},
+			{Name: "Microarchitecture", Values: []string{extract.UarchFromOutput(outputs)}},
+			{Name: "Sockets", Values: []string{extract.ValFromRegexSubmatch(outputs[script.LscpuScriptName].Stdout, `^Socket\(s\):\s*(.+)$`)}},
 		},
 	}
 }

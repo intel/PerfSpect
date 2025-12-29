@@ -1,7 +1,7 @@
-package metrics
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+package metrics
 
 // nmi_watchdog provides helper functions for enabling and disabling the NMI (non-maskable interrupt) watchdog
 
@@ -11,7 +11,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"perfspect/internal/common"
+	"perfspect/internal/workflow"
+
 	"perfspect/internal/script"
 	"perfspect/internal/target"
 )
@@ -65,7 +66,7 @@ func setNMIWatchdog(myTarget target.Target, setting string, localTempDir string)
 	if sysctl, err = findSysctl(myTarget); err != nil {
 		return
 	}
-	_, err = common.RunScript(myTarget, script.ScriptDefinition{
+	_, err = workflow.RunScript(myTarget, script.ScriptDefinition{
 		Name:           "set NMI watchdog",
 		ScriptTemplate: fmt.Sprintf("%s kernel.nmi_watchdog=%s", sysctl, setting),
 		Superuser:      true},

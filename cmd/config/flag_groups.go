@@ -1,15 +1,17 @@
-package config
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
+package config
+
 import (
 	"fmt"
-	"perfspect/internal/common"
-	"perfspect/internal/target"
 	"regexp"
 	"slices"
 	"strings"
+
+	"perfspect/internal/extract"
+	"perfspect/internal/target"
+	"perfspect/internal/workflow"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -192,7 +194,7 @@ func initializeFlags(cmd *cobra.Command) {
 	flagGroups = append(flagGroups, group)
 	// prefetcher options
 	group = flagGroup{name: flagGroupPrefetcherName, flags: []flagDefinition{}}
-	for _, pref := range common.GetPrefetcherDefinitions() {
+	for _, pref := range extract.GetPrefetcherDefinitions() {
 		group.flags = append(group.flags,
 			newStringFlag(cmd,
 				// flag name
@@ -247,7 +249,7 @@ func initializeFlags(cmd *cobra.Command) {
 	)
 	flagGroups = append(flagGroups, group)
 
-	common.AddTargetFlags(Cmd)
+	workflow.AddTargetFlags(Cmd)
 	Cmd.SetUsageFunc(usageFunc)
 }
 
@@ -263,7 +265,7 @@ func usageFunc(cmd *cobra.Command) error {
 		}
 	}
 
-	targetFlagGroup := common.GetTargetFlagGroup()
+	targetFlagGroup := workflow.GetTargetFlagGroup()
 	cmd.Printf("  %s:\n", targetFlagGroup.GroupName)
 	for _, flag := range targetFlagGroup.Flags {
 		cmd.Printf("    --%-20s %s\n", flag.Name, flag.Help)
@@ -292,14 +294,14 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		for _, flag := range group.flags {
 			if cmd.Flags().Lookup(flag.GetName()).Changed && flag.validationFunc != nil {
 				if !flag.validationFunc(cmd) {
-					return common.FlagValidationError(cmd, fmt.Sprintf("invalid flag value, --%s %s, valid values are %s", flag.GetName(), flag.GetValueAsString(), flag.validationDescription))
+					return workflow.FlagValidationError(cmd, fmt.Sprintf("invalid flag value, --%s %s, valid values are %s", flag.GetName(), flag.GetValueAsString(), flag.validationDescription))
 				}
 			}
 		}
 	}
 	// common target flags
-	if err := common.ValidateTargetFlags(cmd); err != nil {
-		return common.FlagValidationError(cmd, err.Error())
+	if err := workflow.ValidateTargetFlags(cmd); err != nil {
+		return workflow.FlagValidationError(cmd, err.Error())
 	}
 	return nil
 }

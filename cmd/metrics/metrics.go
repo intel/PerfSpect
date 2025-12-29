@@ -1,8 +1,8 @@
-// Package metrics is a subcommand of the root command. It provides functionality to collect performance metrics from target(s).
-package metrics
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+// Package metrics is a subcommand of the root command. It provides functionality to collect performance metrics from target(s).
+package metrics
 
 import (
 	"context"
@@ -23,7 +23,9 @@ import (
 	"syscall"
 	"time"
 
-	"perfspect/internal/common"
+	"perfspect/internal/app"
+	"perfspect/internal/workflow"
+
 	"perfspect/internal/cpus"
 	"perfspect/internal/progress"
 	"perfspect/internal/script"
@@ -39,14 +41,14 @@ import (
 const cmdName = "metrics"
 
 var examples = []string{
-	fmt.Sprintf("  Metrics from local host:                  $ %s %s --duration 30", common.AppName, cmdName),
-	fmt.Sprintf("  Metrics from local host in CSV format:    $ %s %s --format csv", common.AppName, cmdName),
-	fmt.Sprintf("  Metrics from remote host:                 $ %s %s --target 192.168.1.1 --user fred --key fred_key", common.AppName, cmdName),
-	fmt.Sprintf("  Metrics for \"hot\" processes:              $ %s %s --scope process", common.AppName, cmdName),
-	fmt.Sprintf("  Metrics for specified processes:          $ %s %s --scope process --pids 1234,6789", common.AppName, cmdName),
-	fmt.Sprintf("  Start workload and collect metrics:       $ %s %s -- /path/to/workload arg1 arg2", common.AppName, cmdName),
-	fmt.Sprintf("  Metrics adjusted for transaction rate:    $ %s %s --txnrate 100", common.AppName, cmdName),
-	fmt.Sprintf("  \"Live\" metrics:                           $ %s %s --live", common.AppName, cmdName),
+	fmt.Sprintf("  Metrics from local host:                  $ %s %s --duration 30", app.Name, cmdName),
+	fmt.Sprintf("  Metrics from local host in CSV format:    $ %s %s --format csv", app.Name, cmdName),
+	fmt.Sprintf("  Metrics from remote host:                 $ %s %s --target 192.168.1.1 --user fred --key fred_key", app.Name, cmdName),
+	fmt.Sprintf("  Metrics for \"hot\" processes:              $ %s %s --scope process", app.Name, cmdName),
+	fmt.Sprintf("  Metrics for specified processes:          $ %s %s --scope process --pids 1234,6789", app.Name, cmdName),
+	fmt.Sprintf("  Start workload and collect metrics:       $ %s %s -- /path/to/workload arg1 arg2", app.Name, cmdName),
+	fmt.Sprintf("  Metrics adjusted for transaction rate:    $ %s %s --txnrate 100", app.Name, cmdName),
+	fmt.Sprintf("  \"Live\" metrics:                           $ %s %s --live", app.Name, cmdName),
 }
 
 var Cmd = &cobra.Command{
@@ -244,7 +246,7 @@ func init() {
 	Cmd.Flags().BoolVar(&flagPrometheusServer, flagPrometheusServerName, false, "")
 	Cmd.Flags().StringVar(&flagPrometheusServerAddr, flagPrometheusServerAddrName, ":9090", "")
 
-	common.AddTargetFlags(Cmd)
+	workflow.AddTargetFlags(Cmd)
 
 	Cmd.SetUsageFunc(usageFunc)
 }
@@ -280,10 +282,10 @@ func usageFunc(cmd *cobra.Command) error {
 	return nil
 }
 
-func getFlagGroups() []common.FlagGroup {
-	var groups []common.FlagGroup
+func getFlagGroups() []app.FlagGroup {
+	var groups []app.FlagGroup
 	// collection options
-	flags := []common.Flag{
+	flags := []app.Flag{
 		{
 			Name: flagDurationName,
 			Help: "number of seconds to run the collection. If 0, the collection will run indefinitely.",
@@ -317,12 +319,12 @@ func getFlagGroups() []common.FlagGroup {
 			Help: "range of CPUs to monitor. If not provided, all cores will be monitored.",
 		},
 	}
-	groups = append(groups, common.FlagGroup{
+	groups = append(groups, app.FlagGroup{
 		GroupName: "Collection Options",
 		Flags:     flags,
 	})
 	// output options
-	flags = []common.Flag{
+	flags = []app.Flag{
 		{
 			Name: flagGranularityName,
 			Help: fmt.Sprintf("level of metric granularity. Only valid when collecting at system scope. Options: %s.", strings.Join(granularityOptions, ", ")),
@@ -348,12 +350,12 @@ func getFlagGroups() []common.FlagGroup {
 			Help: "address (e.g., host:port) to start Prometheus metrics server on (implies --prometheus-server true)",
 		},
 	}
-	groups = append(groups, common.FlagGroup{
+	groups = append(groups, app.FlagGroup{
 		GroupName: "Output Options",
 		Flags:     flags,
 	})
 	// advanced options
-	flags = []common.Flag{
+	flags = []app.Flag{
 		{
 			Name: flagShowMetricNamesName,
 			Help: "show metric names available on this platform and exit",
@@ -395,11 +397,11 @@ func getFlagGroups() []common.FlagGroup {
 			Help: "do not include system summary table in report",
 		},
 	}
-	groups = append(groups, common.FlagGroup{
+	groups = append(groups, app.FlagGroup{
 		GroupName: "Advanced Options",
 		Flags:     flags,
 	})
-	groups = append(groups, common.GetTargetFlagGroup())
+	groups = append(groups, workflow.GetTargetFlagGroup())
 	return groups
 }
 
@@ -408,54 +410,54 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		argsWorkload = args
 		if cmd.Flags().Lookup(flagScopeName).Changed {
-			return common.FlagValidationError(cmd, "scope is not supported with a workload")
+			return workflow.FlagValidationError(cmd, "scope is not supported with a workload")
 		}
 		if cmd.Flags().Lookup(flagDurationName).Changed {
-			return common.FlagValidationError(cmd, "duration is not supported with a workload")
+			return workflow.FlagValidationError(cmd, "duration is not supported with a workload")
 		}
 		if cmd.Flags().Lookup(flagPidListName).Changed {
-			return common.FlagValidationError(cmd, "pids are not supported with a workload")
+			return workflow.FlagValidationError(cmd, "pids are not supported with a workload")
 		}
 		if cmd.Flags().Lookup(flagCidListName).Changed {
-			return common.FlagValidationError(cmd, "cids are not supported with a workload")
+			return workflow.FlagValidationError(cmd, "cids are not supported with a workload")
 		}
 		if cmd.Flags().Lookup(flagFilterName).Changed {
-			return common.FlagValidationError(cmd, "filter is not supported with a workload")
+			return workflow.FlagValidationError(cmd, "filter is not supported with a workload")
 		}
 		if cmd.Flags().Lookup(flagRefreshName).Changed {
-			return common.FlagValidationError(cmd, "refresh is not supported with a workload")
+			return workflow.FlagValidationError(cmd, "refresh is not supported with a workload")
 		}
 		if cmd.Flags().Lookup(flagCountName).Changed {
-			return common.FlagValidationError(cmd, "count is not supported with a workload")
+			return workflow.FlagValidationError(cmd, "count is not supported with a workload")
 		}
 		if cmd.Flags().Lookup(flagCpuRangeName).Changed {
-			return common.FlagValidationError(cmd, "CPU range is not supported with a workload")
+			return workflow.FlagValidationError(cmd, "CPU range is not supported with a workload")
 		}
 	}
 	// confirm valid duration
 	if cmd.Flags().Lookup(flagDurationName).Changed && flagDuration != 0 && flagDuration < flagPerfPrintInterval {
-		return common.FlagValidationError(cmd, fmt.Sprintf("duration must be greater than or equal to the event collection interval (%d)", flagPerfPrintInterval))
+		return workflow.FlagValidationError(cmd, fmt.Sprintf("duration must be greater than or equal to the event collection interval (%d)", flagPerfPrintInterval))
 	}
 	// confirm valid scope
 	if cmd.Flags().Lookup(flagScopeName).Changed && !slices.Contains(scopeOptions, flagScope) {
-		return common.FlagValidationError(cmd, fmt.Sprintf("invalid scope: %s, valid options are: %s", flagScope, strings.Join(scopeOptions, ", ")))
+		return workflow.FlagValidationError(cmd, fmt.Sprintf("invalid scope: %s, valid options are: %s", flagScope, strings.Join(scopeOptions, ", ")))
 	}
 	// pids and cids are mutually exclusive
 	if len(flagPidList) > 0 && len(flagCidList) > 0 {
-		return common.FlagValidationError(cmd, "cannot specify both pids and cids")
+		return workflow.FlagValidationError(cmd, "cannot specify both pids and cids")
 	}
 	// pid list changed
 	if len(flagPidList) > 0 {
 		// if scope was set and it wasn't set to process, error
 		if cmd.Flags().Changed(flagScopeName) && flagScope != scopeProcess {
-			return common.FlagValidationError(cmd, fmt.Sprintf("cannot specify pids when scope is not %s", scopeProcess))
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("cannot specify pids when scope is not %s", scopeProcess))
 		}
 		// if scope wasn't set, set it to process
 		flagScope = scopeProcess
 		// verify PIDs are integers
 		for _, pid := range flagPidList {
 			if _, err := strconv.Atoi(pid); err != nil {
-				return common.FlagValidationError(cmd, "pids must be integers")
+				return workflow.FlagValidationError(cmd, "pids must be integers")
 			}
 		}
 	}
@@ -463,7 +465,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	if len(flagCidList) > 0 {
 		// if scope was set and it wasn't set to cgroup, error
 		if cmd.Flags().Changed(flagScopeName) && flagScope != scopeCgroup {
-			return common.FlagValidationError(cmd, fmt.Sprintf("cannot specify cids when scope is not %s", scopeCgroup))
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("cannot specify cids when scope is not %s", scopeCgroup))
 		}
 		// if scope wasn't set, set it to cgroup
 		flagScope = scopeCgroup
@@ -472,49 +474,49 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	if flagFilter != "" {
 		// if scope isn't process or cgroup, error
 		if flagScope != scopeProcess && flagScope != scopeCgroup {
-			return common.FlagValidationError(cmd, fmt.Sprintf("cannot specify filter when scope is not %s or %s", scopeProcess, scopeCgroup))
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("cannot specify filter when scope is not %s or %s", scopeProcess, scopeCgroup))
 		}
 		// if pids or cids are specified, error
 		if len(flagPidList) > 0 || len(flagCidList) > 0 {
-			return common.FlagValidationError(cmd, "cannot specify filter when pids or cids are specified")
+			return workflow.FlagValidationError(cmd, "cannot specify filter when pids or cids are specified")
 		}
 	}
 	// count changed
 	if cmd.Flags().Lookup(flagCountName).Changed {
 		// if scope isn't process or cgroup, error
 		if flagScope != scopeProcess && flagScope != scopeCgroup {
-			return common.FlagValidationError(cmd, fmt.Sprintf("cannot specify count when scope is not %s or %s", scopeProcess, scopeCgroup))
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("cannot specify count when scope is not %s or %s", scopeProcess, scopeCgroup))
 		}
 		// if count is less than 1, error
 		if flagCount < 1 {
-			return common.FlagValidationError(cmd, "count must be greater than 0")
+			return workflow.FlagValidationError(cmd, "count must be greater than 0")
 		}
 		// if pids or cids are specified, error
 		if len(flagPidList) > 0 || len(flagCidList) > 0 {
-			return common.FlagValidationError(cmd, "cannot specify count when pids or cids are specified")
+			return workflow.FlagValidationError(cmd, "cannot specify count when pids or cids are specified")
 		}
 	}
 	// refresh changed
 	if cmd.Flags().Lookup(flagRefreshName).Changed {
 		// if scope isn't process or cgroup, error
 		if flagScope != scopeProcess && flagScope != scopeCgroup {
-			return common.FlagValidationError(cmd, fmt.Sprintf("cannot specify refresh when scope is not %s or %s", scopeProcess, scopeCgroup))
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("cannot specify refresh when scope is not %s or %s", scopeProcess, scopeCgroup))
 		}
 		// if pidlist or cidlist is set, error
 		if len(flagPidList) > 0 || len(flagCidList) > 0 {
-			return common.FlagValidationError(cmd, "cannot specify refresh when pids or cids are specified")
+			return workflow.FlagValidationError(cmd, "cannot specify refresh when pids or cids are specified")
 		}
 		// if duration is set, error
 		if flagDuration > 0 {
-			return common.FlagValidationError(cmd, "cannot specify refresh when duration is set")
+			return workflow.FlagValidationError(cmd, "cannot specify refresh when duration is set")
 		}
 		// if refresh is less than 1, error
 		if flagRefresh < 0 {
-			return common.FlagValidationError(cmd, "refresh must be greater than or equal to 0")
+			return workflow.FlagValidationError(cmd, "refresh must be greater than or equal to 0")
 		}
 		// if refresh is less than perf print interval, error
 		if flagRefresh < flagPerfPrintInterval {
-			return common.FlagValidationError(cmd, fmt.Sprintf("refresh must be greater than or equal to the event collection interval (%d)", flagPerfPrintInterval))
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("refresh must be greater than or equal to the event collection interval (%d)", flagPerfPrintInterval))
 		}
 	}
 	// cpu range changed
@@ -522,7 +524,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		// error if granularity specifically set to other than CPU
 		// only CPU granularity is allowed when specifying a CPU range
 		if cmd.Flags().Lookup(flagGranularityName).Changed && flagGranularity != granularityCPU {
-			return common.FlagValidationError(cmd, fmt.Sprintf("cpu range can only be specified when granularity is %s. Current granularity is %s.", granularityCPU, flagGranularity))
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("cpu range can only be specified when granularity is %s. Current granularity is %s.", granularityCPU, flagGranularity))
 		}
 
 		// set granularity to cpu if cpu range is specified and granularity not explicitly set
@@ -535,18 +537,18 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 			// some basic validation on CPU range
 			cpuList, err := util.SelectiveIntRangeToIntList(flagCpuRange)
 			if err != nil {
-				return common.FlagValidationError(cmd, fmt.Sprintf("invalid cpu range: %s", flagCpuRange))
+				return workflow.FlagValidationError(cmd, fmt.Sprintf("invalid cpu range: %s", flagCpuRange))
 			}
 			numCpus := len(cpuList)
 			if numCpus == 0 {
-				return common.FlagValidationError(cmd, fmt.Sprintf("cpu range must contain at least one CPU, got: %s", flagCpuRange))
+				return workflow.FlagValidationError(cmd, fmt.Sprintf("cpu range must contain at least one CPU, got: %s", flagCpuRange))
 			}
 			// check if any entries in the cpu range are duplicates
 			// error if so, since perf will not accept this input
 			seen := make(map[int]bool)
 			for _, cpu := range cpuList {
 				if seen[cpu] {
-					return common.FlagValidationError(cmd, fmt.Sprintf("duplicate CPU in cpu range: %s", flagCpuRange))
+					return workflow.FlagValidationError(cmd, fmt.Sprintf("duplicate CPU in cpu range: %s", flagCpuRange))
 				}
 				seen[cpu] = true
 			}
@@ -555,22 +557,22 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	// output options
 	// confirm valid granularity
 	if cmd.Flags().Lookup(flagGranularityName).Changed && !slices.Contains(granularityOptions, flagGranularity) {
-		return common.FlagValidationError(cmd, fmt.Sprintf("invalid granularity: %s, valid options are: %s", flagGranularity, strings.Join(granularityOptions, ", ")))
+		return workflow.FlagValidationError(cmd, fmt.Sprintf("invalid granularity: %s, valid options are: %s", flagGranularity, strings.Join(granularityOptions, ", ")))
 	}
 	// if scope is not system, granularity must be system
 	if flagGranularity != granularitySystem && flagScope != scopeSystem {
-		return common.FlagValidationError(cmd, fmt.Sprintf("granularity option must be %s when collecting at a scope other than %s", granularitySystem, scopeSystem))
+		return workflow.FlagValidationError(cmd, fmt.Sprintf("granularity option must be %s when collecting at a scope other than %s", granularitySystem, scopeSystem))
 	}
 	// confirm valid output format
 	for _, format := range flagOutputFormat {
 		if !slices.Contains(formatOptions, format) {
-			return common.FlagValidationError(cmd, fmt.Sprintf("invalid output format: %s, valid options are: %s", format, strings.Join(formatOptions, ", ")))
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("invalid output format: %s, valid options are: %s", format, strings.Join(formatOptions, ", ")))
 		}
 	}
 	// if live is set, output format must be only one of the formats
 	if flagLive {
 		if len(flagOutputFormat) != 1 {
-			return common.FlagValidationError(cmd, fmt.Sprintf("when --%s is set, only one output format can be specified with --%s", flagLiveName, flagOutputFormatName))
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("when --%s is set, only one output format can be specified with --%s", flagLiveName, flagOutputFormatName))
 		}
 	}
 	// prometheus server address
@@ -594,60 +596,60 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	// confirm valid perf print interval
 	if cmd.Flags().Lookup(flagPerfPrintIntervalName).Changed {
 		if flagPerfPrintInterval < 1 {
-			return common.FlagValidationError(cmd, "event collection interval must be at least 1 second")
+			return workflow.FlagValidationError(cmd, "event collection interval must be at least 1 second")
 		}
 		// if perf print interval is greater than duration, error
 		if flagDuration > 0 && flagPerfPrintInterval > flagDuration {
-			return common.FlagValidationError(cmd, fmt.Sprintf("event collection interval must be less than or equal to the duration (%d)", flagDuration))
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("event collection interval must be less than or equal to the duration (%d)", flagDuration))
 		}
 		// if refresh is relevant, perf print interval must be less than refresh
 		relevant := flagRefresh > 0 && flagScope != scopeSystem && len(flagPidList) == 0 && len(flagCidList) == 0
 		if relevant && flagPerfPrintInterval > flagRefresh {
-			return common.FlagValidationError(cmd, fmt.Sprintf("event collection interval must be less than or equal to the refresh interval (%d)", flagRefresh))
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("event collection interval must be less than or equal to the refresh interval (%d)", flagRefresh))
 		}
 	}
 	// confirm valid perf mux interval
 	if cmd.Flags().Lookup(flagPerfMuxIntervalName).Changed && flagPerfMuxInterval < 10 {
-		return common.FlagValidationError(cmd, "mux interval must be at least 10 milliseconds")
+		return workflow.FlagValidationError(cmd, "mux interval must be at least 10 milliseconds")
 	}
 	// print events to file
 	if flagWriteEventsToFile && flagLive {
-		return common.FlagValidationError(cmd, fmt.Sprintf("cannot write raw perf events to file when --%s is set", flagLiveName))
+		return workflow.FlagValidationError(cmd, fmt.Sprintf("cannot write raw perf events to file when --%s is set", flagLiveName))
 	}
 	// only one output format if live
 	if flagLive && len(flagOutputFormat) > 1 {
-		return common.FlagValidationError(cmd, fmt.Sprintf("specify one output format with --%s <format> when --%s is set", flagOutputFormatName, flagLiveName))
+		return workflow.FlagValidationError(cmd, fmt.Sprintf("specify one output format with --%s <format> when --%s is set", flagOutputFormatName, flagLiveName))
 	}
 	// event file path
 	if flagEventFilePath != "" {
 		if _, err := os.Stat(flagEventFilePath); err != nil {
 			if os.IsNotExist(err) {
-				return common.FlagValidationError(cmd, fmt.Sprintf("event file path does not exist: %s", flagEventFilePath))
+				return workflow.FlagValidationError(cmd, fmt.Sprintf("event file path does not exist: %s", flagEventFilePath))
 			}
-			return common.FlagValidationError(cmd, fmt.Sprintf("failed to access event file path: %s, error: %v", flagEventFilePath, err))
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("failed to access event file path: %s, error: %v", flagEventFilePath, err))
 		}
 	}
 	// metric file path
 	if flagMetricFilePath != "" {
 		if _, err := os.Stat(flagMetricFilePath); err != nil {
 			if os.IsNotExist(err) {
-				return common.FlagValidationError(cmd, fmt.Sprintf("metric file path does not exist: %s", flagMetricFilePath))
+				return workflow.FlagValidationError(cmd, fmt.Sprintf("metric file path does not exist: %s", flagMetricFilePath))
 			}
-			return common.FlagValidationError(cmd, fmt.Sprintf("failed to access metric file path: %s, error: %v", flagMetricFilePath, err))
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("failed to access metric file path: %s, error: %v", flagMetricFilePath, err))
 		}
 	}
 	// input file path
 	if flagInput != "" {
 		if _, err := os.Stat(flagInput); err != nil {
 			if os.IsNotExist(err) {
-				return common.FlagValidationError(cmd, fmt.Sprintf("input file path does not exist: %s", flagInput))
+				return workflow.FlagValidationError(cmd, fmt.Sprintf("input file path does not exist: %s", flagInput))
 			}
-			return common.FlagValidationError(cmd, fmt.Sprintf("failed to access input file path: %s, error: %v", flagInput, err))
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("failed to access input file path: %s, error: %v", flagInput, err))
 		}
 	}
 	// common target flags
-	if err := common.ValidateTargetFlags(cmd); err != nil {
-		return common.FlagValidationError(cmd, err.Error())
+	if err := workflow.ValidateTargetFlags(cmd); err != nil {
+		return workflow.FlagValidationError(cmd, err.Error())
 	}
 	return nil
 }
@@ -846,7 +848,7 @@ func needsOutputDir(cmd *cobra.Command) bool {
 
 func runCmd(cmd *cobra.Command, args []string) error {
 	// appContext is the application context that holds common data and resources.
-	appContext := cmd.Parent().Context().Value(common.AppContext{}).(common.AppContext)
+	appContext := cmd.Parent().Context().Value(app.Context{}).(app.Context)
 	localTempDir := appContext.LocalTempDir
 	localOutputDir := appContext.OutputDir
 	// Setup signal manager for coordinated shutdown
@@ -883,7 +885,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		}
 	}
 	// get the targets
-	myTargets, targetErrs, err := common.GetTargets(cmd, !flagNoRoot, !flagNoRoot, localTempDir)
+	myTargets, targetErrs, err := workflow.GetTargets(cmd, !flagNoRoot, !flagNoRoot, localTempDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
@@ -952,7 +954,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 	// check if all targets have the same architecture
 	for _, target := range myTargets {
-		tArch, err := common.GetTargetArchitecture(target)
+		tArch, err := workflow.GetTargetArchitecture(target)
 		if err != nil {
 			err = fmt.Errorf("failed to get architecture: %w", err)
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -960,7 +962,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			cmd.SilenceUsage = true
 			return err
 		}
-		tArch0, err := common.GetTargetArchitecture(myTargets[0])
+		tArch0, err := workflow.GetTargetArchitecture(myTargets[0])
 		if err != nil {
 			err = fmt.Errorf("failed to get architecture: %w", err)
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -1146,8 +1148,8 @@ func prepareTarget(targetContext *targetContext, localTempDir string, channelErr
 	_ = statusUpdate(myTarget.GetName(), "configuring target")
 	// are PMUs being used on target?
 	if !flagNoRoot {
-		if family, err := common.GetTargetFamily(myTarget); err == nil && cpus.IsIntelCPUFamilyStr(family) {
-			output, err := common.RunScript(myTarget, script.GetScriptByName(script.PMUBusyScriptName), localTempDir, flagNoRoot)
+		if family, err := workflow.GetTargetFamily(myTarget); err == nil && cpus.IsIntelCPUFamilyStr(family) {
+			output, err := workflow.RunScript(myTarget, script.GetScriptByName(script.PMUBusyScriptName), localTempDir, flagNoRoot)
 			if err != nil {
 				err = fmt.Errorf("failed to check if PMUs are in use: %w", err)
 				_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %v", err))
@@ -1197,7 +1199,7 @@ func prepareTarget(targetContext *targetContext, localTempDir string, channelErr
 		perfMuxInterval := flagPerfMuxInterval
 		if useDefaultMuxInterval {
 			// set the default mux interval to 16ms for AMD architecture
-			vendor, err := common.GetTargetVendor(myTarget)
+			vendor, err := workflow.GetTargetVendor(myTarget)
 			if err == nil && vendor == cpus.AMDVendor {
 				perfMuxInterval = 16
 			}
@@ -1416,7 +1418,7 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, perfComma
 		Superuser:      !noRoot,
 	}
 	// start goroutine to run perf, output will be streamed back in provided channels
-	go common.RunScriptStream(myTarget, perfStatScript, localTempDir, stdoutChannel, stderrChannel, exitcodeChannel, scriptErrorChannel, cmdChannel, flagNoRoot)
+	go workflow.RunScriptStream(myTarget, perfStatScript, localTempDir, stdoutChannel, stderrChannel, exitcodeChannel, scriptErrorChannel, cmdChannel, flagNoRoot)
 	// Drain stdout to avoid blocking if the workload writes to stdout.
 	// perf stat emits event lines on stderr; stdout is not used by our pipeline.
 	go func() {

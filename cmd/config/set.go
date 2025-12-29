@@ -1,10 +1,15 @@
+// Copyright (C) 2021-2025 Intel Corporation
+// SPDX-License-Identifier: BSD-3-Clause
+
 package config
 
 import (
 	"fmt"
 	"log/slog"
 	"math"
-	"perfspect/internal/common"
+	"perfspect/internal/extract"
+	"perfspect/internal/workflow"
+
 	"perfspect/internal/cpus"
 	"perfspect/internal/script"
 	"perfspect/internal/target"
@@ -15,9 +20,6 @@ import (
 	"strings"
 	"sync"
 )
-
-// Copyright (C) 2021-2025 Intel Corporation
-// SPDX-License-Identifier: BSD-3-Clause
 
 var uncoreDieFrequencyMutex sync.Mutex
 var uncoreFrequencyMutex sync.Mutex
@@ -126,12 +128,12 @@ func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir str
 	scripts = append(scripts, script.GetScriptByName(script.LspciBitsScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.LspciDevicesScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.L3CacheWayEnabledName))
-	outputs, err := common.RunScripts(myTarget, scripts, true, localTempDir, nil, "", false)
+	outputs, err := workflow.RunScripts(myTarget, scripts, true, localTempDir, nil, "", false)
 	if err != nil {
 		return fmt.Errorf("failed to run scripts on target: %w", err)
 	}
 
-	uarch := common.UarchFromOutput(outputs)
+	uarch := extract.UarchFromOutput(outputs)
 	cpu, err := cpus.GetCPUByMicroArchitecture(uarch)
 	if err != nil {
 		return fmt.Errorf("failed to get CPU by microarchitecture: %w", err)
@@ -139,11 +141,11 @@ func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir str
 	if cpu.CacheWayCount == 0 {
 		return fmt.Errorf("cache way count is zero")
 	}
-	maximumLlcSize, _, err := common.GetL3LscpuMB(outputs)
+	maximumLlcSize, _, err := extract.GetL3LscpuMB(outputs)
 	if err != nil {
 		return fmt.Errorf("failed to get maximum LLC size: %w", err)
 	}
-	currentLlcSize, _, err := common.GetL3MSRMB(outputs)
+	currentLlcSize, _, err := extract.GetL3MSRMB(outputs)
 	if err != nil {
 		return fmt.Errorf("failed to get current LLC size: %w", err)
 	}
@@ -181,15 +183,15 @@ func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir str
 }
 
 func setSSEFrequency(sseFrequency float64, myTarget target.Target, localTempDir string) error {
-	targetFamily, err := common.GetTargetFamily(myTarget)
+	targetFamily, err := workflow.GetTargetFamily(myTarget)
 	if err != nil {
 		return fmt.Errorf("failed to get target family: %w", err)
 	}
-	targetModel, err := common.GetTargetModel(myTarget)
+	targetModel, err := workflow.GetTargetModel(myTarget)
 	if err != nil {
 		return fmt.Errorf("failed to get target model: %w", err)
 	}
-	targetVendor, err := common.GetTargetVendor(myTarget)
+	targetVendor, err := workflow.GetTargetVendor(myTarget)
 	if err != nil {
 		return fmt.Errorf("failed to get target vendor: %w", err)
 	}
@@ -340,15 +342,15 @@ func expandConsolidatedFrequencies(consolidatedStr string, bucketSizes []int) ([
 // Note that the buckets have been consolidated where frequencies are the same, so they
 // will need to be expanded back out to individual buckets for setting.
 func setSSEFrequencies(sseFrequencies string, myTarget target.Target, localTempDir string) error {
-	targetFamily, err := common.GetTargetFamily(myTarget)
+	targetFamily, err := workflow.GetTargetFamily(myTarget)
 	if err != nil {
 		return fmt.Errorf("failed to get target family: %w", err)
 	}
-	targetModel, err := common.GetTargetModel(myTarget)
+	targetModel, err := workflow.GetTargetModel(myTarget)
 	if err != nil {
 		return fmt.Errorf("failed to get target model: %w", err)
 	}
-	targetVendor, err := common.GetTargetVendor(myTarget)
+	targetVendor, err := workflow.GetTargetVendor(myTarget)
 	if err != nil {
 		return fmt.Errorf("failed to get target vendor: %w", err)
 	}
@@ -484,7 +486,7 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 	var dies []dieId
 	// build list of compute or IO dies
 	dieTypesScript := script.GetScriptByName(script.UncoreDieTypesFromTPMIScriptName)
-	scriptOutput, err := common.RunScript(myTarget, dieTypesScript, localTempDir, false)
+	scriptOutput, err := workflow.RunScript(myTarget, dieTypesScript, localTempDir, false)
 	if err != nil {
 		return fmt.Errorf("failed to run script on target: %w", err)
 	}
@@ -525,7 +527,7 @@ func setUncoreDieFrequency(maxFreq bool, computeDie bool, uncoreFrequency float6
 		}
 		scripts = append(scripts, setScript)
 	}
-	_, err = common.RunScripts(myTarget, scripts, false, localTempDir, nil, "", false)
+	_, err = workflow.RunScripts(myTarget, scripts, false, localTempDir, nil, "", false)
 	if err != nil {
 		err = fmt.Errorf("failed to set uncore die frequency: %w", err)
 		slog.Error(err.Error())
@@ -547,7 +549,7 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 		// Depends:        []string{"rdmsr"},
 		// Lkms:           []string{"msr"},
 	}
-	scriptOutput, err := common.RunScript(myTarget, getScript, localTempDir, false)
+	scriptOutput, err := workflow.RunScript(myTarget, getScript, localTempDir, false)
 	if err != nil {
 		return fmt.Errorf("failed to run scripts on target: %w", err)
 	}
@@ -593,7 +595,7 @@ func setTDP(power int, myTarget target.Target, localTempDir string) error {
 		// Lkms:           []string{"msr"},
 		// Depends:        []string{"rdmsr"},
 	}
-	readOutput, err := common.RunScript(myTarget, readScript, localTempDir, false)
+	readOutput, err := workflow.RunScript(myTarget, readScript, localTempDir, false)
 	if err != nil {
 		return fmt.Errorf("failed to read power MSR: %w", err)
 	} else {
@@ -797,11 +799,11 @@ func getUarch(myTarget target.Target, localTempDir string) (string, error) {
 	scripts = append(scripts, script.GetScriptByName(script.LscpuScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.LspciBitsScriptName))
 	scripts = append(scripts, script.GetScriptByName(script.LspciDevicesScriptName))
-	outputs, err := common.RunScripts(myTarget, scripts, true, localTempDir, nil, "", false)
+	outputs, err := workflow.RunScripts(myTarget, scripts, true, localTempDir, nil, "", false)
 	if err != nil {
 		return "", fmt.Errorf("failed to run scripts on target: %w", err)
 	}
-	uarch := common.UarchFromOutput(outputs)
+	uarch := extract.UarchFromOutput(outputs)
 	if uarch == "" {
 		return "", fmt.Errorf("failed to get microarchitecture")
 	}
@@ -809,7 +811,7 @@ func getUarch(myTarget target.Target, localTempDir string) (string, error) {
 }
 
 func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir string, prefetcherType string) error {
-	pf, err := common.GetPrefetcherDefByName(prefetcherType)
+	pf, err := extract.GetPrefetcherDefByName(prefetcherType)
 	if err != nil {
 		return fmt.Errorf("failed to get prefetcher definition: %w", err)
 	}
@@ -971,7 +973,7 @@ func setC1Demotion(enableDisable string, myTarget target.Target, localTempDir st
 
 // runScript runs a script on the target and returns the output
 func runScript(myTarget target.Target, myScript script.ScriptDefinition, localTempDir string) (string, error) {
-	output, err := common.RunScript(myTarget, myScript, localTempDir, false) // nosemgrep
+	output, err := workflow.RunScript(myTarget, myScript, localTempDir, false) // nosemgrep
 	if err != nil {
 		slog.Error("failed to run script on target", slog.String("target", myTarget.GetName()), slog.String("error", err.Error()), slog.String("stdout", output.Stdout), slog.String("stderr", output.Stderr))
 	} else {

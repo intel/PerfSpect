@@ -1,21 +1,21 @@
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
-package report
+package extract
 
 import (
 	"fmt"
 	"sort"
 	"strings"
 
-	"perfspect/internal/common"
 	"perfspect/internal/script"
 )
 
-func cveInfoFromOutput(outputs map[string]script.ScriptOutput) [][]string {
+// CVEInfoFromOutput returns CVE vulnerability information from spectre-meltdown-checker output.
+func CVEInfoFromOutput(outputs map[string]script.ScriptOutput) [][]string {
 	vulns := make(map[string]string)
 	// from spectre-meltdown-checker
-	for _, pair := range common.ValsArrayFromRegexSubmatch(outputs[script.CveScriptName].Stdout, `(CVE-\d+-\d+): (.+)`) {
+	for _, pair := range ValsArrayFromRegexSubmatch(outputs[script.CveScriptName].Stdout, `(CVE-\d+-\d+): (.+)`) {
 		vulns[pair[0]] = pair[1]
 	}
 	// sort the vulnerabilities by CVE ID
@@ -31,8 +31,9 @@ func cveInfoFromOutput(outputs map[string]script.ScriptOutput) [][]string {
 	return cves
 }
 
-func cveSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
-	cves := cveInfoFromOutput(outputs)
+// CVESummaryFromOutput returns a summary string of CVE vulnerability status.
+func CVESummaryFromOutput(outputs map[string]script.ScriptOutput) string {
+	cves := CVEInfoFromOutput(outputs)
 	if len(cves) == 0 {
 		return ""
 	}

@@ -1,8 +1,8 @@
-// Package report is a subcommand of the root command. It generates a configuration report for target(s).
-package report
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+// Package report is a subcommand of the root command. It generates a configuration report for target(s).
+package report
 
 import (
 	"fmt"
@@ -12,18 +12,19 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"perfspect/internal/common"
+	"perfspect/internal/app"
 	"perfspect/internal/report"
 	"perfspect/internal/table"
+	"perfspect/internal/workflow"
 )
 
 const cmdName = "report"
 
 var examples = []string{
-	fmt.Sprintf("  Data from local host:          $ %s %s", common.AppName, cmdName),
-	fmt.Sprintf("  Specific data from local host: $ %s %s --bios --os --cpu --format html,json", common.AppName, cmdName),
-	fmt.Sprintf("  All data from remote target:   $ %s %s --target 192.168.1.1 --user fred --key fred_key", common.AppName, cmdName),
-	fmt.Sprintf("  Data from multiple targets:    $ %s %s --targets targets.yaml", common.AppName, cmdName),
+	fmt.Sprintf("  Data from local host:          $ %s %s", app.Name, cmdName),
+	fmt.Sprintf("  Specific data from local host: $ %s %s --bios --os --cpu --format html,json", app.Name, cmdName),
+	fmt.Sprintf("  All data from remote target:   $ %s %s --target 192.168.1.1 --user fred --key fred_key", app.Name, cmdName),
+	fmt.Sprintf("  Data from multiple targets:    $ %s %s --targets targets.yaml", app.Name, cmdName),
 }
 
 var Cmd = &cobra.Command{
@@ -114,7 +115,7 @@ const (
 )
 
 // categories maps flag names to tables that will be included in report
-var categories = []common.Category{
+var categories = []app.Category{
 	{FlagName: flagSystemSummaryName, FlagVar: &flagSystemSummary, Help: "System Summary", Tables: []table.TableDefinition{tableDefinitions[SystemSummaryTableName]}},
 	{FlagName: flagHostName, FlagVar: &flagHost, Help: "Host", Tables: []table.TableDefinition{tableDefinitions[HostTableName]}},
 	{FlagName: flagBiosName, FlagVar: &flagBios, Help: "BIOS", Tables: []table.TableDefinition{tableDefinitions[BIOSTableName]}},
@@ -155,11 +156,11 @@ func init() {
 		Cmd.Flags().BoolVar(cat.FlagVar, cat.FlagName, cat.DefaultValue, cat.Help)
 	}
 	// set up other flags
-	Cmd.Flags().StringVar(&common.FlagInput, common.FlagInputName, "", "")
+	Cmd.Flags().StringVar(&app.FlagInput, app.FlagInputName, "", "")
 	Cmd.Flags().BoolVar(&flagAll, flagAllName, true, "")
-	Cmd.Flags().StringSliceVar(&common.FlagFormat, common.FlagFormatName, []string{report.FormatAll}, "")
+	Cmd.Flags().StringSliceVar(&app.FlagFormat, app.FlagFormatName, []string{report.FormatAll}, "")
 
-	common.AddTargetFlags(Cmd)
+	workflow.AddTargetFlags(Cmd)
 
 	Cmd.SetUsageFunc(usageFunc)
 }
@@ -189,42 +190,42 @@ func usageFunc(cmd *cobra.Command) error {
 	return nil
 }
 
-func getFlagGroups() []common.FlagGroup {
-	var groups []common.FlagGroup
-	flags := []common.Flag{
+func getFlagGroups() []app.FlagGroup {
+	var groups []app.FlagGroup
+	flags := []app.Flag{
 		{
 			Name: flagAllName,
 			Help: "report configuration for all categories",
 		},
 	}
 	for _, cat := range categories {
-		flags = append(flags, common.Flag{
+		flags = append(flags, app.Flag{
 			Name: cat.FlagName,
 			Help: cat.Help,
 		})
 	}
-	groups = append(groups, common.FlagGroup{
+	groups = append(groups, app.FlagGroup{
 		GroupName: "Categories",
 		Flags:     flags,
 	})
-	flags = []common.Flag{
+	flags = []app.Flag{
 		{
-			Name: common.FlagFormatName,
+			Name: app.FlagFormatName,
 			Help: fmt.Sprintf("choose output format(s) from: %s", strings.Join(append([]string{report.FormatAll}, report.FormatOptions...), ", ")),
 		},
 	}
-	groups = append(groups, common.FlagGroup{
+	groups = append(groups, app.FlagGroup{
 		GroupName: "Other Options",
 		Flags:     flags,
 	})
-	groups = append(groups, common.GetTargetFlagGroup())
-	flags = []common.Flag{
+	groups = append(groups, workflow.GetTargetFlagGroup())
+	flags = []app.Flag{
 		{
-			Name: common.FlagInputName,
+			Name: app.FlagInputName,
 			Help: "\".raw\" file, or directory containing \".raw\" files. Will skip data collection and use raw data for reports.",
 		},
 	}
-	groups = append(groups, common.FlagGroup{
+	groups = append(groups, app.FlagGroup{
 		GroupName: "Advanced Options",
 		Flags:     flags,
 	})
@@ -242,15 +243,15 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		}
 	}
 	// validate format options
-	for _, format := range common.FlagFormat {
+	for _, format := range app.FlagFormat {
 		formatOptions := append([]string{report.FormatAll}, report.FormatOptions...)
 		if !slices.Contains(formatOptions, format) {
-			return common.FlagValidationError(cmd, fmt.Sprintf("format options are: %s", strings.Join(formatOptions, ", ")))
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("format options are: %s", strings.Join(formatOptions, ", ")))
 		}
 	}
 	// common target flags
-	if err := common.ValidateTargetFlags(cmd); err != nil {
-		return common.FlagValidationError(cmd, err.Error())
+	if err := workflow.ValidateTargetFlags(cmd); err != nil {
+		return workflow.FlagValidationError(cmd, err.Error())
 	}
 	return nil
 }
@@ -264,11 +265,11 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		}
 	}
 	// include insights table if all categories are selected
-	var insightsFunc common.InsightsFunc
+	var insightsFunc app.InsightsFunc
 	if flagAll {
-		insightsFunc = common.DefaultInsightsFunc
+		insightsFunc = workflow.DefaultInsightsFunc
 	}
-	reportingCommand := common.ReportingCommand{
+	reportingCommand := workflow.ReportingCommand{
 		Cmd:                    cmd,
 		Tables:                 tables,
 		InsightsFunc:           insightsFunc,

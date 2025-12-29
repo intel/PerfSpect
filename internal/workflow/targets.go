@@ -1,7 +1,7 @@
-package common
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+package workflow
 
 import (
 	"fmt"
@@ -10,17 +10,19 @@ import (
 	"os/exec"
 	"os/user"
 	"path"
-	"perfspect/internal/cpus"
-	"perfspect/internal/progress"
-	"perfspect/internal/script"
-	"perfspect/internal/target"
-	"perfspect/internal/util"
 	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
 
 	"slices"
+
+	"perfspect/internal/app"
+	"perfspect/internal/cpus"
+	"perfspect/internal/progress"
+	"perfspect/internal/script"
+	"perfspect/internal/target"
+	"perfspect/internal/util"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -45,7 +47,7 @@ const (
 	FlagTargetKeyName   = "key"
 )
 
-var targetFlags = []Flag{
+var targetFlags = []app.Flag{
 	{Name: FlagTargetHostName, Help: "host name or IP address of remote target"},
 	{Name: FlagTargetPortName, Help: "port for SSH to remote target"},
 	{Name: FlagTargetUserName, Help: "user name for SSH to remote target"},
@@ -53,6 +55,7 @@ var targetFlags = []Flag{
 	{Name: FlagTargetsFileName, Help: "file with remote target(s) connection details. See targets.yaml for format."},
 }
 
+// AddTargetFlags adds target-related flags to the command.
 func AddTargetFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&flagTargetHost, FlagTargetHostName, "", targetFlags[0].Help)
 	cmd.Flags().StringVar(&flagTargetPort, FlagTargetPortName, "", targetFlags[1].Help)
@@ -63,13 +66,15 @@ func AddTargetFlags(cmd *cobra.Command) {
 	cmd.MarkFlagsMutuallyExclusive(FlagTargetHostName, FlagTargetsFileName)
 }
 
-func GetTargetFlagGroup() FlagGroup {
-	return FlagGroup{
+// GetTargetFlagGroup returns the flag group for target options.
+func GetTargetFlagGroup() app.FlagGroup {
+	return app.FlagGroup{
 		GroupName: "Remote Target Options",
 		Flags:     targetFlags,
 	}
 }
 
+// ValidateTargetFlags validates the target-related flags.
 func ValidateTargetFlags(cmd *cobra.Command) error {
 	if flagTargetsFile != "" && flagTargetHost != "" {
 		return fmt.Errorf("only one of --%s or --%s can be specified", FlagTargetsFileName, FlagTargetHostName)
@@ -175,15 +180,6 @@ func GetTargets(cmd *cobra.Command, needsElevatedPrivileges bool, failIfCantElev
 }
 
 // getSingleTarget returns a target.Target object representing the target host and associated details.
-// The function takes the following parameters:
-// - cmd: A pointer to the cobra.Command object representing the command.
-// - needsElevatedPriviliges: A boolean indicating whether elevated privileges are required.
-// - failIfCantElevate: A boolean indicating whether to fail if elevated privileges can't be obtained.
-// - localTempDir: A string representing the local temporary directory.
-// The function returns the following values:
-// - myTarget: A target.Target object representing the target host and associated details.
-// - targetError: An error indicating a problem with the target host connection.
-// - err: An error object indicating any error that occurred during the function execution.
 func getSingleTarget(cmd *cobra.Command, needsElevatedPrivileges bool, failIfCantElevate bool, localTempDir string) (target.Target, error, error) {
 	targetHost, _ := cmd.Flags().GetString(FlagTargetHostName)
 	targetPort, _ := cmd.Flags().GetString(FlagTargetPortName)
@@ -341,7 +337,6 @@ func sanitizeTargetName(targetName string) string {
 }
 
 // getTargetsFromFile reads a targets file and returns a list of target objects.
-// It takes the path to the targets file and the local temporary directory as input.
 func getTargetsFromFile(targetsFilePath string, localTempDir string) (targets []target.Target, targetErrs []error, err error) {
 	var targetsFile targetsFile
 	// read the file into a byte array
@@ -402,9 +397,6 @@ func getTargetsFromFile(targetsFilePath string, localTempDir string) (targets []
 }
 
 // getPassword prompts the user for a password and returns it as a string.
-// It takes a prompt string as input and displays the prompt to the user.
-// The user's input is hidden as they type, and the entered password is returned as a string.
-// If an error occurs while reading the password, it is returned along with an empty string.
 func getPassword(prompt string) (string, error) {
 	fmt.Fprintf(os.Stderr, "\n%s: ", prompt)
 	pwd, err := term.ReadPassword(0)
@@ -429,12 +421,6 @@ func getHostArchitecture() (string, error) {
 }
 
 // fieldFromDfpOutput parses the output of the `df -P <dir>` command and returns the specified field value.
-// example output:
-//
-//	Filesystem     1024-blocks     Used  Available Capacity Mounted on
-//	/dev/sda2       1858388360 17247372 1747419536       1% /
-//
-// Returns the value of the specified field from the second line of the output.
 func fieldFromDfpOutput(dfOutput string, fieldName string) (string, error) {
 	lines := strings.Split(dfOutput, "\n")
 	if len(lines) < 2 {
@@ -468,7 +454,6 @@ type mountRecord struct {
 }
 
 // parseMountOutput parses the output of the `mount` command and returns a slice of mountRecord structs.
-// e.g., "sysfs on /sys type sysfs (rw,nosuid,nodev,noexec,relatime)"
 func parseMountOutput(mountOutput string) ([]mountRecord, error) {
 	var mounts []mountRecord
 	for line := range strings.SplitSeq(mountOutput, "\n") {
@@ -544,10 +529,12 @@ func isDirNoExec(t target.Target, dir string) (bool, error) {
 	return false, fmt.Errorf("filesystem %s and mount point %s are not found in mount records", filesystem, mountedOn)
 }
 
+// GetTargetArchitecture returns the architecture of the target.
 func GetTargetArchitecture(t target.Target) (string, error) {
 	return t.GetArchitecture()
 }
 
+// GetTargetVendor returns the CPU vendor of the target.
 func GetTargetVendor(t target.Target) (string, error) {
 	vendor := t.GetVendor()
 	if vendor == "" {
@@ -563,6 +550,7 @@ func GetTargetVendor(t target.Target) (string, error) {
 	return vendor, nil
 }
 
+// GetTargetFamily returns the CPU family of the target.
 func GetTargetFamily(t target.Target) (string, error) {
 	family := t.GetFamily()
 	if family == "" {
@@ -578,6 +566,7 @@ func GetTargetFamily(t target.Target) (string, error) {
 	return family, nil
 }
 
+// GetTargetModel returns the CPU model of the target.
 func GetTargetModel(t target.Target) (string, error) {
 	model := t.GetModel()
 	if model == "" {
@@ -593,6 +582,7 @@ func GetTargetModel(t target.Target) (string, error) {
 	return model, nil
 }
 
+// GetTargetStepping returns the CPU stepping of the target.
 func GetTargetStepping(t target.Target) (string, error) {
 	stepping := t.GetStepping()
 	if stepping == "" {
@@ -608,11 +598,12 @@ func GetTargetStepping(t target.Target) (string, error) {
 	return stepping, nil
 }
 
+// GetTargetCapid4 returns the CAPID4 value of the target.
 func GetTargetCapid4(t target.Target, localTempDir string, noRoot bool) (string, error) {
 	capid4 := t.GetCapid4()
 	if capid4 == "" {
 		getScript := script.GetScriptByName(script.LspciBitsScriptName)
-		scriptOutput, err := script.RunScript(t, getScript, localTempDir) // don't call common.RunScript, otherwise infinite loop
+		scriptOutput, err := script.RunScript(t, getScript, localTempDir) // don't call workflow.RunScript, otherwise infinite loop
 		if err != nil {
 			return "", fmt.Errorf("failed to run lspci bits script: %v", err)
 		}
@@ -622,11 +613,12 @@ func GetTargetCapid4(t target.Target, localTempDir string, noRoot bool) (string,
 	return capid4, nil
 }
 
+// GetTargetDevices returns the PCI devices of the target.
 func GetTargetDevices(t target.Target, localTempDir string, noRoot bool) (string, error) {
 	devices := t.GetDevices()
 	if devices == "" {
 		getScript := script.GetScriptByName(script.LspciDevicesScriptName)
-		scriptOutput, err := script.RunScript(t, getScript, localTempDir) // don't call common.RunScript, otherwise infinite loop
+		scriptOutput, err := script.RunScript(t, getScript, localTempDir) // don't call workflow.RunScript, otherwise infinite loop
 		if err != nil {
 			return "", fmt.Errorf("failed to run lspci devices script: %v", err)
 		}
@@ -636,6 +628,7 @@ func GetTargetDevices(t target.Target, localTempDir string, noRoot bool) (string
 	return devices, nil
 }
 
+// GetTargetImplementer returns the ARM implementer of the target.
 func GetTargetImplementer(t target.Target, localTempDir string, noRoot bool) (string, error) {
 	implementer := t.GetImplementer()
 	if implementer == "" {
@@ -650,6 +643,7 @@ func GetTargetImplementer(t target.Target, localTempDir string, noRoot bool) (st
 	return implementer, nil
 }
 
+// GetTargetPart returns the ARM part number of the target.
 func GetTargetPart(t target.Target, localTempDir string, noRoot bool) (string, error) {
 	part := t.GetPart()
 	if part == "" {
@@ -664,11 +658,12 @@ func GetTargetPart(t target.Target, localTempDir string, noRoot bool) (string, e
 	return part, nil
 }
 
+// GetTargetDmidecodePart returns the DMI decode part number of the target.
 func GetTargetDmidecodePart(t target.Target, localTempDir string, noRoot bool) (string, error) {
 	dmidecodePart := t.GetDmidecodePart()
 	if dmidecodePart == "" {
 		getScript := script.GetScriptByName(script.ArmDmidecodePartScriptName)
-		scriptOutput, err := script.RunScript(t, getScript, localTempDir) // don't call common.RunScript, otherwise infinite loop
+		scriptOutput, err := script.RunScript(t, getScript, localTempDir) // don't call workflow.RunScript, otherwise infinite loop
 		if err != nil {
 			return "", fmt.Errorf("failed to run dmidecode part number script: %v", err)
 		}
@@ -678,6 +673,7 @@ func GetTargetDmidecodePart(t target.Target, localTempDir string, noRoot bool) (
 	return dmidecodePart, nil
 }
 
+// GetTargetMicroArchitecture returns the microarchitecture of the target CPU.
 func GetTargetMicroArchitecture(t target.Target, localTempDir string, noRoot bool) (string, error) {
 	uarch := t.GetMicroarchitecture()
 	if uarch == "" {
@@ -701,6 +697,7 @@ func GetTargetMicroArchitecture(t target.Target, localTempDir string, noRoot boo
 	return uarch, nil
 }
 
+// GetX86TargetMicroarchitecture returns the microarchitecture of an x86 target.
 func GetX86TargetMicroarchitecture(t target.Target, localTempDir string, noRoot bool) (string, error) {
 	family, err := GetTargetFamily(t)
 	if err != nil {
@@ -731,6 +728,7 @@ func GetX86TargetMicroarchitecture(t target.Target, localTempDir string, noRoot 
 	return cpu.MicroArchitecture, nil
 }
 
+// GetARMTargetMicroarchitecture returns the microarchitecture of an ARM target.
 func GetARMTargetMicroarchitecture(t target.Target, localTempDir string, noRoot bool) (string, error) {
 	implementer, err := GetTargetImplementer(t, localTempDir, noRoot)
 	if err != nil {
@@ -751,6 +749,7 @@ func GetARMTargetMicroarchitecture(t target.Target, localTempDir string, noRoot 
 	return cpu.MicroArchitecture, nil
 }
 
+// ScriptSupportedOnTarget checks if a script is supported on the target.
 func ScriptSupportedOnTarget(t target.Target, scriptDef script.ScriptDefinition, localTempDir string, noRoot bool) (bool, error) {
 	if len(scriptDef.Architectures) > 0 {
 		arch, err := GetTargetArchitecture(t)
@@ -788,6 +787,7 @@ func ScriptSupportedOnTarget(t target.Target, scriptDef script.ScriptDefinition,
 	return true, nil
 }
 
+// FilterScriptsForTarget filters scripts to only those supported on the target.
 func FilterScriptsForTarget(t target.Target, scriptDefs []script.ScriptDefinition, localTempDir string, noRoot bool) (supportedScripts []script.ScriptDefinition, err error) {
 	for _, scriptDef := range scriptDefs {
 		supported, err := ScriptSupportedOnTarget(t, scriptDef, localTempDir, noRoot)
@@ -802,8 +802,7 @@ func FilterScriptsForTarget(t target.Target, scriptDefs []script.ScriptDefinitio
 	return
 }
 
-// Create wrappers around script.RunScript* that first check if the scripts are compatible with the target
-
+// RunScript runs a script on the target after checking compatibility.
 func RunScript(t target.Target, s script.ScriptDefinition, localTempDir string, noRoot bool) (script.ScriptOutput, error) {
 	supported, err := ScriptSupportedOnTarget(t, s, localTempDir, noRoot)
 	if err != nil {
@@ -815,6 +814,7 @@ func RunScript(t target.Target, s script.ScriptDefinition, localTempDir string, 
 	return script.RunScript(t, s, localTempDir)
 }
 
+// RunScripts runs multiple scripts on the target after checking compatibility.
 func RunScripts(t target.Target, s []script.ScriptDefinition, continueOnScriptError bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc, collectingStatusMsg string, noRoot bool) (map[string]script.ScriptOutput, error) {
 	supportedScripts, err := FilterScriptsForTarget(t, s, localTempDir, noRoot)
 	if err != nil {
@@ -826,6 +826,7 @@ func RunScripts(t target.Target, s []script.ScriptDefinition, continueOnScriptEr
 	return script.RunScripts(t, supportedScripts, continueOnScriptError, localTempDir, statusUpdate, collectingStatusMsg)
 }
 
+// RunScriptStream runs a script on the target with streaming output.
 func RunScriptStream(t target.Target, s script.ScriptDefinition, localTempDir string, stdoutChannel chan []byte, stderrChannel chan []byte, exitcodeChannel chan int, errorChannel chan error, cmdChannel chan *exec.Cmd, noRoot bool) {
 	supported, err := ScriptSupportedOnTarget(t, s, localTempDir, noRoot)
 	if err != nil {

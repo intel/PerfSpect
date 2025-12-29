@@ -1,14 +1,16 @@
-// Package config is a subcommand of the root command. It sets system configuration items on target platform(s).
-package config
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+// Package config is a subcommand of the root command. It sets system configuration items on target platform(s).
+package config
 
 import (
 	"fmt"
 	"log/slog"
 	"os"
-	"perfspect/internal/common"
+	"perfspect/internal/app"
+	"perfspect/internal/workflow"
+
 	"perfspect/internal/cpus"
 	"perfspect/internal/progress"
 	"perfspect/internal/report"
@@ -25,13 +27,13 @@ import (
 const cmdName = "config"
 
 var examples = []string{
-	fmt.Sprintf("  Set core count on local host:            $ %s %s --cores 32", common.AppName, cmdName),
-	fmt.Sprintf("  Set multiple config items on local host: $ %s %s --core-max 3.0 --uncore-max 2.1 --tdp 120", common.AppName, cmdName),
-	fmt.Sprintf("  Record config to file before changes:    $ %s %s --c6 disable --epb 0 --record", common.AppName, cmdName),
-	fmt.Sprintf("  Restore config from file:                $ %s %s restore gnr_config.txt", common.AppName, cmdName),
-	fmt.Sprintf("  Set core count on remote target:         $ %s %s --cores 32 --target 192.168.1.1 --user fred --key fred_key", common.AppName, cmdName),
-	fmt.Sprintf("  View current config on remote target:    $ %s %s --target 192.168.1.1 --user fred --key fred_key", common.AppName, cmdName),
-	fmt.Sprintf("  Set governor on remote targets:          $ %s %s --gov performance --targets targets.yaml", common.AppName, cmdName),
+	fmt.Sprintf("  Set core count on local host:            $ %s %s --cores 32", app.Name, cmdName),
+	fmt.Sprintf("  Set multiple config items on local host: $ %s %s --core-max 3.0 --uncore-max 2.1 --tdp 120", app.Name, cmdName),
+	fmt.Sprintf("  Record config to file before changes:    $ %s %s --c6 disable --epb 0 --record", app.Name, cmdName),
+	fmt.Sprintf("  Restore config from file:                $ %s %s restore gnr_config.txt", app.Name, cmdName),
+	fmt.Sprintf("  Set core count on remote target:         $ %s %s --cores 32 --target 192.168.1.1 --user fred --key fred_key", app.Name, cmdName),
+	fmt.Sprintf("  View current config on remote target:    $ %s %s --target 192.168.1.1 --user fred --key fred_key", app.Name, cmdName),
+	fmt.Sprintf("  Set governor on remote targets:          $ %s %s --gov performance --targets targets.yaml", app.Name, cmdName),
 }
 
 var Cmd = &cobra.Command{
@@ -54,7 +56,7 @@ func init() {
 
 func runCmd(cmd *cobra.Command, args []string) error {
 	// appContext is the application context that holds common data and resources.
-	appContext := cmd.Parent().Context().Value(common.AppContext{}).(common.AppContext)
+	appContext := cmd.Parent().Context().Value(app.Context{}).(app.Context)
 	localTempDir := appContext.LocalTempDir
 	outputDir := appContext.OutputDir
 
@@ -73,7 +75,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		}
 	}
 	// get the targets
-	myTargets, targetErrs, err := common.GetTargets(cmd, true, true, localTempDir)
+	myTargets, targetErrs, err := workflow.GetTargets(cmd, true, true, localTempDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		slog.Error(err.Error())
@@ -301,7 +303,7 @@ func setOnTarget(cmd *cobra.Command, myTarget target.Target, flagGroups []flagGr
 }
 
 // getConfig collects the configuration data from the target(s)
-func getConfig(myTargets []target.Target, localTempDir string) ([]common.TargetScriptOutputs, error) {
+func getConfig(myTargets []target.Target, localTempDir string) ([]workflow.TargetScriptOutputs, error) {
 
 	var scriptsToRun []script.ScriptDefinition
 	for _, scriptName := range tableDefinitions[ConfigurationTableName].ScriptNames {
@@ -309,8 +311,8 @@ func getConfig(myTargets []target.Target, localTempDir string) ([]common.TargetS
 	}
 	multiSpinner := progress.NewMultiSpinner()
 	multiSpinner.Start()
-	orderedTargetScriptOutputs := []common.TargetScriptOutputs{}
-	channelTargetScriptOutputs := make(chan common.TargetScriptOutputs)
+	orderedTargetScriptOutputs := []workflow.TargetScriptOutputs{}
+	channelTargetScriptOutputs := make(chan workflow.TargetScriptOutputs)
 	channelError := make(chan error)
 	for _, myTarget := range myTargets {
 		err := multiSpinner.AddSpinner(myTarget.GetName())
@@ -322,7 +324,7 @@ func getConfig(myTargets []target.Target, localTempDir string) ([]common.TargetS
 		go collectOnTarget(myTarget, scriptsToRun, localTempDir, channelTargetScriptOutputs, channelError, multiSpinner.Status)
 	}
 	// wait for scripts to run on all targets
-	var allTargetScriptOutputs []common.TargetScriptOutputs
+	var allTargetScriptOutputs []workflow.TargetScriptOutputs
 	for range myTargets {
 		select {
 		case scriptOutputs := <-channelTargetScriptOutputs:
@@ -346,7 +348,7 @@ func getConfig(myTargets []target.Target, localTempDir string) ([]common.TargetS
 }
 
 // processConfig processes the collected configuration data and creates text reports
-func processConfig(targetScriptOutputs []common.TargetScriptOutputs) (map[string][]byte, error) {
+func processConfig(targetScriptOutputs []workflow.TargetScriptOutputs) (map[string][]byte, error) {
 	reports := make(map[string][]byte)
 	var err error
 	for _, targetScriptOutput := range targetScriptOutputs {
@@ -396,9 +398,9 @@ func printConfig(reports map[string][]byte, toStdout bool, toFile bool, outputDi
 }
 
 // collectOnTarget runs the scripts on the target and sends the results to the appropriate channels
-func collectOnTarget(myTarget target.Target, scriptsToRun []script.ScriptDefinition, localTempDir string, channelTargetScriptOutputs chan common.TargetScriptOutputs, channelError chan error, statusUpdate progress.MultiSpinnerUpdateFunc) {
+func collectOnTarget(myTarget target.Target, scriptsToRun []script.ScriptDefinition, localTempDir string, channelTargetScriptOutputs chan workflow.TargetScriptOutputs, channelError chan error, statusUpdate progress.MultiSpinnerUpdateFunc) {
 	// run the scripts on the target
-	scriptOutputs, err := common.RunScripts(myTarget, scriptsToRun, true, localTempDir, statusUpdate, "collecting configuration", false)
+	scriptOutputs, err := workflow.RunScripts(myTarget, scriptsToRun, true, localTempDir, statusUpdate, "collecting configuration", false)
 	if err != nil {
 		if statusUpdate != nil {
 			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("error collecting configuration: %v", err))
@@ -410,5 +412,5 @@ func collectOnTarget(myTarget target.Target, scriptsToRun []script.ScriptDefinit
 	if statusUpdate != nil {
 		_ = statusUpdate(myTarget.GetName(), "configuration collection complete")
 	}
-	channelTargetScriptOutputs <- common.TargetScriptOutputs{TargetName: myTarget.GetName(), ScriptOutputs: scriptOutputs}
+	channelTargetScriptOutputs <- workflow.TargetScriptOutputs{TargetName: myTarget.GetName(), ScriptOutputs: scriptOutputs}
 }

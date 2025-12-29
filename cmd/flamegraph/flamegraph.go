@@ -1,19 +1,21 @@
-// Package flamegraph is a subcommand of the root command. It is used to generate flamegraphs from target(s).
-package flamegraph
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+// Package flamegraph is a subcommand of the root command. It is used to generate flamegraphs from target(s).
+package flamegraph
 
 import (
 	"fmt"
 	"os"
-	"perfspect/internal/common"
-	"perfspect/internal/report"
-	"perfspect/internal/table"
-	"perfspect/internal/util"
 	"slices"
 	"strconv"
 	"strings"
+
+	"perfspect/internal/app"
+	"perfspect/internal/report"
+	"perfspect/internal/table"
+	"perfspect/internal/util"
+	"perfspect/internal/workflow"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -22,9 +24,9 @@ import (
 const cmdName = "flamegraph"
 
 var examples = []string{
-	fmt.Sprintf("  Flamegraph from local host:       $ %s %s", common.AppName, cmdName),
-	fmt.Sprintf("  Flamegraph from remote target:    $ %s %s --target 192.168.1.1 --user fred --key fred_key", common.AppName, cmdName),
-	fmt.Sprintf("  Flamegraph from multiple targets: $ %s %s --targets targets.yaml", common.AppName, cmdName),
+	fmt.Sprintf("  Flamegraph from local host:       $ %s %s", app.Name, cmdName),
+	fmt.Sprintf("  Flamegraph from remote target:    $ %s %s --target 192.168.1.1 --user fred --key fred_key", app.Name, cmdName),
+	fmt.Sprintf("  Flamegraph from multiple targets: $ %s %s --targets targets.yaml", app.Name, cmdName),
 }
 
 var Cmd = &cobra.Command{
@@ -57,15 +59,15 @@ const (
 )
 
 func init() {
-	Cmd.Flags().StringVar(&common.FlagInput, common.FlagInputName, "", "")
-	Cmd.Flags().StringSliceVar(&common.FlagFormat, common.FlagFormatName, []string{report.FormatAll}, "")
+	Cmd.Flags().StringVar(&app.FlagInput, app.FlagInputName, "", "")
+	Cmd.Flags().StringSliceVar(&app.FlagFormat, app.FlagFormatName, []string{report.FormatAll}, "")
 	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 0, "")
 	Cmd.Flags().IntVar(&flagFrequency, flagFrequencyName, 11, "")
 	Cmd.Flags().IntSliceVar(&flagPids, flagPidsName, nil, "")
 	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
 	Cmd.Flags().IntVar(&flagMaxDepth, flagMaxDepthName, 0, "")
 
-	common.AddTargetFlags(Cmd)
+	workflow.AddTargetFlags(Cmd)
 
 	Cmd.SetUsageFunc(usageFunc)
 }
@@ -95,9 +97,9 @@ func usageFunc(cmd *cobra.Command) error {
 	return nil
 }
 
-func getFlagGroups() []common.FlagGroup {
-	var groups []common.FlagGroup
-	flags := []common.Flag{
+func getFlagGroups() []app.FlagGroup {
+	var groups []app.FlagGroup
+	flags := []app.Flag{
 		{
 			Name: flagDurationName,
 			Help: "number of seconds to run the collection. If 0, the collection will run indefinitely. Ctrl+c to stop.",
@@ -111,7 +113,7 @@ func getFlagGroups() []common.FlagGroup {
 			Help: "comma separated list of PIDs. If not specified, all PIDs will be collected",
 		},
 		{
-			Name: common.FlagFormatName,
+			Name: app.FlagFormatName,
 			Help: fmt.Sprintf("choose output format(s) from: %s", strings.Join(append([]string{report.FormatAll}, report.FormatHtml, report.FormatTxt, report.FormatJson), ", ")),
 		},
 		{
@@ -123,18 +125,18 @@ func getFlagGroups() []common.FlagGroup {
 			Help: "do not include system summary table in report",
 		},
 	}
-	groups = append(groups, common.FlagGroup{
+	groups = append(groups, app.FlagGroup{
 		GroupName: "Options",
 		Flags:     flags,
 	})
-	groups = append(groups, common.GetTargetFlagGroup())
-	flags = []common.Flag{
+	groups = append(groups, workflow.GetTargetFlagGroup())
+	flags = []app.Flag{
 		{
-			Name: common.FlagInputName,
+			Name: app.FlagInputName,
 			Help: "\".raw\" file, or directory containing \".raw\" files. Will skip data collection and use raw data for reports.",
 		},
 	}
-	groups = append(groups, common.FlagGroup{
+	groups = append(groups, app.FlagGroup{
 		GroupName: "Advanced Options",
 		Flags:     flags,
 	})
@@ -143,35 +145,35 @@ func getFlagGroups() []common.FlagGroup {
 
 func validateFlags(cmd *cobra.Command, args []string) error {
 	// validate format options
-	for _, format := range common.FlagFormat {
+	for _, format := range app.FlagFormat {
 		formatOptions := append([]string{report.FormatAll}, report.FormatHtml, report.FormatTxt, report.FormatJson)
 		if !slices.Contains(formatOptions, format) {
-			return common.FlagValidationError(cmd, fmt.Sprintf("format options are: %s", strings.Join(formatOptions, ", ")))
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("format options are: %s", strings.Join(formatOptions, ", ")))
 		}
 	}
 	// validate input file
-	if common.FlagInput != "" {
-		if _, err := os.Stat(common.FlagInput); os.IsNotExist(err) {
-			return common.FlagValidationError(cmd, fmt.Sprintf("input file %s does not exist", common.FlagInput))
+	if app.FlagInput != "" {
+		if _, err := os.Stat(app.FlagInput); os.IsNotExist(err) {
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("input file %s does not exist", app.FlagInput))
 		}
 	}
 	if flagDuration < 0 {
-		return common.FlagValidationError(cmd, "duration must be 0 or greater")
+		return workflow.FlagValidationError(cmd, "duration must be 0 or greater")
 	}
 	if flagFrequency <= 0 {
-		return common.FlagValidationError(cmd, "frequency must be 1 or greater")
+		return workflow.FlagValidationError(cmd, "frequency must be 1 or greater")
 	}
 	for _, pid := range flagPids {
 		if pid < 0 {
-			return common.FlagValidationError(cmd, "PID must be 0 or greater")
+			return workflow.FlagValidationError(cmd, "PID must be 0 or greater")
 		}
 	}
 	if flagMaxDepth < 0 {
-		return common.FlagValidationError(cmd, "max depth must be 0 or greater")
+		return workflow.FlagValidationError(cmd, "max depth must be 0 or greater")
 	}
 	// common target flags
-	if err := common.ValidateTargetFlags(cmd); err != nil {
-		return common.FlagValidationError(cmd, err.Error())
+	if err := workflow.ValidateTargetFlags(cmd); err != nil {
+		return workflow.FlagValidationError(cmd, err.Error())
 	}
 	return nil
 }
@@ -179,10 +181,10 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 func runCmd(cmd *cobra.Command, args []string) error {
 	var tables []table.TableDefinition
 	if !flagNoSystemSummary {
-		tables = append(tables, common.TableDefinitions[common.SystemSummaryTableName])
+		tables = append(tables, app.TableDefinitions[app.SystemSummaryTableName])
 	}
 	tables = append(tables, tableDefinitions[CallStackFrequencyTableName])
-	reportingCommand := common.ReportingCommand{
+	reportingCommand := workflow.ReportingCommand{
 		Cmd:            cmd,
 		ReportNamePost: "flame",
 		ScriptParams: map[string]string{

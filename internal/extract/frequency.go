@@ -1,19 +1,20 @@
-package common
+// Copyright (C) 2021-2025 Intel Corporation
+// SPDX-License-Identifier: BSD-3-Clause
+
+package extract
 
 import (
 	"fmt"
 	"log/slog"
-	"perfspect/internal/cpus"
-	"perfspect/internal/script"
-	"perfspect/internal/util"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
-)
 
-// Copyright (C) 2021-2025 Intel Corporation
-// SPDX-License-Identifier: BSD-3-Clause
+	"perfspect/internal/cpus"
+	"perfspect/internal/script"
+	"perfspect/internal/util"
+)
 
 // BaseFrequencyFromOutput gets base core frequency
 //
@@ -54,7 +55,7 @@ func BaseFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 	return ""
 }
 
-// getFrequenciesFromHex
+// getFrequenciesFromHex converts hex string to frequency list
 func getFrequenciesFromHex(hex string) ([]int, error) {
 	freqs, err := util.HexToIntList(hex)
 	if err != nil {
@@ -65,7 +66,7 @@ func getFrequenciesFromHex(hex string) ([]int, error) {
 	return freqs, nil
 }
 
-// getBucketSizesFromHex
+// getBucketSizesFromHex converts hex string to bucket sizes
 func getBucketSizesFromHex(hex string) ([]int, error) {
 	bucketSizes, err := util.HexToIntList(hex)
 	if err != nil {
@@ -81,7 +82,6 @@ func getBucketSizesFromHex(hex string) ([]int, error) {
 }
 
 // padFrequencies adds items to the frequencies slice until it reaches the desired length.
-// The value of the added items is the same as the last item in the original slice.
 func padFrequencies(freqs []int, desiredLength int) ([]int, error) {
 	if len(freqs) == 0 {
 		return nil, fmt.Errorf("cannot pad empty frequencies slice")
@@ -93,24 +93,12 @@ func padFrequencies(freqs []int, desiredLength int) ([]int, error) {
 }
 
 // GetSpecFrequencyBuckets gets the core frequency buckets from the script output
-// returns slice of rows
-// first row is header
-// each row is a slice of strings
-// "cores", "cores per die", "sse", "avx2", "avx512", "avx512h", "amx"
-// "0-41", "0-20", "3.5", "3.5", "3.3", "3.2", "3.1"
-// "42-63", "21-31", "3.5", "3.5", "3.3", "3.2", "3.1"
-// "64-85", "32-43", "3.5", "3.5", "3.3", "3.2", "3.1"
-// ...
-// the "cores per die" column is only present for some architectures
 func GetSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string, error) {
 	arch := UarchFromOutput(outputs)
 	if arch == "" {
 		return nil, fmt.Errorf("uarch is required")
 	}
 	out := outputs[script.SpecCoreFrequenciesScriptName].Stdout
-	// expected script output format, the number of fields may vary:
-	// "cores sse avx2 avx512 avx512h amx"
-	// "hex hex hex hex hex hex"
 	if out == "" {
 		return nil, fmt.Errorf("no core frequencies found")
 	}
@@ -232,12 +220,6 @@ func GetSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 }
 
 // ExpandTurboFrequencies expands the turbo frequencies to a list of frequencies
-// input is the output of getSpecFrequencyBuckets, e.g.:
-// "cores", "cores per die", "sse", "avx2", "avx512", "avx512h", "amx"
-// "0-41", "0-20", "3.5", "3.5", "3.3", "3.2", "3.1"
-// "42-63", "21-31", "3.5", "3.5", "3.3", "3.2", "3.1"
-// ...
-// output is the expanded list of the frequencies for the requested ISA
 func ExpandTurboFrequencies(specFrequencyBuckets [][]string, isa string) ([]string, error) {
 	if len(specFrequencyBuckets) < 2 || len(specFrequencyBuckets[0]) < 2 {
 		return nil, fmt.Errorf("unable to parse core frequency buckets")
@@ -284,6 +266,7 @@ func MaxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 	return ""
 }
 
+// GetSSEFreqsFromBuckets extracts SSE frequencies from frequency buckets.
 func GetSSEFreqsFromBuckets(buckets [][]string) []string {
 	if len(buckets) < 2 {
 		return nil
@@ -309,6 +292,7 @@ func GetSSEFreqsFromBuckets(buckets [][]string) []string {
 	return sse
 }
 
+// AllCoreMaxFrequencyFromOutput returns the all-core max frequency.
 func AllCoreMaxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 	specCoreFrequencies, err := GetSpecFrequencyBuckets(outputs)
 	if err != nil {
@@ -322,6 +306,7 @@ func AllCoreMaxFrequencyFromOutput(outputs map[string]script.ScriptOutput) strin
 	return sseFreqs[len(sseFreqs)-1] + "GHz"
 }
 
+// UncoreMinMaxDieFrequencyFromOutput returns uncore min/max frequency for a specific die type.
 func UncoreMinMaxDieFrequencyFromOutput(maxFreq bool, computeDie bool, outputs map[string]script.ScriptOutput) string {
 	// find the first die that matches requrested die type (compute or I/O)
 	re := regexp.MustCompile(`Read bits \d+:\d+ value (\d+) from TPMI ID .* for entry (\d+) in instance (\d+)`)
@@ -379,6 +364,7 @@ func UncoreMinMaxDieFrequencyFromOutput(maxFreq bool, computeDie bool, outputs m
 	return fmt.Sprintf("%.1fGHz", float64(parsed)/10)
 }
 
+// UncoreMinMaxFrequencyFromOutput returns uncore min/max frequency from MSR.
 func UncoreMinMaxFrequencyFromOutput(maxFreq bool, outputs map[string]script.ScriptOutput) string {
 	var parsed int64
 	var err error
@@ -402,10 +388,12 @@ func UncoreMinMaxFrequencyFromOutput(maxFreq bool, outputs map[string]script.Scr
 	return fmt.Sprintf("%.1fGHz", float64(parsed)/10)
 }
 
+// UncoreMinFrequencyFromOutput returns uncore min frequency.
 func UncoreMinFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 	return UncoreMinMaxFrequencyFromOutput(false, outputs)
 }
 
+// UncoreMaxFrequencyFromOutput returns uncore max frequency.
 func UncoreMaxFrequencyFromOutput(outputs map[string]script.ScriptOutput) string {
 	return UncoreMinMaxFrequencyFromOutput(true, outputs)
 }

@@ -1,14 +1,14 @@
-package telemetry
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+package telemetry
 
 import (
 	"encoding/csv"
 	"fmt"
 	"log/slog"
-	"perfspect/internal/common"
 	"perfspect/internal/cpus"
+	"perfspect/internal/extract"
 	"perfspect/internal/script"
 	"perfspect/internal/table"
 	"regexp"
@@ -367,7 +367,7 @@ func powerTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.F
 	fields := []table.Field{
 		{Name: "Time"},
 	}
-	packageRows, err := common.TurbostatPackageRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"PkgWatt", "RAMWatt"})
+	packageRows, err := extract.TurbostatPackageRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"PkgWatt", "RAMWatt"})
 	if err != nil {
 		slog.Warn(err.Error())
 		return []table.Field{}
@@ -400,12 +400,12 @@ func temperatureTelemetryTableValues(outputs map[string]script.ScriptOutput) []t
 		{Name: "Time"},
 		{Name: "Core (Avg.)"},
 	}
-	platformRows, err := common.TurbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"CoreTmp"})
+	platformRows, err := extract.TurbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"CoreTmp"})
 	if err != nil {
 		slog.Warn(err.Error()) // not all systems report core temperature, e.g., cloud VMs
 		return []table.Field{}
 	}
-	packageRows, err := common.TurbostatPackageRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"PkgTmp"})
+	packageRows, err := extract.TurbostatPackageRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"PkgTmp"})
 	if err != nil {
 		// not an error, just means no package rows (package temperature)
 		slog.Warn(err.Error())
@@ -440,12 +440,12 @@ func frequencyTelemetryTableValues(outputs map[string]script.ScriptOutput) []tab
 		{Name: "Time"},
 		{Name: "Core (Avg.)"},
 	}
-	platformRows, err := common.TurbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"Bzy_MHz"})
+	platformRows, err := extract.TurbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"Bzy_MHz"})
 	if err != nil {
 		slog.Warn(err.Error())
 		return []table.Field{}
 	}
-	packageRows, err := common.TurbostatPackageRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"UncMHz"})
+	packageRows, err := extract.TurbostatPackageRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"UncMHz"})
 	if err != nil {
 		// not an error, just means no package rows (uncore frequency)
 		slog.Warn(err.Error())
@@ -480,7 +480,7 @@ func ipcTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.Fie
 		{Name: "Time"},
 		{Name: "Core (Avg.)"},
 	}
-	platformRows, err := common.TurbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"IPC"})
+	platformRows, err := extract.TurbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"IPC"})
 	if err != nil {
 		slog.Warn(err.Error())
 		return []table.Field{}
@@ -505,7 +505,7 @@ func c6TelemetryTableValues(outputs map[string]script.ScriptOutput) []table.Fiel
 		{Name: "Package (Avg.)"},
 		{Name: "Core (Avg.)"},
 	}
-	platformRows, err := common.TurbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"C6%", "CPU%c6"})
+	platformRows, err := extract.TurbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"C6%", "CPU%c6"})
 	if err != nil {
 		slog.Warn(err.Error())
 		return []table.Field{}

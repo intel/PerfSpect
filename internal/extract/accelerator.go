@@ -1,7 +1,7 @@
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
-package report
+package extract
 
 import (
 	"fmt"
@@ -15,6 +15,7 @@ import (
 // references:
 //   https://pci-ids.ucw.cz/read/PC/8086
 
+// AcceleratorDefinition represents an Intel accelerator device.
 type AcceleratorDefinition struct {
 	MfgID       string
 	DevID       string
@@ -23,7 +24,8 @@ type AcceleratorDefinition struct {
 	Description string
 }
 
-var acceleratorDefinitions = []AcceleratorDefinition{
+// AcceleratorDefinitions contains all known Intel accelerator definitions.
+var AcceleratorDefinitions = []AcceleratorDefinition{
 	{
 		MfgID:       "8086",
 		DevID:       "(2710|2714)",
@@ -68,18 +70,20 @@ var acceleratorDefinitions = []AcceleratorDefinition{
 	},
 }
 
-func acceleratorNames() []string {
+// AcceleratorNames returns the short names of all accelerators.
+func AcceleratorNames() []string {
 	var names []string
-	for _, accel := range acceleratorDefinitions {
+	for _, accel := range AcceleratorDefinitions {
 		names = append(names, accel.Name)
 	}
 	return names
 }
 
-func acceleratorCountsFromOutput(outputs map[string]script.ScriptOutput) []string {
+// AcceleratorCountsFromOutput returns the count of each accelerator type from lshw output.
+func AcceleratorCountsFromOutput(outputs map[string]script.ScriptOutput) []string {
 	var counts []string
 	lshw := outputs[script.LshwScriptName].Stdout
-	for _, accel := range acceleratorDefinitions {
+	for _, accel := range AcceleratorDefinitions {
 		regex := fmt.Sprintf("%s:%s", accel.MfgID, accel.DevID)
 		re := regexp.MustCompile(regex)
 		count := len(re.FindAllString(lshw, -1))
@@ -88,9 +92,10 @@ func acceleratorCountsFromOutput(outputs map[string]script.ScriptOutput) []strin
 	return counts
 }
 
-func acceleratorWorkQueuesFromOutput(outputs map[string]script.ScriptOutput) []string {
+// AcceleratorWorkQueuesFromOutput returns the work queues for IAA and DSA accelerators.
+func AcceleratorWorkQueuesFromOutput(outputs map[string]script.ScriptOutput) []string {
 	var queues []string
-	for _, accel := range acceleratorDefinitions {
+	for _, accel := range AcceleratorDefinitions {
 		if accel.Name == "IAA" || accel.Name == "DSA" {
 			var scriptName string
 			if accel.Name == "IAA" {
@@ -119,26 +124,29 @@ func acceleratorWorkQueuesFromOutput(outputs map[string]script.ScriptOutput) []s
 	return queues
 }
 
-func acceleratorFullNamesFromYaml() []string {
+// AcceleratorFullNames returns the full names of all accelerators.
+func AcceleratorFullNames() []string {
 	var fullNames []string
-	for _, accel := range acceleratorDefinitions {
+	for _, accel := range AcceleratorDefinitions {
 		fullNames = append(fullNames, accel.FullName)
 	}
 	return fullNames
 }
 
-func acceleratorDescriptionsFromYaml() []string {
+// AcceleratorDescriptions returns the descriptions of all accelerators.
+func AcceleratorDescriptions() []string {
 	var descriptions []string
-	for _, accel := range acceleratorDefinitions {
+	for _, accel := range AcceleratorDefinitions {
 		descriptions = append(descriptions, accel.Description)
 	}
 	return descriptions
 }
 
-func acceleratorSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
+// AcceleratorSummaryFromOutput returns a summary string of accelerator counts.
+func AcceleratorSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 	var summary []string
-	accelerators := acceleratorNames()
-	counts := acceleratorCountsFromOutput(outputs)
+	accelerators := AcceleratorNames()
+	counts := AcceleratorCountsFromOutput(outputs)
 	for i, name := range accelerators {
 		if strings.Contains(name, "chipset") { // skip "QAT (on chipset)" in this table
 			continue

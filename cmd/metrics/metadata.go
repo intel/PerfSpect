@@ -1,7 +1,7 @@
-package metrics
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+package metrics
 
 // metadata.go defines structures and functions to hold information about the platform
 // to be used during data collection and metric production.
@@ -19,12 +19,13 @@ import (
 	"strings"
 	"time"
 
-	"perfspect/internal/common"
+	"perfspect/internal/app"
 	"perfspect/internal/cpus"
 	"perfspect/internal/progress"
 	"perfspect/internal/script"
 	"perfspect/internal/table"
 	"perfspect/internal/target"
+	"perfspect/internal/workflow"
 )
 
 // Script name constants - used as map keys when retrieving script outputs.
@@ -107,7 +108,7 @@ type MetadataCollector interface {
 
 // LoadMetadata populates and returns a Metadata structure containing state of the system.
 func LoadMetadata(t target.Target, noRoot bool, noSystemSummary bool, localTempDir string, statusUpdate progress.MultiSpinnerUpdateFunc) (Metadata, error) {
-	uarch, err := common.GetTargetArchitecture(t)
+	uarch, err := workflow.GetTargetArchitecture(t)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to get target architecture: %v", err)
 	}
@@ -289,7 +290,7 @@ func getMetadataScripts(noRoot bool, noSystemSummary bool, numGPCounters int) ([
 
 	// Add the system summary table scripts
 	if !noSystemSummary {
-		for _, scriptName := range common.TableDefinitions[common.SystemSummaryTableName].ScriptNames {
+		for _, scriptName := range app.TableDefinitions[app.SystemSummaryTableName].ScriptNames {
 			scriptDef := script.GetScriptByName(scriptName)
 			metadataScripts = append(metadataScripts, scriptDef)
 		}
@@ -369,7 +370,7 @@ func ReadJSONFromFile(path string) (md Metadata, err error) {
 
 // getSystemSummary retrieves the system summary from script outputs.
 func getSystemSummary(scriptOutputs map[string]script.ScriptOutput) (summaryFields [][]string, err error) {
-	allTableValues, err := table.ProcessTables([]table.TableDefinition{common.TableDefinitions[common.SystemSummaryTableName]}, scriptOutputs)
+	allTableValues, err := table.ProcessTables([]table.TableDefinition{app.TableDefinitions[app.SystemSummaryTableName]}, scriptOutputs)
 	if err != nil {
 		err = fmt.Errorf("failed to process script outputs: %w", err)
 		return
