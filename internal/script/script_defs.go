@@ -1,3 +1,6 @@
+// Copyright (C) 2021-2025 Intel Corporation
+// SPDX-License-Identifier: BSD-3-Clause
+
 package script
 
 import (
@@ -5,9 +8,6 @@ import (
 	"perfspect/internal/cpus"
 	texttemplate "text/template" // nosemgrep
 )
-
-// Copyright (C) 2021-2025 Intel Corporation
-// SPDX-License-Identifier: BSD-3-Clause
 
 // script_defs.go defines the bash scripts that are used to collect information from target systems
 

@@ -1,3 +1,6 @@
+// Copyright (C) 2021-2025 Intel Corporation
+// SPDX-License-Identifier: BSD-3-Clause
+
 package config
 
 import (
@@ -17,9 +20,6 @@ import (
 	"strings"
 	"sync"
 )
-
-// Copyright (C) 2021-2025 Intel Corporation
-// SPDX-License-Identifier: BSD-3-Clause
 
 var uncoreDieFrequencyMutex sync.Mutex
 var uncoreFrequencyMutex sync.Mutex

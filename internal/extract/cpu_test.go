@@ -1,12 +1,12 @@
+// Copyright (C) 2021-2025 Intel Corporation
+// SPDX-License-Identifier: BSD-3-Clause
+
 package extract
 
 import (
 	"perfspect/internal/script"
 	"testing"
 )
-
-// Copyright (C) 2021-2025 Intel Corporation
-// SPDX-License-Identifier: BSD-3-Clause
 
 func TestHyperthreadingFromOutput(t *testing.T) {
 	tests := []struct {

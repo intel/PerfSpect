@@ -1,3 +1,6 @@
+// Copyright (C) 2021-2025 Intel Corporation
+// SPDX-License-Identifier: BSD-3-Clause
+
 package extract
 
 import (
@@ -5,9 +8,6 @@ import (
 	"strings"
 	"testing"
 )
-
-// Copyright (C) 2021-2025 Intel Corporation
-// SPDX-License-Identifier: BSD-3-Clause
 
 const turbostatOutput = `TIME: 15:04:05
 INTERVAL: 2

@@ -1,7 +1,7 @@
-package metrics
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+package metrics
 
 import (
 	"bufio"

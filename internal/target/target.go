@@ -1,10 +1,10 @@
+// Copyright (C) 2021-2025 Intel Corporation
+// SPDX-License-Identifier: BSD-3-Clause
+
 /*
 Package target provides a way to interact with local and remote systems.
 */
 package target
-
-// Copyright (C) 2021-2025 Intel Corporation
-// SPDX-License-Identifier: BSD-3-Clause
 
 import (
 	"os"

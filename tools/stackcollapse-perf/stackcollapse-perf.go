@@ -1,7 +1,7 @@
-package main
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+package main
 
 // This code is a port of the Perl script stackcollapse-perf.pl from Brendan
 // Gregg's Flamegraph project -- github.com/brendangregg/FlameGraph.
