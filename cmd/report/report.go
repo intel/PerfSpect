@@ -1,8 +1,8 @@
-// Package report is a subcommand of the root command. It generates a configuration report for target(s).
-package report
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+// Package report is a subcommand of the root command. It generates a configuration report for target(s).
+package report
 
 import (
 	"fmt"

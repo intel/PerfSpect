@@ -1,9 +1,9 @@
+// Copyright (C) 2021-2025 Intel Corporation
+// SPDX-License-Identifier: BSD-3-Clause
+
 // Package app defines application-wide types, constants, and context
 // that are shared across multiple commands.
 package app
-
-// Copyright (C) 2021-2025 Intel Corporation
-// SPDX-License-Identifier: BSD-3-Clause
 
 import (
 	"os"

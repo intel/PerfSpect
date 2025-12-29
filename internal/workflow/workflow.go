@@ -1,10 +1,10 @@
+// Copyright (C) 2021-2025 Intel Corporation
+// SPDX-License-Identifier: BSD-3-Clause
+
 // Package workflow implements the common flow/logic for reporting commands
 // (report, telemetry, flamegraph, lock). It handles target management,
 // script execution, and report generation.
 package workflow
-
-// Copyright (C) 2021-2025 Intel Corporation
-// SPDX-License-Identifier: BSD-3-Clause
 
 import (
 	"fmt"

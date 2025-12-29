@@ -1,8 +1,8 @@
-// Package flamegraph is a subcommand of the root command. It is used to generate flamegraphs from target(s).
-package flamegraph
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+// Package flamegraph is a subcommand of the root command. It is used to generate flamegraphs from target(s).
+package flamegraph
 
 import (
 	"fmt"

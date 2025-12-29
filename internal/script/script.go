@@ -1,8 +1,8 @@
-// Package script provides functions to run scripts on a target and get the output.
-package script
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+// Package script provides functions to run scripts on a target and get the output.
+package script
 
 import (
 	"embed"

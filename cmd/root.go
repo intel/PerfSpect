@@ -1,8 +1,8 @@
-// Package cmd provides the command line interface for the application.
-package cmd
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+// Package cmd provides the command line interface for the application.
+package cmd
 
 import (
 	"bytes"

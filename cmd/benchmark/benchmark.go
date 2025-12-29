@@ -1,8 +1,8 @@
-// Package benchmark is a subcommand of the root command. It runs performance benchmarks on target(s).
-package benchmark
-
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
+
+// Package benchmark is a subcommand of the root command. It runs performance benchmarks on target(s).
+package benchmark
 
 import (
 	"fmt"

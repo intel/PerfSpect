@@ -1,9 +1,9 @@
+// Copyright (C) 2021-2025 Intel Corporation
+// SPDX-License-Identifier: BSD-3-Clause
+
 // Package extract provides helper functions for extracting values from script outputs
 // to populate table fields for reports.
 package extract
-
-// Copyright (C) 2021-2025 Intel Corporation
-// SPDX-License-Identifier: BSD-3-Clause
 
 import (
 	"log/slog"
