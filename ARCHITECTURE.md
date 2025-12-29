@@ -68,7 +68,7 @@ perfspect/
 │   ├── cpus/            # CPU architecture detection
 │   ├── progress/        # Progress indicator (multi-spinner)
 │   └── util/            # General utilities
-└── tools/               # External binaries for target systems
+└── tools/               # Binaries used by scripts (embedded at build time)
 ```
 
 ## Key Abstractions
@@ -120,7 +120,7 @@ type ReportingCommand struct {
 
 ### 3. Script Engine (`internal/script/`)
 
-Scripts are embedded in the binary using `//go:embed` and executed on targets via a controller script that manages concurrent/sequential execution and signal handling.
+Collection scripts are defined in `internal/script/scripts.go`. Script dependencies, i.e., tools used by the scripts to collect data, are in `internal/script/resources/` and embedded in the binary using `//go:embed`. The scripts are executed on targets via a controller script that manages concurrent/sequential execution and signal handling.
 
 **Key concepts:**
 - `ScriptDefinition`: Defines a script (template, dependencies, required privileges)
