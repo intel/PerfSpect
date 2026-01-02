@@ -71,11 +71,6 @@ RUN git clone https://github.com/madler/zlib.git zlib-aarch64 \
 && make \
 && cp libz.a /usr/lib/aarch64-linux-gnu/
 
-# build libaio for aarch64 (for fio)
-RUN git clone --depth 1 --single-branch --branch libaio-0.3.113 https://pagure.io/libaio libaio-aarch64 \
-&& cd libaio-aarch64 \
-&& CC=aarch64-linux-gnu-gcc make
-
 # Build tools
 RUN mkdir workdir
 ADD . /workdir

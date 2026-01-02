@@ -181,7 +181,7 @@ else
 	cd fio-repo && git fetch && git checkout $(FIO_COMMIT)
 endif
 
-fio: fio-repo
+fio: fio-repo libaio-aarch64
 ifeq ("$(wildcard fio/config.log)","")
 	cp -r fio-repo fio
 	cd fio && ./configure --build-static --disable-native
@@ -189,6 +189,15 @@ ifeq ("$(wildcard fio/config.log)","")
 else
 	@echo "fio already built"
 endif
+
+LIBAIO_VERSION := libaio-0.3.113
+libaio-aarch64:
+ifeq ("$(wildcard libaio-aarch64)","")
+	git clone $(GIT_CLONE_OPTS) --branch $(LIBAIO_VERSION) https://pagure.io/libaio libaio-aarch64
+else
+	cd libaio-aarch64 && git fetch --tags && git checkout $(LIBAIO_VERSION)
+endif
+	cd libaio-aarch64 && CC=aarch64-linux-gnu-gcc make -j$(NPROC)
 
 fio-aarch64: fio-repo
 ifeq ("$(wildcard fio-aarch64/config.log)","")
