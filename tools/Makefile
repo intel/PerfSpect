@@ -122,7 +122,6 @@ endif
 	cd cpuid && make
 
 DMIDECODE_VERSION := dmidecode-3-5
-
 dmidecode-repo:
 ifeq ("$(wildcard dmidecode-repo)","")
 	git clone $(GIT_CLONE_OPTS) --branch $(DMIDECODE_VERSION) https://github.com/mirror/dmidecode.git dmidecode-repo
@@ -147,7 +146,6 @@ else
 endif
 
 ETHTOOL_VERSION := v6.5
-
 ethtool-repo:
 ifeq ("$(wildcard ethtool-repo)","")
 	git clone $(GIT_CLONE_OPTS) --branch $(ETHTOOL_VERSION) https://git.kernel.org/pub/scm/network/ethtool/ethtool.git ethtool-repo || \
@@ -174,6 +172,24 @@ else
 	@echo "ethtool-aarch64 already built"
 endif
 
+FIO_COMMIT := de3d5e68dd017a6d6099913b7831bb94f46e49cc # This commit is more recent than the latest release (3.41) and is needed for the aarch64 build's --extra-ldflags option
+fio-repo:
+ifeq ("$(wildcard fio-repo)","")
+	git clone https://github.com/axboe/fio.git fio-repo
+	cd fio-repo && git checkout $(FIO_COMMIT)
+else
+	cd fio-repo && git fetch && git checkout $(FIO_COMMIT)
+endif
+
+fio: fio-repo libaio-aarch64
+ifeq ("$(wildcard fio/config.log)","")
+	cp -r fio-repo fio
+	cd fio && ./configure --build-static --disable-native
+	cd fio && make -j$(NPROC)
+else
+	@echo "fio already built"
+endif
+
 LIBAIO_VERSION := libaio-0.3.113
 libaio-aarch64:
 ifeq ("$(wildcard libaio-aarch64)","")
@@ -183,29 +199,10 @@ else
 endif
 	cd libaio-aarch64 && CC=aarch64-linux-gnu-gcc make -j$(NPROC)
 
-FIO_VERSION := fio-3.38
-
-fio-repo:
-ifeq ("$(wildcard fio-repo)","")
-	git clone $(GIT_CLONE_OPTS) --branch $(FIO_VERSION) https://github.com/axboe/fio.git fio-repo
-else
-	cd fio-repo && git fetch --tags && git checkout $(FIO_VERSION)
-endif
-
-fio: fio-repo
-ifeq ("$(wildcard fio/config.log)","")
-	cp -r fio-repo fio
-	cd fio && ./configure --build-static --disable-native
-	cd fio && make -j$(NPROC)
-else
-	@echo "fio already built"
-endif
-
-# fio-aarch64 needs de3d5e68dd017a6d6099913b7831bb94f46e49cc or newer to support "--extra-ldflags" from commit 6fbe3284d
-fio-aarch64: libaio-aarch64
+fio-aarch64: fio-repo libaio-aarch64
 ifeq ("$(wildcard fio-aarch64/config.log)","")
-	git clone https://github.com/axboe/fio.git fio-aarch64
-	cd fio-aarch64 && git checkout de3d5e68dd017a6d6099913b7831bb94f46e49cc
+	@test -d libaio-aarch64/src || (echo "Error: libaio-aarch64/src directory not found" && exit 1)
+	cp -r fio-repo fio-aarch64
 	cd fio-aarch64 && ./configure --build-static --disable-native --cc=aarch64-linux-gnu-gcc --extra-cflags="-I../libaio-aarch64/src" --extra-ldflags="-L../libaio-aarch64/src"
 	cd fio-aarch64 && make -j$(NPROC)
 else
@@ -213,7 +210,6 @@ else
 endif
 
 IPMITOOL_VERSION := IPMITOOL_1_8_19
-
 ipmitool-repo:
 ifeq ("$(wildcard ipmitool-repo)","")
 	git clone $(GIT_CLONE_OPTS) --branch $(IPMITOOL_VERSION) https://github.com/ipmitool/ipmitool.git ipmitool-repo
@@ -246,7 +242,6 @@ else
 endif
 
 LSHW_VERSION := B.02.19
-
 lshw-repo:
 ifeq ("$(wildcard lshw-repo)","")
 	git clone $(GIT_CLONE_OPTS) --branch $(LSHW_VERSION) https://github.com/lyonel/lshw.git lshw-repo
@@ -271,7 +266,6 @@ else
 endif
 
 LSPCI_VERSION := v3.13.0
-
 lspci-repo:
 ifeq ("$(wildcard lspci-repo)","")
 	git clone $(GIT_CLONE_OPTS) --branch $(LSPCI_VERSION) https://github.com/pciutils/pciutils.git lspci-repo
@@ -323,7 +317,6 @@ endif
 	cd pcm/build && cmake --build .
 
 PERF_VERSION := 6.15.3
-
 linux-$(PERF_VERSION).tar.xz:
 	wget $(WGET_OPTS) https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$(PERF_VERSION).tar.xz
 
@@ -369,7 +362,6 @@ else
 endif
 
 SSHPASS_VERSION := 1.10
-
 sshpass-$(SSHPASS_VERSION).tar.gz:
 	wget $(WGET_OPTS) https://sourceforge.net/projects/sshpass/files/sshpass/$(SSHPASS_VERSION)/sshpass-$(SSHPASS_VERSION).tar.gz
 
@@ -394,7 +386,6 @@ stackcollapse-perf-aarch64:
 	cd stackcollapse-perf && CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o $@
 
 STRESS_NG_VERSION := V0.13.08
-
 stress-ng-repo:
 ifeq ("$(wildcard stress-ng-repo)","")
 	git clone $(GIT_CLONE_OPTS) --branch $(STRESS_NG_VERSION) https://github.com/ColinIanKing/stress-ng.git stress-ng-repo
@@ -419,7 +410,6 @@ else
 endif
 
 SYSSTAT_VERSION := v12.7.6
-
 sysstat-repo:
 ifeq ("$(wildcard sysstat-repo)","")
 	git clone $(GIT_CLONE_OPTS) --branch $(SYSSTAT_VERSION) https://github.com/sysstat/sysstat.git sysstat-repo

@@ -155,7 +155,7 @@ check: check_format check_vet check_static check_license check_lint check_vuln t
 
 .PHONY: sweep
 sweep:
-	rm -rf perfspect_2025-*
+	rm -rf perfspect_202?-*
 	rm -rf debug_out/*
 	rm -rf test/output
 	rm -f __debug_bin*.log
