@@ -199,8 +199,9 @@ else
 endif
 	cd libaio-aarch64 && CC=aarch64-linux-gnu-gcc make -j$(NPROC)
 
-fio-aarch64: fio-repo
+fio-aarch64: fio-repo libaio-aarch64
 ifeq ("$(wildcard fio-aarch64/config.log)","")
+	@test -d libaio-aarch64/src || (echo "Error: libaio-aarch64/src directory not found" && exit 1)
 	cp -r fio-repo fio-aarch64
 	cd fio-aarch64 && ./configure --build-static --disable-native --cc=aarch64-linux-gnu-gcc --extra-cflags="-I../libaio-aarch64/src" --extra-ldflags="-L../libaio-aarch64/src"
 	cd fio-aarch64 && make -j$(NPROC)
