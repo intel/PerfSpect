@@ -5,6 +5,7 @@
 /debug_out
 /tools/bin
 /tools/bin-aarch64
+/tools-cache
 /dist
 /internal/script/resources/x86_64
 /internal/script/resources/aarch64
