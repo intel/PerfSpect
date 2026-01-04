@@ -84,9 +84,11 @@ EOF
 fi
 
 # build the perfspect builder image
-$BUILD_CMD -f builder/build.Dockerfile \
+# Note: Always use regular docker build (not buildx) because it needs access to the
+# locally built perfspect-tools:$TAG image. Buildx runs in an isolated builder context
+# that doesn't have access to local Docker daemon images by default.
+docker build -f builder/build.Dockerfile \
     --build-arg TAG=$TAG \
-    $BUILDER_CACHE_FROM $BUILDER_CACHE_TO \
     --tag perfspect-builder:$TAG .
 
 # build perfspect using the builder image
