@@ -117,21 +117,12 @@ EOF
 fi
 
 # build the perfspect builder image
-if [ -n "$GITHUB_ACTIONS" ]; then
-    # In GitHub Actions, use buildx with cache and explicit build context for tools image
-    # The --build-context flag allows buildx to access the locally built perfspect-tools image
-    docker buildx build --load -f builder/build.Dockerfile \
-        --build-arg TAG=$TAG \
-        --build-context perfspect-tools-context=docker-image://perfspect-tools:$TAG \
-        --cache-from type=gha,scope=perfspect-builder \
-        --cache-to type=gha,mode=max,scope=perfspect-builder \
-        --tag perfspect-builder:$TAG .
-else
-    # Local builds use regular docker build (faster, automatically has access to local images)
-    docker build -f builder/build.Dockerfile \
-        --build-arg TAG=$TAG \
-        --tag perfspect-builder:$TAG .
-fi
+# Note: Use regular docker build (not buildx) because it needs access to the
+# locally built perfspect-tools:$TAG image. The Go module and tool caching
+# is handled via Docker's built-in layer caching.
+docker build -f builder/build.Dockerfile \
+    --build-arg TAG=$TAG \
+    --tag perfspect-builder:$TAG .
 
 # build perfspect using the builder image
 docker container run                                  \
