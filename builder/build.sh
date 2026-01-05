@@ -85,7 +85,7 @@ EOF
 else
     echo "Building tools from source"
     $BUILD_CMD -f tools/build.Dockerfile \
-        "$CACHE_FROM" "$CACHE_TO" \
+        $CACHE_FROM $CACHE_TO \
         --tag perfspect-tools:$TAG ./tools
 
     # Extract binaries for caching (both GitHub Actions and local)
@@ -107,8 +107,8 @@ EOF
         docker build -q -f /tmp/extract-tools.Dockerfile -t perfspect-tools-extractor:$TAG . > /dev/null
         # Create container and extract files
         CONTAINER_ID=$(docker create perfspect-tools-extractor:$TAG)
-        docker cp "$CONTAINER_ID":/output/. "$CACHE_DIR"/
-        docker rm "$CONTAINER_ID" > /dev/null
+        docker cp $CONTAINER_ID:/output/. "$CACHE_DIR"/
+        docker rm $CONTAINER_ID > /dev/null
         # Cleanup
         docker rmi perfspect-tools-extractor:$TAG > /dev/null
         rm /tmp/extract-tools.Dockerfile
