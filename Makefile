@@ -162,9 +162,14 @@ sweep:
 	rm -f perfspect.log
 
 .PHONY: clean
-clean: sweep
+clean: sweep clean-tools-cache
 	@echo "Cleaning up..."
 	rm -f perfspect
 	rm -f perfspect-aarch64
 	sudo rm -rf dist
 	rm -rf internal/script/resources
+
+.PHONY: clean-tools-cache
+clean-tools-cache:
+	@echo "Removing cached tool binaries..."
+	rm -rf tools-cache
