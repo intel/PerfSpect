@@ -15,14 +15,24 @@ FROM ${REGISTRY}${PREFIX}perfspect-tools:${TAG} AS tools
 
 # STAGE 2 - image contains perfspect's Go components build environment
 FROM golang:1.25.5@sha256:20b91eda7a9627c127c0225b0d4e8ec927b476fa4130c6760928b849d769c149
+# install system dependencies
+RUN apt-get update && apt-get install -y jq
+# allow git to operate in the mounted repository regardless of the user
+RUN git config --global --add safe.directory /localrepo
+# pre-install Go tools used by make check
+RUN go install honnef.co/go/tools/cmd/staticcheck@latest && \
+    go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest && \
+    go install golang.org/x/vuln/cmd/govulncheck@latest && \
+    go install github.com/securego/gosec/v2/cmd/gosec@latest
 # copy the tools binaries and source from the previous stage
 RUN mkdir /prebuilt
 RUN mkdir /prebuilt/tools
 COPY --from=tools /bin/ /prebuilt/tools
 COPY --from=tools /oss_source.tgz /prebuilt/
 COPY --from=tools /oss_source.tgz.md5 /prebuilt/
-# allow git to operate in the mounted repository regardless of the user
-RUN git config --global --add safe.directory /localrepo
-# install jq as it is used in the Makefile to create the manifest
-RUN apt-get update
-RUN apt-get install -y jq
+# pre-download Go module dependencies (changes when go.mod/go.sum change)
+WORKDIR /tmp/deps
+COPY go.mod go.sum ./
+RUN go mod download
+
+WORKDIR /
