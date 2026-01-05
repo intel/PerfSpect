@@ -40,38 +40,25 @@ invalidate_cache() {
     fi
 }
 
-# Determine if we're in GitHub Actions
-if [ -n "$GITHUB_ACTIONS" ]; then
-    # Use buildx with GitHub Actions cache
-    CACHE_FROM="--cache-from type=gha,scope=perfspect-tools"
-    CACHE_TO="--cache-to type=gha,mode=max,scope=perfspect-tools"
-    BUILD_CMD="docker buildx build --load"
-else
-    # Local build without cache export
-    CACHE_FROM=""
-    CACHE_TO=""
-    BUILD_CMD="docker build"
-fi
-
-# Check if we can use cached binaries
-USE_CACHE=""
-if [ "$TOOLS_CACHE_HIT" = "true" ]; then
+# Check if we can use cached tools binaries
+USE_TOOLS_CACHE=""
+if [ "$TOOLS_CACHE_HIT" = "true" ]; then # GitHub Actions will set this env var on cache hit
     # GitHub Actions cache hit
-    USE_CACHE="true"
+    USE_TOOLS_CACHE="true"
 elif [ -z "$SKIP_TOOLS_CACHE" ] && [ -d "$CACHE_DIR/bin" ]; then
     # Local cache exists and not disabled
     echo "Found local tools cache in $CACHE_DIR/"
     echo "To force rebuild, run: SKIP_TOOLS_CACHE=1 builder/build.sh"
     if cache_ready; then
-        USE_CACHE="true"
+        USE_TOOLS_CACHE="true"
     else
         echo "Local tools cache is incomplete; it will be discarded and rebuilt."
         invalidate_cache
     fi
 fi
 
-# build tools image (or use cached binaries)
-if [ "$USE_CACHE" = "true" ]; then
+# build tools image (or use cached tools binaries)
+if [ "$USE_TOOLS_CACHE" = "true" ]; then
     echo "Using cached tool binaries, creating minimal tools image"
     # Create a minimal Dockerfile that packages the cached binaries
     cat > /tmp/cached-tools.Dockerfile << EOF
@@ -84,11 +71,14 @@ EOF
     rm /tmp/cached-tools.Dockerfile
 else
     echo "Building tools from source"
-    $BUILD_CMD -f tools/build.Dockerfile \
-        $CACHE_FROM $CACHE_TO \
-        --tag perfspect-tools:$TAG ./tools
+    if [ -n "$GITHUB_ACTIONS" ]; then
+        # Use buildx with GitHub Actions cache
+        docker buildx build --load -f tools/build.Dockerfile --cache-from type=gha,scope=perfspect-tools --cache-to type=gha,mode=max,scope=perfspect-tools --tag perfspect-tools:$TAG ./tools
+    else
+        docker build -f tools/build.Dockerfile --tag perfspect-tools:$TAG ./tools
+    fi
 
-    # Extract binaries for caching (both GitHub Actions and local)
+    # Extract binaries for caching
     if [ -z "$SKIP_TOOLS_CACHE" ]; then
         echo "Extracting tool binaries to tools-cache/ for future builds"
         rm -rf "$CACHE_DIR"
