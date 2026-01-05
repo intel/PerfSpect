@@ -16,6 +16,18 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@988b5a0280414f521da01fcc63a27aeeb4b104db # v3.7.1
+      - name: Cache tool binaries
+        id: cache-tools
+        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        with:
+          path: tools-cache
+          key: perfspect-tools-binaries-${{ hashFiles('tools/Makefile', 'tools/**/*.Dockerfile', 'tools/**/*.patch') }}
+      - name: Set cache hit flag
+        if: steps.cache-tools.outputs.cache-hit == 'true'
+        run: |
+          echo "TOOLS_CACHE_HIT=true" >> $GITHUB_ENV
       - name: build perfspect
         run: |
           builder/build.sh
