@@ -133,6 +133,17 @@ func (rc *ReportingCommand) Run() error {
 		for i := len(indicesToRemove) - 1; i >= 0; i-- {
 			myTargets = slices.Delete(myTargets, indicesToRemove[i], indicesToRemove[i]+1)
 		}
+		// remove targets if no tables to collect
+		indicesToRemove = []int{}
+		for i, target := range myTargets {
+			if numTablesForTarget(rc.Tables, target, localTempDir) == 0 {
+				_ = multiSpinner.Status(target.GetName(), "No collectable data on this target, skipping")
+				indicesToRemove = append(indicesToRemove, i)
+			}
+		}
+		for i := len(indicesToRemove) - 1; i >= 0; i-- {
+			myTargets = slices.Delete(myTargets, indicesToRemove[i], indicesToRemove[i]+1)
+		}
 		// set up signal handler to help with cleaning up child processes on ctrl-c/SIGINT or SIGTERM
 		configureSignalHandler(myTargets, multiSpinner.Status)
 		// collect data from targets
