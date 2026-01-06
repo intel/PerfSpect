@@ -23,7 +23,7 @@ jobs:
         uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
         with:
           path: tools-cache
-          key: perfspect-tools-binaries-${{ hashFiles('tools/Makefile', 'tools/**/*.Dockerfile', 'tools/**/*.patch') }}
+          key: perfspect-tools-binaries-${{ hashFiles('tools/**') }}
       - name: Set cache hit flag
         if: steps.cache-tools.outputs.cache-hit == 'true'
         run: |
