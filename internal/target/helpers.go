@@ -33,7 +33,13 @@ func installLkms(t Target, lkms []string) (installedLkms []string, err error) {
 	}
 	for _, lkm := range lkms {
 		slog.Debug("attempting to install kernel module", slog.String("lkm", lkm))
-		_, _, _, err := t.RunCommandEx(exec.Command("modprobe", "--first-time", lkm), 10, false, true) // #nosec G204
+		var cmd *exec.Cmd
+		if !t.IsSuperUser() {
+			cmd = exec.Command("sudo", "modprobe", "--first-time", lkm)
+		} else {
+			cmd = exec.Command("modprobe", "--first-time", lkm)
+		}
+		_, _, _, err := t.RunCommandEx(cmd, 10, false, true) // #nosec G204
 		if err != nil {
 			slog.Debug("kernel module already installed or problem installing", slog.String("lkm", lkm), slog.String("error", err.Error()))
 			continue
@@ -61,7 +67,13 @@ func uninstallLkms(t Target, lkms []string) (err error) {
 	}
 	for _, lkm := range lkms {
 		slog.Debug("attempting to uninstall kernel module", slog.String("lkm", lkm))
-		_, _, _, err := t.RunCommandEx(exec.Command("modprobe", "-r", lkm), 10, false, true) // #nosec G204
+		var cmd *exec.Cmd
+		if !t.IsSuperUser() {
+			cmd = exec.Command("sudo", "modprobe", "-r", lkm)
+		} else {
+			cmd = exec.Command("modprobe", "-r", lkm)
+		}
+		_, _, _, err := t.RunCommandEx(cmd, 10, false, true) // #nosec G204
 		if err != nil {
 			slog.Error("error uninstalling kernel module", slog.String("lkm", lkm), slog.String("error", err.Error()))
 			continue
