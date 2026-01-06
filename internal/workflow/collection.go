@@ -110,7 +110,7 @@ func outputsFromTargets(cmd *cobra.Command, myTargets []target.Target, tables []
 
 // isTableForTarget checks if the given table is applicable for the specified target
 func isTableForTarget(tbl table.TableDefinition, t target.Target, localTempDir string) bool {
-	if tableRequiresElevatedPrivileges(tbl) && !t.CanElevatePrivileges() {
+	if allTableScriptsRequireSuperuser(tbl) && !t.CanElevatePrivileges() {
 		return false
 	}
 	if len(tbl.Architectures) > 0 {
@@ -150,11 +150,19 @@ func isTableForTarget(tbl table.TableDefinition, t target.Target, localTempDir s
 
 // elevatedPrivilegesRequired returns true if any of the scripts needed for the tables require elevated privileges
 func elevatedPrivilegesRequired(tables []table.TableDefinition) bool {
-	return slices.ContainsFunc(tables, tableRequiresElevatedPrivileges)
+	for _, tbl := range tables {
+		for _, scriptName := range tbl.ScriptNames {
+			script := script.GetScriptByName(scriptName)
+			if script.Superuser {
+				return true
+			}
+		}
+	}
+	return false
 }
 
-// tableRequiresElevatedPrivileges checks if all scripts in the table require elevated privileges
-func tableRequiresElevatedPrivileges(tbl table.TableDefinition) bool {
+// allTableScriptsRequireSuperuser checks if all scripts in the table require superuser privileges
+func allTableScriptsRequireSuperuser(tbl table.TableDefinition) bool {
 	for _, scriptName := range tbl.ScriptNames {
 		script := script.GetScriptByName(scriptName)
 		if !script.Superuser {
