@@ -110,6 +110,9 @@ func outputsFromTargets(cmd *cobra.Command, myTargets []target.Target, tables []
 
 // isTableForTarget checks if the given table is applicable for the specified target
 func isTableForTarget(tbl table.TableDefinition, t target.Target, localTempDir string) bool {
+	if allTableScriptsRequireSuperuser(tbl) && !t.CanElevatePrivileges() {
+		return false
+	}
 	if len(tbl.Architectures) > 0 {
 		architecture, err := t.GetArchitecture()
 		if err != nil {
@@ -156,6 +159,28 @@ func elevatedPrivilegesRequired(tables []table.TableDefinition) bool {
 		}
 	}
 	return false
+}
+
+// allTableScriptsRequireSuperuser checks if all scripts in the table require superuser privileges
+func allTableScriptsRequireSuperuser(tbl table.TableDefinition) bool {
+	for _, scriptName := range tbl.ScriptNames {
+		script := script.GetScriptByName(scriptName)
+		if !script.Superuser {
+			return false
+		}
+	}
+	return true
+}
+
+// numTablesForTarget returns the number of tables applicable for the specified target
+func numTablesForTarget(tables []table.TableDefinition, t target.Target, localTempDir string) int {
+	count := 0
+	for _, tbl := range tables {
+		if isTableForTarget(tbl, t, localTempDir) {
+			count++
+		}
+	}
+	return count
 }
 
 // collectOnTarget runs the scripts on the target and sends the results to the appropriate channels
