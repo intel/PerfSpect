@@ -57,9 +57,6 @@ func configureSignalHandler(myTargets []target.Target, statusFunc progress.Multi
 	go func() {
 		sig := <-sigChannel
 		slog.Debug("received signal", slog.String("signal", sig.String()))
-		// The controller.sh script is run in its own process group, so we need to send the signal
-		// directly to the PID of the controller. For every target, look for the primary_collection_script
-		// PID file and send SIGINT to it.
 		// The controller script is run in its own process group, so we need to send the signal
 		// directly to the PID of the controller. For every target, look for the controller
 		// PID file and send SIGINT to it.
