@@ -172,8 +172,8 @@ func setLlcSize(desiredLlcSize float64, myTarget target.Target, localTempDir str
 		ScriptTemplate: fmt.Sprintf("wrmsr -a 0xC90 %d", msrVal),
 		Superuser:      true,
 		Vendors:        []string{cpus.IntelVendor},
-		// Depends:        []string{"wrmsr"},
-		// Lkms:           []string{"msr"},
+		Depends:        []string{"wrmsr"},
+		Lkms:           []string{"msr"},
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
@@ -222,8 +222,8 @@ func setSSEFrequency(sseFrequency float64, myTarget target.Target, localTempDir 
 				ScriptTemplate: fmt.Sprintf("wrmsr 0x774 %d", value),
 				Superuser:      true,
 				Vendors:        []string{cpus.IntelVendor},
-				// Depends:        []string{"wrmsr"},
-				// Lkms:           []string{"msr"},
+				Depends:        []string{"wrmsr"},
+				Lkms:           []string{"msr"},
 			}
 		} else {
 			value := freqInt << uint(2*8)
@@ -232,8 +232,8 @@ func setSSEFrequency(sseFrequency float64, myTarget target.Target, localTempDir 
 				ScriptTemplate: fmt.Sprintf("wrmsr 0x199 %d", value),
 				Superuser:      true,
 				Vendors:        []string{cpus.IntelVendor},
-				// Depends:        []string{"wrmsr"},
-				// Lkms:           []string{"msr"},
+				Depends:        []string{"wrmsr"},
+				Lkms:           []string{"msr"},
 			}
 		}
 	} else {
@@ -247,8 +247,8 @@ func setSSEFrequency(sseFrequency float64, myTarget target.Target, localTempDir 
 			ScriptTemplate: fmt.Sprintf("wrmsr -a 0x1AD %d", value),
 			Superuser:      true,
 			Vendors:        []string{cpus.IntelVendor},
-			// Depends:        []string{"wrmsr"},
-			// Lkms:           []string{"msr"},
+			Depends:        []string{"wrmsr"},
+			Lkms:           []string{"msr"},
 		}
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
@@ -440,6 +440,8 @@ func setSSEFrequencies(sseFrequencies string, myTarget target.Target, localTempD
 				ScriptTemplate: fmt.Sprintf("wrmsr 0x774 %d", value),
 				Superuser:      true,
 				Vendors:        []string{cpus.IntelVendor},
+				Depends:        []string{"wrmsr"},
+				Lkms:           []string{"msr"},
 			}
 		} else {
 			// For non-intel_pstate driver
@@ -450,6 +452,8 @@ func setSSEFrequencies(sseFrequencies string, myTarget target.Target, localTempD
 				ScriptTemplate: fmt.Sprintf("wrmsr 0x199 %d", value),
 				Superuser:      true,
 				Vendors:        []string{cpus.IntelVendor},
+				Depends:        []string{"wrmsr"},
+				Lkms:           []string{"msr"},
 			}
 		}
 	} else {
@@ -464,6 +468,8 @@ func setSSEFrequencies(sseFrequencies string, myTarget target.Target, localTempD
 			ScriptTemplate: fmt.Sprintf("wrmsr -a 0x1AD %d", value),
 			Superuser:      true,
 			Vendors:        []string{cpus.IntelVendor},
+			Depends:        []string{"wrmsr"},
+			Lkms:           []string{"msr"},
 		}
 	}
 
@@ -546,8 +552,8 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 		Vendors:            []string{cpus.IntelVendor},
 		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF},
 		Superuser:          true,
-		// Depends:        []string{"rdmsr"},
-		// Lkms:           []string{"msr"},
+		Depends:            []string{"rdmsr"},
+		Lkms:               []string{"msr"},
 	}
 	scriptOutput, err := workflow.RunScript(myTarget, getScript, localTempDir, false)
 	if err != nil {
@@ -576,8 +582,8 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 		Superuser:          true,
 		Vendors:            []string{cpus.IntelVendor},
 		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF},
-		// Depends:        []string{"wrmsr"},
-		// Lkms:           []string{"msr"},
+		Depends:            []string{"wrmsr"},
+		Lkms:               []string{"msr"},
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
@@ -592,8 +598,8 @@ func setTDP(power int, myTarget target.Target, localTempDir string) error {
 		ScriptTemplate: "rdmsr 0x610",
 		Superuser:      true,
 		Vendors:        []string{cpus.IntelVendor},
-		// Lkms:           []string{"msr"},
-		// Depends:        []string{"rdmsr"},
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
 	}
 	readOutput, err := workflow.RunScript(myTarget, readScript, localTempDir, false)
 	if err != nil {
@@ -613,8 +619,8 @@ func setTDP(power int, myTarget target.Target, localTempDir string) error {
 				ScriptTemplate: fmt.Sprintf("wrmsr -a 0x610 %d", newVal),
 				Superuser:      true,
 				Vendors:        []string{cpus.IntelVendor},
-				// Depends:        []string{"wrmsr"},
-				// Lkms:           []string{"msr"},
+				Depends:        []string{"wrmsr"},
+				Lkms:           []string{"msr"},
 			}
 			_, err := runScript(myTarget, setScript, localTempDir)
 			if err != nil {
@@ -650,8 +656,8 @@ func setEPB(epb int, myTarget target.Target, localTempDir string) error {
 		ScriptTemplate: "rdmsr " + msr,
 		Vendors:        []string{cpus.IntelVendor},
 		Superuser:      true,
-		// Lkms:           []string{"msr"},
-		// Depends:        []string{"rdmsr"},
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
 	}
 	readOutput, err := runScript(myTarget, readScript, localTempDir)
 	if err != nil {
@@ -671,8 +677,8 @@ func setEPB(epb int, myTarget target.Target, localTempDir string) error {
 		ScriptTemplate: fmt.Sprintf("wrmsr -a %s %d", msr, msrValue),
 		Superuser:      true,
 		Vendors:        []string{cpus.IntelVendor},
-		// Depends:        []string{"wrmsr"},
-		// Lkms:           []string{"msr"},
+		Depends:        []string{"wrmsr"},
+		Lkms:           []string{"msr"},
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
@@ -691,8 +697,8 @@ func setEPP(epp int, myTarget target.Target, localTempDir string) error {
 		ScriptTemplate: "rdmsr 0x774", // IA32_HWP_REQUEST
 		Vendors:        []string{cpus.IntelVendor},
 		Superuser:      true,
-		// Lkms:           []string{"msr"},
-		// Depends:        []string{"rdmsr"},
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
 	}
 	stdout, err := runScript(myTarget, getScript, localTempDir)
 	if err != nil {
@@ -712,8 +718,8 @@ func setEPP(epp int, myTarget target.Target, localTempDir string) error {
 		ScriptTemplate: fmt.Sprintf("wrmsr -a 0x774 %d", eppValue),
 		Superuser:      true,
 		Vendors:        []string{cpus.IntelVendor},
-		// Depends:        []string{"wrmsr"},
-		// Lkms:           []string{"msr"},
+		Depends:        []string{"wrmsr"},
+		Lkms:           []string{"msr"},
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
@@ -725,8 +731,8 @@ func setEPP(epp int, myTarget target.Target, localTempDir string) error {
 		ScriptTemplate: "rdmsr 0x772", // IA32_HWP_REQUEST_PKG
 		Vendors:        []string{cpus.IntelVendor},
 		Superuser:      true,
-		// Lkms:           []string{"msr"},
-		// Depends:        []string{"rdmsr"},
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
 	}
 	stdout, err = runScript(myTarget, getScript, localTempDir)
 	if err != nil {
@@ -746,8 +752,8 @@ func setEPP(epp int, myTarget target.Target, localTempDir string) error {
 		ScriptTemplate: fmt.Sprintf("wrmsr -a 0x772 %d", eppValue),
 		Superuser:      true,
 		Vendors:        []string{cpus.IntelVendor},
-		// Depends:        []string{"wrmsr"},
-		// Lkms:           []string{"msr"},
+		Depends:        []string{"wrmsr"},
+		Lkms:           []string{"msr"},
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
@@ -829,8 +835,8 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 		ScriptTemplate: fmt.Sprintf("rdmsr %d", pf.Msr),
 		Vendors:        []string{cpus.IntelVendor},
 		Superuser:      true,
-		// Lkms:           []string{"msr"},
-		// Depends:        []string{"rdmsr"},
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
 	}
 	stdout, err := runScript(myTarget, getScript, localTempDir)
 	if err != nil {
@@ -860,8 +866,8 @@ func setPrefetcher(enableDisable string, myTarget target.Target, localTempDir st
 		ScriptTemplate: fmt.Sprintf("wrmsr -a %d %d", pf.Msr, newVal),
 		Superuser:      true,
 		Vendors:        []string{cpus.IntelVendor},
-		// Depends:        []string{"wrmsr"},
-		// Lkms:           []string{"msr"},
+		Depends:        []string{"wrmsr"},
+		Lkms:           []string{"msr"},
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
@@ -929,8 +935,8 @@ func setC1Demotion(enableDisable string, myTarget target.Target, localTempDir st
 		ScriptTemplate: "rdmsr 0xe2",
 		Vendors:        []string{cpus.IntelVendor},
 		Superuser:      true,
-		// Lkms:           []string{"msr"},
-		// Depends:        []string{"rdmsr"},
+		Lkms:           []string{"msr"},
+		Depends:        []string{"rdmsr"},
 	}
 	stdout, err := runScript(myTarget, getScript, localTempDir)
 	if err != nil {
@@ -961,8 +967,8 @@ func setC1Demotion(enableDisable string, myTarget target.Target, localTempDir st
 		ScriptTemplate: fmt.Sprintf("wrmsr -a %d %d", 0xe2, newVal),
 		Vendors:        []string{cpus.IntelVendor},
 		Superuser:      true,
-		// Depends:        []string{"wrmsr"},
-		// Lkms:           []string{"msr"},
+		Depends:        []string{"wrmsr"},
+		Lkms:           []string{"msr"},
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
