@@ -1523,9 +1523,9 @@ _finalize=0 # flag to indicate if finalize has been called
 # Function to finalize profiling and output
 finalize() {
     if [ $_finalize -eq 1 ]; then
-		return
-	fi
-	_finalize=1
+        return
+    fi
+    _finalize=1
     stop_profiling
     collapse_perf_data
     print_results
