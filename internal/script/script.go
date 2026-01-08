@@ -259,6 +259,7 @@ declare -A pids=()
 declare -A exitcodes=()
 declare -A orig_names=()
 current_seq_pid=""
+current_seq_script=""
 
 continue_on_script_error={{if .ContinueOnScriptError}}1{{else}}0{{end}}
 
@@ -290,6 +291,7 @@ start_concurrent_scripts() {
 run_sequential_scripts() {
   for s in "${sequential_scripts[@]}"; do
     current_seq_pid=""
+    current_seq_script="$s"
     setsid bash "$script_dir/${s}.sh" > "$script_dir/${s}.stdout" 2> "$script_dir/${s}.stderr" &
     current_seq_pid=$!
     pids[$s]=$current_seq_pid
@@ -304,6 +306,7 @@ run_sequential_scripts() {
       fi
     fi
     current_seq_pid=""
+    current_seq_script=""
   done
 }
 
@@ -314,10 +317,17 @@ kill_script() {
   if ! ps -p "$pid" > /dev/null 2>&1; then return 0; fi
   # Send signal to the process group (negative PID)
   kill -SIGINT -"$pid" 2>/dev/null || true
-  # Give it a moment to clean up
-  sleep 0.1
+  # Give it time to clean up so child script can finalize
+  # Wait up to 5 seconds in 0.5s intervals
+  local waited=0
+  while ps -p "$pid" > /dev/null 2>&1 && [ "$waited" -lt 10 ]; do
+    sleep 0.5
+    waited=$((waited + 1))
+  done
   # Force kill the process group if still alive
-  kill -SIGKILL -"$pid" 2>/dev/null || true
+  if ps -p "$pid" > /dev/null 2>&1; then
+    kill -SIGKILL -"$pid" 2>/dev/null || true
+  fi
   wait "$pid" 2>/dev/null || true
   if [[ -z "${exitcodes[$s]:-}" ]]; then exitcodes[$s]=130; fi
 }
@@ -351,11 +361,8 @@ handle_sigint() {
     kill_script "$s"
   done
   # kill current sequential script if running
-  if [[ -n "$current_seq_pid" ]]; then
-    kill -SIGINT -"$current_seq_pid" 2>/dev/null || true
-    sleep 0.1
-    kill -SIGKILL -"$current_seq_pid" 2>/dev/null || true
-    wait "$current_seq_pid" 2>/dev/null || true
+  if [[ -n "$current_seq_script" ]]; then
+    kill_script "$current_seq_script"
   fi
   print_summary
   rm -f {{.ControllerPIDFile}}
