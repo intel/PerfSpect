@@ -5,6 +5,7 @@ package workflow
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -31,7 +32,8 @@ func signalProcessOnTarget(t target.Target, pidStr string, sigStr string) error 
 	} else {
 		cmd = exec.Command("kill", sigStr, pidStr)
 	}
-	_, _, _, err := t.RunCommandEx(cmd, 5, false, true) // #nosec G204
+	waitTime := 15                                             // this should be more than enough time to gracefully exit
+	_, _, _, err := t.RunCommandEx(cmd, waitTime, false, true) // #nosec G204
 	return err
 }
 
@@ -69,6 +71,7 @@ func configureSignalHandler(myTargets []target.Target, statusFunc progress.Multi
 			stdout, _, exitcode, err := t.RunCommandEx(exec.Command("cat", pidFilePath), 5, false, true) // #nosec G204
 			if err != nil {
 				slog.Error("error retrieving target controller PID", slog.String("target", t.GetName()), slog.String("error", err.Error()))
+				continue
 			}
 			if exitcode == 0 {
 				pidStr := strings.TrimSpace(stdout)
@@ -86,18 +89,20 @@ func configureSignalHandler(myTargets []target.Target, statusFunc progress.Multi
 			ctx, cancel := context.WithTimeout(context.Background(), targetTimeout)
 			timedOut := false
 			pidFilePath := filepath.Join(t.GetTempDirectory(), script.ControllerPIDFileName)
+			// read the pid file
+			stdout, _, exitcode, err := t.RunCommandEx(exec.Command("cat", pidFilePath), 5, false, true) // #nosec G204
+			if err != nil || exitcode != 0 {
+				slog.Debug("target controller PID file no longer exists, assuming script has exited or is in the process of exiting", slog.String("target", t.GetName()))
+				cancel()
+				continue
+			}
+			pidStr := strings.TrimSpace(stdout)
 			for {
-				// read the pid file
-				stdout, _, exitcode, err := t.RunCommandEx(exec.Command("cat", pidFilePath), 5, false, true) // #nosec G204
-				if err != nil || exitcode != 0 {
-					// pid file doesn't exist
-					break
-				}
-				pidStr := strings.TrimSpace(stdout)
 				// determine if the process still exists
 				_, _, exitcode, err = t.RunCommandEx(exec.Command("ps", "-p", pidStr), 5, false, true) // #nosec G204
 				if err != nil || exitcode != 0 {
-					break // process no longer exists, script has exited
+					slog.Debug("target controller process no longer exists", slog.String("target", t.GetName()))
+					break
 				}
 				// check for timeout
 				select {
@@ -122,8 +127,26 @@ func configureSignalHandler(myTargets []target.Target, statusFunc progress.Multi
 			cancel()
 		}
 
-		// send SIGINT to perfspect's children
-		err := util.SignalChildren(syscall.SIGINT)
+		// Race condition between the controller script deleting its PID file and it truly exiting. Future work: reconsider decision
+		// to have the controller script delete its own PID file.
+		// When working with a remote target we want to give our local SSH commannd time to exit cleanly
+		// before we send SIGINT to it. If we interrupt the SSH command unnecessarily, the controller output
+		// will be lost.
+		time.Sleep(500 * time.Millisecond)
+
+		// send SIGINT to perfspect's remaining children, if any
+		myPid := os.Getpid()
+		children, err := util.GetChildren(myPid)
+		if err != nil {
+			slog.Error("error retrieving child processes", slog.String("error", err.Error()))
+			return
+		}
+		if len(children) == 0 {
+			slog.Debug("no child processes to signal")
+			return
+		}
+		slog.Debug("signaling child processes", slog.String("child PIDs", fmt.Sprintf("%v", children)))
+		err = util.SignalChildren(syscall.SIGINT)
 		if err != nil {
 			slog.Error("error sending signal to children", slog.String("error", err.Error()))
 		}

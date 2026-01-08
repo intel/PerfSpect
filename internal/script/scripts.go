@@ -1462,11 +1462,11 @@ fi
 stop_profiling() {
     if [ -n "$perf_fp_pid" ]; then
         kill -0 "$perf_fp_pid" 2>/dev/null && kill -INT "$perf_fp_pid"
-        wait "$perf_fp_pid"
+        wait "$perf_fp_pid" || true
     fi
     if [ -n "$perf_dwarf_pid" ]; then
         kill -0 "$perf_dwarf_pid" 2>/dev/null && kill -INT "$perf_dwarf_pid"
-        wait "$perf_dwarf_pid"
+        wait "$perf_dwarf_pid" || true
     fi
     for pid in "${java_pids[@]}"; do
         async-profiler/bin/asprof stop -o collapsed -f ap_folded_"$pid" "$pid"
@@ -1518,8 +1518,14 @@ print_results() {
     done
 }
 
+_finalize=0 # flag to indicate if finalize has been called
+
 # Function to finalize profiling and output
 finalize() {
+    if [ $_finalize -eq 1 ]; then
+		return
+	fi
+	_finalize=1
     stop_profiling
     collapse_perf_data
     print_results
@@ -1584,16 +1590,18 @@ for pid in "${java_pids[@]}"; do
 done
 
 # profiling has been started, set up trap to finalize on interrupt
-trap finalize INT TERM
+trap finalize INT TERM EXIT
 
-# Wait for the specified duration (seconds), then wrap it up by calling finalize
+# wait
 if [ "$duration" -gt 0 ]; then
+    # wait for the specified duration (seconds), then wrap it up by calling finalize
     sleep "$duration"
-    finalize
+else
+    # wait indefinitely until child processes are killed or interrupted
+    wait
 fi
 
-# Wait indefinitely until interrupted, trap will call finalize
-wait
+finalize
 `,
 		Superuser:  true,
 		Sequential: true,
