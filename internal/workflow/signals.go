@@ -32,7 +32,9 @@ func signalProcessOnTarget(t target.Target, pidStr string, sigStr string) error 
 	} else {
 		cmd = exec.Command("kill", sigStr, pidStr)
 	}
-	waitTime := 15                                             // this should be more than enough time to gracefully exit
+	// waitTime must exceed the controller script's kill_script graceful shutdown period (5s)
+	// plus buffer for network latency when working with remote targets
+	waitTime := 15
 	_, _, _, err := t.RunCommandEx(cmd, waitTime, false, true) // #nosec G204
 	return err
 }
