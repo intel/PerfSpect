@@ -127,9 +127,9 @@ func configureSignalHandler(myTargets []target.Target, statusFunc progress.Multi
 			cancel()
 		}
 
-		// Race condition between the controller script deleting its PID file and it truly exiting. Future work: reconsider decision
-		// to have the controller script delete its own PID file.
-		// When working with a remote target we want to give our local SSH commannd time to exit cleanly
+		// Race condition between the controller script deleting its PID file and it truly exiting.
+		// Future work: reconsider decision to have the controller script delete its own PID file.
+		// When working with a remote target we want to give our local SSH command time to exit cleanly
 		// before we send SIGINT to it. If we interrupt the SSH command unnecessarily, the controller output
 		// will be lost.
 		time.Sleep(500 * time.Millisecond)
