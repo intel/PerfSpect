@@ -339,8 +339,8 @@ func createHtmlReportMultiTarget(allTargetsTableValues [][]table.TableValues, ta
 		// loop through the targets that have values for this table
 		for targetIndex, targetTableValues := range tableValues {
 			targetName := tableTargets[targetIndex]
-			// if the table has rows and no custom renderer, print the table for the target normally
-			if targetTableValues.HasRows && getCustomHTMLMultiTargetRenderer(targetTableValues.Name) == nil {
+			// render the table for this target if it has a custom renderer
+			if shouldRenderTablePerTarget(targetTableValues) {
 				// print the table name only one time per table
 				if targetIndex == 0 {
 					fmt.Fprintf(&sb, "<h2 id=\"%[1]s\">%[1]s</h2>\n", html.EscapeString(targetTableValues.Name))
@@ -357,7 +357,7 @@ func createHtmlReportMultiTarget(allTargetsTableValues [][]table.TableValues, ta
 				} else {
 					sb.WriteString(DefaultHTMLTableRendererFunc(targetTableValues))
 				}
-			} else { // if the table has no rows or a custom renderer, add the table to the list to render as a multi-target table
+			} else { // if the table doesn't have a custom renderer, add it to the list to render as a multi-target table
 				oneTableValuesForAllTargets = append(oneTableValuesForAllTargets, targetTableValues)
 			}
 		}
@@ -382,6 +382,19 @@ func createHtmlReportMultiTarget(allTargetsTableValues [][]table.TableValues, ta
 	sb.WriteString("</html>\n")
 	out = []byte(sb.String())
 	return
+}
+
+// shouldRenderTablePerTarget determines if a table should be rendered individually per target
+// rather than as a combined multi-target comparison table.
+// Renders per-target if:
+//   - The table has multiple rows (HasRows=true), OR
+//   - The table has a custom single-target renderer
+//
+// Unless a specific multi-target renderer exists for the table.
+func shouldRenderTablePerTarget(tableValues table.TableValues) bool {
+	hasCustomRenderer := getCustomHTMLRenderer(tableValues.Name) != nil
+	hasMultiTargetRenderer := getCustomHTMLMultiTargetRenderer(tableValues.Name) != nil
+	return (tableValues.HasRows || hasCustomRenderer) && !hasMultiTargetRenderer
 }
 
 // findTableIndex
