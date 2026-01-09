@@ -35,7 +35,12 @@ var psRegex = `^\s*(\d+)\s+(\d+)\s+([\w\d\(\)\:\/_\-\:\.]+)\s+(.*)`
 // set of running processes.
 func GetProcesses(myTarget target.Target, pids []string) (processes []Process, err error) {
 	for _, pid := range pids {
-		if processExists(myTarget, pid) {
+		var exists bool
+		exists, err = processExists(myTarget, pid)
+		if err != nil {
+			return processes, err
+		}
+		if exists {
 			var process Process
 			if process, err = getProcess(myTarget, pid); err != nil {
 				return
@@ -71,7 +76,11 @@ func GetHotProcesses(myTarget target.Target, maxProcesses int, filter string) (p
 	cmd := exec.Command("ps", "-a", "-x", "-h", "-o", "pid,ppid,comm,cmd", "--sort=-%cpu")
 	stdout, stderr, exitcode, err := myTarget.RunCommand(cmd)
 	if err != nil {
-		err = fmt.Errorf("failed to get hot processes: %s, %d, %v", stderr, exitcode, err)
+		err = fmt.Errorf("failed to execute ps command: %v", err)
+		return
+	}
+	if exitcode != 0 {
+		err = fmt.Errorf("failed to get hot processes: %s, exit code %d", stderr, exitcode)
 		return
 	}
 	psOutput := stdout
@@ -177,14 +186,16 @@ done | sort -nr | head -n %d
 	return
 }
 
-func processExists(myTarget target.Target, pid string) (exists bool) {
+func processExists(myTarget target.Target, pid string) (exists bool, err error) {
 	cmd := exec.Command("ps", "-p", pid)
-	_, _, _, err := myTarget.RunCommand(cmd)
+	var exitCode int
+	_, _, exitCode, err = myTarget.RunCommand(cmd)
 	if err != nil {
-		exists = false
+		slog.Error("failed to check if process exists", slog.String("PID", pid), slog.String("error", err.Error()))
 		return
 	}
-	exists = true
+	// ps -p returns 0 if process exists, non-zero otherwise
+	exists = exitCode == 0
 	return
 }
 
@@ -192,7 +203,11 @@ func getProcess(myTarget target.Target, pid string) (process Process, err error)
 	cmd := exec.Command("ps", "-q", pid, "h", "-o", "pid,ppid,comm,cmd", "ww")
 	stdout, stderr, exitcode, err := myTarget.RunCommand(cmd)
 	if err != nil {
-		err = fmt.Errorf("failed to get process: %s, %d, %v", stderr, exitcode, err)
+		err = fmt.Errorf("failed to execute ps command: %v", err)
+		return
+	}
+	if exitcode != 0 {
+		err = fmt.Errorf("failed to get process: %s, exit code %d", stderr, exitcode)
 		return
 	}
 	psOutput := stdout

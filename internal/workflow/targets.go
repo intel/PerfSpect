@@ -480,10 +480,12 @@ func parseMountOutput(mountOutput string) ([]mountRecord, error) {
 // isDirNoExec checks if the target directory is on a file system that is mounted with noexec.
 func isDirNoExec(t target.Target, dir string) (bool, error) {
 	dfCmd := exec.Command("df", "-P", dir)
-	dfOutput, _, _, err := t.RunCommand(dfCmd)
+	dfOutput, _, exitCode, err := t.RunCommand(dfCmd)
 	if err != nil {
-		err = fmt.Errorf("failed to run df command: %w", err)
-		return false, err
+		return false, fmt.Errorf("failed to run df command: %w", err)
+	}
+	if exitCode != 0 {
+		return false, fmt.Errorf("df command returned exit code %d", exitCode)
 	}
 	filesystem, err := fieldFromDfpOutput(dfOutput, "Filesystem")
 	if err != nil {
@@ -494,10 +496,12 @@ func isDirNoExec(t target.Target, dir string) (bool, error) {
 		return false, err
 	}
 	mountCmd := exec.Command("mount")
-	mountOutput, _, _, err := t.RunCommand(mountCmd)
+	mountOutput, _, exitCode, err := t.RunCommand(mountCmd)
 	if err != nil {
-		err = fmt.Errorf("failed to run mount command: %w", err)
-		return false, err
+		return false, fmt.Errorf("failed to run mount command: %w", err)
+	}
+	if exitCode != 0 {
+		return false, fmt.Errorf("mount command returned exit code %d", exitCode)
 	}
 	mounts, err := parseMountOutput(mountOutput)
 	if err != nil {
@@ -539,10 +543,14 @@ func GetTargetVendor(t target.Target) (string, error) {
 	vendor := t.GetVendor()
 	if vendor == "" {
 		cmd := exec.Command("bash", "-c", "lscpu | grep -i \"^Vendor ID:\" | awk '{print $NF}'")
+		var exitCode int
 		var err error
-		vendor, _, _, err = t.RunCommand(cmd)
+		vendor, _, exitCode, err = t.RunCommand(cmd)
 		if err != nil {
 			return "", fmt.Errorf("failed to get target CPU vendor: %v", err)
+		}
+		if exitCode != 0 {
+			return "", fmt.Errorf("failed to get target CPU vendor: command returned exit code %d", exitCode)
 		}
 		vendor = strings.TrimSpace(vendor)
 		t.SetVendor(vendor)
@@ -555,10 +563,14 @@ func GetTargetFamily(t target.Target) (string, error) {
 	family := t.GetFamily()
 	if family == "" {
 		cmd := exec.Command("bash", "-c", "lscpu | grep -i \"^CPU family:\" | awk '{print $NF}'")
+		var exitCode int
 		var err error
-		family, _, _, err = t.RunCommand(cmd)
+		family, _, exitCode, err = t.RunCommand(cmd)
 		if err != nil {
 			return "", fmt.Errorf("failed to get target CPU family: %v", err)
+		}
+		if exitCode != 0 {
+			return "", fmt.Errorf("failed to get target CPU family: command returned exit code %d", exitCode)
 		}
 		family = strings.TrimSpace(family)
 		t.SetFamily(family)
@@ -571,10 +583,14 @@ func GetTargetModel(t target.Target) (string, error) {
 	model := t.GetModel()
 	if model == "" {
 		cmd := exec.Command("bash", "-c", "lscpu | grep -i \"^Model:\" | awk '{print $NF}'")
+		var exitCode int
 		var err error
-		model, _, _, err = t.RunCommand(cmd)
+		model, _, exitCode, err = t.RunCommand(cmd)
 		if err != nil {
 			return "", fmt.Errorf("failed to get target CPU model: %v", err)
+		}
+		if exitCode != 0 {
+			return "", fmt.Errorf("failed to get target CPU model: command returned exit code %d", exitCode)
 		}
 		model = strings.TrimSpace(model)
 		t.SetModel(model)
@@ -587,10 +603,14 @@ func GetTargetStepping(t target.Target) (string, error) {
 	stepping := t.GetStepping()
 	if stepping == "" {
 		cmd := exec.Command("bash", "-c", "lscpu | grep -i \"^Stepping:\" | awk '{print $NF}'")
+		var exitCode int
 		var err error
-		stepping, _, _, err = t.RunCommand(cmd)
+		stepping, _, exitCode, err = t.RunCommand(cmd)
 		if err != nil {
 			return "", fmt.Errorf("failed to get target CPU stepping: %v", err)
+		}
+		if exitCode != 0 {
+			return "", fmt.Errorf("failed to get target CPU stepping: command returned exit code %d", exitCode)
 		}
 		stepping = strings.TrimSpace(stepping)
 		t.SetStepping(stepping)

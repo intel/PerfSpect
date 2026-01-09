@@ -427,7 +427,11 @@ func getCPUInfo(t target.Target) (cpuInfo []map[string]string, err error) {
 	cmd := exec.Command("cat", "/proc/cpuinfo")
 	stdout, stderr, exitcode, err := t.RunCommand(cmd)
 	if err != nil {
-		err = fmt.Errorf("failed to get cpuinfo: %s, %d, %v", stderr, exitcode, err)
+		err = fmt.Errorf("failed to execute cat command: %v", err)
+		return
+	}
+	if exitcode != 0 {
+		err = fmt.Errorf("failed to get cpuinfo: %s, exit code %d", stderr, exitcode)
 		return
 	}
 	oneCPUInfo := make(map[string]string)
@@ -479,8 +483,12 @@ func getNumGPCounters(uarch string) (numGPCounters int, err error) {
 func getLscpu(t target.Target) (output string, err error) {
 	cmd := exec.Command("lscpu")
 	output, stderr, exitcode, err := t.RunCommand(cmd)
-	if err != nil || exitcode != 0 {
-		err = fmt.Errorf("failed to run lscpu: %s, %d, %v", stderr, exitcode, err)
+	if err != nil {
+		err = fmt.Errorf("failed to execute lscpu command: %v", err)
+		return
+	}
+	if exitcode != 0 {
+		err = fmt.Errorf("failed to run lscpu: %s, exit code %d", stderr, exitcode)
 		return
 	}
 	return

@@ -133,8 +133,12 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, continueOnSc
 	reuseSSHConnection := false // don't reuse ssh connection on long-running commands, makes it difficult to kill the command
 	stdout, stderr, exitcode, err := myTarget.RunCommandEx(cmd, timeout, newProcessGroup, reuseSSHConnection)
 	if err != nil {
-		slog.Error("error running controller script on target", slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitcode", exitcode), slog.String("error", err.Error()))
+		slog.Error("failed to execute controller script on target", slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitcode", exitcode), slog.String("error", err.Error()))
 		return nil, err
+	}
+	if exitcode != 0 {
+		slog.Error("controller script returned non-zero exit code", slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitcode", exitcode))
+		return nil, fmt.Errorf("controller script returned exit code %d", exitcode)
 	}
 	// parse output of controller script
 	allScriptOutputs := parseControllerScriptOutput(stdout)

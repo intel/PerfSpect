@@ -39,9 +39,13 @@ func installLkms(t Target, lkms []string) (installedLkms []string, err error) {
 		} else {
 			cmd = exec.Command("modprobe", "--first-time", lkm)
 		}
-		_, _, _, err := t.RunCommandEx(cmd, 10, false, true) // #nosec G204
+		_, _, exitCode, err := t.RunCommandEx(cmd, 10, false, true) // #nosec G204
 		if err != nil {
-			slog.Debug("kernel module already installed or problem installing", slog.String("lkm", lkm), slog.String("error", err.Error()))
+			slog.Error("failed to run modprobe command", slog.String("lkm", lkm), slog.String("error", err.Error()))
+			continue
+		}
+		if exitCode != 0 {
+			slog.Debug("kernel module already installed or problem installing", slog.String("lkm", lkm), slog.Int("exitCode", exitCode))
 			continue
 		}
 		slog.Debug("kernel module installed", slog.String("lkm", lkm))
@@ -73,9 +77,13 @@ func uninstallLkms(t Target, lkms []string) (err error) {
 		} else {
 			cmd = exec.Command("modprobe", "-r", lkm)
 		}
-		_, _, _, err := t.RunCommandEx(cmd, 10, false, true) // #nosec G204
+		_, _, exitCode, err := t.RunCommandEx(cmd, 10, false, true) // #nosec G204
 		if err != nil {
-			slog.Error("error uninstalling kernel module", slog.String("lkm", lkm), slog.String("error", err.Error()))
+			slog.Error("failed to run modprobe command", slog.String("lkm", lkm), slog.String("error", err.Error()))
+			continue
+		}
+		if exitCode != 0 {
+			slog.Error("error uninstalling kernel module", slog.String("lkm", lkm), slog.Int("exitCode", exitCode))
 			continue
 		}
 		slog.Debug("kernel module uninstalled", slog.String("lkm", lkm))
@@ -125,10 +133,14 @@ func runLocalCommandWithInputWithTimeout(cmd *exec.Cmd, input string, timeout in
 	stdout = outbuf.String()
 	stderr = errbuf.String()
 	if err != nil {
-		exitError := &exec.ExitError{}
+		var exitError *exec.ExitError
 		if errors.As(err, &exitError) {
+			// Command executed but returned non-zero exit code.
+			// This is not an execution failure, so return nil error.
 			exitCode = exitError.ExitCode()
+			err = nil
 		}
+		// Otherwise keep original error (actual execution failure)
 	}
 	return
 }
@@ -197,11 +209,16 @@ func runLocalCommandWithInputWithTimeoutAsync(cmd *exec.Cmd, stdoutChannel chan 
 	}()
 	err = cmd.Wait()
 	if err != nil {
-		if exitError, ok := err.(*exec.ExitError); ok {
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
+			// Command executed but returned non-zero exit code.
+			// This is not an execution failure, so don't return error.
 			exitcodeChannel <- exitError.ExitCode()
 		} else {
+			// Actual execution failure
 			slog.Error("unexpected error type while waiting for command to finish", slog.String("cmd", cmd.String()), slog.String("error", err.Error()))
 			exitcodeChannel <- -1
+			return err
 		}
 	} else {
 		exitcodeChannel <- 0
@@ -221,8 +238,13 @@ func runLocalCommandWithInputWithTimeoutAsync(cmd *exec.Cmd, stdoutChannel chan 
 //   - err: An error if the command execution fails or if there is an issue retrieving the architecture.
 func getArchitecture(t Target) (arch string, err error) {
 	cmd := exec.Command("uname", "-m")
-	arch, _, _, err = t.RunCommand(cmd)
+	var exitCode int
+	arch, _, exitCode, err = t.RunCommand(cmd)
 	if err != nil {
+		return
+	}
+	if exitCode != 0 {
+		err = fmt.Errorf("uname command returned exit code %d", exitCode)
 		return
 	}
 	arch = strings.TrimSpace(arch)

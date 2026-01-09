@@ -5,7 +5,6 @@ package workflow
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -38,8 +37,14 @@ func signalProcessOnTarget(t target.Target, pidStr string, sigStr string) error 
 	// waitTime must exceed the controller script's kill_script graceful shutdown period (5s)
 	// plus buffer for network latency when working with remote targets
 	waitTime := 15
-	_, _, _, err := t.RunCommandEx(cmd, waitTime, false, true) // #nosec G204
-	return err
+	_, _, exitCode, err := t.RunCommandEx(cmd, waitTime, false, true) // #nosec G204
+	if err != nil {
+		return err
+	}
+	if exitCode != 0 {
+		return fmt.Errorf("kill command returned exit code %d", exitCode)
+	}
+	return nil
 }
 
 // configureSignalHandler sets up a signal handler to catch SIGINT and SIGTERM
@@ -72,16 +77,16 @@ func configureSignalHandler(myTargets []target.Target, statusFunc progress.Multi
 				_ = statusFunc(t.GetName(), "Signal received, cleaning up...")
 			}
 			pidFilePath := filepath.Join(t.GetTempDirectory(), script.ControllerPIDFileName)
-			stdout, _, _, err := t.RunCommandEx(exec.Command("cat", pidFilePath), 5, false, true) // #nosec G204
-			// if there's an error and the error type is exec.ExitError, the file likely doesn't exist
-			// so we can skip sending the signal to this target
+			stdout, _, exitCode, err := t.RunCommandEx(exec.Command("cat", pidFilePath), 5, false, true) // #nosec G204
+			// if there's an execution error, log and skip
 			if err != nil {
-				var exitErr *exec.ExitError
-				if errors.As(err, &exitErr) {
-					slog.Debug("target controller PID file not found, assuming script has already exited", slog.String("target", t.GetName()))
-					continue
-				}
 				slog.Error("failed to retrieve target controller PID", slog.String("target", t.GetName()), slog.String("error", err.Error()))
+				continue
+			}
+			// if exit code is non-zero, the file likely doesn't exist
+			// so we can skip sending the signal to this target
+			if exitCode != 0 {
+				slog.Debug("target controller PID file not found, assuming script has already exited", slog.String("target", t.GetName()))
 				continue
 			}
 			pid := strings.TrimSpace(stdout)
@@ -108,14 +113,14 @@ func configureSignalHandler(myTargets []target.Target, statusFunc progress.Multi
 				timedOut := false
 				for {
 					// determine if the process still exists
-					_, _, _, err := tgt.RunCommandEx(exec.Command("ps", "-p", pid), 5, false, true) // #nosec G204
+					_, _, exitCode, err := tgt.RunCommandEx(exec.Command("ps", "-p", pid), 5, false, true) // #nosec G204
 					if err != nil {
-						var exitErr *exec.ExitError
-						if errors.As(err, &exitErr) {
-							slog.Debug("target controller process no longer exists", slog.String("target", tgt.GetName()))
-							break
-						}
 						slog.Error("failed to check target controller process", slog.String("target", tgt.GetName()), slog.String("error", err.Error()))
+						break
+					}
+					// ps -p returns non-zero exit code if the process doesn't exist
+					if exitCode != 0 {
+						slog.Debug("target controller process no longer exists", slog.String("target", tgt.GetName()))
 						break
 					}
 					// check for timeout
