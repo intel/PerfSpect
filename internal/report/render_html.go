@@ -339,8 +339,8 @@ func createHtmlReportMultiTarget(allTargetsTableValues [][]table.TableValues, ta
 		// loop through the targets that have values for this table
 		for targetIndex, targetTableValues := range tableValues {
 			targetName := tableTargets[targetIndex]
-			// if the table has rows and no custom renderer, print the table for the target normally
-			if targetTableValues.HasRows && getCustomHTMLMultiTargetRenderer(targetTableValues.Name) == nil {
+			// render the table for this target
+			if (targetTableValues.HasRows || getCustomHTMLRenderer(targetTableValues.Name) != nil) && getCustomHTMLMultiTargetRenderer(targetTableValues.Name) == nil {
 				// print the table name only one time per table
 				if targetIndex == 0 {
 					fmt.Fprintf(&sb, "<h2 id=\"%[1]s\">%[1]s</h2>\n", html.EscapeString(targetTableValues.Name))

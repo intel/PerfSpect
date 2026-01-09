@@ -282,32 +282,3 @@ func mergeSystemFolded(perfFp string, perfDwarf string) (merged string, err erro
 	merged = mergedStacks.dumpFolded()
 	return
 }
-
-func callStackFrequencyTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
-	out := `<style>
-
-/* Custom page header */
-.fgheader {
-	padding-bottom: 15px;
-	padding-right: 15px;
-	padding-left: 15px;
-	border-bottom: 1px solid #e5e5e5;
-}
-
-/* Make the masthead heading the same height as the navigation */
-.fgheader h3 {
-    margin-top: 0;
-    margin-bottom: 0;
-    line-height: 40px;
-}
-
-/* Customize container */
-.fgcontainer {
-	max-width: 990px;
-}
-</style>
-`
-	out += renderFlameGraph("Native", tableValues, "Native Stacks")
-	out += renderFlameGraph("Java", tableValues, "Java Stacks")
-	return out
-}
