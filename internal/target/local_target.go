@@ -182,15 +182,15 @@ func (t *LocalTarget) CanElevatePrivileges() bool {
 				slog.Error("error writing sudo password", slog.String("error", err.Error()))
 			}
 		}()
-		_, _, _, err := t.RunCommand(cmd)
-		if err == nil {
+		_, _, exitCode, err := t.RunCommand(cmd)
+		if err == nil && exitCode == 0 {
 			t.canElevate = 1
 			return true // sudo password works
 		}
 	}
 	cmd := exec.Command("sudo", "-kS", "ls")
-	_, _, _, err := t.RunCommand(cmd)
-	if err == nil { // true - passwordless sudo works
+	_, _, exitCode, err := t.RunCommand(cmd)
+	if err == nil && exitCode == 0 { // true - passwordless sudo works
 		t.canElevate = 1
 		return true
 	}

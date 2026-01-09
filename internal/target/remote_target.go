@@ -87,8 +87,13 @@ func (t *RemoteTarget) CreateTempDirectory(rootDir string) (tempDir string, err 
 		root = fmt.Sprintf("--tmpdir=%s", rootDir)
 	}
 	cmd := exec.Command("mktemp", "-d", "-t", root, "perfspect.tmp.XXXXXXXXXX", "|", "xargs", "realpath") // #nosec G204
-	tempDir, _, _, err = t.RunCommand(cmd)
+	var exitCode int
+	tempDir, _, exitCode, err = t.RunCommand(cmd)
 	if err != nil {
+		return
+	}
+	if exitCode != 0 {
+		err = fmt.Errorf("mktemp command returned exit code %d", exitCode)
 		return
 	}
 	tempDir = strings.TrimSpace(tempDir)
@@ -127,7 +132,13 @@ func (t *RemoteTarget) GetTempDirectory() string {
 func (t *RemoteTarget) PushFile(srcPath string, dstDir string) error {
 	stdout, stderr, exitCode, err := t.prepareAndRunSCPCommand(srcPath, dstDir, true)
 	slog.Debug("push file", slog.String("srcPath", srcPath), slog.String("dstDir", dstDir), slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitCode", exitCode))
-	return err
+	if err != nil {
+		return err
+	}
+	if exitCode != 0 {
+		return fmt.Errorf("scp command returned exit code %d: %s", exitCode, stderr)
+	}
+	return nil
 }
 
 // PullFile copies a file from a remote source path to a local destination directory
@@ -143,20 +154,40 @@ func (t *RemoteTarget) PushFile(srcPath string, dstDir string) error {
 func (t *RemoteTarget) PullFile(srcPath string, dstDir string) error {
 	stdout, stderr, exitCode, err := t.prepareAndRunSCPCommand(srcPath, dstDir, false)
 	slog.Debug("pull file", slog.String("srcPath", srcPath), slog.String("dstDir", dstDir), slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitCode", exitCode))
-	return err
+	if err != nil {
+		return err
+	}
+	if exitCode != 0 {
+		return fmt.Errorf("scp command returned exit code %d: %s", exitCode, stderr)
+	}
+	return nil
 }
 
 func (t *RemoteTarget) CreateDirectory(baseDir string, targetDir string) (dir string, err error) {
 	dir = filepath.Join(baseDir, targetDir)
 	cmd := exec.Command("mkdir", dir)
-	_, _, _, err = t.RunCommand(cmd)
+	var exitCode int
+	_, _, exitCode, err = t.RunCommand(cmd)
+	if err != nil {
+		return
+	}
+	if exitCode != 0 {
+		err = fmt.Errorf("mkdir command returned exit code %d", exitCode)
+	}
 	return
 }
 
 func (t *RemoteTarget) RemoveDirectory(targetDir string) (err error) {
 	if targetDir != "" {
 		cmd := exec.Command("rm", "-rf", targetDir)
-		_, _, _, err = t.RunCommand(cmd)
+		var exitCode int
+		_, _, exitCode, err = t.RunCommand(cmd)
+		if err != nil {
+			return
+		}
+		if exitCode != 0 {
+			err = fmt.Errorf("rm command returned exit code %d", exitCode)
+		}
 	}
 	return
 }
@@ -164,8 +195,8 @@ func (t *RemoteTarget) RemoveDirectory(targetDir string) (err error) {
 // CanConnect checks if the target is reachable.
 func (t *RemoteTarget) CanConnect() bool {
 	cmd := exec.Command("exit", "0")
-	_, _, _, err := t.RunCommand(cmd)
-	return err == nil
+	_, _, exitCode, err := t.RunCommand(cmd)
+	return err == nil && exitCode == 0
 }
 
 // CanElevatePrivileges (on RemoteTarget) checks if the user name is root or if sudo can be used to elevate privileges.
@@ -179,8 +210,8 @@ func (t *RemoteTarget) CanElevatePrivileges() bool {
 		return true
 	}
 	cmd := exec.Command("sudo", "-kS", "ls")
-	_, _, _, err := t.RunCommand(cmd)
-	if err == nil { // true - passwordless sudo works
+	_, _, exitCode, err := t.RunCommand(cmd)
+	if err == nil && exitCode == 0 { // true - passwordless sudo works
 		t.canElevate = 1
 		return true
 	}
@@ -210,9 +241,12 @@ func (t *RemoteTarget) GetName() (host string) {
 func (t *RemoteTarget) GetUserPath() (string, error) {
 	if t.userPath == "" {
 		cmd := exec.Command("echo", "$PATH")
-		stdout, _, _, err := t.RunCommand(cmd)
+		stdout, _, exitCode, err := t.RunCommand(cmd)
 		if err != nil {
 			return "", err
+		}
+		if exitCode != 0 {
+			return "", fmt.Errorf("echo command returned exit code %d", exitCode)
 		}
 		t.userPath = strings.TrimSpace(stdout)
 	}

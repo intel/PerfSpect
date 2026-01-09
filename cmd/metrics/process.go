@@ -71,7 +71,11 @@ func GetHotProcesses(myTarget target.Target, maxProcesses int, filter string) (p
 	cmd := exec.Command("ps", "-a", "-x", "-h", "-o", "pid,ppid,comm,cmd", "--sort=-%cpu")
 	stdout, stderr, exitcode, err := myTarget.RunCommand(cmd)
 	if err != nil {
-		err = fmt.Errorf("failed to get hot processes: %s, %d, %v", stderr, exitcode, err)
+		err = fmt.Errorf("failed to execute ps command: %v", err)
+		return
+	}
+	if exitcode != 0 {
+		err = fmt.Errorf("failed to get hot processes: %s, exit code %d", stderr, exitcode)
 		return
 	}
 	psOutput := stdout
@@ -179,12 +183,14 @@ done | sort -nr | head -n %d
 
 func processExists(myTarget target.Target, pid string) (exists bool) {
 	cmd := exec.Command("ps", "-p", pid)
-	_, _, _, err := myTarget.RunCommand(cmd)
+	_, _, exitCode, err := myTarget.RunCommand(cmd)
 	if err != nil {
+		// execution failure
 		exists = false
 		return
 	}
-	exists = true
+	// ps -p returns 0 if process exists, non-zero otherwise
+	exists = exitCode == 0
 	return
 }
 
@@ -192,7 +198,11 @@ func getProcess(myTarget target.Target, pid string) (process Process, err error)
 	cmd := exec.Command("ps", "-q", pid, "h", "-o", "pid,ppid,comm,cmd", "ww")
 	stdout, stderr, exitcode, err := myTarget.RunCommand(cmd)
 	if err != nil {
-		err = fmt.Errorf("failed to get process: %s, %d, %v", stderr, exitcode, err)
+		err = fmt.Errorf("failed to execute ps command: %v", err)
+		return
+	}
+	if exitcode != 0 {
+		err = fmt.Errorf("failed to get process: %s, exit code %d", stderr, exitcode)
 		return
 	}
 	psOutput := stdout
