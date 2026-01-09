@@ -35,7 +35,12 @@ var psRegex = `^\s*(\d+)\s+(\d+)\s+([\w\d\(\)\:\/_\-\:\.]+)\s+(.*)`
 // set of running processes.
 func GetProcesses(myTarget target.Target, pids []string) (processes []Process, err error) {
 	for _, pid := range pids {
-		if processExists(myTarget, pid) {
+		var exists bool
+		exists, err = processExists(myTarget, pid)
+		if err != nil {
+			return processes, err
+		}
+		if exists {
 			var process Process
 			if process, err = getProcess(myTarget, pid); err != nil {
 				return
@@ -181,12 +186,12 @@ done | sort -nr | head -n %d
 	return
 }
 
-func processExists(myTarget target.Target, pid string) (exists bool) {
+func processExists(myTarget target.Target, pid string) (exists bool, err error) {
 	cmd := exec.Command("ps", "-p", pid)
-	_, _, exitCode, err := myTarget.RunCommand(cmd)
+	var exitCode int
+	_, _, exitCode, err = myTarget.RunCommand(cmd)
 	if err != nil {
-		// execution failure
-		exists = false
+		slog.Error("failed to check if process exists", slog.String("PID", pid), slog.String("error", err.Error()))
 		return
 	}
 	// ps -p returns 0 if process exists, non-zero otherwise
