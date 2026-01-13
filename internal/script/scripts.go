@@ -1275,7 +1275,7 @@ if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
 fi
 LC_TIME=C mpstat -u -T -I SCPU -P ALL $interval $count
 `,
-		Superuser: true,
+		Superuser: false,
 		Lkms:      []string{},
 		Depends:   []string{"mpstat"},
 	},
@@ -1288,7 +1288,7 @@ if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
 fi
 S_TIME_FORMAT=ISO iostat -d -t $interval $count | sed '/^loop/d'
 `,
-		Superuser: true,
+		Superuser: false,
 		Lkms:      []string{},
 		Depends:   []string{"iostat"},
 	},
@@ -1301,7 +1301,7 @@ if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
 fi
 LC_TIME=C sar -r $interval $count
 `,
-		Superuser: true,
+		Superuser: false,
 		Lkms:      []string{},
 		Depends:   []string{"sar", "sadc"},
 	},
@@ -1314,7 +1314,7 @@ if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
 fi
 LC_TIME=C sar -n DEV $interval $count
 `,
-		Superuser: true,
+		Superuser: false,
 		Lkms:      []string{},
 		Depends:   []string{"sar", "sadc"},
 	},
@@ -1333,7 +1333,7 @@ echo TIME: $(date +"%H:%M:%S")
 echo INTERVAL: $interval
 turbostat -i $interval $count
 `,
-		Superuser: true,
+		Superuser: false,
 		Lkms:      []string{"msr"},
 		Depends:   []string{"turbostat"},
 	},
@@ -1394,7 +1394,7 @@ pw_pid=$!
 wait $pw_pid 2>/dev/null || true
 finalize
 `,
-		Superuser: true,
+		Superuser: false,
 		Lkms:      []string{"msr"},
 		Depends:   []string{"processwatch"},
 	},
