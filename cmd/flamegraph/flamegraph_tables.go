@@ -18,35 +18,36 @@ import (
 
 // flamegraph table names
 const (
-	CallStackFrequencyTableName = "Call Stack Frequency"
+	FlameGraphTableName = "Flamegraph"
 )
 
 // flamegraph tables
 var tableDefinitions = map[string]table.TableDefinition{
-	CallStackFrequencyTableName: {
-		Name:      CallStackFrequencyTableName,
-		MenuLabel: CallStackFrequencyTableName,
+	FlameGraphTableName: {
+		Name:      FlameGraphTableName,
+		MenuLabel: FlameGraphTableName,
 		ScriptNames: []string{
-			script.CollapsedCallStacksScriptName,
+			script.FlameGraphScriptName,
 		},
-		FieldsFunc: callStackFrequencyTableValues},
+		FieldsFunc: flameGraphTableValues},
 }
 
-func callStackFrequencyTableValues(outputs map[string]script.ScriptOutput) []table.Field {
+func flameGraphTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	fields := []table.Field{
 		{Name: "Native Stacks", Values: []string{nativeFoldedFromOutput(outputs)}},
 		{Name: "Java Stacks", Values: []string{javaFoldedFromOutput(outputs)}},
 		{Name: "Maximum Render Depth", Values: []string{maxRenderDepthFromOutput(outputs)}},
+		{Name: "Perf Event", Values: []string{perfEventFromOutput(outputs)}},
 	}
 	return fields
 }
 
 func javaFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
-	if outputs[script.CollapsedCallStacksScriptName].Stdout == "" {
+	if outputs[script.FlameGraphScriptName].Stdout == "" {
 		slog.Warn("collapsed call stack output is empty")
 		return ""
 	}
-	sections := extract.GetSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
+	sections := extract.GetSectionsFromOutput(outputs[script.FlameGraphScriptName].Stdout)
 	if len(sections) == 0 {
 		slog.Warn("no sections in collapsed call stack output")
 		return ""
@@ -84,11 +85,11 @@ func javaFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
 }
 
 func nativeFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
-	if outputs[script.CollapsedCallStacksScriptName].Stdout == "" {
+	if outputs[script.FlameGraphScriptName].Stdout == "" {
 		slog.Warn("collapsed call stack output is empty")
 		return ""
 	}
-	sections := extract.GetSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
+	sections := extract.GetSectionsFromOutput(outputs[script.FlameGraphScriptName].Stdout)
 	if len(sections) == 0 {
 		slog.Warn("no sections in collapsed call stack output")
 		return ""
@@ -103,6 +104,11 @@ func nativeFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
 		}
 	}
 	if dwarfFolded == "" && fpFolded == "" {
+		slog.Warn("no native folded stacks found")
+		// "event syntax error: 'foo'" indicates that the perf event specified is invalid/unsupported
+		if strings.Contains(outputs[script.FlameGraphScriptName].Stderr, "event syntax error") {
+			slog.Error("unsupported perf event specified", slog.String("error", outputs[script.FlameGraphScriptName].Stderr))
+		}
 		return ""
 	}
 	folded, err := mergeSystemFolded(fpFolded, dwarfFolded)
@@ -113,17 +119,35 @@ func nativeFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
 }
 
 func maxRenderDepthFromOutput(outputs map[string]script.ScriptOutput) string {
-	if outputs[script.CollapsedCallStacksScriptName].Stdout == "" {
+	if outputs[script.FlameGraphScriptName].Stdout == "" {
 		slog.Warn("collapsed call stack output is empty")
 		return ""
 	}
-	sections := extract.GetSectionsFromOutput(outputs[script.CollapsedCallStacksScriptName].Stdout)
+	sections := extract.GetSectionsFromOutput(outputs[script.FlameGraphScriptName].Stdout)
 	if len(sections) == 0 {
 		slog.Warn("no sections in collapsed call stack output")
 		return ""
 	}
 	for header, content := range sections {
 		if header == "maximum depth" {
+			return strings.TrimSpace(content)
+		}
+	}
+	return ""
+}
+
+func perfEventFromOutput(outputs map[string]script.ScriptOutput) string {
+	if outputs[script.FlameGraphScriptName].Stdout == "" {
+		slog.Warn("collapsed call stack output is empty")
+		return ""
+	}
+	sections := extract.GetSectionsFromOutput(outputs[script.FlameGraphScriptName].Stdout)
+	if len(sections) == 0 {
+		slog.Warn("no sections in collapsed call stack output")
+		return ""
+	}
+	for header, content := range sections {
+		if header == "perf_event" {
 			return strings.TrimSpace(content)
 		}
 	}
