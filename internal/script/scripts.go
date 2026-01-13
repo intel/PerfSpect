@@ -120,7 +120,7 @@ const (
 	GaudiTelemetryScriptName       = "gaudi telemetry"
 	PDUTelemetryScriptName         = "pdu telemetry"
 	// flamegraph scripts
-	CollapsedCallStacksScriptName = "collapsed call stacks"
+	FlameGraphScriptName = "flamegraph"
 	// lock scripts
 	ProfileKernelLockScriptName = "profile kernel lock"
 )
@@ -1445,13 +1445,14 @@ done
 		Superuser: false,
 	},
 	// flamegraph scripts
-	CollapsedCallStacksScriptName: {
-		Name: CollapsedCallStacksScriptName,
+	FlameGraphScriptName: {
+		Name: FlameGraphScriptName,
 		ScriptTemplate: `# Combined (perf record and async profiler) call stack collection
 pids={{.PIDs}}
 duration={{.Duration}}
 frequency={{.Frequency}}
 maxdepth={{.MaxDepth}}
+perf_event={{.PerfEvent}}
 
 ap_interval=0
 if [ "$frequency" -ne 0 ]; then
@@ -1496,6 +1497,9 @@ collapse_perf_data() {
 print_results() {
     echo "########## maximum depth ##########"
     echo "$maxdepth"
+
+	echo "########## perf_event ##########"
+	echo "$perf_event"
 
     if [ -f perf_dwarf_folded ]; then
         echo "########## perf_dwarf ##########"
@@ -1559,9 +1563,9 @@ fi
 
 # Start profiling with perf in frame pointer mode
 if [ -n "$pids" ]; then
-    perf record -F "$frequency" -p "$pids" -g -o perf_fp_data -m 129 &
+    perf record -e "$perf_event" -F "$frequency" -p "$pids" -g -o perf_fp_data -m 129 &
 else
-    perf record -F "$frequency" -a -g -o perf_fp_data -m 129 &
+    perf record -e "$perf_event" -F "$frequency" -a -g -o perf_fp_data -m 129 &
 fi
 perf_fp_pid=$!
 if ! kill -0 $perf_fp_pid 2>/dev/null; then
@@ -1572,9 +1576,9 @@ fi
 
 # Start profiling with perf in dwarf mode
 if [ -n "$pids" ]; then
-    perf record -F "$frequency" -p "$pids" -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
+    perf record -e "$perf_event" -F "$frequency" -p "$pids" -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
 else
-    perf record -F "$frequency" -a -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
+    perf record -e "$perf_event" -F "$frequency" -a -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
 fi
 perf_dwarf_pid=$!
 if ! kill -0 $perf_dwarf_pid 2>/dev/null; then

@@ -27,6 +27,7 @@ var examples = []string{
 	fmt.Sprintf("  Flamegraph from local host:       $ %s %s", app.Name, cmdName),
 	fmt.Sprintf("  Flamegraph from remote target:    $ %s %s --target 192.168.1.1 --user fred --key fred_key", app.Name, cmdName),
 	fmt.Sprintf("  Flamegraph from multiple targets: $ %s %s --targets targets.yaml", app.Name, cmdName),
+	fmt.Sprintf("  Flamegraph for cache misses:      $ %s %s --perf-event cache-misses", app.Name, cmdName),
 }
 
 var Cmd = &cobra.Command{
@@ -48,6 +49,7 @@ var (
 	flagPids            []int
 	flagNoSystemSummary bool
 	flagMaxDepth        int
+	flagPerfEvent       string
 )
 
 const (
@@ -56,6 +58,7 @@ const (
 	flagPidsName            = "pids"
 	flagNoSystemSummaryName = "no-summary"
 	flagMaxDepthName        = "max-depth"
+	flagPerfEventName       = "perf-event"
 )
 
 func init() {
@@ -66,6 +69,7 @@ func init() {
 	Cmd.Flags().IntSliceVar(&flagPids, flagPidsName, nil, "")
 	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
 	Cmd.Flags().IntVar(&flagMaxDepth, flagMaxDepthName, 0, "")
+	Cmd.Flags().StringVar(&flagPerfEvent, flagPerfEventName, "cycles:P", "")
 
 	workflow.AddTargetFlags(Cmd)
 
@@ -113,12 +117,16 @@ func getFlagGroups() []app.FlagGroup {
 			Help: "comma separated list of PIDs. If not specified, all PIDs will be collected",
 		},
 		{
-			Name: app.FlagFormatName,
-			Help: fmt.Sprintf("choose output format(s) from: %s", strings.Join(append([]string{report.FormatAll}, report.FormatHtml, report.FormatTxt, report.FormatJson), ", ")),
+			Name: flagPerfEventName,
+			Help: "perf event to use for native sampling (e.g., cpu-cycles, instructions, cache-misses, branches, context-switches, mem-loads, mem-stores, etc.)",
 		},
 		{
 			Name: flagMaxDepthName,
 			Help: "maximum render depth of call stack in flamegraph (0 = no limit)",
+		},
+		{
+			Name: app.FlagFormatName,
+			Help: fmt.Sprintf("choose output format(s) from: %s", strings.Join(append([]string{report.FormatAll}, report.FormatHtml, report.FormatTxt, report.FormatJson), ", ")),
 		},
 		{
 			Name: flagNoSystemSummaryName,
@@ -183,7 +191,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	if !flagNoSystemSummary {
 		tables = append(tables, app.TableDefinitions[app.SystemSummaryTableName])
 	}
-	tables = append(tables, tableDefinitions[CallStackFrequencyTableName])
+	tables = append(tables, tableDefinitions[FlameGraphTableName])
 	reportingCommand := workflow.ReportingCommand{
 		Cmd:            cmd,
 		ReportNamePost: "flame",
@@ -192,11 +200,12 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			"Duration":  strconv.Itoa(flagDuration),
 			"PIDs":      strings.Join(util.IntSliceToStringSlice(flagPids), ","),
 			"MaxDepth":  strconv.Itoa(flagMaxDepth),
+			"PerfEvent": flagPerfEvent,
 		},
 		Tables: tables,
 	}
 
-	report.RegisterHTMLRenderer(CallStackFrequencyTableName, callStackFrequencyTableHTMLRenderer)
+	report.RegisterHTMLRenderer(FlameGraphTableName, callStackFrequencyTableHTMLRenderer)
 
 	return reportingCommand.Run()
 }

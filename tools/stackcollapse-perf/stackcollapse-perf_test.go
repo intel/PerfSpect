@@ -50,6 +50,7 @@ stress-ng-cpu 1230793 [098] 6223127.074783:  307465331 cycles:P:
 
 	`)
 	output := &bytes.Buffer{}
+	errorOutput := &bytes.Buffer{}
 
 	config := Config{
 		IncludePname: true,
@@ -60,7 +61,7 @@ stress-ng-cpu 1230793 [098] 6223127.074783:  307465331 cycles:P:
 		TidyGeneric:  true,
 	}
 
-	err := ProcessStacks(input, output, config)
+	err := ProcessStacks(input, output, errorOutput, config)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -68,6 +69,10 @@ stress-ng-cpu 1230793 [098] 6223127.074783:  307465331 cycles:P:
 	expected := "stress-ng-cpu;[stress-ng] 293637623\nstress-ng-cpu;sincosf64x;[libm.so.6];asm_sysvec_apic_timer_interrupt 307465331\n"
 	if output.String() != expected {
 		t.Errorf("expected %q, got %q", expected, output.String())
+	}
+
+	if errorOutput.Len() != 0 {
+		t.Errorf("expected no error output, got %q", errorOutput.String())
 	}
 }
 
@@ -84,7 +89,7 @@ func TestHandleEventRecord(t *testing.T) {
 		TidyGeneric:  true,
 	}
 
-	processName, period, err := handleEventRecord(line, config)
+	processName, period, event, err := handleEventRecord(line, config)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -96,6 +101,10 @@ func TestHandleEventRecord(t *testing.T) {
 	expectedPeriod := 293637623
 	if period != expectedPeriod {
 		t.Errorf("expected period to be %d, got %d", expectedPeriod, period)
+	}
+	expectedEvent := "cycles:P"
+	if event != expectedEvent {
+		t.Errorf("expected event to be '%s', got %q", expectedEvent, event)
 	}
 }
 

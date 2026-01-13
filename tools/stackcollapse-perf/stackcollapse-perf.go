@@ -114,7 +114,7 @@ func main() {
 		input = os.Stdin
 	}
 
-	err = ProcessStacks(input, os.Stdout, config)
+	err = ProcessStacks(input, os.Stdout, os.Stderr, config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error processing stacks: %s\n", err)
 		os.Exit(1)
@@ -133,12 +133,14 @@ var (
 
 // ProcessStacks processes stack traces from the input reader and writes the collapsed stacks to the output writer.
 // It uses the provided configuration to control the processing behavior.
-func ProcessStacks(input io.Reader, output io.Writer, config Config) error {
+func ProcessStacks(input io.Reader, output io.Writer, errorOutput io.Writer, config Config) error {
 	var stack []string
 	var processName string
 	var period int
 	aggregator := NewStackAggregator()
 	scanner := bufio.NewScanner(input)
+	eventFilter := config.EventFilter // if not set, it will be set to the first event encountered
+	skipStackLines := false           // whether to skip stack lines based on event filtering
 
 	// main loop, read lines from stdin
 	for scanner.Scan() {
@@ -165,25 +167,35 @@ func ProcessStacks(input io.Reader, output io.Writer, config Config) error {
 		}
 		// check for event record
 		if eventLineRegex.MatchString(line) {
+			skipStackLines = false
 			var err error
-			processName, period, err = handleEventRecord(line, config)
+			var event string
+			processName, period, event, err = handleEventRecord(line, config)
 			if err != nil {
-				fmt.Fprintf(output, "Error: %s\n", err)
+				fmt.Fprintf(errorOutput, "Error: %s\n", err)
+				skipStackLines = true
+				continue
+			}
+			if eventFilter == "" {
+				eventFilter = event // default to first event
+			} else if event != eventFilter {
+				fmt.Fprintf(errorOutput, "Skipping event %s, filtering for %s\n", event, eventFilter)
+				skipStackLines = true // need to skip stack lines for this event
 			}
 			continue
 		}
 		// check for stack line
-		if stackLineRegex.MatchString(line) {
+		if stackLineRegex.MatchString(line) && !skipStackLines {
 			err := handleStackLine(line, &stack, processName, config)
 			if err != nil {
-				fmt.Fprintf(output, "Error: %s\n", err)
+				fmt.Fprintf(errorOutput, "Error: %s\n", err)
 			}
 			continue
 		}
 	}
 	// Check for errors during scanning
 	if err := scanner.Err(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading input: %s\n", err)
+		fmt.Fprintf(errorOutput, "Error reading input: %s\n", err)
 		return err
 	}
 	// Output results
@@ -199,7 +211,7 @@ func ProcessStacks(input io.Reader, output io.Writer, config Config) error {
 }
 
 // handleEventRecord parses an event record line and updates the process name and period based on the configuration.
-func handleEventRecord(line string, config Config) (processName string, period int, err error) {
+func handleEventRecord(line string, config Config) (processName string, period int, event string, err error) {
 	matches := eventLineRegex.FindStringSubmatch(line)
 	if matches == nil {
 		return
@@ -224,14 +236,7 @@ func handleEventRecord(line string, config Config) (processName string, period i
 			}
 			period = eventPeriodInt
 		}
-		event := eventMatches[2]
-
-		if config.EventFilter == "" {
-			config.EventFilter = event
-		} else if event != config.EventFilter {
-			err = fmt.Errorf("event type mismatch: %s != %s", event, config.EventFilter)
-			return
-		}
+		event = eventMatches[2]
 	}
 
 	if config.IncludeTid {
