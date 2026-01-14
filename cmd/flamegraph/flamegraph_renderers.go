@@ -185,7 +185,7 @@ func renderFlameGraph(header string, tableValues table.TableValues, field string
 	fg := texttemplate.Must(texttemplate.New("flameGraphTemplate").Parse(flameGraphTemplate))
 	buf := new(bytes.Buffer)
 	err = fg.Execute(buf, flameGraphTemplateStruct{
-		ID:     fmt.Sprintf("%d%s", util.RandUint(10000), header),
+		ID:     fmt.Sprintf("%d%s", util.RandUint(10000), strings.Split(header, " ")[0]),
 		Data:   jsonStacks,
 		Header: header,
 	})
@@ -223,7 +223,14 @@ func callStackFrequencyTableHTMLRenderer(tableValues table.TableValues, targetNa
 }
 </style>
 `
-	out += renderFlameGraph("Native", tableValues, "Native Stacks")
-	out += renderFlameGraph("Java", tableValues, "Java Stacks")
+	// get the perf event from the table values
+	perfEventFieldIndex, err := table.GetFieldIndex("Perf Event", tableValues)
+	if err != nil {
+		slog.Error("didn't find expected field (Perf Event) in table", slog.String("error", err.Error()))
+		return out
+	}
+	perfEvent := tableValues.Fields[perfEventFieldIndex].Values[0]
+	out += renderFlameGraph(fmt.Sprintf("Native (%s)", perfEvent), tableValues, "Native Stacks")
+	out += renderFlameGraph("Java (async-profiler)", tableValues, "Java Stacks")
 	return out
 }
