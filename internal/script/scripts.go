@@ -1333,7 +1333,7 @@ echo TIME: $(date +"%H:%M:%S")
 echo INTERVAL: $interval
 turbostat -i $interval $count
 `,
-		Superuser: false,
+		Superuser: true,
 		Lkms:      []string{"msr"},
 		Depends:   []string{"turbostat"},
 	},
@@ -1394,7 +1394,7 @@ pw_pid=$!
 wait $pw_pid 2>/dev/null || true
 finalize
 `,
-		Superuser: false,
+		Superuser: true,
 		Lkms:      []string{"msr"},
 		Depends:   []string{"processwatch"},
 	},
