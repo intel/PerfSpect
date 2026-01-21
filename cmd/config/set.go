@@ -781,7 +781,7 @@ func setELC(elc string, myTarget target.Target, localTempDir string) error {
 	case elcOptions[0]:
 		mode = "latency-optimized-mode"
 	case elcOptions[1]:
-		mode = "default"
+		mode = "optimized-power-mode"
 	default:
 		return fmt.Errorf("invalid ELC mode: %s", elc)
 	}
