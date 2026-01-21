@@ -91,7 +91,7 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []table.Fi
 	}...)
 	// add ELC (for SRF, CWF and GNR only)
 	if strings.Contains(uarch, cpus.UarchSRF) || strings.Contains(uarch, cpus.UarchGNR) || strings.Contains(uarch, cpus.UarchCWF) {
-		fields = append(fields, table.Field{Name: "Efficiency Latency Control", Description: "--elc <default|latency-optimized>", Values: []string{extract.ELCSummaryFromOutput(outputs)}})
+		fields = append(fields, table.Field{Name: "Efficiency Latency Control", Description: "--elc <power-optimized|latency-optimized>", Values: []string{extract.ELCSummaryFromOutput(outputs)}})
 	}
 	// add prefetchers
 	for _, pf := range extract.PrefetcherDefinitions {
