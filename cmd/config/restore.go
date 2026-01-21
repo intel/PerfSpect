@@ -353,7 +353,7 @@ func convertValue(flagName string, rawValue string) (string, error) {
 		// "performance" or "powersave"
 		return parseEnableDisableOrOption(rawValue, governorOptions)
 	case flagELCName:
-		// "Default" -> "default"
+		// "Power-Optimized" -> "power-optimized"
 		// "Latency-Optimized" -> "latency-optimized"
 		rawValueLower := strings.ToLower(rawValue)
 		if slices.Contains(elcOptions, rawValueLower) {

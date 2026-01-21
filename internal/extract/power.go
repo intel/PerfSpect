@@ -204,7 +204,7 @@ func ELCFieldValuesFromOutput(outputs map[string]script.ScriptOutput) (fieldValu
 			if row[5] == "0" && row[6] == "0" && row[7] == "0" {
 				mode = "Latency Optimized"
 			} else if row[5] == "800" && row[6] == "10" && row[7] == "94" {
-				mode = "Default"
+				mode = "Power Optimized"
 			} else {
 				mode = "Custom"
 			}
@@ -213,7 +213,7 @@ func ELCFieldValuesFromOutput(outputs map[string]script.ScriptOutput) (fieldValu
 			case "0":
 				mode = "Latency Optimized"
 			case "1200":
-				mode = "Default"
+				mode = "Power Optimized"
 			default:
 				mode = "Custom"
 			}
