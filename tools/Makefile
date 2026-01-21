@@ -25,7 +25,7 @@ default: tools-x86_64
 .PHONY: sysstat sysstat-aarch64 sysstat-repo
 .PHONY: tsc turbostat
 
-tools-x86_64: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc turbostat
+tools-x86_64: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm bhs-power-mode.sh spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc turbostat
 	mkdir -p bin/x86_64
 	cp -R async-profiler bin/x86_64/
 	cp avx-turbo/avx-turbo bin/x86_64/
