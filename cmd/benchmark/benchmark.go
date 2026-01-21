@@ -244,6 +244,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 
 	reportingCommand := workflow.ReportingCommand{
 		Cmd:                    cmd,
+		ReportNamePost:         "bench",
 		ScriptParams:           map[string]string{"StorageDir": flagStorageDir},
 		Tables:                 tables,
 		SummaryFunc:            summaryFunc,
