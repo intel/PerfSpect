@@ -862,9 +862,9 @@ func elcTableInsights(outputs map[string]script.ScriptOutput, tableValues table.
 			}
 		}
 		for _, mode := range tableValues.Fields[modeFieldIndex].Values {
-			if mode != "" && mode != "Default" {
+			if mode != "" && mode != "Power Optimized" {
 				insights = append(insights, table.Insight{
-					Recommendation: "Consider setting Efficiency Latency Control mode to 'Default' to balance uncore performance and power utilization.",
+					Recommendation: "Consider setting Efficiency Latency Control mode to 'Power Optimized' to balance uncore performance and power utilization.",
 					Justification:  fmt.Sprintf("ELC mode is set to '%s' on at least one die.", mode),
 				})
 				break
