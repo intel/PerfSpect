@@ -1682,6 +1682,7 @@ func systemSummaryTableValues(outputs map[string]script.ScriptOutput) []table.Fi
 		{Name: "Kernel", Values: []string{extract.ValFromRegexSubmatch(outputs[script.UnameScriptName].Stdout, `^Linux \S+ (\S+)`)}},
 		{Name: "TDP", Values: []string{extract.TDPFromOutput(outputs)}},
 		{Name: "Energy Performance Bias", Values: []string{extract.EPBFromOutput(outputs)}},
+		{Name: "Energy Performance Preference", Values: []string{extract.EPPFromOutput(outputs)}},
 		{Name: "Scaling Governor", Values: []string{strings.TrimSpace(outputs[script.ScalingGovernorScriptName].Stdout)}},
 		{Name: "Scaling Driver", Values: []string{strings.TrimSpace(outputs[script.ScalingDriverScriptName].Stdout)}},
 		{Name: "C-states", Values: []string{extract.CstatesSummaryFromOutput(outputs)}},
