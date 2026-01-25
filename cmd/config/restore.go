@@ -353,13 +353,8 @@ func convertValue(flagName string, rawValue string) (string, error) {
 		// "performance" or "powersave"
 		return parseEnableDisableOrOption(rawValue, governorOptions)
 	case flagELCName:
-		// "Power-Optimized" -> "power-optimized"
-		// "Latency-Optimized" -> "latency-optimized"
-		rawValueLower := strings.ToLower(rawValue)
-		if slices.Contains(elcOptions, rawValueLower) {
-			return rawValueLower, nil
-		}
-		return "", fmt.Errorf("invalid elc value: %s", rawValue)
+		// "power" or "latency"
+		return parseEnableDisableOrOption(rawValue, elcOptions)
 	case flagC6Name:
 		return parseEnableDisableOrOption(rawValue, c6Options)
 	case flagC1DemotionName:

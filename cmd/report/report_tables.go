@@ -853,29 +853,37 @@ func elcTableInsights(outputs map[string]script.ScriptOutput, tableValues table.
 		}
 		// suggest setting ELC mode to 'Latency Optimized' or 'Default' based on the current setting
 		for _, mode := range tableValues.Fields[modeFieldIndex].Values {
-			if mode != "" && mode != "Latency Optimized" {
+			if mode != "" && mode != extract.ELCModeLatencyOptimized {
 				insights = append(insights, table.Insight{
-					Recommendation: "Consider setting Efficiency Latency Control mode to 'Latency Optimized' when workload is highly sensitive to memory latency.",
+					Recommendation: "Consider setting Efficiency Latency Control mode to 'Latency Optimized Mode (LOM)' when workload is highly sensitive to memory latency.",
 					Justification:  fmt.Sprintf("ELC mode is set to '%s' on at least one die.", mode),
 				})
 				break
 			}
 		}
 		for _, mode := range tableValues.Fields[modeFieldIndex].Values {
-			if mode != "" && mode != "Power Optimized" {
+			if mode != "" && mode != extract.ELCModeOptimizedPower {
 				insights = append(insights, table.Insight{
-					Recommendation: "Consider setting Efficiency Latency Control mode to 'Power Optimized' to balance uncore performance and power utilization.",
+					Recommendation: "Consider setting Efficiency Latency Control mode to 'Optimized Power Mode (OPM)' to balance uncore performance and power utilization.",
 					Justification:  fmt.Sprintf("ELC mode is set to '%s' on at least one die.", mode),
 				})
 				break
 			}
 		}
-		// if epb is not set to 'Performance (0)' and ELC mode is set to 'Latency Optimized', suggest setting epb to 'Performance (0)'
+		// if epb is not set to 'Performance (0)' and ELC mode is set to 'Latency Optimized Mode (LOM)', suggest setting epb to 'Performance (0)'
 		epb := extract.EPBFromOutput(outputs)
-		if epb != "" && epb != "Performance (0)" && firstMode == "Latency Optimized" {
+		if epb != "" && epb != "Performance (0)" && firstMode == extract.ELCModeLatencyOptimized {
 			insights = append(insights, table.Insight{
-				Recommendation: "Consider setting Energy Performance Bias to 'Performance (0)' to allow Latency Optimized mode to operate as designed.",
+				Recommendation: "Consider setting Energy Performance Bias to 'Performance (0)' to allow Latency Optimized Mode (LOM) to operate as designed.",
 				Justification:  fmt.Sprintf("Energy Performance Bias is set to '%s' and ELC Mode is set to '%s'.", epb, firstMode),
+			})
+		}
+		// if epp is not set to 'Performance (0)' and ELC mode is set to 'Latency Optimized Mode (LOM)', suggest setting epp to 'Performance (0)'
+		epp := extract.EPPFromOutput(outputs)
+		if epp != "" && epp != "Performance (0)" && firstMode == extract.ELCModeLatencyOptimized {
+			insights = append(insights, table.Insight{
+				Recommendation: "Consider setting Energy Performance Preference to 'Performance (0)' to allow Latency Optimized Mode (LOM) to operate as designed.",
+				Justification:  fmt.Sprintf("Energy Performance Preference is set to '%s' and ELC Mode is set to '%s'.", epp, firstMode),
 			})
 		}
 	}

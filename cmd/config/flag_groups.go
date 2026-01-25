@@ -76,7 +76,7 @@ const (
 var governorOptions = []string{"performance", "powersave"}
 
 // elcOptions - list of valid elc options
-var elcOptions = []string{"latency-optimized", "power-optimized"}
+var elcOptions = []string{"latency", "power"}
 
 // prefetcherOptions - list of valid prefetcher options
 var prefetcherOptions = []string{"enable", "disable"}
