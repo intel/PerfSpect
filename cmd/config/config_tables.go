@@ -87,11 +87,11 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []table.Fi
 	fields = append(fields, []table.Field{
 		{Name: "Energy Performance Bias", Description: "--epb <0-15>", Values: []string{extract.EPBFromOutput(outputs)}},
 		{Name: "Energy Performance Preference", Description: "--epp <0-255>", Values: []string{extract.EPPFromOutput(outputs)}},
-		{Name: "Scaling Governor", Description: "--gov <performance|powersave>", Values: []string{strings.TrimSpace(outputs[script.ScalingGovernorScriptName].Stdout)}},
+		{Name: "Scaling Governor", Description: "--gov <" + strings.Join(governorOptions, "|") + ">", Values: []string{strings.TrimSpace(outputs[script.ScalingGovernorScriptName].Stdout)}},
 	}...)
 	// add ELC (for SRF, CWF and GNR only)
 	if strings.Contains(uarch, cpus.UarchSRF) || strings.Contains(uarch, cpus.UarchGNR) || strings.Contains(uarch, cpus.UarchCWF) {
-		fields = append(fields, table.Field{Name: "Efficiency Latency Control", Description: "--elc <power-optimized|latency-optimized>", Values: []string{extract.ELCSummaryFromOutput(outputs)}})
+		fields = append(fields, table.Field{Name: "Efficiency Latency Control", Description: "--elc <" + strings.Join(elcOptions, "|") + ">", Values: []string{extract.ELCSummaryFromOutput(outputs)}})
 	}
 	// add prefetchers
 	for _, pf := range extract.PrefetcherDefinitions {
@@ -123,7 +123,7 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []table.Fi
 			fields = append(fields,
 				table.Field{
 					Name:        pf.ShortName + " prefetcher",
-					Description: "--" + "pref-" + strings.ReplaceAll(strings.ToLower(pf.ShortName), " ", "") + " <enable|disable>",
+					Description: "--" + "pref-" + strings.ReplaceAll(strings.ToLower(pf.ShortName), " ", "") + " <" + strings.Join(prefetcherOptions, "|") + ">",
 					Values:      []string{enabledDisabled}},
 			)
 		}
@@ -131,12 +131,12 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []table.Fi
 	// add C6
 	c6 := extract.C6FromOutput(outputs)
 	if c6 != "" {
-		fields = append(fields, table.Field{Name: "C6", Description: "--c6 <enable|disable>", Values: []string{c6}})
+		fields = append(fields, table.Field{Name: "C6", Description: "--c6 <" + strings.Join(c6Options, "|") + ">", Values: []string{c6}})
 	}
 	// add C1 Demotion
 	c1Demotion := strings.TrimSpace(outputs[script.C1DemotionScriptName].Stdout)
 	if c1Demotion != "" {
-		fields = append(fields, table.Field{Name: "C1 Demotion", Description: "--c1-demotion <enable|disable>", Values: []string{c1Demotion}})
+		fields = append(fields, table.Field{Name: "C1 Demotion", Description: "--c1-demotion <" + strings.Join(c1DemotionOptions, "|") + ">", Values: []string{c1Demotion}})
 	}
 	return fields
 }
