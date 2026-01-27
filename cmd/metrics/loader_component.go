@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"perfspect/internal/cpus"
 	"perfspect/internal/util"
@@ -20,7 +19,7 @@ import (
 )
 
 func (l *ComponentLoader) Load(loaderConfig LoaderConfig) ([]MetricDefinition, []GroupDefinition, error) {
-	metricDefinitions, err := l.loadMetricDefinitions(loaderConfig.MetricDefinitionOverride, loaderConfig.SelectedMetrics, loaderConfig.Metadata)
+	metricDefinitions, err := l.loadMetricDefinitions(loaderConfig.SelectedMetrics, loaderConfig.Metadata)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load metric definitions: %w", err)
 	}
@@ -59,29 +58,22 @@ type ComponentEvent struct {
 	PublicDescription string `json:"PublicDescription"`
 }
 
-func (l *ComponentLoader) loadMetricDefinitions(metricDefinitionOverridePath string, selectedMetrics []string, metadata Metadata) (metrics []MetricDefinition, err error) {
-	var bytes []byte
-	if metricDefinitionOverridePath != "" {
-		bytes, err = os.ReadFile(metricDefinitionOverridePath) // #nosec G304
-		if err != nil {
-			return
-		}
-	} else {
-		var archDir string
-		archDir, err = getUarchDir(metadata.Microarchitecture)
-		if err != nil {
-			return nil, err
-		}
-		if bytes, err = resources.ReadFile(filepath.Join("resources", "component", archDir, "metrics.json")); err != nil {
-			return
-		}
+func (l *ComponentLoader) loadMetricDefinitions(selectedMetrics []string, metadata Metadata) ([]MetricDefinition, error) {
+	archDir, err := getUarchDir(metadata.Microarchitecture)
+	if err != nil {
+		return nil, err
+	}
+	bytes, err := resources.ReadFile(filepath.Join("resources", "component", archDir, "metrics.json"))
+	if err != nil {
+		return nil, err
 	}
 	var componentMetricsInFile []ComponentMetric
 	if err = json.Unmarshal(bytes, &componentMetricsInFile); err != nil {
-		return
+		return nil, err
 	}
 
 	evaluatorFunctions := getARMEvaluatorFunctions(metadata.ARMCPUID)
+	var metrics []MetricDefinition
 	for i := range componentMetricsInFile {
 		// a couple ARM metrics don't have MetricExpr, skip those
 		// if selectedMetrics is empty, include all metrics

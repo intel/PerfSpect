@@ -366,11 +366,11 @@ func getFlagGroups() []app.FlagGroup {
 		},
 		{
 			Name: flagEventFilePathName,
-			Help: "perf event definition file. Will override default event definitions. For legacy loader only.",
+			Help: "perf event definition file. Will override default event definitions. Must be used with --metricfile.",
 		},
 		{
 			Name: flagMetricFilePathName,
-			Help: "metric definition file. Will override default metric definitions.",
+			Help: "metric definition file. Will override default metric definitions. Must be used with --eventfile.",
 		},
 		{
 			Name: flagPerfPrintIntervalName,
@@ -638,6 +638,9 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 			return workflow.FlagValidationError(cmd, fmt.Sprintf("failed to access metric file path: %s, error: %v", flagMetricFilePath, err))
 		}
 	}
+	if (flagMetricFilePath != "" && flagEventFilePath == "") || (flagMetricFilePath == "" && flagEventFilePath != "") {
+		return workflow.FlagValidationError(cmd, "both --metricfile and --eventfile must be specified together")
+	}
 	// input file path
 	if flagInput != "" {
 		if _, err := os.Stat(flagInput); err != nil {
@@ -781,16 +784,9 @@ func getLoaderConfig(loader Loader, selectedMetrics []string, metadata Metadata,
 		SelectedMetrics: selectedMetrics,
 		Metadata:        metadata,
 	}
-	if _, ok := loader.(*PerfmonLoader); ok {
-		loaderConfig.ConfigFileOverride = metricsOverride
-	} else if _, ok := loader.(*LegacyLoader); ok {
+	if _, ok := loader.(*LegacyLoader); ok {
 		loaderConfig.EventDefinitionOverride = eventsOverride
 		loaderConfig.MetricDefinitionOverride = metricsOverride
-	} else if _, ok := loader.(*ComponentLoader); ok {
-		loaderConfig.MetricDefinitionOverride = metricsOverride
-	} else {
-		err := fmt.Errorf("unknown loader type: %T", loader)
-		panic(err) // this should never happen, but if it does, we want to know
 	}
 	return loaderConfig
 }
@@ -802,7 +798,7 @@ func processRawData(localOutputDir string) error {
 	}
 	defer eventsFile.Close()
 	// load metric and event group definitions
-	loader, err := NewLoader(metadata.Microarchitecture)
+	loader, err := NewLoader(metadata.Microarchitecture, flagMetricFilePath != "" && flagEventFilePath != "")
 	if err != nil {
 		err = fmt.Errorf("failed to create metric and event loader: %w", err)
 		return err
@@ -1242,7 +1238,7 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 		return
 	}
 	// load metric and event groups
-	loader, err := NewLoader(targetContext.metadata.Microarchitecture)
+	loader, err := NewLoader(targetContext.metadata.Microarchitecture, flagMetricFilePath != "" && flagEventFilePath != "")
 	if err != nil {
 		err = fmt.Errorf("failed to create metric and event loader: %w", err)
 		_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
