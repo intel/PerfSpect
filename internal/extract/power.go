@@ -229,7 +229,7 @@ func ELCFieldValuesFromOutput(outputs map[string]script.ScriptOutput) (fieldValu
 		if row[elcFieldELCRatio] == "0" && row[elcFieldELCLowThreshold] == "0" && row[elcFieldELCHighThreshold] == "0" && row[elcFieldELCHighThresholdEnable] == "1" {
 			mode = ELCModeLatencyOptimized
 		} else if row[elcFieldELCLowThreshold] == "10" &&
-			row[elcFieldELCHighThreshold] == "95" &&
+			row[elcFieldELCHighThreshold] == "94" &&
 			row[elcFieldELCHighThresholdEnable] == "1" &&
 			((row[elcFieldDieType] == "IO" && row[elcFieldELCRatio] == "800") ||
 				(row[elcFieldDieType] == "Compute" && row[elcFieldELCRatio] == "1200")) {

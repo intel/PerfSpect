@@ -777,6 +777,7 @@ func setGovernor(governor string, myTarget target.Target, localTempDir string) e
 
 // setELCOPM sets ELC to Optimized Power Mode (OPM)
 func setELCOPM(myTarget target.Target, localTempDir string) error {
+	// The script is derived from bhs-power-mode script in the Intel PCM repository.
 	setScript := script.ScriptDefinition{
 		Name: "set elc opm",
 		ScriptTemplate: `
@@ -802,9 +803,9 @@ done <<< "$output"
 
 # Set ELC parameters for I/O and Compute dies
 #   set values common to both die types
-pcm-tpmi 2 0x18 -d -b 39:39 -w 1  # EFFICIENCY_LATENCY_CTRL_HIGH_THRESHOLD_ENABLE
-pcm-tpmi 2 0x18 -d -b 46:40 -w 95 # EFFICIENCY_LATENCY_CTRL_HIGH_THRESHOLD
-pcm-tpmi 2 0x18 -d -b 38:32 -w 10 # EFFICIENCY_LATENCY_CTRL_LOW_THRESHOLD
+pcm-tpmi 2 0x18 -d -b 39:39 -w 1   # EFFICIENCY_LATENCY_CTRL_HIGH_THRESHOLD_ENABLE
+pcm-tpmi 2 0x18 -d -b 46:40 -w 120 # EFFICIENCY_LATENCY_CTRL_HIGH_THRESHOLD (120 / 127 ~= 94%)
+pcm-tpmi 2 0x18 -d -b 38:32 -w 13  # EFFICIENCY_LATENCY_CTRL_LOW_THRESHOLD (13 / 127 ~= 10%)
 
 #   set values for I/O Dies
 for die in "${io_dies[@]}"; do
@@ -830,6 +831,7 @@ done
 
 // setELCLOM sets ELC to Latency Optimized Mode (LOM)
 func setELCLOM(myTarget target.Target, localTempDir string) error {
+	// The script is derived from bhs-power-mode script in the Intel PCM repository.
 	setScript := script.ScriptDefinition{
 		Name: "set elc lom",
 		ScriptTemplate: `

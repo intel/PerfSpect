@@ -541,8 +541,8 @@ extract_and_print_metrics() {
 	min_ratio=$(( min_ratio * 100 ))
 	max_ratio=$(( max_ratio * 100 ))
 	eff_latency_ctrl_ratio=$(( eff_latency_ctrl_ratio * 100 ))
-	eff_latency_ctrl_low_threshold=$(( (eff_latency_ctrl_low_threshold * 100) / 100 ))
-	eff_latency_ctrl_high_threshold=$(( (eff_latency_ctrl_high_threshold * 100) / 100 ))
+	eff_latency_ctrl_low_threshold=$(( (eff_latency_ctrl_low_threshold * 100) / 127 ))
+	eff_latency_ctrl_high_threshold=$(( (eff_latency_ctrl_high_threshold * 100) / 127 ))
 
 	# Print metrics
 	echo -n "$socket_id,$die,$die_type,$min_ratio,$max_ratio,$eff_latency_ctrl_ratio,"
