@@ -57,7 +57,6 @@ type LoaderConfig struct {
 	// Override configurations
 	MetricDefinitionOverride string // For direct metric file override (legacy loader)
 	EventDefinitionOverride  string // For direct event file override  (legacy loader)
-	ConfigFileOverride       string // For config file that points to multiple files (perfmon loader)
 }
 type Loader interface {
 	Load(config LoaderConfig) (metrics []MetricDefinition, groups []GroupDefinition, err error)
@@ -80,7 +79,12 @@ type ComponentLoader struct {
 
 // NewLoader creates the right type of Loader for each CPU microarchitecture
 // Input is the CPU microarchitecture name as defined in the cpus module.
-func NewLoader(uarch string) (Loader, error) {
+// If useLegacyLoader is true, the legacy loader will be used regardless of microarchitecture.
+func NewLoader(uarch string, useLegacyLoader bool) (Loader, error) {
+	if useLegacyLoader {
+		slog.Debug("Using legacy loader due to override", slog.String("uarch", uarch))
+		return newLegacyLoader(), nil
+	}
 	switch uarch {
 	case cpus.UarchCLX, cpus.UarchSKX, cpus.UarchBDX, cpus.UarchBergamo, cpus.UarchGenoa, cpus.UarchTurinZen5, cpus.UarchTurinZen5c:
 		slog.Debug("Using legacy loader for microarchitecture", slog.String("uarch", uarch))
