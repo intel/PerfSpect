@@ -25,7 +25,7 @@ default: tools-x86_64
 .PHONY: sysstat sysstat-aarch64 sysstat-repo
 .PHONY: tsc turbostat
 
-tools-x86_64: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm bhs-power-mode.sh spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc turbostat
+tools-x86_64: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc turbostat
 	mkdir -p bin/x86_64
 	cp -R async-profiler bin/x86_64/
 	cp avx-turbo/avx-turbo bin/x86_64/
@@ -41,7 +41,6 @@ tools-x86_64: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw
 	cp msr-tools/rdmsr bin/x86_64/
 	cp msr-tools/wrmsr bin/x86_64/
 	cp pcm/build/bin/pcm-tpmi bin/x86_64/
-	cp bhs-power-mode.sh bin/x86_64/
 	cp perf-archive/perf-archive.sh bin/x86_64/perf-archive && chmod +rx bin/x86_64/perf-archive
 	cp spectre-meltdown-checker/spectre-meltdown-checker.sh bin/x86_64/
 	cp sshpass/sshpass bin/x86_64/
@@ -315,11 +314,6 @@ endif
 	mkdir -p pcm/build
 	cd pcm/build &&	cmake -DNO_ASAN=1 ..
 	cd pcm/build && cmake --build .
-
-PCM_BHS_POWER_MODE_VERSION := 8fdf97bc9636792e05e4be82421efc1c9aec980f
-bhs-power-mode.sh:
-	wget $(WGET_OPTS) https://raw.githubusercontent.com/intel/pcm/$(PCM_BHS_POWER_MODE_VERSION)/scripts/bhs-power-mode.sh
-	chmod +x bhs-power-mode.sh
 
 PERF_VERSION := 6.15.3
 linux-$(PERF_VERSION).tar.xz:
