@@ -176,6 +176,25 @@ func CstatesFromOutput(outputs map[string]script.ScriptOutput) []CstateInfo {
 	return cstatesInfo
 }
 
+// enum for the column indices in the ELC CSV output
+const (
+	elcFieldSocketID = iota
+	elcFieldDie
+	elcFieldDieType
+	elcFieldMinRatio
+	elcFieldMaxRatio
+	elcFieldELCRatio
+	elcFieldELCLowThreshold
+	elcFieldELCHighThreshold
+	elcFieldELCHighThresholdEnable
+)
+
+const (
+	ELCModeLatencyOptimized = "Latency Optimized Mode (LOM)"
+	ELCModeOptimizedPower   = "Optimized Power Mode (OPM)"
+	ELCModeCustom           = "Custom Mode"
+)
+
 // ELCFieldValuesFromOutput extracts Efficiency Latency Control field values.
 func ELCFieldValuesFromOutput(outputs map[string]script.ScriptOutput) (fieldValues []table.Field) {
 	if outputs[script.ElcScriptName].Stdout == "" {
@@ -189,6 +208,13 @@ func ELCFieldValuesFromOutput(outputs map[string]script.ScriptOutput) (fieldValu
 	if len(rows) < 2 {
 		return
 	}
+	// confirm rows have expected number of columns
+	for _, row := range rows {
+		if len(row) < elcFieldELCHighThresholdEnable+1 {
+			slog.Warn("ELC script output has unexpected number of columns", slog.Int("expected", elcFieldELCHighThresholdEnable+1), slog.Int("actual", len(row)))
+			return
+		}
+	}
 	for fieldNamesIndex, fieldName := range rows[0] {
 		values := []string{}
 		for _, row := range rows[1:] {
@@ -197,30 +223,23 @@ func ELCFieldValuesFromOutput(outputs map[string]script.ScriptOutput) (fieldValu
 		fieldValues = append(fieldValues, table.Field{Name: fieldName, Values: values})
 	}
 
-	values := []string{}
+	modeValues := []string{}
 	for _, row := range rows[1:] {
 		var mode string
-		if len(row) > 7 && row[2] == "IO" {
-			if row[5] == "0" && row[6] == "0" && row[7] == "0" {
-				mode = "Latency Optimized"
-			} else if row[5] == "800" && row[6] == "10" && row[7] == "94" {
-				mode = "Default"
-			} else {
-				mode = "Custom"
-			}
-		} else if len(row) > 5 {
-			switch row[5] {
-			case "0":
-				mode = "Latency Optimized"
-			case "1200":
-				mode = "Default"
-			default:
-				mode = "Custom"
-			}
+		if row[elcFieldELCRatio] == "0" && row[elcFieldELCLowThreshold] == "0" && row[elcFieldELCHighThreshold] == "0" && row[elcFieldELCHighThresholdEnable] == "1" {
+			mode = ELCModeLatencyOptimized
+		} else if row[elcFieldELCLowThreshold] == "10" &&
+			row[elcFieldELCHighThreshold] == "94" &&
+			row[elcFieldELCHighThresholdEnable] == "1" &&
+			((row[elcFieldDieType] == "IO" && row[elcFieldELCRatio] == "800") ||
+				(row[elcFieldDieType] == "Compute" && row[elcFieldELCRatio] == "1200")) {
+			mode = ELCModeOptimizedPower
+		} else {
+			mode = ELCModeCustom
 		}
-		values = append(values, mode)
+		modeValues = append(modeValues, mode)
 	}
-	fieldValues = append(fieldValues, table.Field{Name: "Mode", Values: values})
+	fieldValues = append(fieldValues, table.Field{Name: "Mode", Values: modeValues})
 	return
 }
 

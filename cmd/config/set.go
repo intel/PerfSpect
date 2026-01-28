@@ -775,29 +775,92 @@ func setGovernor(governor string, myTarget target.Target, localTempDir string) e
 	return err
 }
 
-func setELC(elc string, myTarget target.Target, localTempDir string) error {
-	var mode string
-	switch elc {
-	case elcOptions[0]:
-		mode = "latency-optimized-mode"
-	case elcOptions[1]:
-		mode = "default"
-	default:
-		return fmt.Errorf("invalid ELC mode: %s", elc)
-	}
+// setELCOPM sets ELC to Optimized Power Mode (OPM)
+func setELCOPM(myTarget target.Target, localTempDir string) error {
+	// The script is derived from bhs-power-mode script in the Intel PCM repository.
 	setScript := script.ScriptDefinition{
-		Name:               "set elc",
-		ScriptTemplate:     fmt.Sprintf("bhs-power-mode.sh --%s", mode),
+		Name: "set elc opm",
+		ScriptTemplate: `
+# determine I/O and compute dies
+output=$(pcm-tpmi 2 0x10 -d -b 26:26)
+
+# Parse the output to build lists of I/O and compute dies
+io_dies=()
+compute_dies=()
+declare -A die_types
+while read -r line; do
+	if [[ $line == *"instance 0"* ]]; then
+		die=$(echo "$line" | grep -oP 'entry \K[0-9]+')
+		if [[ $line == *"value 1"* ]]; then
+			die_types[$die]="IO"
+	io_dies+=("$die")
+		elif [[ $line == *"value 0"* ]]; then
+			die_types[$die]="Compute"
+	compute_dies+=("$die")
+		fi
+	fi
+done <<< "$output"
+
+# Set ELC parameters for I/O and Compute dies
+#   set values common to both die types
+pcm-tpmi 2 0x18 -d -b 39:39 -w 1   # EFFICIENCY_LATENCY_CTRL_HIGH_THRESHOLD_ENABLE
+pcm-tpmi 2 0x18 -d -b 46:40 -w 120 # EFFICIENCY_LATENCY_CTRL_HIGH_THRESHOLD (120 / 127 ~= 94%)
+pcm-tpmi 2 0x18 -d -b 38:32 -w 13  # EFFICIENCY_LATENCY_CTRL_LOW_THRESHOLD (13 / 127 ~= 10%)
+
+#   set values for I/O Dies
+for die in "${io_dies[@]}"; do
+    pcm-tpmi 2 0x18 -d -e $die -b 28:22 -w 8  # EFFICIENCY_LATENCY_CTRL_RATIO 0.8 GHz for I/O Dies
+done
+
+#   set values for Compute Dies
+for die in "${compute_dies[@]}"; do
+	pcm-tpmi 2 0x18 -d -e $die -b 28:22 -w 12  # EFFICIENCY_LATENCY_CTRL_RATIO 1.2 GHz for Compute Dies
+done
+`,
 		Superuser:          true,
 		Vendors:            []string{cpus.IntelVendor},
 		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF},
-		Depends:            []string{"bhs-power-mode.sh", "pcm-tpmi"},
+		Depends:            []string{"pcm-tpmi"},
 	}
 	_, err := runScript(myTarget, setScript, localTempDir)
 	if err != nil {
-		err = fmt.Errorf("failed to set ELC mode: %w", err)
+		err = fmt.Errorf("failed to set ELC OPM mode: %w", err)
 	}
 	return err
+}
+
+// setELCLOM sets ELC to Latency Optimized Mode (LOM)
+func setELCLOM(myTarget target.Target, localTempDir string) error {
+	// The script is derived from bhs-power-mode script in the Intel PCM repository.
+	setScript := script.ScriptDefinition{
+		Name: "set elc lom",
+		ScriptTemplate: `
+pcm-tpmi 2 0x18 -d -b 39:39 -w 1 # EFFICIENCY_LATENCY_CTRL_HIGH_THRESHOLD_ENABLE
+pcm-tpmi 2 0x18 -d -b 28:22 -w 0 # EFFICIENCY_LATENCY_CTRL_RATIO
+pcm-tpmi 2 0x18 -d -b 46:40 -w 0 # EFFICIENCY_LATENCY_CTRL_HIGH_THRESHOLD
+pcm-tpmi 2 0x18 -d -b 38:32 -w 0 # EFFICIENCY_LATENCY_CTRL_LOW_THRESHOLD
+`,
+		Superuser:          true,
+		Vendors:            []string{cpus.IntelVendor},
+		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF},
+		Depends:            []string{"pcm-tpmi"},
+	}
+	_, err := runScript(myTarget, setScript, localTempDir)
+	if err != nil {
+		err = fmt.Errorf("failed to set ELC LOM mode: %w", err)
+	}
+	return err
+}
+
+func setELC(elc string, myTarget target.Target, localTempDir string) error {
+	switch elc {
+	case elcOptions[0]:
+		return setELCLOM(myTarget, localTempDir)
+	case elcOptions[1]:
+		return setELCOPM(myTarget, localTempDir)
+	default:
+		return fmt.Errorf("invalid ELC mode: %s", elc)
+	}
 }
 
 func getUarch(myTarget target.Target, localTempDir string) (string, error) {

@@ -41,7 +41,6 @@ tools-x86_64: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw
 	cp msr-tools/rdmsr bin/x86_64/
 	cp msr-tools/wrmsr bin/x86_64/
 	cp pcm/build/bin/pcm-tpmi bin/x86_64/
-	cp pcm/scripts/bhs-power-mode.sh bin/x86_64/
 	cp perf-archive/perf-archive.sh bin/x86_64/perf-archive && chmod +rx bin/x86_64/perf-archive
 	cp spectre-meltdown-checker/spectre-meltdown-checker.sh bin/x86_64/
 	cp sshpass/sshpass bin/x86_64/
