@@ -63,8 +63,6 @@ func init() {
 	trimCmd.Flags().IntVar(&flagTrimStartOffset, flagTrimStartOffsetName, 0, "seconds to skip from the beginning of the data")
 	trimCmd.Flags().IntVar(&flagTrimEndOffset, flagTrimEndOffsetName, 0, "seconds to exclude from the end of the data")
 
-	_ = trimCmd.MarkFlagRequired(flagTrimInputName) // error only occurs if flag doesn't exist
-
 	// Set custom usage function to avoid parent's usage function issues
 	trimCmd.SetUsageFunc(func(cmd *cobra.Command) error {
 		fmt.Fprintf(cmd.OutOrStdout(), "Usage:\n  %s\n\n", cmd.UseLine())
@@ -83,6 +81,11 @@ func init() {
 
 // validateTrimFlags checks that the trim command flags are valid and consistent
 func validateTrimFlags(cmd *cobra.Command, args []string) error {
+	// Check that input flag was provided (required flag check)
+	if flagTrimInput == "" {
+		return workflow.FlagValidationError(cmd, "required flag \"--input\" not set")
+	}
+
 	// Check input file or directory exists
 	if _, err := os.Stat(flagTrimInput); err != nil {
 		if os.IsNotExist(err) {
