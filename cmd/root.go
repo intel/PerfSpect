@@ -30,6 +30,7 @@ import (
 	"perfspect/cmd/report"
 	"perfspect/cmd/telemetry"
 	"perfspect/internal/app"
+	"perfspect/internal/script"
 	"perfspect/internal/util"
 
 	"github.com/pkg/errors"
@@ -114,6 +115,7 @@ Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
 	rootCmd.AddCommand(config.Cmd)
 	rootCmd.AddGroup([]*cobra.Group{{ID: "other", Title: "Other Commands:"}}...)
 	rootCmd.AddCommand(updateCmd)
+	rootCmd.AddCommand(extractCmd)
 	// Global (persistent) flags
 	rootCmd.PersistentFlags().BoolVar(&flagDebug, app.FlagDebugName, false, "enable debug logging and retain temporary directories")
 	rootCmd.PersistentFlags().BoolVar(&flagSyslog, app.FlagSyslogName, false, "write logs to syslog instead of a file")
@@ -487,6 +489,29 @@ func getLatestManifest() (manifest, error) {
 	}
 	// return latest version
 	return latestManifest, nil
+}
+
+// define the extract command
+const (
+	extractCommandName = "extract"
+)
+
+var extractCmd = &cobra.Command{
+	GroupID: "other",
+	Use:     extractCommandName,
+	Short:   "Extract the embedded resources (for developers)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		appContext := cmd.Parent().Context().Value(app.Context{}).(app.Context)
+		// extract the internal/script module's embedded resources
+		err := util.ExtractAllResources(script.Resources, appContext.OutputDir)
+		if err != nil {
+			slog.Error("Failed to extract script resources", slog.String("error", err.Error()))
+			fmt.Printf("Error: failed to extract script resources: %v\n", err)
+			return err
+		}
+		fmt.Printf("Extracted script resources to %s\n", appContext.OutputDir)
+		return nil
+	},
 }
 
 // SyslogHandler is a slog.Handler that logs to syslog.
