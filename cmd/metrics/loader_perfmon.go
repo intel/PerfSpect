@@ -189,22 +189,12 @@ func uarchToResourceName(uarch string) string {
 }
 
 func (l *PerfmonLoader) loadMetricsConfig(loaderConfig LoaderConfig) (MetricsConfig, error) {
-	var config MetricsConfig
-	var bytes []byte
-	if loaderConfig.ConfigFileOverride != "" {
-		var err error
-		bytes, err = os.ReadFile(loaderConfig.ConfigFileOverride)
-		if err != nil {
-			return MetricsConfig{}, fmt.Errorf("error reading metric config override file: %w", err)
-		}
-	} else {
-		var err error
-		resourceName := uarchToResourceName(loaderConfig.Metadata.Microarchitecture)
-		bytes, err = resources.ReadFile(filepath.Join("resources", "perfmon", resourceName, resourceName+".json"))
-		if err != nil {
-			return MetricsConfig{}, fmt.Errorf("error reading metrics config file: %w", err)
-		}
+	resourceName := uarchToResourceName(loaderConfig.Metadata.Microarchitecture)
+	bytes, err := resources.ReadFile(filepath.Join("resources", "perfmon", resourceName, resourceName+".json"))
+	if err != nil {
+		return MetricsConfig{}, fmt.Errorf("error reading metrics config file: %w", err)
 	}
+	var config MetricsConfig
 	if err := json.Unmarshal(bytes, &config); err != nil {
 		return MetricsConfig{}, fmt.Errorf("error unmarshaling metrics config JSON: %w", err)
 	}

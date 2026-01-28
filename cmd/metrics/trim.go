@@ -288,7 +288,7 @@ func getTrimmedSourceInfos(sourceDirOrFilename string) ([]trimSourceInfo, error)
 }
 
 func loadMetricDefinitions(metadata Metadata) ([]MetricDefinition, error) {
-	loader, err := NewLoader(metadata.Microarchitecture)
+	loader, err := NewLoader(metadata.Microarchitecture, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create metric definition loader: %w", err)
 	}
