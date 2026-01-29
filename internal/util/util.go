@@ -208,6 +208,31 @@ func GeoMean(vals []float64) (val float64) {
 	return
 }
 
+// ExtractAllResources recurcively extracts all resources as files into the specified directory.
+func ExtractAllResources(resources embed.FS, dir string) error {
+	// walk the embedded filesystem starting at "resources"
+	return fs.WalkDir(resources, "resources", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		relPath, err := filepath.Rel("resources", path)
+		if err != nil {
+			return err
+		}
+		relPath = filepath.Join(dir, relPath)
+		if d.IsDir() {
+			if relPath == "." {
+				return nil
+			}
+			// create directory
+			return os.MkdirAll(relPath, 0700)
+		}
+		// extract file
+		_, err = ExtractResource(resources, path, filepath.Dir(relPath))
+		return err
+	})
+}
+
 // ExtractResource extracts a resource from the given embed.FS and saves it to the specified temporary directory.
 // It returns the path to the saved resource file and any error encountered during the process.
 func ExtractResource(resources embed.FS, resourcePath string, tempDir string) (string, error) {
