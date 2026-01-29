@@ -147,7 +147,11 @@ func (rc *ReportingCommand) createReports(appContext app.Context, orderedTargetS
 				err = fmt.Errorf("failed to create multi-target %s report: %w", format, err)
 				return nil, err
 			}
-			reportFilename := fmt.Sprintf("%s.%s", "all_hosts", format)
+			post := ""
+			if rc.ReportNamePost != "" {
+				post = "_" + rc.ReportNamePost
+			}
+			reportFilename := fmt.Sprintf("%s.%s", "all_hosts"+post, format)
 			reportPath := filepath.Join(appContext.OutputDir, reportFilename)
 			if err = writeReport(reportBytes, reportPath); err != nil {
 				err = fmt.Errorf("failed to write multi-target %s report: %w", format, err)
