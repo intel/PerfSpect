@@ -119,6 +119,7 @@ const (
 	InstructionTelemetryScriptName = "instruction telemetry"
 	GaudiTelemetryScriptName       = "gaudi telemetry"
 	PDUTelemetryScriptName         = "pdu telemetry"
+	KernelTelemetryScriptName      = "kernel telemetry"
 	// flamegraph scripts
 	FlameGraphScriptName = "flamegraph"
 	// lock scripts
@@ -1444,7 +1445,7 @@ done
 `,
 		Superuser: false,
 	},
-	{
+	KernelTelemetryScriptName: {
 		Name: KernelTelemetryScriptName,
 		ScriptTemplate: `interval={{.Interval}}
 duration={{.Duration}}
