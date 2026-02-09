@@ -371,6 +371,9 @@ func summaryFromTableValues(allTableValues []table.TableValues, _ map[string]scr
 	networkReads := getMetricAverage(getTableValues(allTableValues, NetworkTelemetryTableName), []string{"rxkB/s"}, "Time")
 	networkWrites := getMetricAverage(getTableValues(allTableValues, NetworkTelemetryTableName), []string{"txkB/s"}, "Time")
 	memAvail := getMetricAverage(getTableValues(allTableValues, MemoryTelemetryTableName), []string{"avail"}, "Time")
+	minorFaults := getMetricAverage(getTableValues(allTableValues, VirtualMemoryTelemetryTableName), []string{"Minor Faults/s"}, "Time")
+	majorFaults := getMetricAverage(getTableValues(allTableValues, VirtualMemoryTelemetryTableName), []string{"Major Faults/s"}, "Time")
+	ctxSwitches := getMetricAverage(getTableValues(allTableValues, ProcessTelemetryTableName), []string{"Context Switches/s"}, "Time")
 	return table.TableValues{
 		TableDefinition: table.TableDefinition{
 			Name:      telemetrySummaryTableName,
@@ -389,6 +392,9 @@ func summaryFromTableValues(allTableValues []table.TableValues, _ map[string]scr
 			{Name: "Drive Writes (kB/s)", Values: []string{driveWrites}},
 			{Name: "Network RX (kB/s)", Values: []string{networkReads}},
 			{Name: "Network TX (kB/s)", Values: []string{networkWrites}},
+			{Name: "Minor Page Faults/s", Values: []string{minorFaults}},
+			{Name: "Major Page Faults/s", Values: []string{majorFaults}},
+			{Name: "Context Switches/s", Values: []string{ctxSwitches}},
 		},
 	}
 }
