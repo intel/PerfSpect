@@ -1477,8 +1477,6 @@ read_vm() {
 while true; do
   NOW=$(date +%s)
 
-  [[ "$duration" -ne 0 && $((NOW - START_TIME)) -ge "$duration" ]] && exit 0
-
   STAT_NOW="$(read_stat)"
   VM_NOW="$(read_vm)"
 
@@ -1521,6 +1519,8 @@ $swapin,$swapout"
 
   PREV_STAT="$STAT_NOW"
   PREV_VM="$VM_NOW"
+
+  [[ "$duration" -ne 0 && $((NOW - START_TIME)) -ge "$duration" ]] && exit 0
 
   sleep "$interval"
 done
