@@ -764,6 +764,10 @@ func virtualMemoryTelemetryTableValues(outputs map[string]script.ScriptOutput) [
 	}
 	// subsequent rows are data
 	for _, record := range records[1:] {
+		if len(record) != len(header) {
+			slog.Error("unexpected number of fields in virtual memory telemetry output", slog.Int("expected", len(header)), slog.Int("got", len(record)))
+			continue
+		}
 		fields[0].Values = append(fields[0].Values, record[fieldIndices["timestamp"]])
 		fields[1].Values = append(fields[1].Values, record[fieldIndices["minor_faults_per_sec"]])
 		fields[2].Values = append(fields[2].Values, record[fieldIndices["major_faults_per_sec"]])
@@ -806,6 +810,10 @@ func processTelemetryTableValues(outputs map[string]script.ScriptOutput) []table
 	}
 	// subsequent rows are data
 	for _, record := range records[1:] {
+		if len(record) != len(header) {
+			slog.Error("unexpected number of fields in process telemetry output", slog.Int("expected", len(header)), slog.Int("got", len(record)))
+			continue
+		}
 		fields[0].Values = append(fields[0].Values, record[fieldIndices["timestamp"]])
 		fields[1].Values = append(fields[1].Values, record[fieldIndices["ctx_switches_per_sec"]])
 	}
