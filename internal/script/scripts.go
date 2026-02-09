@@ -1476,6 +1476,7 @@ read_vm() {
 
 while true; do
   NOW=$(date +%s)
+  TIMESTAMP=$(date +%H:%M:%S)
 
   STAT_NOW="$(read_stat)"
   VM_NOW="$(read_vm)"
@@ -1512,7 +1513,7 @@ while true; do
     swapin=$(get_vm_delta pswpin)
     swapout=$(get_vm_delta pswpout)
 
-    echo "$NOW,$ctx_rate,$pr_run,$pr_blk,\
+    echo "$TIMESTAMP,$ctx_rate,$pr_run,$pr_blk,\
 $minflt,$majflt,$pgscan,$pgsteal,\
 $swapin,$swapout"
   fi
