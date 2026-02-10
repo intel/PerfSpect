@@ -809,15 +809,15 @@ func kernelTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.
 		return []table.Field{}
 	}
 
-	// Pad syscalls values if fewer than kernel telemetry data (or vice versa)
-	numKernelRows := len(fields[timeIdx].Values)
-	for len(fields[syscallsIdx].Values) < numKernelRows {
-		fields[syscallsIdx].Values = append(fields[syscallsIdx].Values, "")
+	// Ensure all fields have the same number of values by padding with empty strings
+	maxLen := 0
+	for _, f := range fields {
+		if len(f.Values) > maxLen {
+			maxLen = len(f.Values)
+		}
 	}
-	// If syscalls has more rows, pad the kernel telemetry fields
-	numSyscallRows := len(fields[syscallsIdx].Values)
-	for i := 0; i < syscallsIdx; i++ {
-		for len(fields[i].Values) < numSyscallRows {
+	for i := range fields {
+		for len(fields[i].Values) < maxLen {
 			fields[i].Values = append(fields[i].Values, "")
 		}
 	}
