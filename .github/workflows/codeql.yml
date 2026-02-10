@@ -34,10 +34,12 @@ jobs:
         languages: ${{ matrix.language }}
     - name: Build
       run: |
-        mkdir -p internal/script/resources
-        touch internal/script/resources/dummy
-        mkdir -p internal/common/resources
-        touch internal/common/resources/dummy
+        mkdir -p internal/script/resources/x86_64
+        touch internal/script/resources/x86_64/perf
+        touch internal/script/resources/x86_64/fio
+        mkdir -p internal/common/resources/aarch64
+        touch internal/common/resources/aarch64/perf
+        touch internal/common/resources/aarch64/fio
         make
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@662472033e021d55d94146f66f6058822b0b39fd # v3.27.0
