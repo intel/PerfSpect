@@ -674,42 +674,7 @@ func pduTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName str
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
-func virtualMemoryTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
-	data := [][]float64{}
-	datasetNames := []string{}
-	for _, field := range tableValues.Fields[1:] {
-		points := []float64{}
-		for _, val := range field.Values {
-			if val == "" {
-				break
-			}
-			stat, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				slog.Error("error parsing stat", slog.String("error", err.Error()))
-				return ""
-			}
-			points = append(points, stat)
-		}
-		if len(points) > 0 {
-			data = append(data, points)
-			datasetNames = append(datasetNames, field.Name)
-		}
-	}
-	chartConfig := report.ChartTemplateStruct{
-		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
-		XaxisText:     "Time",
-		YaxisText:     "count per second",
-		TitleText:     "",
-		DisplayTitle:  "false",
-		DisplayLegend: "true",
-		AspectRatio:   "2",
-		SuggestedMin:  "0",
-		SuggestedMax:  "0",
-	}
-	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
-}
-
-func processTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
+func kernelTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {

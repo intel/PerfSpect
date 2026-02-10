@@ -33,8 +33,7 @@ const (
 	TemperatureTelemetryTableName           = "Temperature Telemetry"
 	GaudiTelemetryTableName                 = "Gaudi Telemetry"
 	PDUTelemetryTableName                   = "PDU Telemetry"
-	VirtualMemoryTelemetryTableName         = "Virtual Memory Telemetry"
-	ProcessTelemetryTableName               = "Process Telemetry"
+	KernelTelemetryTableName = "Kernel Telemetry"
 )
 
 // telemetry table menu labels
@@ -53,8 +52,7 @@ const (
 	TemperatureTelemetryMenuLabel           = "Temperature"
 	GaudiTelemetryMenuLabel                 = "Gaudi"
 	PDUTelemetryMenuLabel                   = "PDU"
-	VirtualMemoryTelemetryMenuLabel         = "Virtual Memory"
-	ProcessTelemetryMenuLabel               = "Process"
+	KernelTelemetryMenuLabel = "Kernel"
 )
 
 var tableDefinitions = map[string]table.TableDefinition{
@@ -181,22 +179,15 @@ var tableDefinitions = map[string]table.TableDefinition{
 			script.PDUTelemetryScriptName,
 		},
 		FieldsFunc: pduTelemetryTableValues},
-	VirtualMemoryTelemetryTableName: {
-		Name:      VirtualMemoryTelemetryTableName,
-		MenuLabel: VirtualMemoryTelemetryMenuLabel,
+	KernelTelemetryTableName: {
+		Name:      KernelTelemetryTableName,
+		MenuLabel: KernelTelemetryMenuLabel,
 		HasRows:   true,
 		ScriptNames: []string{
 			script.KernelTelemetryScriptName,
+			script.SyscallsTelemetryScriptName,
 		},
-		FieldsFunc: virtualMemoryTelemetryTableValues},
-	ProcessTelemetryTableName: {
-		Name:      ProcessTelemetryTableName,
-		MenuLabel: ProcessTelemetryMenuLabel,
-		HasRows:   true,
-		ScriptNames: []string{
-			script.KernelTelemetryScriptName,
-		},
-		FieldsFunc: processTelemetryTableValues},
+		FieldsFunc: kernelTelemetryTableValues},
 }
 
 func cpuUtilizationTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.Field {
@@ -728,94 +719,108 @@ func instructionTelemetryTableValues(outputs map[string]script.ScriptOutput) []t
 	return fields
 }
 
-func virtualMemoryTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.Field {
+func kernelTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	fields := []table.Field{
 		{Name: "Time"},
+		{Name: "Context Switches/s"},
 		{Name: "Minor Faults/s"},
 		{Name: "Major Faults/s"},
 		{Name: "Pgscan/s"},
 		{Name: "Pgsteal/s"},
 		{Name: "Swapin/s"},
 		{Name: "Swapout/s"},
+		{Name: "Syscalls/s"},
 	}
-	// the output is in CSV format:
-	// timestamp,ctx_switches_per_sec,procs_running,procs_blocked,minor_faults_per_sec,major_faults_per_sec,pgscan_per_sec,pgsteal_per_sec,swapin_per_sec,swapout_per_sec
-	reader := csv.NewReader(strings.NewReader(outputs[script.KernelTelemetryScriptName].Stdout))
-	records, err := reader.ReadAll()
-	if err != nil {
-		slog.Error("failed to read virtual memory telemetry CSV output", slog.String("error", err.Error()))
-		return []table.Field{}
-	}
-	if len(records) == 0 {
-		return []table.Field{}
-	}
-	// first row is the header, find the indices of the fields we're interested in
-	header := records[0]
-	fieldIndices := make(map[string]int)
-	for i, fieldName := range header {
-		fieldIndices[fieldName] = i
-	}
-	requiredFields := []string{"timestamp", "minor_faults_per_sec", "major_faults_per_sec", "pgscan_per_sec", "pgsteal_per_sec", "swapin_per_sec", "swapout_per_sec"}
-	for _, field := range requiredFields {
-		if _, ok := fieldIndices[field]; !ok {
-			slog.Error("missing expected field in virtual memory telemetry output", slog.String("field", field))
-			return []table.Field{}
-		}
-	}
-	// subsequent rows are data
-	for _, record := range records[1:] {
-		if len(record) != len(header) {
-			slog.Error("unexpected number of fields in virtual memory telemetry output", slog.Int("expected", len(header)), slog.Int("got", len(record)))
-			continue
-		}
-		fields[0].Values = append(fields[0].Values, record[fieldIndices["timestamp"]])
-		fields[1].Values = append(fields[1].Values, record[fieldIndices["minor_faults_per_sec"]])
-		fields[2].Values = append(fields[2].Values, record[fieldIndices["major_faults_per_sec"]])
-		fields[3].Values = append(fields[3].Values, record[fieldIndices["pgscan_per_sec"]])
-		fields[4].Values = append(fields[4].Values, record[fieldIndices["pgsteal_per_sec"]])
-		fields[5].Values = append(fields[5].Values, record[fieldIndices["swapin_per_sec"]])
-		fields[6].Values = append(fields[6].Values, record[fieldIndices["swapout_per_sec"]])
-	}
-	return fields
-}
 
-func processTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	fields := []table.Field{
-		{Name: "Time"},
-		{Name: "Context Switches/s"},
-	}
-	// the output is in CSV format:
-	// timestamp,ctx_switches_per_sec,procs_running,procs_blocked,minor_faults_per_sec,major_faults_per_sec,pgscan_per_sec,pgsteal_per_sec,swapin_per_sec,swapout_per_sec
-	reader := csv.NewReader(strings.NewReader(outputs[script.KernelTelemetryScriptName].Stdout))
-	records, err := reader.ReadAll()
-	if err != nil {
-		slog.Error("failed to read process telemetry CSV output", slog.String("error", err.Error()))
-		return []table.Field{}
-	}
-	if len(records) == 0 {
-		return []table.Field{}
-	}
-	// first row is the header, find the indices of the fields we're interested in
-	header := records[0]
-	fieldIndices := make(map[string]int)
-	for i, fieldName := range header {
-		fieldIndices[fieldName] = i
-	}
-	requiredFields := []string{"timestamp", "ctx_switches_per_sec"}
-	for _, field := range requiredFields {
-		if _, ok := fieldIndices[field]; !ok {
-			slog.Error("missing expected field in process telemetry output", slog.String("field", field))
-			return []table.Field{}
+	// Field indices for kernel telemetry data
+	const (
+		timeIdx      = 0
+		ctxIdx       = 1
+		minorIdx     = 2
+		majorIdx     = 3
+		pgscanIdx    = 4
+		pgstealIdx   = 5
+		swapinIdx    = 6
+		swapoutIdx   = 7
+		syscallsIdx  = 8
+	)
+
+	// Parse kernel telemetry script output
+	// CSV format: timestamp,ctx_switches_per_sec,procs_running,procs_blocked,minor_faults_per_sec,major_faults_per_sec,pgscan_per_sec,pgsteal_per_sec,swapin_per_sec,swapout_per_sec
+	if output, ok := outputs[script.KernelTelemetryScriptName]; ok && output.Stdout != "" {
+		reader := csv.NewReader(strings.NewReader(output.Stdout))
+		records, err := reader.ReadAll()
+		if err != nil {
+			slog.Error("failed to read kernel telemetry CSV output", slog.String("error", err.Error()))
+		} else if len(records) > 1 {
+			header := records[0]
+			fieldIndices := make(map[string]int)
+			for i, fieldName := range header {
+				fieldIndices[fieldName] = i
+			}
+
+			// Map CSV columns to field indices
+			csvFields := map[string]int{
+				"timestamp":            timeIdx,
+				"ctx_switches_per_sec": ctxIdx,
+				"minor_faults_per_sec": minorIdx,
+				"major_faults_per_sec": majorIdx,
+				"pgscan_per_sec":       pgscanIdx,
+				"pgsteal_per_sec":      pgstealIdx,
+				"swapin_per_sec":       swapinIdx,
+				"swapout_per_sec":      swapoutIdx,
+			}
+
+			for _, record := range records[1:] {
+				for csvField, fieldIdx := range csvFields {
+					if csvIdx, ok := fieldIndices[csvField]; ok && len(record) > csvIdx {
+						fields[fieldIdx].Values = append(fields[fieldIdx].Values, record[csvIdx])
+					}
+				}
+			}
 		}
 	}
-	// subsequent rows are data
-	for _, record := range records[1:] {
-		if len(record) != len(header) {
-			slog.Error("unexpected number of fields in process telemetry output", slog.Int("expected", len(header)), slog.Int("got", len(record)))
-			continue
+
+	// Parse syscalls from syscalls telemetry script
+	// CSV format: timestamp,syscalls_per_sec
+	if output, ok := outputs[script.SyscallsTelemetryScriptName]; ok && output.Stdout != "" {
+		reader := csv.NewReader(strings.NewReader(output.Stdout))
+		records, err := reader.ReadAll()
+		if err != nil {
+			slog.Error("failed to read syscalls telemetry CSV output", slog.String("error", err.Error()))
+		} else if len(records) > 1 {
+			header := records[0]
+			fieldIndices := make(map[string]int)
+			for i, fieldName := range header {
+				fieldIndices[fieldName] = i
+			}
+			if csvIdx, ok := fieldIndices["syscalls_per_sec"]; ok {
+				for _, record := range records[1:] {
+					if len(record) > csvIdx {
+						fields[syscallsIdx].Values = append(fields[syscallsIdx].Values, record[csvIdx])
+					}
+				}
+			}
 		}
-		fields[0].Values = append(fields[0].Values, record[fieldIndices["timestamp"]])
-		fields[1].Values = append(fields[1].Values, record[fieldIndices["ctx_switches_per_sec"]])
 	}
+
+	// If we have no data from either source, return empty
+	if len(fields[timeIdx].Values) == 0 && len(fields[syscallsIdx].Values) == 0 {
+		return []table.Field{}
+	}
+
+	// Pad syscalls values if fewer than kernel telemetry data (or vice versa)
+	numKernelRows := len(fields[timeIdx].Values)
+	for len(fields[syscallsIdx].Values) < numKernelRows {
+		fields[syscallsIdx].Values = append(fields[syscallsIdx].Values, "")
+	}
+	// If syscalls has more rows, pad the kernel telemetry fields
+	numSyscallRows := len(fields[syscallsIdx].Values)
+	for i := 0; i < syscallsIdx; i++ {
+		for len(fields[i].Values) < numSyscallRows {
+			fields[i].Values = append(fields[i].Values, "")
+		}
+	}
+
 	return fields
 }

@@ -120,6 +120,7 @@ const (
 	GaudiTelemetryScriptName       = "gaudi telemetry"
 	PDUTelemetryScriptName         = "pdu telemetry"
 	KernelTelemetryScriptName      = "kernel telemetry"
+	SyscallsTelemetryScriptName    = "syscalls telemetry"
 	// flamegraph scripts
 	FlameGraphScriptName = "flamegraph"
 	// lock scripts
@@ -1527,6 +1528,79 @@ $swapin,$swapout"
 done
 `,
 		Superuser: false,
+	},
+	SyscallsTelemetryScriptName: {
+		Name: SyscallsTelemetryScriptName,
+		ScriptTemplate: `interval={{.Interval}}
+duration={{.Duration}}
+
+INTERVAL_MS=$((interval * 1000))
+
+cleanup() {
+  exit 0
+}
+trap cleanup INT TERM
+
+# Enumerate syscall enter events dynamically
+EVENTS=$(perf list | awk '/^[[:space:]]*syscalls:sys_enter_/ {print $1}' | paste -sd,)
+
+if [[ -z "$EVENTS" ]]; then
+  echo "No syscalls:sys_enter_* events found" >&2
+  exit 1
+fi
+
+# Count number of event types to know when an interval is complete
+NUM_EVENTS=$(echo "$EVENTS" | tr ',' '\n' | wc -l)
+
+echo "timestamp,syscalls_per_sec"
+
+if [[ "$duration" -eq 0 ]]; then
+  PERF_CMD=(sleep infinity)
+else
+  # Add one extra interval to ensure we get all data points
+  PERF_CMD=(sleep "$((duration + interval))")
+fi
+
+perf stat -a \
+  -e "$EVENTS" \
+  --interval-print "$INTERVAL_MS" \
+  "${PERF_CMD[@]}" 2>&1 | \
+stdbuf -oL awk -v interval="$interval" -v num_events="$NUM_EVENTS" -v duration="$duration" '
+  BEGIN {
+    OFS = ","
+    interval_total = 0
+    event_count = 0
+    intervals_printed = 0
+    max_intervals = (duration > 0) ? int(duration / interval) : 0
+  }
+
+  /syscalls:sys_enter_/ {
+    gsub(",", "", $2)
+    interval_total += $2
+    event_count++
+
+    # When we have seen all events for this interval, print and reset
+    if (event_count >= num_events) {
+      cmd = "date +%H:%M:%S"
+      cmd | getline timestamp
+      close(cmd)
+      rate = interval_total / interval
+      printf "%s,%.2f\n", timestamp, rate
+      fflush()
+      intervals_printed++
+      interval_total = 0
+      event_count = 0
+
+      # Exit after printing the expected number of intervals
+      if (max_intervals > 0 && intervals_printed >= max_intervals) {
+        exit 0
+      }
+    }
+  }
+'
+`,
+		Superuser: true,
+		Depends:   []string{"perf"},
 	},
 	// flamegraph scripts
 	FlameGraphScriptName: {
