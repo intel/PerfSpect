@@ -867,7 +867,7 @@ done
 	},
 	CveScriptName: {
 		Name:           CveScriptName,
-		ScriptTemplate: "spectre-meltdown-checker.sh --batch text",
+		ScriptTemplate: "timeout 90 spectre-meltdown-checker.sh --batch text",
 		Superuser:      true,
 		Lkms:           []string{"msr"},
 		Depends:        []string{"spectre-meltdown-checker.sh", "rdmsr"},
