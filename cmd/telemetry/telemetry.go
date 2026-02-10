@@ -52,17 +52,19 @@ var (
 
 	flagAll bool
 
-	flagCPU         bool
-	flagFrequency   bool
-	flagIPC         bool
-	flagC6          bool
-	flagIRQRate     bool
-	flagMemory      bool
-	flagNetwork     bool
-	flagStorage     bool
-	flagPower       bool
-	flagTemperature bool
-	flagInstrMix    bool
+	flagCPU           bool
+	flagFrequency     bool
+	flagIPC           bool
+	flagC6            bool
+	flagIRQRate       bool
+	flagMemory        bool
+	flagNetwork       bool
+	flagStorage       bool
+	flagPower         bool
+	flagTemperature   bool
+	flagInstrMix      bool
+	flagVirtualMemory bool
+	flagProcess       bool
 
 	flagNoSystemSummary bool
 
@@ -76,17 +78,19 @@ const (
 
 	flagAllName = "all"
 
-	flagCPUName         = "cpu"
-	flagFrequencyName   = "frequency"
-	flagIPCName         = "ipc"
-	flagC6Name          = "c6"
-	flagIRQRateName     = "irqrate"
-	flagMemoryName      = "memory"
-	flagNetworkName     = "network"
-	flagStorageName     = "storage"
-	flagPowerName       = "power"
-	flagTemperatureName = "temperature"
-	flagInstrMixName    = "instrmix"
+	flagCPUName           = "cpu"
+	flagFrequencyName     = "frequency"
+	flagIPCName           = "ipc"
+	flagC6Name            = "c6"
+	flagIRQRateName       = "irqrate"
+	flagMemoryName        = "memory"
+	flagNetworkName       = "network"
+	flagStorageName       = "storage"
+	flagPowerName         = "power"
+	flagTemperatureName   = "temperature"
+	flagInstrMixName      = "instrmix"
+	flagVirtualMemoryName = "virtual-memory"
+	flagProcessName       = "process"
 
 	flagNoSystemSummaryName = "no-summary"
 
@@ -108,6 +112,8 @@ var categories = []app.Category{
 	{FlagName: flagStorageName, FlagVar: &flagStorage, DefaultValue: false, Help: "monitor storage", Tables: []table.TableDefinition{tableDefinitions[DriveTelemetryTableName]}},
 	{FlagName: flagIRQRateName, FlagVar: &flagIRQRate, DefaultValue: false, Help: "monitor IRQ rate", Tables: []table.TableDefinition{tableDefinitions[IRQRateTelemetryTableName]}},
 	{FlagName: flagInstrMixName, FlagVar: &flagInstrMix, DefaultValue: false, Help: "monitor instruction mix", Tables: []table.TableDefinition{tableDefinitions[InstructionTelemetryTableName]}},
+	{FlagName: flagVirtualMemoryName, FlagVar: &flagVirtualMemory, DefaultValue: false, Help: "monitor virtual memory", Tables: []table.TableDefinition{tableDefinitions[VirtualMemoryTelemetryTableName]}},
+	{FlagName: flagProcessName, FlagVar: &flagProcess, DefaultValue: false, Help: "monitor process telemetry", Tables: []table.TableDefinition{tableDefinitions[ProcessTelemetryTableName]}},
 }
 
 const (
@@ -338,6 +344,8 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	report.RegisterHTMLRenderer(InstructionTelemetryTableName, instructionTelemetryTableHTMLRenderer)
 	report.RegisterHTMLRenderer(GaudiTelemetryTableName, gaudiTelemetryTableHTMLRenderer)
 	report.RegisterHTMLRenderer(PDUTelemetryTableName, pduTelemetryTableHTMLRenderer)
+	report.RegisterHTMLRenderer(VirtualMemoryTelemetryTableName, virtualMemoryTelemetryTableHTMLRenderer)
+	report.RegisterHTMLRenderer(ProcessTelemetryTableName, processTelemetryTableHTMLRenderer)
 
 	return reportingCommand.Run()
 }
@@ -363,6 +371,9 @@ func summaryFromTableValues(allTableValues []table.TableValues, _ map[string]scr
 	networkReads := getMetricAverage(getTableValues(allTableValues, NetworkTelemetryTableName), []string{"rxkB/s"}, "Time")
 	networkWrites := getMetricAverage(getTableValues(allTableValues, NetworkTelemetryTableName), []string{"txkB/s"}, "Time")
 	memAvail := getMetricAverage(getTableValues(allTableValues, MemoryTelemetryTableName), []string{"avail"}, "Time")
+	minorFaults := getMetricAverage(getTableValues(allTableValues, VirtualMemoryTelemetryTableName), []string{"Minor Faults/s"}, "Time")
+	majorFaults := getMetricAverage(getTableValues(allTableValues, VirtualMemoryTelemetryTableName), []string{"Major Faults/s"}, "Time")
+	ctxSwitches := getMetricAverage(getTableValues(allTableValues, ProcessTelemetryTableName), []string{"Context Switches/s"}, "Time")
 	return table.TableValues{
 		TableDefinition: table.TableDefinition{
 			Name:      telemetrySummaryTableName,
@@ -381,6 +392,9 @@ func summaryFromTableValues(allTableValues []table.TableValues, _ map[string]scr
 			{Name: "Drive Writes (kB/s)", Values: []string{driveWrites}},
 			{Name: "Network RX (kB/s)", Values: []string{networkReads}},
 			{Name: "Network TX (kB/s)", Values: []string{networkWrites}},
+			{Name: "Minor Page Faults/s", Values: []string{minorFaults}},
+			{Name: "Major Page Faults/s", Values: []string{majorFaults}},
+			{Name: "Context Switches/s", Values: []string{ctxSwitches}},
 		},
 	}
 }

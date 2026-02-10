@@ -107,7 +107,7 @@ func configureSignalHandler(myTargets []target.Target, statusFunc progress.Multi
 			go func(tgt target.Target, pid string) {
 				defer wg.Done()
 				// create a per-target timeout context
-				targetTimeout := 10 * time.Second
+				targetTimeout := 20 * time.Second
 				ctx, cancel := context.WithTimeout(context.Background(), targetTimeout)
 				defer cancel()
 				timedOut := false

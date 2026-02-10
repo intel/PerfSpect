@@ -119,6 +119,7 @@ const (
 	InstructionTelemetryScriptName = "instruction telemetry"
 	GaudiTelemetryScriptName       = "gaudi telemetry"
 	PDUTelemetryScriptName         = "pdu telemetry"
+	KernelTelemetryScriptName      = "kernel telemetry"
 	// flamegraph scripts
 	FlameGraphScriptName = "flamegraph"
 	// lock scripts
@@ -1440,6 +1441,89 @@ for ((i=0; i<count; i++)); do
     fi
     echo "$timestamp,$w"
     sleep $interval
+done
+`,
+		Superuser: false,
+	},
+	KernelTelemetryScriptName: {
+		Name: KernelTelemetryScriptName,
+		ScriptTemplate: `interval={{.Interval}}
+duration={{.Duration}}
+
+START_TIME=$(date +%s)
+PREV_STAT=()
+PREV_VM=()
+
+cleanup() {
+  exit 0
+}
+
+trap cleanup SIGINT SIGTERM
+
+echo "timestamp,\
+ctx_switches_per_sec,procs_running,procs_blocked,\
+minor_faults_per_sec,major_faults_per_sec,\
+pgscan_per_sec,pgsteal_per_sec,\
+swapin_per_sec,swapout_per_sec"
+
+read_stat() {
+  grep -E '^(ctxt|procs_running|procs_blocked)' /proc/stat
+}
+
+read_vm() {
+  grep -E '^(pgfault|pgmajfault|pgscan_|pgsteal_|pswpin|pswpout)' /proc/vmstat
+}
+
+while true; do
+  NOW=$(date +%s)
+  TIMESTAMP=$(date +%H:%M:%S)
+
+  STAT_NOW="$(read_stat)"
+  VM_NOW="$(read_vm)"
+
+  if [[ -n "$PREV_STAT" ]]; then
+
+    ctx_prev=$(echo "$PREV_STAT" | awk '/ctxt/{print $2}')
+    ctx_now=$(echo "$STAT_NOW" | awk '/ctxt/{print $2}')
+    ctx_rate=$(awk "BEGIN {printf \"%.2f\", ($ctx_now-$ctx_prev)/$interval}")
+
+    pr_run=$(echo "$STAT_NOW" | awk '/procs_running/{print $2}')
+    pr_blk=$(echo "$STAT_NOW" | awk '/procs_blocked/{print $2}')
+
+    get_vm_delta() {
+      local key="$1"
+      local prev=$(echo "$PREV_VM" | awk -v k="$key" '$1==k {print $2}')
+      local now=$(echo "$VM_NOW" | awk -v k="$key" '$1==k {print $2}')
+      awk "BEGIN {printf \"%.2f\", ($now-$prev)/$interval}"
+    }
+
+    minflt=$(get_vm_delta pgfault)
+    majflt=$(get_vm_delta pgmajfault)
+
+    pgscan=$(awk "BEGIN {printf \"%.2f\", ( \
+      $(echo "$VM_NOW" | awk '/pgscan_/{s+=$2} END{print s}') - \
+      $(echo "$PREV_VM" | awk '/pgscan_/{s+=$2} END{print s}') \
+      )/$interval}")
+
+    pgsteal=$(awk "BEGIN {printf \"%.2f\", ( \
+      $(echo "$VM_NOW" | awk '/pgsteal_/{s+=$2} END{print s}') - \
+      $(echo "$PREV_VM" | awk '/pgsteal_/{s+=$2} END{print s}') \
+      )/$interval}")
+
+    swapin=$(get_vm_delta pswpin)
+    swapout=$(get_vm_delta pswpout)
+
+    echo "$TIMESTAMP,$ctx_rate,$pr_run,$pr_blk,\
+$minflt,$majflt,$pgscan,$pgsteal,\
+$swapin,$swapout"
+  fi
+
+  PREV_STAT="$STAT_NOW"
+  PREV_VM="$VM_NOW"
+
+  [[ "$duration" -ne 0 && $((NOW - START_TIME)) -ge "$duration" ]] && exit 0
+
+  sleep "$interval"
 done
 `,
 		Superuser: false,

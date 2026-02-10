@@ -33,6 +33,8 @@ const (
 	TemperatureTelemetryTableName           = "Temperature Telemetry"
 	GaudiTelemetryTableName                 = "Gaudi Telemetry"
 	PDUTelemetryTableName                   = "PDU Telemetry"
+	VirtualMemoryTelemetryTableName         = "Virtual Memory Telemetry"
+	ProcessTelemetryTableName               = "Process Telemetry"
 )
 
 // telemetry table menu labels
@@ -51,6 +53,8 @@ const (
 	TemperatureTelemetryMenuLabel           = "Temperature"
 	GaudiTelemetryMenuLabel                 = "Gaudi"
 	PDUTelemetryMenuLabel                   = "PDU"
+	VirtualMemoryTelemetryMenuLabel         = "Virtual Memory"
+	ProcessTelemetryMenuLabel               = "Process"
 )
 
 var tableDefinitions = map[string]table.TableDefinition{
@@ -177,6 +181,22 @@ var tableDefinitions = map[string]table.TableDefinition{
 			script.PDUTelemetryScriptName,
 		},
 		FieldsFunc: pduTelemetryTableValues},
+	VirtualMemoryTelemetryTableName: {
+		Name:      VirtualMemoryTelemetryTableName,
+		MenuLabel: VirtualMemoryTelemetryMenuLabel,
+		HasRows:   true,
+		ScriptNames: []string{
+			script.KernelTelemetryScriptName,
+		},
+		FieldsFunc: virtualMemoryTelemetryTableValues},
+	ProcessTelemetryTableName: {
+		Name:      ProcessTelemetryTableName,
+		MenuLabel: ProcessTelemetryMenuLabel,
+		HasRows:   true,
+		ScriptNames: []string{
+			script.KernelTelemetryScriptName,
+		},
+		FieldsFunc: processTelemetryTableValues},
 }
 
 func cpuUtilizationTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.Field {
@@ -704,6 +724,98 @@ func instructionTelemetryTableValues(outputs map[string]script.ScriptOutput) []t
 				}
 			}
 		}
+	}
+	return fields
+}
+
+func virtualMemoryTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.Field {
+	fields := []table.Field{
+		{Name: "Time"},
+		{Name: "Minor Faults/s"},
+		{Name: "Major Faults/s"},
+		{Name: "Pgscan/s"},
+		{Name: "Pgsteal/s"},
+		{Name: "Swapin/s"},
+		{Name: "Swapout/s"},
+	}
+	// the output is in CSV format:
+	// timestamp,ctx_switches_per_sec,procs_running,procs_blocked,minor_faults_per_sec,major_faults_per_sec,pgscan_per_sec,pgsteal_per_sec,swapin_per_sec,swapout_per_sec
+	reader := csv.NewReader(strings.NewReader(outputs[script.KernelTelemetryScriptName].Stdout))
+	records, err := reader.ReadAll()
+	if err != nil {
+		slog.Error("failed to read virtual memory telemetry CSV output", slog.String("error", err.Error()))
+		return []table.Field{}
+	}
+	if len(records) == 0 {
+		return []table.Field{}
+	}
+	// first row is the header, find the indices of the fields we're interested in
+	header := records[0]
+	fieldIndices := make(map[string]int)
+	for i, fieldName := range header {
+		fieldIndices[fieldName] = i
+	}
+	requiredFields := []string{"timestamp", "minor_faults_per_sec", "major_faults_per_sec", "pgscan_per_sec", "pgsteal_per_sec", "swapin_per_sec", "swapout_per_sec"}
+	for _, field := range requiredFields {
+		if _, ok := fieldIndices[field]; !ok {
+			slog.Error("missing expected field in virtual memory telemetry output", slog.String("field", field))
+			return []table.Field{}
+		}
+	}
+	// subsequent rows are data
+	for _, record := range records[1:] {
+		if len(record) != len(header) {
+			slog.Error("unexpected number of fields in virtual memory telemetry output", slog.Int("expected", len(header)), slog.Int("got", len(record)))
+			continue
+		}
+		fields[0].Values = append(fields[0].Values, record[fieldIndices["timestamp"]])
+		fields[1].Values = append(fields[1].Values, record[fieldIndices["minor_faults_per_sec"]])
+		fields[2].Values = append(fields[2].Values, record[fieldIndices["major_faults_per_sec"]])
+		fields[3].Values = append(fields[3].Values, record[fieldIndices["pgscan_per_sec"]])
+		fields[4].Values = append(fields[4].Values, record[fieldIndices["pgsteal_per_sec"]])
+		fields[5].Values = append(fields[5].Values, record[fieldIndices["swapin_per_sec"]])
+		fields[6].Values = append(fields[6].Values, record[fieldIndices["swapout_per_sec"]])
+	}
+	return fields
+}
+
+func processTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.Field {
+	fields := []table.Field{
+		{Name: "Time"},
+		{Name: "Context Switches/s"},
+	}
+	// the output is in CSV format:
+	// timestamp,ctx_switches_per_sec,procs_running,procs_blocked,minor_faults_per_sec,major_faults_per_sec,pgscan_per_sec,pgsteal_per_sec,swapin_per_sec,swapout_per_sec
+	reader := csv.NewReader(strings.NewReader(outputs[script.KernelTelemetryScriptName].Stdout))
+	records, err := reader.ReadAll()
+	if err != nil {
+		slog.Error("failed to read process telemetry CSV output", slog.String("error", err.Error()))
+		return []table.Field{}
+	}
+	if len(records) == 0 {
+		return []table.Field{}
+	}
+	// first row is the header, find the indices of the fields we're interested in
+	header := records[0]
+	fieldIndices := make(map[string]int)
+	for i, fieldName := range header {
+		fieldIndices[fieldName] = i
+	}
+	requiredFields := []string{"timestamp", "ctx_switches_per_sec"}
+	for _, field := range requiredFields {
+		if _, ok := fieldIndices[field]; !ok {
+			slog.Error("missing expected field in process telemetry output", slog.String("field", field))
+			return []table.Field{}
+		}
+	}
+	// subsequent rows are data
+	for _, record := range records[1:] {
+		if len(record) != len(header) {
+			slog.Error("unexpected number of fields in process telemetry output", slog.Int("expected", len(header)), slog.Int("got", len(record)))
+			continue
+		}
+		fields[0].Values = append(fields[0].Values, record[fieldIndices["timestamp"]])
+		fields[1].Values = append(fields[1].Values, record[fieldIndices["ctx_switches_per_sec"]])
 	}
 	return fields
 }
