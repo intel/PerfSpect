@@ -33,7 +33,7 @@ const (
 	TemperatureTelemetryTableName           = "Temperature Telemetry"
 	GaudiTelemetryTableName                 = "Gaudi Telemetry"
 	PDUTelemetryTableName                   = "PDU Telemetry"
-	KernelTelemetryTableName = "Kernel Telemetry"
+	KernelTelemetryTableName                = "Kernel Telemetry"
 )
 
 // telemetry table menu labels
@@ -52,7 +52,7 @@ const (
 	TemperatureTelemetryMenuLabel           = "Temperature"
 	GaudiTelemetryMenuLabel                 = "Gaudi"
 	PDUTelemetryMenuLabel                   = "PDU"
-	KernelTelemetryMenuLabel = "Kernel"
+	KernelTelemetryMenuLabel                = "Kernel"
 )
 
 var tableDefinitions = map[string]table.TableDefinition{
@@ -722,31 +722,31 @@ func instructionTelemetryTableValues(outputs map[string]script.ScriptOutput) []t
 func kernelTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	fields := []table.Field{
 		{Name: "Time"},
-		{Name: "Context Switches/s"},
-		{Name: "Minor Faults/s"},
-		{Name: "Major Faults/s"},
-		{Name: "Pgscan/s"},
-		{Name: "Pgsteal/s"},
-		{Name: "Swapin/s"},
-		{Name: "Swapout/s"},
-		{Name: "Syscalls/s"},
+		{Name: "Syscalls"},
+		{Name: "Context Switches"},
+		{Name: "Minor Faults"},
+		{Name: "Major Faults"},
+		{Name: "Pgscan"},
+		{Name: "Pgsteal"},
+		{Name: "Swapin"},
+		{Name: "Swapout"},
 	}
 
 	// Field indices for kernel telemetry data
 	const (
-		timeIdx      = 0
-		ctxIdx       = 1
-		minorIdx     = 2
-		majorIdx     = 3
-		pgscanIdx    = 4
-		pgstealIdx   = 5
-		swapinIdx    = 6
-		swapoutIdx   = 7
-		syscallsIdx  = 8
+		timeIdx = iota
+		syscallsIdx
+		ctxIdx
+		minorIdx
+		majorIdx
+		pgscanIdx
+		pgstealIdx
+		swapinIdx
+		swapoutIdx
 	)
 
 	// Parse kernel telemetry script output
-	// CSV format: timestamp,ctx_switches_per_sec,procs_running,procs_blocked,minor_faults_per_sec,major_faults_per_sec,pgscan_per_sec,pgsteal_per_sec,swapin_per_sec,swapout_per_sec
+	// CSV format: timestamp,ctx_switches_per_sec,minor_faults_per_sec,major_faults_per_sec,pgscan_per_sec,pgsteal_per_sec,swapin_per_sec,swapout_per_sec
 	if output, ok := outputs[script.KernelTelemetryScriptName]; ok && output.Stdout != "" {
 		reader := csv.NewReader(strings.NewReader(output.Stdout))
 		records, err := reader.ReadAll()

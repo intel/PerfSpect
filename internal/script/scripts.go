@@ -1462,13 +1462,13 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 echo "timestamp,\
-ctx_switches_per_sec,procs_running,procs_blocked,\
+ctx_switches_per_sec,\
 minor_faults_per_sec,major_faults_per_sec,\
 pgscan_per_sec,pgsteal_per_sec,\
 swapin_per_sec,swapout_per_sec"
 
 read_stat() {
-  grep -E '^(ctxt|procs_running|procs_blocked)' /proc/stat
+  grep -E '^ctxt' /proc/stat
 }
 
 read_vm() {
@@ -1487,9 +1487,6 @@ while true; do
     ctx_prev=$(echo "$PREV_STAT" | awk '/ctxt/{print $2}')
     ctx_now=$(echo "$STAT_NOW" | awk '/ctxt/{print $2}')
     ctx_rate=$(awk "BEGIN {printf \"%.2f\", ($ctx_now-$ctx_prev)/$interval}")
-
-    pr_run=$(echo "$STAT_NOW" | awk '/procs_running/{print $2}')
-    pr_blk=$(echo "$STAT_NOW" | awk '/procs_blocked/{print $2}')
 
     get_vm_delta() {
       local key="$1"
@@ -1514,7 +1511,7 @@ while true; do
     swapin=$(get_vm_delta pswpin)
     swapout=$(get_vm_delta pswpout)
 
-    echo "$TIMESTAMP,$ctx_rate,$pr_run,$pr_blk,\
+    echo "$TIMESTAMP,$ctx_rate,\
 $minflt,$majflt,$pgscan,$pgsteal,\
 $swapin,$swapout"
   fi
