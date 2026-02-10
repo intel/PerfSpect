@@ -15,14 +15,40 @@ default: perfspect
 GOFLAGS_COMMON=-trimpath -mod=readonly -ldflags="-X perfspect/cmd.gVersion=$(VERSION) -s -w"
 GO=CGO_ENABLED=0 GOOS=linux go
 
+# Required embedded binary resources (must exist before building)
+# Note: This is a subset of binaries used to detect if builder/build.sh has been run,
+# not the complete list of embedded resources.
+REQUIRED_RESOURCES := \
+	internal/script/resources/x86_64/perf \
+	internal/script/resources/x86_64/fio \
+	internal/script/resources/aarch64/perf \
+	internal/script/resources/aarch64/fio
+
+# Check that binary dependencies are available
+.PHONY: check-resources
+check-resources:
+	@missing=""; \
+	for f in $(REQUIRED_RESOURCES); do \
+		if [ ! -f "$$f" ]; then \
+			missing="$$missing $$f"; \
+		fi; \
+	done; \
+	if [ -n "$$missing" ]; then \
+		echo "Error: Required binary resources are missing:$$missing"; \
+		echo ""; \
+		echo "Run 'builder/build.sh' first to build the binary dependencies."; \
+		echo "For subsequent builds, use 'make' after the initial build."; \
+		exit 1; \
+	fi
+
 # Build the perfspect binary
 .PHONY: perfspect
-perfspect:
+perfspect: check-resources
 	GOARCH=amd64 $(GO) build $(GOFLAGS_COMMON) -gcflags="all=-spectre=all -N -l" -asmflags="all=-spectre=all" -o $@
 
 # Build the perfspect binary for AARCH64
 .PHONY: perfspect-aarch64
-perfspect-aarch64:
+perfspect-aarch64: check-resources
 	GOARCH=arm64 $(GO) build $(GOFLAGS_COMMON) -o $@
 
 # Copy prebuilt tools to script resources
