@@ -52,19 +52,18 @@ var (
 
 	flagAll bool
 
-	flagCPU           bool
-	flagFrequency     bool
-	flagIPC           bool
-	flagC6            bool
-	flagIRQRate       bool
-	flagMemory        bool
-	flagNetwork       bool
-	flagStorage       bool
-	flagPower         bool
-	flagTemperature   bool
-	flagInstrMix      bool
-	flagVirtualMemory bool
-	flagProcess       bool
+	flagCPU         bool
+	flagFrequency   bool
+	flagIPC         bool
+	flagC6          bool
+	flagIRQRate     bool
+	flagMemory      bool
+	flagNetwork     bool
+	flagStorage     bool
+	flagPower       bool
+	flagTemperature bool
+	flagInstrMix    bool
+	flagKernel      bool
 
 	flagNoSystemSummary bool
 
@@ -78,19 +77,18 @@ const (
 
 	flagAllName = "all"
 
-	flagCPUName           = "cpu"
-	flagFrequencyName     = "frequency"
-	flagIPCName           = "ipc"
-	flagC6Name            = "c6"
-	flagIRQRateName       = "irqrate"
-	flagMemoryName        = "memory"
-	flagNetworkName       = "network"
-	flagStorageName       = "storage"
-	flagPowerName         = "power"
-	flagTemperatureName   = "temperature"
-	flagInstrMixName      = "instrmix"
-	flagVirtualMemoryName = "virtual-memory"
-	flagProcessName       = "process"
+	flagCPUName         = "cpu"
+	flagFrequencyName   = "frequency"
+	flagIPCName         = "ipc"
+	flagC6Name          = "c6"
+	flagIRQRateName     = "irqrate"
+	flagMemoryName      = "memory"
+	flagNetworkName     = "network"
+	flagStorageName     = "storage"
+	flagPowerName       = "power"
+	flagTemperatureName = "temperature"
+	flagInstrMixName    = "instrmix"
+	flagKernelName      = "kernel"
 
 	flagNoSystemSummaryName = "no-summary"
 
@@ -100,6 +98,8 @@ const (
 
 var telemetrySummaryTableName = "Telemetry Summary"
 
+// categories is used to define the telemetry categories, their associated flags, and the tables they include. It is used to generate flags and determine which tables to include in the report based on selected categories.
+// The order of categories in this slice determines the order of tables in the report when multiple categories are selected, as well as the order of flags in the usage message.
 var categories = []app.Category{
 	{FlagName: flagCPUName, FlagVar: &flagCPU, DefaultValue: false, Help: "monitor cpu utilization", Tables: []table.TableDefinition{tableDefinitions[CPUUtilizationTelemetryTableName], tableDefinitions[UtilizationCategoriesTelemetryTableName]}},
 	{FlagName: flagIPCName, FlagVar: &flagIPC, DefaultValue: false, Help: "monitor IPC", Tables: []table.TableDefinition{tableDefinitions[IPCTelemetryTableName]}},
@@ -111,9 +111,8 @@ var categories = []app.Category{
 	{FlagName: flagNetworkName, FlagVar: &flagNetwork, DefaultValue: false, Help: "monitor network", Tables: []table.TableDefinition{tableDefinitions[NetworkTelemetryTableName]}},
 	{FlagName: flagStorageName, FlagVar: &flagStorage, DefaultValue: false, Help: "monitor storage", Tables: []table.TableDefinition{tableDefinitions[DriveTelemetryTableName]}},
 	{FlagName: flagIRQRateName, FlagVar: &flagIRQRate, DefaultValue: false, Help: "monitor IRQ rate", Tables: []table.TableDefinition{tableDefinitions[IRQRateTelemetryTableName]}},
+	{FlagName: flagKernelName, FlagVar: &flagKernel, DefaultValue: false, Help: "monitor kernel", Tables: []table.TableDefinition{tableDefinitions[KernelTelemetryTableName]}},
 	{FlagName: flagInstrMixName, FlagVar: &flagInstrMix, DefaultValue: false, Help: "monitor instruction mix", Tables: []table.TableDefinition{tableDefinitions[InstructionTelemetryTableName]}},
-	{FlagName: flagVirtualMemoryName, FlagVar: &flagVirtualMemory, DefaultValue: false, Help: "monitor virtual memory", Tables: []table.TableDefinition{tableDefinitions[VirtualMemoryTelemetryTableName]}},
-	{FlagName: flagProcessName, FlagVar: &flagProcess, DefaultValue: false, Help: "monitor process telemetry", Tables: []table.TableDefinition{tableDefinitions[ProcessTelemetryTableName]}},
 }
 
 const (
@@ -344,8 +343,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	report.RegisterHTMLRenderer(InstructionTelemetryTableName, instructionTelemetryTableHTMLRenderer)
 	report.RegisterHTMLRenderer(GaudiTelemetryTableName, gaudiTelemetryTableHTMLRenderer)
 	report.RegisterHTMLRenderer(PDUTelemetryTableName, pduTelemetryTableHTMLRenderer)
-	report.RegisterHTMLRenderer(VirtualMemoryTelemetryTableName, virtualMemoryTelemetryTableHTMLRenderer)
-	report.RegisterHTMLRenderer(ProcessTelemetryTableName, processTelemetryTableHTMLRenderer)
+	report.RegisterHTMLRenderer(KernelTelemetryTableName, kernelTelemetryTableHTMLRenderer)
 
 	return reportingCommand.Run()
 }
@@ -371,9 +369,10 @@ func summaryFromTableValues(allTableValues []table.TableValues, _ map[string]scr
 	networkReads := getMetricAverage(getTableValues(allTableValues, NetworkTelemetryTableName), []string{"rxkB/s"}, "Time")
 	networkWrites := getMetricAverage(getTableValues(allTableValues, NetworkTelemetryTableName), []string{"txkB/s"}, "Time")
 	memAvail := getMetricAverage(getTableValues(allTableValues, MemoryTelemetryTableName), []string{"avail"}, "Time")
-	minorFaults := getMetricAverage(getTableValues(allTableValues, VirtualMemoryTelemetryTableName), []string{"Minor Faults/s"}, "Time")
-	majorFaults := getMetricAverage(getTableValues(allTableValues, VirtualMemoryTelemetryTableName), []string{"Major Faults/s"}, "Time")
-	ctxSwitches := getMetricAverage(getTableValues(allTableValues, ProcessTelemetryTableName), []string{"Context Switches/s"}, "Time")
+	minorFaults := getMetricAverage(getTableValues(allTableValues, KernelTelemetryTableName), []string{"Minor Faults"}, "Time")
+	majorFaults := getMetricAverage(getTableValues(allTableValues, KernelTelemetryTableName), []string{"Major Faults"}, "Time")
+	ctxSwitches := getMetricAverage(getTableValues(allTableValues, KernelTelemetryTableName), []string{"Context Switches"}, "Time")
+	syscalls := getMetricAverage(getTableValues(allTableValues, KernelTelemetryTableName), []string{"Syscalls"}, "Time")
 	return table.TableValues{
 		TableDefinition: table.TableDefinition{
 			Name:      telemetrySummaryTableName,
@@ -392,9 +391,10 @@ func summaryFromTableValues(allTableValues []table.TableValues, _ map[string]scr
 			{Name: "Drive Writes (kB/s)", Values: []string{driveWrites}},
 			{Name: "Network RX (kB/s)", Values: []string{networkReads}},
 			{Name: "Network TX (kB/s)", Values: []string{networkWrites}},
+			{Name: "Syscalls/s", Values: []string{syscalls}},
+			{Name: "Context Switches/s", Values: []string{ctxSwitches}},
 			{Name: "Minor Page Faults/s", Values: []string{minorFaults}},
 			{Name: "Major Page Faults/s", Values: []string{majorFaults}},
-			{Name: "Context Switches/s", Values: []string{ctxSwitches}},
 		},
 	}
 }
@@ -442,6 +442,9 @@ func getSumOfFields(fields []table.Field, fieldNames []string, separatorFieldNam
 		}
 		for i := range fields[fieldIdx].Values {
 			valueStr := fields[fieldIdx].Values[i]
+			if valueStr == "" {
+				continue // skip empty values
+			}
 			var valueFloat float64
 			valueFloat, err = strconv.ParseFloat(valueStr, 64)
 			if err != nil {
