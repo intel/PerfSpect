@@ -815,7 +815,7 @@ func uncoreTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 		slog.Error("failed to get uarch from script outputs")
 		return []table.Field{}
 	}
-	if strings.Contains(uarch, cpus.UarchSRF) || strings.Contains(uarch, cpus.UarchGNR) || strings.Contains(uarch, cpus.UarchCWF) {
+	if strings.Contains(uarch, cpus.UarchSRF) || strings.Contains(uarch, cpus.UarchGNR) || strings.Contains(uarch, cpus.UarchCWF) || strings.Contains(uarch, cpus.UarchDMR) {
 		return []table.Field{
 			{Name: "Min Frequency (Compute)", Values: []string{extract.UncoreMinMaxDieFrequencyFromOutput(false, true, outputs)}},
 			{Name: "Min Frequency (I/O)", Values: []string{extract.UncoreMinMaxDieFrequencyFromOutput(false, false, outputs)}},
