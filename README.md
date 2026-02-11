@@ -137,6 +137,18 @@ The `telemetry` command reports CPU utilization, instruction mix, disk stats, ne
 
 ![screenshot of the CPU utilization chart from the HTML output of the telemetry command](docs/telemetry_html.png)
 
+##### Additional Telemetry via Environment Variables
+
+The following optional telemetry sources can be enabled via environment variables:
+
+| Environment Variable | Description |
+| -------------------- | ----------- |
+| `PERFSPECT_GAUDI_HLSMI_PATH` | Full path to the Gaudi `hl-smi` binary. When set, enables collection of Intel Gaudi accelerator telemetry (temperature, utilization, memory, power). |
+| `PERFSPECT_PDU_HOST` | Raritan PDU hostname or IP address for power telemetry. Requires all four PDU variables to be set. |
+| `PERFSPECT_PDU_USER` | Username for PDU authentication. |
+| `PERFSPECT_PDU_PASSWORD` | Password for PDU authentication. |
+| `PERFSPECT_PDU_OUTLET` | PDU outlet group identifier to monitor. |
+
 #### Flamegraph Command
 
 Software flamegraphs are useful in diagnosing software performance bottlenecks. Run `perfspect flamegraph` to capture a system-wide software flamegraph.
