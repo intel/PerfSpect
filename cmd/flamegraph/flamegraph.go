@@ -63,7 +63,7 @@ const (
 
 func init() {
 	Cmd.Flags().StringVar(&app.FlagInput, app.FlagInputName, "", "")
-	Cmd.Flags().StringSliceVar(&app.FlagFormat, app.FlagFormatName, []string{report.FormatAll}, "")
+	Cmd.Flags().StringSliceVar(&app.FlagFormat, app.FlagFormatName, []string{report.FormatHtml}, "")
 	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 0, "")
 	Cmd.Flags().IntVar(&flagFrequency, flagFrequencyName, 11, "")
 	Cmd.Flags().IntSliceVar(&flagPids, flagPidsName, nil, "")

@@ -128,7 +128,7 @@ func init() {
 	}
 	Cmd.Flags().StringVar(&app.FlagInput, app.FlagInputName, "", "")
 	Cmd.Flags().BoolVar(&flagAll, flagAllName, true, "")
-	Cmd.Flags().StringSliceVar(&app.FlagFormat, app.FlagFormatName, []string{report.FormatAll}, "")
+	Cmd.Flags().StringSliceVar(&app.FlagFormat, app.FlagFormatName, []string{report.FormatHtml}, "")
 	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 0, "")
 	Cmd.Flags().IntVar(&flagInterval, flagIntervalName, 2, "")
 	Cmd.Flags().IntVar(&flagInstrMixPid, flagInstrMixPidName, 0, "")
