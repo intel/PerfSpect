@@ -39,28 +39,31 @@ const (
 
 // PrefetcherDefinition represents a prefetcher configuration.
 type PrefetcherDefinition struct {
-	ShortName   string
-	Description string
-	Msr         int
-	Bit         int
-	Uarchs      []string
+	ShortName    string
+	Description  string
+	Msr          int
+	Bit          int
+	Uarchs       []string
+	ManagedByL2P bool // indicates if the prefetcher is dynamically managed by the L2P algorithm
 }
 
 // PrefetcherDefinitions contains all known prefetcher definitions.
 var PrefetcherDefinitions = []PrefetcherDefinition{
 	{
-		ShortName:   PrefetcherL2HWName,
-		Description: "L2 Hardware (MLC Streamer) fetches additional lines of code or data into the L2 cache.",
-		Msr:         MsrPrefetchControl,
-		Bit:         0,
-		Uarchs:      []string{"all"},
+		ShortName:    PrefetcherL2HWName,
+		Description:  "L2 Hardware (MLC Streamer) fetches additional lines of code or data into the L2 cache.",
+		Msr:          MsrPrefetchControl,
+		Bit:          0,
+		Uarchs:       []string{"all"},
+		ManagedByL2P: true,
 	},
 	{
-		ShortName:   PrefetcherL2AdjName,
-		Description: "L2 Adjacent Cache Line (MLC Spatial) fetches the cache line that comprises a cache line pair.",
-		Msr:         MsrPrefetchControl,
-		Bit:         1,
-		Uarchs:      []string{"all"},
+		ShortName:    PrefetcherL2AdjName,
+		Description:  "L2 Adjacent Cache Line (MLC Spatial) fetches the cache line that comprises a cache line pair.",
+		Msr:          MsrPrefetchControl,
+		Bit:          1,
+		Uarchs:       []string{"all"},
+		ManagedByL2P: true,
 	},
 	{
 		ShortName:   PrefetcherDCUHWName,
@@ -84,18 +87,20 @@ var PrefetcherDefinitions = []PrefetcherDefinition{
 		Uarchs:      []string{"all"},
 	},
 	{
-		ShortName:   PrefetcherAMPName,
-		Description: "Adaptive Multipath Probability (MLC AMP) predicts access patterns based on previous patterns and fetches the corresponding cache lines into the L2 cache.",
-		Msr:         MsrPrefetchControl,
-		Bit:         5,
-		Uarchs:      []string{cpus.UarchSPR, cpus.UarchEMR, cpus.UarchGNR},
+		ShortName:    PrefetcherAMPName,
+		Description:  "Adaptive Multipath Probability (MLC AMP) predicts access patterns based on previous patterns and fetches the corresponding cache lines into the L2 cache.",
+		Msr:          MsrPrefetchControl,
+		Bit:          5,
+		Uarchs:       []string{cpus.UarchSPR, cpus.UarchEMR, cpus.UarchGNR, cpus.UarchDMR},
+		ManagedByL2P: true,
 	},
 	{
-		ShortName:   PrefetcherLLCPPName,
-		Description: "Last Level Cache Page (MLC LLC Page) Prefetcher",
-		Msr:         MsrPrefetchControl,
-		Bit:         6,
-		Uarchs:      []string{cpus.UarchGNR},
+		ShortName:    PrefetcherLLCPPName,
+		Description:  "Last Level Cache Page (MLC LLC Page) Prefetcher",
+		Msr:          MsrPrefetchControl,
+		Bit:          6,
+		Uarchs:       []string{cpus.UarchGNR, cpus.UarchDMR},
+		ManagedByL2P: true,
 	},
 	{
 		ShortName:   PrefetcherAOPName,
@@ -105,8 +110,10 @@ var PrefetcherDefinitions = []PrefetcherDefinition{
 		Uarchs:      []string{cpus.UarchGNR},
 	},
 	{
+		// ON DMR, when enabled, prefetchers at bit 0, 1, 5, and 6 are dynamically controlled by the L2P algorithm
+		// ON SPR/EMR/GNR, if prefetchers at bit 0, 1, 5, and 6 are enabled, they are dynamically controlled by the L2P algorithm
 		ShortName:   PrefetcherL2PName,
-		Description: "L2P",
+		Description: "L2P is an algorithm that dynamically enables or disables prefetchers based on real-time telemetry.",
 		Msr:         MsrPrefetchControl,
 		Bit:         12,
 		Uarchs:      []string{cpus.UarchDMR},
@@ -170,6 +177,18 @@ func PrefetchersFromOutput(outputs map[string]script.ScriptOutput) [][]string {
 	if uarch == "" {
 		return [][]string{}
 	}
+	// if on DMR, we need to check if L2P is enabled first, as it dynamically manages the prefetchers at bit 0, 1, 5, and 6
+	l2pEnabled := false
+	if slices.Contains([]string{cpus.UarchDMR}, uarch[:3]) {
+		l2pVal := ValFromRegexSubmatch(outputs[script.PrefetchControlName].Stdout, `^([0-9a-fA-F]+)`)
+		if l2pVal != "" {
+			var err error
+			l2pEnabled, err = IsPrefetcherEnabled(l2pVal, 12)
+			if err != nil {
+				slog.Warn("error checking L2P enabled status", slog.String("error", err.Error()))
+			}
+		}
+	}
 	for _, pf := range PrefetcherDefinitions {
 		if slices.Contains(pf.Uarchs, "all") || slices.Contains(pf.Uarchs, uarch[:3]) {
 			var scriptName string
@@ -194,10 +213,14 @@ func PrefetchersFromOutput(outputs map[string]script.ScriptOutput) [][]string {
 				slog.Warn("error checking prefetcher enabled status", slog.String("error", err.Error()))
 				continue
 			}
-			if enabled {
-				enabledDisabled = "Enabled"
+			if l2pEnabled && pf.ManagedByL2P {
+				enabledDisabled = "Managed by L2P"
 			} else {
-				enabledDisabled = "Disabled"
+				if enabled {
+					enabledDisabled = "Enabled"
+				} else {
+					enabledDisabled = "Disabled"
+				}
 			}
 			out = append(out, []string{pf.ShortName, pf.Description, fmt.Sprintf("0x%04X", pf.Msr), strconv.Itoa(pf.Bit), enabledDisabled})
 		}
@@ -210,6 +233,18 @@ func PrefetchersSummaryFromOutput(outputs map[string]script.ScriptOutput) string
 	uarch := UarchFromOutput(outputs)
 	if uarch == "" {
 		return ""
+	}
+	// if on DMR, we need to check if L2P is enabled first, as it dynamically manages the prefetchers at bit 0, 1, 5, and 6
+	l2pEnabled := false
+	if slices.Contains([]string{cpus.UarchDMR}, uarch[:3]) {
+		l2pVal := ValFromRegexSubmatch(outputs[script.PrefetchControlName].Stdout, `^([0-9a-fA-F]+)`)
+		if l2pVal != "" {
+			var err error
+			l2pEnabled, err = IsPrefetcherEnabled(l2pVal, 12)
+			if err != nil {
+				slog.Warn("error checking L2P enabled status", slog.String("error", err.Error()))
+			}
+		}
 	}
 	var prefList []string
 	for _, pf := range PrefetcherDefinitions {
@@ -236,10 +271,14 @@ func PrefetchersSummaryFromOutput(outputs map[string]script.ScriptOutput) string
 				slog.Warn("error checking prefetcher enabled status", slog.String("error", err.Error()))
 				continue
 			}
-			if enabled {
-				enabledDisabled = "Enabled"
+			if l2pEnabled && pf.ManagedByL2P {
+				enabledDisabled = "Managed by L2P"
 			} else {
-				enabledDisabled = "Disabled"
+				if enabled {
+					enabledDisabled = "Enabled"
+				} else {
+					enabledDisabled = "Disabled"
+				}
 			}
 			prefList = append(prefList, fmt.Sprintf("%s: %s", pf.ShortName, enabledDisabled))
 		}
