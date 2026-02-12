@@ -44,6 +44,7 @@ var Cmd = &cobra.Command{
 }
 
 var (
+	flagInput           string
 	flagDuration        int
 	flagFrequency       int
 	flagPackage         bool
@@ -59,7 +60,7 @@ const (
 )
 
 func init() {
-	Cmd.Flags().StringVar(&app.FlagInput, app.FlagInputName, "", "")
+	Cmd.Flags().StringVar(&flagInput, app.FlagInputName, "", "")
 	Cmd.Flags().StringSliceVar(&flagFormat, app.FlagFormatName, []string{report.FormatAll}, "")
 	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 10, "")
 	Cmd.Flags().IntVar(&flagFrequency, flagFrequencyName, 11, "")
@@ -208,19 +209,15 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			"Duration":  strconv.Itoa(flagDuration),
 			"Package":   strconv.FormatBool(flagPackage),
 		},
-		Tables: tables,
+		Tables:  tables,
+		Input:   flagInput,
+		Formats: formalizeOutputFormat(flagFormat),
 	}
 
 	// only try to download package when option specified
 	if flagPackage {
 		reportingCommand.AdhocFunc = pullDataFiles
 	}
-
-	// The app.FlagFormat designed to hold the output formats, but as a global variable,
-	// it would be overwrite by other command's initialization function. So the current
-	// workaround is to make an assignment to ensure the current command's output format
-	// flag takes effect as expected.
-	app.FlagFormat = formalizeOutputFormat(flagFormat)
 
 	report.RegisterHTMLRenderer(KernelLockAnalysisTableName, kernelLockAnalysisHTMLRenderer)
 

@@ -50,7 +50,9 @@ var Cmd = &cobra.Command{
 
 // flag vars
 var (
-	flagAll bool
+	flagInput  string
+	flagFormat []string
+	flagAll    bool
 
 	flagSpeed       bool
 	flagPower       bool
@@ -100,9 +102,9 @@ func init() {
 		Cmd.Flags().BoolVar(benchmark.FlagVar, benchmark.FlagName, benchmark.DefaultValue, benchmark.Help)
 	}
 	// set up other flags
-	Cmd.Flags().StringVar(&app.FlagInput, app.FlagInputName, "", "")
+	Cmd.Flags().StringVar(&flagInput, app.FlagInputName, "", "")
 	Cmd.Flags().BoolVar(&flagAll, flagAllName, true, "")
-	Cmd.Flags().StringSliceVar(&app.FlagFormat, app.FlagFormatName, []string{report.FormatAll}, "")
+	Cmd.Flags().StringSliceVar(&flagFormat, app.FlagFormatName, []string{report.FormatAll}, "")
 	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
 	Cmd.Flags().StringVar(&flagStorageDir, flagStorageDirName, "/tmp", "")
 
@@ -197,7 +199,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		}
 	}
 	// validate format options
-	for _, format := range app.FlagFormat {
+	for _, format := range flagFormat {
 		formatOptions := append([]string{report.FormatAll}, report.FormatOptions...)
 		if !slices.Contains(formatOptions, format) {
 			return workflow.FlagValidationError(cmd, fmt.Sprintf("format options are: %s", strings.Join(formatOptions, ", ")))
@@ -251,6 +253,8 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		SummaryTableName:       benchmarkSummaryTableName,
 		SummaryBeforeTableName: SpeedBenchmarkTableName,
 		InsightsFunc:           nil,
+		Input:                  flagInput,
+		Formats:                flagFormat,
 	}
 
 	report.RegisterHTMLRenderer(FrequencyBenchmarkTableName, frequencyBenchmarkTableHtmlRenderer)

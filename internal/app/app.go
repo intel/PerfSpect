@@ -38,12 +38,6 @@ const (
 	FlagFormatName = "format"
 )
 
-// Global flag variables for reporting commands.
-var (
-	FlagInput  string
-	FlagFormat []string
-)
-
 // Category represents a configuration category with associated tables and flags.
 type Category struct {
 	FlagName     string
