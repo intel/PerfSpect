@@ -34,6 +34,7 @@ const (
 	PrefetcherHomelessName  = "Homeless"
 	PrefetcherLLCName       = "LLC"
 	PrefetcherLLCStreamName = "LLC Stream"
+	PrefetcherL2PName       = "L2P"
 )
 
 // PrefetcherDefinition represents a prefetcher configuration.
@@ -102,6 +103,13 @@ var PrefetcherDefinitions = []PrefetcherDefinition{
 		Msr:         MsrPrefetchControl,
 		Bit:         7,
 		Uarchs:      []string{cpus.UarchGNR},
+	},
+	{
+		ShortName:   PrefetcherL2PName,
+		Description: "L2P",
+		Msr:         MsrPrefetchControl,
+		Bit:         12,
+		Uarchs:      []string{cpus.UarchDMR},
 	},
 	{
 		ShortName:   PrefetcherHomelessName,
