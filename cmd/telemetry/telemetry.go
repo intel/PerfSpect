@@ -47,6 +47,8 @@ var Cmd = &cobra.Command{
 }
 
 var (
+	flagInput    string
+	flagFormat   []string
 	flagDuration int
 	flagInterval int
 
@@ -125,9 +127,9 @@ func init() {
 	for _, cat := range categories {
 		Cmd.Flags().BoolVar(cat.FlagVar, cat.FlagName, cat.DefaultValue, cat.Help)
 	}
-	Cmd.Flags().StringVar(&app.FlagInput, app.FlagInputName, "", "")
+	Cmd.Flags().StringVar(&flagInput, app.FlagInputName, "", "")
 	Cmd.Flags().BoolVar(&flagAll, flagAllName, true, "")
-	Cmd.Flags().StringSliceVar(&app.FlagFormat, app.FlagFormatName, []string{report.FormatHtml}, "")
+	Cmd.Flags().StringSliceVar(&flagFormat, app.FlagFormatName, []string{report.FormatHtml}, "")
 	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 0, "")
 	Cmd.Flags().IntVar(&flagInterval, flagIntervalName, 2, "")
 	Cmd.Flags().IntVar(&flagInstrMixPid, flagInstrMixPidName, 0, "")
@@ -237,7 +239,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		}
 	}
 	// validate format options
-	for _, format := range app.FlagFormat {
+	for _, format := range flagFormat {
 		formatOptions := []string{report.FormatAll}
 		formatOptions = append(formatOptions, report.FormatOptions...)
 		if !slices.Contains(formatOptions, format) {
@@ -327,6 +329,8 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		SummaryTableName:       telemetrySummaryTableName,
 		SummaryBeforeTableName: CPUUtilizationTelemetryTableName,
 		InsightsFunc:           insightsFunc,
+		Input:                  flagInput,
+		Formats:                flagFormat,
 	}
 
 	report.RegisterHTMLRenderer(CPUUtilizationTelemetryTableName, cpuUtilizationTelemetryTableHTMLRenderer)

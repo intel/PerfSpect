@@ -22,11 +22,11 @@ import (
 )
 
 // outputsFromInput reads the raw file(s) and returns the data in the order of the raw files
-func outputsFromInput(tables []table.TableDefinition, summaryTableName string) ([]TargetScriptOutputs, error) {
+func outputsFromInput(input string, tables []table.TableDefinition, summaryTableName string) ([]TargetScriptOutputs, error) {
 	orderedTargetScriptOutputs := []TargetScriptOutputs{}
 	includedTables := []table.TableDefinition{}
 	// read the raw file(s) as JSON
-	rawReports, err := report.ReadRawReports(app.FlagInput)
+	rawReports, err := report.ReadRawReports(input)
 	if err != nil {
 		err = fmt.Errorf("failed to read raw file(s): %w", err)
 		return nil, err

@@ -40,7 +40,9 @@ var Cmd = &cobra.Command{
 
 // flag vars
 var (
-	flagAll bool
+	flagInput  string
+	flagFormat []string
+	flagAll    bool
 	// categories
 	flagSystemSummary  bool
 	flagHost           bool
@@ -156,9 +158,9 @@ func init() {
 		Cmd.Flags().BoolVar(cat.FlagVar, cat.FlagName, cat.DefaultValue, cat.Help)
 	}
 	// set up other flags
-	Cmd.Flags().StringVar(&app.FlagInput, app.FlagInputName, "", "")
+	Cmd.Flags().StringVar(&flagInput, app.FlagInputName, "", "")
 	Cmd.Flags().BoolVar(&flagAll, flagAllName, true, "")
-	Cmd.Flags().StringSliceVar(&app.FlagFormat, app.FlagFormatName, []string{report.FormatAll}, "")
+	Cmd.Flags().StringSliceVar(&flagFormat, app.FlagFormatName, []string{report.FormatAll}, "")
 
 	workflow.AddTargetFlags(Cmd)
 
@@ -243,7 +245,7 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		}
 	}
 	// validate format options
-	for _, format := range app.FlagFormat {
+	for _, format := range flagFormat {
 		formatOptions := append([]string{report.FormatAll}, report.FormatOptions...)
 		if !slices.Contains(formatOptions, format) {
 			return workflow.FlagValidationError(cmd, fmt.Sprintf("format options are: %s", strings.Join(formatOptions, ", ")))
@@ -274,6 +276,8 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		Tables:                 tables,
 		InsightsFunc:           insightsFunc,
 		SystemSummaryTableName: SystemSummaryTableName,
+		Input:                  flagInput,
+		Formats:                flagFormat,
 	}
 
 	report.RegisterHTMLRenderer(DIMMTableName, dimmTableHTMLRenderer)

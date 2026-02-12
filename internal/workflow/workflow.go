@@ -51,7 +51,9 @@ type ReportingCommand struct {
 	SummaryBeforeTableName string // the name of the table that the summary table should be placed before in the report
 	InsightsFunc           app.InsightsFunc
 	AdhocFunc              AdhocFunc
-	SystemSummaryTableName string // Optional: Only affects xlsx format reports. If set, the table with this name will be used as the "Brief" sheet in the xlsx report. If empty or unset, no "Brief" sheet is generated.
+	SystemSummaryTableName string   // Optional: Only affects xlsx format reports. If set, the table with this name will be used as the "Brief" sheet in the xlsx report. If empty or unset, no "Brief" sheet is generated.
+	Input                  string   // Input file/directory path for reading pre-collected data
+	Formats                []string // Output formats (e.g., "html", "json", "xlsx")
 }
 
 // Run is the common flow/logic for all reporting commands, i.e., 'report', 'telemetry', 'flame', 'lock'
@@ -76,9 +78,9 @@ func (rc *ReportingCommand) Run() error {
 
 	var myTargets []target.Target
 	var orderedTargetScriptOutputs []TargetScriptOutputs
-	if app.FlagInput != "" {
+	if rc.Input != "" {
 		var err error
-		orderedTargetScriptOutputs, err = outputsFromInput(rc.Tables, rc.SummaryTableName)
+		orderedTargetScriptOutputs, err = outputsFromInput(rc.Input, rc.Tables, rc.SummaryTableName)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			slog.Error(err.Error())
@@ -175,7 +177,7 @@ func (rc *ReportingCommand) Run() error {
 		return err
 	}
 	// check report formats
-	formats := app.FlagFormat
+	formats := rc.Formats
 	if slices.Contains(formats, report.FormatAll) {
 		formats = report.FormatOptions
 	}

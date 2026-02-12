@@ -44,6 +44,8 @@ var Cmd = &cobra.Command{
 }
 
 var (
+	flagInput           string
+	flagFormat          []string
 	flagDuration        int
 	flagFrequency       int
 	flagPids            []int
@@ -62,8 +64,8 @@ const (
 )
 
 func init() {
-	Cmd.Flags().StringVar(&app.FlagInput, app.FlagInputName, "", "")
-	Cmd.Flags().StringSliceVar(&app.FlagFormat, app.FlagFormatName, []string{report.FormatHtml}, "")
+	Cmd.Flags().StringVar(&flagInput, app.FlagInputName, "", "")
+	Cmd.Flags().StringSliceVar(&flagFormat, app.FlagFormatName, []string{report.FormatHtml}, "")
 	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 0, "")
 	Cmd.Flags().IntVar(&flagFrequency, flagFrequencyName, 11, "")
 	Cmd.Flags().IntSliceVar(&flagPids, flagPidsName, nil, "")
@@ -153,16 +155,16 @@ func getFlagGroups() []app.FlagGroup {
 
 func validateFlags(cmd *cobra.Command, args []string) error {
 	// validate format options
-	for _, format := range app.FlagFormat {
+	for _, format := range flagFormat {
 		formatOptions := append([]string{report.FormatAll}, report.FormatHtml, report.FormatTxt, report.FormatJson)
 		if !slices.Contains(formatOptions, format) {
 			return workflow.FlagValidationError(cmd, fmt.Sprintf("format options are: %s", strings.Join(formatOptions, ", ")))
 		}
 	}
 	// validate input file
-	if app.FlagInput != "" {
-		if _, err := os.Stat(app.FlagInput); os.IsNotExist(err) {
-			return workflow.FlagValidationError(cmd, fmt.Sprintf("input file %s does not exist", app.FlagInput))
+	if flagInput != "" {
+		if _, err := os.Stat(flagInput); os.IsNotExist(err) {
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("input file %s does not exist", flagInput))
 		}
 	}
 	if flagDuration < 0 {
@@ -202,7 +204,9 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			"MaxDepth":  strconv.Itoa(flagMaxDepth),
 			"PerfEvent": flagPerfEvent,
 		},
-		Tables: tables,
+		Tables:  tables,
+		Input:   flagInput,
+		Formats: flagFormat,
 	}
 
 	report.RegisterHTMLRenderer(FlameGraphTableName, callStackFrequencyTableHTMLRenderer)
