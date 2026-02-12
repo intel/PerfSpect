@@ -170,12 +170,17 @@ func IsPrefetcherEnabled(msrValue string, bit int) (bool, error) {
 	return bitMask&msrInt == 0, nil
 }
 
-// PrefetchersFromOutput extracts prefetcher status from script outputs.
-func PrefetchersFromOutput(outputs map[string]script.ScriptOutput) [][]string {
-	out := make([][]string, 0)
+// resolvedPrefetcher holds the resolved status of a single prefetcher.
+type resolvedPrefetcher struct {
+	Definition PrefetcherDefinition
+	Status     string // "Enabled", "Disabled", or "Managed by L2P"
+}
+
+// resolvePrefetchers determines the status of each applicable prefetcher from script outputs.
+func resolvePrefetchers(outputs map[string]script.ScriptOutput) []resolvedPrefetcher {
 	uarch := UarchFromOutput(outputs)
 	if uarch == "" {
-		return [][]string{}
+		return nil
 	}
 	// if on DMR, we need to check if L2P is enabled first, as it dynamically manages the prefetchers at bit 0, 1, 5, and 6
 	l2pEnabled := false
@@ -189,102 +194,73 @@ func PrefetchersFromOutput(outputs map[string]script.ScriptOutput) [][]string {
 			}
 		}
 	}
+	var results []resolvedPrefetcher
 	for _, pf := range PrefetcherDefinitions {
-		if slices.Contains(pf.Uarchs, "all") || slices.Contains(pf.Uarchs, uarch[:3]) {
-			var scriptName string
-			switch pf.Msr {
-			case MsrPrefetchControl:
-				scriptName = script.PrefetchControlName
-			case MsrPrefetchers:
-				scriptName = script.PrefetchersName
-			case MsrAtomPrefTuning1:
-				scriptName = script.PrefetchersAtomName
-			default:
-				slog.Error("unknown msr for prefetcher", slog.String("msr", fmt.Sprintf("0x%x", pf.Msr)))
-				continue
-			}
-			msrVal := ValFromRegexSubmatch(outputs[scriptName].Stdout, `^([0-9a-fA-F]+)`)
-			if msrVal == "" {
-				continue
-			}
-			var enabledDisabled string
-			enabled, err := IsPrefetcherEnabled(msrVal, pf.Bit)
-			if err != nil {
-				slog.Warn("error checking prefetcher enabled status", slog.String("error", err.Error()))
-				continue
-			}
-			if l2pEnabled && pf.ManagedByL2P {
-				enabledDisabled = "Managed by L2P"
-			} else {
-				if enabled {
-					enabledDisabled = "Enabled"
-				} else {
-					enabledDisabled = "Disabled"
-				}
-			}
-			out = append(out, []string{pf.ShortName, pf.Description, fmt.Sprintf("0x%04X", pf.Msr), strconv.Itoa(pf.Bit), enabledDisabled})
+		if !slices.Contains(pf.Uarchs, "all") && !slices.Contains(pf.Uarchs, uarch[:3]) {
+			continue
 		}
+		var scriptName string
+		switch pf.Msr {
+		case MsrPrefetchControl:
+			scriptName = script.PrefetchControlName
+		case MsrPrefetchers:
+			scriptName = script.PrefetchersName
+		case MsrAtomPrefTuning1:
+			scriptName = script.PrefetchersAtomName
+		default:
+			slog.Error("unknown msr for prefetcher", slog.String("msr", fmt.Sprintf("0x%x", pf.Msr)))
+			continue
+		}
+		msrVal := ValFromRegexSubmatch(outputs[scriptName].Stdout, `^([0-9a-fA-F]+)`)
+		if msrVal == "" {
+			continue
+		}
+		enabled, err := IsPrefetcherEnabled(msrVal, pf.Bit)
+		if err != nil {
+			slog.Warn("error checking prefetcher enabled status", slog.String("error", err.Error()))
+			continue
+		}
+		var status string
+		if l2pEnabled && pf.ManagedByL2P {
+			status = "Managed by L2P"
+		} else if enabled {
+			status = "Enabled"
+		} else {
+			status = "Disabled"
+		}
+		results = append(results, resolvedPrefetcher{Definition: pf, Status: status})
+	}
+	return results
+}
+
+// PrefetchersFromOutput extracts prefetcher status from script outputs.
+func PrefetchersFromOutput(outputs map[string]script.ScriptOutput) [][]string {
+	resolved := resolvePrefetchers(outputs)
+	if resolved == nil {
+		return [][]string{}
+	}
+	out := make([][]string, 0, len(resolved))
+	for _, r := range resolved {
+		out = append(out, []string{
+			r.Definition.ShortName,
+			r.Definition.Description,
+			fmt.Sprintf("0x%04X", r.Definition.Msr),
+			strconv.Itoa(r.Definition.Bit),
+			r.Status,
+		})
 	}
 	return out
 }
 
 // PrefetchersSummaryFromOutput returns a summary of all prefetcher statuses.
 func PrefetchersSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
-	uarch := UarchFromOutput(outputs)
-	if uarch == "" {
-		return ""
+	resolved := resolvePrefetchers(outputs)
+	if len(resolved) == 0 {
+		return "None"
 	}
-	// if on DMR, we need to check if L2P is enabled first, as it dynamically manages the prefetchers at bit 0, 1, 5, and 6
-	l2pEnabled := false
-	if slices.Contains([]string{cpus.UarchDMR}, uarch[:3]) {
-		l2pVal := ValFromRegexSubmatch(outputs[script.PrefetchControlName].Stdout, `^([0-9a-fA-F]+)`)
-		if l2pVal != "" {
-			var err error
-			l2pEnabled, err = IsPrefetcherEnabled(l2pVal, 12)
-			if err != nil {
-				slog.Warn("error checking L2P enabled status", slog.String("error", err.Error()))
-			}
-		}
+	prefList := make([]string, 0, len(resolved))
+	for _, r := range resolved {
+		prefList = append(prefList, fmt.Sprintf("%s: %s", r.Definition.ShortName, r.Status))
 	}
-	var prefList []string
-	for _, pf := range PrefetcherDefinitions {
-		if slices.Contains(pf.Uarchs, "all") || slices.Contains(pf.Uarchs, uarch[:3]) {
-			var scriptName string
-			switch pf.Msr {
-			case MsrPrefetchControl:
-				scriptName = script.PrefetchControlName
-			case MsrPrefetchers:
-				scriptName = script.PrefetchersName
-			case MsrAtomPrefTuning1:
-				scriptName = script.PrefetchersAtomName
-			default:
-				slog.Error("unknown msr for prefetcher", slog.String("msr", fmt.Sprintf("0x%x", pf.Msr)))
-				continue
-			}
-			msrVal := ValFromRegexSubmatch(outputs[scriptName].Stdout, `^([0-9a-fA-F]+)`)
-			if msrVal == "" {
-				continue
-			}
-			var enabledDisabled string
-			enabled, err := IsPrefetcherEnabled(msrVal, pf.Bit)
-			if err != nil {
-				slog.Warn("error checking prefetcher enabled status", slog.String("error", err.Error()))
-				continue
-			}
-			if l2pEnabled && pf.ManagedByL2P {
-				enabledDisabled = "Managed by L2P"
-			} else {
-				if enabled {
-					enabledDisabled = "Enabled"
-				} else {
-					enabledDisabled = "Disabled"
-				}
-			}
-			prefList = append(prefList, fmt.Sprintf("%s: %s", pf.ShortName, enabledDisabled))
-		}
-	}
-	if len(prefList) > 0 {
-		return strings.Join(prefList, ", ")
-	}
-	return "None"
+	return strings.Join(prefList, ", ")
 }
