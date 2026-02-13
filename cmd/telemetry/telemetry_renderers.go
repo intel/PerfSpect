@@ -49,7 +49,7 @@ func renderLineChart(xAxisLabels []string, data [][]float64, datasetNames []stri
 		}
 		allFormattedPoints = append(allFormattedPoints, strings.Join(formattedPoints, ","))
 	}
-	return report.RenderChart("line", allFormattedPoints, datasetNames, xAxisLabels, config, datasetHiddenFlags)
+	return report.RenderChart("stackedBar", allFormattedPoints, datasetNames, xAxisLabels, config, datasetHiddenFlags)
 }
 
 func cpuUtilizationTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
@@ -565,7 +565,7 @@ func instructionTelemetryTableHTMLRenderer(tableValues table.TableValues, target
 		DisplayLegend: "true",
 		AspectRatio:   "1", // extra tall due to large number of data sets
 		SuggestedMin:  "0",
-		SuggestedMax:  "0",
+		SuggestedMax:  "100", // TODO AG: confirm that this suggested max makes sense
 	}
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, hiddenFlags)
 }
