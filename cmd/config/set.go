@@ -219,7 +219,7 @@ func setSSEFrequency(sseFrequency float64, myTarget target.Target, localTempDir 
 			}
 			setScript = script.ScriptDefinition{
 				Name:           "set frequency bins",
-				ScriptTemplate: fmt.Sprintf("wrmsr 0x774 %d", value),
+				ScriptTemplate: fmt.Sprintf("wrmsr -a 0x774 %d", value),
 				Superuser:      true,
 				Vendors:        []string{cpus.IntelVendor},
 				Depends:        []string{"wrmsr"},
@@ -229,7 +229,7 @@ func setSSEFrequency(sseFrequency float64, myTarget target.Target, localTempDir 
 			value := freqInt << uint(2*8)
 			setScript = script.ScriptDefinition{
 				Name:           "set frequency bins",
-				ScriptTemplate: fmt.Sprintf("wrmsr 0x199 %d", value),
+				ScriptTemplate: fmt.Sprintf("wrmsr -a 0x199 %d", value),
 				Superuser:      true,
 				Vendors:        []string{cpus.IntelVendor},
 				Depends:        []string{"wrmsr"},
@@ -437,7 +437,7 @@ func setSSEFrequencies(sseFrequencies string, myTarget target.Target, localTempD
 			}
 			setScript = script.ScriptDefinition{
 				Name:           "set frequency bins",
-				ScriptTemplate: fmt.Sprintf("wrmsr 0x774 %d", value),
+				ScriptTemplate: fmt.Sprintf("wrmsr -a 0x774 %d", value),
 				Superuser:      true,
 				Vendors:        []string{cpus.IntelVendor},
 				Depends:        []string{"wrmsr"},
@@ -449,7 +449,7 @@ func setSSEFrequencies(sseFrequencies string, myTarget target.Target, localTempD
 			value := freqInt << uint(2*8)
 			setScript = script.ScriptDefinition{
 				Name:           "set frequency bins",
-				ScriptTemplate: fmt.Sprintf("wrmsr 0x199 %d", value),
+				ScriptTemplate: fmt.Sprintf("wrmsr -a 0x199 %d", value),
 				Superuser:      true,
 				Vendors:        []string{cpus.IntelVendor},
 				Depends:        []string{"wrmsr"},
