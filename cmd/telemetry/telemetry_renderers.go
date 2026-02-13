@@ -125,7 +125,7 @@ func utilizationCategoriesTelemetryTableHTMLRenderer(tableValues table.TableValu
 	}
 	chartConfig := report.ChartTemplateStruct{
 		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
-		Name:          "utilizationCategoriesChart",
+		Name:          "cpuUtilizationCategoriesChart",
 		Type:          "bar",
 		XaxisText:     "Time",
 		YaxisText:     "% Utilization",
