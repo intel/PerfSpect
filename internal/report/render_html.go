@@ -423,7 +423,7 @@ const lineChartTemplate = `<div class="chart-container" style="max-width: 900px"
 </div>
 <script>
 new Chart(document.getElementById('{{.ID}}'), {
-    type: 'line',
+    type: '{{.Type}}',
     data: {
 		labels: [{{.Labels}}],
         datasets: [{{.Datasets}}]
@@ -467,7 +467,33 @@ new Chart(document.getElementById('{{.ID}}'), {
                 }
             },
             legend: {
-                display: {{.DisplayLegend}}
+                display: {{.DisplayLegend}},
+				onClick: function(e, legendItem, legend) {
+					const chart = legend.chart;
+					const datasetIndex = legendItem.datasetIndex;
+					const nativeEvent = e && e.native ? e.native : e;
+					const isCtrl = nativeEvent && (nativeEvent.ctrlKey || nativeEvent.metaKey);
+
+					if (isCtrl) {
+						const onlyThisVisible = chart.data.datasets.every(function(ds, idx) {
+							if (idx === datasetIndex) {
+								return chart.isDatasetVisible(idx);
+							}
+							return !chart.isDatasetVisible(idx);
+						});
+
+						chart.data.datasets.forEach(function(ds, idx) {
+							const visible = onlyThisVisible ? true : idx === datasetIndex;
+							chart.setDatasetVisibility(idx, visible);
+						});
+						chart.update();
+						return;
+					}
+
+					const visible = chart.isDatasetVisible(datasetIndex);
+					chart.setDatasetVisibility(datasetIndex, !visible);
+					chart.update();
+				}
             }
         }
     }
@@ -479,7 +505,7 @@ const stackedBarChartTemplate = `<div class="chart-container" style="max-width: 
 </div>
 <script>
 new Chart(document.getElementById('{{.ID}}'), {
-    type: 'bar',
+    type: '{{.Type}}',
     data: {
 		labels: [{{.Labels}}],
         datasets: [{{.Datasets}}]
@@ -525,7 +551,33 @@ new Chart(document.getElementById('{{.ID}}'), {
                 }
             },
             legend: {
-                display: {{.DisplayLegend}}
+                display: {{.DisplayLegend}},
+				onClick: function(e, legendItem, legend) {
+					const chart = legend.chart;
+					const datasetIndex = legendItem.datasetIndex;
+					const nativeEvent = e && e.native ? e.native : e;
+					const isCtrl = nativeEvent && (nativeEvent.ctrlKey || nativeEvent.metaKey);
+
+					if (isCtrl) {
+						const onlyThisVisible = chart.data.datasets.every(function(ds, idx) {
+							if (idx === datasetIndex) {
+								return chart.isDatasetVisible(idx);
+							}
+							return !chart.isDatasetVisible(idx);
+						});
+
+						chart.data.datasets.forEach(function(ds, idx) {
+							const visible = onlyThisVisible ? true : idx === datasetIndex;
+							chart.setDatasetVisibility(idx, visible);
+						});
+						chart.update();
+						return;
+					}
+
+					const visible = chart.isDatasetVisible(datasetIndex);
+					chart.setDatasetVisibility(datasetIndex, !visible);
+					chart.update();
+				}
             }
         }
     }
@@ -537,7 +589,7 @@ const scatterChartTemplate = `<div class="chart-container" style="max-width: 900
 </div>
 <script>
 new Chart(document.getElementById('{{.ID}}'), {
-    type: 'scatter',
+    type: '{{.Type}}',
     data: {
         datasets: [{{.Datasets}}]
     },
@@ -576,7 +628,33 @@ new Chart(document.getElementById('{{.ID}}'), {
                 }
             },
             legend: {
-                display: {{.DisplayLegend}}
+                display: {{.DisplayLegend}},
+				onClick: function(e, legendItem, legend) {
+					const chart = legend.chart;
+					const datasetIndex = legendItem.datasetIndex;
+					const nativeEvent = e && e.native ? e.native : e;
+					const isCtrl = nativeEvent && (nativeEvent.ctrlKey || nativeEvent.metaKey);
+
+					if (isCtrl) {
+						const onlyThisVisible = chart.data.datasets.every(function(ds, idx) {
+							if (idx === datasetIndex) {
+								return chart.isDatasetVisible(idx);
+							}
+							return !chart.isDatasetVisible(idx);
+						});
+
+						chart.data.datasets.forEach(function(ds, idx) {
+							const visible = onlyThisVisible ? true : idx === datasetIndex;
+							chart.setDatasetVisibility(idx, visible);
+						});
+						chart.update();
+						return;
+					}
+
+					const visible = chart.isDatasetVisible(datasetIndex);
+					chart.setDatasetVisibility(datasetIndex, !visible);
+					chart.update();
+				}
             }
         }
     }
@@ -586,6 +664,7 @@ new Chart(document.getElementById('{{.ID}}'), {
 
 type ChartTemplateStruct struct {
 	ID            string
+	Type          string
 	Labels        string // only for line charts
 	Datasets      string
 	XaxisText     string
@@ -717,8 +796,9 @@ func RenderMultiTargetTableValuesAsHTML(tableValues []table.TableValues, targetN
 //
 // Returns:
 //   - A string containing the rendered chart HTML/JavaScript, or an error message if rendering fails.
-func RenderChart(chartType string, allFormattedPoints []string, datasetNames []string, xAxisLabels []string, config ChartTemplateStruct, datasetHiddenFlags []bool) string {
+func RenderChart(allFormattedPoints []string, datasetNames []string, xAxisLabels []string, config ChartTemplateStruct, datasetHiddenFlags []bool) string {
 	datasets := []string{}
+	chartType := config.Type
 	for dataIdx, formattedPoints := range allFormattedPoints {
 		specValues := formattedPoints
 		dst := texttemplate.Must(texttemplate.New("datasetTemplate").Parse(datasetTemplate))
@@ -749,7 +829,7 @@ func RenderChart(chartType string, allFormattedPoints []string, datasetNames []s
 	switch chartType {
 	case "line":
 		chartTemplate = lineChartTemplate
-	case "stackedBar":
+	case "bar":
 		chartTemplate = stackedBarChartTemplate
 	case "scatter":
 		chartTemplate = scatterChartTemplate
@@ -759,7 +839,7 @@ func RenderChart(chartType string, allFormattedPoints []string, datasetNames []s
 	sct := texttemplate.Must(texttemplate.New("chartTemplate").Parse(chartTemplate))
 	buf := new(bytes.Buffer)
 	config.Datasets = strings.Join(datasets, ",")
-	if chartType == "line" || chartType == "stackedBar" { // TODO AG: autogenerated, check if functionally correct
+	if chartType == "line" || chartType == "bar" { // TODO AG: autogenerated, check if functionally correct
 		config.Labels = func() string {
 			var labels []string
 			for _, label := range xAxisLabels {
@@ -803,7 +883,7 @@ func RenderScatterChart(data [][]ScatterPoint, datasetNames []string, config Cha
 		}
 		allFormattedPoints = append(allFormattedPoints, strings.Join(formattedPoints, ","))
 	}
-	return RenderChart("scatter", allFormattedPoints, datasetNames, nil, config, nil)
+	return RenderChart(allFormattedPoints, datasetNames, nil, config, nil) // TODO AG: check this is correct too
 }
 
 func getColor(idx int) string {
