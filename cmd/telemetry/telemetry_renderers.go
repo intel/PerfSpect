@@ -89,6 +89,7 @@ func cpuUtilizationTelemetryTableHTMLRenderer(tableValues table.TableValues, tar
 	}
 	chartConfig := report.ChartTemplateStruct{
 		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
+		Name:          "cpuUtilizationChart",
 		Type:          "line",
 		XaxisText:     "Time",
 		YaxisText:     "% Utilization",
