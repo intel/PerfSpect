@@ -125,6 +125,7 @@ func utilizationCategoriesTelemetryTableHTMLRenderer(tableValues table.TableValu
 	}
 	chartConfig := report.ChartTemplateStruct{
 		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
+		Name:          "utilizationCategoriesChart",
 		Type:          "bar",
 		XaxisText:     "Time",
 		YaxisText:     "% Utilization",
@@ -166,6 +167,7 @@ func irqRateTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName
 	}
 	chartConfig := report.ChartTemplateStruct{
 		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
+		Name:          "irqRateChart",
 		Type:          "line",
 		XaxisText:     "Time",
 		YaxisText:     "IRQ/s",
@@ -223,6 +225,7 @@ func driveTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName s
 		}
 		chartConfig := report.ChartTemplateStruct{
 			ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
+			Name:          "driveUtilizationChart",
 			Type:          "line",
 			XaxisText:     "Time",
 			YaxisText:     "",
@@ -282,6 +285,7 @@ func networkTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName
 		}
 		chartConfig := report.ChartTemplateStruct{
 			ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
+			Name:          "networkUtilizationChart",
 			Type:          "line",
 			XaxisText:     "Time",
 			YaxisText:     "",
@@ -320,6 +324,7 @@ func memoryTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName 
 	}
 	chartConfig := report.ChartTemplateStruct{
 		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
+		Name:          "memoryUsageChart",
 		Type:          "bar",
 		XaxisText:     "Time",
 		YaxisText:     "kilobytes",
@@ -356,6 +361,7 @@ func averageFrequencyTelemetryTableHTMLRenderer(tableValues table.TableValues, t
 	}
 	chartConfig := report.ChartTemplateStruct{
 		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
+		Name:          "averageFrequencyChart",
 		Type:          "line",
 		XaxisText:     "Time",
 		YaxisText:     "MHz",
@@ -392,6 +398,7 @@ func powerTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName s
 	}
 	chartConfig := report.ChartTemplateStruct{
 		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
+		Name:          "powerChart",
 		Type:          "line",
 		XaxisText:     "Time",
 		YaxisText:     "Watts",
@@ -428,6 +435,7 @@ func temperatureTelemetryTableHTMLRenderer(tableValues table.TableValues, target
 	}
 	chartConfig := report.ChartTemplateStruct{
 		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
+		Name:          "temperatureChart",
 		Type:          "line",
 		XaxisText:     "Time",
 		YaxisText:     "Celsius",
@@ -464,6 +472,7 @@ func ipcTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName str
 	}
 	chartConfig := report.ChartTemplateStruct{
 		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
+		Name:          "ipcChart",
 		Type:          "line",
 		XaxisText:     "Time",
 		YaxisText:     "IPC",
@@ -500,6 +509,7 @@ func c6TelemetryTableHTMLRenderer(tableValues table.TableValues, targetName stri
 	}
 	chartConfig := report.ChartTemplateStruct{
 		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
+		Name:          "c6ResidencyChart",
 		Type:          "line",
 		XaxisText:     "Time",
 		YaxisText:     "% C6 Residency",
@@ -569,6 +579,7 @@ func instructionTelemetryTableHTMLRenderer(tableValues table.TableValues, target
 	}
 	chartConfig := report.ChartTemplateStruct{
 		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
+		Name:          "instructionUsageChart",
 		Type:          "bar",
 		XaxisText:     "Time",
 		YaxisText:     "% Samples",
@@ -627,6 +638,8 @@ func renderGaudiStatsChart(tableValues table.TableValues, chartStatFieldName str
 	}
 	chartConfig := report.ChartTemplateStruct{
 		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
+		Name:          "gaudiStatsChart",
+		Type:          "line",
 		XaxisText:     "Time",
 		YaxisText:     yAxisText,
 		TitleText:     titleText,
@@ -674,6 +687,8 @@ func pduTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName str
 	}
 	chartConfig := report.ChartTemplateStruct{
 		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
+		Name:          "pduStatsChart",
+		Type:          "line",
 		XaxisText:     "Time",
 		YaxisText:     "Watts",
 		TitleText:     "",
@@ -709,6 +724,7 @@ func kernelTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName 
 	}
 	chartConfig := report.ChartTemplateStruct{
 		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
+		Name:          "irqRateChart",
 		Type:          "line",
 		XaxisText:     "Time",
 		YaxisText:     "count per second",

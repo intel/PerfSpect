@@ -503,8 +503,9 @@ new Chart(document.getElementById('{{.ID}}'), {
 const stackedBarChartTemplate = `<div class="chart-container" style="max-width: 900px">
 <canvas id="{{.ID}}"></canvas>
 </div>
+<button type="button" class="pure-button" onclick="{{.Name}}ToggleChartType()" style="margin-bottom: 10px;">Toggle line/bar</button>
 <script>
-new Chart(document.getElementById('{{.ID}}'), {
+const {{.Name}} = new Chart(document.getElementById('{{.ID}}'), {
     type: '{{.Type}}',
     data: {
 		labels: [{{.Labels}}],
@@ -582,6 +583,13 @@ new Chart(document.getElementById('{{.ID}}'), {
         }
     }
 });
+function {{.Name}}ToggleChartType() {
+	const nextType = {{.Name}}.config.type === 'bar' ? 'line' : 'bar';
+	{{.Name}}.config.type = nextType;
+	{{.Name}}.options.scales.x.stacked = nextType === 'bar';
+	{{.Name}}.options.scales.y.stacked = nextType === 'bar';
+	{{.Name}}.update();
+}
 </script>
 `
 const scatterChartTemplate = `<div class="chart-container" style="max-width: 900px">
@@ -664,6 +672,7 @@ new Chart(document.getElementById('{{.ID}}'), {
 
 type ChartTemplateStruct struct {
 	ID            string
+	Name          string
 	Type          string
 	Labels        string // only for line charts
 	Datasets      string
