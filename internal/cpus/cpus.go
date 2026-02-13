@@ -140,13 +140,8 @@ var cpuCharacteristicsMap = map[string]CPUCharacteristics{
 	UarchGNR_X2:  {MicroArchitecture: UarchGNR_X2, MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 16},  // Granite Rapids - SP (XCC)
 	UarchGNR_X3:  {MicroArchitecture: UarchGNR_X3, MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 16}, // Granite Rapids - AP (UCC)
 	UarchGNR_D:   {MicroArchitecture: UarchGNR_D, MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 16},   // Granite Rapids - D
-<<<<<<< HEAD
 	UarchCWF:     {MicroArchitecture: UarchCWF, MemoryChannelCount: 12, LogicalThreadCount: 1, CacheWayCount: 16},    // Clearwater Forest - generic
 	UarchDMR:     {MicroArchitecture: UarchDMR, MemoryChannelCount: 16, LogicalThreadCount: 1, CacheWayCount: 16},    // Diamond Rapids - generic
-=======
-	UarchCWF:     {MicroArchitecture: UarchCWF, MemoryChannelCount: 12, LogicalThreadCount: 1, CacheWayCount: 0},     // Clearwater Forest - generic
-	UarchDMR:     {MicroArchitecture: UarchDMR, MemoryChannelCount: 16, LogicalThreadCount: 1, CacheWayCount: 16},    // Diamond Rapids
->>>>>>> 6db7f48ce0e8a579534eaa218e30943b6ae25817
 	// AMD CPUs
 	UarchNaples:     {MicroArchitecture: UarchNaples, MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 0},      // Naples
 	UarchRome:       {MicroArchitecture: UarchRome, MemoryChannelCount: 8, LogicalThreadCount: 2, CacheWayCount: 0},        // Rome
