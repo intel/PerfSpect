@@ -52,6 +52,8 @@ func coreTurboFrequencyTableHTMLRenderer(tableValues table.TableValues) string {
 	}
 	chartConfig := report.ChartTemplateStruct{
 		ID:            fmt.Sprintf("turboFrequency%d", util.RandUint(10000)),
+		Name:          "coreTurboFrequencyChart",
+		Type:          "scatter",
 		XaxisText:     "Core Count",
 		YaxisText:     "Frequency (GHz)",
 		TitleText:     "",
@@ -98,6 +100,8 @@ func memoryBenchmarkTableMultiTargetHtmlRenderer(allTableValues []table.TableVal
 	}
 	chartConfig := report.ChartTemplateStruct{
 		ID:            fmt.Sprintf("latencyBandwidth%d", util.RandUint(10000)),
+		Name:          "latencyBandwidthChart",
+		Type:          "scatter",
 		XaxisText:     "Bandwidth (GB/s)",
 		YaxisText:     "Latency (ns)",
 		TitleText:     "",
