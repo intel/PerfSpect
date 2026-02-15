@@ -247,8 +247,12 @@ func ELCFieldValuesFromOutput(outputs map[string]script.ScriptOutput) (fieldValu
 func TDPFromOutput(outputs map[string]script.ScriptOutput) string {
 	msrHex := strings.TrimSpace(outputs[script.PackagePowerLimitName].Stdout)
 	msr, err := strconv.ParseInt(msrHex, 16, 0)
-	if err != nil || msr == 0 {
+	if err != nil {
+		slog.Error("failed to parse TDP value", slog.String("error", err.Error()), slog.String("msrHex", msrHex))
 		return ""
+	}
+	if msr == 0 {
+		return "Unknown"
 	}
 	return fmt.Sprint(msr/8) + "W"
 }
