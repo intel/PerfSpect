@@ -819,7 +819,7 @@ done
 `,
 		Superuser:          true,
 		Vendors:            []string{cpus.IntelVendor},
-		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF},
+		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF, cpus.UarchDMR},
 		Depends:            []string{"pcm-tpmi"},
 	}
 	_, err := runScript(myTarget, setScript, localTempDir)
@@ -842,7 +842,7 @@ pcm-tpmi 2 0x18 -d -b 38:32 -w 0 # EFFICIENCY_LATENCY_CTRL_LOW_THRESHOLD
 `,
 		Superuser:          true,
 		Vendors:            []string{cpus.IntelVendor},
-		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF},
+		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF, cpus.UarchDMR},
 		Depends:            []string{"pcm-tpmi"},
 	}
 	_, err := runScript(myTarget, setScript, localTempDir)

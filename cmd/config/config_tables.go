@@ -71,7 +71,7 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []table.Fi
 		{Name: "Package Power / TDP", Description: "--tdp <Watts>", Values: []string{extract.TDPFromOutput(outputs)}},
 		{Name: "Core SSE Frequency", Description: "--core-max <GHz>", Values: []string{sseFrequenciesFromOutput(outputs)}},
 	}
-	if strings.Contains(uarch, cpus.UarchSRF) || strings.Contains(uarch, cpus.UarchGNR) || strings.Contains(uarch, cpus.UarchCWF) {
+	if strings.Contains(uarch, cpus.UarchSRF) || strings.Contains(uarch, cpus.UarchGNR) || strings.Contains(uarch, cpus.UarchCWF) || strings.Contains(uarch, cpus.UarchDMR) {
 		fields = append(fields, []table.Field{
 			{Name: "Uncore Max Frequency (Compute)", Description: "--uncore-max-compute <GHz>", Values: []string{extract.UncoreMinMaxDieFrequencyFromOutput(true, true, outputs)}},
 			{Name: "Uncore Min Frequency (Compute)", Description: "--uncore-min-compute <GHz>", Values: []string{extract.UncoreMinMaxDieFrequencyFromOutput(false, true, outputs)}},
@@ -89,8 +89,8 @@ func configurationTableValues(outputs map[string]script.ScriptOutput) []table.Fi
 		{Name: "Energy Performance Preference", Description: "--epp <0-255>", Values: []string{extract.EPPFromOutput(outputs)}},
 		{Name: "Scaling Governor", Description: "--gov <" + strings.Join(governorOptions, "|") + ">", Values: []string{strings.TrimSpace(outputs[script.ScalingGovernorScriptName].Stdout)}},
 	}...)
-	// add ELC (for SRF, CWF and GNR only)
-	if strings.Contains(uarch, cpus.UarchSRF) || strings.Contains(uarch, cpus.UarchGNR) || strings.Contains(uarch, cpus.UarchCWF) {
+	// add ELC (for SRF, CWF, GNR, and DMR only)
+	if strings.Contains(uarch, cpus.UarchSRF) || strings.Contains(uarch, cpus.UarchGNR) || strings.Contains(uarch, cpus.UarchCWF) || strings.Contains(uarch, cpus.UarchDMR) {
 		fields = append(fields, table.Field{Name: "Efficiency Latency Control", Description: "--elc <" + strings.Join(elcOptions, "|") + ">", Values: []string{extract.ELCSummaryFromOutput(outputs)}})
 	}
 	// add prefetchers
