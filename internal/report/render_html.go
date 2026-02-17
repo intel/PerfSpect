@@ -423,7 +423,7 @@ const lineChartTemplate = `<div class="chart-container" style="max-width: 900px"
 </div>
 <script>
 new Chart(document.getElementById('{{.ID}}'), {
-    type: '{{.Type}}',
+    type: 'line',
     data: {
 		labels: [{{.Labels}}],
         datasets: [{{.Datasets}}]
@@ -498,98 +498,6 @@ new Chart(document.getElementById('{{.ID}}'), {
         }
     }
 });
-</script>
-`
-const stackedBarChartTemplate = `<div class="chart-container" style="max-width: 900px">
-<canvas id="{{.ID}}"></canvas>
-</div>
-<button type="button" class="pure-button" onclick="{{.Name}}ToggleChartType()" style="margin-bottom: 10px;">Toggle line/bar</button>
-<script>
-const {{.Name}} = new Chart(document.getElementById('{{.ID}}'), {
-    type: '{{.Type}}',
-    data: {
-		labels: [{{.Labels}}],
-        datasets: [{{.Datasets}}]
-    },
-    options: {
-        aspectRatio: {{.AspectRatio}},
-        scales: {
-            x: {
-                beginAtZero: false,
-                title: {
-                    text: "{{.XaxisText}}",
-                    display: true
-                },
-				ticks: {
-					maxRotation: 90,
-					minRotation: 45
-                },
-				stacked: true
-            },
-            y: {
-                title: {
-                    text: "{{.YaxisText}}",
-                    display: true
-                },
-				suggestedMin: {{.SuggestedMin}},
-				suggestedMax: {{.SuggestedMax}},
-				stacked: true
-            }
-        },
-        plugins: {
-            title: {
-                text: "{{.TitleText}}",
-                display: {{.DisplayTitle}},
-                font: {
-                    size: 18
-                }
-            },
-            tooltip: {
-                callbacks: {
-                    label: function(ctx) {
-                        return ctx.dataset.label + " (" + ctx.parsed.x + ", " + ctx.parsed.y + ")";
-                    }
-                }
-            },
-            legend: {
-                display: {{.DisplayLegend}},
-				onClick: function(e, legendItem, legend) {
-					const chart = legend.chart;
-					const datasetIndex = legendItem.datasetIndex;
-					const nativeEvent = e && e.native ? e.native : e;
-					const isCtrl = nativeEvent && (nativeEvent.ctrlKey || nativeEvent.metaKey);
-
-					if (isCtrl) {
-						const onlyThisVisible = chart.data.datasets.every(function(ds, idx) {
-							if (idx === datasetIndex) {
-								return chart.isDatasetVisible(idx);
-							}
-							return !chart.isDatasetVisible(idx);
-						});
-
-						chart.data.datasets.forEach(function(ds, idx) {
-							const visible = onlyThisVisible ? true : idx === datasetIndex;
-							chart.setDatasetVisibility(idx, visible);
-						});
-						chart.update();
-						return;
-					}
-
-					const visible = chart.isDatasetVisible(datasetIndex);
-					chart.setDatasetVisibility(datasetIndex, !visible);
-					chart.update();
-				}
-            }
-        }
-    }
-});
-function {{.Name}}ToggleChartType() {
-	const nextType = {{.Name}}.config.type === 'bar' ? 'line' : 'bar';
-	{{.Name}}.config.type = nextType;
-	{{.Name}}.options.scales.x.stacked = nextType === 'bar';
-	{{.Name}}.options.scales.y.stacked = nextType === 'bar';
-	{{.Name}}.update();
-}
 </script>
 `
 const scatterChartTemplate = `<div class="chart-container" style="max-width: 900px">
@@ -597,7 +505,7 @@ const scatterChartTemplate = `<div class="chart-container" style="max-width: 900
 </div>
 <script>
 new Chart(document.getElementById('{{.ID}}'), {
-    type: '{{.Type}}',
+    type: 'scatter',
     data: {
         datasets: [{{.Datasets}}]
     },
@@ -672,8 +580,6 @@ new Chart(document.getElementById('{{.ID}}'), {
 
 type ChartTemplateStruct struct {
 	ID            string
-	Name          string
-	Type          string
 	Labels        string // only for line charts
 	Datasets      string
 	XaxisText     string
@@ -805,9 +711,8 @@ func RenderMultiTargetTableValuesAsHTML(tableValues []table.TableValues, targetN
 //
 // Returns:
 //   - A string containing the rendered chart HTML/JavaScript, or an error message if rendering fails.
-func RenderChart(allFormattedPoints []string, datasetNames []string, xAxisLabels []string, config ChartTemplateStruct, datasetHiddenFlags []bool) string {
+func RenderChart(chartType string, allFormattedPoints []string, datasetNames []string, xAxisLabels []string, config ChartTemplateStruct, datasetHiddenFlags []bool) string {
 	datasets := []string{}
-	chartType := config.Type
 	for dataIdx, formattedPoints := range allFormattedPoints {
 		specValues := formattedPoints
 		dst := texttemplate.Must(texttemplate.New("datasetTemplate").Parse(datasetTemplate))
@@ -838,8 +743,6 @@ func RenderChart(allFormattedPoints []string, datasetNames []string, xAxisLabels
 	switch chartType {
 	case "line":
 		chartTemplate = lineChartTemplate
-	case "bar":
-		chartTemplate = stackedBarChartTemplate
 	case "scatter":
 		chartTemplate = scatterChartTemplate
 	default:
@@ -848,7 +751,7 @@ func RenderChart(allFormattedPoints []string, datasetNames []string, xAxisLabels
 	sct := texttemplate.Must(texttemplate.New("chartTemplate").Parse(chartTemplate))
 	buf := new(bytes.Buffer)
 	config.Datasets = strings.Join(datasets, ",")
-	if chartType == "line" || chartType == "bar" {
+	if chartType == "line" {
 		config.Labels = func() string {
 			var labels []string
 			for _, label := range xAxisLabels {
@@ -892,7 +795,7 @@ func RenderScatterChart(data [][]ScatterPoint, datasetNames []string, config Cha
 		}
 		allFormattedPoints = append(allFormattedPoints, strings.Join(formattedPoints, ","))
 	}
-	return RenderChart(allFormattedPoints, datasetNames, nil, config, nil)
+	return RenderChart("scatter", allFormattedPoints, datasetNames, nil, config, nil)
 }
 
 func getColor(idx int) string {
