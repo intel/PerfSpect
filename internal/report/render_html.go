@@ -271,7 +271,14 @@ func createHtmlReport(allTableValues []table.TableValues, targetName string) (ou
 	<h3>JavaScript is disabled. Functionality is limited.</h3>
 </noscript>
 `)
+	// boolean value chartUsageNoteAdded tracks whether the usage note for interpreting charts has been added, to avoid repeating it for multiple charts
+	chartUsageNoteAdded := false
 	for _, tableValues := range allTableValues {
+		// if "Summary" is not in the table name, add this note about interpreting charts, since summary tables are often used for insights and recommendations rather than raw data
+		if !strings.Contains(tableValues.Name, "Summary") && !chartUsageNoteAdded {
+			sb.WriteString("<h3 id=\"Usage Note\"><mark>NOTE</mark>: Categories in charts below can be shown/hidden by clicking on them. To isolate a specific category, use ctrl+click. To reset the visibility of all categories, ctrl+click on an isolated category.</h3>\n")
+			chartUsageNoteAdded = true
+		}
 		// print the table name
 		fmt.Fprintf(&sb, "<h2 id=\"%[1]s\">%[1]s</h2>\n", html.EscapeString(tableValues.Name))
 		// if there's no data in the table, print a message and continue
