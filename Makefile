@@ -193,7 +193,8 @@ clean: sweep clean-tools-cache
 	rm -f perfspect
 	rm -f perfspect-aarch64
 	sudo rm -rf dist
-	rm -rf internal/script/resources
+	rm -rf internal/script/resources/aarch64
+	rm -rf internal/script/resources/x86_64
 
 .PHONY: clean-tools-cache
 clean-tools-cache:
