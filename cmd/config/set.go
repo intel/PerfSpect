@@ -785,20 +785,23 @@ func setELCOPM(myTarget target.Target, localTempDir string) error {
 output=$(pcm-tpmi 2 0x10 -d -b 26:26)
 
 # Parse the output to build lists of I/O and compute dies
+# Store as "instance:entry" to handle multiple instances per socket
 io_dies=()
 compute_dies=()
 declare -A die_types
 while read -r line; do
-	if [[ $line == *"instance 0"* ]]; then
-		die=$(echo "$line" | grep -oP 'entry \K[0-9]+')
-		if [[ $line == *"value 1"* ]]; then
-			die_types[$die]="IO"
-	io_dies+=("$die")
-		elif [[ $line == *"value 0"* ]]; then
-			die_types[$die]="Compute"
-	compute_dies+=("$die")
-		fi
-	fi
+    if [[ $line == *"entry"* && $line == *"instance"* ]]; then
+        entry=$(echo "$line" | grep -oP 'entry \K[0-9]+')
+        instance=$(echo "$line" | grep -oP 'instance \K[0-9]+')
+        die_key="${instance}:${entry}"
+        if [[ $line == *"value 1"* ]]; then
+            die_types[$die_key]="IO"
+            io_dies+=("$die_key")
+        elif [[ $line == *"value 0"* ]]; then
+            die_types[$die_key]="Compute"
+            compute_dies+=("$die_key")
+        fi
+    fi
 done <<< "$output"
 
 # Set ELC parameters for I/O and Compute dies
@@ -808,13 +811,17 @@ pcm-tpmi 2 0x18 -d -b 46:40 -w 120 # EFFICIENCY_LATENCY_CTRL_HIGH_THRESHOLD (120
 pcm-tpmi 2 0x18 -d -b 38:32 -w 13  # EFFICIENCY_LATENCY_CTRL_LOW_THRESHOLD (13 / 127 ~= 10%)
 
 #   set values for I/O Dies
-for die in "${io_dies[@]}"; do
-    pcm-tpmi 2 0x18 -d -e $die -b 28:22 -w 8  # EFFICIENCY_LATENCY_CTRL_RATIO 0.8 GHz for I/O Dies
+for die_key in "${io_dies[@]}"; do
+    instance="${die_key%:*}"
+    entry="${die_key#*:}"
+    pcm-tpmi 2 0x18 -d -i $instance -e $entry -b 28:22 -w 8  # EFFICIENCY_LATENCY_CTRL_RATIO 0.8 GHz for I/O Dies
 done
 
 #   set values for Compute Dies
-for die in "${compute_dies[@]}"; do
-	pcm-tpmi 2 0x18 -d -e $die -b 28:22 -w 12  # EFFICIENCY_LATENCY_CTRL_RATIO 1.2 GHz for Compute Dies
+for die_key in "${compute_dies[@]}"; do
+    instance="${die_key%:*}"
+    entry="${die_key#*:}"
+    pcm-tpmi 2 0x18 -d -i $instance -e $entry -b 28:22 -w 12  # EFFICIENCY_LATENCY_CTRL_RATIO 1.2 GHz for Compute Dies
 done
 `,
 		Superuser:          true,
