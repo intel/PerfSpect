@@ -508,64 +508,89 @@ echo "$epb"`,
 output=$(pcm-tpmi 2 0x10 -d -b 26:26)
 
 # Parse the output to build lists of I/O and compute dies
+# Store as "instance:entry" to handle multiple instances per socket
 io_dies=()
 compute_dies=()
 declare -A die_types
 while read -r line; do
-	if [[ $line == *"instance 0"* ]]; then
-		die=$(echo "$line" | grep -oP 'entry \K[0-9]+')
-		if [[ $line == *"value 1"* ]]; then
-			die_types[$die]="IO"
-	io_dies+=("$die")
-		elif [[ $line == *"value 0"* ]]; then
-			die_types[$die]="Compute"
-	compute_dies+=("$die")
-		fi
-	fi
+    if [[ $line == *"entry"* && $line == *"instance"* ]]; then
+        entry=$(echo "$line" | grep -oP 'entry \K[0-9]+')
+        instance=$(echo "$line" | grep -oP 'instance \K[0-9]+')
+        die_key="${instance}:${entry}"
+        if [[ $line == *"value 1"* ]]; then
+            die_types[$die_key]="IO"
+            io_dies+=("$die_key")
+        elif [[ $line == *"value 0"* ]]; then
+            die_types[$die_key]="Compute"
+            compute_dies+=("$die_key")
+        fi
+    fi
 done <<< "$output"
 
 # Function to extract and calculate metrics from the value
 extract_and_print_metrics() {
-	local value=$1
-	local socket_id=$2
-	local die=$3
-	local die_type=${die_types[$die]}
+    local value=$1
+    local socket_id=$2
+    local die_key=$3
+    local die_type=${die_types[$die_key]}
 
-	# Extract bits and calculate metrics
-	local min_ratio=$(( (value >> 15) & 0x7F ))
-	local max_ratio=$(( (value >> 8) & 0x7F ))
-	local eff_latency_ctrl_ratio=$(( (value >> 22) & 0x7F ))
-	local eff_latency_ctrl_low_threshold=$(( (value >> 32) & 0x7F ))
-	local eff_latency_ctrl_high_threshold=$(( (value >> 40) & 0x7F ))
-	local eff_latency_ctrl_high_threshold_enable=$(( (value >> 39) & 0x1 ))
+    # Extract instance and entry from die_key
+    local inst="${die_key%:*}"
+    local entry="${die_key#*:}"
 
-	# Convert to MHz or percentage
-	min_ratio=$(( min_ratio * 100 ))
-	max_ratio=$(( max_ratio * 100 ))
-	eff_latency_ctrl_ratio=$(( eff_latency_ctrl_ratio * 100 ))
-	eff_latency_ctrl_low_threshold=$(( (eff_latency_ctrl_low_threshold * 100) / 127 ))
-	eff_latency_ctrl_high_threshold=$(( (eff_latency_ctrl_high_threshold * 100) / 127 ))
+    # Extract bits and calculate metrics
+    local min_ratio=$(( (value >> 15) & 0x7F ))
+    local max_ratio=$(( (value >> 8) & 0x7F ))
+    local eff_latency_ctrl_ratio=$(( (value >> 22) & 0x7F ))
+    local eff_latency_ctrl_low_threshold=$(( (value >> 32) & 0x7F ))
+    local eff_latency_ctrl_high_threshold=$(( (value >> 40) & 0x7F ))
+    local eff_latency_ctrl_high_threshold_enable=$(( (value >> 39) & 0x1 ))
 
-	# Print metrics
-	echo -n "$socket_id,$die,$die_type,$min_ratio,$max_ratio,$eff_latency_ctrl_ratio,"
-	echo "$eff_latency_ctrl_low_threshold,$eff_latency_ctrl_high_threshold,$eff_latency_ctrl_high_threshold_enable"
+    # Convert to MHz or percentage
+    min_ratio=$(( min_ratio * 100 ))
+    max_ratio=$(( max_ratio * 100 ))
+    eff_latency_ctrl_ratio=$(( eff_latency_ctrl_ratio * 100 ))
+    eff_latency_ctrl_low_threshold=$(( (eff_latency_ctrl_low_threshold * 100) / 127 ))
+    eff_latency_ctrl_high_threshold=$(( (eff_latency_ctrl_high_threshold * 100) / 127 ))
+
+    # Print metrics
+    echo -n "$socket_id,$inst,$entry,$die_type,$min_ratio,$max_ratio,$eff_latency_ctrl_ratio,"
+    echo "$eff_latency_ctrl_low_threshold,$eff_latency_ctrl_high_threshold,$eff_latency_ctrl_high_threshold_enable"
 }
 
 # Print CSV header
-echo "Socket,Die,Type,Min Ratio (MHz),Max Ratio (MHz),ELC Ratio (MHz),ELC Low Threshold (%),ELC High Threshold (%),ELC High Threshold Enable"
+echo "Socket,Instance,Die,Type,Min Ratio (MHz),Max Ratio (MHz),ELC Ratio (MHz),ELC Low Threshold (%),ELC High Threshold (%),ELC High Threshold Enable"
 
 # Iterate over all dies and run pcm-tpmi for each to get the metrics
-for die in "${!die_types[@]}"; do
-	output=$(pcm-tpmi 2 0x18 -d -e "$die")
+for die_key in "${!die_types[@]}"; do
+    instance="${die_key%:*}"
+    entry="${die_key#*:}"
+    output=$(pcm-tpmi 2 0x18 -d -i "$instance" -e "$entry")
 
-	# Parse the output and extract metrics for each socket
-	while read -r line; do
-		if [[ $line == *"Read value"* ]]; then
-			value=$(echo "$line" | grep -oP 'value \K[0-9]+')
-			socket_id=$(echo "$line" | grep -oP 'instance \K[0-9]+')
-			extract_and_print_metrics "$value" "$socket_id" "$die"
-		fi
-	done <<< "$output"
+    # Parse the output and extract metrics for each socket
+    while read -r line; do
+        if [[ $line == *"Read value"* ]]; then
+            value=$(echo "$line" | grep -oP 'value \K[0-9]+')
+            # Extract instance ID
+            inst=$(echo "$line" | grep -oP 'instance \K[0-9]+')
+            # Extract entry ID
+            ent=$(echo "$line" | grep -oP 'entry \K[0-9]+')
+            # Create die_key from instance and entry
+            parsed_die_key="${inst}:${ent}"
+            # Extract socket ID if present, otherwise fallback to instance ID
+            if [[ $line =~ \(socket\ ([0-9]+)\) ]]; then
+                socket_id=${BASH_REMATCH[1]}
+            else
+                socket_id=$inst
+            fi
+            # Extract NUMA node ID if present in the output (format: "(NUMA node X)")
+            numa_node=""
+            if [[ $line =~ \(NUMA\ node\ ([0-9]+)\) ]]; then
+                numa_node=${BASH_REMATCH[1]}
+            fi
+            extract_and_print_metrics "$value" "$socket_id" "$parsed_die_key" "$numa_node" "$inst" 
+        fi
+    done <<< "$output"
 done
 `,
 		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF, cpus.UarchDMR},
