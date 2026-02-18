@@ -250,7 +250,7 @@ func TDPFromOutput(outputs map[string]script.ScriptOutput) string {
 	msrHex := strings.TrimSpace(outputs[script.PackagePowerLimitName].Stdout)
 	msr, err := strconv.ParseInt(msrHex, 16, 0)
 	if err != nil {
-		slog.Error("failed to parse TDP value", slog.String("error", err.Error()), slog.String("msrHex", msrHex))
+		slog.Warn("failed to parse TDP value", slog.String("error", err.Error()), slog.String("msrHex", msrHex))
 		return ""
 	}
 	if msr == 0 {
