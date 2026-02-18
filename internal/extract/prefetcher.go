@@ -34,32 +34,36 @@ const (
 	PrefetcherHomelessName  = "Homeless"
 	PrefetcherLLCName       = "LLC"
 	PrefetcherLLCStreamName = "LLC Stream"
+	PrefetcherL2PName       = "L2P"
 )
 
 // PrefetcherDefinition represents a prefetcher configuration.
 type PrefetcherDefinition struct {
-	ShortName   string
-	Description string
-	Msr         int
-	Bit         int
-	Uarchs      []string
+	ShortName    string
+	Description  string
+	Msr          int
+	Bit          int
+	Uarchs       []string
+	ManagedByL2P bool // indicates if the prefetcher is dynamically managed by the L2P algorithm
 }
 
 // PrefetcherDefinitions contains all known prefetcher definitions.
 var PrefetcherDefinitions = []PrefetcherDefinition{
 	{
-		ShortName:   PrefetcherL2HWName,
-		Description: "L2 Hardware (MLC Streamer) fetches additional lines of code or data into the L2 cache.",
-		Msr:         MsrPrefetchControl,
-		Bit:         0,
-		Uarchs:      []string{"all"},
+		ShortName:    PrefetcherL2HWName,
+		Description:  "L2 Hardware (MLC Streamer) fetches additional lines of code or data into the L2 cache.",
+		Msr:          MsrPrefetchControl,
+		Bit:          0,
+		Uarchs:       []string{"all"},
+		ManagedByL2P: true,
 	},
 	{
-		ShortName:   PrefetcherL2AdjName,
-		Description: "L2 Adjacent Cache Line (MLC Spatial) fetches the cache line that comprises a cache line pair.",
-		Msr:         MsrPrefetchControl,
-		Bit:         1,
-		Uarchs:      []string{"all"},
+		ShortName:    PrefetcherL2AdjName,
+		Description:  "L2 Adjacent Cache Line (MLC Spatial) fetches the cache line that comprises a cache line pair.",
+		Msr:          MsrPrefetchControl,
+		Bit:          1,
+		Uarchs:       []string{"all"},
+		ManagedByL2P: true,
 	},
 	{
 		ShortName:   PrefetcherDCUHWName,
@@ -83,18 +87,20 @@ var PrefetcherDefinitions = []PrefetcherDefinition{
 		Uarchs:      []string{"all"},
 	},
 	{
-		ShortName:   PrefetcherAMPName,
-		Description: "Adaptive Multipath Probability (MLC AMP) predicts access patterns based on previous patterns and fetches the corresponding cache lines into the L2 cache.",
-		Msr:         MsrPrefetchControl,
-		Bit:         5,
-		Uarchs:      []string{cpus.UarchSPR, cpus.UarchEMR, cpus.UarchGNR},
+		ShortName:    PrefetcherAMPName,
+		Description:  "Adaptive Multipath Probability (MLC AMP) predicts access patterns based on previous patterns and fetches the corresponding cache lines into the L2 cache.",
+		Msr:          MsrPrefetchControl,
+		Bit:          5,
+		Uarchs:       []string{cpus.UarchSPR, cpus.UarchEMR, cpus.UarchGNR, cpus.UarchDMR},
+		ManagedByL2P: true,
 	},
 	{
-		ShortName:   PrefetcherLLCPPName,
-		Description: "Last Level Cache Page (MLC LLC Page) Prefetcher",
-		Msr:         MsrPrefetchControl,
-		Bit:         6,
-		Uarchs:      []string{cpus.UarchGNR},
+		ShortName:    PrefetcherLLCPPName,
+		Description:  "Last Level Cache Page (MLC LLC Page) Prefetcher",
+		Msr:          MsrPrefetchControl,
+		Bit:          6,
+		Uarchs:       []string{cpus.UarchGNR, cpus.UarchDMR},
+		ManagedByL2P: true,
 	},
 	{
 		ShortName:   PrefetcherAOPName,
@@ -102,6 +108,15 @@ var PrefetcherDefinitions = []PrefetcherDefinition{
 		Msr:         MsrPrefetchControl,
 		Bit:         7,
 		Uarchs:      []string{cpus.UarchGNR},
+	},
+	{
+		// ON DMR, when enabled, prefetchers at bit 0, 1, 5, and 6 are dynamically controlled by the L2P algorithm
+		// ON SPR/EMR/GNR, if prefetchers at bit 0, 1, 5, and 6 are enabled, they are dynamically controlled by the L2P algorithm
+		ShortName:   PrefetcherL2PName,
+		Description: "L2P is an algorithm that dynamically enables or disables prefetchers based on real-time telemetry.",
+		Msr:         MsrPrefetchControl,
+		Bit:         12,
+		Uarchs:      []string{cpus.UarchDMR},
 	},
 	{
 		ShortName:   PrefetcherHomelessName,
@@ -155,89 +170,97 @@ func IsPrefetcherEnabled(msrValue string, bit int) (bool, error) {
 	return bitMask&msrInt == 0, nil
 }
 
-// PrefetchersFromOutput extracts prefetcher status from script outputs.
-func PrefetchersFromOutput(outputs map[string]script.ScriptOutput) [][]string {
-	out := make([][]string, 0)
+// resolvedPrefetcher holds the resolved status of a single prefetcher.
+type resolvedPrefetcher struct {
+	Definition PrefetcherDefinition
+	Status     string // "Enabled", "Disabled", or "Managed by L2P"
+}
+
+// resolvePrefetchers determines the status of each applicable prefetcher from script outputs.
+func resolvePrefetchers(outputs map[string]script.ScriptOutput) []resolvedPrefetcher {
 	uarch := UarchFromOutput(outputs)
 	if uarch == "" {
+		return nil
+	}
+	// if on DMR, we need to check if L2P is enabled first, as it dynamically manages the prefetchers at bit 0, 1, 5, and 6
+	l2pEnabled := false
+	if slices.Contains([]string{cpus.UarchDMR}, uarch[:3]) {
+		l2pVal := ValFromRegexSubmatch(outputs[script.PrefetchControlName].Stdout, `^([0-9a-fA-F]+)`)
+		if l2pVal != "" {
+			var err error
+			l2pEnabled, err = IsPrefetcherEnabled(l2pVal, 12)
+			if err != nil {
+				slog.Warn("error checking L2P enabled status", slog.String("error", err.Error()))
+			}
+		}
+	}
+	var results []resolvedPrefetcher
+	for _, pf := range PrefetcherDefinitions {
+		if !slices.Contains(pf.Uarchs, "all") && !slices.Contains(pf.Uarchs, uarch[:3]) {
+			continue
+		}
+		var scriptName string
+		switch pf.Msr {
+		case MsrPrefetchControl:
+			scriptName = script.PrefetchControlName
+		case MsrPrefetchers:
+			scriptName = script.PrefetchersName
+		case MsrAtomPrefTuning1:
+			scriptName = script.PrefetchersAtomName
+		default:
+			slog.Error("unknown msr for prefetcher", slog.String("msr", fmt.Sprintf("0x%x", pf.Msr)))
+			continue
+		}
+		msrVal := ValFromRegexSubmatch(outputs[scriptName].Stdout, `^([0-9a-fA-F]+)`)
+		if msrVal == "" {
+			continue
+		}
+		enabled, err := IsPrefetcherEnabled(msrVal, pf.Bit)
+		if err != nil {
+			slog.Warn("error checking prefetcher enabled status", slog.String("error", err.Error()))
+			continue
+		}
+		var status string
+		if l2pEnabled && pf.ManagedByL2P {
+			status = "Managed by L2P"
+		} else if enabled {
+			status = "Enabled"
+		} else {
+			status = "Disabled"
+		}
+		results = append(results, resolvedPrefetcher{Definition: pf, Status: status})
+	}
+	return results
+}
+
+// PrefetchersFromOutput extracts prefetcher status from script outputs.
+func PrefetchersFromOutput(outputs map[string]script.ScriptOutput) [][]string {
+	resolved := resolvePrefetchers(outputs)
+	if resolved == nil {
 		return [][]string{}
 	}
-	for _, pf := range PrefetcherDefinitions {
-		if slices.Contains(pf.Uarchs, "all") || slices.Contains(pf.Uarchs, uarch[:3]) {
-			var scriptName string
-			switch pf.Msr {
-			case MsrPrefetchControl:
-				scriptName = script.PrefetchControlName
-			case MsrPrefetchers:
-				scriptName = script.PrefetchersName
-			case MsrAtomPrefTuning1:
-				scriptName = script.PrefetchersAtomName
-			default:
-				slog.Error("unknown msr for prefetcher", slog.String("msr", fmt.Sprintf("0x%x", pf.Msr)))
-				continue
-			}
-			msrVal := ValFromRegexSubmatch(outputs[scriptName].Stdout, `^([0-9a-fA-F]+)`)
-			if msrVal == "" {
-				continue
-			}
-			var enabledDisabled string
-			enabled, err := IsPrefetcherEnabled(msrVal, pf.Bit)
-			if err != nil {
-				slog.Warn("error checking prefetcher enabled status", slog.String("error", err.Error()))
-				continue
-			}
-			if enabled {
-				enabledDisabled = "Enabled"
-			} else {
-				enabledDisabled = "Disabled"
-			}
-			out = append(out, []string{pf.ShortName, pf.Description, fmt.Sprintf("0x%04X", pf.Msr), strconv.Itoa(pf.Bit), enabledDisabled})
-		}
+	out := make([][]string, 0, len(resolved))
+	for _, r := range resolved {
+		out = append(out, []string{
+			r.Definition.ShortName,
+			r.Definition.Description,
+			fmt.Sprintf("0x%04X", r.Definition.Msr),
+			strconv.Itoa(r.Definition.Bit),
+			r.Status,
+		})
 	}
 	return out
 }
 
 // PrefetchersSummaryFromOutput returns a summary of all prefetcher statuses.
 func PrefetchersSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
-	uarch := UarchFromOutput(outputs)
-	if uarch == "" {
-		return ""
+	resolved := resolvePrefetchers(outputs)
+	if len(resolved) == 0 {
+		return "None"
 	}
-	var prefList []string
-	for _, pf := range PrefetcherDefinitions {
-		if slices.Contains(pf.Uarchs, "all") || slices.Contains(pf.Uarchs, uarch[:3]) {
-			var scriptName string
-			switch pf.Msr {
-			case MsrPrefetchControl:
-				scriptName = script.PrefetchControlName
-			case MsrPrefetchers:
-				scriptName = script.PrefetchersName
-			case MsrAtomPrefTuning1:
-				scriptName = script.PrefetchersAtomName
-			default:
-				slog.Error("unknown msr for prefetcher", slog.String("msr", fmt.Sprintf("0x%x", pf.Msr)))
-				continue
-			}
-			msrVal := ValFromRegexSubmatch(outputs[scriptName].Stdout, `^([0-9a-fA-F]+)`)
-			if msrVal == "" {
-				continue
-			}
-			var enabledDisabled string
-			enabled, err := IsPrefetcherEnabled(msrVal, pf.Bit)
-			if err != nil {
-				slog.Warn("error checking prefetcher enabled status", slog.String("error", err.Error()))
-				continue
-			}
-			if enabled {
-				enabledDisabled = "Enabled"
-			} else {
-				enabledDisabled = "Disabled"
-			}
-			prefList = append(prefList, fmt.Sprintf("%s: %s", pf.ShortName, enabledDisabled))
-		}
+	prefList := make([]string, 0, len(resolved))
+	for _, r := range resolved {
+		prefList = append(prefList, fmt.Sprintf("%s: %s", r.Definition.ShortName, r.Status))
 	}
-	if len(prefList) > 0 {
-		return strings.Join(prefList, ", ")
-	}
-	return "None"
+	return strings.Join(prefList, ", ")
 }
