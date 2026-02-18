@@ -44,7 +44,7 @@ check-resources:
 # Build the perfspect binary
 .PHONY: perfspect
 perfspect: check-resources
-	GOARCH=amd64 $(GO) build $(GOFLAGS_COMMON) -gcflags="all=-spectre=all -N -l" -asmflags="all=-spectre=all" -o $@
+	GOARCH=amd64 $(GO) build $(GOFLAGS_COMMON) -o $@
 
 # Build the perfspect binary for AARCH64
 .PHONY: perfspect-aarch64
