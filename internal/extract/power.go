@@ -111,21 +111,6 @@ func EPBFromOutput(outputs map[string]script.ScriptOutput) string {
 	return epbValToLabel(int(msr))
 }
 
-// ELCSummaryFromOutput returns a summary of Efficiency Latency Control settings.
-func ELCSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
-	fieldValues := ELCFieldValuesFromOutput(outputs)
-	if len(fieldValues) < 10 || len(fieldValues[9].Values) == 0 {
-		return ""
-	}
-	summary := fieldValues[9].Values[0]
-	for _, value := range fieldValues[9].Values[1:] {
-		if value != summary {
-			return "mixed"
-		}
-	}
-	return summary
-}
-
 // C6FromOutput returns the C6 C-state status.
 func C6FromOutput(outputs map[string]script.ScriptOutput) string {
 	cstatesInfo := CstatesFromOutput(outputs)
@@ -179,6 +164,7 @@ func CstatesFromOutput(outputs map[string]script.ScriptOutput) []CstateInfo {
 // enum for the column indices in the ELC CSV output
 const (
 	elcFieldSocketID = iota
+	elcFieldInstance
 	elcFieldDie
 	elcFieldDieType
 	elcFieldMinRatio
@@ -187,6 +173,7 @@ const (
 	elcFieldELCLowThreshold
 	elcFieldELCHighThreshold
 	elcFieldELCHighThresholdEnable
+	elcFieldMode
 )
 
 const (
@@ -243,12 +230,31 @@ func ELCFieldValuesFromOutput(outputs map[string]script.ScriptOutput) (fieldValu
 	return
 }
 
+// ELCSummaryFromOutput returns a summary of Efficiency Latency Control settings.
+func ELCSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
+	fieldValues := ELCFieldValuesFromOutput(outputs)
+	if len(fieldValues) < elcFieldMode+1 || len(fieldValues[elcFieldMode].Values) == 0 {
+		return ""
+	}
+	summary := fieldValues[elcFieldMode].Values[0]
+	for _, value := range fieldValues[elcFieldMode].Values[1:] {
+		if value != summary {
+			return "mixed"
+		}
+	}
+	return summary
+}
+
 // TDPFromOutput returns the TDP (Thermal Design Power) from script outputs.
 func TDPFromOutput(outputs map[string]script.ScriptOutput) string {
 	msrHex := strings.TrimSpace(outputs[script.PackagePowerLimitName].Stdout)
 	msr, err := strconv.ParseInt(msrHex, 16, 0)
-	if err != nil || msr == 0 {
+	if err != nil {
+		slog.Warn("failed to parse TDP value", slog.String("error", err.Error()), slog.String("msrHex", msrHex))
 		return ""
+	}
+	if msr == 0 {
+		return "Unknown"
 	}
 	return fmt.Sprint(msr/8) + "W"
 }
