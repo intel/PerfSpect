@@ -77,7 +77,7 @@ tools-aarch64: async-profiler-aarch64 dmidecode-aarch64 ethtool-aarch64 fio-aarc
 tools: tools-x86_64 tools-aarch64
 	@echo "Tools built successfully in bin/x86_64 and bin/aarch64 directories."
 
-ASYNC_PROFILER_VERSION := 4.0
+ASYNC_PROFILER_VERSION := 4.3
 async-profiler:
 ifeq ("$(wildcard async-profiler)","")
 ifeq ("$(wildcard async-profiler-$(ASYNC_PROFILER_VERSION)-linux-x64.tar.gz)","")
