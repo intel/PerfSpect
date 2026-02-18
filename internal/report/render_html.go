@@ -10,7 +10,6 @@ import (
 	htmltemplate "html/template"
 	"log/slog"
 	"perfspect/internal/table"
-	"slices"
 	"strings"
 	texttemplate "text/template" // nosemgrep
 )
@@ -272,27 +271,7 @@ func createHtmlReport(allTableValues []table.TableValues, targetName string) (ou
 	<h3>JavaScript is disabled. Functionality is limited.</h3>
 </noscript>
 `)
-	// boolean value chartUsageNoteAdded tracks whether the usage note for interpreting charts has been added, to avoid repeating it for multiple charts
-	chartUsageNoteAdded := false
-
-	// array of strings of table names that have custom renderers that include charts. The array of strings starts with no entries and will be populated as we scan through the tables to check for custom renderers that include charts.
-	chartRendererCheck := []string{}
-
-	// scan through the tables to see if any of them have a custom renderer that includes a chart, so we know whether to include the usage note about interpreting charts
 	for _, tableValues := range allTableValues {
-		renderer := getCustomHTMLRenderer(tableValues.Name)
-
-		// if renderer is not nil and renderer(tableValues, targetName) contains the substring "chart-container", set chartRendererCheck to true.
-		if renderer != nil && strings.Contains(renderer(tableValues, targetName), "chart-container") {
-			chartRendererCheck = append(chartRendererCheck, tableValues.Name)
-		}
-	}
-	for _, tableValues := range allTableValues {
-		// if we haven't already added the usage note about interpreting charts, check if the current tableValues.Name is in chartRendererCheck, and if so, add the usage note and set chartUsageNoteAdded to true
-		if !chartUsageNoteAdded && slices.Contains(chartRendererCheck, tableValues.Name) {
-			sb.WriteString("<h3 id=\"Usage Note\"><mark>NOTE</mark>: Categories in charts below can be shown/hidden by clicking on them. To isolate a specific category, use ctrl+click. To reset the visibility of all categories, ctrl+click on an isolated category.</h3>\n")
-			chartUsageNoteAdded = true
-		}
 		// print the table name
 		fmt.Fprintf(&sb, "<h2 id=\"%[1]s\">%[1]s</h2>\n", html.EscapeString(tableValues.Name))
 		// if there's no data in the table, print a message and continue
