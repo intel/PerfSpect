@@ -1230,6 +1230,8 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 		channelError <- targetError{target: myTarget, err: err}
 		return
 	}
+	// set the collection interval before loading metrics so that metric expressions using duration_time are compiled with the correct value
+	targetContext.metadata.CollectionInterval = time.Duration(flagPerfPrintInterval) * time.Second
 	slog.Debug("metadata: " + targetContext.metadata.String())
 	if !targetContext.metadata.SupportsInstructions {
 		slog.Error("Target does not support instructions event collection", slog.String("target", myTarget.GetName()))

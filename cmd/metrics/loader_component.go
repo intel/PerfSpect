@@ -13,6 +13,7 @@ import (
 	"perfspect/internal/util"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/casbin/govaluate"
@@ -56,6 +57,10 @@ func (cm *ComponentMetric) getLegacyName() string {
 type ComponentEvent struct {
 	ArchStdEvent      string `json:"ArchStdEvent"`
 	PublicDescription string `json:"PublicDescription"`
+	EventCode         string `json:"EventCode"`
+	EventName         string `json:"EventName"`
+	BriefDescription  string `json:"BriefDescription"`
+	Errata            string `json:"Errata"`
 }
 
 func (l *ComponentLoader) loadMetricDefinitions(selectedMetrics []string, metadata Metadata) ([]MetricDefinition, error) {
@@ -196,7 +201,11 @@ func (l *ComponentLoader) formEventGroups(metrics []MetricDefinition, events []C
 	numGPCounters := metadata.NumGeneralPurposeCounters // groups can have at most this many events (plus fixed counters)
 	eventNames := make(map[string]bool)
 	for _, event := range events {
-		eventNames[event.ArchStdEvent] = true
+		if event.EventName != "" {
+			eventNames[event.EventName] = true
+		} else if event.ArchStdEvent != "" {
+			eventNames[event.ArchStdEvent] = true
+		}
 	}
 
 	for _, metric := range metrics {
@@ -226,7 +235,28 @@ func (l *ComponentLoader) formEventGroups(metrics []MetricDefinition, events []C
 				continue
 			}
 			// Add the event to the current group
-			currentGroup = append(currentGroup, EventDefinition{Name: variable, Raw: variable, Device: "cpu"})
+			var perfRaw string
+			event := findEventByName(events, variable)
+			if event == nil {
+				slog.Warn("Could not find event definition for metric variable, skipping variable", slog.String("metric", metric.Name), slog.String("variable", variable))
+				continue
+			}
+			if event.ArchStdEvent != "" {
+				perfRaw = event.ArchStdEvent
+			} else if event.EventName != "" {
+				if strings.Contains(metadata.PerfSupportedEvents, event.EventName) {
+					perfRaw = event.EventName
+				} else if event.EventCode != "" {
+					perfRaw = fmt.Sprintf("armv8_pmuv3_0/config=%s,name=%s/", event.EventCode, variable)
+				} else {
+					slog.Warn("Event definition for metric variable does not have ArchStdEvent, EventName supported by perf, or EventCode, skipping variable", slog.String("metric", metric.Name), slog.String("variable", variable))
+					continue
+				}
+			} else {
+				slog.Warn("Event definition for metric variable does not have EventName or ArchStdEvent, skipping variable", slog.String("metric", metric.Name), slog.String("variable", variable))
+				continue
+			}
+			currentGroup = append(currentGroup, EventDefinition{Name: variable, Raw: perfRaw, Device: "cpu"})
 
 			// Only increment the GP counter count if this isn't a fixed counter
 			if variable != "CPU_CYCLES" {
@@ -254,6 +284,16 @@ func (l *ComponentLoader) formEventGroups(metrics []MetricDefinition, events []C
 	groups = mergeSmallGroups(groups, numGPCounters)
 
 	return groups, nil
+}
+
+// findEventByName searches for an event by name in the list of events
+func findEventByName(events []ComponentEvent, name string) *ComponentEvent {
+	for _, event := range events {
+		if event.EventName == name || event.ArchStdEvent == name {
+			return &event
+		}
+	}
+	return nil
 }
 
 // mergeSmallGroups merges groups that have few events, ensuring that the merged group does not exceed numGPCounters
@@ -385,7 +425,8 @@ func initializeComponentMetricVariables(expression string) map[string]int {
 	}
 
 	constants := map[string]bool{
-		"#slots": true,
+		"#slots":        true,
+		"duration_time": true,
 	}
 
 	functions := map[string]bool{
@@ -406,7 +447,7 @@ func initializeComponentMetricVariables(expression string) map[string]int {
 		}
 
 		// Skip some tokens
-		if isInteger(token) || isHex(token) || operators[token] || constants[token] || functions[token] {
+		if isInteger(token) || isHex(token) || isExp(token) || operators[token] || constants[token] || functions[token] {
 			continue
 		}
 
@@ -415,6 +456,19 @@ func initializeComponentMetricVariables(expression string) map[string]int {
 		}
 	}
 	return variables
+}
+
+func isExp(s string) bool {
+	// Check if the string is in the format 1eN where N is a positive integer
+	if len(s) < 3 || s[0] != '1' || s[1] != 'e' {
+		return false
+	}
+	for _, c := range s[2:] {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func isHex(s string) bool {
@@ -445,6 +499,8 @@ func isInteger(s string) bool {
 func initializeComponentMetricEvaluable(expression string, evaluatorFunctions map[string]govaluate.ExpressionFunction, metadata Metadata) *govaluate.EvaluableExpression {
 	// replace #slots with metadata.ARMSlots
 	transformedExpression := strings.ReplaceAll(expression, "#slots", fmt.Sprintf("%d", metadata.ARMSlots))
+	// replace duration_time with metadata.CollectionInterval.Seconds()
+	transformedExpression = strings.ReplaceAll(transformedExpression, "duration_time", fmt.Sprintf("%f", metadata.CollectionInterval.Seconds()))
 	// replace if else with ?:
 	transformedExpression, err := transformExpression(transformedExpression)
 	if err != nil {
@@ -469,6 +525,18 @@ func initializeComponentMetricEvaluable(expression string, evaluatorFunctions ma
 		}
 		return match // Should not happen, but return the original match if extraction fails
 	})
+	// govaluate doesn't like numeric constances in the format 1eN where N is a positive integer, so we replace them with the equivalent integer value
+	rxScientific := regexp.MustCompile(`1e(\d+)`)
+	if rxScientific.MatchString(transformedExpression) {
+		transformedExpression = rxScientific.ReplaceAllStringFunc(transformedExpression, func(match string) string {
+			exp, _ := strconv.Atoi(match[2:])
+			result := 1
+			for range exp {
+				result *= 10
+			}
+			return fmt.Sprintf("%d", result)
+		})
+	}
 
 	if transformedExpression != expression {
 		slog.Debug("Transformed metric expression", slog.String("original", expression), slog.String("transformed", transformedExpression))

@@ -99,6 +99,7 @@ type Metadata struct {
 	CollectionStartTime time.Time
 	PerfSpectVersion    string
 	WithWorkload        bool // true if metrics were collected with a user-provided workload application
+	CollectionInterval  time.Duration
 }
 
 // MetadataCollector defines the interface for architecture-specific metadata collection.
