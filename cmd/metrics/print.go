@@ -341,6 +341,10 @@ func printMetricsTxt(metricFrames []MetricFrame, metricDefinitions []MetricDefin
 			name := nameFromMetricDefinition(metricDefinitions, metricFrames[0].Metrics[i].Name)
 			line = fmt.Sprintf("%-70s ", name)
 			for _, metricFrame := range metricFrames {
+				if i >= len(metricFrame.Metrics) {
+					slog.Error("metric frame has fewer metrics than expected", slog.Int("index", i), slog.Int("metrics", len(metricFrame.Metrics)))
+					break
+				}
 				line += fmt.Sprintf("%15s", strconv.FormatFloat(metricFrame.Metrics[i].Value, 'g', 4, 64))
 			}
 			outputLines = append(outputLines, line)

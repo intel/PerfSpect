@@ -16,6 +16,10 @@ import (
 )
 
 func telemetryTableHTMLRenderer(tableValues table.TableValues, data [][]float64, datasetNames []string, chartConfig report.ChartTemplateStruct, datasetHiddenFlags []bool) string {
+	if len(tableValues.Fields) == 0 {
+		slog.Error("no fields in table", slog.String("table", tableValues.Name))
+		return ""
+	}
 	tsFieldIdx := 0
 	var timestamps []string
 	for i := range tableValues.Fields[0].Values {
@@ -53,6 +57,10 @@ func renderLineChart(xAxisLabels []string, data [][]float64, datasetNames []stri
 }
 
 func cpuUtilizationTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
+	if len(tableValues.Fields) < 3 {
+		slog.Error("insufficient fields in table, expected at least 3", slog.String("table", tableValues.Name), slog.Int("fields", len(tableValues.Fields)))
+		return ""
+	}
 	data := [][]float64{}
 	datasetNames := []string{}
 	// collect the busy (100 - idle) values for each CPU
@@ -102,6 +110,10 @@ func cpuUtilizationTelemetryTableHTMLRenderer(tableValues table.TableValues, tar
 }
 
 func utilizationCategoriesTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
+	if len(tableValues.Fields) < 2 {
+		slog.Error("insufficient fields in table, expected at least 2", slog.String("table", tableValues.Name), slog.Int("fields", len(tableValues.Fields)))
+		return ""
+	}
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -137,6 +149,10 @@ func utilizationCategoriesTelemetryTableHTMLRenderer(tableValues table.TableValu
 }
 
 func irqRateTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
+	if len(tableValues.Fields) < 3 || len(tableValues.Fields[0].Values) == 0 {
+		slog.Error("insufficient fields or empty values in table, expected at least 3 fields with values", slog.String("table", tableValues.Name), slog.Int("fields", len(tableValues.Fields)))
+		return ""
+	}
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[2:] { // 1 data set per field, e.g., %usr, %nice, etc., skip Time and CPU fields
@@ -146,6 +162,10 @@ func irqRateTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName
 		points := []float64{}
 		total := 0.0
 		for i := range field.Values {
+			if i >= len(tableValues.Fields[0].Values) {
+				slog.Error("field values length mismatch", slog.String("table", tableValues.Name), slog.Int("index", i))
+				break
+			}
 			if tableValues.Fields[0].Values[i] != timeStamp { // new timestamp?
 				points = append(points, total)
 				total = 0.0
@@ -180,14 +200,26 @@ func irqRateTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName
 // - one scatter chart per drive, showing the drive's utilization over time
 // - each drive stat is a separate dataset within the chart
 func driveTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
+	if len(tableValues.Fields) < 3 {
+		slog.Error("insufficient fields in table, expected at least 3", slog.String("table", tableValues.Name), slog.Int("fields", len(tableValues.Fields)))
+		return ""
+	}
 	var out strings.Builder
 	driveStats := make(map[string][][]string)
 	for i := range tableValues.Fields[0].Values {
+		if i >= len(tableValues.Fields[1].Values) {
+			slog.Error("field values length mismatch", slog.String("table", tableValues.Name), slog.Int("index", i))
+			break
+		}
 		drive := tableValues.Fields[1].Values[i]
 		if _, ok := driveStats[drive]; !ok {
 			driveStats[drive] = make([][]string, len(tableValues.Fields)-2)
 		}
 		for j := range len(tableValues.Fields) - 2 {
+			if i >= len(tableValues.Fields[j+2].Values) {
+				slog.Error("field values length mismatch", slog.String("table", tableValues.Name), slog.Int("field", j+2), slog.Int("index", i))
+				continue
+			}
 			driveStats[drive][j] = append(driveStats[drive][j], tableValues.Fields[j+2].Values[i])
 		}
 	}
@@ -238,14 +270,26 @@ func driveTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName s
 // - one scatter chart per network device, showing the device's utilization over time
 // - each network stat is a separate dataset within the chart
 func networkTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
+	if len(tableValues.Fields) < 3 {
+		slog.Error("insufficient fields in table, expected at least 3", slog.String("table", tableValues.Name), slog.Int("fields", len(tableValues.Fields)))
+		return ""
+	}
 	var out strings.Builder
 	nicStats := make(map[string][][]string)
 	for i := range tableValues.Fields[0].Values {
+		if i >= len(tableValues.Fields[1].Values) {
+			slog.Error("field values length mismatch", slog.String("table", tableValues.Name), slog.Int("index", i))
+			break
+		}
 		drive := tableValues.Fields[1].Values[i]
 		if _, ok := nicStats[drive]; !ok {
 			nicStats[drive] = make([][]string, len(tableValues.Fields)-2)
 		}
 		for j := range len(tableValues.Fields) - 2 {
+			if i >= len(tableValues.Fields[j+2].Values) {
+				slog.Error("field values length mismatch", slog.String("table", tableValues.Name), slog.Int("field", j+2), slog.Int("index", i))
+				continue
+			}
 			nicStats[drive][j] = append(nicStats[drive][j], tableValues.Fields[j+2].Values[i])
 		}
 	}
@@ -293,6 +337,10 @@ func networkTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName
 }
 
 func memoryTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
+	if len(tableValues.Fields) < 2 {
+		slog.Error("insufficient fields in table, expected at least 2", slog.String("table", tableValues.Name), slog.Int("fields", len(tableValues.Fields)))
+		return ""
+	}
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -328,6 +376,10 @@ func memoryTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName 
 }
 
 func averageFrequencyTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
+	if len(tableValues.Fields) < 2 {
+		slog.Error("insufficient fields in table, expected at least 2", slog.String("table", tableValues.Name), slog.Int("fields", len(tableValues.Fields)))
+		return ""
+	}
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -363,6 +415,10 @@ func averageFrequencyTelemetryTableHTMLRenderer(tableValues table.TableValues, t
 }
 
 func powerTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
+	if len(tableValues.Fields) < 2 {
+		slog.Error("insufficient fields in table, expected at least 2", slog.String("table", tableValues.Name), slog.Int("fields", len(tableValues.Fields)))
+		return ""
+	}
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -398,6 +454,10 @@ func powerTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName s
 }
 
 func temperatureTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
+	if len(tableValues.Fields) < 2 {
+		slog.Error("insufficient fields in table, expected at least 2", slog.String("table", tableValues.Name), slog.Int("fields", len(tableValues.Fields)))
+		return ""
+	}
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -433,6 +493,10 @@ func temperatureTelemetryTableHTMLRenderer(tableValues table.TableValues, target
 }
 
 func ipcTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
+	if len(tableValues.Fields) < 2 {
+		slog.Error("insufficient fields in table, expected at least 2", slog.String("table", tableValues.Name), slog.Int("fields", len(tableValues.Fields)))
+		return ""
+	}
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -468,6 +532,10 @@ func ipcTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName str
 }
 
 func c6TelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
+	if len(tableValues.Fields) < 2 {
+		slog.Error("insufficient fields in table, expected at least 2", slog.String("table", tableValues.Name), slog.Int("fields", len(tableValues.Fields)))
+		return ""
+	}
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -515,6 +583,10 @@ func instructionTelemetryTableHTMLRenderer(tableValues table.TableValues, target
 		sum    float64
 	}
 	entries := []instrEntry{}
+	if len(tableValues.Fields) < 2 {
+		slog.Error("insufficient fields in table, expected at least 2", slog.String("table", tableValues.Name), slog.Int("fields", len(tableValues.Fields)))
+		return ""
+	}
 	for _, field := range tableValues.Fields[1:] { // skip timestamp field
 		points := []float64{}
 		sum := 0.0
@@ -586,9 +658,17 @@ func renderGaudiStatsChart(tableValues table.TableValues, chartStatFieldName str
 		slog.Error("no gaudi chartStatFieldName field found")
 		return ""
 	}
+	if len(tableValues.Fields) == 0 {
+		slog.Error("no fields in table", slog.String("table", tableValues.Name))
+		return ""
+	}
 	// group the data points by module_id
 	moduleStat := make(map[string][]float64)
 	for i := range tableValues.Fields[0].Values {
+		if i >= len(tableValues.Fields[moduleIdFieldIdx].Values) || i >= len(tableValues.Fields[chartStatFieldIndex].Values) {
+			slog.Error("field values length mismatch", slog.String("table", tableValues.Name), slog.Int("index", i))
+			break
+		}
 		moduleId := tableValues.Fields[moduleIdFieldIdx].Values[i]
 		val, err := strconv.ParseFloat(tableValues.Fields[chartStatFieldIndex].Values[i], 64)
 		if err != nil {
@@ -638,6 +718,10 @@ func gaudiTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName s
 }
 
 func pduTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
+	if len(tableValues.Fields) < 2 {
+		slog.Error("insufficient fields in table, expected at least 2", slog.String("table", tableValues.Name), slog.Int("fields", len(tableValues.Fields)))
+		return ""
+	}
 	data := [][]float64{}
 	for _, field := range tableValues.Fields[1:] {
 		points := []float64{}
@@ -675,6 +759,10 @@ func pduTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName str
 }
 
 func kernelTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
+	if len(tableValues.Fields) < 2 {
+		slog.Error("insufficient fields in table, expected at least 2", slog.String("table", tableValues.Name), slog.Int("fields", len(tableValues.Fields)))
+		return ""
+	}
 	data := [][]float64{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
