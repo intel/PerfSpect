@@ -14,6 +14,10 @@ import (
 )
 
 func renderFrequencyTable(tableValues table.TableValues) (out string) {
+	if len(tableValues.Fields) < 2 {
+		slog.Error("insufficient fields in table, expected at least 2", slog.String("table", tableValues.Name), slog.Int("fields", len(tableValues.Fields)))
+		return
+	}
 	var rows [][]string
 	headers := []string{""}
 	valuesStyles := [][]string{}
@@ -30,6 +34,10 @@ func renderFrequencyTable(tableValues table.TableValues) (out string) {
 }
 
 func coreTurboFrequencyTableHTMLRenderer(tableValues table.TableValues) string {
+	if len(tableValues.Fields) < 2 {
+		slog.Error("insufficient fields in table, expected at least 2", slog.String("table", tableValues.Name), slog.Int("fields", len(tableValues.Fields)))
+		return ""
+	}
 	data := [][]report.ScatterPoint{}
 	datasetNames := []string{}
 	for _, field := range tableValues.Fields[1:] {
@@ -79,8 +87,16 @@ func memoryBenchmarkTableMultiTargetHtmlRenderer(allTableValues []table.TableVal
 	data := [][]report.ScatterPoint{}
 	datasetNames := []string{}
 	for targetIdx, tableValues := range allTableValues {
+		if len(tableValues.Fields) < 2 {
+			slog.Error("insufficient fields in table, expected at least 2", slog.String("table", tableValues.Name), slog.Int("fields", len(tableValues.Fields)))
+			continue
+		}
 		points := []report.ScatterPoint{}
 		for valIdx := range tableValues.Fields[0].Values {
+			if valIdx >= len(tableValues.Fields[1].Values) {
+				slog.Error("field values length mismatch", slog.String("table", tableValues.Name), slog.Int("index", valIdx))
+				break
+			}
 			latency, err := strconv.ParseFloat(tableValues.Fields[0].Values[valIdx], 64)
 			if err != nil {
 				slog.Error("error parsing latency", slog.String("error", err.Error()))
