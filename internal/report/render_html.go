@@ -467,7 +467,33 @@ new Chart(document.getElementById('{{.ID}}'), {
                 }
             },
             legend: {
-                display: {{.DisplayLegend}}
+                display: {{.DisplayLegend}},
+				onClick: function(e, legendItem, legend) {
+					const chart = legend.chart;
+					const datasetIndex = legendItem.datasetIndex;
+					const nativeEvent = e && e.native ? e.native : e;
+					const isCtrl = nativeEvent && (nativeEvent.ctrlKey || nativeEvent.metaKey);
+
+					if (isCtrl) {
+						const onlyThisVisible = chart.data.datasets.every(function(ds, idx) {
+							if (idx === datasetIndex) {
+								return chart.isDatasetVisible(idx);
+							}
+							return !chart.isDatasetVisible(idx);
+						});
+
+						chart.data.datasets.forEach(function(ds, idx) {
+							const visible = onlyThisVisible ? true : idx === datasetIndex;
+							chart.setDatasetVisibility(idx, visible);
+						});
+						chart.update();
+						return;
+					}
+
+					const visible = chart.isDatasetVisible(datasetIndex);
+					chart.setDatasetVisibility(datasetIndex, !visible);
+					chart.update();
+				}
             }
         }
     }
@@ -518,7 +544,33 @@ new Chart(document.getElementById('{{.ID}}'), {
                 }
             },
             legend: {
-                display: {{.DisplayLegend}}
+                display: {{.DisplayLegend}},
+				onClick: function(e, legendItem, legend) {
+					const chart = legend.chart;
+					const datasetIndex = legendItem.datasetIndex;
+					const nativeEvent = e && e.native ? e.native : e;
+					const isCtrl = nativeEvent && (nativeEvent.ctrlKey || nativeEvent.metaKey);
+
+					if (isCtrl) {
+						const onlyThisVisible = chart.data.datasets.every(function(ds, idx) {
+							if (idx === datasetIndex) {
+								return chart.isDatasetVisible(idx);
+							}
+							return !chart.isDatasetVisible(idx);
+						});
+
+						chart.data.datasets.forEach(function(ds, idx) {
+							const visible = onlyThisVisible ? true : idx === datasetIndex;
+							chart.setDatasetVisibility(idx, visible);
+						});
+						chart.update();
+						return;
+					}
+
+					const visible = chart.isDatasetVisible(datasetIndex);
+					chart.setDatasetVisibility(datasetIndex, !visible);
+					chart.update();
+				}
             }
         }
     }
