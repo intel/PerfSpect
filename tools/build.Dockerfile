@@ -15,7 +15,7 @@ ENV http_proxy=${http_proxy}
 ENV https_proxy=${https_proxy}
 ENV LANG=en_US.UTF-8
 ARG DEBIAN_FRONTEND=noninteractive
-ARG GO_VERSION=1.25.7
+ARG GO_VERSION=1.26.0
 
 # install minimum packages to add repositories
 RUN success=false; \
