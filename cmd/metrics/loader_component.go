@@ -199,14 +199,6 @@ func (l *ComponentLoader) loadEventDefinitions(metadata Metadata) (events []Comp
 
 func (l *ComponentLoader) formEventGroups(metrics []MetricDefinition, events []ComponentEvent, metadata Metadata) (groups []GroupDefinition, err error) {
 	numGPCounters := metadata.NumGeneralPurposeCounters // groups can have at most this many events (plus fixed counters)
-	eventNames := make(map[string]bool)
-	for _, event := range events {
-		if event.EventName != "" {
-			eventNames[event.EventName] = true
-		} else if event.ArchStdEvent != "" {
-			eventNames[event.ArchStdEvent] = true
-		}
-	}
 
 	for _, metric := range metrics {
 		var metricGroups []GroupDefinition
@@ -229,11 +221,6 @@ func (l *ComponentLoader) formEventGroups(metrics []MetricDefinition, events []C
 		slices.Sort(variables)
 
 		for _, variable := range variables {
-			// confirm variable is a valid event
-			if _, exists := eventNames[variable]; !exists {
-				slog.Warn("Metric variable does not correspond to a known event, skipping variable", slog.String("metric", metric.Name), slog.String("variable", variable))
-				continue
-			}
 			// Add the event to the current group
 			var perfRaw string
 			event := findEventByName(events, variable)
@@ -244,6 +231,7 @@ func (l *ComponentLoader) formEventGroups(metrics []MetricDefinition, events []C
 			if event.ArchStdEvent != "" {
 				perfRaw = event.ArchStdEvent
 			} else if event.EventName != "" {
+				// if the event name is supported by perf, use that. Otherwise, fall back to using the event code with the armv8_pmuv3_0/config= raw event format
 				if strings.Contains(metadata.PerfSupportedEvents, event.EventName) {
 					perfRaw = event.EventName
 				} else if event.EventCode != "" {
@@ -253,6 +241,7 @@ func (l *ComponentLoader) formEventGroups(metrics []MetricDefinition, events []C
 					continue
 				}
 			} else {
+				// this shouldn't happen since the variable should match either ArchStdEvent or EventName, but log just in case
 				slog.Warn("Event definition for metric variable does not have EventName or ArchStdEvent, skipping variable", slog.String("metric", metric.Name), slog.String("variable", variable))
 				continue
 			}
@@ -287,10 +276,11 @@ func (l *ComponentLoader) formEventGroups(metrics []MetricDefinition, events []C
 }
 
 // findEventByName searches for an event by name in the list of events
+// it checks both EventName and ArchStdEvent fields for a match
 func findEventByName(events []ComponentEvent, name string) *ComponentEvent {
-	for _, event := range events {
-		if event.EventName == name || event.ArchStdEvent == name {
-			return &event
+	for i := range events {
+		if events[i].EventName == name || events[i].ArchStdEvent == name {
+			return &events[i]
 		}
 	}
 	return nil
@@ -525,7 +515,7 @@ func initializeComponentMetricEvaluable(expression string, evaluatorFunctions ma
 		}
 		return match // Should not happen, but return the original match if extraction fails
 	})
-	// govaluate doesn't like numeric constances in the format 1eN where N is a positive integer, so we replace them with the equivalent integer value
+	// govaluate doesn't like numeric constants in the format 1eN where N is a positive integer, so we replace them with the equivalent integer value
 	rxScientific := regexp.MustCompile(`1e(\d+)`)
 	if rxScientific.MatchString(transformedExpression) {
 		transformedExpression = rxScientific.ReplaceAllStringFunc(transformedExpression, func(match string) string {
