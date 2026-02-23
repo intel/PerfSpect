@@ -283,8 +283,18 @@ func mergeSystemFolded(perfFp string, perfDwarf string) (merged string, err erro
 	}
 	fpSampleCount := fpStacks.totalSamples()
 	dwarfSampleCount := dwarfStacks.totalSamples()
-	if fpSampleCount == 0 || dwarfSampleCount == 0 {
-		err = fmt.Errorf("sample counts cannot be zero")
+	if fpSampleCount == 0 && dwarfSampleCount == 0 {
+		err = fmt.Errorf("both fp and dwarf sample counts cannot be zero")
+		return
+	}
+	if fpSampleCount == 0 {
+		slog.Warn("no fp samples; using dwarf stacks")
+		merged = dwarfStacks.dumpFolded()
+		return
+	}
+	if dwarfSampleCount == 0 {
+		slog.Warn("no dwarf samples; using fp stacks")
+		merged = fpStacks.dumpFolded()
 		return
 	}
 	fpToDwarfScalingRatio := float64(fpSampleCount) / float64(dwarfSampleCount)
