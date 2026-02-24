@@ -1797,11 +1797,15 @@ if [ $sample_native -eq 1 ]; then
 fi # if sample_native
 
 if [ $sample_java -eq 1 ]; then
-    # Start profiling Java with async-profiler for each Java PID
-    for pid in "${java_pids[@]}"; do
-        java_cmds+=("$(tr '\000' ' ' < /proc/"$pid"/cmdline)")
-        async-profiler/bin/asprof start "${asprof_arguments[@]}" -i "$ap_interval" "$pid"
-    done
+    if [ ${#java_pids[@]} -eq 0 ]; then
+        echo "Warning: Java sampling was requested, but no Java processes were found; skipping Java profiling." >&2
+    else
+        # Start profiling Java with async-profiler for each Java PID
+        for pid in "${java_pids[@]}"; do
+            java_cmds+=("$(tr '\000' ' ' < /proc/"$pid"/cmdline)")
+            async-profiler/bin/asprof start "${asprof_arguments[@]}" -i "$ap_interval" "$pid"
+        done
+    fi
 fi
 
 # profiling has been started, set up trap to finalize on interrupt
