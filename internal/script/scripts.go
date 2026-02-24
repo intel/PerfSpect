@@ -1804,6 +1804,12 @@ if [ $sample_java -eq 1 ]; then
         for pid in "${java_pids[@]}"; do
             java_cmds+=("$(tr '\000' ' ' < /proc/"$pid"/cmdline)")
             async-profiler/bin/asprof start "${asprof_arguments[@]}" -i "$ap_interval" "$pid"
+            asprof_pid=$!
+            if ! kill -0 $asprof_pid 2>/dev/null; then
+                echo "Failed to start async-profiler for PID $pid" >&2
+                stop_profiling
+                exit 1
+            fi
         done
     fi
 fi

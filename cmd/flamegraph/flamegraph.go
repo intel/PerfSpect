@@ -207,6 +207,9 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 			return workflow.FlagValidationError(cmd, fmt.Sprintf("sample type options are: %s", strings.Join(SampleTypeOptions, ", ")))
 		}
 	}
+	if len(flagSampleTypes) == 0 {
+		return workflow.FlagValidationError(cmd, "at least one sample type must be specified")
+	}
 	// common target flags
 	if err := workflow.ValidateTargetFlags(cmd); err != nil {
 		return workflow.FlagValidationError(cmd, err.Error())
