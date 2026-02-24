@@ -215,6 +215,18 @@
       "Origin": "perfmon"
     },
     {
+      "MetricName": "numa_percent_all_reads_to_local_cluster_memory",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "numa_percent_all_reads_to_remote_cluster_cache",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "numa_percent_all_reads_to_local_cluster_cache",
+      "Origin": "perfmon"
+    },
+    {
       "MetricName": "uncore_frequency",
       "Origin": "perfmon"
     },
