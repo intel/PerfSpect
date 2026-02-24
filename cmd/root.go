@@ -240,7 +240,7 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 		slog.Debug("Checking for perfspect updates")
 		updateAvailable, latestManifest, err := checkForUpdates(gVersion)
 		if err != nil {
-			slog.Error(err.Error())
+			slog.Error(fmt.Sprintf("Error while checking for updates: %v", err))
 		} else if updateAvailable {
 			fmt.Fprintf(os.Stderr, "A new version (%s) of %s is available!\nPlease run '%s update' to update to the latest version.\n\n", latestManifest.Version, app.Name, app.Name)
 		} else {
@@ -471,11 +471,17 @@ type manifest struct {
 func getLatestManifest() (manifest, error) {
 	// download manifest file from server
 	url := artifactoryUrl + "manifest.json"
-	resp, err := http.Get(url)
+	client := &http.Client{
+		Timeout: 2 * time.Second, // want to timeout relatively quickly if we can't reach the server
+	}
+	resp, err := client.Get(url)
 	if err != nil {
 		return manifest{}, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return manifest{}, fmt.Errorf("failed to fetch manifest, status: %s", resp.Status)
+	}
 	buf := new(bytes.Buffer)
 	_, err = io.Copy(buf, resp.Body)
 	if err != nil {
