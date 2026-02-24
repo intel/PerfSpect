@@ -52,6 +52,8 @@ var (
 	flagNoSystemSummary bool
 	flagMaxDepth        int
 	flagPerfEvent       string
+	flagSampleTypes     []string
+	flagAsprofArguments string
 )
 
 const (
@@ -61,7 +63,16 @@ const (
 	flagNoSystemSummaryName = "no-summary"
 	flagMaxDepthName        = "max-depth"
 	flagPerfEventName       = "perf-event"
+	flagSampleTypesName     = "sample"
+	flagAsprofArgumentsName = "asprof-args"
 )
+
+const (
+	SampleTypeNative = "native"
+	SampleTypeJava   = "java"
+)
+
+var SampleTypeOptions = []string{SampleTypeNative, SampleTypeJava}
 
 func init() {
 	Cmd.Flags().StringVar(&flagInput, app.FlagInputName, "", "")
@@ -72,7 +83,8 @@ func init() {
 	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
 	Cmd.Flags().IntVar(&flagMaxDepth, flagMaxDepthName, 0, "")
 	Cmd.Flags().StringVar(&flagPerfEvent, flagPerfEventName, "cycles:P", "")
-
+	Cmd.Flags().StringSliceVar(&flagSampleTypes, flagSampleTypesName, []string{SampleTypeNative, SampleTypeJava}, "")
+	Cmd.Flags().StringVar(&flagAsprofArguments, flagAsprofArgumentsName, "-t -F probesp+vtable", "")
 	workflow.AddTargetFlags(Cmd)
 
 	Cmd.SetUsageFunc(usageFunc)
@@ -107,6 +119,10 @@ func getFlagGroups() []app.FlagGroup {
 	var groups []app.FlagGroup
 	flags := []app.Flag{
 		{
+			Name: flagSampleTypesName,
+			Help: fmt.Sprintf("choose sample type(s) from: %s", strings.Join(SampleTypeOptions, ", ")),
+		},
+		{
 			Name: flagDurationName,
 			Help: "number of seconds to run the collection. If 0, the collection will run indefinitely. Ctrl+c to stop.",
 		},
@@ -121,6 +137,10 @@ func getFlagGroups() []app.FlagGroup {
 		{
 			Name: flagPerfEventName,
 			Help: "perf event to use for native sampling (e.g., cpu-cycles, instructions, cache-misses, branches, context-switches, mem-loads, mem-stores, etc.)",
+		},
+		{
+			Name: flagAsprofArgumentsName,
+			Help: "arguments to pass to async-profiler, e.g., $ asprof start <these arguments> -i <interval> <pid>.",
 		},
 		{
 			Name: flagMaxDepthName,
@@ -181,6 +201,12 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	if flagMaxDepth < 0 {
 		return workflow.FlagValidationError(cmd, "max depth must be 0 or greater")
 	}
+	// validate sample types
+	for _, sampleType := range flagSampleTypes {
+		if !slices.Contains(SampleTypeOptions, sampleType) {
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("sample type options are: %s", strings.Join(SampleTypeOptions, ", ")))
+		}
+	}
 	// common target flags
 	if err := workflow.ValidateTargetFlags(cmd); err != nil {
 		return workflow.FlagValidationError(cmd, err.Error())
@@ -198,11 +224,13 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		Cmd:            cmd,
 		ReportNamePost: "flame",
 		ScriptParams: map[string]string{
-			"Frequency": strconv.Itoa(flagFrequency),
-			"Duration":  strconv.Itoa(flagDuration),
-			"PIDs":      strings.Join(util.IntSliceToStringSlice(flagPids), ","),
-			"MaxDepth":  strconv.Itoa(flagMaxDepth),
-			"PerfEvent": flagPerfEvent,
+			"Frequency":       strconv.Itoa(flagFrequency),
+			"Duration":        strconv.Itoa(flagDuration),
+			"PIDs":            strings.Join(util.IntSliceToStringSlice(flagPids), ","),
+			"MaxDepth":        strconv.Itoa(flagMaxDepth),
+			"PerfEvent":       flagPerfEvent,
+			"SampleTypes":     strings.Join(flagSampleTypes, ","),
+			"AsprofArguments": flagAsprofArguments,
 		},
 		Tables:  tables,
 		Input:   flagInput,

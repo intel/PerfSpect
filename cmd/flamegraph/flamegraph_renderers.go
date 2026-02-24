@@ -229,8 +229,27 @@ func callStackFrequencyTableHTMLRenderer(tableValues table.TableValues, targetNa
 		slog.Error("didn't find expected field (Perf Event) in table", slog.String("error", err.Error()))
 		return out
 	}
+	if len(tableValues.Fields[perfEventFieldIndex].Values) == 0 {
+		slog.Error("no values for perf event field in table")
+		return out
+	}
 	perfEvent := tableValues.Fields[perfEventFieldIndex].Values[0]
-	out += renderFlameGraph(fmt.Sprintf("Native (%s)", perfEvent), tableValues, "Native Stacks")
-	out += renderFlameGraph("Java (async-profiler)", tableValues, "Java Stacks")
+	out += renderFlameGraph(fmt.Sprintf("Native (perf record -e %s)", perfEvent), tableValues, "Native Stacks")
+
+	// get the asprof arguments from the table values
+	asprofArgumentsFieldIndex, err := table.GetFieldIndex("Asprof Arguments", tableValues)
+	if err != nil {
+		slog.Error("didn't find expected field (Asprof Arguments) in table", slog.String("error", err.Error()))
+		return out
+	}
+	if len(tableValues.Fields[asprofArgumentsFieldIndex].Values) == 0 {
+		slog.Error("no values for asprof arguments field in table")
+		return out
+	}
+	asprofArguments := tableValues.Fields[asprofArgumentsFieldIndex].Values[0]
+	if asprofArguments != "" {
+		asprofArguments = " " + asprofArguments
+	}
+	out += renderFlameGraph(fmt.Sprintf("Java (asprof start%s)", asprofArguments), tableValues, "Java Stacks")
 	return out
 }
