@@ -156,6 +156,10 @@ func renderFlameGraph(header string, tableValues table.TableValues, field string
 		return
 	}
 	maxDepth := tableValues.Fields[maxDepthFieldIndex].Values[0]
+	if maxDepth == "" {
+		slog.Error("maximum render depth field is empty")
+		return
+	}
 	maxStackDepth, err := strconv.Atoi(maxDepth)
 	if err != nil {
 		slog.Error("failed to convert maximum stack depth", slog.String("error", err.Error()))
