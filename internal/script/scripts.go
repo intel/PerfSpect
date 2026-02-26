@@ -1633,25 +1633,20 @@ duration={{.Duration}}
 frequency={{.Frequency}}
 maxdepth={{.MaxDepth}}
 perf_event={{.PerfEvent}}
-sample_types={{.SampleTypes}}
 read -r -a asprof_arguments <<< "{{.AsprofArguments}}"
-
-# determine which sample types to collect based on the input parameter
-sample_native=0
-sample_java=0
-IFS=',' read -r -a sample_type_array <<< "$sample_types"
-for st in "${sample_type_array[@]}"; do
-    if [[ "$st" == "native" ]]; then
-        sample_native=1
-    elif [[ "$st" == "java" ]]; then
-        sample_java=1
-    fi
-done
 
 ap_interval=0
 if [ "$frequency" -ne 0 ]; then
     ap_interval=$((1000000000 / frequency))
 fi
+
+# Adjust perf_event_paranoid and kptr_restrict for profiling, saving original values to restore later
+adjust_and_save_settings() {
+    perf_event_paranoid=$(cat /proc/sys/kernel/perf_event_paranoid)
+    echo -1 >/proc/sys/kernel/perf_event_paranoid
+    kptr_restrict=$(cat /proc/sys/kernel/kptr_restrict)
+    echo 0 >/proc/sys/kernel/kptr_restrict
+}
 
 # Restore original settings
 restore_settings() {
@@ -1661,39 +1656,35 @@ restore_settings() {
 
 # Function to stop profiling
 stop_profiling() {
-    if [ $sample_native -eq 1 ]; then
-        if [ -n "$perf_fp_pid" ]; then
-            kill -0 "$perf_fp_pid" 2>/dev/null && kill -INT "$perf_fp_pid"
-            wait "$perf_fp_pid" || true
-        fi
-        if [ -n "$perf_dwarf_pid" ]; then
-            kill -0 "$perf_dwarf_pid" 2>/dev/null && kill -INT "$perf_dwarf_pid"
-            wait "$perf_dwarf_pid" || true
-        fi
-    fi
-    if [ $sample_java -eq 1 ]; then
-        for pid in "${java_pids[@]}"; do
-            async-profiler/bin/asprof stop -o collapsed -f ap_folded_"$pid" "$pid"
-        done
-    fi
+	# stop perf (may already be stopped if stopped by signal)
+	if [ -n "$perf_fp_pid" ]; then
+		kill -0 "$perf_fp_pid" 2>/dev/null && kill -INT "$perf_fp_pid"
+		wait "$perf_fp_pid" || true
+	fi
+	if [ -n "$perf_dwarf_pid" ]; then
+		kill -0 "$perf_dwarf_pid" 2>/dev/null && kill -INT "$perf_dwarf_pid"
+		wait "$perf_dwarf_pid" || true
+	fi
+	# stop async-profiler
+	for pid in "${java_pids[@]}"; do
+		async-profiler/bin/asprof stop -o collapsed -f ap_folded_"$pid" "$pid"
+	done
     restore_settings
 }
 
 # Function to collapse perf data
 collapse_perf_data() {
-    if [ $sample_native -eq 1 ]; then
-        if [ -f perf_dwarf_data ]; then
-            perf script -i perf_dwarf_data > perf_dwarf_stacks
-            stackcollapse-perf perf_dwarf_stacks > perf_dwarf_folded
-        else
-            echo "Error: perf_dwarf_data file not found" >&2
-        fi
-        if [ -f perf_fp_data ]; then
-            perf script -i perf_fp_data > perf_fp_stacks
-            stackcollapse-perf perf_fp_stacks > perf_fp_folded
-        else
-            echo "Error: perf_fp_data file not found" >&2
-        fi
+    if [ -f perf_dwarf_data ]; then
+        perf script -i perf_dwarf_data > perf_dwarf_stacks
+        stackcollapse-perf perf_dwarf_stacks > perf_dwarf_folded
+    else
+        echo "Error: perf_dwarf_data file not found" >&2
+    fi
+    if [ -f perf_fp_data ]; then
+        perf script -i perf_fp_data > perf_fp_stacks
+        stackcollapse-perf perf_fp_stacks > perf_fp_folded
+    else
+        echo "Error: perf_fp_data file not found" >&2
     fi
 }
 
@@ -1706,7 +1697,7 @@ print_results() {
     echo "$perf_event"
 
     echo "########## asprof_arguments ##########"
-    printf '%s\n' "${asprof_arguments[@]}"
+    printf '%s\n' "${asprof_arguments[*]}"
 
     if [ -f perf_dwarf_folded ]; then
         echo "########## perf_dwarf ##########"
@@ -1734,21 +1725,28 @@ _finalize=0 # flag to indicate if finalize has been called
 # Function to finalize profiling and output
 finalize() {
     if [ $_finalize -eq 1 ]; then
+        echo "Finalize has already been called, skipping..." >&2
         return
     fi
     _finalize=1
+    echo "Finalizing profiling and outputting results..." >&2
     stop_profiling
     collapse_perf_data
     print_results
     rm -f controller.pid
-    exit 0
+    #exit 0
 }
 
+on_signal() {
+    echo "Received signal to stop profiling..." >&2
+    finalize
+}
+
+# trap signals - set flag instead of calling finalize directly to avoid bash exit race
+trap on_signal INT TERM EXIT
+
 # Adjust perf_event_paranoid and kptr_restrict
-perf_event_paranoid=$(cat /proc/sys/kernel/perf_event_paranoid)
-echo -1 >/proc/sys/kernel/perf_event_paranoid
-kptr_restrict=$(cat /proc/sys/kernel/kptr_restrict)
-echo 0 >/proc/sys/kernel/kptr_restrict
+adjust_and_save_settings
 
 # If pids specified, check if at least one of them is running
 if [ -n "$pids" ]; then
@@ -1768,65 +1766,60 @@ else
     mapfile -t java_pids < <(pgrep java)
 fi
 
-if [ $sample_native -eq 1 ]; then
 # Start profiling with perf in frame pointer mode
-    if [ -n "$pids" ]; then
-        perf record -e "$perf_event" -F "$frequency" -p "$pids" -g -o perf_fp_data -m 129 &
-    else
-        perf record -e "$perf_event" -F "$frequency" -a -g -o perf_fp_data -m 129 &
-    fi
-    perf_fp_pid=$!
-    if ! kill -0 $perf_fp_pid 2>/dev/null; then
-        echo "Failed to start perf record in frame pointer mode" >&2
-        stop_profiling
-        exit 1
-    fi
-
-    # Start profiling with perf in dwarf mode
-    if [ -n "$pids" ]; then
-        perf record -e "$perf_event" -F "$frequency" -p "$pids" -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
-    else
-        perf record -e "$perf_event" -F "$frequency" -a -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
-    fi
-    perf_dwarf_pid=$!
-    if ! kill -0 $perf_dwarf_pid 2>/dev/null; then
-        echo "Failed to start perf record in dwarf mode" >&2
-        stop_profiling
-        exit 1
-    fi
-fi # if sample_native
-
-if [ $sample_java -eq 1 ]; then
-    if [ ${#java_pids[@]} -eq 0 ]; then
-        echo "Warning: Java sampling was requested, but no Java processes were found; skipping Java profiling." >&2
-    else
-        # Start profiling Java with async-profiler for each Java PID
-        for pid in "${java_pids[@]}"; do
-            java_cmds+=("$(tr '\000' ' ' < /proc/"$pid"/cmdline)")
-            async-profiler/bin/asprof start "${asprof_arguments[@]}" -i "$ap_interval" "$pid"
-            asprof_pid=$!
-            if ! kill -0 $asprof_pid 2>/dev/null; then
-                echo "Failed to start async-profiler for PID $pid" >&2
-                stop_profiling
-                exit 1
-            fi
-        done
-    fi
+if [ -n "$pids" ]; then
+	perf record -e "$perf_event" -F "$frequency" -p "$pids" -g -o perf_fp_data -m 129 &
+else
+	perf record -e "$perf_event" -F "$frequency" -a -g -o perf_fp_data -m 129 &
+fi
+perf_fp_pid=$!
+if ! kill -0 $perf_fp_pid 2>/dev/null; then
+	echo "Failed to start perf record in frame pointer mode" >&2
+	stop_profiling
+	exit 1
 fi
 
-# profiling has been started, set up trap to finalize on interrupt
-trap finalize INT TERM EXIT
+# Start profiling with perf in dwarf mode
+if [ -n "$pids" ]; then
+	perf record -e "$perf_event" -F "$frequency" -p "$pids" -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
+else
+	perf record -e "$perf_event" -F "$frequency" -a -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
+fi
+perf_dwarf_pid=$!
+if ! kill -0 $perf_dwarf_pid 2>/dev/null; then
+	echo "Failed to start perf record in dwarf mode" >&2
+	stop_profiling
+	exit 1
+fi
+
+if [ ${#java_pids[@]} -eq 0 ]; then
+	echo "Warning: Java sampling was requested, but no Java processes were found; skipping Java profiling." >&2
+else
+	# Start profiling Java with async-profiler for each Java PID
+	for pid in "${java_pids[@]}"; do
+		java_cmds+=("$(tr '\000' ' ' < /proc/"$pid"/cmdline)")
+		# asprof start will return immediately after starting the profiler
+		if ! async-profiler/bin/asprof start "${asprof_arguments[@]}" -i "$ap_interval" "$pid"; then
+			echo "Failed to start async-profiler for PID $pid" >&2
+			stop_profiling
+			exit 1
+		fi
+	done
+fi
 
 # wait
 if [ "$duration" -gt 0 ]; then
-    # wait for the specified duration (seconds), then wrap it up by calling finalize
+    # sleep for the specified duration (seconds)
+    echo "Profiling for specified duration of $duration seconds..." >&2
     sleep "$duration"
 else
-    # wait indefinitely until child processes are killed or interrupted
+    # wait indefinitely until child processes are killed or interrupted]
+    echo "Profiling indefinitely until interrupted..." >&2
     wait
 fi
 
 finalize
+exit 0
 `,
 		Superuser:  true,
 		Sequential: true,
