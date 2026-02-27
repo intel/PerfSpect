@@ -1659,32 +1659,44 @@ stop_profiling() {
 	# stop perf (may already be stopped if stopped by signal)
 	if [ -n "$perf_fp_pid" ]; then
 		kill -0 "$perf_fp_pid" 2>/dev/null && kill -INT "$perf_fp_pid"
-		wait "$perf_fp_pid" || true
 	fi
 	if [ -n "$perf_dwarf_pid" ]; then
 		kill -0 "$perf_dwarf_pid" 2>/dev/null && kill -INT "$perf_dwarf_pid"
-		wait "$perf_dwarf_pid" || true
 	fi
 	# stop async-profiler
 	for pid in "${java_pids[@]}"; do
+		# this call is synchronous and will wait until the profile is written to file before returning
 		async-profiler/bin/asprof stop -o collapsed -f ap_folded_"$pid" "$pid"
 	done
+	# wait for perf processes to finish and exit
+	if [ -n "$perf_fp_pid" ]; then
+		wait "$perf_fp_pid" || true
+	fi
+	if [ -n "$perf_dwarf_pid" ]; then
+		wait "$perf_dwarf_pid" || true
+	fi
     restore_settings
 }
 
 # Function to collapse perf data
 collapse_perf_data() {
     if [ -f perf_dwarf_data ]; then
-        perf script -i perf_dwarf_data > perf_dwarf_stacks
-        stackcollapse-perf perf_dwarf_stacks > perf_dwarf_folded
+        (perf script -i perf_dwarf_data > perf_dwarf_stacks && stackcollapse-perf perf_dwarf_stacks > perf_dwarf_folded) &
+        local dwarf_pid=$!
     else
         echo "Error: perf_dwarf_data file not found" >&2
     fi
     if [ -f perf_fp_data ]; then
-        perf script -i perf_fp_data > perf_fp_stacks
-        stackcollapse-perf perf_fp_stacks > perf_fp_folded
+        (perf script -i perf_fp_data > perf_fp_stacks && stackcollapse-perf perf_fp_stacks > perf_fp_folded) &
+        local fp_pid=$!
     else
         echo "Error: perf_fp_data file not found" >&2
+    fi
+    if [ -n "$dwarf_pid" ]; then
+        wait "$dwarf_pid" || echo "Error: failed to process perf_dwarf_data (perf script or stackcollapse-perf failed)" >&2
+    fi
+    if [ -n "$fp_pid" ]; then
+        wait "$fp_pid" || echo "Error: failed to process perf_fp_data (perf script or stackcollapse-perf failed)" >&2
     fi
 }
 
