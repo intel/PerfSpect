@@ -322,14 +322,15 @@ kill_script() {
   # Send signal to the process group (negative PID)
   kill -SIGINT -"$pid" 2>/dev/null || true
   # Give it time to clean up so child script can finalize
-  # Wait up to 5 seconds in 0.5s intervals
+  # Wait up to 1 minute in 1s intervals
   local waited=0
-  while ps -p "$pid" > /dev/null 2>&1 && [ "$waited" -lt 10 ]; do
-    sleep 0.5
+  while ps -p "$pid" > /dev/null 2>&1 && [ "$waited" -lt 60 ]; do
+    sleep 1
     waited=$((waited + 1))
   done
   # Force kill the process group if still alive
   if ps -p "$pid" > /dev/null 2>&1; then
+    echo "Force killing script '${orig_names[$s]}' with PID $pid after waiting for it to exit gracefully" >&2
     kill -SIGKILL -"$pid" 2>/dev/null || true
   fi
   wait "$pid" 2>/dev/null || true
