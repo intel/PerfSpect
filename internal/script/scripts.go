@@ -1557,8 +1557,12 @@ done
 duration={{.Duration}}
 
 INTERVAL_MS=$((interval * 1000))
+PERF_PID=""
 
 cleanup() {
+  if [[ -n "$PERF_PID" ]]; then
+    kill -0 "$PERF_PID" 2>/dev/null && kill -INT "$PERF_PID" 2>/dev/null || true
+  fi
   exit 0
 }
 trap cleanup INT TERM
@@ -1619,7 +1623,9 @@ stdbuf -oL awk -v interval="$interval" -v num_events="$NUM_EVENTS" -v duration="
       }
     }
   }
-'
+' &
+PERF_PID=$!
+wait $PERF_PID
 `,
 		Superuser: true,
 		Depends:   []string{"perf"},
