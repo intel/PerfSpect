@@ -319,21 +319,29 @@ kill_script() {
   local pid="${pids[$s]:-}"
   [[ -z "$pid" ]] && return 0
   if ! ps -p "$pid" > /dev/null 2>&1; then return 0; fi
-  # Send signal to the process group (negative PID)
+  # Signal the process group (negative PID)
+  echo "Sending SIGINT to script '${orig_names[$s]}' with PID $pid" >&2
   kill -SIGINT -"$pid" 2>/dev/null || true
-  # Give it time to clean up so child script can finalize
-  # Wait up to 5 seconds in 0.5s intervals
+  # Wait up to 1 minute in 1s intervals
   local waited=0
-  while ps -p "$pid" > /dev/null 2>&1 && [ "$waited" -lt 10 ]; do
-    sleep 0.5
+  echo "Waiting for script '${orig_names[$s]}' with PID $pid to exit gracefully" >&2
+  while ps -p "$pid" > /dev/null 2>&1 && [ "$waited" -lt 60 ]; do
+    echo -n "." >&2
+    sleep 1
     waited=$((waited + 1))
   done
+  echo "Done waiting for script '${orig_names[$s]}' with PID $pid to exit gracefully" >&2
   # Force kill the process group if still alive
   if ps -p "$pid" > /dev/null 2>&1; then
+    echo "Force killing script '${orig_names[$s]}' with PID $pid" >&2
     kill -SIGKILL -"$pid" 2>/dev/null || true
   fi
   wait "$pid" 2>/dev/null || true
-  if [[ -z "${exitcodes[$s]:-}" ]]; then exitcodes[$s]=130; fi
+  echo "Script '${orig_names[$s]}' with PID $pid has been killed" >&2
+  if [[ -z "${exitcodes[$s]:-}" ]]; then
+    echo "Setting exit code for script '${orig_names[$s]}' to 130 (terminated by SIGINT)" >&2
+    exitcodes[$s]=130
+  fi
 }
 
 wait_for_concurrent_scripts() {

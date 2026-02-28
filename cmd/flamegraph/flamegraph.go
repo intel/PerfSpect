@@ -52,6 +52,7 @@ var (
 	flagNoSystemSummary bool
 	flagMaxDepth        int
 	flagPerfEvent       string
+	flagAsprofArguments string
 )
 
 const (
@@ -61,6 +62,7 @@ const (
 	flagNoSystemSummaryName = "no-summary"
 	flagMaxDepthName        = "max-depth"
 	flagPerfEventName       = "perf-event"
+	flagAsprofArgumentsName = "asprof-args"
 )
 
 func init() {
@@ -72,7 +74,7 @@ func init() {
 	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
 	Cmd.Flags().IntVar(&flagMaxDepth, flagMaxDepthName, 0, "")
 	Cmd.Flags().StringVar(&flagPerfEvent, flagPerfEventName, "cycles:P", "")
-
+	Cmd.Flags().StringVar(&flagAsprofArguments, flagAsprofArgumentsName, "-t -F probesp+vtable", "")
 	workflow.AddTargetFlags(Cmd)
 
 	Cmd.SetUsageFunc(usageFunc)
@@ -121,6 +123,10 @@ func getFlagGroups() []app.FlagGroup {
 		{
 			Name: flagPerfEventName,
 			Help: "perf event to use for native sampling (e.g., cpu-cycles, instructions, cache-misses, branches, context-switches, mem-loads, mem-stores, etc.)",
+		},
+		{
+			Name: flagAsprofArgumentsName,
+			Help: "arguments to pass to async-profiler, e.g., $ asprof start <these arguments> -i <interval> <pid>.",
 		},
 		{
 			Name: flagMaxDepthName,
@@ -198,11 +204,12 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		Cmd:            cmd,
 		ReportNamePost: "flame",
 		ScriptParams: map[string]string{
-			"Frequency": strconv.Itoa(flagFrequency),
-			"Duration":  strconv.Itoa(flagDuration),
-			"PIDs":      strings.Join(util.IntSliceToStringSlice(flagPids), ","),
-			"MaxDepth":  strconv.Itoa(flagMaxDepth),
-			"PerfEvent": flagPerfEvent,
+			"Frequency":       strconv.Itoa(flagFrequency),
+			"Duration":        strconv.Itoa(flagDuration),
+			"PIDs":            strings.Join(util.IntSliceToStringSlice(flagPids), ","),
+			"MaxDepth":        strconv.Itoa(flagMaxDepth),
+			"PerfEvent":       flagPerfEvent,
+			"AsprofArguments": flagAsprofArguments,
 		},
 		Tables:  tables,
 		Input:   flagInput,
