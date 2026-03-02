@@ -1381,13 +1381,13 @@ finalize() {
     # Explicitly write to fd 2 to ensure it reaches stderr
     echo "Finalizing instruction mix telemetry (pw_pid=$pw_pid)..." 1>&2
     
-    # kill the processwatch pipeline process group if it is still running
+    # kill the processwatch pipeline if it is still running
     if [ -n "${pw_pid:-}" ] && [ "$pw_pid" -gt 0 ]; then
         # Try SIGTERM first
-        kill -TERM -"$pw_pid" 2>/dev/null || true
+        kill -TERM "$pw_pid" 2>/dev/null || true
         sleep 0.1
         # Then SIGKILL if needed
-        kill -KILL -"$pw_pid" 2>/dev/null || true
+        kill -KILL "$pw_pid" 2>/dev/null || true
     fi
 }
 trap finalize INT TERM EXIT
