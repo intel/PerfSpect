@@ -320,8 +320,9 @@ kill_script() {
   [[ -z "$pid" ]] && return 0
   if ! ps -p "$pid" > /dev/null 2>&1; then return 0; fi
   # Signal the process group (negative PID)
-  echo "Sending SIGINT to script '${orig_names[$s]}' with PID $pid" >&2
-  kill -SIGINT -"$pid" 2>/dev/null || true
+  # Bash background jobs ignore SIGINT by default, but they do not ignore SIGTERM.
+  echo "Sending SIGTERM to script '${orig_names[$s]}' with PID $pid" >&2
+  kill -SIGTERM -"$pid" 2>/dev/null || true
   # Wait up to 1 minute in 1s intervals
   local waited=0
   echo "Waiting for script '${orig_names[$s]}' with PID $pid to exit gracefully" >&2
@@ -339,8 +340,8 @@ kill_script() {
   wait "$pid" 2>/dev/null || true
   echo "Script '${orig_names[$s]}' with PID $pid has been killed" >&2
   if [[ -z "${exitcodes[$s]:-}" ]]; then
-    echo "Setting exit code for script '${orig_names[$s]}' to 130 (terminated by SIGINT)" >&2
-    exitcodes[$s]=130
+    echo "Setting exit code for script '${orig_names[$s]}' to 143 (terminated by SIGTERM)" >&2
+    exitcodes[$s]=143
   fi
 }
 
