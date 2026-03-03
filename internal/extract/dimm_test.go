@@ -526,12 +526,12 @@ func TestDeriveDIMMInfoOther(t *testing.T) {
 	}
 
 	tests := []struct {
-		name               string
-		dimms              [][]string
-		channelsPerSocket  int
-		expectedDerived    []DerivedDIMMFields
-		expectErr          bool
-		expectNil          bool // nil result, no error (parse failure logged)
+		name              string
+		dimms             [][]string
+		channelsPerSocket int
+		expectedDerived   []DerivedDIMMFields
+		expectErr         bool
+		expectNil         bool // nil result, no error (parse failure logged)
 	}{
 		{
 			name: "type1 - two sockets, two channels each, one slot",

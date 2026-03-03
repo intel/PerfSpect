@@ -352,8 +352,8 @@ type dimmFormat struct {
 var dimmFormats = []dimmFormat{
 	{
 		// Inspur ICX 2s system — must be before GenericCPULetterDigit to differentiate
-		name:  "Inspur ICX",
-		dType: dimmTypeInspurICX,
+		name:   "Inspur ICX",
+		dType:  dimmTypeInspurICX,
 		locPat: regexp.MustCompile(`CPU([0-9])_C([0-9])D([0-9])`),
 		extractFunc: func(_, locMatch []string) (socket, slot int, err error) {
 			socket, _ = strconv.Atoi(locMatch[1])
@@ -377,8 +377,8 @@ var dimmFormats = []dimmFormat{
 		},
 	},
 	{
-		name:  "Generic CPU_Letter_Digit",
-		dType: dimmTypeGenericCPULetterDigit,
+		name:   "Generic CPU_Letter_Digit",
+		dType:  dimmTypeGenericCPULetterDigit,
 		locPat: regexp.MustCompile(`CPU([0-9])_([A-Z])([0-9])`),
 		extractFunc: func(_, locMatch []string) (socket, slot int, err error) {
 			socket, _ = strconv.Atoi(locMatch[1])
@@ -387,8 +387,8 @@ var dimmFormats = []dimmFormat{
 		},
 	},
 	{
-		name:  "MC Format",
-		dType: dimmTypeMCFormat,
+		name:   "MC Format",
+		dType:  dimmTypeMCFormat,
 		locPat: regexp.MustCompile(`CPU([0-9])_MC._DIMM_([A-Z])([0-9])`),
 		extractFunc: func(_, locMatch []string) (socket, slot int, err error) {
 			socket, _ = strconv.Atoi(locMatch[1])
@@ -409,8 +409,8 @@ var dimmFormats = []dimmFormat{
 	{
 		// SuperMicro X13DET-B (SPR) / X11DPT-B (CLX).
 		// Must be before PNodeChannelDimm because that pattern also matches, but bank loc data is invalid.
-		name:  "SuperMicro SPR",
-		dType: dimmTypeSuperMicroSPR,
+		name:   "SuperMicro SPR",
+		dType:  dimmTypeSuperMicroSPR,
 		locPat: regexp.MustCompile(`P([1,2])-DIMM([A-L])([1,2])`),
 		extractFunc: func(_, locMatch []string) (socket, slot int, err error) {
 			socket, _ = strconv.Atoi(locMatch[1])
@@ -486,8 +486,8 @@ var dimmFormats = []dimmFormat{
 	},
 	{
 		// Gigabyte Milan: DIMM_P[0-1]_[A-Z][0-1]
-		name:  "Gigabyte Milan",
-		dType: dimmTypeGigabyteMilan,
+		name:   "Gigabyte Milan",
+		dType:  dimmTypeGigabyteMilan,
 		locPat: regexp.MustCompile(`DIMM_P([0-1])_[A-Z]([0-1])`),
 		extractFunc: func(_, locMatch []string) (socket, slot int, err error) {
 			socket, _ = strconv.Atoi(locMatch[1])
@@ -508,8 +508,8 @@ var dimmFormats = []dimmFormat{
 	},
 	{
 		// Alder Lake Client Desktop: Controller[0-1]-Channel*-DIMM[0-1]
-		name:  "Alder Lake",
-		dType: dimmTypeAlderLake,
+		name:   "Alder Lake",
+		dType:  dimmTypeAlderLake,
 		locPat: regexp.MustCompile(`Controller([0-1]).*DIMM([0-1])`),
 		extractFunc: func(_, locMatch []string) (socket, slot int, err error) {
 			socket = 0
@@ -519,8 +519,8 @@ var dimmFormats = []dimmFormat{
 	},
 	{
 		// Birchstream: CPU[0-9]_DIMM_[A-H][1-2]
-		name:  "Birchstream",
-		dType: dimmTypeBirchstream,
+		name:   "Birchstream",
+		dType:  dimmTypeBirchstream,
 		locPat: regexp.MustCompile(`CPU(\d)_DIMM_([A-H])([1-2])`),
 		extractFunc: func(_, locMatch []string) (socket, slot int, err error) {
 			socket, _ = strconv.Atoi(locMatch[1])
@@ -531,8 +531,8 @@ var dimmFormats = []dimmFormat{
 	},
 	{
 		// Birchstream Granite Rapids AP/X3: CPU[0-9]_DIMM_[A-L] (no slot digit)
-		name:  "Birchstream GNR AP/X3",
-		dType: dimmTypeBirchstreamGNRAP,
+		name:   "Birchstream GNR AP/X3",
+		dType:  dimmTypeBirchstreamGNRAP,
 		locPat: regexp.MustCompile(`CPU(\d)_DIMM_([A-L])`),
 		extractFunc: func(_, locMatch []string) (socket, slot int, err error) {
 			socket, _ = strconv.Atoi(locMatch[1])
@@ -542,8 +542,8 @@ var dimmFormats = []dimmFormat{
 	},
 	{
 		// Forest City platform for SRF and GNR: CPU[0-9] CH[0-7]/D[0-1]
-		name:  "Forest City SRF/GNR",
-		dType: dimmTypeForestCity,
+		name:   "Forest City SRF/GNR",
+		dType:  dimmTypeForestCity,
 		locPat: regexp.MustCompile(`CPU(\d) CH([0-7])/D([0-1])`),
 		extractFunc: func(_, locMatch []string) (socket, slot int, err error) {
 			socket, _ = strconv.Atoi(locMatch[1])
