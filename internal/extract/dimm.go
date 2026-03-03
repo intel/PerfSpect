@@ -471,8 +471,8 @@ func getDIMMParseInfo(bankLocator string, locator string) (dt dimmType, reBankLo
 	// explicitly exclude Dimm0 as the pattern we're looking for is Dimm1 or Dimm2
 	// must match both Bank Locator and Locator to be considered dimmType16
 	// seen on Quanta GNR
-	reBankLoc = regexp.MustCompile(`_Node([0-9])_Channel([0-9])_Dimm([1-2])`)
-	reLoc = regexp.MustCompile(`CPU([0-9])_([A-Z])([1-2])`)
+	reBankLoc = regexp.MustCompile(`_Node([\d+])_Channel([\d+])_Dimm([1-2])\b`)
+	reLoc = regexp.MustCompile(`CPU([\d+])_([A-Z])([1-2])\b`)
 	if reBankLoc.FindStringSubmatch(bankLocator) != nil && reLoc.FindStringSubmatch(locator) != nil {
 		dt = dimmType16
 		return
