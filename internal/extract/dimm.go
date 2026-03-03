@@ -291,336 +291,306 @@ func deriveDIMMInfoHPE(dimms [][]string, numSockets int, channelsPerSocket int) 
 	return derivedFields, nil
 }
 
-/*
-Get DIMM socket and slot from Bank Locator or Locator field from dmidecode.
-This method is inherently unreliable/incomplete as each OEM can set
-these fields as they see fit.
-Returns None when there's no match.
-*/
-func getDIMMSocketSlot(dimmType dimmType, reBankLoc *regexp.Regexp, reLoc *regexp.Regexp, bankLocator string, locator string) (socket int, slot int, err error) {
-	switch dimmType {
-	case dimmType0:
-		match := reLoc.FindStringSubmatch(locator)
-		if match != nil {
-			socket, _ = strconv.Atoi(match[1])
-			slot, _ = strconv.Atoi(match[3])
-		}
-		return
-	case dimmType1:
-		match := reLoc.FindStringSubmatch(locator)
-		if match != nil {
-			socket, _ = strconv.Atoi(match[1])
-			slot, _ = strconv.Atoi(match[3])
-			return
-		}
-	case dimmType2:
-		match := reLoc.FindStringSubmatch(locator)
-		if match != nil {
-			socket, _ = strconv.Atoi(match[1])
-			slot, _ = strconv.Atoi(match[3])
-			return
-		}
-	case dimmType3:
-		match := reBankLoc.FindStringSubmatch(bankLocator)
-		if match != nil {
-			socket, _ = strconv.Atoi(match[1])
-			slot, _ = strconv.Atoi(match[3])
-			return
-		}
-	case dimmType4:
-		match := reBankLoc.FindStringSubmatch(bankLocator)
-		if match != nil {
-			socket, _ = strconv.Atoi(match[1])
-			slot, _ = strconv.Atoi(match[4])
-			return
-		}
-	case dimmType5:
-		match := reBankLoc.FindStringSubmatch(bankLocator)
-		if match != nil {
-			socket, _ = strconv.Atoi(match[1])
-			slot, _ = strconv.Atoi(match[3])
-			return
-		}
-	case dimmType6:
-		match := reLoc.FindStringSubmatch(locator)
-		if match != nil {
-			socket, _ = strconv.Atoi(match[1])
-			socket -= 1
-			slot, _ = strconv.Atoi(match[3])
-			slot -= 1
-			return
-		}
-	case dimmType7:
-		match := reLoc.FindStringSubmatch(locator)
-		if match != nil {
-			socket, _ = strconv.Atoi(match[1])
-			slot, _ = strconv.Atoi(match[3])
-			slot -= 1
-			return
-		}
-	case dimmType8:
-		match := reBankLoc.FindStringSubmatch(bankLocator)
-		if match != nil {
-			match2 := reLoc.FindStringSubmatch(locator)
-			if match2 != nil {
-				socket, _ = strconv.Atoi(match[1])
-				socket -= 1
-				slot, _ = strconv.Atoi(match2[2])
-				slot -= 1
-				return
-			}
-		}
-	case dimmType9:
-		match := reLoc.FindStringSubmatch(locator)
-		if match != nil {
-			socket, _ = strconv.Atoi(match[1])
-			slot, _ = strconv.Atoi(match[2])
-			return
-		}
-	case dimmType10:
-		match := reBankLoc.FindStringSubmatch(bankLocator)
-		if match != nil {
-			socket = 0
-			slot, _ = strconv.Atoi(match[2])
-			return
-		}
-	case dimmType11:
-		match := reLoc.FindStringSubmatch(locator)
-		if match != nil {
-			socket = 0
-			slot, _ = strconv.Atoi(match[2])
-			return
-		}
-	case dimmType12:
-		match := reLoc.FindStringSubmatch(locator)
-		if match != nil {
-			socket, _ = strconv.Atoi(match[1])
-			socket = socket - 1
-			slot, _ = strconv.Atoi(match[3])
-			slot = slot - 1
-			return
-		}
-	case dimmType13:
-		match := reLoc.FindStringSubmatch(locator)
-		if match != nil {
-			socket, _ = strconv.Atoi(match[1])
-			slot, _ = strconv.Atoi(match[3])
-			slot = slot - 1
-			return
-		}
-	case dimmType14:
-		match := reLoc.FindStringSubmatch(locator)
-		if match != nil {
-			socket, _ = strconv.Atoi(match[1])
-			slot = 0
-			return
-		}
-	case dimmType15:
-		match := reLoc.FindStringSubmatch(locator)
-		if match != nil {
-			socket, _ = strconv.Atoi(match[1])
-			slot, _ = strconv.Atoi(match[3])
-			return
-		}
-	case dimmType16:
-		match := reBankLoc.FindStringSubmatch(bankLocator)
-		if match != nil {
-			socket, _ = strconv.Atoi(match[1])
-			slot, _ = strconv.Atoi(match[3])
-			slot -= 1
-			return
-		}
-	}
-	err = fmt.Errorf("unrecognized bank locator and/or locator in dimm info: %s %s", bankLocator, locator)
-	return
-}
-
 type dimmType int
 
 const (
-	dimmTypeUNKNOWN          = -1
-	dimmType0       dimmType = iota
-	dimmType1
-	dimmType2
-	dimmType3
-	dimmType4
-	dimmType5
-	dimmType6
-	dimmType7
-	dimmType8
-	dimmType9
-	dimmType10
-	dimmType11
-	dimmType12
-	dimmType13
-	dimmType14
-	dimmType15
-	dimmType16
+	dimmTypeUNKNOWN dimmType = iota
+	dimmTypeInspurICX
+	dimmTypeQuantaGNR
+	dimmTypeGenericCPULetterDigit
+	dimmTypeMCFormat
+	dimmTypeNodeChannelDimm
+	dimmTypeSuperMicroSPR
+	dimmTypePNodeChannelDimm
+	dimmTypeNodeChannelDimmAlt
+	dimmTypeSKXSDP
+	dimmTypeICXSDP
+	dimmTypeNodeDIMM
+	dimmTypeGigabyteMilan
+	dimmTypeNUC
+	dimmTypeAlderLake
+	dimmTypeBirchstream
+	dimmTypeBirchstreamGNRAP
+	dimmTypeForestCity
 )
 
+// Keep old names as aliases so tests written against the original constants still compile.
+const (
+	dimmType0  = dimmTypeInspurICX
+	dimmType1  = dimmTypeGenericCPULetterDigit
+	dimmType2  = dimmTypeMCFormat
+	dimmType3  = dimmTypeNodeChannelDimm
+	dimmType4  = dimmTypePNodeChannelDimm
+	dimmType5  = dimmTypeNodeChannelDimmAlt
+	dimmType6  = dimmTypeSKXSDP
+	dimmType7  = dimmTypeICXSDP
+	dimmType8  = dimmTypeNodeDIMM
+	dimmType9  = dimmTypeGigabyteMilan
+	dimmType10 = dimmTypeNUC
+	dimmType11 = dimmTypeAlderLake
+	dimmType12 = dimmTypeSuperMicroSPR
+	dimmType13 = dimmTypeBirchstream
+	dimmType14 = dimmTypeBirchstreamGNRAP
+	dimmType15 = dimmTypeForestCity
+	dimmType16 = dimmTypeQuantaGNR
+)
+
+// dimmFormat defines how to identify and extract socket/slot for a DIMM format.
+type dimmFormat struct {
+	name       string
+	dType      dimmType
+	bankLocPat *regexp.Regexp // nil if bank locator not used for matching
+	locPat     *regexp.Regexp // nil if locator not used for matching
+	matchBoth  bool           // true = both patterns must match
+	// extractFunc extracts socket and slot from regex matches.
+	// bankLocMatch/locMatch are nil when the corresponding pattern is nil or didn't match.
+	extractFunc func(bankLocMatch, locMatch []string) (socket, slot int, err error)
+}
+
+// dimmFormats is the ordered list of DIMM format definitions. Order matters:
+// more specific patterns must appear before more general ones.
+var dimmFormats = []dimmFormat{
+	{
+		// Inspur ICX 2s system — must be before GenericCPULetterDigit to differentiate
+		name:  "Inspur ICX",
+		dType: dimmTypeInspurICX,
+		locPat: regexp.MustCompile(`CPU([0-9])_C([0-9])D([0-9])`),
+		extractFunc: func(_, locMatch []string) (socket, slot int, err error) {
+			socket, _ = strconv.Atoi(locMatch[1])
+			slot, _ = strconv.Atoi(locMatch[3])
+			return
+		},
+	},
+	{
+		// Quanta GNR — must match BOTH bank locator and locator.
+		// Explicitly excludes Dimm0; must be before NodeChannelDimmAlt (type5).
+		name:       "Quanta GNR",
+		dType:      dimmTypeQuantaGNR,
+		bankLocPat: regexp.MustCompile(`_Node(\d+)_Channel(\d+)_Dimm([1-2])\b`),
+		locPat:     regexp.MustCompile(`CPU(\d+)_([A-Z])([1-2])\b`),
+		matchBoth:  true,
+		extractFunc: func(bankLocMatch, _ []string) (socket, slot int, err error) {
+			socket, _ = strconv.Atoi(bankLocMatch[1])
+			slot, _ = strconv.Atoi(bankLocMatch[3])
+			slot -= 1
+			return
+		},
+	},
+	{
+		name:  "Generic CPU_Letter_Digit",
+		dType: dimmTypeGenericCPULetterDigit,
+		locPat: regexp.MustCompile(`CPU([0-9])_([A-Z])([0-9])`),
+		extractFunc: func(_, locMatch []string) (socket, slot int, err error) {
+			socket, _ = strconv.Atoi(locMatch[1])
+			slot, _ = strconv.Atoi(locMatch[3])
+			return
+		},
+	},
+	{
+		name:  "MC Format",
+		dType: dimmTypeMCFormat,
+		locPat: regexp.MustCompile(`CPU([0-9])_MC._DIMM_([A-Z])([0-9])`),
+		extractFunc: func(_, locMatch []string) (socket, slot int, err error) {
+			socket, _ = strconv.Atoi(locMatch[1])
+			slot, _ = strconv.Atoi(locMatch[3])
+			return
+		},
+	},
+	{
+		name:       "NODE CHANNEL DIMM",
+		dType:      dimmTypeNodeChannelDimm,
+		bankLocPat: regexp.MustCompile(`NODE ([0-9]) CHANNEL ([0-9]) DIMM ([0-9])`),
+		extractFunc: func(bankLocMatch, _ []string) (socket, slot int, err error) {
+			socket, _ = strconv.Atoi(bankLocMatch[1])
+			slot, _ = strconv.Atoi(bankLocMatch[3])
+			return
+		},
+	},
+	{
+		// SuperMicro X13DET-B (SPR) / X11DPT-B (CLX).
+		// Must be before PNodeChannelDimm because that pattern also matches, but bank loc data is invalid.
+		name:  "SuperMicro SPR",
+		dType: dimmTypeSuperMicroSPR,
+		locPat: regexp.MustCompile(`P([1,2])-DIMM([A-L])([1,2])`),
+		extractFunc: func(_, locMatch []string) (socket, slot int, err error) {
+			socket, _ = strconv.Atoi(locMatch[1])
+			socket -= 1
+			slot, _ = strconv.Atoi(locMatch[3])
+			slot -= 1
+			return
+		},
+	},
+	{
+		name:       "P_Node_Channel_Dimm",
+		dType:      dimmTypePNodeChannelDimm,
+		bankLocPat: regexp.MustCompile(`P([0-9])_Node([0-9])_Channel([0-9])_Dimm([0-9])`),
+		extractFunc: func(bankLocMatch, _ []string) (socket, slot int, err error) {
+			socket, _ = strconv.Atoi(bankLocMatch[1])
+			slot, _ = strconv.Atoi(bankLocMatch[4])
+			return
+		},
+	},
+	{
+		name:       "_Node_Channel_Dimm",
+		dType:      dimmTypeNodeChannelDimmAlt,
+		bankLocPat: regexp.MustCompile(`_Node([0-9])_Channel([0-9])_Dimm([0-9])`),
+		extractFunc: func(bankLocMatch, _ []string) (socket, slot int, err error) {
+			socket, _ = strconv.Atoi(bankLocMatch[1])
+			slot, _ = strconv.Atoi(bankLocMatch[3])
+			return
+		},
+	},
+	{
+		// SKX SDP: CPU[1-4]_DIMM_[A-Z][1-2] with NODE [1-8]
+		name:       "SKX SDP",
+		dType:      dimmTypeSKXSDP,
+		locPat:     regexp.MustCompile(`CPU([1-4])_DIMM_([A-Z])([1-2])`),
+		bankLocPat: regexp.MustCompile(`NODE ([1-8])`),
+		matchBoth:  true,
+		extractFunc: func(_, locMatch []string) (socket, slot int, err error) {
+			socket, _ = strconv.Atoi(locMatch[1])
+			socket -= 1
+			slot, _ = strconv.Atoi(locMatch[3])
+			slot -= 1
+			return
+		},
+	},
+	{
+		// ICX SDP: CPU[0-7]_DIMM_[A-Z][1-2] with NODE [0-9]+
+		name:       "ICX SDP",
+		dType:      dimmTypeICXSDP,
+		locPat:     regexp.MustCompile(`CPU([0-7])_DIMM_([A-Z])([1-2])`),
+		bankLocPat: regexp.MustCompile(`NODE ([0-9]+)`),
+		matchBoth:  true,
+		extractFunc: func(_, locMatch []string) (socket, slot int, err error) {
+			socket, _ = strconv.Atoi(locMatch[1])
+			slot, _ = strconv.Atoi(locMatch[3])
+			slot -= 1
+			return
+		},
+	},
+	{
+		// NODE n + DIMM_Xn (both must match)
+		name:       "NODE DIMM",
+		dType:      dimmTypeNodeDIMM,
+		bankLocPat: regexp.MustCompile(`NODE ([1-9]\d*)`),
+		locPat:     regexp.MustCompile(`DIMM_([A-Z])([1-9]\d*)`),
+		matchBoth:  true,
+		extractFunc: func(bankLocMatch, locMatch []string) (socket, slot int, err error) {
+			socket, _ = strconv.Atoi(bankLocMatch[1])
+			socket -= 1
+			slot, _ = strconv.Atoi(locMatch[2])
+			slot -= 1
+			return
+		},
+	},
+	{
+		// Gigabyte Milan: DIMM_P[0-1]_[A-Z][0-1]
+		name:  "Gigabyte Milan",
+		dType: dimmTypeGigabyteMilan,
+		locPat: regexp.MustCompile(`DIMM_P([0-1])_[A-Z]([0-1])`),
+		extractFunc: func(_, locMatch []string) (socket, slot int, err error) {
+			socket, _ = strconv.Atoi(locMatch[1])
+			slot, _ = strconv.Atoi(locMatch[2])
+			return
+		},
+	},
+	{
+		// NUC: CHANNEL [A-D] DIMM[0-9]
+		name:       "NUC SODIMM",
+		dType:      dimmTypeNUC,
+		bankLocPat: regexp.MustCompile(`CHANNEL ([A-D]) DIMM([0-9])`),
+		extractFunc: func(bankLocMatch, _ []string) (socket, slot int, err error) {
+			socket = 0
+			slot, _ = strconv.Atoi(bankLocMatch[2])
+			return
+		},
+	},
+	{
+		// Alder Lake Client Desktop: Controller[0-1]-Channel*-DIMM[0-1]
+		name:  "Alder Lake",
+		dType: dimmTypeAlderLake,
+		locPat: regexp.MustCompile(`Controller([0-1]).*DIMM([0-1])`),
+		extractFunc: func(_, locMatch []string) (socket, slot int, err error) {
+			socket = 0
+			slot, _ = strconv.Atoi(locMatch[2])
+			return
+		},
+	},
+	{
+		// Birchstream: CPU[0-9]_DIMM_[A-H][1-2]
+		name:  "Birchstream",
+		dType: dimmTypeBirchstream,
+		locPat: regexp.MustCompile(`CPU(\d)_DIMM_([A-H])([1-2])`),
+		extractFunc: func(_, locMatch []string) (socket, slot int, err error) {
+			socket, _ = strconv.Atoi(locMatch[1])
+			slot, _ = strconv.Atoi(locMatch[3])
+			slot -= 1
+			return
+		},
+	},
+	{
+		// Birchstream Granite Rapids AP/X3: CPU[0-9]_DIMM_[A-L] (no slot digit)
+		name:  "Birchstream GNR AP/X3",
+		dType: dimmTypeBirchstreamGNRAP,
+		locPat: regexp.MustCompile(`CPU(\d)_DIMM_([A-L])`),
+		extractFunc: func(_, locMatch []string) (socket, slot int, err error) {
+			socket, _ = strconv.Atoi(locMatch[1])
+			slot = 0
+			return
+		},
+	},
+	{
+		// Forest City platform for SRF and GNR: CPU[0-9] CH[0-7]/D[0-1]
+		name:  "Forest City SRF/GNR",
+		dType: dimmTypeForestCity,
+		locPat: regexp.MustCompile(`CPU(\d) CH([0-7])/D([0-1])`),
+		extractFunc: func(_, locMatch []string) (socket, slot int, err error) {
+			socket, _ = strconv.Atoi(locMatch[1])
+			slot, _ = strconv.Atoi(locMatch[3])
+			return
+		},
+	},
+}
+
+// getDIMMParseInfo identifies the DIMM format from a representative bank locator and locator string.
 func getDIMMParseInfo(bankLocator string, locator string) (dt dimmType, reBankLoc *regexp.Regexp, reLoc *regexp.Regexp) {
-	dt = dimmTypeUNKNOWN
-	// Inspur ICX 2s system
-	// Needs to be before next regex pattern to differentiate
-	reLoc = regexp.MustCompile(`CPU([0-9])_C([0-9])D([0-9])`)
-	if reLoc.FindStringSubmatch(locator) != nil {
-		dt = dimmType0
-		return
+	for _, f := range dimmFormats {
+		bankLocOK := f.bankLocPat == nil || f.bankLocPat.FindStringSubmatch(bankLocator) != nil
+		locOK := f.locPat == nil || f.locPat.FindStringSubmatch(locator) != nil
+		if f.matchBoth {
+			if bankLocOK && locOK {
+				return f.dType, f.bankLocPat, f.locPat
+			}
+		} else if f.bankLocPat != nil && bankLocOK {
+			return f.dType, f.bankLocPat, f.locPat
+		} else if f.locPat != nil && locOK {
+			return f.dType, f.bankLocPat, f.locPat
+		}
 	}
+	return dimmTypeUNKNOWN, nil, nil
+}
 
-	// explicitly exclude Dimm0 as the pattern we're looking for is Dimm1 or Dimm2
-	// must match both Bank Locator and Locator to be considered dimmType16
-	// seen on Quanta GNR
-	reBankLoc = regexp.MustCompile(`_Node([\d+])_Channel([\d+])_Dimm([1-2])\b`)
-	reLoc = regexp.MustCompile(`CPU([\d+])_([A-Z])([1-2])\b`)
-	if reBankLoc.FindStringSubmatch(bankLocator) != nil && reLoc.FindStringSubmatch(locator) != nil {
-		dt = dimmType16
-		return
-	}
-
-	reLoc = regexp.MustCompile(`CPU([0-9])_([A-Z])([0-9])`)
-	if reLoc.FindStringSubmatch(locator) != nil {
-		dt = dimmType1
-		return
-	}
-	reLoc = regexp.MustCompile(`CPU([0-9])_MC._DIMM_([A-Z])([0-9])`)
-	if reLoc.FindStringSubmatch(locator) != nil {
-		dt = dimmType2
-		return
-	}
-	reBankLoc = regexp.MustCompile(`NODE ([0-9]) CHANNEL ([0-9]) DIMM ([0-9])`)
-	if reBankLoc.FindStringSubmatch(bankLocator) != nil {
-		dt = dimmType3
-		return
-	}
-	/* Added for SuperMicro X13DET-B (SPR). Must be before Type4 because Type4 matches, but data in BankLoc is invalid.
-	 * Locator: P1-DIMMA1
-	 * Locator: P1-DIMMB1
-	 * Locator: P1-DIMMC1
-	 * ...
-	 * Locator: P2-DIMMA1
-	 * ...
-	 * Note: also matches SuperMicro X11DPT-B (CLX)
-	 */
-	reLoc = regexp.MustCompile(`P([1,2])-DIMM([A-L])([1,2])`)
-	if reLoc.FindStringSubmatch(locator) != nil {
-		dt = dimmType12
-		return
-	}
-	reBankLoc = regexp.MustCompile(`P([0-9])_Node([0-9])_Channel([0-9])_Dimm([0-9])`)
-	if reBankLoc.FindStringSubmatch(bankLocator) != nil {
-		dt = dimmType4
-		return
-	}
-	reBankLoc = regexp.MustCompile(`_Node([0-9])_Channel([0-9])_Dimm([0-9])`)
-	if reBankLoc.FindStringSubmatch(bankLocator) != nil {
-		dt = dimmType5
-		return
-	}
-	/* SKX SDP
-	 * Locator: CPU1_DIMM_A1, Bank Locator: NODE 1
-	 * Locator: CPU1_DIMM_A2, Bank Locator: NODE 1
-	 */
-	reLoc = regexp.MustCompile(`CPU([1-4])_DIMM_([A-Z])([1-2])`)
-	if reLoc.FindStringSubmatch(locator) != nil {
-		reBankLoc = regexp.MustCompile(`NODE ([1-8])`)
-		if reBankLoc.FindStringSubmatch(bankLocator) != nil {
-			dt = dimmType6
-			return
+// getDIMMSocketSlot extracts socket and slot from bank locator and locator strings
+// using the format identified by getDIMMParseInfo.
+func getDIMMSocketSlot(dt dimmType, reBankLoc *regexp.Regexp, reLoc *regexp.Regexp, bankLocator string, locator string) (socket int, slot int, err error) {
+	for _, f := range dimmFormats {
+		if f.dType != dt {
+			continue
 		}
-	}
-	/* ICX SDP
-	 * Locator: CPU0_DIMM_A1, Bank Locator: NODE 0
-	 * Locator: CPU0_DIMM_A2, Bank Locator: NODE 0
-	 */
-	reLoc = regexp.MustCompile(`CPU([0-7])_DIMM_([A-Z])([1-2])`)
-	if reLoc.FindStringSubmatch(locator) != nil {
-		reBankLoc = regexp.MustCompile(`NODE ([0-9]+)`)
-		if reBankLoc.FindStringSubmatch(bankLocator) != nil {
-			dt = dimmType7
-			return
+		var bankLocMatch, locMatch []string
+		if f.bankLocPat != nil {
+			bankLocMatch = reBankLoc.FindStringSubmatch(bankLocator)
 		}
-	}
-	reBankLoc = regexp.MustCompile(`NODE ([1-9]\d*)`)
-	if reBankLoc.FindStringSubmatch(bankLocator) != nil {
-		reLoc = regexp.MustCompile(`DIMM_([A-Z])([1-9]\d*)`)
-		if reLoc.FindStringSubmatch(locator) != nil {
-			dt = dimmType8
-			return
+		if f.locPat != nil {
+			locMatch = reLoc.FindStringSubmatch(locator)
 		}
+		if bankLocMatch != nil || locMatch != nil {
+			return f.extractFunc(bankLocMatch, locMatch)
+		}
+		break
 	}
-	/* GIGABYTE MILAN
-	 * Locator: DIMM_P0_A0, Bank Locator: BANK 0
-	 * Locator: DIMM_P0_A1, Bank Locator: BANK 1
-	 * Locator: DIMM_P0_B0, Bank Locator: BANK 0
-	 * ...
-	 * Locator: DIMM_P1_I0, Bank Locator: BANK 0
-	 */
-	reLoc = regexp.MustCompile(`DIMM_P([0-1])_[A-Z]([0-1])`)
-	if reLoc.FindStringSubmatch(locator) != nil {
-		dt = dimmType9
-		return
-	}
-	/* my NUC
-	 * Locator: SODIMM0, Bank Locator: CHANNEL A DIMM0
-	 * Locator: SODIMM1, Bank Locator: CHANNEL B DIMM0
-	 */
-	reBankLoc = regexp.MustCompile(`CHANNEL ([A-D]) DIMM([0-9])`)
-	if reBankLoc.FindStringSubmatch(bankLocator) != nil {
-		dt = dimmType10
-		return
-	}
-	/* Alder Lake Client Desktop
-	 * Locator: Controller0-ChannelA-DIMM0, Bank Locator: BANK 0
-	 * Locator: Controller1-ChannelA-DIMM0, Bank Locator: BANK 0
-	 */
-	reLoc = regexp.MustCompile(`Controller([0-1]).*DIMM([0-1])`)
-	if reLoc.FindStringSubmatch(locator) != nil {
-		dt = dimmType11
-		return
-	}
-	/* BIRCHSTREAM
-	 * LOCATOR      BANK LOCATOR
-	 * CPU0_DIMM_A1 BANK 0
-	 * CPU0_DIMM_A2 BANK 0
-	 * CPU0_DIMM_B1 BANK 1
-	 * CPU0_DIMM_B2 BANK 1
-	 * ...
-	 * CPU0_DIMM_H2 BANK 7
-	 */
-	reLoc = regexp.MustCompile(`CPU([\d])_DIMM_([A-H])([1-2])`)
-	if reLoc.FindStringSubmatch(locator) != nil {
-		dt = dimmType13
-		return
-	}
-	/* BIRCHSTREAM GRANITE RAPIDS AP/X3
-	 * LOCATOR      BANK LOCATOR
-	 * CPU0_DIMM_A  BANK 0
-	 * CPU0_DIMM_B  BANK 1
-	 * CPU0_DIMM_C  BANK 2
-	 * CPU0_DIMM_D  BANK 3
-	 * ...
-	 * CPU0_DIMM_L  BANK 11
-	 */
-	reLoc = regexp.MustCompile(`CPU([\d])_DIMM_([A-L])`)
-	if reLoc.FindStringSubmatch(locator) != nil {
-		dt = dimmType14
-		return
-	}
-	/* FOREST CITY PLATFORM FOR SRF AND GNR
-	 * LOCATOR      BANK LOCATOR
-	 * CPU0 CH0/D0  BANK 0
-	 * CPU0 CH0/D1  BANK 0
-	 * CPU0 CH1/D0  BANK 1
-	 * CPU0 CH1/D1  BANK 1
-	 * ...
-	 * CPU0 CH7/D1  BANK 7
-	 */
-	reLoc = regexp.MustCompile(`CPU([\d]) CH([0-7])/D([0-1])`)
-	if reLoc.FindStringSubmatch(locator) != nil {
-		dt = dimmType15
-		return
-	}
+	err = fmt.Errorf("unrecognized bank locator and/or locator in dimm info: %s %s", bankLocator, locator)
 	return
 }
 
