@@ -38,6 +38,7 @@ func flameGraphTableValues(outputs map[string]script.ScriptOutput) []table.Field
 		{Name: "Java Stacks", Values: []string{javaFoldedFromOutput(outputs)}},
 		{Name: "Maximum Render Depth", Values: []string{maxRenderDepthFromOutput(outputs)}},
 		{Name: "Perf Event", Values: []string{perfEventFromOutput(outputs)}},
+		{Name: "Asprof Arguments", Values: []string{asprofArgumentsFromOutput(outputs)}},
 	}
 	return fields
 }
@@ -104,7 +105,6 @@ func nativeFoldedFromOutput(outputs map[string]script.ScriptOutput) string {
 		}
 	}
 	if dwarfFolded == "" && fpFolded == "" {
-		slog.Warn("no native folded stacks found")
 		// "event syntax error: 'foo'" indicates that the perf event specified is invalid/unsupported
 		if strings.Contains(outputs[script.FlameGraphScriptName].Stderr, "event syntax error") {
 			slog.Error("unsupported perf event specified", slog.String("error", outputs[script.FlameGraphScriptName].Stderr))
@@ -148,6 +148,24 @@ func perfEventFromOutput(outputs map[string]script.ScriptOutput) string {
 	}
 	for header, content := range sections {
 		if header == "perf_event" {
+			return strings.TrimSpace(content)
+		}
+	}
+	return ""
+}
+
+func asprofArgumentsFromOutput(outputs map[string]script.ScriptOutput) string {
+	if outputs[script.FlameGraphScriptName].Stdout == "" {
+		slog.Warn("collapsed call stack output is empty")
+		return ""
+	}
+	sections := extract.GetSectionsFromOutput(outputs[script.FlameGraphScriptName].Stdout)
+	if len(sections) == 0 {
+		slog.Warn("no sections in collapsed call stack output")
+		return ""
+	}
+	for header, content := range sections {
+		if header == "asprof_arguments" {
 			return strings.TrimSpace(content)
 		}
 	}
