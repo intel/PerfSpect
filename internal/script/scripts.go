@@ -1646,6 +1646,30 @@ if [ "$frequency" -ne 0 ]; then
     ap_interval=$((1000000000 / frequency))
 fi
 
+# Prefer system installed perf over bundled perf to avoid kernel incompatibilities as we're
+# occasionally seeing crashes from perf script with the bundled perf that don't occur with 
+# the system perf. This is likely due to the bundled perf being built on a different kernel
+# version than the one it's running on.
+PERF_CMD="perf"
+# Search for all occurrences of perf in PATH
+if type -P -a perf >/dev/null 2>&1; then
+    for p in $(type -P -a perf); do
+        # Exclude the bundled perf in the current working directory
+        if [[ "$p" != "$PWD/"* ]] && [[ "$p" != "./"* ]] && [[ "$p" != "perf" ]]; then
+            # Verify the found perf actually works. On some distros (e.g., Ubuntu),
+            # /usr/bin/perf is a wrapper script that delegates to a kernel-version-specific
+            # binary. If the matching linux-tools package isn't installed, the wrapper fails.
+            if "$p" --version >/dev/null 2>&1; then
+                PERF_CMD="$p"
+                break
+            else
+                echo "Skipping $p (not functional, may be missing linux-tools for current kernel)" >&2
+            fi
+        fi
+    done
+fi
+echo "Using perf at $PERF_CMD" >&2
+
 # Adjust perf_event_paranoid and kptr_restrict for profiling, saving original values to restore later
 adjust_and_save_settings() {
     perf_event_paranoid=$(cat /proc/sys/kernel/perf_event_paranoid)
@@ -1687,13 +1711,13 @@ stop_profiling() {
 # Function to collapse perf data
 collapse_perf_data() {
     if [ -f perf_dwarf_data ]; then
-        (perf script -i perf_dwarf_data > perf_dwarf_stacks && stackcollapse-perf perf_dwarf_stacks > perf_dwarf_folded) &
+        ("${PERF_CMD}" script -i perf_dwarf_data > perf_dwarf_stacks && stackcollapse-perf perf_dwarf_stacks > perf_dwarf_folded) &
         local dwarf_pid=$!
     else
         echo "Error: perf_dwarf_data file not found" >&2
     fi
     if [ -f perf_fp_data ]; then
-        (perf script -i perf_fp_data > perf_fp_stacks && stackcollapse-perf perf_fp_stacks > perf_fp_folded) &
+        ("${PERF_CMD}" script -i perf_fp_data > perf_fp_stacks && stackcollapse-perf perf_fp_stacks > perf_fp_folded) &
         local fp_pid=$!
     else
         echo "Error: perf_fp_data file not found" >&2
@@ -1786,9 +1810,9 @@ fi
 
 # Start profiling with perf in frame pointer mode
 if [ -n "$pids" ]; then
-	perf record -e "$perf_event" -F "$frequency" -p "$pids" -g -o perf_fp_data -m 129 &
+	"${PERF_CMD}" record -e "$perf_event" -F "$frequency" -p "$pids" -g -o perf_fp_data -m 129 &
 else
-	perf record -e "$perf_event" -F "$frequency" -a -g -o perf_fp_data -m 129 &
+	"${PERF_CMD}" record -e "$perf_event" -F "$frequency" -a -g -o perf_fp_data -m 129 &
 fi
 perf_fp_pid=$!
 if ! kill -0 $perf_fp_pid 2>/dev/null; then
@@ -1799,9 +1823,9 @@ fi
 
 # Start profiling with perf in dwarf mode
 if [ -n "$pids" ]; then
-	perf record -e "$perf_event" -F "$frequency" -p "$pids" -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
+	"${PERF_CMD}" record -e "$perf_event" -F "$frequency" -p "$pids" -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
 else
-	perf record -e "$perf_event" -F "$frequency" -a -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
+	"${PERF_CMD}" record -e "$perf_event" -F "$frequency" -a -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
 fi
 perf_dwarf_pid=$!
 if ! kill -0 $perf_dwarf_pid 2>/dev/null; then
