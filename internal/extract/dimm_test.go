@@ -621,3 +621,26 @@ func TestDeriveDIMMInfoOther(t *testing.T) {
 		})
 	}
 }
+
+func TestGetDIMMSocketSlotMatchBothPartialMatch(t *testing.T) {
+	// For matchBoth formats (e.g., QuantaGNR), if only one of the two patterns
+	// matches a subsequent DIMM row, getDIMMSocketSlot must return an error
+	// rather than passing a nil match slice to extractFunc (which would panic).
+	//
+	// This simulates deriveDIMMInfoOther identifying the format from dimms[0],
+	// then encountering a later DIMM where only one pattern matches.
+	bankLocPat := dimmFormats[1].bankLocPat // QuantaGNR
+	locPat := dimmFormats[1].locPat
+
+	// locator matches but bankLocator does not
+	_, _, err := getDIMMSocketSlot(dimmTypeQuantaGNR, bankLocPat, locPat, "NOT_A_NODE", "CPU0_A1")
+	if err == nil {
+		t.Error("expected error when bankLocator doesn't match for matchBoth format, got nil")
+	}
+
+	// bankLocator matches but locator does not
+	_, _, err = getDIMMSocketSlot(dimmTypeQuantaGNR, bankLocPat, locPat, "_Node0_Channel0_Dimm1", "UNKNOWN")
+	if err == nil {
+		t.Error("expected error when locator doesn't match for matchBoth format, got nil")
+	}
+}

@@ -564,7 +564,11 @@ func getDIMMSocketSlot(dt dimmType, reBankLoc *regexp.Regexp, reLoc *regexp.Rege
 		if f.locPat != nil {
 			locMatch = reLoc.FindStringSubmatch(locator)
 		}
-		if bankLocMatch != nil || locMatch != nil {
+		if f.matchBoth {
+			if bankLocMatch != nil && locMatch != nil {
+				return f.extractFunc(bankLocMatch, locMatch)
+			}
+		} else if bankLocMatch != nil || locMatch != nil {
 			return f.extractFunc(bankLocMatch, locMatch)
 		}
 		break
