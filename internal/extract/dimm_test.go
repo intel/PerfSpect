@@ -578,6 +578,17 @@ func TestDeriveDIMMInfoOther(t *testing.T) {
 			channelsPerSocket: 2,
 			expectErr:         true,
 		},
+		{
+			// First DIMM identifies as GenericCPULetterDigit, but second DIMM
+			// doesn't match that format, triggering the return nil, nil path.
+			name: "mismatched format in subsequent DIMM returns nil",
+			dimms: [][]string{
+				makeDIMMRow("Not Specified", "CPU0_A0"),
+				makeDIMMRow("Not Specified", "UNKNOWN_FORMAT"),
+			},
+			channelsPerSocket: 2,
+			expectNil:         true,
+		},
 	}
 
 	for _, tt := range tests {
