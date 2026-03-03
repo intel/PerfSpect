@@ -422,6 +422,14 @@ func getDIMMSocketSlot(dimmType dimmType, reBankLoc *regexp.Regexp, reLoc *regex
 			slot, _ = strconv.Atoi(match[3])
 			return
 		}
+	case dimmType16:
+		match := reBankLoc.FindStringSubmatch(bankLocator)
+		if match != nil {
+			socket, _ = strconv.Atoi(match[1])
+			slot, _ = strconv.Atoi(match[3])
+			slot -= 1
+			return
+		}
 	}
 	err = fmt.Errorf("unrecognized bank locator and/or locator in dimm info: %s %s", bankLocator, locator)
 	return
@@ -447,6 +455,7 @@ const (
 	dimmType13
 	dimmType14
 	dimmType15
+	dimmType16
 )
 
 func getDIMMParseInfo(bankLocator string, locator string) (dt dimmType, reBankLoc *regexp.Regexp, reLoc *regexp.Regexp) {
@@ -458,6 +467,17 @@ func getDIMMParseInfo(bankLocator string, locator string) (dt dimmType, reBankLo
 		dt = dimmType0
 		return
 	}
+
+	// explicitly exclude Dimm0 as the pattern we're looking for is Dimm1 or Dimm2
+	// must match both Bank Locator and Locator to be considered dimmType16
+	// seen on Quanta GNR
+	reBankLoc = regexp.MustCompile(`_Node([\d+])_Channel([\d+])_Dimm([1-2])\b`)
+	reLoc = regexp.MustCompile(`CPU([\d+])_([A-Z])([1-2])\b`)
+	if reBankLoc.FindStringSubmatch(bankLocator) != nil && reLoc.FindStringSubmatch(locator) != nil {
+		dt = dimmType16
+		return
+	}
+
 	reLoc = regexp.MustCompile(`CPU([0-9])_([A-Z])([0-9])`)
 	if reLoc.FindStringSubmatch(locator) != nil {
 		dt = dimmType1
