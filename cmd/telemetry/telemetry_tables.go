@@ -22,7 +22,7 @@ const (
 	CPUUtilizationTelemetryTableName        = "CPU Utilization Telemetry"
 	UtilizationCategoriesTelemetryTableName = "Utilization Categories Telemetry"
 	IPCTelemetryTableName                   = "IPC Telemetry"
-	C6TelemetryTableName                    = "C6 Telemetry"
+	CstatesTelemetryTableName               = "C-States Telemetry"
 	FrequencyTelemetryTableName             = "Frequency Telemetry"
 	IRQRateTelemetryTableName               = "IRQ Rate Telemetry"
 	InstructionTelemetryTableName           = "Instruction Telemetry"
@@ -41,7 +41,7 @@ const (
 	CPUUtilizationTelemetryMenuLabel        = "CPU Utilization"
 	UtilizationCategoriesTelemetryMenuLabel = "Utilization Categories"
 	IPCTelemetryMenuLabel                   = "IPC"
-	C6TelemetryMenuLabel                    = "C6"
+	CstatesTelemetryMenuLabel               = "C-States"
 	FrequencyTelemetryMenuLabel             = "Frequency"
 	IRQRateTelemetryMenuLabel               = "IRQ Rate"
 	InstructionTelemetryMenuLabel           = "Instruction"
@@ -84,15 +84,15 @@ var tableDefinitions = map[string]table.TableDefinition{
 			script.TurbostatTelemetryScriptName,
 		},
 		FieldsFunc: ipcTelemetryTableValues},
-	C6TelemetryTableName: {
-		Name:          C6TelemetryTableName,
-		MenuLabel:     C6TelemetryMenuLabel,
+	CstatesTelemetryTableName: {
+		Name:          CstatesTelemetryTableName,
+		MenuLabel:     CstatesTelemetryMenuLabel,
 		Architectures: []string{cpus.X86Architecture},
 		HasRows:       true,
 		ScriptNames: []string{
 			script.TurbostatTelemetryScriptName,
 		},
-		FieldsFunc: c6TelemetryTableValues},
+		FieldsFunc: cstatesTelemetryTableValues},
 	FrequencyTelemetryTableName: {
 		Name:          FrequencyTelemetryTableName,
 		MenuLabel:     FrequencyTelemetryMenuLabel,
@@ -510,13 +510,12 @@ func ipcTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.Fie
 	return fields
 }
 
-func c6TelemetryTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	fields := []table.Field{
-		{Name: "Time"},
-		{Name: "Package (Avg.)"},
-		{Name: "Core (Avg.)"},
-	}
-	platformRows, err := extract.TurbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"C6%", "CPU%c6"})
+func cstatesTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.Field {
+	fields := []table.Field{}
+	// e.g., SRF - C1% C1E% C6S% C6SP% CPU%c1 CPU%c6 Mod%c6
+	// e.g., GNR - POLL% C1% C1E% C6% C6P% CPU%c1 CPU%c6
+	reCstate := regexp.MustCompile(`^(C\d+\w%|CPU%c\d+|POLL%|Mod%c\d+)$`) // matches C1%, C1E%, C6%, C6S%, C6P%, CPU%c1, CPU%c6, C1E%, C6P%, POLL%, Mod%c6
+	platformRows, err := extract.TurbostatPlatformRowsByRegexMatch(outputs[script.TurbostatTelemetryScriptName].Stdout, []*regexp.Regexp{reCstate})
 	if err != nil {
 		slog.Warn(err.Error())
 		return []table.Field{}
@@ -525,14 +524,21 @@ func c6TelemetryTableValues(outputs map[string]script.ScriptOutput) []table.Fiel
 		slog.Warn("no platform rows found in turbostat telemetry output")
 		return []table.Field{}
 	}
+	// dynamically build the fields based on the cstate-related fields we found in the platform rows
+	// e.g., if we found "C6%" and "CPU%c6", we'll create two fields, "C6%" and "CPU%c6"
 	// for each platform row
 	for i := range platformRows {
-		// append the timestamp to the fields
-		fields[0].Values = append(fields[0].Values, platformRows[i][0]) // Timestamp
-		// append the C6 residency values to the fields
-		fields[1].Values = append(fields[1].Values, platformRows[i][1]) // C6%
-		// append the CPU C6 residency values to the fields
-		fields[2].Values = append(fields[2].Values, platformRows[i][2]) // CPU%c6
+		// the first row contains the field names, so use that to build the fields, including the timestamp field
+		if i == 0 {
+			for _, fieldName := range platformRows[i] {
+				fields = append(fields, table.Field{Name: fieldName})
+			}
+		} else {
+			// append the values to the corresponding fields
+			for j := range platformRows[i] {
+				fields[j].Values = append(fields[j].Values, platformRows[i][j])
+			}
+		}
 	}
 	return fields
 }

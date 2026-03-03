@@ -531,7 +531,7 @@ func ipcTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName str
 	return telemetryTableHTMLRenderer(tableValues, data, datasetNames, chartConfig, nil)
 }
 
-func c6TelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
+func cstatesTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
 	if len(tableValues.Fields) < 2 {
 		slog.Error("insufficient fields in table, expected at least 2", slog.String("table", tableValues.Name), slog.Int("fields", len(tableValues.Fields)))
 		return ""
@@ -559,7 +559,7 @@ func c6TelemetryTableHTMLRenderer(tableValues table.TableValues, targetName stri
 	chartConfig := report.ChartTemplateStruct{
 		ID:            fmt.Sprintf("%s%d", tableValues.Name, util.RandUint(10000)),
 		XaxisText:     "Time",
-		YaxisText:     "% C6 Residency",
+		YaxisText:     "% Residency",
 		TitleText:     "",
 		DisplayTitle:  "false",
 		DisplayLegend: "true",

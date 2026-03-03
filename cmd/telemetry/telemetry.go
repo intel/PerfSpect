@@ -57,7 +57,7 @@ var (
 	flagCPU         bool
 	flagFrequency   bool
 	flagIPC         bool
-	flagC6          bool
+	flagCstate      bool
 	flagIRQRate     bool
 	flagMemory      bool
 	flagNetwork     bool
@@ -82,7 +82,7 @@ const (
 	flagCPUName         = "cpu"
 	flagFrequencyName   = "frequency"
 	flagIPCName         = "ipc"
-	flagC6Name          = "c6"
+	flagCstateName      = "cstate"
 	flagIRQRateName     = "irqrate"
 	flagMemoryName      = "memory"
 	flagNetworkName     = "network"
@@ -105,7 +105,7 @@ var telemetrySummaryTableName = "Telemetry Summary"
 var categories = []app.Category{
 	{FlagName: flagCPUName, FlagVar: &flagCPU, DefaultValue: false, Help: "monitor cpu utilization", Tables: []table.TableDefinition{tableDefinitions[CPUUtilizationTelemetryTableName], tableDefinitions[UtilizationCategoriesTelemetryTableName]}},
 	{FlagName: flagIPCName, FlagVar: &flagIPC, DefaultValue: false, Help: "monitor IPC", Tables: []table.TableDefinition{tableDefinitions[IPCTelemetryTableName]}},
-	{FlagName: flagC6Name, FlagVar: &flagC6, DefaultValue: false, Help: "monitor C6 residency", Tables: []table.TableDefinition{tableDefinitions[C6TelemetryTableName]}},
+	{FlagName: flagCstateName, FlagVar: &flagCstate, DefaultValue: false, Help: "monitor C-States residency", Tables: []table.TableDefinition{tableDefinitions[CstatesTelemetryTableName]}},
 	{FlagName: flagFrequencyName, FlagVar: &flagFrequency, DefaultValue: false, Help: "monitor cpu frequency", Tables: []table.TableDefinition{tableDefinitions[FrequencyTelemetryTableName]}},
 	{FlagName: flagPowerName, FlagVar: &flagPower, DefaultValue: false, Help: "monitor power", Tables: []table.TableDefinition{tableDefinitions[PowerTelemetryTableName]}},
 	{FlagName: flagTemperatureName, FlagVar: &flagTemperature, DefaultValue: false, Help: "monitor temperature", Tables: []table.TableDefinition{tableDefinitions[TemperatureTelemetryTableName]}},
@@ -336,7 +336,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	report.RegisterHTMLRenderer(CPUUtilizationTelemetryTableName, cpuUtilizationTelemetryTableHTMLRenderer)
 	report.RegisterHTMLRenderer(UtilizationCategoriesTelemetryTableName, utilizationCategoriesTelemetryTableHTMLRenderer)
 	report.RegisterHTMLRenderer(IPCTelemetryTableName, ipcTelemetryTableHTMLRenderer)
-	report.RegisterHTMLRenderer(C6TelemetryTableName, c6TelemetryTableHTMLRenderer)
+	report.RegisterHTMLRenderer(CstatesTelemetryTableName, cstatesTelemetryTableHTMLRenderer)
 	report.RegisterHTMLRenderer(FrequencyTelemetryTableName, averageFrequencyTelemetryTableHTMLRenderer)
 	report.RegisterHTMLRenderer(IRQRateTelemetryTableName, irqRateTelemetryTableHTMLRenderer)
 	report.RegisterHTMLRenderer(DriveTelemetryTableName, driveTelemetryTableHTMLRenderer)
@@ -364,7 +364,6 @@ func getTableValues(allTableValues []table.TableValues, tableName string) table.
 func summaryFromTableValues(allTableValues []table.TableValues, _ map[string]script.ScriptOutput) table.TableValues {
 	cpuUtil := getCPUAveragePercentage(getTableValues(allTableValues, UtilizationCategoriesTelemetryTableName), "%idle", true)
 	ipc := getCPUAveragePercentage(getTableValues(allTableValues, IPCTelemetryTableName), "Core (Avg.)", false)
-	c6 := getCPUAveragePercentage(getTableValues(allTableValues, C6TelemetryTableName), "Core (Avg.)", false)
 	avgCoreFreq := getMetricAverage(getTableValues(allTableValues, FrequencyTelemetryTableName), []string{"Core (Avg.)"}, "Time")
 	pkgPower := getPkgAveragePower(allTableValues)
 	pkgTemperature := getPkgAverageTemperature(allTableValues)
@@ -386,7 +385,6 @@ func summaryFromTableValues(allTableValues []table.TableValues, _ map[string]scr
 		Fields: []table.Field{
 			{Name: "CPU Utilization (%)", Values: []string{cpuUtil}},
 			{Name: "IPC", Values: []string{ipc}},
-			{Name: "C6 Core Residency (%)", Values: []string{c6}},
 			{Name: "Core Frequency (MHz)", Values: []string{avgCoreFreq}},
 			{Name: "Package Power (Watts)", Values: []string{pkgPower}},
 			{Name: "Package Temperature (C)", Values: []string{pkgTemperature}},

@@ -6,6 +6,7 @@ package extract
 import (
 	"fmt"
 	"log/slog"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -75,6 +76,73 @@ func parseTurbostatOutput(output string) ([]map[string]string, error) {
 		rowCount++
 	}
 	return rows, nil
+}
+
+// TurbostatPlatformRowsByRegexMatch parses the output of the turbostat script and returns the rows
+// for the platform (summary) only, matching fields by regex.
+// Multiple fields may match the regex, all matching fields, and their values, will be returned in
+// the order they appear in the output.
+// Returns:
+// - [][]string: first row is the header with "timestamp" followed by matched field names, subsequent
+// rows contain the corresponding values for each platform row in the output.
+func TurbostatPlatformRowsByRegexMatch(turboStatScriptOutput string, fieldRegexs []*regexp.Regexp) ([][]string, error) {
+	if turboStatScriptOutput == "" {
+		return nil, fmt.Errorf("turbostat output is empty")
+	}
+	if len(fieldRegexs) == 0 {
+		return nil, fmt.Errorf("no field regexes provided")
+	}
+	rows, err := parseTurbostatOutput(turboStatScriptOutput)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse turbostat output: %w", err)
+	}
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("no platform rows found in turbostat output")
+	}
+	// Determine which fields match any of the regexes, preserving column order
+	// from the first platform row.
+	var matchedFields []string
+	for _, row := range rows {
+		if !isPlatformRow(row) {
+			continue
+		}
+		for field := range row {
+			for _, re := range fieldRegexs {
+				if re.MatchString(field) {
+					if !slices.Contains(matchedFields, field) {
+						matchedFields = append(matchedFields, field)
+					}
+					break
+				}
+			}
+		}
+		break // only need the first platform row to discover fields
+	}
+	if len(matchedFields) == 0 {
+		return nil, fmt.Errorf("no fields matched the provided regexes in turbostat output")
+	}
+	// Sort alphabetically for deterministic output since map iteration is unordered.
+	slices.Sort(matchedFields)
+	// First row is the header: timestamp followed by matched field names.
+	header := make([]string, len(matchedFields)+1)
+	header[0] = "timestamp"
+	copy(header[1:], matchedFields)
+	fieldValues := [][]string{header}
+	for _, row := range rows {
+		if !isPlatformRow(row) {
+			continue
+		}
+		rowValues := make([]string, len(matchedFields)+1)
+		rowValues[0] = row["timestamp"]
+		for i, field := range matchedFields {
+			rowValues[i+1] = row[field]
+		}
+		fieldValues = append(fieldValues, rowValues)
+	}
+	if len(fieldValues) == 1 { // only the header row, no data
+		return nil, fmt.Errorf("no platform data found in turbostat output for the provided regexes")
+	}
+	return fieldValues, nil
 }
 
 // TurbostatPlatformRows parses the output of the turbostat script and returns the rows
