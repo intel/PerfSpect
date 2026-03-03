@@ -240,7 +240,7 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 		slog.Debug("Checking for perfspect updates")
 		updateAvailable, latestManifest, err := checkForUpdates(gVersion)
 		if err != nil {
-			slog.Error(fmt.Sprintf("Error while checking for updates: %v", err))
+			slog.Warn(fmt.Sprintf("Failed to check for updates: %v", err))
 		} else if updateAvailable {
 			fmt.Fprintf(os.Stderr, "A new version (%s) of %s is available!\nPlease run '%s update' to update to the latest version.\n\n", latestManifest.Version, app.Name, app.Name)
 		} else {
