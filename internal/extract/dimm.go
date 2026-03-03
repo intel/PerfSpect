@@ -314,27 +314,6 @@ const (
 	dimmTypeForestCity
 )
 
-// Keep old names as aliases so tests written against the original constants still compile.
-const (
-	dimmType0  = dimmTypeInspurICX
-	dimmType1  = dimmTypeGenericCPULetterDigit
-	dimmType2  = dimmTypeMCFormat
-	dimmType3  = dimmTypeNodeChannelDimm
-	dimmType4  = dimmTypePNodeChannelDimm
-	dimmType5  = dimmTypeNodeChannelDimmAlt
-	dimmType6  = dimmTypeSKXSDP
-	dimmType7  = dimmTypeICXSDP
-	dimmType8  = dimmTypeNodeDIMM
-	dimmType9  = dimmTypeGigabyteMilan
-	dimmType10 = dimmTypeNUC
-	dimmType11 = dimmTypeAlderLake
-	dimmType12 = dimmTypeSuperMicroSPR
-	dimmType13 = dimmTypeBirchstream
-	dimmType14 = dimmTypeBirchstreamGNRAP
-	dimmType15 = dimmTypeForestCity
-	dimmType16 = dimmTypeQuantaGNR
-)
-
 // dimmFormat defines how to identify and extract socket/slot for a DIMM format.
 type dimmFormat struct {
 	name       string

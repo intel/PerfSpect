@@ -16,167 +16,167 @@ func TestGetDIMMParseInfo(t *testing.T) {
 	}{
 		// --- One positive case per dimmType ---
 		{
-			name:         "dimmType0 - Inspur ICX",
+			name:         "Inspur ICX",
 			bankLocator:  "Not Specified",
 			locator:      "CPU0_C0D0",
-			expectedType: dimmType0,
+			expectedType: dimmTypeInspurICX,
 		},
 		{
-			name:         "dimmType1 - Generic CPU_Letter_Digit",
+			name:         "Generic CPU_Letter_Digit",
 			bankLocator:  "Not Specified",
 			locator:      "CPU0_A0",
-			expectedType: dimmType1,
+			expectedType: dimmTypeGenericCPULetterDigit,
 		},
 		{
-			name:         "dimmType2 - MC format",
+			name:         "MC format",
 			bankLocator:  "Not Specified",
 			locator:      "CPU0_MC0_DIMM_A0",
-			expectedType: dimmType2,
+			expectedType: dimmTypeMCFormat,
 		},
 		{
-			name:         "dimmType3 - NODE CHANNEL DIMM",
+			name:         "NODE CHANNEL DIMM",
 			bankLocator:  "NODE 0 CHANNEL 0 DIMM 0",
 			locator:      "DIMM0",
-			expectedType: dimmType3,
+			expectedType: dimmTypeNodeChannelDimm,
 		},
 		{
-			name:         "dimmType4 - P_Node_Channel_Dimm",
+			name:         "P_Node_Channel_Dimm",
 			bankLocator:  "P0_Node0_Channel0_Dimm0",
 			locator:      "DIMM0",
-			expectedType: dimmType4,
+			expectedType: dimmTypePNodeChannelDimm,
 		},
 		{
-			name:         "dimmType5 - _Node_Channel_Dimm",
+			name:         "_Node_Channel_Dimm",
 			bankLocator:  "_Node0_Channel0_Dimm0",
 			locator:      "DIMM0",
-			expectedType: dimmType5,
+			expectedType: dimmTypeNodeChannelDimmAlt,
 		},
 		{
-			name:         "dimmType6 - SKX SDP (1-indexed)",
+			name:         "SKX SDP (1-indexed)",
 			bankLocator:  "NODE 1",
 			locator:      "CPU1_DIMM_A1",
-			expectedType: dimmType6,
+			expectedType: dimmTypeSKXSDP,
 		},
 		{
-			name:         "dimmType7 - ICX SDP (0-indexed)",
+			name:         "ICX SDP (0-indexed)",
 			bankLocator:  "NODE 0",
 			locator:      "CPU0_DIMM_A1",
-			expectedType: dimmType7,
+			expectedType: dimmTypeICXSDP,
 		},
 		{
-			name:         "dimmType8 - NODE n + DIMM_Xn",
+			name:         "NODE n + DIMM_Xn",
 			bankLocator:  "NODE 1",
 			locator:      "DIMM_A1",
-			expectedType: dimmType8,
+			expectedType: dimmTypeNodeDIMM,
 		},
 		{
-			name:         "dimmType9 - Gigabyte Milan DIMM_Pn_Xn",
+			name:         "Gigabyte Milan DIMM_Pn_Xn",
 			bankLocator:  "BANK 0",
 			locator:      "DIMM_P0_A0",
-			expectedType: dimmType9,
+			expectedType: dimmTypeGigabyteMilan,
 		},
 		{
-			name:         "dimmType10 - NUC SODIMM",
+			name:         "NUC SODIMM",
 			bankLocator:  "CHANNEL A DIMM0",
 			locator:      "SODIMM0",
-			expectedType: dimmType10,
+			expectedType: dimmTypeNUC,
 		},
 		{
-			name:         "dimmType11 - Alder Lake Controller",
+			name:         "Alder Lake Controller",
 			bankLocator:  "BANK 0",
 			locator:      "Controller0-ChannelA-DIMM0",
-			expectedType: dimmType11,
+			expectedType: dimmTypeAlderLake,
 		},
 		{
-			name:         "dimmType12 - SuperMicro SPR P1-DIMMA1",
+			name:         "SuperMicro SPR P1-DIMMA1",
 			bankLocator:  "Not Specified",
 			locator:      "P1-DIMMA1",
-			expectedType: dimmType12,
+			expectedType: dimmTypeSuperMicroSPR,
 		},
 		{
-			name:         "dimmType13 - Birchstream CPU0_DIMM_A1",
+			name:         "Birchstream CPU0_DIMM_A1",
 			bankLocator:  "BANK 0",
 			locator:      "CPU0_DIMM_A1",
-			expectedType: dimmType13,
+			expectedType: dimmTypeBirchstream,
 		},
 		{
-			name:         "dimmType14 - GNR AP/X3 CPU0_DIMM_A",
+			name:         "GNR AP/X3 CPU0_DIMM_A",
 			bankLocator:  "BANK 0",
 			locator:      "CPU0_DIMM_A",
-			expectedType: dimmType14,
+			expectedType: dimmTypeBirchstreamGNRAP,
 		},
 		{
-			name:         "dimmType15 - Forest City CPU0 CH0/D0",
+			name:         "Forest City CPU0 CH0/D0",
 			bankLocator:  "BANK 0",
 			locator:      "CPU0 CH0/D0",
-			expectedType: dimmType15,
+			expectedType: dimmTypeForestCity,
 		},
 		{
-			name:         "dimmType16 - Quanta GNR",
+			name:         "Quanta GNR",
 			bankLocator:  "_Node0_Channel0_Dimm1",
 			locator:      "CPU0_A1",
-			expectedType: dimmType16,
+			expectedType: dimmTypeQuantaGNR,
 		},
 		// --- Ordering-sensitive / ambiguous cases ---
 		{
-			name:         "ordering: CPU0_C0D0 matches type0, not type1",
+			name:         "ordering: CPU0_C0D0 matches InspurICX, not GenericCPULetterDigit",
 			bankLocator:  "Not Specified",
 			locator:      "CPU0_C0D0",
-			expectedType: dimmType0,
+			expectedType: dimmTypeInspurICX,
 		},
 		{
-			name:         "ordering: P1-DIMMA1 matches type12, not type1",
+			name:         "ordering: P1-DIMMA1 matches SuperMicroSPR, not GenericCPULetterDigit",
 			bankLocator:  "Not Specified",
 			locator:      "P1-DIMMA1",
-			expectedType: dimmType12,
+			expectedType: dimmTypeSuperMicroSPR,
 		},
 		{
-			name:         "ordering: Quanta GNR matches type16, not type5",
+			name:         "ordering: Quanta GNR matches QuantaGNR, not NodeChannelDimmAlt",
 			bankLocator:  "_Node0_Channel0_Dimm1",
 			locator:      "CPU0_A1",
-			expectedType: dimmType16,
+			expectedType: dimmTypeQuantaGNR,
 		},
 		{
-			// type16 requires Dimm[1-2]; Dimm0 doesn't match type16.
-			// CPU0_A1 matches type1's CPU([0-9])_([A-Z])([0-9]) before reaching type5's bank locator check.
-			name:         "ordering: _Node0_Channel0_Dimm0 with CPU0_A1 falls to type1",
+			// QuantaGNR requires Dimm[1-2]; Dimm0 doesn't match.
+			// CPU0_A1 matches GenericCPULetterDigit before reaching NodeChannelDimmAlt's bank locator check.
+			name:         "ordering: _Node0_Channel0_Dimm0 with CPU0_A1 falls to GenericCPULetterDigit",
 			bankLocator:  "_Node0_Channel0_Dimm0",
 			locator:      "CPU0_A1",
-			expectedType: dimmType1,
+			expectedType: dimmTypeGenericCPULetterDigit,
 		},
 		{
-			// type6 requires CPU[1-4] and NODE [1-8]; type7 requires CPU[0-7] and NODE [0-9]+
-			name:         "ordering: SKX SDP CPU1_DIMM_A1 NODE 1 matches type6",
+			// SKXSDP requires CPU[1-4] and NODE [1-8]; ICXSDP requires CPU[0-7] and NODE [0-9]+
+			name:         "ordering: SKX SDP CPU1_DIMM_A1 NODE 1 matches SKXSDP",
 			bankLocator:  "NODE 1",
 			locator:      "CPU1_DIMM_A1",
-			expectedType: dimmType6,
+			expectedType: dimmTypeSKXSDP,
 		},
 		{
-			// CPU0 doesn't match type6's CPU[1-4], so falls to type7
-			name:         "ordering: ICX SDP CPU0_DIMM_A1 NODE 0 matches type7",
+			// CPU0 doesn't match SKXSDP's CPU[1-4], so falls to ICXSDP
+			name:         "ordering: ICX SDP CPU0_DIMM_A1 NODE 0 matches ICXSDP",
 			bankLocator:  "NODE 0",
 			locator:      "CPU0_DIMM_A1",
-			expectedType: dimmType7,
+			expectedType: dimmTypeICXSDP,
 		},
 		{
-			// Birchstream CPU0_DIMM_A1 with non-NODE bank loc → not type6/7, falls to type13
-			name:         "ordering: Birchstream CPU0_DIMM_A1 BANK 0 matches type13, not type7",
+			// Birchstream CPU0_DIMM_A1 with non-NODE bank loc -> not SKXSDP/ICXSDP, falls to Birchstream
+			name:         "ordering: Birchstream CPU0_DIMM_A1 BANK 0 matches Birchstream, not ICXSDP",
 			bankLocator:  "BANK 0",
 			locator:      "CPU0_DIMM_A1",
-			expectedType: dimmType13,
+			expectedType: dimmTypeBirchstream,
 		},
 		// --- Multi-digit values (regression tests for [\d+] bug fix) ---
 		{
-			name:         "type16 - multi-digit node number",
+			name:         "QuantaGNR - multi-digit node number",
 			bankLocator:  "_Node10_Channel0_Dimm1",
 			locator:      "CPU0_A1",
-			expectedType: dimmType16,
+			expectedType: dimmTypeQuantaGNR,
 		},
 		{
-			name:         "type16 - multi-digit channel number",
+			name:         "QuantaGNR - multi-digit channel number",
 			bankLocator:  "_Node0_Channel12_Dimm2",
 			locator:      "CPU10_B2",
-			expectedType: dimmType16,
+			expectedType: dimmTypeQuantaGNR,
 		},
 		// --- Unknown / no match ---
 		{
@@ -213,257 +213,257 @@ func TestGetDIMMSocketSlot(t *testing.T) {
 		expectedSlot   int
 		expectErr      bool
 	}{
-		// dimmType0: reLoc match[1]=socket, match[3]=slot
+		// InspurICX: locMatch[1]=socket, locMatch[3]=slot
 		{
-			name:           "type0 - Inspur ICX CPU0_C0D0",
+			name:           "InspurICX - CPU0_C0D0",
 			bankLocator:    "Not Specified",
 			locator:        "CPU0_C0D0",
 			expectedSocket: 0,
 			expectedSlot:   0,
 		},
 		{
-			name:           "type0 - Inspur ICX CPU1_C2D1",
+			name:           "InspurICX - CPU1_C2D1",
 			bankLocator:    "Not Specified",
 			locator:        "CPU1_C2D1",
 			expectedSocket: 1,
 			expectedSlot:   1,
 		},
-		// dimmType1: reLoc match[1]=socket, match[3]=slot
+		// GenericCPULetterDigit: locMatch[1]=socket, locMatch[3]=slot
 		{
-			name:           "type1 - CPU0_A0",
+			name:           "GenericCPULetterDigit - CPU0_A0",
 			bankLocator:    "Not Specified",
 			locator:        "CPU0_A0",
 			expectedSocket: 0,
 			expectedSlot:   0,
 		},
 		{
-			name:           "type1 - CPU1_B3",
+			name:           "GenericCPULetterDigit - CPU1_B3",
 			bankLocator:    "Not Specified",
 			locator:        "CPU1_B3",
 			expectedSocket: 1,
 			expectedSlot:   3,
 		},
-		// dimmType2: reLoc match[1]=socket, match[3]=slot
+		// MCFormat: locMatch[1]=socket, locMatch[3]=slot
 		{
-			name:           "type2 - CPU0_MC0_DIMM_A0",
+			name:           "MCFormat - CPU0_MC0_DIMM_A0",
 			bankLocator:    "Not Specified",
 			locator:        "CPU0_MC0_DIMM_A0",
 			expectedSocket: 0,
 			expectedSlot:   0,
 		},
 		{
-			name:           "type2 - CPU1_MC1_DIMM_B2",
+			name:           "MCFormat - CPU1_MC1_DIMM_B2",
 			bankLocator:    "Not Specified",
 			locator:        "CPU1_MC1_DIMM_B2",
 			expectedSocket: 1,
 			expectedSlot:   2,
 		},
-		// dimmType3: reBankLoc match[1]=socket, match[3]=slot
+		// NodeChannelDimm: bankLocMatch[1]=socket, bankLocMatch[3]=slot
 		{
-			name:           "type3 - NODE 0 CHANNEL 0 DIMM 0",
+			name:           "NodeChannelDimm - NODE 0 CHANNEL 0 DIMM 0",
 			bankLocator:    "NODE 0 CHANNEL 0 DIMM 0",
 			locator:        "DIMM0",
 			expectedSocket: 0,
 			expectedSlot:   0,
 		},
 		{
-			name:           "type3 - NODE 1 CHANNEL 3 DIMM 1",
+			name:           "NodeChannelDimm - NODE 1 CHANNEL 3 DIMM 1",
 			bankLocator:    "NODE 1 CHANNEL 3 DIMM 1",
 			locator:        "DIMM1",
 			expectedSocket: 1,
 			expectedSlot:   1,
 		},
-		// dimmType4: reBankLoc match[1]=socket, match[4]=slot
+		// PNodeChannelDimm: bankLocMatch[1]=socket, bankLocMatch[4]=slot
 		{
-			name:           "type4 - P0_Node0_Channel0_Dimm0",
+			name:           "PNodeChannelDimm - P0_Node0_Channel0_Dimm0",
 			bankLocator:    "P0_Node0_Channel0_Dimm0",
 			locator:        "DIMM0",
 			expectedSocket: 0,
 			expectedSlot:   0,
 		},
 		{
-			name:           "type4 - P1_Node1_Channel2_Dimm1",
+			name:           "PNodeChannelDimm - P1_Node1_Channel2_Dimm1",
 			bankLocator:    "P1_Node1_Channel2_Dimm1",
 			locator:        "DIMM1",
 			expectedSocket: 1,
 			expectedSlot:   1,
 		},
-		// dimmType5: reBankLoc match[1]=socket, match[3]=slot
+		// NodeChannelDimmAlt: bankLocMatch[1]=socket, bankLocMatch[3]=slot
 		{
-			name:           "type5 - _Node0_Channel0_Dimm0",
+			name:           "NodeChannelDimmAlt - _Node0_Channel0_Dimm0",
 			bankLocator:    "_Node0_Channel0_Dimm0",
 			locator:        "DIMM0",
 			expectedSocket: 0,
 			expectedSlot:   0,
 		},
 		{
-			name:           "type5 - _Node1_Channel2_Dimm1",
+			name:           "NodeChannelDimmAlt - _Node1_Channel2_Dimm1",
 			bankLocator:    "_Node1_Channel2_Dimm1",
 			locator:        "DIMM1",
 			expectedSocket: 1,
 			expectedSlot:   1,
 		},
-		// dimmType6: reLoc match[1]=socket-1, match[3]=slot-1
+		// SKXSDP: locMatch[1]=socket-1, locMatch[3]=slot-1
 		{
-			name:           "type6 - SKX SDP CPU1_DIMM_A1 NODE 1",
+			name:           "SKXSDP - CPU1_DIMM_A1 NODE 1",
 			bankLocator:    "NODE 1",
 			locator:        "CPU1_DIMM_A1",
 			expectedSocket: 0,
 			expectedSlot:   0,
 		},
 		{
-			name:           "type6 - SKX SDP CPU2_DIMM_B2 NODE 2",
+			name:           "SKXSDP - CPU2_DIMM_B2 NODE 2",
 			bankLocator:    "NODE 2",
 			locator:        "CPU2_DIMM_B2",
 			expectedSocket: 1,
 			expectedSlot:   1,
 		},
-		// dimmType7: reLoc match[1]=socket, match[3]=slot-1
+		// ICXSDP: locMatch[1]=socket, locMatch[3]=slot-1
 		{
-			name:           "type7 - ICX SDP CPU0_DIMM_A1 NODE 0",
+			name:           "ICXSDP - CPU0_DIMM_A1 NODE 0",
 			bankLocator:    "NODE 0",
 			locator:        "CPU0_DIMM_A1",
 			expectedSocket: 0,
 			expectedSlot:   0,
 		},
 		{
-			// CPU0 doesn't match type6's CPU[1-4], so falls to type7's CPU[0-7]
-			name:           "type7 - ICX SDP CPU0_DIMM_C2 NODE 0",
+			// CPU0 doesn't match SKXSDP's CPU[1-4], so falls to ICXSDP's CPU[0-7]
+			name:           "ICXSDP - CPU0_DIMM_C2 NODE 0",
 			bankLocator:    "NODE 0",
 			locator:        "CPU0_DIMM_C2",
 			expectedSocket: 0,
 			expectedSlot:   1,
 		},
-		// dimmType8: reBankLoc match[1]=socket-1, reLoc match[2]=slot-1
+		// NodeDIMM: bankLocMatch[1]=socket-1, locMatch[2]=slot-1
 		{
-			name:           "type8 - NODE 1 DIMM_A1",
+			name:           "NodeDIMM - NODE 1 DIMM_A1",
 			bankLocator:    "NODE 1",
 			locator:        "DIMM_A1",
 			expectedSocket: 0,
 			expectedSlot:   0,
 		},
 		{
-			name:           "type8 - NODE 2 DIMM_B3",
+			name:           "NodeDIMM - NODE 2 DIMM_B3",
 			bankLocator:    "NODE 2",
 			locator:        "DIMM_B3",
 			expectedSocket: 1,
 			expectedSlot:   2,
 		},
-		// dimmType9: reLoc match[1]=socket, match[2]=slot
+		// GigabyteMilan: locMatch[1]=socket, locMatch[2]=slot
 		{
-			name:           "type9 - Gigabyte Milan DIMM_P0_A0",
+			name:           "GigabyteMilan - DIMM_P0_A0",
 			bankLocator:    "BANK 0",
 			locator:        "DIMM_P0_A0",
 			expectedSocket: 0,
 			expectedSlot:   0,
 		},
 		{
-			name:           "type9 - Gigabyte Milan DIMM_P1_B1",
+			name:           "GigabyteMilan - DIMM_P1_B1",
 			bankLocator:    "BANK 0",
 			locator:        "DIMM_P1_B1",
 			expectedSocket: 1,
 			expectedSlot:   1,
 		},
-		// dimmType10: socket=0, reBankLoc match[2]=slot
+		// NUC: socket=0, bankLocMatch[2]=slot
 		{
-			name:           "type10 - NUC CHANNEL A DIMM0",
+			name:           "NUC - CHANNEL A DIMM0",
 			bankLocator:    "CHANNEL A DIMM0",
 			locator:        "SODIMM0",
 			expectedSocket: 0,
 			expectedSlot:   0,
 		},
 		{
-			name:           "type10 - NUC CHANNEL B DIMM1",
+			name:           "NUC - CHANNEL B DIMM1",
 			bankLocator:    "CHANNEL B DIMM1",
 			locator:        "SODIMM1",
 			expectedSocket: 0,
 			expectedSlot:   1,
 		},
-		// dimmType11: socket=0, reLoc match[2]=slot
+		// AlderLake: socket=0, locMatch[2]=slot
 		{
-			name:           "type11 - Alder Lake Controller0-ChannelA-DIMM0",
+			name:           "AlderLake - Controller0-ChannelA-DIMM0",
 			bankLocator:    "BANK 0",
 			locator:        "Controller0-ChannelA-DIMM0",
 			expectedSocket: 0,
 			expectedSlot:   0,
 		},
 		{
-			name:           "type11 - Alder Lake Controller1-ChannelA-DIMM1",
+			name:           "AlderLake - Controller1-ChannelA-DIMM1",
 			bankLocator:    "BANK 0",
 			locator:        "Controller1-ChannelA-DIMM1",
 			expectedSocket: 0,
 			expectedSlot:   1,
 		},
-		// dimmType12: reLoc match[1]=socket-1, match[3]=slot-1
+		// SuperMicroSPR: locMatch[1]=socket-1, locMatch[3]=slot-1
 		{
-			name:           "type12 - SuperMicro P1-DIMMA1",
+			name:           "SuperMicroSPR - P1-DIMMA1",
 			bankLocator:    "Not Specified",
 			locator:        "P1-DIMMA1",
 			expectedSocket: 0,
 			expectedSlot:   0,
 		},
 		{
-			name:           "type12 - SuperMicro P2-DIMMB2",
+			name:           "SuperMicroSPR - P2-DIMMB2",
 			bankLocator:    "Not Specified",
 			locator:        "P2-DIMMB2",
 			expectedSocket: 1,
 			expectedSlot:   1,
 		},
-		// dimmType13: reLoc match[1]=socket, match[3]=slot-1
+		// Birchstream: locMatch[1]=socket, locMatch[3]=slot-1
 		{
-			name:           "type13 - Birchstream CPU0_DIMM_A1",
+			name:           "Birchstream - CPU0_DIMM_A1",
 			bankLocator:    "BANK 0",
 			locator:        "CPU0_DIMM_A1",
 			expectedSocket: 0,
 			expectedSlot:   0,
 		},
 		{
-			name:           "type13 - Birchstream CPU1_DIMM_H2",
+			name:           "Birchstream - CPU1_DIMM_H2",
 			bankLocator:    "BANK 7",
 			locator:        "CPU1_DIMM_H2",
 			expectedSocket: 1,
 			expectedSlot:   1,
 		},
-		// dimmType14: reLoc match[1]=socket, slot=0
+		// BirchstreamGNRAP: locMatch[1]=socket, slot=0
 		{
-			name:           "type14 - GNR AP/X3 CPU0_DIMM_A",
+			name:           "BirchstreamGNRAP - CPU0_DIMM_A",
 			bankLocator:    "BANK 0",
 			locator:        "CPU0_DIMM_A",
 			expectedSocket: 0,
 			expectedSlot:   0,
 		},
 		{
-			name:           "type14 - GNR AP/X3 CPU1_DIMM_L",
+			name:           "BirchstreamGNRAP - CPU1_DIMM_L",
 			bankLocator:    "BANK 11",
 			locator:        "CPU1_DIMM_L",
 			expectedSocket: 1,
 			expectedSlot:   0,
 		},
-		// dimmType15: reLoc match[1]=socket, match[3]=slot
+		// ForestCity: locMatch[1]=socket, locMatch[3]=slot
 		{
-			name:           "type15 - Forest City CPU0 CH0/D0",
+			name:           "ForestCity - CPU0 CH0/D0",
 			bankLocator:    "BANK 0",
 			locator:        "CPU0 CH0/D0",
 			expectedSocket: 0,
 			expectedSlot:   0,
 		},
 		{
-			name:           "type15 - Forest City CPU1 CH7/D1",
+			name:           "ForestCity - CPU1 CH7/D1",
 			bankLocator:    "BANK 7",
 			locator:        "CPU1 CH7/D1",
 			expectedSocket: 1,
 			expectedSlot:   1,
 		},
-		// dimmType16: reBankLoc match[1]=socket, reLoc match[3]=slot-1
+		// QuantaGNR: bankLocMatch[1]=socket, bankLocMatch[3]=slot-1
 		{
-			name:           "type16 - Quanta GNR _Node0_Channel0_Dimm1 CPU0_A1",
+			name:           "QuantaGNR - _Node0_Channel0_Dimm1 CPU0_A1",
 			bankLocator:    "_Node0_Channel0_Dimm1",
 			locator:        "CPU0_A1",
 			expectedSocket: 0,
 			expectedSlot:   0,
 		},
 		{
-			name:           "type16 - Quanta GNR _Node1_Channel2_Dimm2 CPU1_B2",
+			name:           "QuantaGNR - _Node1_Channel2_Dimm2 CPU1_B2",
 			bankLocator:    "_Node1_Channel2_Dimm2",
 			locator:        "CPU1_B2",
 			expectedSocket: 1,
@@ -471,8 +471,8 @@ func TestGetDIMMSocketSlot(t *testing.T) {
 		},
 		// --- Multi-digit regression tests for [\d+] bug fix ---
 		{
-			// Socket comes from reBankLoc match[1] (Node number), slot from reBankLoc match[3] (Dimm-1)
-			name:           "type16 - multi-digit node _Node10_Channel0_Dimm1 CPU0_A1",
+			// Socket comes from bankLocMatch[1] (Node number), slot from bankLocMatch[3] (Dimm-1)
+			name:           "QuantaGNR - multi-digit node _Node10_Channel0_Dimm1 CPU0_A1",
 			bankLocator:    "_Node10_Channel0_Dimm1",
 			locator:        "CPU0_A1",
 			expectedSocket: 10,
@@ -534,7 +534,7 @@ func TestDeriveDIMMInfoOther(t *testing.T) {
 		expectNil         bool // nil result, no error (parse failure logged)
 	}{
 		{
-			name: "type1 - two sockets, two channels each, one slot",
+			name: "GenericCPULetterDigit - two sockets, two channels each, one slot",
 			dimms: [][]string{
 				makeDIMMRow("Not Specified", "CPU0_A0"),
 				makeDIMMRow("Not Specified", "CPU0_B0"),
@@ -550,7 +550,7 @@ func TestDeriveDIMMInfoOther(t *testing.T) {
 			},
 		},
 		{
-			name: "type3 - NODE CHANNEL format",
+			name: "NodeChannelDimm - NODE CHANNEL format",
 			dimms: [][]string{
 				makeDIMMRow("NODE 0 CHANNEL 0 DIMM 0", "DIMM0"),
 				makeDIMMRow("NODE 0 CHANNEL 0 DIMM 1", "DIMM1"),
