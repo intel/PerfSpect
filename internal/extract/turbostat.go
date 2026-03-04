@@ -81,7 +81,7 @@ func parseTurbostatOutput(output string) ([]map[string]string, error) {
 // TurbostatPlatformRowsByRegexMatch parses the output of the turbostat script and returns the rows
 // for the platform (summary) only, matching fields by regex.
 // Multiple fields may match the regex, all matching fields, and their values, will be returned in
-// the order they appear in the output.
+// alphabetical order.
 // Returns:
 // - [][]string: first row is the header with "timestamp" followed by matched field names, subsequent
 // rows contain the corresponding values for each platform row in the output.
@@ -97,15 +97,16 @@ func TurbostatPlatformRowsByRegexMatch(turboStatScriptOutput string, fieldRegexs
 		return nil, fmt.Errorf("unable to parse turbostat output: %w", err)
 	}
 	if len(rows) == 0 {
-		return nil, fmt.Errorf("no platform rows found in turbostat output")
+		return nil, fmt.Errorf("no rows found in turbostat output")
 	}
-	// Determine which fields match any of the regexes, preserving column order
-	// from the first platform row.
+	// Build our list of field names
 	var matchedFields []string
+	foundPlatformRow := false
 	for _, row := range rows {
 		if !isPlatformRow(row) {
 			continue
 		}
+		foundPlatformRow = true
 		for field := range row {
 			for _, re := range fieldRegexs {
 				if re.MatchString(field) {
@@ -117,6 +118,9 @@ func TurbostatPlatformRowsByRegexMatch(turboStatScriptOutput string, fieldRegexs
 			}
 		}
 		break // only need the first platform row to discover fields
+	}
+	if !foundPlatformRow {
+		return nil, fmt.Errorf("no platform rows found in turbostat output")
 	}
 	if len(matchedFields) == 0 {
 		return nil, fmt.Errorf("no fields matched the provided regexes in turbostat output")
