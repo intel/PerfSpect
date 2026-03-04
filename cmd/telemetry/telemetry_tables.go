@@ -514,7 +514,7 @@ func cstatesTelemetryTableValues(outputs map[string]script.ScriptOutput) []table
 	fields := []table.Field{}
 	// e.g., SRF - C1% C1E% C6S% C6SP% CPU%c1 CPU%c6 Mod%c6
 	// e.g., GNR - POLL% C1% C1E% C6% C6P% CPU%c1 CPU%c6
-	reCstate := regexp.MustCompile(`^(C\d+\w%|CPU%c\d+|POLL%|Mod%c\d+)$`) // matches C1%, C1E%, C6%, C6S%, C6P%, CPU%c1, CPU%c6, C1E%, C6P%, POLL%, Mod%c6
+	reCstate := regexp.MustCompile(`^(C\d+\w*%|CPU%c\d+|POLL%|Mod%c\d+)$`) // matches C1%, C1E%, C6%, C6S%, C6P%, CPU%c1, CPU%c6, C1E%, C6P%, POLL%, Mod%c6
 	platformRows, err := extract.TurbostatPlatformRowsByRegexMatch(outputs[script.TurbostatTelemetryScriptName].Stdout, []*regexp.Regexp{reCstate})
 	if err != nil {
 		slog.Warn(err.Error())
