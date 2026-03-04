@@ -55,7 +55,7 @@ func summarizeMetricsWithTrim(localInputDir, localOutputDir, targetName string, 
 		return filesCreated, err
 	}
 	csvSummaryFile := filepath.Join(localOutputDir, targetName+"_metrics_summary.csv")
-	// coverity[INSECURE_FILE_PERMISSIONS:FALSE] - file permissions are set to 0644 to allow user read/write and group/other read, which is appropriate for the output files
+	//coverity[INSECURE_FILE_PERMISSIONS] - file permissions are set to 0644 to allow user read/write and group/other read, which is appropriate for the output files
 	err = os.WriteFile(csvSummaryFile, []byte(out), 0644) // #nosec G306
 	if err != nil {
 		err = fmt.Errorf("failed to write summary to file: %w", err)
@@ -69,7 +69,7 @@ func summarizeMetricsWithTrim(localInputDir, localOutputDir, targetName string, 
 		return filesCreated, err
 	}
 	htmlSummaryFile := filepath.Join(localOutputDir, targetName+"_metrics_summary.html")
-	// coverity[INSECURE_FILE_PERMISSIONS:FALSE] - file permissions are set to 0644 to allow user read/write and group/other read, which is appropriate for the output files
+	//coverity[INSECURE_FILE_PERMISSIONS] - file permissions are set to 0644 to allow user read/write and group/other read, which is appropriate for the output files
 	err = os.WriteFile(htmlSummaryFile, []byte(out), 0644) // #nosec G306
 	if err != nil {
 		err = fmt.Errorf("failed to write HTML summary to file: %w", err)

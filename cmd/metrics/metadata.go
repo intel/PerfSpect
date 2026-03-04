@@ -334,7 +334,7 @@ func (md Metadata) JSON() (out []byte, err error) {
 // WriteJSONToFile writes the metadata structure to the filename provided.
 // Note that the file will be truncated.
 func (md Metadata) WriteJSONToFile(path string) (err error) {
-	// coverity[INSECURE_FILE_PERMISSIONS:FALSE] - file permissions are set to 0644 to allow user read/write and group/other read, which is appropriate for the output files
+	//coverity[INSECURE_FILE_PERMISSIONS] - file permissions are set to 0644 to allow user read/write and group/other read, which is appropriate for the output files
 	rawFile, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644) // #nosec G304 G302
 	if err != nil {
 		slog.Error("failed to open raw file for writing", slog.String("error", err.Error()))

@@ -141,7 +141,7 @@ func printMetricsJSON(metricFrames []MetricFrame, metricDefinitions []MetricDefi
 		}
 		if printToFile {
 			var file *os.File
-			// coverity[INSECURE_FILE_PERMISSIONS:FALSE] - file permissions are set to 0644 to allow user read/write and group/other read, which is appropriate for the output files
+			//coverity[INSECURE_FILE_PERMISSIONS] - file permissions are set to 0644 to allow user read/write and group/other read, which is appropriate for the output files
 			file, err = os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644) // #nosec G304 G302
 			if err != nil {
 				return
@@ -165,7 +165,7 @@ func printMetricsCSV(metricFrames []MetricFrame, frameCount int, metricDefinitio
 	var file *os.File
 	if printToFile {
 		// open file for writing/appending
-		// coverity[INSECURE_FILE_PERMISSIONS:FALSE] - file permissions are set to 0644 to allow user read/write and group/other read, which is appropriate for the output files
+		//coverity[INSECURE_FILE_PERMISSIONS] - file permissions are set to 0644 to allow user read/write and group/other read, which is appropriate for the output files
 		file, err = os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644) // #nosec G304 G302
 		if err != nil {
 			return
@@ -228,7 +228,7 @@ func printMetricsWide(metricFrames []MetricFrame, frameCount int, metricDefiniti
 	var file *os.File
 	if printToFile {
 		// open file for writing/appending
-		// coverity[INSECURE_FILE_PERMISSIONS:FALSE] - file permissions are set to 0644 to allow user read/write and group/other read, which is appropriate for the output files
+		//coverity[INSECURE_FILE_PERMISSIONS] - file permissions are set to 0644 to allow user read/write and group/other read, which is appropriate for the output files
 		file, err = os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644) // #nosec G304 G302
 		if err != nil {
 			return
@@ -382,7 +382,7 @@ func printMetricsTxt(metricFrames []MetricFrame, metricDefinitions []MetricDefin
 	if printToFile {
 		// open file for writing/appending
 		var file *os.File
-		// coverity[INSECURE_FILE_PERMISSIONS:FALSE] - file permissions are set to 0644 to allow user read/write and group/other read, which is appropriate for the output files
+		//coverity[INSECURE_FILE_PERMISSIONS] - file permissions are set to 0644 to allow user read/write and group/other read, which is appropriate for the output files
 		file, err = os.OpenFile(outputDir+"/"+targetName+"_"+"metrics.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644) // #nosec G304 G302
 		if err != nil {
 			return

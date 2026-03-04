@@ -360,7 +360,7 @@ func printConfig(reports map[string][]byte, toStdout bool, toFile bool, outputDi
 		}
 		if toFile {
 			outputFilePath := fmt.Sprintf("%s/%s_config.txt", outputDir, targetName)
-			// coverity[INSECURE_FILE_PERMISSIONS:FALSE] - file permissions are set to 0644 to allow user read/write and group/other read, which is appropriate for the output files
+			//coverity[INSECURE_FILE_PERMISSIONS] - file permissions are set to 0644 to allow user read/write and group/other read, which is appropriate for the output files
 			err := os.WriteFile(outputFilePath, reportBytes, 0644) // #nosec G306
 			if err != nil {
 				err = fmt.Errorf("failed to write configuration report to file: %v", err)

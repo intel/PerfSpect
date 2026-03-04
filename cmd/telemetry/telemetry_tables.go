@@ -823,7 +823,7 @@ func kernelTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.
 		}
 	}
 	for i := range fields {
-		// coverity[INFINITE_LOOP:FALSE] - false positive, loop will terminate when len(fields[i].Values) >= maxLen
+		//coverity[INFINITE_LOOP] - false positive, loop will terminate when len(fields[i].Values) >= maxLen
 		for len(fields[i].Values) < maxLen {
 			fields[i].Values = append(fields[i].Values, "")
 		}
