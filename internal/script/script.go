@@ -13,7 +13,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"text/template"
+	"text/template" // nosemgrep
 
 	"perfspect/internal/progress"
 	"perfspect/internal/target"

@@ -45,6 +45,7 @@ func (rc *ReportingCommand) createRawReports(appContext app.Context, orderedTarg
 
 // writeReport writes the report bytes to the specified path.
 func writeReport(reportBytes []byte, reportPath string) error {
+	// coverity[INSECURE_FILE_PERMISSIONS:FALSE] - file permissions are set to 0644 to allow user read/write and group/other read, which is appropriate for the output files
 	err := os.WriteFile(reportPath, reportBytes, 0644) // #nosec G306
 	if err != nil {
 		err = fmt.Errorf("failed to write report file: %v", err)

@@ -401,9 +401,6 @@ func setSSEFrequencies(sseFrequencies string, myTarget target.Target, localTempD
 	} else {
 		archMultiplier = 1
 	}
-	if archMultiplier == 0 {
-		return fmt.Errorf("unsupported microarchitecture for SSE frequency setting: %s", uarch)
-	}
 	adjustedBucketSizes := make([]int, len(bucketSizes))
 	for i, size := range bucketSizes {
 		adjustedBucketSizes[i] = size * archMultiplier
