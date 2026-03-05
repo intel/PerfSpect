@@ -39,7 +39,7 @@ Usage:
 | [`config`](#config-command) | Modify system configuration | [options](docs/perfspect_config.md) |
 
 > [!TIP]
-> Run `perfspect [command] -h` to view command-specific help text.
+> Run `perfspect [command] -h` to view command-specific help text. See [`perfspect -h`](docs/perfspect.md) for global options.
 
 #### Metrics Command
 
