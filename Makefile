@@ -202,7 +202,7 @@ clean-tools-cache:
 	rm -rf tools-cache
 
 # Generate command documentation from help text
-COMMANDS := report benchmark metrics telemetry flamegraph lock config
+COMMANDS := report benchmark metrics telemetry flamegraph lock config update extract
 SUBCOMMANDS := metrics:trim config:restore
 
 .PHONY: docs

@@ -41,6 +41,8 @@ Usage:
 > [!TIP]
 > Run `perfspect [command] -h` to view command-specific help text. See [`perfspect -h`](docs/perfspect.md) for global options.
 
+Additional commands: [`update`](docs/perfspect_update.md) checks for and applies application updates (Intel network only), and [`extract`](docs/perfspect_extract.md) extracts embedded resources (for developers).
+
 #### Metrics Command
 
 The `metrics` command generates reports containing CPU architectural performance characterization metrics in HTML and CSV formats. Run `perfspect metrics`.
