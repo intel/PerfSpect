@@ -47,13 +47,13 @@ Additional commands: [`update`](docs/perfspect_update.md) checks for and applies
 
 The `metrics` command generates reports containing CPU architectural performance characterization metrics in HTML and CSV formats. Run `perfspect metrics`.
 
-![screenshot of the TMAM page from the metrics command HTML report, provides a description of TMAM on the left and a pie chart showing the 1st and 2nd level TMAM metrics on the right](docs/metrics_html_tma.png)
+![screenshot of the TMAM page from the metrics command HTML report, provides a description of TMAM on the left and a pie chart showing the 1st and 2nd level TMAM metrics on the right](docs/images/metrics_html_tma.png)
 
 ##### Live Metrics
 
 The `metrics` command supports two modes -- default and "live". Default mode behaves as above -- metrics are collected and saved into report files for review.  The "live" mode prints the metrics to stdout where they can be viewed in the console and/or redirected into a file or observability pipeline. Run `perfspect metrics --live`.
 
-![screenshot of live CSV metrics in a text terminal](docs/metrics_live.png)
+![screenshot of live CSV metrics in a text terminal](docs/images/metrics_live.png)
 
 ##### Metrics Without Root Permissions
 
@@ -93,7 +93,7 @@ See [`perfspect metrics -h`](docs/perfspect_metrics.md) for the extensive set of
 
 The `report` command generates system configuration reports in a variety of formats. All categories of information are collected by default. See [`perfspect report -h`](docs/perfspect_report.md) for all options.
 
-![screenshot of a small section of the HTML report from the report command](docs/report_html.png)
+![screenshot of a small section of the HTML report from the report command](docs/images/report_html.png)
 
 It's possible to report a subset of information by providing command line options. Note that by specifying only the `txt` format, it is printed to stdout, as well as written to a report file.
 
@@ -137,7 +137,7 @@ See [`perfspect benchmark -h`](docs/perfspect_benchmark.md) for all options.
 
 The `telemetry` command reports CPU utilization, instruction mix, disk stats, network stats, and more on the specified target(s). All telemetry types are collected by default. To choose telemetry types, see the additional command line options ([`perfspect telemetry -h`](docs/perfspect_telemetry.md)).
 
-![screenshot of the CPU utilization chart from the HTML output of the telemetry command](docs/telemetry_html.png)
+![screenshot of the CPU utilization chart from the HTML output of the telemetry command](docs/images/telemetry_html.png)
 
 ##### Additional Telemetry via Environment Variables
 
@@ -158,7 +158,7 @@ Software flamegraphs are useful in diagnosing software performance bottlenecks. 
 > [!TIP]
 > By default, flamegraphs are collected using the `cycles:P` event. To analyze different performance aspects, use the `--perf-event` flag to specify an alternative perf event (e.g., `cache-misses`, `instructions`, `branches`, `context-switches`, `mem-loads`, `mem-stores`, etc.).
 
-![screenshot of a flamegraph from the HTML output of the flamegraph command](docs/flamegraph.png)
+![screenshot of a flamegraph from the HTML output of the flamegraph command](docs/images/flamegraph.png)
 
 #### Lock Command
 
