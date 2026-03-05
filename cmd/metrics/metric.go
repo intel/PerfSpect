@@ -201,7 +201,6 @@ func evaluateExpression(metric MetricDefinition, variables map[string]any) (resu
 
 // write json formatted events to raw file
 func writeEventsToFile(path string, events [][]byte) (err error) {
-	//coverity[INSECURE_FILE_PERMISSIONS] - file permissions are set to 0644 to allow user read/write and group/other read, which is appropriate for the output files
 	rawFile, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644) // #nosec G304 G302
 	if err != nil {
 		slog.Error("failed to open raw file for writing", slog.String("error", err.Error()))

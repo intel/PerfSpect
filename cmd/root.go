@@ -188,7 +188,6 @@ func initializeApplication(cmd *cobra.Command, args []string) error {
 	} else { // log to file
 		// open log file in current directory
 		var err error
-		//coverity[INSECURE_FILE_PERMISSIONS] - file permissions are set to 0644 to allow user read/write and group/other read, which is appropriate for the output files
 		gLogFile, err = os.OpenFile(app.Name+".log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644) // #nosec G302
 		if err != nil {
 			fmt.Printf("Error: failed to open log file: %v\n", err)

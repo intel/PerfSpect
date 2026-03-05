@@ -411,10 +411,8 @@ func getHostArchitecture() (string, error) {
 	switch runtime.GOARCH {
 	case "amd64":
 		return cpus.X86Architecture, nil
-	//coverity[DEADCODE] - coverity is not recognizing that this case is valid when running on ARM architecture
 	case "arm64":
 		return cpus.ARMArchitecture, nil
-	//coverity[DEADCODE] - coverity is not recognizing that this case is valid when running on an architecture other than x86 or ARM
 	default:
 		slog.Error("unsupported architecture", slog.String("architecture", runtime.GOARCH))
 		err := fmt.Errorf("unsupported architecture: %s", runtime.GOARCH)
