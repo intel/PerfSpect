@@ -200,3 +200,36 @@ clean: sweep clean-tools-cache
 clean-tools-cache:
 	@echo "Removing cached tool binaries..."
 	rm -rf tools-cache
+
+# Generate command documentation from help text
+COMMANDS := report benchmark metrics telemetry flamegraph lock config update extract
+SUBCOMMANDS := metrics:trim config:restore
+
+.PHONY: docs
+docs: perfspect
+	@echo "Generating command documentation..."
+	@mkdir -p docs
+	@echo '# perfspect' > docs/perfspect.md
+	@echo '' >> docs/perfspect.md
+	@echo '```text' >> docs/perfspect.md
+	@./perfspect --help >> docs/perfspect.md
+	@echo '```' >> docs/perfspect.md
+	@for cmd in $(COMMANDS); do \
+		echo "  $$cmd"; \
+		echo "# perfspect $$cmd" > docs/perfspect_$$cmd.md; \
+		echo '' >> docs/perfspect_$$cmd.md; \
+		echo '```text' >> docs/perfspect_$$cmd.md; \
+		./perfspect $$cmd --help >> docs/perfspect_$$cmd.md; \
+		echo '```' >> docs/perfspect_$$cmd.md; \
+	done
+	@for sub in $(SUBCOMMANDS); do \
+		cmd=$${sub%%:*}; \
+		subcmd=$${sub##*:}; \
+		echo "  $$cmd $$subcmd"; \
+		echo "# perfspect $$cmd $$subcmd" > docs/perfspect_$${cmd}_$${subcmd}.md; \
+		echo '' >> docs/perfspect_$${cmd}_$${subcmd}.md; \
+		echo '```text' >> docs/perfspect_$${cmd}_$${subcmd}.md; \
+		./perfspect $$cmd $$subcmd --help >> docs/perfspect_$${cmd}_$${subcmd}.md; \
+		echo '```' >> docs/perfspect_$${cmd}_$${subcmd}.md; \
+	done
+	@echo "Documentation generated in docs/"
