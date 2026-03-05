@@ -28,15 +28,15 @@ Usage:
 
 ### Commands
 
-| Command | Description |
-| ------- | ----------- |
-| [`metrics`](#metrics-command) | CPU core and uncore metrics |
-| [`report`](#report-command) | System configuration and health |
-| [`benchmark`](#benchmark-command) | Performance benchmarks |
-| [`telemetry`](#telemetry-command) | System telemetry |
-| [`flamegraph`](#flamegraph-command) | Software call-stacks as flamegraphs |
-| [`lock`](#lock-command) | Software hot spot, cache-to-cache and lock contention |
-| [`config`](#config-command) | Modify system configuration |
+| Command | Description | Reference |
+| ------- | ----------- | --------- |
+| [`metrics`](#metrics-command) | CPU core and uncore metrics | [options](docs/perfspect_metrics.md) |
+| [`report`](#report-command) | System configuration and health | [options](docs/perfspect_report.md) |
+| [`benchmark`](#benchmark-command) | Performance benchmarks | [options](docs/perfspect_benchmark.md) |
+| [`telemetry`](#telemetry-command) | System telemetry | [options](docs/perfspect_telemetry.md) |
+| [`flamegraph`](#flamegraph-command) | Software call-stacks as flamegraphs | [options](docs/perfspect_flamegraph.md) |
+| [`lock`](#lock-command) | Software hot spot, cache-to-cache and lock contention | [options](docs/perfspect_lock.md) |
+| [`config`](#config-command) | Modify system configuration | [options](docs/perfspect_config.md) |
 
 > [!TIP]
 > Run `perfspect [command] -h` to view command-specific help text.
@@ -65,7 +65,7 @@ Once the configuration changes are applied, use the `--noroot` flag on the comma
 
 ##### Refining Metrics to a Specific Time Range
 
-After collecting metrics, you can generate new summary reports for a specific time interval using the `metrics trim` subcommand. This is useful when you've collected metrics for an entire workload but want to analyze only a specific portion, excluding setup, teardown, or other unwanted phases.
+After collecting metrics, you can generate new summary reports for a specific time interval using the [`metrics trim`](docs/perfspect_metrics_trim.md) subcommand. This is useful when you've collected metrics for an entire workload but want to analyze only a specific portion, excluding setup, teardown, or other unwanted phases.
 
 The time range can be specified using either absolute timestamps (seconds since epoch) or relative offsets from the beginning/end of the data. At least one time parameter must be specified.
 
@@ -85,11 +85,11 @@ $ ./perfspect metrics trim --input perfspect_2025-11-28_09-21-56 --start-time 17
 
 The `metrics` command can expose metrics via a Prometheus compatible `metrics` endpoint. This allows integration with Prometheus monitoring systems. To enable the Prometheus endpoint, use the `--prometheus-server` flag. By default, the endpoint listens on port 9090. The port can be changed using the `--prometheus-server-addr` flag. Run `perfspect metrics --prometheus-server`. See the [example daemonset](docs/perfspect-daemonset.md) for deploying in Kubernetes.
 
-See `perfspect metrics -h` for the extensive set of options and examples.
+See [`perfspect metrics -h`](docs/perfspect_metrics.md) for the extensive set of options and examples.
 
 #### Report Command
 
-The `report` command generates system configuration reports in a variety of formats. All categories of information are collected by default. See `perfspect report -h` for all options.
+The `report` command generates system configuration reports in a variety of formats. All categories of information are collected by default. See [`perfspect report -h`](docs/perfspect_report.md) for all options.
 
 ![screenshot of a small section of the HTML report from the report command](docs/report_html.png)
 
@@ -119,7 +119,7 @@ The `benchmark` command runs performance micro-benchmarks to evaluate system hea
 ./perfspect benchmark --no-summary     # Exclude system summary from output
 ```
 
-See `perfspect benchmark -h` for all options.
+See [`perfspect benchmark -h`](docs/perfspect_benchmark.md) for all options.
 
 | Benchmark | Description |
 | --------- | ----------- |
@@ -133,7 +133,7 @@ See `perfspect benchmark -h` for all options.
 
 #### Telemetry Command
 
-The `telemetry` command reports CPU utilization, instruction mix, disk stats, network stats, and more on the specified target(s). All telemetry types are collected by default. To choose telemetry types, see the additional command line options (`perfspect telemetry -h`).
+The `telemetry` command reports CPU utilization, instruction mix, disk stats, network stats, and more on the specified target(s). All telemetry types are collected by default. To choose telemetry types, see the additional command line options ([`perfspect telemetry -h`](docs/perfspect_telemetry.md)).
 
 ![screenshot of the CPU utilization chart from the HTML output of the telemetry command](docs/telemetry_html.png)
 
@@ -151,7 +151,7 @@ The following optional telemetry sources can be enabled via environment variable
 
 #### Flamegraph Command
 
-Software flamegraphs are useful in diagnosing software performance bottlenecks. Run `perfspect flamegraph` to capture a system-wide software flamegraph.
+Software flamegraphs are useful in diagnosing software performance bottlenecks. Run `perfspect flamegraph` to capture a system-wide software flamegraph. See [`perfspect flamegraph -h`](docs/perfspect_flamegraph.md) for all options.
 
 > [!TIP]
 > By default, flamegraphs are collected using the `cycles:P` event. To analyze different performance aspects, use the `--perf-event` flag to specify an alternative perf event (e.g., `cache-misses`, `instructions`, `branches`, `context-switches`, `mem-loads`, `mem-stores`, etc.).
@@ -160,11 +160,11 @@ Software flamegraphs are useful in diagnosing software performance bottlenecks. 
 
 #### Lock Command
 
-As systems contain more and more cores, it can be useful to analyze the Linux kernel lock overhead and potential false-sharing that impacts system scalability. Run `perfspect lock` to collect system-wide hot spot, cache-to-cache and lock contention information. Experienced performance engineers can analyze the collected information to identify bottlenecks.
+As systems contain more and more cores, it can be useful to analyze the Linux kernel lock overhead and potential false-sharing that impacts system scalability. Run `perfspect lock` to collect system-wide hot spot, cache-to-cache and lock contention information. Experienced performance engineers can analyze the collected information to identify bottlenecks. See [`perfspect lock -h`](docs/perfspect_lock.md) for all options.
 
 #### Config Command
 
-The `config` command provides a method to view and change various system configuration parameters. Run `perfspect config -h` to view the parameters that can be modified.
+The `config` command provides a method to view and change various system configuration parameters. Run [`perfspect config -h`](docs/perfspect_config.md) to view the parameters that can be modified.
 
 > [!WARNING]
 > Misconfiguring the system may cause it to stop functionining. In some cases, a reboot may be required to restore default settings.
@@ -189,7 +189,7 @@ Configuration recorded to: perfspect_2025-12-01_14-30-45/gnr_config.txt
 
 ##### Restoring Configuration
 
-The `config restore` subcommand restores configuration from a previously recorded file. This is useful for reverting changes or applying a known-good configuration across multiple systems.
+The [`config restore`](docs/perfspect_config_restore.md) subcommand restores configuration from a previously recorded file. This is useful for reverting changes or applying a known-good configuration across multiple systems.
 
 Example:
 
