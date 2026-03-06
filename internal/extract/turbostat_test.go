@@ -5,6 +5,7 @@ package extract
 
 import (
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -571,6 +572,133 @@ Package Core    CPU     Avg_MHz Busy%
 			}
 			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("turbostatPackageRows() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTurbostatPackageRowsByRegexMatch(t *testing.T) {
+	tests := []struct {
+		name            string
+		turbostatOutput string
+		fieldRegexs     []*regexp.Regexp
+		want            [][][]string
+		wantErr         bool
+	}{
+		{
+			name:            "Match Watt fields across two packages",
+			turbostatOutput: turbostatOutput,
+			fieldRegexs:     []*regexp.Regexp{regexp.MustCompile(`^\w+Watt$`)},
+			want: [][][]string{
+				{{"timestamp", "PkgWatt", "RAMWatt"}, {"15:04:05", "223.53", "7.38"}, {"15:04:07", "229.53", "7.38"}, {"15:04:09", "223.53", "7.38"}},
+				{{"timestamp", "PkgWatt", "RAMWatt"}, {"15:04:05", "208.40", "16.83"}, {"15:04:07", "218.40", "16.83"}, {"15:04:09", "208.40", "16.83"}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Two packages, single field match",
+			turbostatOutput: `
+TIME: 12:00:00
+INTERVAL: 1
+Package Core    CPU     Avg_MHz Busy% FooBar
+-       -       -       1000    10    999
+0       0       0       1000    10    999
+0       1       1       1100    11
+1       0       2       2000    20    999
+1       1       3       2100    21
+`,
+			fieldRegexs: []*regexp.Regexp{regexp.MustCompile(`^Avg_MHz$`)},
+			want: [][][]string{
+				{{"timestamp", "Avg_MHz"}, {"12:00:00", "1000"}},
+				{{"timestamp", "Avg_MHz"}, {"12:00:00", "2000"}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Fields sorted alphabetically",
+			turbostatOutput: `
+TIME: 12:00:00
+INTERVAL: 1
+Package Core    CPU     Zebra Alpha
+-       -       -       1     2
+0       0       0       10    20
+1       0       2       30    40
+`,
+			fieldRegexs: []*regexp.Regexp{regexp.MustCompile(`^(Zebra|Alpha)$`)},
+			want: [][][]string{
+				{{"timestamp", "Alpha", "Zebra"}, {"12:00:00", "20", "10"}},
+				{{"timestamp", "Alpha", "Zebra"}, {"12:00:00", "40", "30"}},
+			},
+			wantErr: false,
+		},
+		{
+			name: "No regex matches",
+			turbostatOutput: `
+TIME: 12:00:00
+INTERVAL: 1
+Package Core    CPU     Avg_MHz
+-       -       -       1000
+0       0       0       1000
+`,
+			fieldRegexs: []*regexp.Regexp{regexp.MustCompile(`^NoMatch$`)},
+			want:        nil,
+			wantErr:     true,
+		},
+		{
+			name:            "Empty output",
+			turbostatOutput: "",
+			fieldRegexs:     []*regexp.Regexp{regexp.MustCompile(`^\w+$`)},
+			want:            nil,
+			wantErr:         true,
+		},
+		{
+			name: "Empty regexes",
+			turbostatOutput: `
+TIME: 12:00:00
+INTERVAL: 1
+Package Core    CPU     Avg_MHz
+0       0       0       1000
+`,
+			fieldRegexs: []*regexp.Regexp{},
+			want:        nil,
+			wantErr:     true,
+		},
+		{
+			name: "No package rows",
+			turbostatOutput: `
+TIME: 12:00:00
+INTERVAL: 1
+Package Core    CPU     Avg_MHz
+-       -       -       999
+-       -       -       888
+`,
+			fieldRegexs: []*regexp.Regexp{regexp.MustCompile(`^Avg_MHz$`)},
+			want:        nil,
+			wantErr:     true,
+		},
+		{
+			name: "Malformed package number",
+			turbostatOutput: `
+TIME: 12:00:00
+INTERVAL: 1
+Package Core    CPU     Avg_MHz
+X       0       0       1000
+`,
+			fieldRegexs: []*regexp.Regexp{regexp.MustCompile(`^Avg_MHz$`)},
+			want:        nil,
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := TurbostatPackageRowsByRegexMatch(tt.turbostatOutput, tt.fieldRegexs)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("TurbostatPackageRowsByRegexMatch() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("TurbostatPackageRowsByRegexMatch() = %v, want %v", got, tt.want)
 			}
 		})
 	}

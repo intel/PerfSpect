@@ -197,8 +197,117 @@ func isPlatformRow(row map[string]string) bool {
 	return true
 }
 
+// TurbostatPackageRowsByRegexMatch parses the output of the turbostat script and returns the rows
+// for each package, matching fields by regex.
+// Multiple fields may match the regex, all matching fields, and their values, will be returned in
+// alphabetical order.
+// Returns:
+// - [][][]string: first dimension is indexed by package number, second dimension is the row
+// for each package reading, third dimension has "timestamp" followed by matched field values.
+// The first row of each package's data is the header.
+func TurbostatPackageRowsByRegexMatch(turboStatScriptOutput string, fieldRegexs []*regexp.Regexp) ([][][]string, error) {
+	if turboStatScriptOutput == "" {
+		return nil, fmt.Errorf("turbostat output is empty")
+	}
+	if len(fieldRegexs) == 0 {
+		return nil, fmt.Errorf("no field regexes provided")
+	}
+	rows, err := parseTurbostatOutput(turboStatScriptOutput)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse turbostat output: %w", err)
+	}
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("no rows found in turbostat output")
+	}
+	// Build our list of matched field names from the first package row
+	var matchedFields []string
+	foundPackageRow := false
+	for _, row := range rows {
+		if _, ok := row["Package"]; !ok {
+			if row["CPU"] == "0" {
+				row["Package"] = "0"
+			} else {
+				continue
+			}
+		}
+		if !isPackageRow(row) {
+			continue
+		}
+		foundPackageRow = true
+		for field := range row {
+			for _, re := range fieldRegexs {
+				if re.MatchString(field) {
+					if !slices.Contains(matchedFields, field) {
+						matchedFields = append(matchedFields, field)
+					}
+					break
+				}
+			}
+		}
+		break // only need the first package row to discover fields
+	}
+	if !foundPackageRow {
+		return nil, fmt.Errorf("no package rows found in turbostat output")
+	}
+	if len(matchedFields) == 0 {
+		return nil, fmt.Errorf("no fields matched the provided regexes in turbostat output")
+	}
+	// Sort alphabetically for deterministic output since map iteration is unordered.
+	slices.Sort(matchedFields)
+	// Build the header row
+	header := make([]string, len(matchedFields)+1)
+	header[0] = "timestamp"
+	copy(header[1:], matchedFields)
+	// Collect rows per package
+	var packageRows [][][]string
+	for _, row := range rows {
+		if _, ok := row["Package"]; !ok {
+			if row["CPU"] == "0" {
+				row["Package"] = "0"
+			} else {
+				continue
+			}
+		}
+		if !isPackageRow(row) {
+			continue
+		}
+		rowValues := make([]string, len(matchedFields)+1)
+		rowValues[0] = row["timestamp"]
+		for i, field := range matchedFields {
+			rowValues[i+1] = row[field]
+		}
+		packageNum, err := strconv.Atoi(row["Package"])
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse package number %q: %w", row["Package"], err)
+		}
+		if len(packageRows) < packageNum+1 {
+			// Initialize with header row followed by the data row
+			pkg := [][]string{header, rowValues}
+			// Extend slice to accommodate the package index, initializing placeholders with header
+			for len(packageRows) < packageNum {
+				packageRows = append(packageRows, [][]string{header})
+			}
+			packageRows = append(packageRows, pkg)
+		} else {
+			// Ensure the package slice is initialized with the header before appending data rows
+			if packageRows[packageNum] == nil {
+				packageRows[packageNum] = [][]string{header}
+			}
+			packageRows[packageNum] = append(packageRows[packageNum], rowValues)
+		}
+	}
+	if len(packageRows) == 0 {
+		return nil, fmt.Errorf("no data found in turbostat output for the provided regexes")
+	}
+	return packageRows, nil
+}
+
 // TurbostatPackageRows parses the output of the turbostat script and returns the rows
 // for each package.
+// Returns:
+// - [][][]string: first dimension is indexed by package number, second dimension is the row
+// for each package reading, third dimension is the fields for each row with the first field
+// being the timestamp followed by the requested field names in order.
 func TurbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([][][]string, error) {
 	if turboStatScriptOutput == "" {
 		return nil, fmt.Errorf("turbostat output is empty")
@@ -236,7 +345,7 @@ func TurbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([]
 		}
 		packageNum, err := strconv.Atoi(row["Package"])
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse package number: %s", row["Package"])
+			return nil, fmt.Errorf("unable to parse package number %q: %w", row["Package"], err)
 		}
 		if len(packageRows) < packageNum+1 {
 			packageRows = append(packageRows, [][]string{rowValues})

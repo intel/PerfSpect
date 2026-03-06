@@ -1577,7 +1577,7 @@ func processPerfOutput(
 				var err error
 				metricFrames, frameTimestamp, err = ProcessEvents(batchLines, eventGroupDefinitions, metricDefinitions, processes, frameTimestamp, metadata)
 				if err != nil {
-					slog.Error(err.Error())
+					slog.Warn(err.Error())
 					numConsecutiveProcessEventErrors++
 					if numConsecutiveProcessEventErrors > maxConsecutiveProcessEventErrors {
 						slog.Error("too many consecutive errors processing events, triggering shutdown", slog.Int("max errors", maxConsecutiveProcessEventErrors))

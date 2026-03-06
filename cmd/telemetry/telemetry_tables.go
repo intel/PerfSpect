@@ -375,29 +375,42 @@ func memoryTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.
 }
 
 func powerTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	fields := []table.Field{
-		{Name: "Time"},
-	}
-	packageRows, err := extract.TurbostatPackageRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"PkgWatt", "RAMWatt"})
+	reWatt := regexp.MustCompile(`^\w+Watt$`) // matches PkgWatt, RAMWatt, etc.
+	packageRows, err := extract.TurbostatPackageRowsByRegexMatch(outputs[script.TurbostatTelemetryScriptName].Stdout, []*regexp.Regexp{reWatt})
 	if err != nil {
 		slog.Warn(err.Error())
 		return []table.Field{}
 	}
-	for i := range packageRows {
-		fields = append(fields, table.Field{Name: fmt.Sprintf("Package %d", i)})
-		fields = append(fields, table.Field{Name: fmt.Sprintf("DRAM %d", i)})
+	if len(packageRows) == 0 {
+		return []table.Field{}
 	}
-	// for each package
-	numPackages := len(packageRows)
-	for i := range packageRows {
-		// traverse the rows
-		for _, row := range packageRows[i] {
+	// dynamically build fields from the header row of the first package
+	// header format: ["timestamp", "PkgWatt", "RAMWatt", ...]
+	// fields will be: "Time", then for each package, one field per matched watt metric
+	// e.g., "Package 0 PkgWatt", "Package 0 RAMWatt", "Package 1 PkgWatt", ...
+	header := packageRows[0][0]
+	fields := []table.Field{{Name: "Time"}}
+	for i, pkgRows := range packageRows {
+		if len(pkgRows) == 0 {
+			continue
+		}
+		for _, fieldName := range header[1:] {
+			fields = append(fields, table.Field{Name: fmt.Sprintf("Package %d %s", i, fieldName)})
+		}
+	}
+	numMetrics := len(header) - 1 // number of matched watt fields per package
+	for i, pkgRows := range packageRows {
+		if len(pkgRows) < 2 {
+			continue // skip packages with only a header or empty
+		}
+		// skip the header row (first row), iterate data rows
+		for _, row := range pkgRows[1:] {
 			if i == 0 {
 				fields[0].Values = append(fields[0].Values, row[0]) // Timestamp
 			}
-			// append the package power and DRAM power to the fields
-			fields[i*numPackages+1].Values = append(fields[i*numPackages+1].Values, row[1]) // Package power
-			fields[i*numPackages+2].Values = append(fields[i*numPackages+2].Values, row[2]) // DRAM power
+			for j := range numMetrics {
+				fields[i*numMetrics+1+j].Values = append(fields[i*numMetrics+1+j].Values, row[j+1])
+			}
 		}
 	}
 	if len(fields[0].Values) == 0 {
@@ -407,37 +420,26 @@ func powerTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.F
 }
 
 func temperatureTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	fields := []table.Field{
-		{Name: "Time"},
-		{Name: "Core (Avg.)"},
-	}
-	platformRows, err := extract.TurbostatPlatformRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"CoreTmp"})
+	fields := []table.Field{}
+	reTemp := regexp.MustCompile(`^\w+Tmp$`) // matches CoreTmp, PkgTmp, etc.
+	platformRows, err := extract.TurbostatPlatformRowsByRegexMatch(outputs[script.TurbostatTelemetryScriptName].Stdout, []*regexp.Regexp{reTemp})
 	if err != nil {
-		slog.Warn(err.Error()) // not all systems report core temperature, e.g., cloud VMs
+		slog.Warn(err.Error()) // not all systems report temperature, e.g., cloud VMs
 		return []table.Field{}
 	}
-	packageRows, err := extract.TurbostatPackageRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"PkgTmp"})
-	if err != nil {
-		// not an error, just means no package rows (package temperature)
-		slog.Warn(err.Error())
+	if len(platformRows) == 0 {
+		return []table.Field{}
 	}
-	// add the package rows to the fields
-	for i := range packageRows {
-		fields = append(fields, table.Field{Name: fmt.Sprintf("Package %d", i)})
-	}
-	// for each platform row
+	// dynamically build fields from the header row
 	for i := range platformRows {
-		// append the timestamp to the fields
-		fields[0].Values = append(fields[0].Values, platformRows[i][0]) // Timestamp
-		// append the core temperature values to the fields
-		fields[1].Values = append(fields[1].Values, platformRows[i][1]) // Core temperature
-	}
-	// for each package
-	for i := range packageRows {
-		// traverse the rows
-		for _, row := range packageRows[i] {
-			// append the package temperature to the fields
-			fields[i+2].Values = append(fields[i+2].Values, row[1]) // Package temperature
+		if i == 0 {
+			for _, fieldName := range platformRows[i] {
+				fields = append(fields, table.Field{Name: fieldName})
+			}
+		} else {
+			for j := range platformRows[i] {
+				fields[j].Values = append(fields[j].Values, platformRows[i][j])
+			}
 		}
 	}
 	if len(fields[0].Values) == 0 {
