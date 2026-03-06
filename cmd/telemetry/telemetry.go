@@ -505,7 +505,7 @@ func getPkgAverageTemperature(allTableValues []table.TableValues) string {
 	}
 	pkgTempFieldIndices := make([]int, 0)
 	for i, field := range tableValues.Fields {
-		if strings.HasPrefix(field.Name, "Package") {
+		if field.Name == "PkgTmp" {
 			pkgTempFieldIndices = append(pkgTempFieldIndices, i)
 		}
 	}
@@ -538,7 +538,7 @@ func getPkgAveragePower(allTableValues []table.TableValues) string {
 	}
 	pkgPowerFieldIndices := make([]int, 0)
 	for i, field := range tableValues.Fields {
-		if strings.HasPrefix(field.Name, "Package") {
+		if strings.HasSuffix(field.Name, "PkgWatt") {
 			pkgPowerFieldIndices = append(pkgPowerFieldIndices, i)
 		}
 	}

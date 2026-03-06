@@ -283,12 +283,16 @@ func TurbostatPackageRowsByRegexMatch(turboStatScriptOutput string, fieldRegexs 
 		if len(packageRows) < packageNum+1 {
 			// Initialize with header row followed by the data row
 			pkg := [][]string{header, rowValues}
-			// Extend slice to accommodate the package index
+			// Extend slice to accommodate the package index, initializing placeholders with header
 			for len(packageRows) < packageNum {
-				packageRows = append(packageRows, nil)
+				packageRows = append(packageRows, [][]string{header})
 			}
 			packageRows = append(packageRows, pkg)
 		} else {
+			// Ensure the package slice is initialized with the header before appending data rows
+			if packageRows[packageNum] == nil {
+				packageRows[packageNum] = [][]string{header}
+			}
 			packageRows[packageNum] = append(packageRows[packageNum], rowValues)
 		}
 	}

@@ -390,13 +390,19 @@ func powerTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.F
 	// e.g., "Package 0 PkgWatt", "Package 0 RAMWatt", "Package 1 PkgWatt", ...
 	header := packageRows[0][0]
 	fields := []table.Field{{Name: "Time"}}
-	for i := range packageRows {
+	for i, pkgRows := range packageRows {
+		if len(pkgRows) == 0 {
+			continue
+		}
 		for _, fieldName := range header[1:] {
 			fields = append(fields, table.Field{Name: fmt.Sprintf("Package %d %s", i, fieldName)})
 		}
 	}
 	numMetrics := len(header) - 1 // number of matched watt fields per package
 	for i, pkgRows := range packageRows {
+		if len(pkgRows) < 2 {
+			continue // skip packages with only a header or empty
+		}
 		// skip the header row (first row), iterate data rows
 		for _, row := range pkgRows[1:] {
 			if i == 0 {
