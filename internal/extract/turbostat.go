@@ -217,7 +217,7 @@ func TurbostatPackageRowsByRegexMatch(turboStatScriptOutput string, fieldRegexs 
 		return nil, fmt.Errorf("unable to parse turbostat output: %w", err)
 	}
 	if len(rows) == 0 {
-		return nil, fmt.Errorf("no package rows found in turbostat output")
+		return nil, fmt.Errorf("no rows found in turbostat output")
 	}
 	// Build our list of matched field names from the first package row
 	var matchedFields []string
@@ -278,7 +278,7 @@ func TurbostatPackageRowsByRegexMatch(turboStatScriptOutput string, fieldRegexs 
 		}
 		packageNum, err := strconv.Atoi(row["Package"])
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse package number: %s", row["Package"])
+			return nil, fmt.Errorf("unable to parse package number %q: %w", row["Package"], err)
 		}
 		if len(packageRows) < packageNum+1 {
 			// Initialize with header row followed by the data row
@@ -345,7 +345,7 @@ func TurbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([]
 		}
 		packageNum, err := strconv.Atoi(row["Package"])
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse package number: %s", row["Package"])
+			return nil, fmt.Errorf("unable to parse package number %q: %w", row["Package"], err)
 		}
 		if len(packageRows) < packageNum+1 {
 			packageRows = append(packageRows, [][]string{rowValues})

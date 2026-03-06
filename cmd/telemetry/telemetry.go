@@ -499,7 +499,7 @@ func getCPUAveragePercentage(tableValues table.TableValues, fieldName string, in
 
 func getPkgAverageTemperature(allTableValues []table.TableValues) string {
 	tableValues := getTableValues(allTableValues, TemperatureTelemetryTableName)
-	// number of packages can vary, so we need to find the average temperature across all packages
+	// compute the average PkgTmp value across all samples
 	if len(tableValues.Fields) == 0 {
 		return ""
 	}
