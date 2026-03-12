@@ -48,6 +48,7 @@ const (
 	scriptKernelVersion          = "kernel version"
 	scriptARMSlots               = "arm slots"
 	scriptARMCPUID               = "arm cpuid"
+	scriptPerfStatAMDUncoreProbe = "perf stat amd uncore probe"
 )
 
 // CommonMetadata -- common to all architectures
@@ -211,6 +212,13 @@ BEGIN {
 		Name:           scriptPerfStatTMA,
 		ScriptTemplate: "perf stat -a -e '{topdown.slots, topdown-bad-spec}' sleep 1",
 		Architectures:  []string{cpus.X86Architecture},
+		Depends:        []string{"perf"},
+	},
+	{
+		Name:           scriptPerfStatAMDUncoreProbe,
+		ScriptTemplate: `perf stat -a -e "l3/event=0x4,umask=0xff,enallcores=0x1,enallslices=0x1,threadmask=0x3,name='l3_lookup_state.all_coherent_accesses_to_l3'/" sleep 1`,
+		Architectures:  []string{cpus.X86Architecture},
+		Vendors:        []string{cpus.AMDVendor},
 		Depends:        []string{"perf"},
 	},
 	{

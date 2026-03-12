@@ -149,6 +149,18 @@ func (c *X86MetadataCollector) CollectMetadata(t target.Target, noRoot bool, noS
 	}
 	metadata.SupportsUncore = c.checkUncoreSupport(metadata.UncoreDeviceIDs, isAMDArchitecture)
 
+	// On AMD, probe that L3 uncore actually works (e.g. GCP VMs expose l3 in sysfs but perf cannot use it).
+	// If the probe fails, disable uncore so collection uses core-only events and still produces metrics.
+	if isAMDArchitecture && metadata.SupportsUncore {
+		if output, ok := scriptOutputs[scriptPerfStatAMDUncoreProbe]; ok {
+			if !getSupportsAMDUncore(output) {
+				slog.Warn("AMD L3 uncore probe failed, disabling uncore metrics", slog.String("stderr", output.Stderr))
+				metadata.SupportsUncore = false
+				removeUncoreDevices(metadata.UncoreDeviceIDs, "l3", "df")
+			}
+		}
+	}
+
 	return metadata, nil
 }
 
@@ -227,6 +239,32 @@ func (c *X86MetadataCollector) checkUncoreSupport(uncoreDeviceIDs map[string][]i
 	}
 	slog.Warn("Uncore devices not supported")
 	return false
+}
+
+// getSupportsAMDUncore returns true if the AMD uncore probe script succeeded (L3 PMU is usable).
+// On some VMs (e.g. GCP AMD Turin), sysfs lists amd_l3 but perf cannot use it.
+func getSupportsAMDUncore(output script.ScriptOutput) bool {
+	if output.Exitcode != 0 {
+		return false
+	}
+	stderr := output.Stderr
+	if strings.Contains(stderr, "Unable to find PMU or event on a PMU of 'l3'") {
+		return false
+	}
+	if strings.Contains(stderr, "event syntax error") && strings.Contains(stderr, "l3") {
+		return false
+	}
+	if strings.Contains(stderr, "<not supported>") {
+		return false
+	}
+	return true
+}
+
+// removeUncoreDevices removes the given device names from the map (used when uncore probe fails).
+func removeUncoreDevices(uncoreDeviceIDs map[string][]int, deviceNames ...string) {
+	for _, name := range deviceNames {
+		delete(uncoreDeviceIDs, name)
+	}
 }
 
 // --- x86-specific helper functions ---

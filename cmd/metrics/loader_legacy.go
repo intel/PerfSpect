@@ -184,6 +184,10 @@ func isCollectableEvent(event EventDefinition, metadata Metadata) bool {
 	// - their corresponding device is not found
 	// - not in system-wide collection scope
 	if event.Device != "cpu" && event.Device != "" {
+		if !metadata.SupportsUncore {
+			slog.Debug("Uncore events not supported on target", slog.String("event", event.Name))
+			return false
+		}
 		if flagScope == scopeProcess || flagScope == scopeCgroup {
 			slog.Debug("Uncore events not supported in process or cgroup scope", slog.String("event", event.Name))
 			return false
