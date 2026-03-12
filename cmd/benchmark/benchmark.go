@@ -260,6 +260,8 @@ func runCmd(cmd *cobra.Command, args []string) error {
 
 	report.RegisterHTMLRenderer(FrequencyBenchmarkTableName, frequencyBenchmarkTableHtmlRenderer)
 	report.RegisterHTMLRenderer(MemoryLoadedLatencyBenchmarkTableName, memoryBenchmarkTableHtmlRenderer)
+	report.RegisterHTMLRenderer(MemoryBandwidthMatrixBenchmarkName, memoryNUMABandwidthMatrixTableHtmlRenderer)
+	report.RegisterHTMLRenderer(MemoryLatencyMatrixBenchmarkName, memoryNUMALatencyMatrixTableHtmlRenderer)
 
 	report.RegisterHTMLMultiTargetRenderer(MemoryLoadedLatencyBenchmarkTableName, memoryBenchmarkTableMultiTargetHtmlRenderer)
 

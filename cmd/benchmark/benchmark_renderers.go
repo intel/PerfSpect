@@ -5,6 +5,7 @@ package benchmark
 
 import (
 	"fmt"
+	"html"
 	"log/slog"
 	"strconv"
 
@@ -124,4 +125,111 @@ func memoryBenchmarkTableMultiTargetHtmlRenderer(allTableValues []table.TableVal
 		SuggestedMax:  "0",
 	}
 	return report.RenderScatterChart(data, datasetNames, chartConfig)
+}
+
+// renderNUMAMatrixHeatmapTable renders a NUMA matrix (bandwidth or latency) as an HTML table
+// with heatmap cell background colors. higherIsBetter true = green for high values (e.g. bandwidth);
+// false = green for low values (e.g. latency).
+func renderNUMAMatrixHeatmapTable(tableValues table.TableValues, higherIsBetter bool) string {
+	if len(tableValues.Fields) < 2 {
+		slog.Error("insufficient fields for NUMA matrix", slog.String("table", tableValues.Name), slog.Int("fields", len(tableValues.Fields)))
+		return ""
+	}
+	rows := len(tableValues.Fields[0].Values)
+	cols := len(tableValues.Fields)
+	// Parse numeric matrix (skip field 0 = row header column)
+	type cell struct {
+		text string
+		val  float64
+		ok   bool
+	}
+	matrix := make([][]cell, rows)
+	var minVal, maxVal float64
+	first := true
+	for r := 0; r < rows; r++ {
+		matrix[r] = make([]cell, cols)
+		for c := 0; c < cols; c++ {
+			matrix[r][c].text = tableValues.Fields[c].Values[r]
+			if c == 0 {
+				matrix[r][c].ok = false
+				continue
+			}
+			v, err := strconv.ParseFloat(tableValues.Fields[c].Values[r], 64)
+			if err != nil {
+				matrix[r][c].ok = false
+				continue
+			}
+			matrix[r][c].val = v
+			matrix[r][c].ok = true
+			if first {
+				minVal, maxVal = v, v
+				first = false
+			} else {
+				if v < minVal {
+					minVal = v
+				}
+				if v > maxVal {
+					maxVal = v
+				}
+			}
+		}
+	}
+	// Build headers and rows for RenderHTMLTable
+	headers := make([]string, cols)
+	for c := 0; c < cols; c++ {
+		headers[c] = tableValues.Fields[c].Name
+	}
+	tableRows := make([][]string, rows)
+	valuesStyles := make([][]string, rows)
+	span := maxVal - minVal
+	if span == 0 {
+		span = 1
+	}
+	for r := 0; r < rows; r++ {
+		tableRows[r] = make([]string, cols)
+		valuesStyles[r] = make([]string, cols)
+		for c := 0; c < cols; c++ {
+			tableRows[r][c] = html.EscapeString(matrix[r][c].text)
+			if c == 0 {
+				valuesStyles[r][c] = "font-weight:bold"
+				continue
+			}
+			if !matrix[r][c].ok {
+				continue
+			}
+			v := matrix[r][c].val
+			var t float64
+			if higherIsBetter {
+				t = (v - minVal) / span
+			} else {
+				t = (maxVal - v) / span
+			}
+			valuesStyles[r][c] = heatmapCellStyle(t)
+		}
+	}
+	return report.RenderHTMLTable(headers, tableRows, "pure-table pure-table-striped", valuesStyles)
+}
+
+// heatmapCellStyle returns a CSS background-color for a normalized value t in [0,1].
+// t=0 -> red, t=1 -> green; interpolates in RGB.
+func heatmapCellStyle(t float64) string {
+	if t < 0 {
+		t = 0
+	}
+	if t > 1 {
+		t = 1
+	}
+	// Red #e03131 to Green #2f9e44
+	r := uint8(224 - (224-47)*t)
+	g := uint8(49 + (158-49)*t)
+	b := uint8(49 + (68-49)*t)
+	return fmt.Sprintf("background-color: rgb(%d,%d,%d)", r, g, b)
+}
+
+func memoryNUMABandwidthMatrixTableHtmlRenderer(tableValues table.TableValues, targetName string) string {
+	return renderNUMAMatrixHeatmapTable(tableValues, true)
+}
+
+func memoryNUMALatencyMatrixTableHtmlRenderer(tableValues table.TableValues, targetName string) string {
+	return renderNUMAMatrixHeatmapTable(tableValues, false)
 }
