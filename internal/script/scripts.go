@@ -103,13 +103,14 @@ const (
 	ArmPartScriptName                = "arm part"
 	ArmDmidecodePartScriptName       = "arm dmidecode part"
 	// benchmark scripts
-	MemoryBenchmarkScriptName    = "memory benchmark"
-	NumaBenchmarkScriptName      = "numa benchmark"
-	SpeedBenchmarkScriptName     = "speed benchmark"
-	FrequencyBenchmarkScriptName = "frequency benchmark"
-	PowerBenchmarkScriptName     = "power benchmark"
-	IdlePowerBenchmarkScriptName = "idle power benchmark"
-	StorageBenchmarkScriptName   = "storage benchmark"
+	MemoryLoadedLatencyBenchmarkScriptName       = "memory loaded latency benchmark"
+	MemoryNUMABandwidthMatrixBenchmarkScriptName = "memory numa bandwidth matrix benchmark"
+	MemoryNUMALatencyMatrixBenchmarkScriptName   = "memory numa latency matrix benchmark"
+	SpeedBenchmarkScriptName                     = "speed benchmark"
+	FrequencyBenchmarkScriptName                 = "frequency benchmark"
+	PowerBenchmarkScriptName                     = "power benchmark"
+	IdlePowerBenchmarkScriptName                 = "idle power benchmark"
+	StorageBenchmarkScriptName                   = "storage benchmark"
 	// telemetry scripts
 	MpstatTelemetryScriptName      = "mpstat telemetry"
 	IostatTelemetryScriptName      = "iostat telemetry"
@@ -1036,8 +1037,8 @@ echo $__DEFAULT_HL_DEVICE
 		Superuser:      true,
 		Depends:        []string{"dmidecode"},
 	},
-	MemoryBenchmarkScriptName: {
-		Name: MemoryBenchmarkScriptName,
+	MemoryLoadedLatencyBenchmarkScriptName: {
+		Name: MemoryLoadedLatencyBenchmarkScriptName,
 		ScriptTemplate: `# measure memory loaded latency
 #  need at least 2 GB (2,097,152 KB) of huge pages per NUMA node
 min_kb=2097152
@@ -1056,8 +1057,8 @@ echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages
 		Depends:    []string{"mlc"},
 		Sequential: true,
 	},
-	NumaBenchmarkScriptName: {
-		Name: NumaBenchmarkScriptName,
+	MemoryNUMABandwidthMatrixBenchmarkScriptName: {
+		Name: MemoryNUMABandwidthMatrixBenchmarkScriptName,
 		ScriptTemplate: `# measure memory bandwidth matrix
 #  need at least 2 GB (2,097,152 KB) of huge pages per NUMA node
 min_kb=2097152
@@ -1069,6 +1070,26 @@ if [ $needed_num_huge_pages -gt $orig_num_huge_pages ]; then
   echo $needed_num_huge_pages > /proc/sys/vm/nr_hugepages
 fi
 mlc --bandwidth_matrix -b500m -X
+echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages
+`,
+		Superuser:  true,
+		Lkms:       []string{"msr"},
+		Depends:    []string{"mlc"},
+		Sequential: true,
+	},
+	MemoryNUMALatencyMatrixBenchmarkScriptName: {
+		Name: MemoryNUMALatencyMatrixBenchmarkScriptName,
+		ScriptTemplate: `# measure memory latency matrix
+#  need at least 2 GB (2,097,152 KB) of huge pages per NUMA node
+min_kb=2097152
+numa_nodes=$( lscpu | grep "NUMA node(s):" | awk '{print $3}' )
+size_huge_pages_kb=$( grep Hugepagesize /proc/meminfo | awk '{print $2}' )
+orig_num_huge_pages=$( cat /proc/sys/vm/nr_hugepages )
+needed_num_huge_pages=$((numa_nodes * min_kb / size_huge_pages_kb))
+if [ $needed_num_huge_pages -gt $orig_num_huge_pages ]; then
+  echo $needed_num_huge_pages > /proc/sys/vm/nr_hugepages
+fi
+mlc --latency_matrix -b500m -X
 echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages
 `,
 		Superuser:  true,

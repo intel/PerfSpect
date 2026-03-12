@@ -19,19 +19,30 @@ import (
 // table names
 const (
 	// benchmark table names
-	SpeedBenchmarkTableName       = "Speed Benchmark"
-	PowerBenchmarkTableName       = "Power Benchmark"
-	TemperatureBenchmarkTableName = "Temperature Benchmark"
-	FrequencyBenchmarkTableName   = "Frequency Benchmark"
-	MemoryBenchmarkTableName      = "Memory Benchmark"
-	NUMABenchmarkTableName        = "NUMA Benchmark"
-	StorageBenchmarkTableName     = "Storage Benchmark"
+	SpeedBenchmarkTableName               = "Speed"
+	PowerBenchmarkTableName               = "Power"
+	TemperatureBenchmarkTableName         = "Temperature"
+	FrequencyBenchmarkTableName           = "Frequency"
+	MemoryLoadedLatencyBenchmarkTableName = "Memory Loaded Latency"
+	MemoryBandwidthMatrixBenchmarkName    = "Memory NUMA Bandwidth Matrix (GB/s)"
+	MemoryLatencyMatrixBenchmarkName      = "Memory NUMA Latency Matrix (ns)"
+	StorageBenchmarkTableName             = "Storage"
+)
+
+const (
+	// menu labels
+	SpeedBenchmarksMenuLabel       = "Speed"
+	PowerBenchmarksMenuLabel       = "Power"
+	TemperatureBenchmarksMenuLabel = "Temperature"
+	FrequencyBenchmarksMenuLabel   = "Frequency"
+	MemoryBenchmarksMenuLabel      = "Memory"
+	StorageBenchmarksMenuLabel     = "Storage"
 )
 
 var tableDefinitions = map[string]table.TableDefinition{
 	SpeedBenchmarkTableName: {
 		Name:      SpeedBenchmarkTableName,
-		MenuLabel: SpeedBenchmarkTableName,
+		MenuLabel: SpeedBenchmarksMenuLabel,
 		HasRows:   false,
 		ScriptNames: []string{
 			script.SpeedBenchmarkScriptName,
@@ -39,7 +50,7 @@ var tableDefinitions = map[string]table.TableDefinition{
 		FieldsFunc: speedBenchmarkTableValues},
 	PowerBenchmarkTableName: {
 		Name:          PowerBenchmarkTableName,
-		MenuLabel:     PowerBenchmarkTableName,
+		MenuLabel:     PowerBenchmarksMenuLabel,
 		Architectures: []string{cpus.X86Architecture},
 		HasRows:       false,
 		ScriptNames: []string{
@@ -49,7 +60,7 @@ var tableDefinitions = map[string]table.TableDefinition{
 		FieldsFunc: powerBenchmarkTableValues},
 	TemperatureBenchmarkTableName: {
 		Name:          TemperatureBenchmarkTableName,
-		MenuLabel:     TemperatureBenchmarkTableName,
+		MenuLabel:     TemperatureBenchmarksMenuLabel,
 		Architectures: []string{cpus.X86Architecture},
 		HasRows:       false,
 		ScriptNames: []string{
@@ -58,7 +69,7 @@ var tableDefinitions = map[string]table.TableDefinition{
 		FieldsFunc: temperatureBenchmarkTableValues},
 	FrequencyBenchmarkTableName: {
 		Name:          FrequencyBenchmarkTableName,
-		MenuLabel:     FrequencyBenchmarkTableName,
+		MenuLabel:     FrequencyBenchmarksMenuLabel,
 		Architectures: []string{cpus.X86Architecture},
 		HasRows:       true,
 		ScriptNames: []string{
@@ -69,29 +80,35 @@ var tableDefinitions = map[string]table.TableDefinition{
 			script.FrequencyBenchmarkScriptName,
 		},
 		FieldsFunc: frequencyBenchmarkTableValues},
-	MemoryBenchmarkTableName: {
-		Name:          MemoryBenchmarkTableName,
-		MenuLabel:     MemoryBenchmarkTableName,
+	MemoryLoadedLatencyBenchmarkTableName: {
+		Name:          MemoryLoadedLatencyBenchmarkTableName,
+		MenuLabel:     MemoryBenchmarksMenuLabel,
 		Architectures: []string{cpus.X86Architecture},
 		HasRows:       true,
 		ScriptNames: []string{
-			script.MemoryBenchmarkScriptName,
+			script.MemoryLoadedLatencyBenchmarkScriptName,
 		},
-		NoDataFound: "No memory benchmark data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
+		NoDataFound: "No memory loaded latency benchmark data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
 		FieldsFunc:  memoryBenchmarkTableValues},
-	NUMABenchmarkTableName: {
-		Name:          NUMABenchmarkTableName,
-		MenuLabel:     NUMABenchmarkTableName,
+	MemoryBandwidthMatrixBenchmarkName: {
+		Name:          MemoryBandwidthMatrixBenchmarkName,
 		Architectures: []string{cpus.X86Architecture},
 		HasRows:       true,
 		ScriptNames: []string{
-			script.NumaBenchmarkScriptName,
+			script.MemoryNUMABandwidthMatrixBenchmarkScriptName,
 		},
-		NoDataFound: "No NUMA benchmark data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
-		FieldsFunc:  numaBenchmarkTableValues},
+		FieldsFunc: memoryNUMABandwidthMatrixTableValues},
+	MemoryLatencyMatrixBenchmarkName: {
+		Name:          MemoryLatencyMatrixBenchmarkName,
+		Architectures: []string{cpus.X86Architecture},
+		HasRows:       true,
+		ScriptNames: []string{
+			script.MemoryNUMALatencyMatrixBenchmarkScriptName,
+		},
+		FieldsFunc: memoryNUMALatencyMatrixTableValues},
 	StorageBenchmarkTableName: {
 		Name:      StorageBenchmarkTableName,
-		MenuLabel: StorageBenchmarkTableName,
+		MenuLabel: StorageBenchmarksMenuLabel,
 		HasRows:   true,
 		ScriptNames: []string{
 			script.StorageBenchmarkScriptName,
@@ -232,7 +249,7 @@ func memoryBenchmarkTableValues(outputs map[string]script.ScriptOutput) []table.
 	 00008	261.54	 225073.3
 	 ...
 	*/
-	latencyBandwidthPairs := extract.ValsArrayFromRegexSubmatch(outputs[script.MemoryBenchmarkScriptName].Stdout, `\s*[0-9]*\s*([0-9]*\.[0-9]+)\s*([0-9]*\.[0-9]+)`)
+	latencyBandwidthPairs := extract.ValsArrayFromRegexSubmatch(outputs[script.MemoryLoadedLatencyBenchmarkScriptName].Stdout, `\s*[0-9]*\s*([0-9]*\.[0-9]+)\s*([0-9]*\.[0-9]+)`)
 	for _, latencyBandwidth := range latencyBandwidthPairs {
 		latency := latencyBandwidth[0]
 		bandwidth, err := strconv.ParseFloat(latencyBandwidth[1], 32)
@@ -250,7 +267,7 @@ func memoryBenchmarkTableValues(outputs map[string]script.ScriptOutput) []table.
 	return fields
 }
 
-func numaBenchmarkTableValues(outputs map[string]script.ScriptOutput) []table.Field {
+func memoryNUMABandwidthMatrixTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	fields := []table.Field{
 		{Name: "Node"},
 	}
@@ -260,7 +277,7 @@ func numaBenchmarkTableValues(outputs map[string]script.ScriptOutput) []table.Fi
 	       0	175610.3	 55579.7
 	       1	 55575.2	175656.7
 	*/
-	nodeBandwidthsPairs := extract.ValsArrayFromRegexSubmatch(outputs[script.NumaBenchmarkScriptName].Stdout, `^\s+(\d)\s+(\d.*)$`)
+	nodeBandwidthsPairs := extract.ValsArrayFromRegexSubmatch(outputs[script.MemoryNUMABandwidthMatrixBenchmarkScriptName].Stdout, `^\s+(\d)\s+(\d.*)$`)
 	// add 1 field per numa node
 	for _, nodeBandwidthsPair := range nodeBandwidthsPairs {
 		fields = append(fields, table.Field{Name: nodeBandwidthsPair[0]})
@@ -281,6 +298,45 @@ func numaBenchmarkTableValues(outputs map[string]script.ScriptOutput) []table.Fi
 				continue
 			}
 			fields[i+1].Values = append(fields[i+1].Values, fmt.Sprintf("%.1f", val/1000))
+		}
+	}
+	if len(fields[0].Values) == 0 {
+		return []table.Field{}
+	}
+	return fields
+}
+
+func memoryNUMALatencyMatrixTableValues(outputs map[string]script.ScriptOutput) []table.Field {
+	fields := []table.Field{
+		{Name: "Node"},
+	}
+	/* MLC Output:
+		Numa node
+	Numa node	     0	     1
+	       0	175	 200
+	       1	 100	 150
+	*/
+	nodeLatenciesPairs := extract.ValsArrayFromRegexSubmatch(outputs[script.MemoryNUMALatencyMatrixBenchmarkScriptName].Stdout, `^\s+(\d)\s+(\d.*)$`)
+	// add 1 field per numa node
+	for _, nodeLatencyPairs := range nodeLatenciesPairs {
+		fields = append(fields, table.Field{Name: nodeLatencyPairs[0]})
+	}
+	// add rows
+	for _, nodeLatencyPairs := range nodeLatenciesPairs {
+		fields[0].Values = append(fields[0].Values, nodeLatencyPairs[0])
+		latencies := strings.Split(strings.TrimSpace(nodeLatencyPairs[1]), "\t")
+		if len(latencies) != len(nodeLatenciesPairs) {
+			slog.Warn(fmt.Sprintf("Mismatched number of bandwidths for numa node %s, %s", nodeLatencyPairs[0], nodeLatencyPairs[1]))
+			return []table.Field{}
+		}
+		for i, latency := range latencies {
+			latency = strings.TrimSpace(latency)
+			val, err := strconv.ParseFloat(latency, 64)
+			if err != nil {
+				slog.Error(fmt.Sprintf("Unable to convert latency to float: %s", latency))
+				continue
+			}
+			fields[i+1].Values = append(fields[i+1].Values, fmt.Sprintf("%.1f", val))
 		}
 	}
 	if len(fields[0].Values) == 0 {

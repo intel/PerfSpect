@@ -59,7 +59,6 @@ var (
 	flagTemperature bool
 	flagFrequency   bool
 	flagMemory      bool
-	flagNuma        bool
 	flagStorage     bool
 
 	flagNoSystemSummary bool
@@ -76,7 +75,6 @@ const (
 	flagTemperatureName = "temperature"
 	flagFrequencyName   = "frequency"
 	flagMemoryName      = "memory"
-	flagNumaName        = "numa"
 	flagStorageName     = "storage"
 
 	flagNoSystemSummaryName = "no-summary"
@@ -91,8 +89,11 @@ var categories = []app.Category{
 	{FlagName: flagPowerName, FlagVar: &flagPower, DefaultValue: false, Help: "power consumption benchmark", Tables: []table.TableDefinition{tableDefinitions[PowerBenchmarkTableName]}},
 	{FlagName: flagTemperatureName, FlagVar: &flagTemperature, DefaultValue: false, Help: "temperature benchmark", Tables: []table.TableDefinition{tableDefinitions[TemperatureBenchmarkTableName]}},
 	{FlagName: flagFrequencyName, FlagVar: &flagFrequency, DefaultValue: false, Help: "turbo frequency benchmark", Tables: []table.TableDefinition{tableDefinitions[FrequencyBenchmarkTableName]}},
-	{FlagName: flagMemoryName, FlagVar: &flagMemory, DefaultValue: false, Help: "memory latency and bandwidth benchmark", Tables: []table.TableDefinition{tableDefinitions[MemoryBenchmarkTableName]}},
-	{FlagName: flagNumaName, FlagVar: &flagNuma, DefaultValue: false, Help: "NUMA bandwidth matrix benchmark", Tables: []table.TableDefinition{tableDefinitions[NUMABenchmarkTableName]}},
+	{FlagName: flagMemoryName, FlagVar: &flagMemory, DefaultValue: false, Help: "memory latency and bandwidth benchmark",
+		Tables: []table.TableDefinition{
+			tableDefinitions[MemoryLoadedLatencyBenchmarkTableName],
+			tableDefinitions[MemoryBandwidthMatrixBenchmarkName],
+			tableDefinitions[MemoryLatencyMatrixBenchmarkName]}},
 	{FlagName: flagStorageName, FlagVar: &flagStorage, DefaultValue: false, Help: "storage performance benchmark", Tables: []table.TableDefinition{tableDefinitions[StorageBenchmarkTableName]}},
 }
 
@@ -258,9 +259,9 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	report.RegisterHTMLRenderer(FrequencyBenchmarkTableName, frequencyBenchmarkTableHtmlRenderer)
-	report.RegisterHTMLRenderer(MemoryBenchmarkTableName, memoryBenchmarkTableHtmlRenderer)
+	report.RegisterHTMLRenderer(MemoryLoadedLatencyBenchmarkTableName, memoryBenchmarkTableHtmlRenderer)
 
-	report.RegisterHTMLMultiTargetRenderer(MemoryBenchmarkTableName, memoryBenchmarkTableMultiTargetHtmlRenderer)
+	report.RegisterHTMLMultiTargetRenderer(MemoryLoadedLatencyBenchmarkTableName, memoryBenchmarkTableMultiTargetHtmlRenderer)
 
 	return reportingCommand.Run()
 }
@@ -275,7 +276,7 @@ func benchmarkSummaryFromTableValues(allTableValues []table.TableValues, outputs
 		allCoreMaxFreq = allCoreMaxFreq + " GHz"
 	}
 	// get the maximum memory bandwidth from the memory latency table
-	memLatTableValues := getTableValues(allTableValues, MemoryBenchmarkTableName)
+	memLatTableValues := getTableValues(allTableValues, MemoryLoadedLatencyBenchmarkTableName)
 	var bandwidthValues []string
 	if len(memLatTableValues.Fields) > 1 {
 		bandwidthValues = memLatTableValues.Fields[1].Values
@@ -296,7 +297,7 @@ func benchmarkSummaryFromTableValues(allTableValues []table.TableValues, outputs
 		maxMemBW = fmt.Sprintf("%.1f GB/s", maxBandwidth)
 	}
 	// get the minimum memory latency
-	minLatency := getValueFromTableValues(getTableValues(allTableValues, MemoryBenchmarkTableName), "Latency (ns)", 0)
+	minLatency := getValueFromTableValues(getTableValues(allTableValues, MemoryLoadedLatencyBenchmarkTableName), "Latency (ns)", 0)
 	if minLatency != "" {
 		minLatency = minLatency + " ns"
 	}
