@@ -123,7 +123,6 @@ var tableDefinitions = map[string]table.TableDefinition{
 		FieldsFunc:  cacheIdleLatencyTableValues},
 	CacheMaxBandwidthBenchmarkTableName: {
 		Name:          CacheMaxBandwidthBenchmarkTableName,
-		MenuLabel:     CacheBenchmarksMenuLabel,
 		Architectures: []string{cpus.X86Architecture},
 		HasRows:       false,
 		ScriptNames: []string{
