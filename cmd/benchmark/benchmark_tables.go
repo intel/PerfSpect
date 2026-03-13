@@ -130,8 +130,7 @@ var tableDefinitions = map[string]table.TableDefinition{
 			script.L2MaxBandwidthBenchmarkScriptName,
 			script.L3MaxBandwidthBenchmarkScriptName,
 		},
-		NoDataFound: "No cache maximum bandwidth benchmark data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
-		FieldsFunc:  cacheMaxBandwidthTableValues},
+		FieldsFunc: cacheMaxBandwidthTableValues},
 	StorageBenchmarkTableName: {
 		Name:      StorageBenchmarkTableName,
 		MenuLabel: StorageBenchmarksMenuLabel,
