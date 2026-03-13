@@ -187,8 +187,13 @@ BUF_KB=$(( L2_KB * 4 ))
 // mlcInvocation: exact arguments to mlc (e.g. "--loaded_latency -b${BUF_KB} -X"). Enables
 // different flags for memory vs cache; can be updated per script when cache flags are finalized.
 func mlcBenchmarkScript(bufferSetup, mlcInvocation string) string {
-	return `cache_size_mb() { local one_size=$(lscpu -C 2>/dev/null | awk -v level="$1" '$1==level {print $2; exit}'); [ -z "$one_size" ] && echo 1 && return; echo "$one_size" | awk '/M$/{gsub(/M/,""); v=$1+0; printf "%.0f", (v<1?1:v); exit} /K$/{gsub(/K/,""); v=$1/1024; printf "%.0f", (v<1?1:v); exit} /G$/{gsub(/G/,""); printf "%.0f", $1*1024; exit} {print 1}'; }
-cache_size_kb() { local one_size=$(lscpu -C 2>/dev/null | awk -v level="$1" '$1==level {print $2; exit}'); [ -z "$one_size" ] && echo 1 && return; echo "$one_size" | awk '/M$/{gsub(/M/,""); v=$1+0; printf "%.0f", (v<0.001?1:v*1024); exit} /K$/{gsub(/K/,""); v=$1+0; printf "%.0f", (v<1?1:v); exit} /G$/{gsub(/G/,""); printf "%.0f", $1*1024*1024; exit} {print 1}'; }
+	return `cache_size_kb() {
+  local one_size
+  one_size=$(lscpu -C 2>/dev/null | awk -v level="$1" '$1==level {print $2; exit}')
+  if [ -z "$one_size" ]; then echo 1; return; fi
+  # Parse lscpu size (e.g. 32K, 1M, 2G): M->KB (v*1024, min 1), K->as-is (min 1), G->KB ($1*1024*1024), else 1
+  echo "$one_size" | awk '/M$/{gsub(/M/,""); v=$1+0; printf "%.0f", (v<0.001?1:v*1024); exit} /K$/{gsub(/K/,""); v=$1+0; printf "%.0f", (v<1?1:v); exit} /G$/{gsub(/G/,""); printf "%.0f", $1*1024*1024; exit} {print 1}'
+}
 ` +
 		bufferSetup + "\n" +
 		`min_kb=2097152
