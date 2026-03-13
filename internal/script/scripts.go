@@ -103,13 +103,20 @@ const (
 	ArmPartScriptName                = "arm part"
 	ArmDmidecodePartScriptName       = "arm dmidecode part"
 	// benchmark scripts
-	MemoryBenchmarkScriptName    = "memory benchmark"
-	NumaBenchmarkScriptName      = "numa benchmark"
-	SpeedBenchmarkScriptName     = "speed benchmark"
-	FrequencyBenchmarkScriptName = "frequency benchmark"
-	PowerBenchmarkScriptName     = "power benchmark"
-	IdlePowerBenchmarkScriptName = "idle power benchmark"
-	StorageBenchmarkScriptName   = "storage benchmark"
+	MemoryLoadedLatencyBenchmarkScriptName       = "memory loaded latency benchmark"
+	MemoryNUMABandwidthMatrixBenchmarkScriptName = "memory numa bandwidth matrix benchmark"
+	MemoryNUMALatencyMatrixBenchmarkScriptName   = "memory numa latency matrix benchmark"
+	L1IdleLatencyBenchmarkScriptName             = "l1 idle latency benchmark"
+	L2IdleLatencyBenchmarkScriptName             = "l2 idle latency benchmark"
+	L3IdleLatencyBenchmarkScriptName             = "l3 idle latency benchmark"
+	L1MaxBandwidthBenchmarkScriptName            = "l1 max bandwidth benchmark"
+	L2MaxBandwidthBenchmarkScriptName            = "l2 max bandwidth benchmark"
+	L3MaxBandwidthBenchmarkScriptName            = "l3 max bandwidth benchmark"
+	SpeedBenchmarkScriptName                     = "speed benchmark"
+	FrequencyBenchmarkScriptName                 = "frequency benchmark"
+	PowerBenchmarkScriptName                     = "power benchmark"
+	IdlePowerBenchmarkScriptName                 = "idle power benchmark"
+	StorageBenchmarkScriptName                   = "storage benchmark"
 	// telemetry scripts
 	MpstatTelemetryScriptName      = "mpstat telemetry"
 	IostatTelemetryScriptName      = "iostat telemetry"
@@ -153,6 +160,53 @@ func GetParameterizedScriptByName(name string, params map[string]string) ScriptD
 	scriptDefinition := scriptDefinitions[name]
 	scriptDefinition.ScriptTemplate = buf.String()
 	return scriptDefinition
+}
+
+// mlc benchmark script constants (buffer setup snippets passed into mlcBenchmarkScript)
+const (
+	// for measuring memory bandwidth and latency (2x of L3 cache size)
+	mlcBufferSetupMemory = `L3_KB=$(cache_size_kb L3)
+BUF_KB=$(( L3_KB * 2 ))
+[ $BUF_KB -lt 1 ] && BUF_KB=1`
+	// for measuring L1 bandwidth and latency (half of L1D cache size minus 4KB)
+	mlcBufferSetupL1 = `L1D_KB=$(cache_size_kb L1D)
+BUF_KB=$(( L1D_KB / 2 - 4 ))
+[ $BUF_KB -lt 1 ] && BUF_KB=1`
+	// for measuring L2 bandwidth and latency (half of L2 cache size)
+	mlcBufferSetupL2 = `L2_KB=$(cache_size_kb L2)
+BUF_KB=$(( L2_KB / 2 ))
+[ $BUF_KB -lt 1 ] && BUF_KB=1`
+	// for measuring L3 bandwidth and latency (4x of L2 cache size)
+	mlcBufferSetupL3 = `L2_KB=$(cache_size_kb L2)
+BUF_KB=$(( L2_KB * 4 ))
+[ $BUF_KB -lt 1 ] && BUF_KB=1`
+)
+
+// mlcBenchmarkScript returns the full bash script for an MLC memory/cache benchmark.
+// bufferSetup: bash that sets BUF_KB (and ensures min 1). MLC -b is kB by default; append 'm' for MB.
+// mlcInvocation: exact arguments to mlc (e.g. "--loaded_latency -b${BUF_KB} -X"). Enables
+// different flags for memory vs cache; can be updated per script when cache flags are finalized.
+func mlcBenchmarkScript(bufferSetup, mlcInvocation string) string {
+	return `cache_size_kb() {
+  local one_size
+  one_size=$(lscpu -C 2>/dev/null | awk -v level="$1" '$1==level {print $2; exit}')
+  if [ -z "$one_size" ]; then echo 1; return; fi
+  # Parse lscpu size (e.g. 32K, 1M, 2G): M->KB (v*1024, min 1), K->as-is (min 1), G->KB ($1*1024*1024), else 1
+  echo "$one_size" | awk '/M$/{gsub(/M/,""); v=$1+0; printf "%.0f", (v<0.001?1:v*1024); exit} /K$/{gsub(/K/,""); v=$1+0; printf "%.0f", (v<1?1:v); exit} /G$/{gsub(/G/,""); printf "%.0f", $1*1024*1024; exit} {print 1}'
+}
+` +
+		bufferSetup + "\n" +
+		`min_kb=2097152
+numa_nodes=$( lscpu | grep "NUMA node(s):" | awk '{print $3}' )
+size_huge_pages_kb=$( grep Hugepagesize /proc/meminfo | awk '{print $2}' )
+orig_num_huge_pages=$( cat /proc/sys/vm/nr_hugepages )
+needed_num_huge_pages=$((numa_nodes * min_kb / size_huge_pages_kb))
+if [ $needed_num_huge_pages -gt $orig_num_huge_pages ]; then
+  echo $needed_num_huge_pages > /proc/sys/vm/nr_hugepages
+fi
+` +
+		"mlc " + mlcInvocation + "\n" +
+		"echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages\n"
 }
 
 // script definitions
@@ -1036,45 +1090,77 @@ echo $__DEFAULT_HL_DEVICE
 		Superuser:      true,
 		Depends:        []string{"dmidecode"},
 	},
-	MemoryBenchmarkScriptName: {
-		Name: MemoryBenchmarkScriptName,
-		ScriptTemplate: `# measure memory loaded latency
-#  need at least 2 GB (2,097,152 KB) of huge pages per NUMA node
-min_kb=2097152
-numa_nodes=$( lscpu | grep "NUMA node(s):" | awk '{print $3}' )
-size_huge_pages_kb=$( grep Hugepagesize /proc/meminfo | awk '{print $2}' )
-orig_num_huge_pages=$( cat /proc/sys/vm/nr_hugepages )
-needed_num_huge_pages=$((numa_nodes * min_kb / size_huge_pages_kb))
-if [ $needed_num_huge_pages -gt $orig_num_huge_pages ]; then
-  echo $needed_num_huge_pages > /proc/sys/vm/nr_hugepages
-fi
-mlc --loaded_latency -b500m -X
-echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages
-`,
-		Superuser:  true,
-		Lkms:       []string{"msr"},
-		Depends:    []string{"mlc"},
-		Sequential: true,
+	MemoryLoadedLatencyBenchmarkScriptName: {
+		Name:           MemoryLoadedLatencyBenchmarkScriptName,
+		ScriptTemplate: mlcBenchmarkScript(mlcBufferSetupMemory, "--loaded_latency -b${BUF_KB} -X"),
+		Superuser:      true,
+		Lkms:           []string{"msr"},
+		Depends:        []string{"mlc"},
+		Sequential:     true,
 	},
-	NumaBenchmarkScriptName: {
-		Name: NumaBenchmarkScriptName,
-		ScriptTemplate: `# measure memory bandwidth matrix
-#  need at least 2 GB (2,097,152 KB) of huge pages per NUMA node
-min_kb=2097152
-numa_nodes=$( lscpu | grep "NUMA node(s):" | awk '{print $3}' )
-size_huge_pages_kb=$( grep Hugepagesize /proc/meminfo | awk '{print $2}' )
-orig_num_huge_pages=$( cat /proc/sys/vm/nr_hugepages )
-needed_num_huge_pages=$((numa_nodes * min_kb / size_huge_pages_kb))
-if [ $needed_num_huge_pages -gt $orig_num_huge_pages ]; then
-  echo $needed_num_huge_pages > /proc/sys/vm/nr_hugepages
-fi
-mlc --bandwidth_matrix -b500m -X
-echo $orig_num_huge_pages > /proc/sys/vm/nr_hugepages
-`,
-		Superuser:  true,
-		Lkms:       []string{"msr"},
-		Depends:    []string{"mlc"},
-		Sequential: true,
+	MemoryNUMABandwidthMatrixBenchmarkScriptName: {
+		Name:           MemoryNUMABandwidthMatrixBenchmarkScriptName,
+		ScriptTemplate: mlcBenchmarkScript(mlcBufferSetupMemory, "--bandwidth_matrix -b${BUF_KB} -X"),
+		Superuser:      true,
+		Lkms:           []string{"msr"},
+		Depends:        []string{"mlc"},
+		Sequential:     true,
+	},
+	MemoryNUMALatencyMatrixBenchmarkScriptName: {
+		Name:           MemoryNUMALatencyMatrixBenchmarkScriptName,
+		ScriptTemplate: mlcBenchmarkScript(mlcBufferSetupMemory, "--latency_matrix -b${BUF_KB} -X"),
+		Superuser:      true,
+		Lkms:           []string{"msr"},
+		Depends:        []string{"mlc"},
+		Sequential:     true,
+	},
+	L1IdleLatencyBenchmarkScriptName: {
+		Name:           L1IdleLatencyBenchmarkScriptName,
+		ScriptTemplate: mlcBenchmarkScript(mlcBufferSetupL1, "--idle_latency -b${BUF_KB} -t10 -c1 -i1"),
+		Superuser:      true,
+		Lkms:           []string{"msr"},
+		Depends:        []string{"mlc"},
+		Sequential:     true,
+	},
+	L2IdleLatencyBenchmarkScriptName: {
+		Name:           L2IdleLatencyBenchmarkScriptName,
+		ScriptTemplate: mlcBenchmarkScript(mlcBufferSetupL2, "--idle_latency -b${BUF_KB} -t10 -c1 -i3"),
+		Superuser:      true,
+		Lkms:           []string{"msr"},
+		Depends:        []string{"mlc"},
+		Sequential:     true,
+	},
+	L3IdleLatencyBenchmarkScriptName: {
+		Name:           L3IdleLatencyBenchmarkScriptName,
+		ScriptTemplate: mlcBenchmarkScript(mlcBufferSetupL3, "--idle_latency -b${BUF_KB} -t10 -c1 -i3"),
+		Superuser:      true,
+		Lkms:           []string{"msr"},
+		Depends:        []string{"mlc"},
+		Sequential:     true,
+	},
+	L1MaxBandwidthBenchmarkScriptName: {
+		Name:           L1MaxBandwidthBenchmarkScriptName,
+		ScriptTemplate: mlcBenchmarkScript(mlcBufferSetupL1, "--loaded_latency -d0 -T -b${BUF_KB} -t10"),
+		Superuser:      true,
+		Lkms:           []string{"msr"},
+		Depends:        []string{"mlc"},
+		Sequential:     true,
+	},
+	L2MaxBandwidthBenchmarkScriptName: {
+		Name:           L2MaxBandwidthBenchmarkScriptName,
+		ScriptTemplate: mlcBenchmarkScript(mlcBufferSetupL2, "--loaded_latency -d0 -T -b${BUF_KB} -t10"),
+		Superuser:      true,
+		Lkms:           []string{"msr"},
+		Depends:        []string{"mlc"},
+		Sequential:     true,
+	},
+	L3MaxBandwidthBenchmarkScriptName: {
+		Name:           L3MaxBandwidthBenchmarkScriptName,
+		ScriptTemplate: mlcBenchmarkScript(mlcBufferSetupL3, "--loaded_latency -d0 -T -b${BUF_KB} -t10 -u"),
+		Superuser:      true,
+		Lkms:           []string{"msr"},
+		Depends:        []string{"mlc"},
+		Sequential:     true,
 	},
 	SpeedBenchmarkScriptName: {
 		Name: SpeedBenchmarkScriptName,

@@ -19,7 +19,7 @@ Flags:
     --temperature          temperature benchmark (default: false)
     --frequency            turbo frequency benchmark (default: false)
     --memory               memory latency and bandwidth benchmark (default: false)
-    --numa                 NUMA bandwidth matrix benchmark (default: false)
+    --cache                L1/L2/L3 cache idle latency and maximum bandwidth benchmark (default: false)
     --storage              storage performance benchmark (default: false)
   Other Options:
     --no-summary           do not include system summary in output (default: false)

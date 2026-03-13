@@ -19,19 +19,33 @@ import (
 // table names
 const (
 	// benchmark table names
-	SpeedBenchmarkTableName       = "Speed Benchmark"
-	PowerBenchmarkTableName       = "Power Benchmark"
-	TemperatureBenchmarkTableName = "Temperature Benchmark"
-	FrequencyBenchmarkTableName   = "Frequency Benchmark"
-	MemoryBenchmarkTableName      = "Memory Benchmark"
-	NUMABenchmarkTableName        = "NUMA Benchmark"
-	StorageBenchmarkTableName     = "Storage Benchmark"
+	SpeedBenchmarkTableName               = "Speed"
+	PowerBenchmarkTableName               = "Power"
+	TemperatureBenchmarkTableName         = "Temperature"
+	FrequencyBenchmarkTableName           = "Frequency"
+	MemoryLoadedLatencyBenchmarkTableName = "Memory Loaded Latency"
+	MemoryBandwidthMatrixBenchmarkName    = "Memory NUMA Bandwidth Matrix (GB/s)"
+	MemoryLatencyMatrixBenchmarkName      = "Memory NUMA Latency Matrix (ns)"
+	CacheIdleLatencyBenchmarkTableName    = "Cache Idle Latency (ns)"
+	CacheMaxBandwidthBenchmarkTableName   = "Cache Maximum Bandwidth (GB/s)"
+	StorageBenchmarkTableName             = "Storage"
+)
+
+const (
+	// menu labels
+	SpeedBenchmarksMenuLabel       = "Speed"
+	PowerBenchmarksMenuLabel       = "Power"
+	TemperatureBenchmarksMenuLabel = "Temperature"
+	FrequencyBenchmarksMenuLabel   = "Frequency"
+	MemoryBenchmarksMenuLabel      = "Memory"
+	CacheBenchmarksMenuLabel       = "Cache"
+	StorageBenchmarksMenuLabel     = "Storage"
 )
 
 var tableDefinitions = map[string]table.TableDefinition{
 	SpeedBenchmarkTableName: {
 		Name:      SpeedBenchmarkTableName,
-		MenuLabel: SpeedBenchmarkTableName,
+		MenuLabel: SpeedBenchmarksMenuLabel,
 		HasRows:   false,
 		ScriptNames: []string{
 			script.SpeedBenchmarkScriptName,
@@ -39,7 +53,7 @@ var tableDefinitions = map[string]table.TableDefinition{
 		FieldsFunc: speedBenchmarkTableValues},
 	PowerBenchmarkTableName: {
 		Name:          PowerBenchmarkTableName,
-		MenuLabel:     PowerBenchmarkTableName,
+		MenuLabel:     PowerBenchmarksMenuLabel,
 		Architectures: []string{cpus.X86Architecture},
 		HasRows:       false,
 		ScriptNames: []string{
@@ -49,7 +63,7 @@ var tableDefinitions = map[string]table.TableDefinition{
 		FieldsFunc: powerBenchmarkTableValues},
 	TemperatureBenchmarkTableName: {
 		Name:          TemperatureBenchmarkTableName,
-		MenuLabel:     TemperatureBenchmarkTableName,
+		MenuLabel:     TemperatureBenchmarksMenuLabel,
 		Architectures: []string{cpus.X86Architecture},
 		HasRows:       false,
 		ScriptNames: []string{
@@ -58,7 +72,7 @@ var tableDefinitions = map[string]table.TableDefinition{
 		FieldsFunc: temperatureBenchmarkTableValues},
 	FrequencyBenchmarkTableName: {
 		Name:          FrequencyBenchmarkTableName,
-		MenuLabel:     FrequencyBenchmarkTableName,
+		MenuLabel:     FrequencyBenchmarksMenuLabel,
 		Architectures: []string{cpus.X86Architecture},
 		HasRows:       true,
 		ScriptNames: []string{
@@ -69,29 +83,57 @@ var tableDefinitions = map[string]table.TableDefinition{
 			script.FrequencyBenchmarkScriptName,
 		},
 		FieldsFunc: frequencyBenchmarkTableValues},
-	MemoryBenchmarkTableName: {
-		Name:          MemoryBenchmarkTableName,
-		MenuLabel:     MemoryBenchmarkTableName,
+	MemoryLoadedLatencyBenchmarkTableName: {
+		Name:          MemoryLoadedLatencyBenchmarkTableName,
+		MenuLabel:     MemoryBenchmarksMenuLabel,
 		Architectures: []string{cpus.X86Architecture},
 		HasRows:       true,
 		ScriptNames: []string{
-			script.MemoryBenchmarkScriptName,
+			script.MemoryLoadedLatencyBenchmarkScriptName,
 		},
-		NoDataFound: "No memory benchmark data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
+		NoDataFound: "No memory loaded latency benchmark data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
 		FieldsFunc:  memoryBenchmarkTableValues},
-	NUMABenchmarkTableName: {
-		Name:          NUMABenchmarkTableName,
-		MenuLabel:     NUMABenchmarkTableName,
+	MemoryBandwidthMatrixBenchmarkName: {
+		Name:          MemoryBandwidthMatrixBenchmarkName,
 		Architectures: []string{cpus.X86Architecture},
 		HasRows:       true,
 		ScriptNames: []string{
-			script.NumaBenchmarkScriptName,
+			script.MemoryNUMABandwidthMatrixBenchmarkScriptName,
 		},
-		NoDataFound: "No NUMA benchmark data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
-		FieldsFunc:  numaBenchmarkTableValues},
+		FieldsFunc: memoryNUMABandwidthMatrixTableValues},
+	MemoryLatencyMatrixBenchmarkName: {
+		Name:          MemoryLatencyMatrixBenchmarkName,
+		Architectures: []string{cpus.X86Architecture},
+		HasRows:       true,
+		ScriptNames: []string{
+			script.MemoryNUMALatencyMatrixBenchmarkScriptName,
+		},
+		FieldsFunc: memoryNUMALatencyMatrixTableValues},
+	CacheIdleLatencyBenchmarkTableName: {
+		Name:          CacheIdleLatencyBenchmarkTableName,
+		MenuLabel:     CacheBenchmarksMenuLabel,
+		Architectures: []string{cpus.X86Architecture},
+		HasRows:       false,
+		ScriptNames: []string{
+			script.L1IdleLatencyBenchmarkScriptName,
+			script.L2IdleLatencyBenchmarkScriptName,
+			script.L3IdleLatencyBenchmarkScriptName,
+		},
+		NoDataFound: "No cache idle latency benchmark data found. Please see the GitHub repository README for instructions on how to install Intel Memory Latency Checker (mlc).",
+		FieldsFunc:  cacheIdleLatencyTableValues},
+	CacheMaxBandwidthBenchmarkTableName: {
+		Name:          CacheMaxBandwidthBenchmarkTableName,
+		Architectures: []string{cpus.X86Architecture},
+		HasRows:       false,
+		ScriptNames: []string{
+			script.L1MaxBandwidthBenchmarkScriptName,
+			script.L2MaxBandwidthBenchmarkScriptName,
+			script.L3MaxBandwidthBenchmarkScriptName,
+		},
+		FieldsFunc: cacheMaxBandwidthTableValues},
 	StorageBenchmarkTableName: {
 		Name:      StorageBenchmarkTableName,
-		MenuLabel: StorageBenchmarkTableName,
+		MenuLabel: StorageBenchmarksMenuLabel,
 		HasRows:   true,
 		ScriptNames: []string{
 			script.StorageBenchmarkScriptName,
@@ -218,7 +260,8 @@ func frequencyBenchmarkTableValues(outputs map[string]script.ScriptOutput) []tab
 	return fields
 }
 
-func memoryBenchmarkTableValues(outputs map[string]script.ScriptOutput) []table.Field {
+// loadedLatencyTableValuesFromOutput parses MLC loaded-latency output (latency ns, bandwidth MB/s) into table fields.
+func loadedLatencyTableValuesFromOutput(stdout string) []table.Field {
 	fields := []table.Field{
 		{Name: "Latency (ns)"},
 		{Name: "Bandwidth (GB/s)"},
@@ -226,21 +269,17 @@ func memoryBenchmarkTableValues(outputs map[string]script.ScriptOutput) []table.
 	/* MLC Output:
 	Inject	Latency	Bandwidth
 	Delay	(ns)	MB/sec
-	==========================
 	 00000	261.65	 225060.9
-	 00002	261.63	 225040.5
-	 00008	261.54	 225073.3
 	 ...
 	*/
-	latencyBandwidthPairs := extract.ValsArrayFromRegexSubmatch(outputs[script.MemoryBenchmarkScriptName].Stdout, `\s*[0-9]*\s*([0-9]*\.[0-9]+)\s*([0-9]*\.[0-9]+)`)
+	latencyBandwidthPairs := extract.ValsArrayFromRegexSubmatch(stdout, `\s*[0-9]*\s*([0-9]*\.[0-9]+)\s*([0-9]*\.[0-9]+)`)
 	for _, latencyBandwidth := range latencyBandwidthPairs {
 		latency := latencyBandwidth[0]
 		bandwidth, err := strconv.ParseFloat(latencyBandwidth[1], 32)
 		if err != nil {
-			slog.Error(fmt.Sprintf("Unable to convert bandwidth to float: %s", latencyBandwidth[1]))
+			slog.Error("Unable to convert bandwidth to float", slog.String("value", latencyBandwidth[1]))
 			continue
 		}
-		// insert into beginning of list
 		fields[0].Values = append([]string{latency}, fields[0].Values...)
 		fields[1].Values = append([]string{fmt.Sprintf("%.1f", bandwidth/1000)}, fields[1].Values...)
 	}
@@ -250,43 +289,169 @@ func memoryBenchmarkTableValues(outputs map[string]script.ScriptOutput) []table.
 	return fields
 }
 
-func numaBenchmarkTableValues(outputs map[string]script.ScriptOutput) []table.Field {
-	fields := []table.Field{
-		{Name: "Node"},
+func memoryBenchmarkTableValues(outputs map[string]script.ScriptOutput) []table.Field {
+	return loadedLatencyTableValuesFromOutput(outputs[script.MemoryLoadedLatencyBenchmarkScriptName].Stdout)
+}
+
+// numaBandwidthMatrixTableValuesFromOutput parses MLC bandwidth matrix output (node rows, MB/s values) into table fields.
+// Handles missing nodes (e.g. disabled sockets): column count is the max across rows; short rows are padded with empty cells.
+func numaBandwidthMatrixTableValuesFromOutput(stdout string) []table.Field {
+	nodeBandwidthsPairs := extract.ValsArrayFromRegexSubmatch(stdout, `^\s+(\d+)\s+(\d.*)$`)
+	if len(nodeBandwidthsPairs) == 0 {
+		return []table.Field{}
 	}
-	/* MLC Output:
-		Numa node
-	Numa node	     0	     1
-	       0	175610.3	 55579.7
-	       1	 55575.2	175656.7
-	*/
-	nodeBandwidthsPairs := extract.ValsArrayFromRegexSubmatch(outputs[script.NumaBenchmarkScriptName].Stdout, `^\s+(\d)\s+(\d.*)$`)
-	// add 1 field per numa node
-	for _, nodeBandwidthsPair := range nodeBandwidthsPairs {
-		fields = append(fields, table.Field{Name: nodeBandwidthsPair[0]})
+	numCols := 0
+	for _, pair := range nodeBandwidthsPairs {
+		bandwidths := strings.Split(strings.TrimSpace(pair[1]), "\t")
+		if n := len(bandwidths); n > numCols {
+			numCols = n
+		}
 	}
-	// add rows
+	if numCols == 0 {
+		return []table.Field{}
+	}
+	fields := make([]table.Field, 1+numCols)
+	fields[0] = table.Field{Name: "Node"}
+	for c := 0; c < numCols; c++ {
+		fields[1+c] = table.Field{Name: strconv.Itoa(c)}
+	}
 	for _, nodeBandwidthsPair := range nodeBandwidthsPairs {
 		fields[0].Values = append(fields[0].Values, nodeBandwidthsPair[0])
 		bandwidths := strings.Split(strings.TrimSpace(nodeBandwidthsPair[1]), "\t")
-		if len(bandwidths) != len(nodeBandwidthsPairs) {
-			slog.Warn(fmt.Sprintf("Mismatched number of bandwidths for numa node %s, %s", nodeBandwidthsPair[0], nodeBandwidthsPair[1]))
-			return []table.Field{}
-		}
-		for i, bw := range bandwidths {
-			bw = strings.TrimSpace(bw)
-			val, err := strconv.ParseFloat(bw, 64)
-			if err != nil {
-				slog.Error(fmt.Sprintf("Unable to convert bandwidth to float: %s", bw))
-				continue
+		for c := 0; c < numCols; c++ {
+			var cell string
+			if c < len(bandwidths) {
+				bw := strings.TrimSpace(bandwidths[c])
+				val, err := strconv.ParseFloat(bw, 64)
+				if err != nil {
+					cell = ""
+				} else {
+					cell = fmt.Sprintf("%.1f", val/1000)
+				}
 			}
-			fields[i+1].Values = append(fields[i+1].Values, fmt.Sprintf("%.1f", val/1000))
+			fields[1+c].Values = append(fields[1+c].Values, cell)
 		}
-	}
-	if len(fields[0].Values) == 0 {
-		return []table.Field{}
 	}
 	return fields
+}
+
+func memoryNUMABandwidthMatrixTableValues(outputs map[string]script.ScriptOutput) []table.Field {
+	return numaBandwidthMatrixTableValuesFromOutput(outputs[script.MemoryNUMABandwidthMatrixBenchmarkScriptName].Stdout)
+}
+
+// numaLatencyMatrixTableValuesFromOutput parses MLC latency matrix output (node rows, ns values) into table fields.
+// Handles missing nodes (e.g. disabled sockets): column count is the max across rows; short rows are padded with empty cells.
+func numaLatencyMatrixTableValuesFromOutput(stdout string) []table.Field {
+	nodeLatenciesPairs := extract.ValsArrayFromRegexSubmatch(stdout, `^\s+(\d+)\s+(\d.*)$`)
+	if len(nodeLatenciesPairs) == 0 {
+		return []table.Field{}
+	}
+	numCols := 0
+	for _, pair := range nodeLatenciesPairs {
+		latencies := strings.Split(strings.TrimSpace(pair[1]), "\t")
+		if n := len(latencies); n > numCols {
+			numCols = n
+		}
+	}
+	if numCols == 0 {
+		return []table.Field{}
+	}
+	fields := make([]table.Field, 1+numCols)
+	fields[0] = table.Field{Name: "Node"}
+	for c := 0; c < numCols; c++ {
+		fields[1+c] = table.Field{Name: strconv.Itoa(c)}
+	}
+	for _, nodeLatencyPairs := range nodeLatenciesPairs {
+		fields[0].Values = append(fields[0].Values, nodeLatencyPairs[0])
+		latencies := strings.Split(strings.TrimSpace(nodeLatencyPairs[1]), "\t")
+		for c := 0; c < numCols; c++ {
+			var cell string
+			if c < len(latencies) {
+				latency := strings.TrimSpace(latencies[c])
+				val, err := strconv.ParseFloat(latency, 64)
+				if err != nil {
+					cell = ""
+				} else {
+					cell = fmt.Sprintf("%.1f", val)
+				}
+			}
+			fields[1+c].Values = append(fields[1+c].Values, cell)
+		}
+	}
+	return fields
+}
+
+func memoryNUMALatencyMatrixTableValues(outputs map[string]script.ScriptOutput) []table.Field {
+	return numaLatencyMatrixTableValuesFromOutput(outputs[script.MemoryNUMALatencyMatrixBenchmarkScriptName].Stdout)
+}
+
+func idleLatencyNsFromOutput(stdout string) string {
+	s := extract.ValFromRegexSubmatch(stdout, `\(\s*([\d.]+)\s*ns\)`)
+	if s == "" {
+		s = extract.ValFromRegexSubmatch(stdout, `([\d.]+)\s*ns`)
+	}
+	return strings.TrimSpace(s)
+}
+
+// maxBandwidthMBFromOutput parses MLC loaded_latency output into a string.
+// The last few lines of output look like this:
+
+// Inject  Latency Bandwidth
+// Delay   (ns)    MB/sec
+// ==========================
+//	00000    0.00  11721640.9
+
+// There will be one row of data so we parse only the last line of output.
+func maxBandwidthMBFromOutput(stdout string) string {
+	latencyBandwidthPairs := extract.ValsArrayFromRegexSubmatch(stdout, `\s*[0-9]*\s*([0-9]*\.[0-9]+)\s*([0-9]*\.[0-9]+)`)
+	if len(latencyBandwidthPairs) == 0 {
+		return ""
+	}
+	latencyBandwidth := latencyBandwidthPairs[len(latencyBandwidthPairs)-1]
+	bandwidth, err := strconv.ParseFloat(latencyBandwidth[1], 64)
+	if err != nil {
+		slog.Error("Unable to convert bandwidth to float", slog.String("value", latencyBandwidth[1]))
+		return ""
+	}
+	return fmt.Sprintf("%.1f", bandwidth)
+}
+
+func cacheIdleLatencyTableValues(outputs map[string]script.ScriptOutput) []table.Field {
+	l1 := idleLatencyNsFromOutput(outputs[script.L1IdleLatencyBenchmarkScriptName].Stdout)
+	l2 := idleLatencyNsFromOutput(outputs[script.L2IdleLatencyBenchmarkScriptName].Stdout)
+	l3 := idleLatencyNsFromOutput(outputs[script.L3IdleLatencyBenchmarkScriptName].Stdout)
+	if l1 == "" && l2 == "" && l3 == "" {
+		return []table.Field{}
+	}
+	return []table.Field{
+		{Name: "L1", Values: []string{l1}},
+		{Name: "L2", Values: []string{l2}},
+		{Name: "L3", Values: []string{l3}},
+	}
+}
+
+func cacheMaxBandwidthTableValues(outputs map[string]script.ScriptOutput) []table.Field {
+	l1MB := maxBandwidthMBFromOutput(outputs[script.L1MaxBandwidthBenchmarkScriptName].Stdout)
+	l2MB := maxBandwidthMBFromOutput(outputs[script.L2MaxBandwidthBenchmarkScriptName].Stdout)
+	l3MB := maxBandwidthMBFromOutput(outputs[script.L3MaxBandwidthBenchmarkScriptName].Stdout)
+	if l1MB == "" && l2MB == "" && l3MB == "" {
+		return []table.Field{}
+	}
+	var l1, l2, l3 string
+	if v, err := strconv.ParseFloat(l1MB, 64); err == nil {
+		l1 = fmt.Sprintf("%.1f", v/1000)
+	}
+	if v, err := strconv.ParseFloat(l2MB, 64); err == nil {
+		l2 = fmt.Sprintf("%.1f", v/1000)
+	}
+	if v, err := strconv.ParseFloat(l3MB, 64); err == nil {
+		l3 = fmt.Sprintf("%.1f", v/1000)
+	}
+	return []table.Field{
+		{Name: "L1", Values: []string{l1}},
+		{Name: "L2", Values: []string{l2}},
+		{Name: "L3", Values: []string{l3}},
+	}
 }
 
 // formatOrEmpty formats a value and returns an empty string if the formatted value is "0".

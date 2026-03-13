@@ -3,6 +3,8 @@
 # arguments:
 #    --loaded_latency
 #    --bandwidth_matrix
+#    --idle_latency
+#    --max_bandwidth
 
 if [ "$1" == "--loaded_latency" ]; then
 cat <<EOT
@@ -36,6 +38,22 @@ Delay	(ns)	MB/sec
  05000	105.77	   2688.7
  09000	105.60	   1844.7
  20000	105.48	   1148.7
+
+EOT
+elif [ "$1" == "--idle_latency" ]; then
+cat <<EOT
+Intel(R) Memory Latency Checker - v3.10
+Command line parameters: --idle_latency -b20 -t10 -c1 -i1
+
+Each iteration took 1.5 base frequency clocks ( 1.5 ns)
+
+EOT
+elif [ "$1" == "--max_bandwidth" ]; then
+cat <<EOT
+Intel(R) Memory Latency Checker - v3.10
+Command line parameters: --max_bandwidth -b20
+
+Peak bandwidth: 7430968.4 MB/sec
 
 EOT
 elif [ "$1" == "--bandwidth_matrix" ]; then
