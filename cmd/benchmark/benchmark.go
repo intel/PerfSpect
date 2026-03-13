@@ -59,6 +59,7 @@ var (
 	flagTemperature bool
 	flagFrequency   bool
 	flagMemory      bool
+	flagCache       bool
 	flagStorage     bool
 
 	flagNoSystemSummary bool
@@ -75,6 +76,7 @@ const (
 	flagTemperatureName = "temperature"
 	flagFrequencyName   = "frequency"
 	flagMemoryName      = "memory"
+	flagCacheName       = "cache"
 	flagStorageName     = "storage"
 
 	flagNoSystemSummaryName = "no-summary"
@@ -94,6 +96,10 @@ var categories = []app.Category{
 			tableDefinitions[MemoryLoadedLatencyBenchmarkTableName],
 			tableDefinitions[MemoryBandwidthMatrixBenchmarkName],
 			tableDefinitions[MemoryLatencyMatrixBenchmarkName]}},
+	{FlagName: flagCacheName, FlagVar: &flagCache, DefaultValue: false, Help: "L1/L2/L3 cache idle latency and maximum bandwidth benchmark",
+		Tables: []table.TableDefinition{
+			tableDefinitions[CacheIdleLatencyBenchmarkTableName],
+			tableDefinitions[CacheMaxBandwidthBenchmarkTableName]}},
 	{FlagName: flagStorageName, FlagVar: &flagStorage, DefaultValue: false, Help: "storage performance benchmark", Tables: []table.TableDefinition{tableDefinitions[StorageBenchmarkTableName]}},
 }
 
@@ -262,6 +268,8 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	report.RegisterHTMLRenderer(MemoryLoadedLatencyBenchmarkTableName, memoryBenchmarkTableHtmlRenderer)
 	report.RegisterHTMLRenderer(MemoryBandwidthMatrixBenchmarkName, memoryNUMABandwidthMatrixTableHtmlRenderer)
 	report.RegisterHTMLRenderer(MemoryLatencyMatrixBenchmarkName, memoryNUMALatencyMatrixTableHtmlRenderer)
+	report.RegisterHTMLRenderer(CacheIdleLatencyBenchmarkTableName, func(tv table.TableValues, _ string) string { return report.DefaultHTMLTableRendererFunc(tv) })
+	report.RegisterHTMLRenderer(CacheMaxBandwidthBenchmarkTableName, func(tv table.TableValues, _ string) string { return report.DefaultHTMLTableRendererFunc(tv) })
 
 	report.RegisterHTMLMultiTargetRenderer(MemoryLoadedLatencyBenchmarkTableName, memoryBenchmarkTableMultiTargetHtmlRenderer)
 

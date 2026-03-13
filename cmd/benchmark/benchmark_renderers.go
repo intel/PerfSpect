@@ -146,9 +146,9 @@ func renderNUMAMatrixHeatmapTable(tableValues table.TableValues, higherIsBetter 
 	matrix := make([][]cell, rows)
 	var minVal, maxVal float64
 	first := true
-	for r := 0; r < rows; r++ {
+	for r := range rows {
 		matrix[r] = make([]cell, cols)
-		for c := 0; c < cols; c++ {
+		for c := range cols {
 			matrix[r][c].text = tableValues.Fields[c].Values[r]
 			if c == 0 {
 				matrix[r][c].ok = false
@@ -176,7 +176,7 @@ func renderNUMAMatrixHeatmapTable(tableValues table.TableValues, higherIsBetter 
 	}
 	// Build headers and rows for RenderHTMLTable
 	headers := make([]string, cols)
-	for c := 0; c < cols; c++ {
+	for c := range cols {
 		headers[c] = tableValues.Fields[c].Name
 	}
 	tableRows := make([][]string, rows)
@@ -185,10 +185,10 @@ func renderNUMAMatrixHeatmapTable(tableValues table.TableValues, higherIsBetter 
 	if span == 0 {
 		span = 1
 	}
-	for r := 0; r < rows; r++ {
+	for r := range rows {
 		tableRows[r] = make([]string, cols)
 		valuesStyles[r] = make([]string, cols)
-		for c := 0; c < cols; c++ {
+		for c := range cols {
 			tableRows[r][c] = html.EscapeString(matrix[r][c].text)
 			if c == 0 {
 				valuesStyles[r][c] = "font-weight:bold"
