@@ -544,13 +544,12 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 	defer uncoreFrequencyMutex.Unlock()
 
 	getScript := script.ScriptDefinition{
-		Name:               "get uncore frequency MSR",
-		ScriptTemplate:     "rdmsr 0x620",
-		Vendors:            []string{cpus.IntelVendor},
-		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF},
-		Superuser:          true,
-		Depends:            []string{"rdmsr"},
-		Lkms:               []string{"msr"},
+		Name:           "get uncore frequency MSR",
+		ScriptTemplate: "rdmsr 0x620",
+		Vendors:        []string{cpus.IntelVendor},
+		Superuser:      true,
+		Depends:        []string{"rdmsr"},
+		Lkms:           []string{"msr"},
 	}
 	scriptOutput, err := workflow.RunScript(myTarget, getScript, localTempDir, false)
 	if err != nil {
@@ -574,13 +573,12 @@ func setUncoreFrequency(maxFreq bool, uncoreFrequency float64, myTarget target.T
 		newVal = newVal | newFreq<<8
 	}
 	setScript := script.ScriptDefinition{
-		Name:               "set uncore frequency MSR",
-		ScriptTemplate:     fmt.Sprintf("wrmsr -a 0x620 %d", newVal),
-		Superuser:          true,
-		Vendors:            []string{cpus.IntelVendor},
-		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchCWF},
-		Depends:            []string{"wrmsr"},
-		Lkms:               []string{"msr"},
+		Name:           "set uncore frequency MSR",
+		ScriptTemplate: fmt.Sprintf("wrmsr -a 0x620 %d", newVal),
+		Superuser:      true,
+		Vendors:        []string{cpus.IntelVendor},
+		Depends:        []string{"wrmsr"},
+		Lkms:           []string{"msr"},
 	}
 	_, err = runScript(myTarget, setScript, localTempDir)
 	if err != nil {
