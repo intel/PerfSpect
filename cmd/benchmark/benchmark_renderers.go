@@ -181,6 +181,9 @@ func renderNUMAMatrixHeatmapTable(tableValues table.TableValues, higherIsBetter 
 	}
 	tableRows := make([][]string, rows)
 	valuesStyles := make([][]string, rows)
+	// Don't apply heatmap when there's only one NUMA node (single data cell); it would always be red.
+	dataCells := rows * (cols - 1)
+	applyHeatmap := dataCells > 1
 	span := maxVal - minVal
 	if span == 0 {
 		span = 1
@@ -195,6 +198,9 @@ func renderNUMAMatrixHeatmapTable(tableValues table.TableValues, higherIsBetter 
 				continue
 			}
 			if !matrix[r][c].ok {
+				continue
+			}
+			if !applyHeatmap {
 				continue
 			}
 			v := matrix[r][c].val
