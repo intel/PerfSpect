@@ -129,8 +129,8 @@ See [`perfspect benchmark -h`](docs/perfspect_benchmark.md) for all options.
 | power | runs stress-ng to load all cpus to 100% for 60s. Uses [turbostat](https://github.com/torvalds/linux/tree/master/tools/power/x86/turbostat) to measure power. |
 | temperature | runs the same micro benchmark as 'power', but extracts maximum temperature from turbostat output. |
 | frequency | runs [avx-turbo](https://github.com/travisdowns/avx-turbo) to measure scalar and AVX frequencies across processor's cores. **Note:** Runtime increases with core count. |
-| memory | runs [Intel(r) Memory Latency Checker](https://www.intel.com/content/www/us/en/download/736633/intel-memory-latency-checker-intel-mlc.html) (MLC) to measure memory bandwidth and latency across a load range. **Note: MLC is not included with PerfSpect.** It can be downloaded from [Intel Memory Latency Checker](https://www.intel.com/content/www/us/en/download/736633/intel-memory-latency-checker-intel-mlc.html). Once downloaded, extract the Linux executable and place it in the perfspect/tools/x86_64 directory. |
-| numa | runs Intel(r) Memory Latency Checker(MLC) to measure bandwidth between NUMA nodes. See Note above about downloading MLC. |
+| memory | runs [Intel(r) Memory Latency Checker](https://www.intel.com/content/www/us/en/download/736633/intel-memory-latency-checker-intel-mlc.html) (MLC) to measure memory bandwidth and latency. **Note: MLC is not included with PerfSpect.** It can be downloaded from [Intel Memory Latency Checker](https://www.intel.com/content/www/us/en/download/736633/intel-memory-latency-checker-intel-mlc.html). Once downloaded, extract the Linux executable and place it in the perfspect/tools/x86_64 directory. |
+| cache | runs MLC to measure L1, L2, and L3 cache idle latency (ns) and maximum bandwidth (GB/s). See Note above about downloading MLC. |
 | storage | runs [fio](https://github.com/axboe/fio) for 2 minutes across multiple I/O patterns to measure storage latency, IOPs, and bandwidth. Use --storage-dir to override the default location (/tmp). Minimum 32GB disk space required. |
 
 #### Telemetry Command
