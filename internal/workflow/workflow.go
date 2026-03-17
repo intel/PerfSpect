@@ -189,22 +189,6 @@ func (rc *ReportingCommand) Run() error {
 		rc.Cmd.SilenceUsage = true
 		return err
 	}
-	// if we are debugging, create a tgz archive with the raw reports, formatted reports, and log file
-	if appContext.Debug {
-		archiveFiles := append(reportFilePaths, rawReports...)
-		if len(archiveFiles) > 0 {
-			if logFilePath != "" {
-				archiveFiles = append(archiveFiles, logFilePath)
-			}
-			err := util.CreateFlatTGZ(archiveFiles, filepath.Join(outputDir, app.Name+"_"+timestamp+".tgz"))
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				slog.Error(err.Error())
-				rc.Cmd.SilenceUsage = true
-				return err
-			}
-		}
-	}
 	if len(reportFilePaths) > 0 {
 		fmt.Println("Report files:")
 	}
@@ -240,6 +224,22 @@ func (rc *ReportingCommand) Run() error {
 		// stop the progress indicator
 		multiSpinner.Finish()
 		fmt.Println()
+	}
+	// if we are debugging, create a tgz archive with the raw reports, formatted reports, and log file
+	if appContext.Debug {
+		archiveFiles := append(reportFilePaths, rawReports...)
+		if len(archiveFiles) > 0 {
+			if logFilePath != "" {
+				archiveFiles = append(archiveFiles, logFilePath)
+			}
+			err := util.CreateFlatTGZ(archiveFiles, filepath.Join(outputDir, app.Name+"_"+timestamp+".tgz"))
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				slog.Error(err.Error())
+				rc.Cmd.SilenceUsage = true
+				return err
+			}
+		}
 	}
 	return nil
 }
