@@ -1,3 +1,3 @@
 # CLAUDE.md
 
-Read .github/copilot-instructions.md for instructions.
+@../.github/copilot-instructions.md
