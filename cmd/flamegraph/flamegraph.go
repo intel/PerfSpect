@@ -44,25 +44,27 @@ var Cmd = &cobra.Command{
 }
 
 var (
-	flagInput           string
-	flagFormat          []string
-	flagDuration        int
-	flagFrequency       int
-	flagPids            []int
-	flagNoSystemSummary bool
-	flagMaxDepth        int
-	flagPerfEvent       string
-	flagAsprofArguments string
+	flagInput            string
+	flagFormat           []string
+	flagDuration         int
+	flagFrequency        int
+	flagPids             []int
+	flagNoSystemSummary  bool
+	flagMaxDepth         int
+	flagPerfEvent        string
+	flagAsprofArguments  string
+	flagDualNativeStacks bool
 )
 
 const (
-	flagDurationName        = "duration"
-	flagFrequencyName       = "frequency"
-	flagPidsName            = "pids"
-	flagNoSystemSummaryName = "no-summary"
-	flagMaxDepthName        = "max-depth"
-	flagPerfEventName       = "perf-event"
-	flagAsprofArgumentsName = "asprof-args"
+	flagDurationName         = "duration"
+	flagFrequencyName        = "frequency"
+	flagPidsName             = "pids"
+	flagNoSystemSummaryName  = "no-summary"
+	flagMaxDepthName         = "max-depth"
+	flagPerfEventName        = "perf-event"
+	flagAsprofArgumentsName  = "asprof-args"
+	flagDualNativeStacksName = "dual-native-stacks"
 )
 
 func init() {
@@ -75,6 +77,7 @@ func init() {
 	Cmd.Flags().IntVar(&flagMaxDepth, flagMaxDepthName, 0, "")
 	Cmd.Flags().StringVar(&flagPerfEvent, flagPerfEventName, "cycles:P", "")
 	Cmd.Flags().StringVar(&flagAsprofArguments, flagAsprofArgumentsName, "-t -F probesp+vtable", "")
+	Cmd.Flags().BoolVar(&flagDualNativeStacks, flagDualNativeStacksName, false, "")
 	workflow.AddTargetFlags(Cmd)
 
 	Cmd.SetUsageFunc(usageFunc)
@@ -123,6 +126,10 @@ func getFlagGroups() []app.FlagGroup {
 		{
 			Name: flagPerfEventName,
 			Help: "perf event to use for native sampling (e.g., cpu-cycles, instructions, cache-misses, branches, context-switches, mem-loads, mem-stores, etc.)",
+		},
+		{
+			Name: flagDualNativeStacksName,
+			Help: "also record DWARF unwind perf and merge with frame-pointer stacks per process (larger profiles, longer post-processing time)",
 		},
 		{
 			Name: flagAsprofArgumentsName,
@@ -204,12 +211,13 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		Cmd:            cmd,
 		ReportNamePost: "flame",
 		ScriptParams: map[string]string{
-			"Frequency":       strconv.Itoa(flagFrequency),
-			"Duration":        strconv.Itoa(flagDuration),
-			"PIDs":            strings.Join(util.IntSliceToStringSlice(flagPids), ","),
-			"MaxDepth":        strconv.Itoa(flagMaxDepth),
-			"PerfEvent":       flagPerfEvent,
-			"AsprofArguments": flagAsprofArguments,
+			"Frequency":        strconv.Itoa(flagFrequency),
+			"Duration":         strconv.Itoa(flagDuration),
+			"PIDs":             strings.Join(util.IntSliceToStringSlice(flagPids), ","),
+			"MaxDepth":         strconv.Itoa(flagMaxDepth),
+			"PerfEvent":        flagPerfEvent,
+			"AsprofArguments":  flagAsprofArguments,
+			"DualNativeStacks": strconv.FormatBool(flagDualNativeStacks),
 		},
 		Tables:  tables,
 		Input:   flagInput,

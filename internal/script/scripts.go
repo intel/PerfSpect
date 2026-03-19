@@ -1725,6 +1725,7 @@ duration={{.Duration}}
 frequency={{.Frequency}}
 maxdepth={{.MaxDepth}}
 perf_event={{.PerfEvent}}
+dual_native_stacks={{.DualNativeStacks}}
 read -r -a asprof_arguments <<< "{{.AsprofArguments}}"
 
 ap_interval=0
@@ -1794,25 +1795,28 @@ stop_profiling() {
     restore_settings
 }
 
-# Function to collapse perf data
+# Function to collapse perf data (pipe to stackcollapse-perf to avoid large intermediate stack files)
 collapse_perf_data() {
-    if [ -f perf_dwarf_data ]; then
-        ("${PERF_CMD}" script -i perf_dwarf_data > perf_dwarf_stacks && stackcollapse-perf perf_dwarf_stacks > perf_dwarf_folded) &
-        local dwarf_pid=$!
-    else
-        echo "Error: perf_dwarf_data file not found" >&2
-    fi
+    local dwarf_pid="" fp_pid=""
     if [ -f perf_fp_data ]; then
-        ("${PERF_CMD}" script -i perf_fp_data > perf_fp_stacks && stackcollapse-perf perf_fp_stacks > perf_fp_folded) &
-        local fp_pid=$!
+        ("${PERF_CMD}" script -i perf_fp_data | stackcollapse-perf > perf_fp_folded) &
+        fp_pid=$!
     else
         echo "Error: perf_fp_data file not found" >&2
     fi
-    if [ -n "$dwarf_pid" ]; then
-        wait "$dwarf_pid" || echo "Error: failed to process perf_dwarf_data (perf script or stackcollapse-perf failed)" >&2
+    if [ "$dual_native_stacks" = "true" ]; then
+        if [ -f perf_dwarf_data ]; then
+            ("${PERF_CMD}" script -i perf_dwarf_data | stackcollapse-perf > perf_dwarf_folded) &
+            dwarf_pid=$!
+        else
+            echo "Error: perf_dwarf_data file not found" >&2
+        fi
     fi
     if [ -n "$fp_pid" ]; then
         wait "$fp_pid" || echo "Error: failed to process perf_fp_data (perf script or stackcollapse-perf failed)" >&2
+    fi
+    if [ -n "$dwarf_pid" ]; then
+        wait "$dwarf_pid" || echo "Error: failed to process perf_dwarf_data (perf script or stackcollapse-perf failed)" >&2
     fi
 }
 
@@ -1894,7 +1898,7 @@ else
     mapfile -t java_pids < <(pgrep java)
 fi
 
-# Start profiling with perf in frame pointer mode
+# Frame-pointer perf record (default native profile)
 if [ -n "$pids" ]; then
 	"${PERF_CMD}" record -e "$perf_event" -F "$frequency" -p "$pids" -g -o perf_fp_data -m 129 &
 else
@@ -1907,17 +1911,20 @@ if ! kill -0 $perf_fp_pid 2>/dev/null; then
 	exit 1
 fi
 
-# Start profiling with perf in dwarf mode
-if [ -n "$pids" ]; then
-	"${PERF_CMD}" record -e "$perf_event" -F "$frequency" -p "$pids" -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
-else
-	"${PERF_CMD}" record -e "$perf_event" -F "$frequency" -a -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
-fi
-perf_dwarf_pid=$!
-if ! kill -0 $perf_dwarf_pid 2>/dev/null; then
-	echo "Failed to start perf record in dwarf mode" >&2
-	stop_profiling
-	exit 1
+# DWARF perf record (second native profile when dual_native_stacks is true)
+perf_dwarf_pid=""
+if [ "$dual_native_stacks" = "true" ]; then
+	if [ -n "$pids" ]; then
+		"${PERF_CMD}" record -e "$perf_event" -F "$frequency" -p "$pids" -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
+	else
+		"${PERF_CMD}" record -e "$perf_event" -F "$frequency" -a -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
+	fi
+	perf_dwarf_pid=$!
+	if ! kill -0 $perf_dwarf_pid 2>/dev/null; then
+		echo "Failed to start perf record in dwarf mode" >&2
+		stop_profiling
+		exit 1
+	fi
 fi
 
 if [ ${#java_pids[@]} -eq 0 ]; then

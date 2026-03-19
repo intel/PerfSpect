@@ -1,5 +1,6 @@
 # perfspect flamegraph
 
+
 ```text
 Collect flamegraph data from target(s)
 
@@ -17,6 +18,7 @@ Flags:
     --frequency            number of samples taken per second (default: 11)
     --pids                 comma separated list of PIDs. If not specified, all PIDs will be collected (default: [])
     --perf-event           perf event to use for native sampling (e.g., cpu-cycles, instructions, cache-misses, branches, context-switches, mem-loads, mem-stores, etc.) (default: cycles:P)
+    --dual-native-stacks   also record DWARF unwind perf and merge with frame-pointer stacks per process (larger profiles) (default: false)
     --asprof-args          arguments to pass to async-profiler, e.g., $ asprof start <these arguments> -i <interval> <pid>. (default: -t -F probesp+vtable)
     --max-depth            maximum render depth of call stack in flamegraph (0 = no limit) (default: 0)
     --format               choose output format(s) from: all, html, txt, json (default: [html])
