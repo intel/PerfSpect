@@ -1799,14 +1799,14 @@ stop_profiling() {
 collapse_perf_data() {
     local dwarf_pid="" fp_pid=""
     if [ -f perf_fp_data ]; then
-        ("${PERF_CMD}" script -i perf_fp_data | stackcollapse-perf > perf_fp_folded) &
+        ( set -o pipefail; "${PERF_CMD}" script -i perf_fp_data | stackcollapse-perf > perf_fp_folded ) &
         fp_pid=$!
     else
         echo "Error: perf_fp_data file not found" >&2
     fi
     if [ "$dual_native_stacks" = "true" ]; then
         if [ -f perf_dwarf_data ]; then
-            ("${PERF_CMD}" script -i perf_dwarf_data | stackcollapse-perf > perf_dwarf_folded) &
+            ( set -o pipefail; "${PERF_CMD}" script -i perf_dwarf_data | stackcollapse-perf > perf_dwarf_folded ) &
             dwarf_pid=$!
         else
             echo "Error: perf_dwarf_data file not found" >&2
