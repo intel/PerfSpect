@@ -176,9 +176,19 @@ BUF_KB=$(( L1D_KB / 2 - 4 ))
 	mlcBufferSetupL2 = `L2_KB=$(cache_size_kb L2)
 BUF_KB=$(( L2_KB / 2 ))
 [ $BUF_KB -lt 1 ] && BUF_KB=1`
-	// for measuring L3 bandwidth and latency (4x of L2 cache size)
+	// for measuring L3 idle latency (4x of L2 cache size, single thread)
 	mlcBufferSetupL3 = `L2_KB=$(cache_size_kb L2)
 BUF_KB=$(( L2_KB * 4 ))
+[ $BUF_KB -lt 1 ] && BUF_KB=1`
+	// for measuring L3 max bandwidth (80% of per-thread L3 share, all threads)
+	mlcBufferSetupL3BW = `L2_KB=$(cache_size_kb L2)
+L3_KB=$(cache_size_kb L3)
+TPC=$(lscpu | grep 'Thread(s) per core' | awk '{print $NF}')
+CPS=$(lscpu | grep -E 'Core\(s\) per socket:' | head -1 | awk '{print $4}')
+TOTAL=$(( TPC * CPS ))
+BUF_KB=$(( L3_KB * 8 / 10 / TOTAL ))
+MIN_KB=$(( L2_KB / TPC + 1 ))
+[ $BUF_KB -lt $MIN_KB ] && BUF_KB=$MIN_KB
 [ $BUF_KB -lt 1 ] && BUF_KB=1`
 )
 
@@ -1156,7 +1166,7 @@ echo $__DEFAULT_HL_DEVICE
 	},
 	L3MaxBandwidthBenchmarkScriptName: {
 		Name:           L3MaxBandwidthBenchmarkScriptName,
-		ScriptTemplate: mlcBenchmarkScript(mlcBufferSetupL3, "--loaded_latency -d0 -T -b${BUF_KB} -t10 -u"),
+		ScriptTemplate: mlcBenchmarkScript(mlcBufferSetupL3BW, "--loaded_latency -d0 -T -b${BUF_KB} -t10"),
 		Superuser:      true,
 		Lkms:           []string{"msr"},
 		Depends:        []string{"mlc"},
