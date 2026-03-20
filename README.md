@@ -153,7 +153,7 @@ The following optional telemetry sources can be enabled via environment variable
 
 #### Flamegraph Command
 
-Software flamegraphs are useful in diagnosing software performance bottlenecks. Run `perfspect flamegraph` to capture a system-wide software flamegraph. See [`perfspect flamegraph -h`](docs/perfspect_flamegraph.md) for all options.
+Software flamegraphs are useful in diagnosing software performance bottlenecks. Run `perfspect flamegraph` to capture a system-wide software flamegraph. Native stacks use frame-pointer `perf` by default; `--dual-native-stacks` adds DWARF recording and merges those stacks with the frame-pointer profile. See [`perfspect flamegraph -h`](docs/perfspect_flamegraph.md) for all options.
 
 > [!TIP]
 > By default, flamegraphs are collected using the `cycles:P` event. To analyze different performance aspects, use the `--perf-event` flag to specify an alternative perf event (e.g., `cache-misses`, `instructions`, `branches`, `context-switches`, `mem-loads`, `mem-stores`, etc.).
