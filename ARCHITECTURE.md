@@ -7,10 +7,11 @@ This document describes the high-level architecture of PerfSpect to help new con
 PerfSpect is a performance analysis tool for Linux systems. It collects system configuration data, hardware performance metrics, and generates reports. The tool supports both local execution and remote targets via SSH.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         CLI (cmd/root.go)                               │
-│   report │ benchmark │ telemetry │ flamegraph │ lock │ metrics | config │
-└─────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                        CLI (cmd/root.go)                                         │
+│  report │ benchmark │ telemetry │ flamegraph │ lock │ metrics │ config │ update │ extract        │
+│                                                         └ trim   └ restore                       │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘
           │                                                    │
           │                                                    │
           ▼                                                    ▼
@@ -24,7 +25,13 @@ PerfSpect is a performance analysis tool for Linux systems. It collects system c
 │  - Target setup and validation        │    │  config: System tuning,    │
 │  - Parallel data collection           │    │    set/restore operations  │
 │  - Signal handling and cleanup        │    │                            │
-│  - Report generation orchestration    │    │                            │
+│  - Report generation orchestration    │    │  update: Download and      │
+│                                       │    │    install latest release  │
+│                                       │    │    (Intel network only)    │
+│                                       │    │                            │
+│                                       │    │  extract: Dump embedded    │
+│                                       │    │    resources to disk       │
+│                                       │    │    (for developers)        │
 └───────────────────────────────────────┘    └────────────────────────────┘
           │                                               │
           └──────────────────┬────────────────────────────┘
@@ -49,14 +56,16 @@ PerfSpect is a performance analysis tool for Linux systems. It collects system c
 perfspect/
 ├── main.go              # Entry point
 ├── cmd/                 # Command implementations
-│   ├── root.go          # CLI setup, global flags, app lifecycle
+│   ├── root.go          # CLI setup, global flags, app lifecycle, update & extract commands
 │   ├── report/          # System configuration reports
 │   ├── metrics/         # CPU performance counter collection
+│   │   └── trim.go      # 'metrics trim' subcommand: filter metrics to a time range
 │   ├── benchmark/       # Performance micro-benchmarks
 │   ├── telemetry/       # System telemetry collection
 │   ├── flamegraph/      # CPU flamegraph generation
 │   ├── lock/            # Lock contention analysis
 │   └── config/          # System configuration commands
+│       └── restore.go   # 'config restore' subcommand: restore system config from file
 ├── internal/            # Internal packages
 │   ├── app/             # Application context and shared types
 │   ├── extract/         # Data extraction functions from script outputs
