@@ -229,18 +229,22 @@ func NICIrqMappingsFromOutput(outputs map[string]script.ScriptOutput) [][]string
 // NICSummaryFromOutput returns a summary of installed NICs.
 func NICSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 	nics := ParseNicInfo(outputs[script.NicInfoScriptName].Stdout)
-	if len(nics) == 0 {
-		return "N/A"
-	}
 	modelCount := make(map[string]int)
 	for _, nic := range nics {
+		// don't include virtual functions or bridge devices in the summary as they are not physical NICs, and we want the summary to reflect physical hardware
+		if strings.Contains(nic.Name, "(virtual)") || nic.Driver == "bridge" {
+			continue
+		}
+		if nic.Model == "" {
+			nic.Model = nic.Vendor + " Unknown Model"
+		}
 		modelCount[nic.Model]++
+	}
+	if len(modelCount) == 0 {
+		return "N/A"
 	}
 	var summary []string
 	for model, count := range modelCount {
-		if model == "" {
-			model = "Unknown NIC"
-		}
 		summary = append(summary, fmt.Sprintf("%dx %s", count, model))
 	}
 	return strings.Join(summary, ", ")
