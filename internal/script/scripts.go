@@ -857,7 +857,7 @@ rdmsr 0x2FFE
 			bdf=${bdf#*:}
 		fi
 		if [ -n "$bdf" ] && command -v lspci >/dev/null 2>&1; then
-			model=$(lspci -i pci.ids.gz | awk -v bdf="$bdf" 'tolower($0) ~ /ethernet/ && $1 == bdf { pos = index($0, ": "); if (pos > 0) print substr($0, pos + 2); exit }')
+			model=$(lspci -s "$bdf" -i pci.ids.gz | awk 'NR == 1 { pos = index($0, ": "); if (pos > 0) print substr($0, pos + 2); exit }')
 			if [ -n "$model" ] && [ -n "$vendor" ]; then
 				model=$(awk -v vendor="$vendor" -v model="$model" 'BEGIN {
 					v = tolower(vendor)
