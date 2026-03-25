@@ -137,8 +137,16 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, continueOnSc
 		return nil, err
 	}
 	if exitcode != 0 {
-		slog.Error("controller script returned non-zero exit code", slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitcode", exitcode))
-		return nil, fmt.Errorf("controller script returned exit code %d", exitcode)
+		// If the controller was interrupted (e.g., by SIGINT) but still produced output,
+		// parse the output rather than discarding it. This handles the case where the
+		// controller's handle_sigint exits 0 but the SSH process carrying it gets
+		// interrupted and returns a non-zero exit code (e.g., 255).
+		if strings.Contains(stdout, "<---------------------->") {
+			slog.Warn("controller script returned non-zero exit code, but output is available and will be processed", slog.Int("exitcode", exitcode), slog.String("stderr", stderr))
+		} else {
+			slog.Error("controller script returned non-zero exit code", slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitcode", exitcode))
+			return nil, fmt.Errorf("controller script returned exit code %d", exitcode)
+		}
 	}
 	// parse output of controller script
 	allScriptOutputs := parseControllerScriptOutput(stdout)
