@@ -62,12 +62,12 @@ func parseTurbostatOutput(output string) ([]map[string]string, error) {
 		if len(headers) == 0 {
 			continue
 		}
-		if len(fields) != len(headers) {
-			continue
+		if len(fields) > len(headers) {
+			return nil, fmt.Errorf("more turbostat row values than headers: %d values, %d headers", len(fields), len(headers))
 		}
-		row := make(map[string]string, len(headers))
-		for i, h := range headers {
-			row[h] = fields[i]
+		row := make(map[string]string, len(fields))
+		for i := range fields {
+			row[headers[i]] = fields[i] // this assumes any missing fields are at the end and will be empty string, which is consistent with turbostat output
 		}
 		if timeParsed && interval > 0 {
 			row["timestamp"] = timestamp.Format("15:04:05")
@@ -360,7 +360,7 @@ func TurbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([]
 }
 
 func isPackageRow(row map[string]string) bool {
-	if val, ok := row["Package"]; ok && val != "-" {
+	if val, ok := row["Package"]; ok && val != "-" && row["Core"] == "0" {
 		return true
 	}
 	return false
