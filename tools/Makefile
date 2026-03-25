@@ -189,9 +189,12 @@ else
 endif
 
 LIBAIO_VERSION := libaio-0.3.113
+PRIMARY_REPO="https://github.com/littledan/linux-libaio.git"
+FALLBACK_REPO="https://github.com/yugabyte/libaio.git"
 libaio-aarch64:
 ifeq ("$(wildcard libaio-aarch64)","")
-	git clone $(GIT_CLONE_OPTS) --branch $(LIBAIO_VERSION) https://pagure.io/libaio libaio-aarch64
+	git clone $(GIT_CLONE_OPTS) --branch $(LIBAIO_VERSION) $(PRIMARY_REPO) libaio-aarch64 || \
+	git clone $(GIT_CLONE_OPTS) --branch $(LIBAIO_VERSION) $(FALLBACK_REPO) libaio-aarch64
 else
 	cd libaio-aarch64 && git fetch --tags && git checkout $(LIBAIO_VERSION)
 endif
