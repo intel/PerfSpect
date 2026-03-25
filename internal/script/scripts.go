@@ -845,8 +845,34 @@ rdmsr 0x2FFE
 	udevadm_out=$(udevadm info --query=all --path=/sys/class/net/"$ifc")
 	echo "Vendor ID: $(echo "$udevadm_out" | grep ID_VENDOR_ID= | cut -d'=' -f2)"
 	echo "Model ID: $(echo "$udevadm_out" | grep ID_MODEL_ID= | cut -d'=' -f2)"
-	echo "Vendor: $(echo "$udevadm_out" | grep ID_VENDOR_FROM_DATABASE= | cut -d'=' -f2)"
-	echo "Model: $(echo "$udevadm_out" | grep ID_MODEL_FROM_DATABASE= | cut -d'=' -f2)"
+	vendor=$(echo "$udevadm_out" | grep ID_VENDOR_FROM_DATABASE= | cut -d'=' -f2)
+	echo "Vendor: $vendor"
+	model=$(echo "$udevadm_out" | grep ID_MODEL_FROM_DATABASE= | cut -d'=' -f2)
+	# fall back to lspci if model is not available from udevadm, and trim vendor prefix if present (e.g. "Intel Ethernet Controller" -> "Ethernet Controller")
+	if [ -z "$model" ]; then
+		id_path=$(echo "$udevadm_out" | grep ID_PATH= | cut -d'=' -f2)
+		bdf=${id_path##*-}
+		# ID_PATH may include the domain (0000:49:00.0); lspci typically prints 49:00.0.
+		if [[ "$bdf" == *:*:* ]]; then
+			bdf=${bdf#*:}
+		fi
+		if [ -n "$bdf" ] && command -v lspci >/dev/null 2>&1; then
+			model=$(lspci -s "$bdf" -i pci.ids.gz | awk 'NR == 1 { pos = index($0, ": "); if (pos > 0) print substr($0, pos + 2); exit }')
+			if [ -n "$model" ] && [ -n "$vendor" ]; then
+				model=$(awk -v vendor="$vendor" -v model="$model" 'BEGIN {
+					v = tolower(vendor)
+					m = tolower(model)
+					out = model
+					if (v != "" && substr(m, 1, length(v)) == v) {
+						out = substr(model, length(v) + 1)
+						sub(/^[[:space:]]+/, "", out)
+					}
+					print out
+				}')
+			fi
+		fi
+	fi
+	echo "Model: $model"
 	echo "MTU: $(cat /sys/class/net/"$ifc"/mtu 2>/dev/null)"
 	echo "$ethtool_out"
 	echo "$ethtool_i_out"
@@ -883,7 +909,7 @@ rdmsr 0x2FFE
 	echo "----------------------------------------"
 done
 `,
-		Depends:   []string{"ethtool"},
+		Depends:   []string{"ethtool", "lspci", "pci.ids.gz"},
 		Superuser: true,
 	},
 	IRQBalanceScriptName: {
