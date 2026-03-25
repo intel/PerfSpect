@@ -443,14 +443,11 @@ func TestTurbostatPackageRows(t *testing.T) {
 		wantErr         bool
 	}{
 		{
-			name:            "package rows with UncoreMHz, PKGTmp, PkgWatt",
+			name:            "package rows with UncoreMHz, PKGTmp, PkgWatt (sparse rows)",
 			turbostatOutput: turbostatOutput,
 			fieldNames:      []string{"UncMHz", "PkgTmp", "PkgWatt"},
-			want: [][][]string{
-				{{"15:04:05", "2350", "57", "223.53"}, {"15:04:07", "2400", "59", "229.53"}, {"15:04:09", "2400", "57", "223.53"}},
-				{{"15:04:05", "2300", "53", "208.40"}, {"15:04:07", "2400", "55", "218.40"}, {"15:04:09", "2400", "53", "208.40"}},
-			},
-			wantErr: false,
+			want:            nil,
+			wantErr:         true,
 		},
 		{
 			name: "Typical output, two packages, one field",
@@ -590,8 +587,8 @@ func TestTurbostatPackageRowsByRegexMatch(t *testing.T) {
 			turbostatOutput: turbostatOutput,
 			fieldRegexs:     []*regexp.Regexp{regexp.MustCompile(`^\w+Watt$`)},
 			want: [][][]string{
-				{{"timestamp", "PkgWatt", "RAMWatt"}, {"15:04:05", "223.53", "7.38"}, {"15:04:07", "229.53", "7.38"}, {"15:04:09", "223.53", "7.38"}},
-				{{"timestamp", "PkgWatt", "RAMWatt"}, {"15:04:05", "208.40", "16.83"}, {"15:04:07", "218.40", "16.83"}, {"15:04:09", "208.40", "16.83"}},
+				{{"timestamp", "PkgWatt", "RAMWatt"}, {"15:04:05", "223.53", "7.38"}, {"15:04:05", "", ""}, {"15:04:07", "229.53", "7.38"}, {"15:04:07", "", ""}, {"15:04:09", "223.53", "7.38"}, {"15:04:09", "", ""}},
+				{{"timestamp", "PkgWatt", "RAMWatt"}, {"15:04:05", "208.40", "16.83"}, {"15:04:05", "", ""}, {"15:04:07", "218.40", "16.83"}, {"15:04:07", "", ""}, {"15:04:09", "208.40", "16.83"}, {"15:04:09", "", ""}},
 			},
 			wantErr: false,
 		},
