@@ -479,14 +479,16 @@ func frequencyTelemetryTableValues(outputs map[string]script.ScriptOutput) []tab
 			fields = append(fields, table.Field{Name: fmt.Sprintf("Pkg %d %s", i, fieldName)})
 		}
 	}
-	numUncoreMetrics := (len(fields) - 2) / len(packageRows) // number of uncore frequency fields per package, after time and core frequency fields
-	// append the uncore frequency values to the fields
-	for i := range packageRows {
-		for _, row := range packageRows[i][1:] { // skip header row
-			// append the package frequency to the fields
-			// uncore frequency fields start after time and core frequency fields
-			for j := range row[1:] { // skip timestamp field
-				fields[2+i*numUncoreMetrics+j].Values = append(fields[2+i*numUncoreMetrics+j].Values, row[j+1])
+	if len(packageRows) > 0 {
+		numUncoreMetrics := (len(fields) - 2) / len(packageRows) // number of uncore frequency fields per package, after time and core frequency fields
+		// append the uncore frequency values to the fields
+		for i := range packageRows {
+			for _, row := range packageRows[i][1:] { // skip header row
+				// append the package frequency to the fields
+				// uncore frequency fields start after time and core frequency fields
+				for j := range row[1:] { // skip timestamp field
+					fields[2+i*numUncoreMetrics+j].Values = append(fields[2+i*numUncoreMetrics+j].Values, row[j+1])
+				}
 			}
 		}
 	}
