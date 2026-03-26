@@ -1,8 +1,8 @@
-## Example DaemonSet for PerfSpect for GKE
+# Example DaemonSet for PerfSpect for GKE
 
 This is an example DaemonSet for exposing PerfSpect metrics as a prometheus compatible metrics endpoint. This example assumes the use of Google Kubernetes Engine (GKE) and using the `PodMonitoring` resource to collect metrics from the metrics endpoint.
 
-```
+``` yaml
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -61,4 +61,5 @@ spec:
   - port: metrics-port
     interval: 30s
 ```
- * Replace `docker.registry/user-sandbox/ar-us/perfspect` with the location of your perfspect container image.
+
+* Replace `docker.registry/user-sandbox/ar-us/perfspect` with the location of your perfspect container image.

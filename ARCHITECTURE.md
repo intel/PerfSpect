@@ -6,7 +6,7 @@ This document describes the high-level architecture of PerfSpect to help new con
 
 PerfSpect is a performance analysis tool for Linux systems. It collects system configuration data, hardware performance metrics, and generates reports. The tool supports both local execution and remote targets via SSH.
 
-```
+```text
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                                        CLI (cmd/root.go)                                         │
 │  report │ benchmark │ telemetry │ flamegraph │ lock │ metrics │ config │ update │ extract        │
@@ -52,7 +52,7 @@ PerfSpect is a performance analysis tool for Linux systems. It collects system c
 
 ## Directory Structure
 
-```
+```text
 perfspect/
 ├── main.go              # Entry point
 ├── cmd/                 # Command implementations
@@ -99,6 +99,7 @@ type Target interface {
 ```
 
 **Implementations:**
+
 - `LocalTarget`: Executes commands directly on the local machine
 - `RemoteTarget`: Executes commands via SSH on remote machines
 
@@ -118,6 +119,7 @@ type ReportingCommand struct {
 ```
 
 **Workflow (`ReportingCommand.Run()`):**
+
 1. Parse flags and validate inputs
 2. Initialize targets (local or from `--target`/`--targets` flags)
 3. For each target in parallel:
@@ -132,12 +134,14 @@ type ReportingCommand struct {
 Collection scripts are defined in `internal/script/scripts.go`. Script dependencies, i.e., tools used by the scripts to collect data, are in `internal/script/resources/` and embedded in the binary using `//go:embed`. The scripts are executed on targets via a controller script that manages concurrent/sequential execution and signal handling.
 
 **Key concepts:**
+
 - `ScriptDefinition`: Defines a script (template, dependencies, required privileges)
 - `ScriptOutput`: Captures stdout, stderr, and exit code
 - `controller.sh`: Generated script that orchestrates all scripts on a target
 
 **Flow:**
-```
+
+```text
 1. Scripts defined in code with templates and dependencies
 2. Controller script generated from concurrent + sequential scripts
 3. Scripts and dependencies copied to target temp directory
@@ -161,6 +165,7 @@ type TableDefinition struct {
 ```
 
 **Field value retrieval:**
+
 - `ValuesFunc`: Function that parses script output and returns field values
 - Supports regex extraction, JSON parsing, and custom logic
 
@@ -175,6 +180,7 @@ type Loader interface {
 ```
 
 **Implementations:**
+
 - `LegacyLoader`: Original format (CLX, SKX, BDX, AMD processors)
 - `PerfmonLoader`: Intel perfmon JSON format (GNR, EMR, SPR, ICX)
 - `ComponentLoader`: ARM processors (Graviton, Axion, Ampere)
@@ -183,7 +189,7 @@ The `NewLoader()` factory function returns the appropriate loader based on CPU m
 
 ## Data Flow Example: `perfspect report`
 
-```
+```text
 1. User runs: perfspect report --target 192.168.1.2 --user admin --key ~/.ssh/id_rsa
 
 2. cmd/report/report.go:
@@ -224,7 +230,8 @@ PerfSpect uses goroutines for parallel operations:
 3. **Signal handling**: A goroutine listens for SIGINT/SIGTERM and coordinates graceful shutdown across all targets
 
 **Signal handling flow:**
-```
+
+```text
 SIGINT received
     → Signal handler goroutine activated
     → For each target: send SIGINT to controller.sh PID
@@ -243,4 +250,5 @@ make check      # Run all code quality checks (format, vet, lint)
 Test files are colocated with source files (e.g., `extract_test.go` alongside `extract.go`).
 
 ## Functional Testing
+
 Functional tests are located in an Intel internal GitHub repository. The tests run against various Linux distributions and CPU architectures on internal servers and public cloud systems to validate end-to-end functionality.

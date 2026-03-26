@@ -2,31 +2,28 @@
 
 ## Project Overview
 
-PerfSpect is a performance analysis tool for Linux systems written in Go. It provides several commands:
-- `metrics`: Collects CPU performance metrics using hardware performance counters
-- `report`: Generates system configuration and health reports from collected data
-- `benchmark`: Runs performance micro-benchmarks to evaluate system health
-- `telemetry`: Gathers system telemetry data
-- `flamegraph`: Creates CPU flamegraphs
-- `lock`: Analyzes lock contention
-- `config`: Modifies system configuration for performance tuning
+PerfSpect is a performance analysis tool for Linux systems written in Go. It provides commands for collecting CPU performance metrics, generating system configuration reports, running micro-benchmarks, gathering telemetry, creating flamegraphs, analyzing lock contention, and modifying system configuration. It can target both local and remote systems via SSH.
 
-The tool can target both local and remote systems via SSH.
+See `ARCHITECTURE.md` for detailed architecture, data flow diagrams, and concurrency model.
 
 ## Project Structure
 
 - `main.go` - Application entry point
-- `cmd/` - Command implementations (metrics, report, telemetry, flamegraph, lock, config)
-- `internal/` - Internal packages (common, cpus, progress, report, script, table, target, util)
-- `internal/common/` - Shared types, functions, and workflows for commands
-- `internal/target/` - Abstraction for local and remote target systems
-- `internal/table/` - Table definitions and helpers for reports
-- `internal/script/` - Script execution framework and script dependencies as embedded resources
-- `internal/report/` - Report generation and formatting
-- `internal/progress/` - Progress tracking utilities
-- `internal/cpus/` - CPU architecture detection and metadata
-- `internal/util/` - General utility functions
-- `tools/` - External tools and utilities, i.e., dependencies used for collecting data on target systems
+- `cmd/` - Command implementations (metrics, report, benchmark, telemetry, flamegraph, lock, config)
+  - Subcommands: `metrics trim`, `config restore`
+  - `update` and `extract` commands are defined in `cmd/root.go`
+- `internal/`
+  - `app/` - Application context and shared types
+  - `workflow/` - Shared workflow orchestration for reporting commands
+  - `extract/` - Data extraction functions from script outputs
+  - `target/` - Target abstraction (local and remote via SSH)
+  - `script/` - Script execution framework; scripts and tool dependencies are embedded via `//go:embed`
+  - `report/` - Report generation and formatting (txt, json, html, xlsx)
+  - `table/` - Table definitions and helpers for reports
+  - `cpus/` - CPU architecture detection and metadata
+  - `progress/` - Progress indicator (multi-spinner)
+  - `util/` - General utility functions
+- `tools/` - Binaries used by scripts (embedded at build time)
 - `builder/` - Docker-based build system
 - `scripts/` - Helper scripts
 
@@ -45,18 +42,11 @@ The tool can target both local and remote systems via SSH.
 
 ### Building and Testing
 
-#### Build Commands
-
 - `make` - Build the x86_64 binary
-
-#### Testing
-
+- `make perfspect-aarch64` - Build the ARM64 binary
 - `make test` - Run all unit tests
-- Follow standard Go testing practices
-
-#### Code Quality Checks
-
-Run `make check` to perform all code quality checks
+- `make check` - Run all code quality checks
+  - Individual checks: `make check_format`, `make check_vet`, `make check_static`, `make check_lint`, `make check_vuln`, `make check_sec`, `make check_semgrep`
 
 ### Logging
 
@@ -67,7 +57,6 @@ Run `make check` to perform all code quality checks
 
 - Uses `github.com/spf13/cobra` for CLI
 - Each command is in its own subdirectory under `cmd/`
-- Some commands have subcommands (e.g., `metrics trim`, `config restore`)
 - Common flags are defined in `cmd/root.go`
 
 ### Target Systems
@@ -79,8 +68,13 @@ Run `make check` to perform all code quality checks
 
 ### Documentation
 
-- Update README.md for user-facing changes
 - Use comments for complex logic
-- Document public APIs
 - Add examples for new features
-- Keep command help text up to date
+- Update cobra command help strings in source, then run `make docs` to regenerate `docs/perfspect_*.md` (requires a built binary)
+- Update README.md for user-facing changes
+- Update ARCHITECTURE.md for architectural changes
+
+## Agent Instructions
+
+- Ask clarifying questions if requirements are ambiguous
+- Unless it is a very simple task, start with an explanation and plan instead of jumping directly to coding a solution
