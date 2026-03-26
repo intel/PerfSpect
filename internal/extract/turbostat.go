@@ -219,9 +219,16 @@ func TurbostatPackageRowsByRegexMatch(turboStatScriptOutput string, fieldRegexs 
 	if len(rows) == 0 {
 		return nil, fmt.Errorf("no rows found in turbostat output")
 	}
+	// filter all rows down to only package rows
+	rows, err = extractPackageRows(rows)
+	if err != nil {
+		return nil, fmt.Errorf("unable to extract package rows: %w", err)
+	}
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("no package rows found in turbostat output")
+	}
 	// Build our list of matched field names from the first package row
 	var matchedFields []string
-	foundPackageRow := false
 	for _, row := range rows {
 		if _, ok := row["Package"]; !ok {
 			if row["CPU"] == "0" {
@@ -230,10 +237,6 @@ func TurbostatPackageRowsByRegexMatch(turboStatScriptOutput string, fieldRegexs 
 				continue
 			}
 		}
-		if !isPackageRow(row) {
-			continue
-		}
-		foundPackageRow = true
 		for field := range row {
 			for _, re := range fieldRegexs {
 				if re.MatchString(field) {
@@ -245,9 +248,6 @@ func TurbostatPackageRowsByRegexMatch(turboStatScriptOutput string, fieldRegexs 
 			}
 		}
 		break // only need the first package row to discover fields
-	}
-	if !foundPackageRow {
-		return nil, fmt.Errorf("no package rows found in turbostat output")
 	}
 	if len(matchedFields) == 0 {
 		return nil, fmt.Errorf("no fields matched the provided regexes in turbostat output")
@@ -267,9 +267,6 @@ func TurbostatPackageRowsByRegexMatch(turboStatScriptOutput string, fieldRegexs 
 			} else {
 				continue
 			}
-		}
-		if !isPackageRow(row) {
-			continue
 		}
 		rowValues := make([]string, len(matchedFields)+1)
 		rowValues[0] = row["timestamp"]
@@ -322,6 +319,14 @@ func TurbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([]
 	if len(rows) == 0 {
 		return nil, fmt.Errorf("no package rows found in turbostat output")
 	}
+	// filter all rows down to only package rows
+	rows, err = extractPackageRows(rows)
+	if err != nil {
+		return nil, fmt.Errorf("unable to extract package rows: %w", err)
+	}
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("no package rows found in turbostat output")
+	}
 	var packageRows [][][]string
 	for _, row := range rows {
 		if _, ok := row["Package"]; !ok {
@@ -330,9 +335,6 @@ func TurbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([]
 			} else {
 				continue
 			}
-		}
-		if !isPackageRow(row) {
-			continue
 		}
 		rowValues := make([]string, len(fieldNames)+1)
 		rowValues[0] = row["timestamp"]
@@ -359,11 +361,18 @@ func TurbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([]
 	return packageRows, nil
 }
 
-func isPackageRow(row map[string]string) bool {
-	if val, ok := row["Package"]; ok && val != "-" && row["Core"] == "0" {
-		return true
+func extractPackageRows(rows []map[string]string) ([]map[string]string, error) {
+	var packageRows []map[string]string
+	for i, row := range rows {
+		if val, ok := row["Package"]; ok && val != "-" && row["Core"] == "0" {
+			if i > 0 && rows[i-1]["Package"] == val && rows[i-1]["Core"] == "0" {
+				// This is the hyperthread associated with the package row, skip it
+				continue
+			}
+			packageRows = append(packageRows, row)
+		}
 	}
-	return false
+	return packageRows, nil
 }
 
 // MaxTotalPackagePowerFromOutput calculates the maximum total package power from the turbostat output.

@@ -387,7 +387,7 @@ func powerTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.F
 	// dynamically build fields from the header row of the first package
 	// header format: ["timestamp", "PkgWatt", "RAMWatt", ...]
 	// fields will be: "Time", then for each package, one field per matched watt metric
-	// e.g., "Package 0 PkgWatt", "Package 0 RAMWatt", "Package 1 PkgWatt", ...
+	// e.g., "Pkg 0 PkgWatt", "Pkg 0 RAMWatt", "Pkg 1 PkgWatt", ...
 	header := packageRows[0][0]
 	fields := []table.Field{{Name: "Time"}}
 	for i, pkgRows := range packageRows {
@@ -395,7 +395,7 @@ func powerTelemetryTableValues(outputs map[string]script.ScriptOutput) []table.F
 			continue
 		}
 		for _, fieldName := range header[1:] {
-			fields = append(fields, table.Field{Name: fmt.Sprintf("Package %d %s", i, fieldName)})
+			fields = append(fields, table.Field{Name: fmt.Sprintf("Pkg %d %s", i, fieldName)})
 		}
 	}
 	numMetrics := len(header) - 1 // number of matched watt fields per package
@@ -458,14 +458,12 @@ func frequencyTelemetryTableValues(outputs map[string]script.ScriptOutput) []tab
 		slog.Warn(err.Error())
 		return []table.Field{}
 	}
-	packageRows, err := extract.TurbostatPackageRows(outputs[script.TurbostatTelemetryScriptName].Stdout, []string{"UncMHz"})
+	// UncMHz, UMHz0.0, UMHz1.0, etc. are the uncore frequency fields in turbostat output, but they aren't always present, so we look for any field that matches the regex
+	uncoreRegex := regexp.MustCompile(`^(UncMHz|UMHz\d+\.\d+)$`)
+	packageRows, err := extract.TurbostatPackageRowsByRegexMatch(outputs[script.TurbostatTelemetryScriptName].Stdout, []*regexp.Regexp{uncoreRegex})
 	if err != nil {
 		// not an error, just means no package rows (uncore frequency)
 		slog.Warn(err.Error())
-	}
-	// add the package rows to the fields
-	for i := range packageRows {
-		fields = append(fields, table.Field{Name: fmt.Sprintf("Uncore Package %d", i)})
 	}
 	// for each platform row
 	for i := range platformRows {
@@ -474,12 +472,22 @@ func frequencyTelemetryTableValues(outputs map[string]script.ScriptOutput) []tab
 		// append the core frequency values to the fields
 		fields[1].Values = append(fields[1].Values, platformRows[i][1]) // Core frequency
 	}
-	// for each package
+	// dynamically build fields for uncore frequencies based on the package rows we found that match the uncore frequency regex
 	for i := range packageRows {
-		// traverse the rows
-		for _, row := range packageRows[i] {
+		// the first package row contains the field names, so use that to build the fields
+		for _, fieldName := range packageRows[i][0][1:] { // skip timestamp field
+			fields = append(fields, table.Field{Name: fmt.Sprintf("Pkg %d %s", i, fieldName)})
+		}
+	}
+	numUncoreMetrics := (len(fields) - 2) / len(packageRows) // number of uncore frequency fields per package, after time and core frequency fields
+	// append the uncore frequency values to the fields
+	for i := range packageRows {
+		for _, row := range packageRows[i][1:] { // skip header row
 			// append the package frequency to the fields
-			fields[i+2].Values = append(fields[i+2].Values, row[1]) // Package frequency
+			// uncore frequency fields start after time and core frequency fields
+			for j := range row[1:] { // skip timestamp field
+				fields[2+i*numUncoreMetrics+j].Values = append(fields[2+i*numUncoreMetrics+j].Values, row[j+1])
+			}
 		}
 	}
 	if len(fields[0].Values) == 0 {
