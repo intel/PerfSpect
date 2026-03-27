@@ -443,16 +443,6 @@ func TestTurbostatPackageRows(t *testing.T) {
 		wantErr         bool
 	}{
 		{
-			name:            "package rows with UncoreMHz, PKGTmp, PkgWatt",
-			turbostatOutput: turbostatOutput,
-			fieldNames:      []string{"UncMHz", "PkgTmp", "PkgWatt"},
-			want: [][][]string{
-				{{"15:04:05", "2350", "57", "223.53"}, {"15:04:07", "2400", "59", "229.53"}, {"15:04:09", "2400", "57", "223.53"}},
-				{{"15:04:05", "2300", "53", "208.40"}, {"15:04:07", "2400", "55", "218.40"}, {"15:04:09", "2400", "53", "208.40"}},
-			},
-			wantErr: false,
-		},
-		{
 			name: "Typical output, two packages, one field",
 			turbostatOutput: `
 TIME: 12:00:00

@@ -25,7 +25,7 @@ default: tools-x86_64
 .PHONY: sysstat sysstat-aarch64 sysstat-repo
 .PHONY: tsc turbostat
 
-tools-x86_64: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc turbostat
+tools-x86_64: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw lspci msr-tools pcm spectre-meltdown-checker sshpass stackcollapse-perf stress-ng sysstat tsc
 	mkdir -p bin/x86_64
 	cp -R async-profiler bin/x86_64/
 	cp avx-turbo/avx-turbo bin/x86_64/
@@ -50,7 +50,6 @@ tools-x86_64: async-profiler avx-turbo cpuid dmidecode ethtool fio ipmitool lshw
 	cp sysstat/sar bin/x86_64/
 	cp sysstat/sadc bin/x86_64/
 	cp tsc/tsc bin/x86_64/
-	cp linux_turbostat/tools/power/x86/turbostat/turbostat bin/x86_64/
 	cd bin/x86_64 && strip --strip-unneeded * || true
 
 tools-aarch64: async-profiler-aarch64 dmidecode-aarch64 ethtool-aarch64 fio-aarch64 ipmitool-aarch64 lshw-aarch64 lspci-aarch64 spectre-meltdown-checker sshpass-aarch64 stackcollapse-perf-aarch64 stress-ng-aarch64 sysstat-aarch64
@@ -190,9 +189,12 @@ else
 endif
 
 LIBAIO_VERSION := libaio-0.3.113
+PRIMARY_REPO="https://github.com/littledan/linux-libaio.git"
+FALLBACK_REPO="https://github.com/yugabyte/libaio.git"
 libaio-aarch64:
 ifeq ("$(wildcard libaio-aarch64)","")
-	git clone $(GIT_CLONE_OPTS) --branch $(LIBAIO_VERSION) https://pagure.io/libaio libaio-aarch64
+	git clone $(GIT_CLONE_OPTS) --branch $(LIBAIO_VERSION) $(PRIMARY_REPO) libaio-aarch64 || \
+	git clone $(GIT_CLONE_OPTS) --branch $(LIBAIO_VERSION) $(FALLBACK_REPO) libaio-aarch64
 else
 	cd libaio-aarch64 && git fetch --tags && git checkout $(LIBAIO_VERSION)
 endif
@@ -348,7 +350,7 @@ else
 	cd processwatch && git fetch --tags && git checkout $(PROCESSWATCH_VERSION)
 endif
 	cd processwatch && ./build.sh
-	mkdir -p bin
+	mkdir -p bin/x86_64
 	cp processwatch/processwatch bin/x86_64/
 	strip --strip-unneeded bin/x86_64/processwatch
 
@@ -437,14 +439,18 @@ endif
 tsc:
 	cd tsc && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build
 
-TURBOSTAT_VERSION := 6.9.12
+# turbostat version 2025.12.02 is in kernel 6.19
+TURBOSTAT_LINUX_VERSION := 6.19.9
 turbostat:
 ifeq ("$(wildcard linux_turbostat)","")
-	wget $(WGET_OPTS) https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$(TURBOSTAT_VERSION).tar.xz
-	tar -xf linux-$(TURBOSTAT_VERSION).tar.xz && mv linux-$(TURBOSTAT_VERSION)/ linux_turbostat/
+	wget $(WGET_OPTS) https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$(TURBOSTAT_LINUX_VERSION).tar.xz
+	tar -xf linux-$(TURBOSTAT_LINUX_VERSION).tar.xz && mv linux-$(TURBOSTAT_LINUX_VERSION)/ linux_turbostat/
 endif
 	sed -i '/_Static_assert/d' linux_turbostat/tools/power/x86/turbostat/turbostat.c
 	cd linux_turbostat/tools/power/x86/turbostat && make
+	mkdir -p bin/x86_64
+	cp linux_turbostat/tools/power/x86/turbostat/turbostat bin/x86_64/
+	strip --strip-unneeded bin/x86_64/turbostat
 
 reset:
 	cd async-profiler
@@ -462,7 +468,6 @@ reset:
 	cd stress-ng && git clean -fdx && git reset --hard
 	cd sysstat && git clean -fdx && git reset --hard
 	cd tsc && rm -f tsc
-	cd linux_turbostat/tools/power/x86/turbostat && make clean
 
 # libs are not directly used in the build but are required in the oss archive file because some of the tools are statically linked
 # glibc 2.27 was the version used in Ubuntu 18.04 which is the base docker image we used to build the tools
@@ -475,5 +480,5 @@ libcrypt.tar.gz:
 libs: glibc.tar.gz zlib.tar.gz libcrypt.tar.gz
 
 oss-source: reset libs
-	tar --exclude-vcs -czf oss_source.tgz async-profiler/ cpuid/ dmidecode/ ethtool/ fio/ ipmitool/ lshw/ lspci/ msr-tools/ perf-archive/ pcm/ spectre-meltdown-checker/ sshpass/ stress-ng/ sysstat/ linux_turbostat/tools/power/x86/turbostat glibc.tar.gz zlib.tar.gz libcrypt.tar.gz
+	tar --exclude-vcs -czf oss_source.tgz async-profiler/ cpuid/ dmidecode/ ethtool/ fio/ ipmitool/ lshw/ lspci/ msr-tools/ perf-archive/ pcm/ spectre-meltdown-checker/ sshpass/ stress-ng/ sysstat/ glibc.tar.gz zlib.tar.gz libcrypt.tar.gz
 	md5sum oss_source.tgz > oss_source.tgz.md5

@@ -167,6 +167,7 @@ ADD . /workdir
 WORKDIR /workdir
 RUN make perf
 RUN make processwatch
+RUN make turbostat
 
 FROM scratch AS output
 COPY --from=builder workdir/bin /bin
