@@ -240,6 +240,8 @@ SIGINT received
     → Print partial results
 ```
 
+For a detailed description of signal handling across all commands and scenarios (local/remote targets, Ctrl-C vs external signals), see [Signal Handling](docs/signal-handling.md).
+
 ## Unit Testing
 
 ```bash
