@@ -1492,6 +1492,8 @@ turbostat -i $interval $count
 duration={{.Duration}}
 pid={{.InstrMixPID}}
 
+min_fd_limit=4096
+
 cleanup_done=0
 
 finalize() {
@@ -1513,6 +1515,38 @@ finalize() {
     fi
 }
 trap finalize INT TERM EXIT
+
+# processwatch opens perf_event file descriptors per monitored CPU. On large
+# systems, the default soft open-file limit can be too low and libbpf fails with
+# "Too many open files" while attaching insn_collect.
+cpu_count=$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 1)
+required_fd_limit=$((cpu_count * 2 + 128))
+if [ "$required_fd_limit" -lt "$min_fd_limit" ]; then
+	required_fd_limit=$min_fd_limit
+fi
+
+current_fd_limit=$(ulimit -Sn)
+if [ "$current_fd_limit" = "unlimited" ]; then
+	current_fd_limit=$required_fd_limit
+fi
+
+if [ "$current_fd_limit" -lt "$required_fd_limit" ]; then
+	hard_fd_limit=$(ulimit -Hn)
+	if [ "$hard_fd_limit" = "unlimited" ] || [ "$hard_fd_limit" -ge "$required_fd_limit" ]; then
+		ulimit -Sn "$required_fd_limit" 2>/dev/null || true
+	fi
+	current_fd_limit=$(ulimit -Sn)
+fi
+
+if [ "$current_fd_limit" = "unlimited" ]; then
+	current_fd_limit=$required_fd_limit
+fi
+
+if [ "$current_fd_limit" -lt "$required_fd_limit" ]; then
+	echo "instruction telemetry requires at least $required_fd_limit open files for $cpu_count CPUs, but the current soft limit is $current_fd_limit" 1>&2
+	echo "increase the open file limit (ulimit -n) or reduce the number of monitored CPUs before retrying instruction telemetry" 1>&2
+	exit 1
+fi
 
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
     count=$((duration / interval))
