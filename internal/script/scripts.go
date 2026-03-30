@@ -1215,20 +1215,20 @@ done
 		Architectures: []string{cpus.X86Architecture},
 		ScriptTemplate: `# Function to expand a range of numbers, e.g. "0-24", into an array of numbers
 expand_range() {
-	local range=$1
-	local expanded=()
-	IFS=',' read -ra parts <<< "$range"
-	for part in "${parts[@]}"; do
-		if [[ $part == *-* ]]; then
-			IFS='-' read -ra limits <<< "$part"
-			for ((i=${limits[0]}; i<=${limits[1]}; i++)); do
-				expanded+=("$i")
-			done
-		else
-			expanded+=("$part")
-		fi
-	done
-	echo "${expanded[@]}"
+    local range=$1
+    local expanded=()
+    IFS=',' read -ra parts <<< "$range"
+    for part in "${parts[@]}"; do
+        if [[ $part == *-* ]]; then
+            IFS='-' read -ra limits <<< "$part"
+            for ((i=${limits[0]}; i<=${limits[1]}; i++)); do
+                expanded+=("$i")
+            done
+        else
+            expanded+=("$part")
+        fi
+    done
+    echo "${expanded[@]}"
 }
 
 num_cores_per_socket=$( lscpu | grep -E 'Core\(s\) per socket:' | head -1 | awk '{print $4}' )
@@ -1236,18 +1236,21 @@ num_cores_per_socket=$( lscpu | grep -E 'Core\(s\) per socket:' | head -1 | awk 
 family=$(lscpu | grep -E '^CPU family:' | awk '{print $3}')
 model=$(lscpu | grep -E '^Model:' | awk '{print $2}')
 
-# if GNR (family 6, model 173), we need to interleave the core-ids across dies
-if [ $family -eq 6 ] && [ $model -eq 173 ]; then
-    # Get the number of dies and sockets
-    num_devices=$(lspci -d 8086:3258 | wc -l)
+# if GNR or CWF (family 6, model 173 or 221), we need to interleave the core-ids across dies
+if [ $family -eq 6 ] && { [ $model -eq 173 ] || [ $model -eq 221 ]; }; then
+    # count the total number of compute dies
+    output=$(pcm-tpmi 2 0x10 -d -b 26:26)
+    compute_die_count=0
+    while read -r line; do
+        if [[ $line == *"entry"* && $line == *"instance"* && $line == *"value 0"* ]]; then
+            compute_die_count=$((compute_die_count + 1))
+        fi
+    done <<< "$output"
+    # echo "Number of compute dies: $compute_die_count"
     num_sockets=$(lscpu | grep -E '^Socket\(s\):' | awk '{print $2}')
-    # echo "Number of devices: $num_devices"
     # echo "Number of sockets: $num_sockets"
-    num_devices_per_die=2
-    # Calculate the number of dies per socket
-    dies_per_socket=$((num_devices / num_sockets / num_devices_per_die))
+    dies_per_socket=$(( compute_die_count / num_sockets ))
     # echo "Number of dies per socket: $dies_per_socket"
-    # Calculate the number of cores per die
     cores_per_die=$((num_cores_per_socket / dies_per_socket))
     # echo "Number of cores per die: $cores_per_die"
 
@@ -1298,7 +1301,7 @@ avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd
 `,
 		Superuser:  true,
 		Lkms:       []string{"msr"},
-		Depends:    []string{"avx-turbo", "lspci"},
+		Depends:    []string{"avx-turbo", "pcm-tpmi"},
 		Sequential: true,
 	},
 	PowerBenchmarkScriptName: {
