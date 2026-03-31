@@ -124,30 +124,37 @@ func GetSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 	var dieCoreBuckets []string
 	totalCoreStartRange := 1
 	startRange := 1
-	var archMultiplier int
-	if strings.Contains(arch, cpus.UarchSRF) || strings.Contains(arch, cpus.UarchCWF) {
-		archMultiplier = 4
+	var numDies int
+	var coreMultiplier int
+	if strings.Contains(arch, cpus.UarchSRF) {
+		numDies = 4
+		coreMultiplier = 4
+	} else if strings.Contains(arch, cpus.UarchCWF) {
+		numDies = 3
+		coreMultiplier = 4
 	} else if strings.Contains(arch, cpus.UarchGNR_X3) {
-		archMultiplier = 3
+		numDies = 3
+		coreMultiplier = 1
 	} else if strings.Contains(arch, cpus.UarchGNR_X2) {
-		archMultiplier = 2
+		numDies = 2
+		coreMultiplier = 1
 	} else {
-		archMultiplier = 1
+		numDies = 1
+		coreMultiplier = 1
 	}
 	for _, count := range bucketCoreCounts {
-		if startRange > count {
+		adjustedCount := count * coreMultiplier
+		if startRange > adjustedCount {
 			break
 		}
-		if archMultiplier > 1 {
-			totalCoreCount := count * archMultiplier
-			if totalCoreStartRange > int(totalCoreCount) {
-				break
-			}
-			totalCoreBuckets = append(totalCoreBuckets, fmt.Sprintf("%d-%d", totalCoreStartRange, totalCoreCount))
-			totalCoreStartRange = int(totalCoreCount) + 1
+		totalCoreCount := adjustedCount * numDies
+		if totalCoreStartRange > int(totalCoreCount) {
+			break
 		}
-		dieCoreBuckets = append(dieCoreBuckets, fmt.Sprintf("%d-%d", startRange, count))
-		startRange = int(count) + 1
+		totalCoreBuckets = append(totalCoreBuckets, fmt.Sprintf("%d-%d", totalCoreStartRange, totalCoreCount))
+		totalCoreStartRange = int(totalCoreCount) + 1
+		dieCoreBuckets = append(dieCoreBuckets, fmt.Sprintf("%d-%d", startRange, adjustedCount))
+		startRange = int(adjustedCount) + 1
 	}
 	// get the frequencies for each isa
 	var allIsaFreqs [][]string
@@ -185,7 +192,7 @@ func GetSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 	specCoreFreqs = make([][]string, 1, len(dieCoreBuckets)+1)
 	// add bucket field name(s)
 	specCoreFreqs[0] = append(specCoreFreqs[0], "Cores")
-	if archMultiplier > 1 {
+	if numDies > 1 {
 		specCoreFreqs[0] = append(specCoreFreqs[0], "Cores per Die")
 	}
 	// add fieldNames for ISAs that have frequencies
@@ -198,7 +205,7 @@ func GetSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 	for i, bucket := range dieCoreBuckets {
 		row := make([]string, 0, len(allIsaFreqs)+2)
 		// add the total core buckets for multi-die architectures
-		if archMultiplier > 1 {
+		if numDies > 1 {
 			row = append(row, totalCoreBuckets[i])
 		}
 		// add the die core buckets

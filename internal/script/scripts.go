@@ -383,7 +383,14 @@ if ( [ "$family" -eq 6 ] && [ "$model" -eq 173 ] ) || ( [ "$family" -eq 6 ] && [
 	avx512=$(pcm-tpmi 0x5 0xB8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_6
 	avx512h=$(pcm-tpmi 0x5 0xC0 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_7
 	amx=$(pcm-tpmi 0x5 0xC8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_8
-elif [ "$family" -eq 6 ] && ( [ "$model" -eq 175 ] || [ "$model" -eq 221 ] ); then  # SRF, CWF
+elif [ "$family" -eq 6 ] && [ "$model" -eq 221 ]; then  # CWF (no AVX-512 or AMX support)
+	cores=$(pcm-tpmi 0x5 0xD8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_10
+	sse=$(rdmsr 0x1ad) # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
+	avx2=$(pcm-tpmi 0x5 0xB0 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_5
+	avx512=0
+	avx512h=0
+	amx=0
+elif [ "$family" -eq 6 ] && [ "$model" -eq 175 ]; then  # SRF
 	cores=$(rdmsr 0x1ae) # MSR_TURBO_GROUP_CORE_CNT: Group Size of Active Cores for Turbo Mode Operation
 	# if pstate driver is intel_pstate use 0x774 else use 0x199
 	driver=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver)
