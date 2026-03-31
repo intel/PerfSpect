@@ -1253,8 +1253,16 @@ if [ $family -eq 6 ] && { [ $model -eq 173 ] || [ $model -eq 221 ]; }; then
             compute_die_count=$((compute_die_count + 1))
         fi
     done <<< "$output"
+	if [ $compute_die_count -eq 0 ]; then
+		echo "Error: Failed to get compute die count from pcm-tpmi output" >&2
+		exit 1
+	fi
     # echo "Number of compute dies: $compute_die_count"
     num_sockets=$(lscpu | grep -E '^Socket\(s\):' | awk '{print $2}')
+	if [ $num_sockets -eq 0 ]; then
+		echo "Error: Failed to get number of sockets" >&2
+		exit 1
+	fi
     # echo "Number of sockets: $num_sockets"
     dies_per_socket=$(( compute_die_count / num_sockets ))
     # echo "Number of dies per socket: $dies_per_socket"
