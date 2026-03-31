@@ -127,7 +127,7 @@ func GetSpecFrequencyBuckets(outputs map[string]script.ScriptOutput) ([][]string
 	var numDies int
 	var coreMultiplier int
 	if strings.Contains(arch, cpus.UarchSRF) {
-		numDies = 4
+		numDies = 1
 		coreMultiplier = 4
 	} else if strings.Contains(arch, cpus.UarchCWF) {
 		numDies = 3
