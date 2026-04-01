@@ -336,18 +336,18 @@ cstate_dir="/sys/devices/system/cpu/cpu0/cpuidle"
 
 # Check if the directory exists
 if [ -d "$cstate_dir" ]; then
-	for state in "$cstate_dir"/state*; do
-		name=$(cat "$state/name")
-		disable=$(cat "$state/disable")
-		if [ "$disable" -eq 0 ]; then
-			status="Enabled"
-		else
-			status="Disabled"
-		fi
-		echo "$name,$status"
-	done
+    for state in "$cstate_dir"/state*; do
+        name=$(cat "$state/name")
+        disable=$(cat "$state/disable")
+        if [ "$disable" -eq 0 ]; then
+            status="Enabled"
+        else
+            status="Disabled"
+        fi
+        echo "$name,$status"
+    done
 else
-	echo "C-state directory not found."
+    echo "C-state directory not found."
 fi
 `,
 	},
@@ -376,33 +376,40 @@ family=$(echo "$lscpu" | grep -E "^CPU family:" | awk '{print $3}')
 model=$(echo "$lscpu" | grep -E "^Model:" | awk '{print $2}')
 # if cpu is GNR, GNR-D, or DMR get the frequencies from tpmi
 if ( [ "$family" -eq 6 ] && [ "$model" -eq 173 ] ) || ( [ "$family" -eq 6 ] && [ "$model" -eq 174 ] ) || ( [ "$family" -eq 19 ] && [ "$model" -eq 1 ] ); then  # GNR, GNR-D, DMR
-	cores=$(pcm-tpmi 0x5 0xD8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_10
-	# this works unless the TRL is overridden on MSR 0x1AD --> sse=$(pcm-tpmi 0x5 0xA8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_4
-	sse=$(rdmsr 0x1ad) # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
-	avx2=$(pcm-tpmi 0x5 0xB0 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_5
-	avx512=$(pcm-tpmi 0x5 0xB8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_6
-	avx512h=$(pcm-tpmi 0x5 0xC0 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_7
-	amx=$(pcm-tpmi 0x5 0xC8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_8
-elif [ "$family" -eq 6 ] && ( [ "$model" -eq 175 ] || [ "$model" -eq 221 ] ); then  # SRF, CWF
-	cores=$(rdmsr 0x1ae) # MSR_TURBO_GROUP_CORE_CNT: Group Size of Active Cores for Turbo Mode Operation
-	# if pstate driver is intel_pstate use 0x774 else use 0x199
-	driver=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver)
-	if [ "$driver" = "intel_pstate" ]; then
-		sse=$(rdmsr 0x774 -f 15:8) # IA32_HWP_REQUEST
-	else
-		sse=$(rdmsr 0x199 -f 15:8) # IA32_PERF_CTL
-	fi
-	avx2=0
-	avx512=0
-	avx512h=0
-	amx=0
+    cores=$(pcm-tpmi 0x5 0xD8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_10
+    # this works unless the TRL is overridden on MSR 0x1AD --> sse=$(pcm-tpmi 0x5 0xA8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_4
+    sse=$(rdmsr 0x1ad) # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
+    avx2=$(pcm-tpmi 0x5 0xB0 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_5
+    avx512=$(pcm-tpmi 0x5 0xB8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_6
+    avx512h=$(pcm-tpmi 0x5 0xC0 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_7
+    amx=$(pcm-tpmi 0x5 0xC8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_8
+elif [ "$family" -eq 6 ] && [ "$model" -eq 221 ]; then  # CWF (no AVX-512 or AMX support)
+    cores=$(pcm-tpmi 0x5 0xD8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_10
+    sse=$(rdmsr 0x1ad) # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
+    avx2=$(pcm-tpmi 0x5 0xB0 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_5
+    avx512=0
+    avx512h=0
+    amx=0
+elif [ "$family" -eq 6 ] && [ "$model" -eq 175 ]; then  # SRF
+    cores=$(rdmsr 0x1ae) # MSR_TURBO_GROUP_CORE_CNT: Group Size of Active Cores for Turbo Mode Operation
+    # if pstate driver is intel_pstate use 0x774 else use 0x199
+    driver=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver)
+    if [ "$driver" = "intel_pstate" ]; then
+        sse=$(rdmsr 0x774 -f 15:8) # IA32_HWP_REQUEST
+    else
+        sse=$(rdmsr 0x199 -f 15:8) # IA32_PERF_CTL
+    fi
+    avx2=0
+    avx512=0
+    avx512h=0
+    amx=0
 else # not SRF, CWF or GNR
-	cores=$(rdmsr 0x1ae) # MSR_TURBO_GROUP_CORE_CNT: Group Size of Active Cores for Turbo Mode Operation
-	sse=$(rdmsr 0x1ad) # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
-	avx2=0
-	avx512=0
-	avx512h=0
-	amx=0
+    cores=$(rdmsr 0x1ae) # MSR_TURBO_GROUP_CORE_CNT: Group Size of Active Cores for Turbo Mode Operation
+    sse=$(rdmsr 0x1ad) # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
+    avx2=0
+    avx512=0
+    avx512h=0
+    amx=0
 fi
 echo "cores sse avx2 avx512 avx512h amx"
 echo "$cores" "$sse" "$avx2" "$avx512" "$avx512h" "$amx"`,
@@ -669,12 +676,12 @@ if ! supported=$(pcm-tpmi 5 0xF8 -d -b 12:12 -i 0 -e 0 | tail -n 2 | head -n 1 |
     exit 1
 fi
 if [[ ! "$supported" =~ ^[0-9]+$ ]]; then
-	echo "Error: Invalid output from pcm-tpmi when checking support" >&2
-	exit 1
+    echo "Error: Invalid output from pcm-tpmi when checking support" >&2
+    exit 1
 fi
 if [ "$supported" -eq 0 ]; then
-	echo "SST-TF is not supported"
-	exit 0
+    echo "SST-TF is not supported"
+    exit 0
 fi
 # Is SST-TF enabled?
 if ! enabled=$(pcm-tpmi 5 0x78 -d -b 9:9 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}'); then
@@ -682,54 +689,54 @@ if ! enabled=$(pcm-tpmi 5 0x78 -d -b 9:9 -i 0 -e 0 | tail -n 2 | head -n 1 | awk
     exit 1
 fi
 if [[ ! "$enabled" =~ ^[0-9]+$ ]]; then
-	echo "Error: Invalid output from pcm-tpmi when checking enabled status" >&2
-	exit 1
+    echo "Error: Invalid output from pcm-tpmi when checking enabled status" >&2
+    exit 1
 fi
 if [ "$enabled" -eq 0 ]; then
-	echo "SST-TF is not enabled"
-	exit 0
+    echo "SST-TF is not enabled"
+    exit 0
 fi
 echo "bucket,cores,AVX,AVX2,AVX-512,AVX-512 heavy,AMX"
 # up to 5 buckets
 for ((i=0; i<5; i++))
 do
-	# Get the # of cores in this bucket
-	bithigh=$((i*8+7))
-	bitlow=$((i*8))
-	if ! numcores=$(pcm-tpmi 5 0x100 -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}'); then
-		echo "Error: Failed to get number of cores for bucket $i" >&2
-		exit 1
-	fi
-	if [[ ! "$numcores" =~ ^[0-9]+$ ]]; then
-		echo "Error: Invalid output from pcm-tpmi when getting number of cores for bucket $i" >&2
-		exit 1
-	fi
-	# if the number of cores is 0, skip this bucket
-	if [ "$numcores" -eq 0 ]; then
-		continue
-	fi
-	echo -n "$i,$numcores,"
-	# Get the frequencies for this bucket
-	bithigh=$((i*8+7)) # 8 bits per frequency
-	bitlow=$((i*8))
-	# 5 isa frequencies per bucket (AVX, AVX2, AVX-512, AVX-512 heavy, AMX)
-	for((j=0; j<5; j++))
-	do
-		offset=$((j*8 + 264)) # 264 is 0x108 (SST_TF_INFO_2) AVX
-		if ! freq=$(pcm-tpmi 5 $offset -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}'); then
-			echo "Error: Failed to get frequency for instruction set $j in bucket $i" >&2
-			exit 1
-		fi
-		if [[ ! "$freq" =~ ^[0-9]+$ ]]; then
-			echo "Error: Invalid frequency value for instruction set $j in bucket $i" >&2
-			exit 1
-		fi
-		echo -n "$freq"
-		if [ $j -lt 4 ]; then
-			echo -n ","
-		fi
-	done
-	echo "" # finish the line
+    # Get the # of cores in this bucket
+    bithigh=$((i*8+7))
+    bitlow=$((i*8))
+    if ! numcores=$(pcm-tpmi 5 0x100 -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}'); then
+        echo "Error: Failed to get number of cores for bucket $i" >&2
+        exit 1
+    fi
+    if [[ ! "$numcores" =~ ^[0-9]+$ ]]; then
+        echo "Error: Invalid output from pcm-tpmi when getting number of cores for bucket $i" >&2
+        exit 1
+    fi
+    # if the number of cores is 0, skip this bucket
+    if [ "$numcores" -eq 0 ]; then
+        continue
+    fi
+    echo -n "$i,$numcores,"
+    # Get the frequencies for this bucket
+    bithigh=$((i*8+7)) # 8 bits per frequency
+    bitlow=$((i*8))
+    # 5 isa frequencies per bucket (AVX, AVX2, AVX-512, AVX-512 heavy, AMX)
+    for((j=0; j<5; j++))
+    do
+        offset=$((j*8 + 264)) # 264 is 0x108 (SST_TF_INFO_2) AVX
+        if ! freq=$(pcm-tpmi 5 $offset -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}'); then
+            echo "Error: Failed to get frequency for instruction set $j in bucket $i" >&2
+            exit 1
+        fi
+        if [[ ! "$freq" =~ ^[0-9]+$ ]]; then
+            echo "Error: Invalid frequency value for instruction set $j in bucket $i" >&2
+            exit 1
+        fi
+        echo -n "$freq"
+        if [ $j -lt 4 ]; then
+            echo -n ","
+        fi
+    done
+    echo "" # finish the line
 done
 `,
 		MicroArchitectures: []string{cpus.UarchGNR, cpus.UarchGNR_D, cpus.UarchDMR},
@@ -744,13 +751,13 @@ if ! supported=$(pcm-tpmi 5 0xF8 -d -b 12:12 -i 0 -e 0 | tail -n 2 | head -n 1 |
     exit 1
 fi
 if [[ ! "$supported" =~ ^[0-9]+$ ]]; then
-	echo "Error: Invalid output from pcm-tpmi when checking support" >&2
-	exit 1
+    echo "Error: Invalid output from pcm-tpmi when checking support" >&2
+    exit 1
 fi
 
 if [ "$supported" -eq 0 ]; then
-	echo "SST-TF is not supported"
-	exit 0
+    echo "SST-TF is not supported"
+    exit 0
 fi
 # Is SST-TF enabled?
 if ! enabled=$(pcm-tpmi 5 0x78 -d -b 9:9 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}'); then
@@ -758,32 +765,32 @@ if ! enabled=$(pcm-tpmi 5 0x78 -d -b 9:9 -i 0 -e 0 | tail -n 2 | head -n 1 | awk
     exit 1
 fi
 if [[ ! "$enabled" =~ ^[0-9]+$ ]]; then
-	echo "Error: Invalid output from pcm-tpmi when checking enabled status" >&2
-	exit 1
+    echo "Error: Invalid output from pcm-tpmi when checking enabled status" >&2
+    exit 1
 fi
 
 if [ "$enabled" -eq 0 ]; then
-	echo "SST-TF is not enabled"
-	exit 0
+    echo "SST-TF is not enabled"
+    exit 0
 fi
 echo "AVX,AVX2,AVX-512,AVX-512 heavy,AMX"
 # Get the low priority core clip ratios (frequencies)
 for((j=0; j<5; j++))
 do
-	bithigh=$((j*8+23))
-	bitlow=$((j*8+16))
-	if ! freq=$(pcm-tpmi 5 0xF8 -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}'); then
-		echo "Error: Failed to get frequency for instruction set $j" >&2
-		exit 1
-	fi
-	if [[ ! "$freq" =~ ^[0-9]+$ ]]; then
-		echo "Error: Invalid frequency value for instruction set $j" >&2
-		exit 1
-	fi
-	echo -n "$freq"
-	if [ $j -ne 4 ]; then
-		echo -n ","
-	fi
+    bithigh=$((j*8+23))
+    bitlow=$((j*8+16))
+    if ! freq=$(pcm-tpmi 5 0xF8 -d -b $bithigh:$bitlow -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $5}'); then
+        echo "Error: Failed to get frequency for instruction set $j" >&2
+        exit 1
+    fi
+    if [[ ! "$freq" =~ ^[0-9]+$ ]]; then
+        echo "Error: Invalid frequency value for instruction set $j" >&2
+        exit 1
+    fi
+    echo -n "$freq"
+    if [ $j -ne 4 ]; then
+        echo -n ","
+    fi
 done
 echo "" # finish the line
 `,
@@ -831,82 +838,82 @@ rdmsr 0x2FFE
 	NicInfoScriptName: {
 		Name: NicInfoScriptName,
 		ScriptTemplate: `for ifc_path in /sys/class/net/*; do
-	ifc=$(basename "$ifc_path")
-	if [ "$ifc" = "lo" ]; then
-		continue
-	fi
-	if ! ethtool_out=$(ethtool "$ifc" 2>/dev/null); then
-		continue
-	fi
-	if ! ethtool_i_out=$(ethtool -i "$ifc" 2>/dev/null); then
-		continue
-	fi
-	echo "Interface: $ifc"
-	udevadm_out=$(udevadm info --query=all --path=/sys/class/net/"$ifc")
-	echo "Vendor ID: $(echo "$udevadm_out" | grep ID_VENDOR_ID= | cut -d'=' -f2)"
-	echo "Model ID: $(echo "$udevadm_out" | grep ID_MODEL_ID= | cut -d'=' -f2)"
-	vendor=$(echo "$udevadm_out" | grep ID_VENDOR_FROM_DATABASE= | cut -d'=' -f2)
-	echo "Vendor: $vendor"
-	model=$(echo "$udevadm_out" | grep ID_MODEL_FROM_DATABASE= | cut -d'=' -f2)
-	# fall back to lspci if model is not available from udevadm, and trim vendor prefix if present (e.g. "Intel Ethernet Controller" -> "Ethernet Controller")
-	if [ -z "$model" ]; then
-		id_path=$(echo "$udevadm_out" | grep ID_PATH= | cut -d'=' -f2)
-		bdf=${id_path##*-}
-		# ID_PATH may include the domain (0000:49:00.0); lspci typically prints 49:00.0.
-		if [[ "$bdf" == *:*:* ]]; then
-			bdf=${bdf#*:}
-		fi
-		if [ -n "$bdf" ] && command -v lspci >/dev/null 2>&1; then
-			model=$(lspci -s "$bdf" -i pci.ids.gz | awk 'NR == 1 { pos = index($0, ": "); if (pos > 0) print substr($0, pos + 2); exit }')
-			if [ -n "$model" ] && [ -n "$vendor" ]; then
-				model=$(awk -v vendor="$vendor" -v model="$model" 'BEGIN {
-					v = tolower(vendor)
-					m = tolower(model)
-					out = model
-					if (v != "" && substr(m, 1, length(v)) == v) {
-						out = substr(model, length(v) + 1)
-						sub(/^[[:space:]]+/, "", out)
-					}
-					print out
-				}')
-			fi
-		fi
-	fi
-	echo "Model: $model"
-	echo "MTU: $(cat /sys/class/net/"$ifc"/mtu 2>/dev/null)"
-	echo "$ethtool_out"
-	echo "$ethtool_i_out"
-	if ethtool_c_out=$(ethtool -c "$ifc" 2>/dev/null); then
-		echo "$ethtool_c_out"
-	fi
-	echo "MAC Address: $(cat /sys/class/net/"$ifc"/address 2>/dev/null)"
-	echo "NUMA Node: $(cat /sys/class/net/"$ifc"/device/numa_node 2>/dev/null)"
-	# Check if this is a virtual function
-	if [ -L /sys/class/net/"$ifc"/device/physfn ]; then
-		echo "Virtual Function: yes"
-	else
-		echo "Virtual Function: no"
-	fi
-	echo -n "CPU Affinity: "
-	intlist=$( grep -e "$ifc" /proc/interrupts | cut -d':' -f1 | sed -e 's/^[[:space:]]*//' )
-	for int in $intlist; do
-		cpu=$( cat /proc/irq/"$int"/smp_affinity_list 2>/dev/null)
-		printf "%s:%s;" "$int" "$cpu"
-	done
-	printf "\n"
-	echo "TX Queues: $(ls -d /sys/class/net/"$ifc"/queues/tx-* | wc -l)"
-	echo "RX Queues: $(ls -d /sys/class/net/"$ifc"/queues/rx-* | wc -l)"
-	for q in /sys/class/net/"$ifc"/queues/tx-*; do
-		if [ -f "$q/xps_cpus" ]; then
-			echo "xps_cpus $(basename "$q"): $(cat "$q/xps_cpus")"
-		fi
-	done
-	for q in /sys/class/net/"$ifc"/queues/rx-*; do
-		if [ -f "$q/rps_cpus" ]; then
-			echo "rps_cpus $(basename "$q"): $(cat "$q/rps_cpus")"
-		fi
-	done
-	echo "----------------------------------------"
+    ifc=$(basename "$ifc_path")
+    if [ "$ifc" = "lo" ]; then
+        continue
+    fi
+    if ! ethtool_out=$(ethtool "$ifc" 2>/dev/null); then
+        continue
+    fi
+    if ! ethtool_i_out=$(ethtool -i "$ifc" 2>/dev/null); then
+        continue
+    fi
+    echo "Interface: $ifc"
+    udevadm_out=$(udevadm info --query=all --path=/sys/class/net/"$ifc")
+    echo "Vendor ID: $(echo "$udevadm_out" | grep ID_VENDOR_ID= | cut -d'=' -f2)"
+    echo "Model ID: $(echo "$udevadm_out" | grep ID_MODEL_ID= | cut -d'=' -f2)"
+    vendor=$(echo "$udevadm_out" | grep ID_VENDOR_FROM_DATABASE= | cut -d'=' -f2)
+    echo "Vendor: $vendor"
+    model=$(echo "$udevadm_out" | grep ID_MODEL_FROM_DATABASE= | cut -d'=' -f2)
+    # fall back to lspci if model is not available from udevadm, and trim vendor prefix if present (e.g. "Intel Ethernet Controller" -> "Ethernet Controller")
+    if [ -z "$model" ]; then
+        id_path=$(echo "$udevadm_out" | grep ID_PATH= | cut -d'=' -f2)
+        bdf=${id_path##*-}
+        # ID_PATH may include the domain (0000:49:00.0); lspci typically prints 49:00.0.
+        if [[ "$bdf" == *:*:* ]]; then
+            bdf=${bdf#*:}
+        fi
+        if [ -n "$bdf" ] && command -v lspci >/dev/null 2>&1; then
+            model=$(lspci -s "$bdf" -i pci.ids.gz | awk 'NR == 1 { pos = index($0, ": "); if (pos > 0) print substr($0, pos + 2); exit }')
+            if [ -n "$model" ] && [ -n "$vendor" ]; then
+                model=$(awk -v vendor="$vendor" -v model="$model" 'BEGIN {
+                    v = tolower(vendor)
+                    m = tolower(model)
+                    out = model
+                    if (v != "" && substr(m, 1, length(v)) == v) {
+                        out = substr(model, length(v) + 1)
+                        sub(/^[[:space:]]+/, "", out)
+                    }
+                    print out
+                }')
+            fi
+        fi
+    fi
+    echo "Model: $model"
+    echo "MTU: $(cat /sys/class/net/"$ifc"/mtu 2>/dev/null)"
+    echo "$ethtool_out"
+    echo "$ethtool_i_out"
+    if ethtool_c_out=$(ethtool -c "$ifc" 2>/dev/null); then
+        echo "$ethtool_c_out"
+    fi
+    echo "MAC Address: $(cat /sys/class/net/"$ifc"/address 2>/dev/null)"
+    echo "NUMA Node: $(cat /sys/class/net/"$ifc"/device/numa_node 2>/dev/null)"
+    # Check if this is a virtual function
+    if [ -L /sys/class/net/"$ifc"/device/physfn ]; then
+        echo "Virtual Function: yes"
+    else
+        echo "Virtual Function: no"
+    fi
+    echo -n "CPU Affinity: "
+    intlist=$( grep -e "$ifc" /proc/interrupts | cut -d':' -f1 | sed -e 's/^[[:space:]]*//' )
+    for int in $intlist; do
+        cpu=$( cat /proc/irq/"$int"/smp_affinity_list 2>/dev/null)
+        printf "%s:%s;" "$int" "$cpu"
+    done
+    printf "\n"
+    echo "TX Queues: $(ls -d /sys/class/net/"$ifc"/queues/tx-* | wc -l)"
+    echo "RX Queues: $(ls -d /sys/class/net/"$ifc"/queues/rx-* | wc -l)"
+    for q in /sys/class/net/"$ifc"/queues/tx-*; do
+        if [ -f "$q/xps_cpus" ]; then
+            echo "xps_cpus $(basename "$q"): $(cat "$q/xps_cpus")"
+        fi
+    done
+    for q in /sys/class/net/"$ifc"/queues/rx-*; do
+        if [ -f "$q/rps_cpus" ]; then
+            echo "rps_cpus $(basename "$q"): $(cat "$q/rps_cpus")"
+        fi
+    done
+    echo "----------------------------------------"
 done
 `,
 		Depends:   []string{"ethtool", "lspci", "pci.ids.gz"},
@@ -923,51 +930,51 @@ lsblk -r -o NAME,MODEL,SIZE,MOUNTPOINT,FSTYPE,RQ-SIZE,MIN-IO -e7 -e1 \
 | cut -d' ' -f1,2,3,4,5,6,7 --output-delimiter='|' \
 | while IFS='|' read -r name model size mountpoint fstype rqsize minio ;
 do
-	# skip the lsblk output header
-	if [ "$name" = "NAME" ] ; then
-		continue
-	fi
-	fw=""
-	addr=""
-	numa=""
-	curlinkspeed=""
-	curlinkwidth=""
-	maxlinkspeed=""
-	maxlinkwidth=""
-	# replace \x20 with space in model
-	model=${model//\\x20/ }
-	# if name refers to an NVMe device e.g, nvme0n1 - nvme99n99
-	if [[ $name =~ ^(nvme[0-9]+)n[0-9]+$ ]]; then
-		# get the name without the namespace
-		nvme=${BASH_REMATCH[1]}
-		if [ -f /sys/block/"$name"/device/firmware_rev ] ; then
-			fw=$( cat /sys/block/"$name"/device/firmware_rev )
-		fi
-		if [ -f /sys/block/"$name"/device/address ] ; then
-			addr=$( cat /sys/block/"$name"/device/address )
-		fi
-		if [ -d "/sys/block/$name/device/${nvme}" ]; then
-			numa=$( cat /sys/block/"$name"/device/"${nvme}"/numa_node )
-			curlinkspeed=$( cat /sys/block/"$name"/device/"${nvme}"/device/current_link_speed )
-			curlinkwidth=$( cat /sys/block/"$name"/device/"${nvme}"/device/current_link_width )
-			maxlinkspeed=$( cat /sys/block/"$name"/device/"${nvme}"/device/max_link_speed )
-			maxlinkwidth=$( cat /sys/block/"$name"/device/"${nvme}"/device/max_link_width )
-		elif [ -d "/sys/block/$name/device/device" ]; then
-			numa=$( cat /sys/block/"$name"/device/device/numa_node )
-			curlinkspeed=$( cat /sys/block/"$name"/device/device/current_link_speed )
-			curlinkwidth=$( cat /sys/block/"$name"/device/device/current_link_width )
-			maxlinkspeed=$( cat /sys/block/"$name"/device/device/max_link_speed )
-			maxlinkwidth=$( cat /sys/block/"$name"/device/device/max_link_width )
-		fi
-	fi
-	echo "$name|$model|$size|$mountpoint|$fstype|$rqsize|$minio|$fw|$addr|$numa|$curlinkspeed|$curlinkwidth|$maxlinkspeed|$maxlinkwidth"
+    # skip the lsblk output header
+    if [ "$name" = "NAME" ] ; then
+        continue
+    fi
+    fw=""
+    addr=""
+    numa=""
+    curlinkspeed=""
+    curlinkwidth=""
+    maxlinkspeed=""
+    maxlinkwidth=""
+    # replace \x20 with space in model
+    model=${model//\\x20/ }
+    # if name refers to an NVMe device e.g, nvme0n1 - nvme99n99
+    if [[ $name =~ ^(nvme[0-9]+)n[0-9]+$ ]]; then
+        # get the name without the namespace
+        nvme=${BASH_REMATCH[1]}
+        if [ -f /sys/block/"$name"/device/firmware_rev ] ; then
+            fw=$( cat /sys/block/"$name"/device/firmware_rev )
+        fi
+        if [ -f /sys/block/"$name"/device/address ] ; then
+            addr=$( cat /sys/block/"$name"/device/address )
+        fi
+        if [ -d "/sys/block/$name/device/${nvme}" ]; then
+            numa=$( cat /sys/block/"$name"/device/"${nvme}"/numa_node )
+            curlinkspeed=$( cat /sys/block/"$name"/device/"${nvme}"/device/current_link_speed )
+            curlinkwidth=$( cat /sys/block/"$name"/device/"${nvme}"/device/current_link_width )
+            maxlinkspeed=$( cat /sys/block/"$name"/device/"${nvme}"/device/max_link_speed )
+            maxlinkwidth=$( cat /sys/block/"$name"/device/"${nvme}"/device/max_link_width )
+        elif [ -d "/sys/block/$name/device/device" ]; then
+            numa=$( cat /sys/block/"$name"/device/device/numa_node )
+            curlinkspeed=$( cat /sys/block/"$name"/device/device/current_link_speed )
+            curlinkwidth=$( cat /sys/block/"$name"/device/device/current_link_width )
+            maxlinkspeed=$( cat /sys/block/"$name"/device/device/max_link_speed )
+            maxlinkwidth=$( cat /sys/block/"$name"/device/device/max_link_width )
+        fi
+    fi
+    echo "$name|$model|$size|$mountpoint|$fstype|$rqsize|$minio|$fw|$addr|$numa|$curlinkspeed|$curlinkwidth|$maxlinkspeed|$maxlinkwidth"
 done
 `,
 	},
 	HdparmScriptName: {
 		Name: HdparmScriptName,
 		ScriptTemplate: `lsblk -d -r -o NAME -e7 -e1 -n | while read -r device ; do
-	hdparm -i /dev/"$device"
+    hdparm -i /dev/"$device"
 done
 `,
 		Superuser: true,
@@ -1099,11 +1106,11 @@ done
 __DEFAULT_HL_DEVICE=
 __pcidev=$(grep PCI_ID /sys/bus/pci/devices/*/uevent | grep -i 1da3: || echo "")
 if echo $__pcidev | grep -qE '1000|1001|1010|1011'; then
-	__DEFAULT_HL_DEVICE="gaudi"
+    __DEFAULT_HL_DEVICE="gaudi"
 elif echo $__pcidev | grep -qE '1020|1030'; then
-	__DEFAULT_HL_DEVICE="gaudi2"
+    __DEFAULT_HL_DEVICE="gaudi2"
 elif echo $__pcidev | grep -qE '106[0-9]'; then
-	__DEFAULT_HL_DEVICE="gaudi3"
+    __DEFAULT_HL_DEVICE="gaudi3"
 fi
 echo $__DEFAULT_HL_DEVICE
 `,
@@ -1202,8 +1209,8 @@ echo $__DEFAULT_HL_DEVICE
 		Name: SpeedBenchmarkScriptName,
 		ScriptTemplate: `methods=$( stress-ng --cpu 1 --cpu-method x 2>&1 | cut -d":" -f2 | cut -c 6- )
 for method in $methods; do
-	printf "%s " "$method"
-	stress-ng --cpu 0 -t 1 --cpu-method "$method" --metrics-brief 2>&1 | tail -1 | awk '{print $9}'
+    printf "%s " "$method"
+    stress-ng --cpu 0 -t 1 --cpu-method "$method" --metrics-brief 2>&1 | tail -1 | awk '{print $9}'
 done
 `,
 		Superuser:  false,
@@ -1215,20 +1222,20 @@ done
 		Architectures: []string{cpus.X86Architecture},
 		ScriptTemplate: `# Function to expand a range of numbers, e.g. "0-24", into an array of numbers
 expand_range() {
-	local range=$1
-	local expanded=()
-	IFS=',' read -ra parts <<< "$range"
-	for part in "${parts[@]}"; do
-		if [[ $part == *-* ]]; then
-			IFS='-' read -ra limits <<< "$part"
-			for ((i=${limits[0]}; i<=${limits[1]}; i++)); do
-				expanded+=("$i")
-			done
-		else
-			expanded+=("$part")
-		fi
-	done
-	echo "${expanded[@]}"
+    local range=$1
+    local expanded=()
+    IFS=',' read -ra parts <<< "$range"
+    for part in "${parts[@]}"; do
+        if [[ $part == *-* ]]; then
+            IFS='-' read -ra limits <<< "$part"
+            for ((i=${limits[0]}; i<=${limits[1]}; i++)); do
+                expanded+=("$i")
+            done
+        else
+            expanded+=("$part")
+        fi
+    done
+    echo "${expanded[@]}"
 }
 
 num_cores_per_socket=$( lscpu | grep -E 'Core\(s\) per socket:' | head -1 | awk '{print $4}' )
@@ -1236,18 +1243,29 @@ num_cores_per_socket=$( lscpu | grep -E 'Core\(s\) per socket:' | head -1 | awk 
 family=$(lscpu | grep -E '^CPU family:' | awk '{print $3}')
 model=$(lscpu | grep -E '^Model:' | awk '{print $2}')
 
-# if GNR (family 6, model 173), we need to interleave the core-ids across dies
-if [ $family -eq 6 ] && [ $model -eq 173 ]; then
-    # Get the number of dies and sockets
-    num_devices=$(lspci -d 8086:3258 | wc -l)
+# if GNR or CWF (family 6, model 173 or 221), we need to interleave the core-ids across dies
+if [ $family -eq 6 ] && { [ $model -eq 173 ] || [ $model -eq 221 ]; }; then
+    # count the total number of compute dies
+    output=$(pcm-tpmi 2 0x10 -d -b 26:26)
+    compute_die_count=0
+    while read -r line; do
+        if [[ $line == *"entry"* && $line == *"instance"* && $line == *"value 0"* ]]; then
+            compute_die_count=$((compute_die_count + 1))
+        fi
+    done <<< "$output"
+    if [ $compute_die_count -eq 0 ]; then
+        echo "Error: Failed to get compute die count from pcm-tpmi output" >&2
+        exit 1
+    fi
+    # echo "Number of compute dies: $compute_die_count"
     num_sockets=$(lscpu | grep -E '^Socket\(s\):' | awk '{print $2}')
-    # echo "Number of devices: $num_devices"
+    if [ $num_sockets -eq 0 ]; then
+        echo "Error: Failed to get number of sockets" >&2
+        exit 1
+    fi
     # echo "Number of sockets: $num_sockets"
-    num_devices_per_die=2
-    # Calculate the number of dies per socket
-    dies_per_socket=$((num_devices / num_sockets / num_devices_per_die))
+    dies_per_socket=$(( compute_die_count / num_sockets ))
     # echo "Number of dies per socket: $dies_per_socket"
-    # Calculate the number of cores per die
     cores_per_die=$((num_cores_per_socket / dies_per_socket))
     # echo "Number of cores per die: $cores_per_die"
 
@@ -1298,7 +1316,7 @@ avx-turbo --min-threads=1 --max-threads=$num_cores_per_socket --test scalar_iadd
 `,
 		Superuser:  true,
 		Lkms:       []string{"msr"},
-		Depends:    []string{"avx-turbo", "lspci"},
+		Depends:    []string{"avx-turbo", "pcm-tpmi"},
 		Sequential: true,
 	},
 	PowerBenchmarkScriptName: {
@@ -1420,7 +1438,7 @@ rm -rf $test_dir
 		ScriptTemplate: `interval={{.Interval}}
 duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
-	count=$((duration / interval))
+    count=$((duration / interval))
 fi
 LC_TIME=C mpstat -u -T -I SCPU -P ALL $interval $count
 `,
@@ -1433,7 +1451,7 @@ LC_TIME=C mpstat -u -T -I SCPU -P ALL $interval $count
 		ScriptTemplate: `interval={{.Interval}}
 duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
-	count=$((duration / interval))
+    count=$((duration / interval))
 fi
 S_TIME_FORMAT=ISO iostat -d -t $interval $count | sed '/^loop/d'
 `,
@@ -1446,7 +1464,7 @@ S_TIME_FORMAT=ISO iostat -d -t $interval $count | sed '/^loop/d'
 		ScriptTemplate: `interval={{.Interval}}
 duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
-	count=$((duration / interval))
+    count=$((duration / interval))
 fi
 LC_TIME=C sar -r $interval $count
 `,
@@ -1459,7 +1477,7 @@ LC_TIME=C sar -r $interval $count
 		ScriptTemplate: `interval={{.Interval}}
 duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
-	count=$((duration / interval))
+    count=$((duration / interval))
 fi
 LC_TIME=C sar -n DEV $interval $count
 `,
@@ -1473,10 +1491,10 @@ LC_TIME=C sar -n DEV $interval $count
 		ScriptTemplate: `interval={{.Interval}}
 duration={{.Duration}}
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
-	count=$((duration / interval))
-	count="-n $count"
+    count=$((duration / interval))
+    count="-n $count"
 else
-	count=""
+    count=""
 fi
 echo TIME: $(date +"%H:%M:%S")
 echo INTERVAL: $interval
@@ -1522,30 +1540,30 @@ trap finalize INT TERM EXIT
 cpu_count=$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 1)
 required_fd_limit=$((cpu_count * 2 + 128))
 if [ "$required_fd_limit" -lt "$min_fd_limit" ]; then
-	required_fd_limit=$min_fd_limit
+    required_fd_limit=$min_fd_limit
 fi
 
 current_fd_limit=$(ulimit -Sn)
 if [ "$current_fd_limit" = "unlimited" ]; then
-	current_fd_limit=$required_fd_limit
+    current_fd_limit=$required_fd_limit
 fi
 
 if [ "$current_fd_limit" -lt "$required_fd_limit" ]; then
-	hard_fd_limit=$(ulimit -Hn)
-	if [ "$hard_fd_limit" = "unlimited" ] || [ "$hard_fd_limit" -ge "$required_fd_limit" ]; then
-		ulimit -Sn "$required_fd_limit" 2>/dev/null || true
-	fi
-	current_fd_limit=$(ulimit -Sn)
+    hard_fd_limit=$(ulimit -Hn)
+    if [ "$hard_fd_limit" = "unlimited" ] || [ "$hard_fd_limit" -ge "$required_fd_limit" ]; then
+        ulimit -Sn "$required_fd_limit" 2>/dev/null || true
+    fi
+    current_fd_limit=$(ulimit -Sn)
 fi
 
 if [ "$current_fd_limit" = "unlimited" ]; then
-	current_fd_limit=$required_fd_limit
+    current_fd_limit=$required_fd_limit
 fi
 
 if [ "$current_fd_limit" -lt "$required_fd_limit" ]; then
-	echo "instruction telemetry requires at least $required_fd_limit open files for $cpu_count CPUs, but the current soft limit is $current_fd_limit" 1>&2
-	echo "increase the open file limit (ulimit -n) or reduce the number of monitored CPUs before retrying instruction telemetry" 1>&2
-	exit 1
+    echo "instruction telemetry requires at least $required_fd_limit open files for $cpu_count CPUs, but the current soft limit is $current_fd_limit" 1>&2
+    echo "increase the open file limit (ulimit -n) or reduce the number of monitored CPUs before retrying instruction telemetry" 1>&2
+    exit 1
 fi
 
 if [ $duration -ne 0 ] && [ $interval -ne 0 ]; then
@@ -1843,25 +1861,25 @@ restore_settings() {
 
 # Function to stop profiling
 stop_profiling() {
-	# stop perf (may already be stopped if stopped by signal)
-	if [ -n "$perf_fp_pid" ]; then
-		kill -0 "$perf_fp_pid" 2>/dev/null && kill -INT "$perf_fp_pid"
-	fi
-	if [ -n "$perf_dwarf_pid" ]; then
-		kill -0 "$perf_dwarf_pid" 2>/dev/null && kill -INT "$perf_dwarf_pid"
-	fi
-	# stop async-profiler
-	for pid in "${java_pids[@]}"; do
-		# this call is synchronous and will wait until the profile is written to file before returning
-		async-profiler/bin/asprof stop -o collapsed -f ap_folded_"$pid" "$pid"
-	done
-	# wait for perf processes to finish and exit
-	if [ -n "$perf_fp_pid" ]; then
-		wait "$perf_fp_pid" || true
-	fi
-	if [ -n "$perf_dwarf_pid" ]; then
-		wait "$perf_dwarf_pid" || true
-	fi
+    # stop perf (may already be stopped if stopped by signal)
+    if [ -n "$perf_fp_pid" ]; then
+        kill -0 "$perf_fp_pid" 2>/dev/null && kill -INT "$perf_fp_pid"
+    fi
+    if [ -n "$perf_dwarf_pid" ]; then
+        kill -0 "$perf_dwarf_pid" 2>/dev/null && kill -INT "$perf_dwarf_pid"
+    fi
+    # stop async-profiler
+    for pid in "${java_pids[@]}"; do
+        # this call is synchronous and will wait until the profile is written to file before returning
+        async-profiler/bin/asprof stop -o collapsed -f ap_folded_"$pid" "$pid"
+    done
+    # wait for perf processes to finish and exit
+    if [ -n "$perf_fp_pid" ]; then
+        wait "$perf_fp_pid" || true
+    fi
+    if [ -n "$perf_dwarf_pid" ]; then
+        wait "$perf_dwarf_pid" || true
+    fi
     restore_settings
 }
 
@@ -1970,46 +1988,46 @@ fi
 
 # Frame-pointer perf record (default native profile)
 if [ -n "$pids" ]; then
-	"${PERF_CMD}" record -e "$perf_event" -F "$frequency" -p "$pids" -g -o perf_fp_data -m 129 &
+    "${PERF_CMD}" record -e "$perf_event" -F "$frequency" -p "$pids" -g -o perf_fp_data -m 129 &
 else
-	"${PERF_CMD}" record -e "$perf_event" -F "$frequency" -a -g -o perf_fp_data -m 129 &
+    "${PERF_CMD}" record -e "$perf_event" -F "$frequency" -a -g -o perf_fp_data -m 129 &
 fi
 perf_fp_pid=$!
 if ! kill -0 $perf_fp_pid 2>/dev/null; then
-	echo "Failed to start perf record in frame pointer mode" >&2
-	stop_profiling
-	exit 1
+    echo "Failed to start perf record in frame pointer mode" >&2
+    stop_profiling
+    exit 1
 fi
 
 # DWARF perf record (second native profile when dual_native_stacks is true)
 perf_dwarf_pid=""
 if [ "$dual_native_stacks" = "true" ]; then
-	if [ -n "$pids" ]; then
-		"${PERF_CMD}" record -e "$perf_event" -F "$frequency" -p "$pids" -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
-	else
-		"${PERF_CMD}" record -e "$perf_event" -F "$frequency" -a -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
-	fi
-	perf_dwarf_pid=$!
-	if ! kill -0 $perf_dwarf_pid 2>/dev/null; then
-		echo "Failed to start perf record in dwarf mode" >&2
-		stop_profiling
-		exit 1
-	fi
+    if [ -n "$pids" ]; then
+        "${PERF_CMD}" record -e "$perf_event" -F "$frequency" -p "$pids" -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
+    else
+        "${PERF_CMD}" record -e "$perf_event" -F "$frequency" -a -g -o perf_dwarf_data -m 257 --call-graph dwarf,8192 &
+    fi
+    perf_dwarf_pid=$!
+    if ! kill -0 $perf_dwarf_pid 2>/dev/null; then
+        echo "Failed to start perf record in dwarf mode" >&2
+        stop_profiling
+        exit 1
+    fi
 fi
 
 if [ ${#java_pids[@]} -eq 0 ]; then
-	echo "Warning: Java sampling was requested, but no Java processes were found; skipping Java profiling." >&2
+    echo "Warning: Java sampling was requested, but no Java processes were found; skipping Java profiling." >&2
 else
-	# Start profiling Java with async-profiler for each Java PID
-	for pid in "${java_pids[@]}"; do
-		java_cmds+=("$(tr '\000' ' ' < /proc/"$pid"/cmdline)")
-		# asprof start will return immediately after starting the profiler
-		if ! async-profiler/bin/asprof start "${asprof_arguments[@]}" -i "$ap_interval" "$pid"; then
-			echo "Failed to start async-profiler for PID $pid" >&2
-			stop_profiling
-			exit 1
-		fi
-	done
+    # Start profiling Java with async-profiler for each Java PID
+    for pid in "${java_pids[@]}"; do
+        java_cmds+=("$(tr '\000' ' ' < /proc/"$pid"/cmdline)")
+        # asprof start will return immediately after starting the profiler
+        if ! async-profiler/bin/asprof start "${asprof_arguments[@]}" -i "$ap_interval" "$pid"; then
+            echo "Failed to start async-profiler for PID $pid" >&2
+            stop_profiling
+            exit 1
+        fi
+    done
 fi
 
 # wait
@@ -2056,14 +2074,14 @@ PERF_LOCK_CONTENTION_BPF=$?
 
 # collect lock
 if [ ${PERF_LOCK_CONTENTION_BPF} -eq 0 ]; then
-	perf lock contention -a -bv --max-stack 20 2>${PERF_CONTENTION_DATA} -- sleep $duration &
-	PERF_LOCK_PID=$!
+    perf lock contention -a -bv --max-stack 20 2>${PERF_CONTENTION_DATA} -- sleep $duration &
+    PERF_LOCK_PID=$!
 fi
 
 wait ${PERF_HOTSPOT_PID}
 
 if [ ${PERF_LOCK_CONTENTION_BPF} -eq 0 ]; then
-	wait ${PERF_LOCK_PID}
+    wait ${PERF_LOCK_PID}
 fi
 
 # restore perf_event_paranoid and kptr_restrict
@@ -2072,25 +2090,25 @@ echo "$KPTR_RESTRICT" > /proc/sys/kernel/kptr_restrict
 
 # collapse perf data
 if [ -d "${PERF_HOTSPOT_DATA}" ]; then
-	echo "########## perf_hotspot_no_children ##########"
-	perf report -i ${PERF_HOTSPOT_DATA} --no-children --call-graph none --stdio
-	echo "########## perf_hotspot_callgraph ##########"
-	perf report -i ${PERF_HOTSPOT_DATA} --stdio
-	echo "########## perf_c2c_no_children ##########"
-	perf c2c report  -i ${PERF_HOTSPOT_DATA} --call-graph none --stdio
-	echo "########## perf_c2c_callgraph ##########"
-	perf c2c report  -i ${PERF_HOTSPOT_DATA} --stdio
+    echo "########## perf_hotspot_no_children ##########"
+    perf report -i ${PERF_HOTSPOT_DATA} --no-children --call-graph none --stdio
+    echo "########## perf_hotspot_callgraph ##########"
+    perf report -i ${PERF_HOTSPOT_DATA} --stdio
+    echo "########## perf_c2c_no_children ##########"
+    perf c2c report  -i ${PERF_HOTSPOT_DATA} --call-graph none --stdio
+    echo "########## perf_c2c_callgraph ##########"
+    perf c2c report  -i ${PERF_HOTSPOT_DATA} --stdio
 
-	if [ "${package,,}" = "true" ]; then
-		echo "########## perf_package_path ##########"
-		PERF_HOTSPOT_DATA_DIR=$(dirname "${PERF_HOTSPOT_DATA}")
-		( cd ${PERF_HOTSPOT_DATA_DIR}; perf archive --all ${PERF_HOTSPOT_DATA} > /dev/null 2>&1; chown ${SUDO_UID}.${SUDO_UID} -R ${PERF_HOTSPOT_DATA_DIR} )
-		ls ${PERF_HOTSPOT_DATA_DIR}/perf.all*.tar.bz2
-	fi
+    if [ "${package,,}" = "true" ]; then
+        echo "########## perf_package_path ##########"
+        PERF_HOTSPOT_DATA_DIR=$(dirname "${PERF_HOTSPOT_DATA}")
+        ( cd ${PERF_HOTSPOT_DATA_DIR}; perf archive --all ${PERF_HOTSPOT_DATA} > /dev/null 2>&1; chown ${SUDO_UID}.${SUDO_UID} -R ${PERF_HOTSPOT_DATA_DIR} )
+        ls ${PERF_HOTSPOT_DATA_DIR}/perf.all*.tar.bz2
+    fi
 fi
 if [ -f "${PERF_CONTENTION_DATA}" ]; then
-	echo "########## perf_lock_contention ##########"
-	cat ${PERF_CONTENTION_DATA}
+    echo "########## perf_lock_contention ##########"
+    cat ${PERF_CONTENTION_DATA}
 fi
 `,
 		Superuser: true,
