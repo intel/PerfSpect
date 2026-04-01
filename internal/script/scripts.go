@@ -164,10 +164,13 @@ func GetParameterizedScriptByName(name string, params map[string]string) ScriptD
 
 // mlc benchmark script constants (buffer setup snippets passed into mlcBenchmarkScript)
 const (
-	// for measuring memory bandwidth and latency (2x of L3 cache size)
+	// for measuring memory bandwidth and latency (2x of per-core L3 share, minimum 100 MB)
 	mlcBufferSetupMemory = `L3_KB=$(cache_size_kb L3)
-BUF_KB=$(( L3_KB * 2 ))
-[ $BUF_KB -lt 1 ] && BUF_KB=1`
+CORES_PER_SOCKET=$(lscpu | grep -E 'Core\(s\) per socket:' | head -1 | awk '{print $4}')
+[ $CORES_PER_SOCKET -lt 1 ] && CORES_PER_SOCKET=1
+BUF_KB=$(( L3_KB * 2 / CORES_PER_SOCKET ))
+MIN_KB=102400
+[ $BUF_KB -lt $MIN_KB ] && BUF_KB=$MIN_KB`
 	// for measuring L1 bandwidth and latency (half of L1D cache size minus 4KB)
 	mlcBufferSetupL1 = `L1D_KB=$(cache_size_kb L1D)
 BUF_KB=$(( L1D_KB / 2 - 4 ))
