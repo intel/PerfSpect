@@ -1,0 +1,266 @@
+{
+  "Header": {
+    "Copyright": "Copyright (c) 2001 - 2025 Intel Corporation. All rights reserved.",
+    "Info": "PerfSpect Performance Monitoring Metrics for Intel(R) Xeon(R) 6 Processor with E-cores (Clearwater Forest)"
+  },
+  "PerfmonMetricsFile": "resources:cwf/clearwaterforest_metrics.json",
+  "PerfmonCoreEventsFile": "resources:cwf/clearwaterforest_core.json",
+  "PerfmonUncoreEventsFile": "resources:cwf/clearwaterforest_uncore.json",
+  "PerfmonRetireLatencyFile": "",
+  "AlternateTMAMetricsFile": "",
+  "PerfspectMetricsFile": "resources:cwf/cwf_perfspect_metrics.json",
+  "ReportMetrics": [
+    {
+      "MetricName": "cpu_operating_frequency",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "cpu_utilization",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "cpu_util_kernel",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "cpi",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "cycles_per_txn",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "kernel_cpi",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "kernel_cycles_per_txn",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "ipc",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "giga_instructions_per_sec",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "branch_misprediction_ratio",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "loads_retired_per_instr",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "stores_retired_per_instr",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "locks_retired_per_instr",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "locks_retired_per_txn",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "l1d_misses_per_txn",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "l1d_demand_data_read_hits_per_instr",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "l1d_demand_data_read_hits_per_txn",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "l1_i_code_read_misses_with_prefetches_per_instr",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "l1i_code_read_misses_per_txn",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "l2_demand_data_read_hits_per_instr",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "l2_demand_data_read_hits_per_txn",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "l2_misses_per_txn",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "l2_demand_data_read_mpi",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "l2_demand_data_read_misses_per_txn",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "llc_code_read_mpi_demand_plus_prefetch",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "llc_code_read_misses_per_txn",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "llc_data_read_mpi_demand_plus_prefetch",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "llc_data_read_misses_per_txn",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "llc_demand_data_read_miss_latency",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "llc_miss_local_memory_bandwidth_read",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "llc_miss_local_memory_bandwidth_write",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "llc_miss_remote_memory_bandwidth_read",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "llc_miss_remote_memory_bandwidth_write",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "upi_data_transmit_bw",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "package_power",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "dram_power",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "core_c6_residency",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "package_c6_residency",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "memory_bandwidth_read",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "memory_bandwidth_write",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "memory_bandwidth_total",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "itlb_2nd_level_mpi",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "itlb_misses_per_txn",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "dtlb_2nd_level_load_mpi",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "dtlb_load_misses_per_txn",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "dtlb_2nd_level_store_mpi",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "dtlb_store_misses_per_txn",
+      "Origin": "perfspect"
+    },
+    {
+      "MetricName": "numa_reads_addressed_to_local_dram",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "numa_reads_addressed_to_remote_dram",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "uncore_frequency",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "io_bandwidth_write",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "io_bandwidth_read",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "io_bandwidth_read_local",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "io_bandwidth_read_remote",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "io_bandwidth_write_local",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "io_bandwidth_write_remote",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "io_bandwidth_read_l3_miss",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "io_bandwidth_write_l3_miss",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "io_number_of_partial_pci_writes",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "io_read_l3_miss",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "io_partial_write_l3_miss",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "io_full_write_l3_miss",
+      "Origin": "perfmon"
+    },
+    {
+      "MetricName": "io_lost_fwd",
+      "Origin": "perfmon"
+    }
+  ]
+}
