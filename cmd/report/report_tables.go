@@ -1153,7 +1153,7 @@ func dimmTableInsights(outputs map[string]script.ScriptOutput, tableValues table
 					speedParts := strings.Split(speed, " ")
 					configuredSpeedParts := strings.Split(configuredSpeed, " ")
 					if len(speedParts) > 0 && len(configuredSpeedParts) > 0 {
-						speedVal, err := strconv.Atoi(speedParts[0])
+						maximumSpeedVal, err := strconv.Atoi(speedParts[0])
 						if err != nil {
 							slog.Warn(err.Error())
 						} else {
@@ -1161,11 +1161,12 @@ func dimmTableInsights(outputs map[string]script.ScriptOutput, tableValues table
 							if err != nil {
 								slog.Warn(err.Error())
 							} else {
-								if speedVal < configuredSpeedVal {
+								if configuredSpeedVal < maximumSpeedVal {
 									insights = append(insights, table.Insight{
 										Recommendation: "Consider configuring DIMMs for their maximum speed.",
-										Justification:  fmt.Sprintf("DIMMs configured for %s when their maximum speed is %s.", configuredSpeed, speed),
+										Justification:  fmt.Sprintf("At least one DIMM was found with configured speed %s when their maximum speed is %s.", configuredSpeed, speed),
 									})
+									break
 								}
 							}
 						}
@@ -1176,7 +1177,6 @@ func dimmTableInsights(outputs map[string]script.ScriptOutput, tableValues table
 	}
 	return insights
 }
-
 func nicTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	allNicsInfo := extract.ParseNicInfo(outputs[script.NicInfoScriptName].Stdout)
 	if len(allNicsInfo) == 0 {
