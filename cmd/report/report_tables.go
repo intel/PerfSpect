@@ -10,6 +10,7 @@ import (
 	htmltemplate "html/template"
 	"log/slog"
 	"math"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -844,7 +845,7 @@ func elcTableInsights(outputs map[string]script.ScriptOutput, tableValues table.
 	if err != nil {
 		slog.Warn(err.Error())
 	} else {
-		// warn if ELC mode is not set to 'Latency Optimized' or 'Default' consistently across all dies
+		// warn if ELC mode is not set to 'Latency Optimized' or 'Optimized Power Mode' consistently across all dies
 		firstMode := tableValues.Fields[modeFieldIndex].Values[0]
 		for _, mode := range tableValues.Fields[modeFieldIndex].Values[1:] {
 			if mode != firstMode {
@@ -855,7 +856,7 @@ func elcTableInsights(outputs map[string]script.ScriptOutput, tableValues table.
 				break
 			}
 		}
-		// suggest setting ELC mode to 'Latency Optimized' or 'Default' based on the current setting
+		// suggest setting ELC mode to 'Latency Optimized' or 'Optimized Power Mode' based on the current setting
 		for _, mode := range tableValues.Fields[modeFieldIndex].Values {
 			if mode != "" && mode != extract.ELCModeLatencyOptimized {
 				insights = append(insights, table.Insight{
@@ -1729,6 +1730,132 @@ func dimmDetails(dimm []string) (details string) {
 	return
 }
 
+var configuredSpeedPattern = regexp.MustCompile(`(\d+(?:\.\d+)?\s*MT/s)\s*\[(\d+(?:\.\d+)?\s*MT/s)\]`)
+
+func highlightConfiguredSpeedMismatchesHTML(value string) string {
+	if value == "" {
+		return ""
+	}
+
+	matches := configuredSpeedPattern.FindAllStringSubmatchIndex(value, -1)
+	if len(matches) == 0 {
+		return htmltemplate.HTMLEscapeString(value)
+	}
+
+	var sb strings.Builder
+	last := 0
+	for _, match := range matches {
+		fullStart, fullEnd := match[0], match[1]
+		maxStart, maxEnd := match[2], match[3]
+		configuredStart, configuredEnd := match[4], match[5]
+
+		sb.WriteString(htmltemplate.HTMLEscapeString(value[last:fullStart]))
+
+		maxSpeed := strings.TrimSpace(value[maxStart:maxEnd])
+		configuredSpeed := strings.TrimSpace(value[configuredStart:configuredEnd])
+		if maxSpeed != "" && configuredSpeed != "" && maxSpeed != configuredSpeed {
+			sb.WriteString(htmltemplate.HTMLEscapeString(value[fullStart:configuredStart]))
+			sb.WriteString(`<span style="background-color:#fff3b0;font-weight:700">`)
+			sb.WriteString(htmltemplate.HTMLEscapeString(value[configuredStart:configuredEnd]))
+			sb.WriteString(`</span>`)
+			sb.WriteString(htmltemplate.HTMLEscapeString(value[configuredEnd:fullEnd]))
+		} else {
+			sb.WriteString(htmltemplate.HTMLEscapeString(value[fullStart:fullEnd]))
+		}
+
+		last = fullEnd
+	}
+	sb.WriteString(htmltemplate.HTMLEscapeString(value[last:]))
+	return sb.String()
+}
+
+// systemSummaryTableHTMLRenderer renders the System Summary table with special handling to highlight
+// memory speed mismatches. It expects the "Installed Memory" and "System Summary" fields to contain
+// values in the format of "<max speed> [<configured speed>]". If such a pattern is detected and the
+// max speed differs from the configured speed, the configured speed will be highlighted in the HTML
+// output.
+func systemSummaryTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
+	values := [][]string{}
+	var tableValueStyles [][]string
+	for _, field := range tableValues.Fields {
+		rowValues := []string{report.CreateFieldNameWithDescription(field.Name, field.Description)}
+		if len(field.Values) > 0 {
+			fieldValue := field.Values[0]
+			if field.Name == "Installed Memory" || field.Name == "System Summary" {
+				rowValues = append(rowValues, highlightConfiguredSpeedMismatchesHTML(fieldValue))
+			} else {
+				rowValues = append(rowValues, htmltemplate.HTMLEscapeString(fieldValue))
+			}
+		} else {
+			rowValues = append(rowValues, "")
+		}
+		values = append(values, rowValues)
+		tableValueStyles = append(tableValueStyles, []string{"font-weight:bold"})
+	}
+	_ = targetName
+	return report.RenderHTMLTable([]string{}, values, "pure-table pure-table-striped", tableValueStyles)
+}
+
+func systemSummaryTableHTMLMultiTargetRenderer(tableValues []table.TableValues, targetNames []string) string {
+	if len(tableValues) == 0 {
+		return ""
+	}
+
+	values := [][]string{}
+	var tableValueStyles [][]string
+	for fieldIndex, field := range tableValues[0].Fields {
+		rowValues := []string{report.CreateFieldNameWithDescription(field.Name, field.Description)}
+		for _, targetTableValues := range tableValues {
+			if len(targetTableValues.Fields) > fieldIndex && len(targetTableValues.Fields[fieldIndex].Values) > 0 {
+				fieldValue := targetTableValues.Fields[fieldIndex].Values[0]
+				if field.Name == "Installed Memory" || field.Name == "System Summary" {
+					rowValues = append(rowValues, highlightConfiguredSpeedMismatchesHTML(fieldValue))
+				} else {
+					rowValues = append(rowValues, htmltemplate.HTMLEscapeString(fieldValue))
+				}
+			} else {
+				rowValues = append(rowValues, "")
+			}
+		}
+		values = append(values, rowValues)
+		tableValueStyles = append(tableValueStyles, []string{"font-weight:bold"})
+	}
+
+	headers := []string{""}
+	headers = append(headers, targetNames...)
+	return report.RenderHTMLTable(headers, values, "pure-table pure-table-striped", tableValueStyles)
+}
+
+// dimmDetailsHTML takes the DIMM details string and returns an HTML-escaped version of it with the
+// configured speed highlighted if it differs from the maximum speed.
+func dimmDetailsHTML(details string) string {
+	if details == "No Module Installed" {
+		return htmltemplate.HTMLEscapeString(details)
+	}
+
+	matches := configuredSpeedPattern.FindAllStringSubmatchIndex(details, -1)
+	if len(matches) == 0 {
+		return htmltemplate.HTMLEscapeString(details)
+	}
+	match := matches[len(matches)-1]
+	if len(match) != 6 || match[1] != len(details) {
+		return htmltemplate.HTMLEscapeString(details)
+	}
+
+	maxSpeed := strings.TrimSpace(details[match[2]:match[3]])
+	configuredSpeed := strings.TrimSpace(details[match[4]:match[5]])
+	if maxSpeed == "" || configuredSpeed == "" || configuredSpeed == maxSpeed {
+		return htmltemplate.HTMLEscapeString(details)
+	}
+
+	// highlight configured speed when it differs from the DIMM maximum speed
+	return htmltemplate.HTMLEscapeString(details[:match[4]]) +
+		`<span style="background-color:#fff3b0;font-weight:700">` +
+		htmltemplate.HTMLEscapeString(details[match[4]:match[5]]) +
+		`</span>` +
+		htmltemplate.HTMLEscapeString(details[match[5]:])
+}
+
 func dimmTableHTMLRenderer(tableValues table.TableValues, targetName string) string {
 	if len(tableValues.Fields) <= max(extract.DerivedSocketIdx, extract.DerivedChannelIdx, extract.DerivedSlotIdx) ||
 		len(tableValues.Fields[extract.DerivedSocketIdx].Values) == 0 ||
@@ -1794,7 +1921,7 @@ func dimmTableHTMLRenderer(tableValues table.TableValues, targetName string) str
 			slotTableValuesStyles = append(slotTableValuesStyles, []string{})
 			for _, slot := range slotKeys {
 				dimmDetails := channelMap[slot]
-				slotTableValues[0] = append(slotTableValues[0], htmltemplate.HTMLEscapeString(dimmDetails))
+				slotTableValues[0] = append(slotTableValues[0], dimmDetailsHTML(dimmDetails))
 				var slotColor string
 				if dimmDetails == "No Module Installed" {
 					slotColor = "background-color:silver"
