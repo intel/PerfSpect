@@ -231,8 +231,8 @@ func NICSummaryFromOutput(outputs map[string]script.ScriptOutput) string {
 	nics := ParseNicInfo(outputs[script.NicInfoScriptName].Stdout)
 	modelCount := make(map[string]int)
 	for _, nic := range nics {
-		// don't include virtual functions or bridge devices in the summary as they are not physical NICs, and we want the summary to reflect physical hardware
-		if nic.IsVirtual || strings.Contains(nic.Name, "(virtual)") || nic.Driver == "bridge" {
+		// don't include virtual functions, bridge devices, or virtual Ethernet pairs (veth) devices in the summary as they are not physical NICs, and we want the summary to reflect physical hardware
+		if nic.IsVirtual || strings.Contains(nic.Name, "(virtual)") || nic.Driver == "bridge" || nic.Driver == "veth" {
 			continue
 		}
 		if strings.TrimSpace(nic.Model) == "" {
