@@ -281,6 +281,8 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	report.RegisterHTMLRenderer(DIMMTableName, dimmTableHTMLRenderer)
+	report.RegisterHTMLRenderer(SystemSummaryTableName, systemSummaryTableHTMLRenderer)
+	report.RegisterHTMLMultiTargetRenderer(SystemSummaryTableName, systemSummaryTableHTMLMultiTargetRenderer)
 
 	return reportingCommand.Run()
 }
