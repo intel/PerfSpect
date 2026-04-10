@@ -448,7 +448,8 @@ new Chart(document.getElementById('{{.ID}}'), {
                     display: true
                 },
 				suggestedMin: {{.SuggestedMin}},
-				suggestedMax: {{.SuggestedMax}},
+				suggestedMax: {{.SuggestedMax}},{{if .YaxisMax}}
+				max: {{.YaxisMax}},{{end}}
             }
         },
         plugins: {
@@ -525,7 +526,8 @@ new Chart(document.getElementById('{{.ID}}'), {
                     display: true
                 },
 				suggestedMin: {{.SuggestedMin}},
-				suggestedMax: {{.SuggestedMax}},
+				suggestedMax: {{.SuggestedMax}},{{if .YaxisMax}}
+				max: {{.YaxisMax}},{{end}}
             }
         },
         plugins: {
@@ -590,6 +592,7 @@ type ChartTemplateStruct struct {
 	AspectRatio   string
 	SuggestedMin  string
 	SuggestedMax  string
+	YaxisMax      string // hard max for Y-axis; "" means no constraint
 }
 
 // CreateFieldNameWithDescription creates HTML for a field name with optional description tooltip
