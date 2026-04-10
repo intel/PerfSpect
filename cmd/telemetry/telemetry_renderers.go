@@ -15,10 +15,37 @@ import (
 	"strings"
 )
 
+// computeAxisMax examines all datasets and returns a Y-axis hard max string.
+// If outliers are detected (actual max > P99 * 1.5), it returns a value slightly
+// above P99. Otherwise it returns "" (no constraint, use auto-scale).
+func computeAxisMax(data [][]float64) string {
+	var all []float64
+	for _, dataset := range data {
+		all = append(all, dataset...)
+	}
+	if len(all) < 4 {
+		return ""
+	}
+	sorted := make([]float64, len(all))
+	copy(sorted, all)
+	slices.Sort(sorted)
+	p99Idx := int(float64(len(sorted)-1) * 0.99)
+	p99 := sorted[p99Idx]
+	actualMax := sorted[len(sorted)-1]
+	if p99 > 0 && actualMax > p99*1.5 {
+		return fmt.Sprintf("%f", p99*1.1)
+	}
+	return ""
+}
+
 func telemetryTableHTMLRenderer(tableValues table.TableValues, data [][]float64, datasetNames []string, chartConfig report.ChartTemplateStruct, datasetHiddenFlags []bool) string {
 	if len(tableValues.Fields) == 0 {
 		slog.Error("no fields in table", slog.String("table", tableValues.Name))
 		return ""
+	}
+	// Auto-detect outliers and set hard Y-axis max for auto-scaled charts
+	if chartConfig.YaxisMax == "" && chartConfig.SuggestedMax == "0" {
+		chartConfig.YaxisMax = computeAxisMax(data)
 	}
 	tsFieldIdx := 0
 	var timestamps []string
