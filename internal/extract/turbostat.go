@@ -364,12 +364,25 @@ func TurbostatPackageRows(turboStatScriptOutput string, fieldNames []string) ([]
 func extractPackageRows(rows []map[string]string) ([]map[string]string, error) {
 	var packageRows []map[string]string
 	for i, row := range rows {
-		if val, ok := row["Package"]; ok && val != "-" && row["Core"] == "0" {
-			if i > 0 && rows[i-1]["Package"] == val && rows[i-1]["Core"] == "0" {
-				// This is the hyperthread associated with the package row, skip it
-				continue
+		// if we have a "Package" field
+		if pkg, ok := row["Package"]; ok {
+			if pkg != "-" && row["Core"] == "0" {
+				if i > 0 && rows[i-1]["Package"] == pkg && rows[i-1]["Core"] == "0" {
+					// This is the hyperthread associated with the package row, skip it
+					continue
+				}
+				packageRows = append(packageRows, row)
 			}
-			packageRows = append(packageRows, row)
+		} else { // if no "Package" field, identify package rows by Core 0
+			if row["Core"] == "0" {
+				if i > 0 && rows[i-1]["Core"] == "0" {
+					// This is the hyperthread associated with the package row, skip it
+					continue
+				}
+				if cpu, ok := row["CPU"]; ok && cpu == "0" {
+					packageRows = append(packageRows, row)
+				}
+			}
 		}
 	}
 	return packageRows, nil
