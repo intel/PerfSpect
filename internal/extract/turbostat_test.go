@@ -44,6 +44,26 @@ Package Core    CPU     Avg_MHz Busy%   Bzy_MHz TSC_MHz IPC     IRQ     SMI     
 1       1       193     1       0.02    3885    2000    0.30    26      0       0       0       0       27      0.00    0.00    0.00    99.99   0.02
 `
 
+const turbostatOutputNoPackage = `TIME: 13:55:22
+INTERVAL: 2
+Core	CPU	Avg_MHz	Busy%	Bzy_MHz	TSC_MHz	IPC	IRQ	NMI	SMI	LLCkRPS	LLC%hit	POLL%	C1%	C1E%	C6%	C6P%	CPU%c1	CPU%c6	CoreTmp	CoreThr	PkgTmp	Pkg%pc2	Pkg%pc6	PkgWatt	RAMWatt	PKG_%	RAM_%	UMHz0.0	UMHz1.0	UMHz2.0	UMHz3.0	UMHz4.0	SysWatt
+-	-	2745	95.78	2855	2008	1.89	582397	70	0	17746	87.03	0.00	0.00	3.94	0.00	0.00	2.73	0.00	59	0	59	0.00	0.00	406.56	6.20	894601.29	0.00	2200	2200	2200	2500	2500	0.00
+0	0	2744	96.52	2843	2000	1.87	2583	0	0	103	97.44	0.00	0.00	3.16	0.00	0.00	3.00	0.00	50	0	59	0.00	0.00	401.78	6.13	884085.02	0.00	2200	2200	2200	2500	2500
+0	128	2725	95.73	2847	2000	1.86	2248	0	0	89	80.52	0.00	0.00	4.04	0.00	0.00	3.00
+1	1	2717	95.47	2846	2000	1.87	2285	0	0	83	97.44	0.00	0.00	4.23	0.00	0.00	3.15	0.00	53	0
+1	129	2737	96.21	2845	2000	1.89	2270	0	0	56	88.03	0.00	0.00	3.56	0.00	0.00	3.15
+2	2	2729	95.98	2843	2000	1.87	2267	0	0	48	95.46	0.00	0.00	3.68	0.00	0.00	2.95	0.00	52	0
+2	130	2728	95.75	2849	2000	1.88	2255	0	0	55	88.07	0.00	0.00	4.02	0.00	0.00	2.95
+Core	CPU	Avg_MHz	Busy%	Bzy_MHz	TSC_MHz	IPC	IRQ	NMI	SMI	LLCkRPS	LLC%hit	POLL%	C1%	C1E%	C6%	C6P%	CPU%c1	CPU%c6	CoreTmp	CoreThr	PkgTmp	Pkg%pc2	Pkg%pc6	PkgWatt	RAMWatt	PKG_%	RAM_%	UMHz0.0	UMHz1.0	UMHz2.0	UMHz3.0	UMHz4.0	SysWatt
+-	-	2073	95.15	2184	1995	1.83	569520	52	0	21009	95.08	0.00	0.00	4.47	0.00	0.00	2.87	0.00	63	0	62	0.00	0.00	363.13	6.02	0.00	0.00	1900	1900	1900	1900	1900	0.00
+0	0	2084	95.49	2183	2000	1.80	2537	1	0	150	98.35	0.00	0.00	4.29	0.00	0.00	3.54	0.00	53	0	62	0.00	0.00	364.84	6.05	0.00	0.00	1900	1900	1900	1900	1900
+0	128	2090	95.65	2185	2000	1.81	2229	1	0	144	83.50	0.00	0.00	3.85	0.00	0.00	3.54
+1	1	2116	96.44	2194	2000	1.84	2263	0	0	67	97.66	0.00	0.00	3.33	0.00	0.00	2.80	0.00	56	0
+1	129	2069	94.81	2182	2000	1.80	2218	0	0	73	97.75	0.00	0.00	4.59	0.00	0.00	2.80
+2	2	2107	95.92	2197	2000	1.87	2243	1	0	89	96.75	0.00	0.00	3.86	0.00	0.00	2.72	0.00	55	0
+2	130	2076	95.15	2181	2000	1.83	2235	0	0	61	97.33	0.00	0.00	4.22	0.00	0.00	2.72
+`
+
 func TestTurbostatPlatformRows(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -116,6 +136,14 @@ func TestTurbostatPlatformRows(t *testing.T) {
 			wantFirst:       nil,
 			wantLen:         0,
 			expectErr:       true,
+		},
+		{
+			name:            "No package field, identify by core 0",
+			turbostatOutput: turbostatOutputNoPackage,
+			fieldNames:      []string{"Avg_MHz", "Busy%"},
+			wantFirst:       []string{"13:55:22", "2745", "95.78"},
+			wantLen:         2,
+			expectErr:       false,
 		},
 	}
 
