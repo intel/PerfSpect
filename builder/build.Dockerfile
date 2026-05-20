@@ -15,7 +15,7 @@ ARG TOOLS_IMAGE=${REGISTRY}${PREFIX}perfspect-tools:${TAG}
 FROM ${TOOLS_IMAGE} AS tools
 
 # STAGE 2 - image contains perfspect's Go components build environment
-FROM golang:1.26.2@sha256:2a2b4b5791cea8ae09caecba7bad0bd9631def96e5fe362e4a5e67009fe4ae61
+FROM golang:1.26.3@sha256:efaccb5b497e90df3ebe5216cc25cd9f98e73874e2d638b56e38d4a3f098c41c
 # install system dependencies
 RUN apt-get update && apt-get install -y jq
 # allow git to operate in the mounted repository regardless of the user
