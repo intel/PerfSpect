@@ -378,7 +378,15 @@ fi
 family=$(echo "$lscpu" | grep -E "^CPU family:" | awk '{print $3}')
 model=$(echo "$lscpu" | grep -E "^Model:" | awk '{print $2}')
 # if cpu is GNR, GNR-D, or DMR get the frequencies from tpmi
-if ( [ "$family" -eq 6 ] && [ "$model" -eq 173 ] ) || ( [ "$family" -eq 6 ] && [ "$model" -eq 174 ] ) || ( [ "$family" -eq 19 ] && [ "$model" -eq 1 ] ); then  # GNR, GNR-D, DMR
+if [ "$family" -eq 19 ] && [ "$model" -eq 1 ]; then # DMR
+    cores=$(pcm-tpmi 0x5 0xe8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_10
+    # this works unless the TRL is overridden on MSR 0x1AD --> sse=$(pcm-tpmi 0x5 0xA8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_4
+    sse=$(rdmsr 0x1ad) # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
+    avx2=$(pcm-tpmi 0x5 0xC0 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_5
+    avx512=$(pcm-tpmi 0x5 0xC8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_6
+    avx512h=$(pcm-tpmi 0x5 0xD0 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_7
+    amx=$(pcm-tpmi 0x5 0xD8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PPINFO_8
+elif ( [ "$family" -eq 6 ] && [ "$model" -eq 173 ] ) || ( [ "$family" -eq 6 ] && [ "$model" -eq 174 ] ); then  # GNR, GNR-D
     cores=$(pcm-tpmi 0x5 0xD8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_10
     # this works unless the TRL is overridden on MSR 0x1AD --> sse=$(pcm-tpmi 0x5 0xA8 -i 0 -e 0 | tail -n 2 | head -n 1 | awk '{print $3}') # SST_PP_INFO_4
     sse=$(rdmsr 0x1ad) # MSR_TURBO_RATIO_LIMIT: Maximum Ratio Limit of Turbo Mode
