@@ -69,6 +69,7 @@ const (
 	UarchGraviton2       = "Graviton2"
 	UarchGraviton3       = "Graviton3"
 	UarchGraviton4       = "Graviton4"
+	UarchGraviton5       = "Graviton5"
 	UarchAxion           = "Axion"
 	UarchAltraFamily     = "Altra Family"
 	UarchAmpereOneAC03   = "AmpereOne AC03"
@@ -154,6 +155,7 @@ var cpuCharacteristicsMap = map[string]CPUCharacteristics{
 	UarchGraviton2:       {MicroArchitecture: UarchGraviton2, MemoryChannelCount: 8, LogicalThreadCount: 1},        // AWS Graviton 2 ([m|c|r]6g) Neoverse-N1
 	UarchGraviton3:       {MicroArchitecture: UarchGraviton3, MemoryChannelCount: 8, LogicalThreadCount: 1},        // AWS Graviton 3 ([m|c|r]7g) Neoverse-V1
 	UarchGraviton4:       {MicroArchitecture: UarchGraviton4, MemoryChannelCount: 12, LogicalThreadCount: 1},       // AWS Graviton 4 ([m|c|r]8g) Neoverse-V2
+	UarchGraviton5:       {MicroArchitecture: UarchGraviton5, MemoryChannelCount: 16, LogicalThreadCount: 1},       // AWS Graviton 5 ([m|c|r]8g) Neoverse-V3
 	UarchAxion:           {MicroArchitecture: UarchAxion, MemoryChannelCount: 12, LogicalThreadCount: 1},           // GCP Axion (c4a) Neoverse-V2
 	UarchAltraFamily:     {MicroArchitecture: UarchAltraFamily, MemoryChannelCount: 8, LogicalThreadCount: 1},      // Ampere Altra
 	UarchAmpereOneAC03:   {MicroArchitecture: UarchAmpereOneAC03, MemoryChannelCount: 8, LogicalThreadCount: 1},    // AmpereOne AC03
@@ -209,6 +211,7 @@ var cpuIdentifiersARM = []struct {
 	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd0c", DmidecodePart: "AWS Graviton2"}, UarchGraviton2},       // AWS Graviton 2 ([m|c|r]6g) Neoverse-N1
 	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd40", DmidecodePart: "AWS Graviton3"}, UarchGraviton3},       // AWS Graviton 3 ([m|c|r]7g) Neoverse-V1
 	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd4f", DmidecodePart: "AWS Graviton4"}, UarchGraviton4},       // AWS Graviton 4 ([m|c|r]8g) Neoverse-V2
+	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd84", DmidecodePart: "AWS Graviton5"}, UarchGraviton5},       // AWS Graviton 5 ([m|c|r]8g) Neoverse-V3
 	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd4f", DmidecodePart: "Not Specified"}, UarchAxion},           // GCP Axion (c4a) Neoverse-V2
 	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd0c", DmidecodePart: "Not Specified"}, UarchAltraFamily},     // Ampere Altra
 	{CPUIdentifierARM{Implementer: "0xc0", Part: "0xac3", DmidecodePart: ""}, UarchAmpereOneAC03},                // AmpereOne AC03
