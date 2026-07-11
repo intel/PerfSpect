@@ -545,6 +545,8 @@ func initializeComponentMetricEvaluable(expression string, evaluatorFunctions ma
 // the cpus module, to the directory where the associated events and metrics reside
 func getUarchDir(uarch string) (string, error) {
 	switch uarch {
+	case cpus.UarchGraviton5:
+		return "neoverse-v3", nil
 	case cpus.UarchGraviton4, cpus.UarchAxion:
 		return "neoverse-n2-v2", nil
 	case cpus.UarchGraviton2:

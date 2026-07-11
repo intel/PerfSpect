@@ -229,7 +229,7 @@ func getARMSlots(scriptOutputs map[string]script.ScriptOutput) (slots int, err e
 // Used as a fallback when we cannot read the slots from sysfs.
 func getARMSlotsByArchitecture(uarch string) (slots int, err error) {
 	switch uarch {
-	case cpus.UarchGraviton4, cpus.UarchAxion:
+	case cpus.UarchGraviton4, cpus.UarchGraviton5, cpus.UarchAxion:
 		slots = 8
 	case cpus.UarchGraviton2, cpus.UarchGraviton3:
 		slots = 6
