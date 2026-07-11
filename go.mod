@@ -25,7 +25,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/xuri/excelize/v2 v2.11.0
 	golang.org/x/term v0.45.0
-	golang.org/x/text v0.38.0
+	golang.org/x/text v0.40.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
