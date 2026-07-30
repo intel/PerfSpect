@@ -228,6 +228,11 @@ func isCollectableEvent(event EventDefinition, metadata Metadata) bool {
 	}
 	// finally, if it isn't in the perf list output, it isn't collectable
 	name := strings.Split(event.Name, ":")[0]
+	// TODO: this substring check can produce a false positive, e.g., "ST_SPEC" matches a line
+	// reading "INST_SPEC". util.HasLineIgnoreCase requires a whole-line match and is what the
+	// component (ARM) loader uses. Switching to it here needs verification on an Intel target
+	// first: PerfSupportedEvents holds entries like "cstate_core/c6-residency" and the ":" suffix
+	// is stripped above, so a stricter match could start rejecting events that work today.
 	if !strings.Contains(metadata.PerfSupportedEvents, name) {
 		slog.Debug("Event not supported by perf", slog.String("event", name))
 		return false

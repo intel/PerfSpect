@@ -228,20 +228,27 @@ func (l *ComponentLoader) formEventGroups(metrics []MetricDefinition, events []C
 				slog.Warn("Could not find event definition for metric variable, skipping variable", slog.String("metric", metric.Name), slog.String("variable", variable))
 				continue
 			}
-			if event.ArchStdEvent != "" {
+			// Choose how to name the event to perf, in order of preference: the architectural
+			// standard name, the vendor-specific name, then the raw event code.
+			if event.ArchStdEvent != "" && util.HasLineIgnoreCase(metadata.PerfAllSupportedEvents, event.ArchStdEvent) {
+				// perf knows this architectural event by name. Keep the case as-is; perf echoes
+				// the name back verbatim and the metric expressions are written against it.
 				perfRaw = event.ArchStdEvent
 			} else if event.EventName != "" {
-				// if the event name is supported by perf, use that. Otherwise, fall back to using the event code with the armv8_pmuv3_0/config= raw event format
-				if strings.Contains(metadata.PerfSupportedEvents, event.EventName) {
+				if util.HasLineIgnoreCase(metadata.PerfSupportedEvents, event.EventName) {
+					// perf knows this vendor-specific event by name
 					perfRaw = event.EventName
 				} else if event.EventCode != "" {
+					// perf doesn't know the name, so program the counter directly and alias
+					// the result back to the variable name the metric expression expects
 					perfRaw = fmt.Sprintf("armv8_pmuv3_0/config=%s,name=%s/", event.EventCode, variable)
 				} else {
+					// nothing left to try
 					slog.Warn("Event definition for metric variable does not have ArchStdEvent, EventName supported by perf, or EventCode, skipping variable", slog.String("metric", metric.Name), slog.String("variable", variable))
 					continue
 				}
 			} else {
-				// this shouldn't happen since the variable should match either ArchStdEvent or EventName, but log just in case
+				// findEventByName matched on one of the two name fields, so one must be set
 				slog.Warn("Event definition for metric variable does not have EventName or ArchStdEvent, skipping variable", slog.String("metric", metric.Name), slog.String("variable", variable))
 				continue
 			}

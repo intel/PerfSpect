@@ -117,6 +117,11 @@ func (c *ARMMetadataCollector) CollectMetadata(t target.Target, noRoot bool, noS
 		return Metadata{}, fmt.Errorf("failed to retrieve architecture: %v", err)
 	}
 
+	// perf full list
+	if metadata.PerfAllSupportedEvents, err = getAllPerfSupportedEvents(scriptOutputs); err != nil {
+		return Metadata{}, fmt.Errorf("failed to load all perf supported events: %v", err)
+	}
+
 	// perf list
 	if metadata.PerfSupportedEvents, err = getPerfSupportedEvents(scriptOutputs); err != nil {
 		return Metadata{}, fmt.Errorf("failed to load perf list: %v", err)

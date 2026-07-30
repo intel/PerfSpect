@@ -50,6 +50,11 @@ func (event OtherEvent) IsCollectable(metadata Metadata) bool {
 		return false
 	}
 	// check if the event is supported by perf
+	// TODO: this substring check can produce a false positive, e.g., "ST_SPEC" matches a line
+	// reading "INST_SPEC". util.HasLineIgnoreCase requires a whole-line match and is what the
+	// component (ARM) loader uses. Switching to it here needs verification on an Intel target
+	// first: PerfSupportedEvents holds entries like "cstate_core/c6-residency", so a stricter
+	// match could start rejecting events that work today.
 	if !strings.Contains(metadata.PerfSupportedEvents, event.EventName) {
 		slog.Debug("Other event is not supported by perf", slog.String("event", event.EventName))
 		return false // other events are not supported
