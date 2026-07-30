@@ -436,8 +436,8 @@ func getArchitecture(scriptOutputs map[string]script.ScriptOutput) (arch string,
 	return
 }
 
-// getAllPerfSupportedEvents returns the output from 'perf list'.
-func getAllPerfSupportedEvents(scriptOutputs map[string]script.ScriptOutput) (supportedEvents string, err error) {
+// getPerfAllSupportedEvents returns the output from 'perf list'.
+func getPerfAllSupportedEvents(scriptOutputs map[string]script.ScriptOutput) (supportedEvents string, err error) {
 	supportedEvents = scriptOutputs[scriptPerfAllSupportedEvents].Stdout
 	if scriptOutputs[scriptPerfAllSupportedEvents].Exitcode != 0 {
 		err = fmt.Errorf("failed to get all perf supported events: %s", scriptOutputs[scriptPerfAllSupportedEvents].Stderr)

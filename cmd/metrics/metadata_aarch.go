@@ -118,7 +118,7 @@ func (c *ARMMetadataCollector) CollectMetadata(t target.Target, noRoot bool, noS
 	}
 
 	// perf full list
-	if metadata.PerfAllSupportedEvents, err = getAllPerfSupportedEvents(scriptOutputs); err != nil {
+	if metadata.PerfAllSupportedEvents, err = getPerfAllSupportedEvents(scriptOutputs); err != nil {
 		return Metadata{}, fmt.Errorf("failed to load all perf supported events: %v", err)
 	}
 
