@@ -211,8 +211,8 @@ var cpuIdentifiersARM = []struct {
 	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd0c", DmidecodePart: "AWS Graviton2"}, UarchGraviton2},       // AWS Graviton 2 ([m|c|r]6g) Neoverse-N1
 	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd40", DmidecodePart: "AWS Graviton3"}, UarchGraviton3},       // AWS Graviton 3 ([m|c|r]7g) Neoverse-V1
 	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd4f", DmidecodePart: "AWS Graviton4"}, UarchGraviton4},       // AWS Graviton 4 ([m|c|r]8g) Neoverse-V2
-	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd84", DmidecodePart: "AWS Graviton5"}, UarchGraviton5},       // AWS Graviton 5 ([m|c|r]8g) Neoverse-V3
-	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd84", DmidecodePart: "N/A"}, UarchGraviton5},                 // AWS Graviton 5 ([m|c|r]8g) Neoverse-V3
+	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd84", DmidecodePart: "AWS Graviton5"}, UarchGraviton5},       // AWS Graviton 5 ([m|c|r]9g) Neoverse-V3
+	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd84", DmidecodePart: "N/A"}, UarchGraviton5},                 // AWS Graviton 5 ([m|c|r]9g) Neoverse-V3
 	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd4f", DmidecodePart: "Not Specified"}, UarchAxion},           // GCP Axion (c4a) Neoverse-V2
 	{CPUIdentifierARM{Implementer: "0x41", Part: "0xd0c", DmidecodePart: "Not Specified"}, UarchAltraFamily},     // Ampere Altra
 	{CPUIdentifierARM{Implementer: "0xc0", Part: "0xac3", DmidecodePart: ""}, UarchAmpereOneAC03},                // AmpereOne AC03
