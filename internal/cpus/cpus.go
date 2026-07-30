@@ -155,7 +155,7 @@ var cpuCharacteristicsMap = map[string]CPUCharacteristics{
 	UarchGraviton2:       {MicroArchitecture: UarchGraviton2, MemoryChannelCount: 8, LogicalThreadCount: 1},        // AWS Graviton 2 ([m|c|r]6g) Neoverse-N1
 	UarchGraviton3:       {MicroArchitecture: UarchGraviton3, MemoryChannelCount: 8, LogicalThreadCount: 1},        // AWS Graviton 3 ([m|c|r]7g) Neoverse-V1
 	UarchGraviton4:       {MicroArchitecture: UarchGraviton4, MemoryChannelCount: 12, LogicalThreadCount: 1},       // AWS Graviton 4 ([m|c|r]8g) Neoverse-V2
-	UarchGraviton5:       {MicroArchitecture: UarchGraviton5, MemoryChannelCount: 16, LogicalThreadCount: 1},       // AWS Graviton 5 ([m|c|r]8g) Neoverse-V3
+	UarchGraviton5:       {MicroArchitecture: UarchGraviton5, MemoryChannelCount: 12, LogicalThreadCount: 1},       // AWS Graviton 5 ([m|c|r]9g) Neoverse-V3
 	UarchAxion:           {MicroArchitecture: UarchAxion, MemoryChannelCount: 12, LogicalThreadCount: 1},           // GCP Axion (c4a) Neoverse-V2
 	UarchAltraFamily:     {MicroArchitecture: UarchAltraFamily, MemoryChannelCount: 8, LogicalThreadCount: 1},      // Ampere Altra
 	UarchAmpereOneAC03:   {MicroArchitecture: UarchAmpereOneAC03, MemoryChannelCount: 8, LogicalThreadCount: 1},    // AmpereOne AC03
