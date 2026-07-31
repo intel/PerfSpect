@@ -6,6 +6,7 @@ package metrics
 import (
 	"fmt"
 	"log/slog"
+	"perfspect/internal/util"
 	"strings"
 )
 
@@ -55,7 +56,7 @@ func (event OtherEvent) IsCollectable(metadata Metadata) bool {
 	// component (ARM) loader uses. Switching to it here needs verification on an Intel target
 	// first: PerfSupportedEvents holds entries like "cstate_core/c6-residency", so a stricter
 	// match could start rejecting events that work today.
-	if !strings.Contains(metadata.PerfSupportedEvents, event.EventName) {
+	if !util.HasLineIgnoreCase(metadata.PerfSupportedEvents, event.EventName) {
 		slog.Debug("Other event is not supported by perf", slog.String("event", event.EventName))
 		return false // other events are not supported
 	}

@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"perfspect/internal/util"
 	"strings"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -233,7 +234,7 @@ func isCollectableEvent(event EventDefinition, metadata Metadata) bool {
 	// component (ARM) loader uses. Switching to it here needs verification on an Intel target
 	// first: PerfSupportedEvents holds entries like "cstate_core/c6-residency" and the ":" suffix
 	// is stripped above, so a stricter match could start rejecting events that work today.
-	if !strings.Contains(metadata.PerfSupportedEvents, name) {
+	if !util.HasLineIgnoreCase(metadata.PerfSupportedEvents, name) {
 		slog.Debug("Event not supported by perf", slog.String("event", name))
 		return false
 	}
