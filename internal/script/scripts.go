@@ -164,7 +164,7 @@ func GetParameterizedScriptByName(name string, params map[string]string) ScriptD
 
 // mlc benchmark script constants (buffer setup snippets passed into mlcBenchmarkScript)
 const (
-	// for measuring memory bandwidth and latency (2x of L3 cache size)
+	// for measuring memory bandwidth and latency (2x of L3 cache size) 
 	mlcBufferSetupMemory = `L3_KB=$(cache_size_kb L3)
 BUF_KB=$(( L3_KB * 2 ))
 [ $BUF_KB -lt 1 ] && BUF_KB=1`
