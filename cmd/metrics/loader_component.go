@@ -248,6 +248,7 @@ func (l *ComponentLoader) formEventGroups(metrics []MetricDefinition, events []C
 					continue
 				}
 			} else {
+				// this shouldn't happen since the variable should match either ArchStdEvent or EventName, but log just in case
 				// findEventByName matched on one of the two name fields, so one must be set
 				slog.Warn("Event definition for metric variable does not have EventName or ArchStdEvent, skipping variable", slog.String("metric", metric.Name), slog.String("variable", variable))
 				continue

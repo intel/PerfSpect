@@ -30,10 +30,12 @@ import (
 
 // Script name constants - used as map keys when retrieving script outputs.
 // Using constants prevents silent failures from typos.
+// The string in quotes results determines how the script is named in /tmp/perfspect.tmp.*/
+// e.g. get architecture becomes /tmp/perfspect.tmp.*/get_architecture.sh
 const (
 	scriptGetArchitecture        = "get architecture"
 	scriptPerfSupportedEvents    = "perf supported events"
-	scriptPerfAllSupportedEvents = "all perf supported events"
+	scriptPerfAllSupportedEvents = "perf all supported events"
 	scriptListUncoreDevices      = "list uncore devices"
 	scriptPerfStatInstructions   = "perf stat instructions"
 	scriptPerfStatRefCycles      = "perf stat ref-cycles"
