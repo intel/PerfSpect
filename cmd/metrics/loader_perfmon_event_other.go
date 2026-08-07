@@ -6,6 +6,7 @@ package metrics
 import (
 	"fmt"
 	"log/slog"
+	"perfspect/internal/util"
 	"strings"
 )
 
@@ -49,8 +50,9 @@ func (event OtherEvent) IsCollectable(metadata Metadata) bool {
 		slog.Debug("System level events not supported in CPU granularity", slog.String("event", event.EventName))
 		return false
 	}
-	// check if the event is supported by perf
-	if !strings.Contains(metadata.PerfSupportedEvents, event.EventName) {
+	// ensure that the event name is in the perf supported events list, ignoring case and making
+	// sure that the event name is a whole line match (not a substring match)
+	if !util.HasLineIgnoreCase(metadata.PerfSupportedEvents, event.EventName) {
 		slog.Debug("Other event is not supported by perf", slog.String("event", event.EventName))
 		return false // other events are not supported
 	}

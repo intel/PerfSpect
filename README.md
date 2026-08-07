@@ -276,3 +276,4 @@ Use `builder/build.sh` to build the dependencies and the application in Docker c
 ### Subsequent Builds
 
 `make` builds the app. It assumes the dependencies have been built previously and that you have Go installed on your development system. See [go.mod](go.mod) for the minimum Go version.
+
