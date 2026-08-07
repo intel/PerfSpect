@@ -117,6 +117,11 @@ func (c *ARMMetadataCollector) CollectMetadata(t target.Target, noRoot bool, noS
 		return Metadata{}, fmt.Errorf("failed to retrieve architecture: %v", err)
 	}
 
+	// perf full list
+	if metadata.PerfAllSupportedEvents, err = getPerfAllSupportedEvents(scriptOutputs); err != nil {
+		return Metadata{}, fmt.Errorf("failed to load all perf supported events: %v", err)
+	}
+
 	// perf list
 	if metadata.PerfSupportedEvents, err = getPerfSupportedEvents(scriptOutputs); err != nil {
 		return Metadata{}, fmt.Errorf("failed to load perf list: %v", err)
@@ -229,7 +234,7 @@ func getARMSlots(scriptOutputs map[string]script.ScriptOutput) (slots int, err e
 // Used as a fallback when we cannot read the slots from sysfs.
 func getARMSlotsByArchitecture(uarch string) (slots int, err error) {
 	switch uarch {
-	case cpus.UarchGraviton4, cpus.UarchAxion:
+	case cpus.UarchGraviton4, cpus.UarchGraviton5, cpus.UarchAxion:
 		slots = 8
 	case cpus.UarchGraviton2, cpus.UarchGraviton3:
 		slots = 6

@@ -30,9 +30,12 @@ import (
 
 // Script name constants - used as map keys when retrieving script outputs.
 // Using constants prevents silent failures from typos.
+// The string in quotes results determines how the script is named in /tmp/perfspect.tmp.*/
+// e.g. get architecture becomes /tmp/perfspect.tmp.*/get_architecture.sh
 const (
 	scriptGetArchitecture        = "get architecture"
 	scriptPerfSupportedEvents    = "perf supported events"
+	scriptPerfAllSupportedEvents = "perf all supported events"
 	scriptListUncoreDevices      = "list uncore devices"
 	scriptPerfStatInstructions   = "perf stat instructions"
 	scriptPerfStatRefCycles      = "perf stat ref-cycles"
@@ -65,6 +68,7 @@ type CommonMetadata struct {
 	Hostname                  string
 	ModelName                 string
 	PerfSupportedEvents       string
+	PerfAllSupportedEvents    string
 	SystemSummaryFields       [][]string // slice of key-value pairs
 	SupportsInstructions      bool
 }
@@ -175,6 +179,40 @@ BEGIN {
     }
     # Reset for next object
     in_hardware_event = 0
+    event_name = ""
+}
+' # end of awk
+`,
+		Depends: []string{"perf"},
+	},
+	{
+		Name:           scriptGetArchitecture,
+		ScriptTemplate: "uname -m",
+	},
+	{
+		Name: scriptPerfAllSupportedEvents,
+		ScriptTemplate: `# Parse perf list JSON output to extract Hardware events and cstate/power events
+perf list --json 2>/dev/null | awk '
+BEGIN {
+    event_name = ""
+}
+
+# Capture EventName
+/"EventName":/ {
+    # Extract the value between quotes after "EventName":
+    line = $0
+    sub(/.*"EventName": "/, "", line)
+    sub(/".*/, "", line)
+    event_name = line
+}
+
+# At end of object (closing brace), check if we should print
+/^}/ {
+
+	if (event_name != "") {
+		print event_name
+	}
+    # Reset for next object
     event_name = ""
 }
 ' # end of awk
@@ -397,6 +435,16 @@ func getArchitecture(scriptOutputs map[string]script.ScriptOutput) (arch string,
 		return
 	}
 	arch = strings.TrimSpace(scriptOutputs[scriptGetArchitecture].Stdout)
+	return
+}
+
+// getPerfAllSupportedEvents returns the output from 'perf list'.
+func getPerfAllSupportedEvents(scriptOutputs map[string]script.ScriptOutput) (supportedEvents string, err error) {
+	supportedEvents = scriptOutputs[scriptPerfAllSupportedEvents].Stdout
+	if scriptOutputs[scriptPerfAllSupportedEvents].Exitcode != 0 {
+		err = fmt.Errorf("failed to get all perf supported events: %s", scriptOutputs[scriptPerfAllSupportedEvents].Stderr)
+		return
+	}
 	return
 }
 

@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"perfspect/internal/util"
 	"strings"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -228,7 +229,9 @@ func isCollectableEvent(event EventDefinition, metadata Metadata) bool {
 	}
 	// finally, if it isn't in the perf list output, it isn't collectable
 	name := strings.Split(event.Name, ":")[0]
-	if !strings.Contains(metadata.PerfSupportedEvents, name) {
+	// ensure that the event name is in the perf supported events list, ignoring case and making
+	// sure that the event name is a whole line match (not a substring match)
+	if !util.HasLineIgnoreCase(metadata.PerfSupportedEvents, name) {
 		slog.Debug("Event not supported by perf", slog.String("event", name))
 		return false
 	}

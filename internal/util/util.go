@@ -868,3 +868,15 @@ func ContainsIgnoreCase(slice []string, str string) bool {
 	}
 	return false
 }
+
+// HasLineIgnoreCase checks if text, a newline-separated list of values, has a line equal to
+// str, ignoring case and surrounding whitespace. Unlike strings.Contains, the whole line must
+// match, e.g., "ST_SPEC" does not match a line reading "INST_SPEC".
+func HasLineIgnoreCase(text string, str string) bool {
+	for line := range strings.SplitSeq(text, "\n") {
+		if strings.EqualFold(strings.TrimSpace(line), str) {
+			return true
+		}
+	}
+	return false
+}
