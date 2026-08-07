@@ -841,3 +841,45 @@ func TestReplaceWholeWord(t *testing.T) {
 		}
 	}
 }
+
+func TestHasLineIgnoreCase(t *testing.T) {
+	// a few lines in the style of the 'perf list' event name output
+	perfEvents := "inst_spec\nst_spec\nstall_slot_backend\ncstate_core/c6-residency\n  br_mis_pred  \n"
+	tests := []struct {
+		text     string
+		str      string
+		expected bool
+	}{
+		// Exact match
+		{perfEvents, "st_spec", true},
+		// Case-insensitive match
+		{perfEvents, "ST_SPEC", true},
+		{perfEvents, "InSt_SpEc", true},
+		// Substring of a longer line must not match
+		{"INST_SPEC\n", "ST_SPEC", false},
+		{perfEvents, "spec", false},
+		{perfEvents, "stall_slot", false},
+		// Line is a superstring of the query
+		{perfEvents, "stall_slot_backend_extra", false},
+		// Surrounding whitespace on the line is ignored
+		{perfEvents, "br_mis_pred", true},
+		// Line containing a slash
+		{perfEvents, "cstate_core/c6-residency", true},
+		// Not present
+		{perfEvents, "l1d_cache", false},
+		// Empty text
+		{"", "st_spec", false},
+		// Empty query matches an empty line, but not a populated list
+		{perfEvents, "", true},
+		{"inst_spec", "", false},
+		// Single line without a trailing newline
+		{"inst_spec", "inst_spec", true},
+	}
+
+	for _, tt := range tests {
+		got := HasLineIgnoreCase(tt.text, tt.str)
+		if got != tt.expected {
+			t.Errorf("HasLineIgnoreCase(%q, %q) = %v, want %v", tt.text, tt.str, got, tt.expected)
+		}
+	}
+}
