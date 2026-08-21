@@ -5,7 +5,7 @@
 #
 
 NPROC := $(shell nproc)
-WGET_OPTS := --retry-connrefused --waitretry=1 --read-timeout=20 --timeout=15 --tries=3 -N
+WGET_OPTS := --retry-connrefused --waitretry=5 --read-timeout=60 --timeout=15 --tries=20 -N
 GIT_CLONE_OPTS := --depth 1 --single-branch
 
 default: tools-x86_64
