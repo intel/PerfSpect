@@ -157,6 +157,7 @@ Software flamegraphs are useful in diagnosing software performance bottlenecks. 
 
 > [!TIP]
 > By default, flamegraphs are collected using the `cycles:P` event. To analyze different performance aspects, use the `--perf-event` flag to specify an alternative perf event (e.g., `cache-misses`, `instructions`, `branches`, `context-switches`, `mem-loads`, `mem-stores`, etc.).
+
 > [!TIP]
 > It's possible to use asprof to profile a Java workload within a Docker container, but it's first necessary to copy the asprof .so library into each container where Java profiling is to happen. To do this:
 > 1. Extract PerfSpect's embedded resources with `perfspect extract --output resources`
