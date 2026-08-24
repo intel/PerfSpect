@@ -164,7 +164,7 @@ Software flamegraphs are useful in diagnosing software performance bottlenecks. 
 > 2. For each container you would like to profile Java code: `docker cp resources/${ARCH}/async-profiler/lib/libasyncProfiler.so ${CONT_NAME}:/dest/path/`
 > 3. When running PerfSpect flamegraph, add this flag: `--asprof-args "--libpath /dest/path/libasyncProfiler.so"`
 > 
-> e.g. `docker cp resources/x86_64/async-profiler/lib/libasyncProfiler.so ${CONT_NAME}:/tmp/ && ./perfspect flamegraph --asprof-args "--libpath /tmp/libasyncProfiler.so"
+> e.g. `docker cp resources/x86_64/async-profiler/lib/libasyncProfiler.so ${CONT_NAME}:/tmp/ && ./perfspect flamegraph --asprof-args "--libpath /tmp/libasyncProfiler.so"`
 
 ![screenshot of a flamegraph from the HTML output of the flamegraph command](docs/images/flamegraph.png)
 
