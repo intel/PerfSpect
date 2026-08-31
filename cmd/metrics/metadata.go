@@ -147,7 +147,7 @@ var baseMetadataScripts = []script.ScriptDefinition{
 	{
 		Name: scriptPerfSupportedEvents,
 		ScriptTemplate: `# Parse perf list JSON output to extract Hardware events and cstate/power events
-perf list --json 2>/dev/null | awk '
+timeout 30 perf list --json 2>/dev/null | awk '
 BEGIN {
     in_hardware_event = 0
     event_name = ""
@@ -192,7 +192,7 @@ BEGIN {
 	{
 		Name: scriptPerfAllSupportedEvents,
 		ScriptTemplate: `# Parse perf list JSON output to extract Hardware events and cstate/power events
-perf list --json 2>/dev/null | awk '
+timeout 30 perf list --json 2>/dev/null | awk '
 BEGIN {
     event_name = ""
 }
