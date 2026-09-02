@@ -300,8 +300,17 @@ BEGIN {
 	},
 }
 
+// metadataScriptTimeout bounds how long any single metadata script may run.
+// Metadata collection is a bounded probing phase -- every script here reads a
+// sysfs/procfs value, runs a tool, or runs 'perf stat ... sleep 1' -- so none has
+// a legitimate reason to run for long. Without a bound, a probe that wedges (e.g.
+// a perf event that hangs the PMU on some virtualized instance types) stalls
+// collection indefinitely, because the controller waits on it forever.
+const metadataScriptTimeout = 60
+
 // getMetadataScripts returns the list of scripts to run for metadata collection.
-// It copies the base definitions and applies template replacements and privilege settings.
+// It copies the base definitions and applies template replacements, privilege
+// settings, and the metadata script timeout.
 func getMetadataScripts(noRoot bool, noSystemSummary bool, numGPCounters int) ([]script.ScriptDefinition, error) {
 	metadataScripts := make([]script.ScriptDefinition, 0, len(baseMetadataScripts))
 
@@ -309,6 +318,7 @@ func getMetadataScripts(noRoot bool, noSystemSummary bool, numGPCounters int) ([
 	for _, baseDef := range baseMetadataScripts {
 		scriptDef := baseDef
 		scriptDef.Superuser = !noRoot
+		scriptDef.Timeout = metadataScriptTimeout
 
 		// Apply template replacements for fixed counter scripts
 		switch scriptDef.Name {
@@ -339,6 +349,10 @@ func getMetadataScripts(noRoot bool, noSystemSummary bool, numGPCounters int) ([
 	if !noSystemSummary {
 		for _, scriptName := range app.TableDefinitions[app.SystemSummaryTableName].ScriptNames {
 			scriptDef := script.GetScriptByName(scriptName)
+			// Only tighten the budget; never loosen one a script set for itself.
+			if scriptDef.Timeout == 0 || scriptDef.Timeout > metadataScriptTimeout {
+				scriptDef.Timeout = metadataScriptTimeout
+			}
 			metadataScripts = append(metadataScripts, scriptDef)
 		}
 	}

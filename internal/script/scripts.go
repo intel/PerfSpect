@@ -21,6 +21,7 @@ type ScriptDefinition struct {
 	Depends            []string // binary dependencies that must be available for the script to run
 	Superuser          bool     // requires sudo or root
 	Sequential         bool     // run script sequentially (not at the same time as others)
+	Timeout            int      // maximum seconds the script may run before its process group is killed. 0 means no timeout.
 }
 
 // script names, these must be unique

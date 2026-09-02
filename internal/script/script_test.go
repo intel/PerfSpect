@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"perfspect/internal/target"
 )
@@ -333,6 +334,106 @@ func TestFormMasterScriptExecutionIntegration(t *testing.T) {
 		}
 		if !strings.Contains(p.Stderr, "STDERR-"+sanitizeScriptName(p.Name)) {
 			t.Errorf("stderr mismatch for %s: %q", p.Name, p.Stderr)
+		}
+	}
+}
+
+// TestFormMasterScriptNoTimeoutRunsToCompletion confirms that a script with
+// Timeout unset (0) is left to run without a watchdog, so indefinite-duration
+// collection is unaffected.
+func TestFormMasterScriptNoTimeoutRunsToCompletion(t *testing.T) {
+	tmp := t.TempDir()
+	scripts := []ScriptDefinition{{Name: "untimed", ScriptTemplate: "sleep 2\necho done\n"}}
+	writeChildScripts(t, tmp, scripts)
+	master, _, err := formControllerScript(tmp, scripts, nil, true)
+	if err != nil {
+		t.Fatalf("error forming master script: %v", err)
+	}
+	masterPath := filepath.Join(tmp, "controller.sh")
+	if err := os.WriteFile(masterPath, []byte(master), 0o700); err != nil {
+		t.Fatalf("failed writing master script: %v", err)
+	}
+	out, err := runLocalBash(masterPath)
+	if err != nil {
+		t.Fatalf("error executing master script: %v\noutput: %s", err, out)
+	}
+	if strings.Contains(out, "TIMEOUT:") {
+		t.Errorf("script with no timeout should not be killed by a watchdog:\n%s", out)
+	}
+	parsed := parseControllerScriptOutput(out)
+	if len(parsed) != 1 || parsed[0].Exitcode != 0 {
+		t.Fatalf("expected one successful script output, got %+v", parsed)
+	}
+	if !strings.Contains(parsed[0].Stdout, "done") {
+		t.Errorf("expected script to run to completion, stdout: %q", parsed[0].Stdout)
+	}
+}
+
+// TestFormMasterScriptWatchdogKillsHungScript confirms that a script exceeding
+// its Timeout has its whole process group killed, and that the controller keeps
+// going instead of blocking on it forever.
+//
+// The hung script leaves a grandchild sleeping and waits on it. That is the shape
+// of a wedged probe (e.g. a perf that hangs the PMU), and the case a plain
+// 'timeout' wrapped around the inner command does not cover, because signalling
+// only the direct child leaves the grandchild -- and therefore the wait -- alive.
+func TestFormMasterScriptWatchdogKillsHungScript(t *testing.T) {
+	tmp := t.TempDir()
+	scripts := []ScriptDefinition{
+		{Name: "hung probe", ScriptTemplate: "sleep 600 &\nwait\n", Timeout: 3},
+		{Name: "fast probe", ScriptTemplate: "echo alive\n", Timeout: 3},
+	}
+	writeChildScripts(t, tmp, scripts)
+	master, _, err := formControllerScript(tmp, scripts, nil, true)
+	if err != nil {
+		t.Fatalf("error forming master script: %v", err)
+	}
+	masterPath := filepath.Join(tmp, "controller.sh")
+	if err := os.WriteFile(masterPath, []byte(master), 0o700); err != nil {
+		t.Fatalf("failed writing master script: %v", err)
+	}
+
+	start := time.Now()
+	out, err := runLocalBash(masterPath)
+	if err != nil {
+		t.Fatalf("error executing master script: %v\noutput: %s", err, out)
+	}
+	elapsed := time.Since(start)
+	// Without the watchdog the controller waits on the hung script indefinitely.
+	if elapsed > 30*time.Second {
+		t.Fatalf("controller did not recover from hung script: took %v", elapsed)
+	}
+
+	// The timeout must be reported clearly enough to identify which probe hung.
+	for _, want := range []string{"TIMEOUT:", "exceeded 3s", "killed by the watchdog", "SCRIPT RESULT: 'hung probe'"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing timeout diagnostic %q in output:\n%s", want, out)
+		}
+	}
+
+	byName := make(map[string]ScriptOutput)
+	for _, p := range parseControllerScriptOutput(out) {
+		byName[p.Name] = p
+	}
+	// The hung script is reported as signal-killed, not as a success.
+	if ec := byName["hung probe"].Exitcode; ec != 143 && ec != 137 {
+		t.Errorf("expected hung script to exit via signal (143/137), got %d", ec)
+	}
+	// A hung script must not prevent the other scripts' results from being collected.
+	if got := byName["fast probe"]; got.Exitcode != 0 || !strings.Contains(got.Stdout, "alive") {
+		t.Errorf("expected fast probe to succeed, got exit=%d stdout=%q", got.Exitcode, got.Stdout)
+	}
+}
+
+// writeChildScripts writes each script definition's template to the directory
+// the controller script expects to find it in.
+func writeChildScripts(t *testing.T, dir string, scripts []ScriptDefinition) {
+	t.Helper()
+	for _, s := range scripts {
+		p := filepath.Join(dir, scriptNameToFilename(s.Name))
+		content := "#!/usr/bin/env bash\n" + s.ScriptTemplate
+		if err := os.WriteFile(p, []byte(content), 0o700); err != nil {
+			t.Fatalf("failed writing child script %s: %v", p, err)
 		}
 	}
 }

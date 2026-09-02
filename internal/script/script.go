@@ -148,6 +148,23 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, continueOnSc
 			return nil, fmt.Errorf("controller script returned exit code %d", exitcode)
 		}
 	}
+	// Surface watchdog timeouts. The controller reports these on stderr and, when
+	// continuing on script error, still exits 0 -- so without this the fact that a
+	// script was killed for hanging would not be logged anywhere.
+	if strings.Contains(stderr, "TIMEOUT:") {
+		for line := range strings.SplitSeq(stderr, "\n") {
+			if strings.HasPrefix(line, "TIMEOUT:") {
+				slog.Warn("script exceeded its timeout and was killed", slog.String("detail", strings.TrimPrefix(line, "TIMEOUT: ")))
+			}
+		}
+	}
+	// Log per-script exit codes and elapsed times to make a slow or failing script
+	// identifiable without re-running with extra instrumentation.
+	for line := range strings.SplitSeq(stderr, "\n") {
+		if strings.HasPrefix(line, "SCRIPT RESULT:") {
+			slog.Debug("script result", slog.String("detail", strings.TrimPrefix(line, "SCRIPT RESULT: ")))
+		}
+	}
 	// parse output of controller script
 	allScriptOutputs := parseControllerScriptOutput(stdout)
 	for _, scriptOutput := range allScriptOutputs {
@@ -220,10 +237,12 @@ func formControllerScript(targetTempDirectory string, concurrentScripts []Script
 	// template that renders the shell controller script.
 	// Primarily carries the sanitized script name used for filenames and
 	// template keys (e.g., ${s}.sh, ${s}.stdout, pids[$s]), while the original
-	// Name is kept for readable summary output.
+	// Name is kept for readable summary output. Timeout is the script's
+	// watchdog budget in seconds; 0 means the script may run indefinitely.
 	type tplScript struct {
 		Name      string
 		Sanitized string
+		Timeout   int
 	}
 	// tplData holds all data passed into the controller script template.
 	tplData := struct {
@@ -243,7 +262,7 @@ func formControllerScript(targetTempDirectory string, concurrentScripts []Script
 			needsElevated = true
 		}
 		tplData.ConcurrentScripts = append(tplData.ConcurrentScripts, tplScript{
-			Name: s.Name, Sanitized: sanitizeScriptName(s.Name),
+			Name: s.Name, Sanitized: sanitizeScriptName(s.Name), Timeout: s.Timeout,
 		})
 	}
 	for _, s := range sequentialScripts {
@@ -251,7 +270,7 @@ func formControllerScript(targetTempDirectory string, concurrentScripts []Script
 			needsElevated = true
 		}
 		tplData.SequentialScripts = append(tplData.SequentialScripts, tplScript{
-			Name: s.Name, Sanitized: sanitizeScriptName(s.Name),
+			Name: s.Name, Sanitized: sanitizeScriptName(s.Name), Timeout: s.Timeout,
 		})
 	}
 	// define controller script template
@@ -270,6 +289,9 @@ declare -a sequential_scripts=()
 declare -A pids=()
 declare -A exitcodes=()
 declare -A orig_names=()
+declare -A timeouts=()
+declare -A watchdog_pids=()
+declare -A start_times=()
 current_seq_pid=""
 current_seq_script=""
 
@@ -287,16 +309,88 @@ ensure_trailing_newline() {
 {{- range .ConcurrentScripts}}
 concurrent_scripts+=({{ .Sanitized }})
 orig_names[{{ .Sanitized }}]="{{ .Name }}"
+timeouts[{{ .Sanitized }}]={{ .Timeout }}
 {{ end }}
 {{- range .SequentialScripts}}
 sequential_scripts+=({{ .Sanitized }})
 orig_names[{{ .Sanitized }}]="{{ .Name }}"
+timeouts[{{ .Sanitized }}]={{ .Timeout }}
 {{ end }}
+
+# Grace period between the watchdog's SIGTERM and its follow-up SIGKILL.
+readonly WATCHDOG_KILL_AFTER=5
+
+# Grace period kill_script allows a script to exit after SIGTERM before it
+# escalates to SIGKILL, during signal-triggered cleanup.
+readonly KILL_GRACE_SECONDS=5
+
+# start_watchdog starts a background timer for a script. Each script runs via
+# setsid, so it leads its own process group; the watchdog signals the whole
+# group (negative PID). This is what makes the timeout forceful: signalling only
+# the script's direct child would leave a wedged grandchild (e.g. a perf stuck in
+# the kernel) running, and the controller's 'wait' would block on it forever.
+start_watchdog() {
+  local s="$1" pid="$2" budget="${timeouts[$1]:-0}"
+  [[ "$budget" -le 0 ]] && return 0
+  (
+    # Poll rather than 'sleep $budget' so the watchdog exits promptly once the
+    # script finishes, instead of lingering for the full budget.
+    local waited=0
+    while [[ "$waited" -lt "$budget" ]]; do
+      ps -p "$pid" > /dev/null 2>&1 || exit 0
+      sleep 1
+      waited=$((waited + 1))
+    done
+    ps -p "$pid" > /dev/null 2>&1 || exit 0
+    echo "TIMEOUT: script '${orig_names[$s]}' exceeded ${budget}s; sending SIGTERM to process group $pid" >&2
+    kill -SIGTERM -"$pid" 2>/dev/null || true
+    local killwait=0
+    while ps -p "$pid" > /dev/null 2>&1 && [[ "$killwait" -lt "$WATCHDOG_KILL_AFTER" ]]; do
+      sleep 1
+      killwait=$((killwait + 1))
+    done
+    if ps -p "$pid" > /dev/null 2>&1; then
+      echo "TIMEOUT: script '${orig_names[$s]}' ignored SIGTERM after ${WATCHDOG_KILL_AFTER}s; sending SIGKILL to process group $pid" >&2
+      kill -SIGKILL -"$pid" 2>/dev/null || true
+    fi
+  ) &
+  watchdog_pids[$s]=$!
+}
+
+# stop_watchdog cancels a script's watchdog once the script has exited.
+stop_watchdog() {
+  local s="$1" wpid="${watchdog_pids[$1]:-}"
+  [[ -z "$wpid" ]] && return 0
+  kill -SIGKILL "$wpid" 2>/dev/null || true
+  wait "$wpid" 2>/dev/null || true
+  unset 'watchdog_pids[$s]'
+}
+
+# report_script_result logs a script's exit code and elapsed time, and on a
+# timeout kill (SIGTERM=143, SIGKILL=137) or generic failure also emits a tail of
+# its stderr. This identifies exactly which probe hung, rather than leaving a
+# silent stall.
+report_script_result() {
+  local s="$1" ec="$2"
+  local elapsed=$(( $(date +%s) - ${start_times[$s]:-0} ))
+  echo "SCRIPT RESULT: '${orig_names[$s]}' exit=$ec elapsed=${elapsed}s" >&2
+  if [[ "$ec" -ne 0 ]]; then
+    if [[ "$ec" -eq 143 || "$ec" -eq 137 ]]; then
+      echo "SCRIPT RESULT: '${orig_names[$s]}' was killed by the watchdog (likely hung)" >&2
+    fi
+    if [[ -s "$script_dir/${s}.stderr" ]]; then
+      echo "SCRIPT RESULT: '${orig_names[$s]}' stderr tail:" >&2
+      tail -n 20 "$script_dir/${s}.stderr" >&2 || true
+    fi
+  fi
+}
 
 start_concurrent_scripts() {
   for s in "${concurrent_scripts[@]}"; do
     setsid bash "$script_dir/${s}.sh" > "$script_dir/${s}.stdout" 2> "$script_dir/${s}.stderr" &
     pids[$s]=$!
+    start_times[$s]=$(date +%s)
+    start_watchdog "$s" "${pids[$s]}"
   done
 }
 
@@ -307,11 +401,17 @@ run_sequential_scripts() {
     setsid bash "$script_dir/${s}.sh" > "$script_dir/${s}.stdout" 2> "$script_dir/${s}.stderr" &
     current_seq_pid=$!
     pids[$s]=$current_seq_pid
+    start_times[$s]=$(date +%s)
+    start_watchdog "$s" "$current_seq_pid"
     if wait "$current_seq_pid"; then
       exitcodes[$s]=0
+      stop_watchdog "$s"
+      report_script_result "$s" 0
     else
       ec=$?
       exitcodes[$s]=$ec
+      stop_watchdog "$s"
+      report_script_result "$s" "$ec"
       if [ "$continue_on_script_error" -eq 0 ]; then
         echo "Script '${orig_names[$s]}' failed with exit code $ec; stopping further sequential scripts." >&2
         exit $ec
@@ -325,16 +425,21 @@ run_sequential_scripts() {
 kill_script() {
   local s="$1"
   local pid="${pids[$s]:-}"
+  stop_watchdog "$s"
   [[ -z "$pid" ]] && return 0
   if ! ps -p "$pid" > /dev/null 2>&1; then return 0; fi
   # Signal the process group (negative PID)
   # Bash background jobs ignore SIGINT by default, but they do not ignore SIGTERM.
   echo "Sending SIGTERM to script '${orig_names[$s]}' with PID $pid" >&2
   kill -SIGTERM -"$pid" 2>/dev/null || true
-  # Wait up to 1 minute in 1s intervals
+  # Wait for the script to exit gracefully, in 1s intervals.
+  # This budget is per-script and cleanup is serial, so it must stay small: the
+  # signal handler in perfspect only allows ~20s for the whole controller to exit
+  # before it escalates to SIGKILL. A long budget here (it was 60s) makes a single
+  # hung script stall shutdown well past that deadline.
   local waited=0
   echo "Waiting for script '${orig_names[$s]}' with PID $pid to exit gracefully" >&2
-  while ps -p "$pid" > /dev/null 2>&1 && [ "$waited" -lt 60 ]; do
+  while ps -p "$pid" > /dev/null 2>&1 && [ "$waited" -lt "$KILL_GRACE_SECONDS" ]; do
     echo -n "." >&2
     sleep 1
     waited=$((waited + 1))
@@ -361,6 +466,8 @@ wait_for_concurrent_scripts() {
       ec=$?
       exitcodes[$s]=$ec
     fi
+    stop_watchdog "$s"
+    report_script_result "$s" "${exitcodes[$s]}"
   done
 }
 
