@@ -158,6 +158,16 @@ Software flamegraphs are useful in diagnosing software performance bottlenecks. 
 > [!TIP]
 > By default, flamegraphs are collected using the `cycles:P` event. To analyze different performance aspects, use the `--perf-event` flag to specify an alternative perf event (e.g., `cache-misses`, `instructions`, `branches`, `context-switches`, `mem-loads`, `mem-stores`, etc.).
 
+> [!TIP]
+> It's possible to use PerfSpect to extract a flamegraph of a Java workload within a Docker container, but it's first necessary to copy the async profiler library into each container where Java profiling is to happen. To do this:
+> 1. Extract PerfSpect's embedded resources with `./perfspect extract --output resources`
+> 2. For each container you would like to profile Java code: `docker cp resources/${ARCH}/async-profiler/lib/libasyncProfiler.so ${CONT_NAME}:/dest/path/`
+> 3. When running PerfSpect flamegraph, add this flag: `--asprof-args "--libpath /dest/path/libasyncProfiler.so"`
+> 
+> e.g. `./perfspect extract --output resources && docker cp resources/x86_64/async-profiler/lib/libasyncProfiler.so ${CONT_NAME}:/tmp/ && ./perfspect flamegraph --asprof-args "--libpath /tmp/libasyncProfiler.so"`
+>
+> Note that if PerfSpect is being run remotely, then the async profiler library will need to be copied to the test system and then into the test system's containers.
+
 ![screenshot of a flamegraph from the HTML output of the flamegraph command](docs/images/flamegraph.png)
 
 #### Lock Command

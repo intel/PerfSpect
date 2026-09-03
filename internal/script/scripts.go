@@ -1879,7 +1879,7 @@ stop_profiling() {
     # stop async-profiler
     for pid in "${java_pids[@]}"; do
         # this call is synchronous and will wait until the profile is written to file before returning
-        async-profiler/bin/asprof stop -o collapsed -f ap_folded_"$pid" "$pid"
+        async-profiler/bin/asprof stop "${asprof_arguments[@]}" -o collapsed "$pid" | tee ap_folded_"$pid"
     done
     # wait for perf processes to finish and exit
     if [ -n "$perf_fp_pid" ]; then
