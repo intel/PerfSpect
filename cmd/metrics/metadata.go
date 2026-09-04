@@ -147,7 +147,7 @@ var baseMetadataScripts = []script.ScriptDefinition{
 	{
 		Name: scriptPerfSupportedEvents,
 		ScriptTemplate: `# Parse perf list JSON output to extract Hardware events and cstate/power events
-timeout 30 perf list --json 2>/dev/null | awk '
+timeout --kill-after=5 30 perf list --json 2>/dev/null | awk '
 BEGIN {
     in_hardware_event = 0
     event_name = ""
@@ -182,6 +182,14 @@ BEGIN {
     event_name = ""
 }
 ' # end of awk
+# The pipeline's exit status is awk's, so a perf that timed out or failed would
+# otherwise look like success with an empty event list -- a silently wrong result
+# rather than a reported failure.
+perf_status=${PIPESTATUS[0]}
+if [[ "$perf_status" -ne 0 ]]; then
+  echo "perf list failed or timed out (exit $perf_status)" >&2
+  exit "$perf_status"
+fi
 `,
 		Depends: []string{"perf"},
 	},
@@ -192,7 +200,7 @@ BEGIN {
 	{
 		Name: scriptPerfAllSupportedEvents,
 		ScriptTemplate: `# Parse perf list JSON output to extract Hardware events and cstate/power events
-timeout 30 perf list --json 2>/dev/null | awk '
+timeout --kill-after=5 30 perf list --json 2>/dev/null | awk '
 BEGIN {
     event_name = ""
 }
@@ -216,6 +224,14 @@ BEGIN {
     event_name = ""
 }
 ' # end of awk
+# The pipeline's exit status is awk's, so a perf that timed out or failed would
+# otherwise look like success with an empty event list -- a silently wrong result
+# rather than a reported failure.
+perf_status=${PIPESTATUS[0]}
+if [[ "$perf_status" -ne 0 ]]; then
+  echo "perf list failed or timed out (exit $perf_status)" >&2
+  exit "$perf_status"
+fi
 `,
 		Depends: []string{"perf"},
 	},
@@ -226,52 +242,52 @@ BEGIN {
 	},
 	{
 		Name:           scriptPerfStatInstructions,
-		ScriptTemplate: "timeout 30 perf stat -a -e instructions sleep 1",
+		ScriptTemplate: "timeout --kill-after=5 30 perf stat -a -e instructions sleep 1",
 		Depends:        []string{"perf"},
 	},
 	{
 		Name:           scriptPerfStatRefCycles,
-		ScriptTemplate: "timeout 30 perf stat -a -e ref-cycles sleep 1",
+		ScriptTemplate: "timeout --kill-after=5 30 perf stat -a -e ref-cycles sleep 1",
 		Depends:        []string{"perf"},
 	},
 	{
 		Name:           scriptPerfStatPEBS,
-		ScriptTemplate: "timeout 30 perf stat -a -e INT_MISC.UNKNOWN_BRANCH_CYCLES sleep 1",
+		ScriptTemplate: "timeout --kill-after=5 30 perf stat -a -e INT_MISC.UNKNOWN_BRANCH_CYCLES sleep 1",
 		Architectures:  []string{cpus.X86Architecture},
 		Depends:        []string{"perf"},
 	},
 	{
 		Name:           scriptPerfStatOCR,
-		ScriptTemplate: "timeout 30 perf stat -a -e OCR.READS_TO_CORE.LOCAL_DRAM sleep 1",
+		ScriptTemplate: "timeout --kill-after=5 30 perf stat -a -e OCR.READS_TO_CORE.LOCAL_DRAM sleep 1",
 		Architectures:  []string{cpus.X86Architecture},
 		Depends:        []string{"perf"},
 	},
 	{
 		Name:           scriptPerfStatTMA,
-		ScriptTemplate: "timeout 30 perf stat -a -e '{topdown.slots, topdown-bad-spec}' sleep 1",
+		ScriptTemplate: "timeout --kill-after=5 30 perf stat -a -e '{topdown.slots, topdown-bad-spec}' sleep 1",
 		Architectures:  []string{cpus.X86Architecture},
 		Depends:        []string{"perf"},
 	},
 	{
 		Name:           scriptPerfStatAMDUncoreProbe,
-		ScriptTemplate: `timeout 30 perf stat -a -e "l3/event=0x4,umask=0xff,enallcores=0x1,enallslices=0x1,threadmask=0x3,name='l3_lookup_state.all_coherent_accesses_to_l3'/" sleep 1`,
+		ScriptTemplate: `timeout --kill-after=5 30 perf stat -a -e "l3/event=0x4,umask=0xff,enallcores=0x1,enallslices=0x1,threadmask=0x3,name='l3_lookup_state.all_coherent_accesses_to_l3'/" sleep 1`,
 		Architectures:  []string{cpus.X86Architecture},
 		Vendors:        []string{cpus.AMDVendor},
 		Depends:        []string{"perf"},
 	},
 	{
 		Name:           scriptPerfStatFixedInstr,
-		ScriptTemplate: "timeout 30 perf stat -a -e '{{{.InstructionsList}}}' sleep 1",
+		ScriptTemplate: "timeout --kill-after=5 30 perf stat -a -e '{{{.InstructionsList}}}' sleep 1",
 		Depends:        []string{"perf"},
 	},
 	{
 		Name:           scriptPerfStatFixedCycles,
-		ScriptTemplate: "timeout 30 perf stat -a -e '{{{.CpuCyclesList}}}' sleep 1",
+		ScriptTemplate: "timeout --kill-after=5 30 perf stat -a -e '{{{.CpuCyclesList}}}' sleep 1",
 		Depends:        []string{"perf"},
 	},
 	{
 		Name:           scriptPerfStatFixedRefCycles,
-		ScriptTemplate: "timeout 30 perf stat -a -e '{{{.RefCyclesList}}}' sleep 1",
+		ScriptTemplate: "timeout --kill-after=5 30 perf stat -a -e '{{{.RefCyclesList}}}' sleep 1",
 		Depends:        []string{"perf"},
 	},
 	{
@@ -307,8 +323,8 @@ BEGIN {
 // a perf event that hangs the PMU on some virtualized instance types) stalls
 // collection indefinitely, because the controller waits on it forever.
 //
-// The value sits deliberately between two limits. It must exceed the 'timeout 30'
-// that wraps the perf probes, so that when that inner timeout works the kill is
+// The value sits deliberately between two limits. It must exceed the 30s
+// 'timeout' that wraps the perf probes, so that when that inner timeout works the kill is
 // attributed to the probe rather than to this watchdog; and the whole phase --
 // this budget plus the watchdog's escalation plus the controller's own deadline --
 // must finish well inside the time a caller waits for collection to start, or the
