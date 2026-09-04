@@ -4,6 +4,7 @@
 package script
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path"
@@ -583,6 +584,77 @@ func processCmdlineExists(t *testing.T, needle string) bool {
 		}
 	}
 	return false
+}
+
+// TestCleanupScriptKillsControllerTree exercises the shell that reaps a
+// controller we stopped waiting for. Killing the local end of the connection has
+// no effect on the target, so this is what actually stops leaked probes from
+// accumulating there across runs.
+func TestCleanupScriptKillsControllerTree(t *testing.T) {
+	tmp := t.TempDir()
+	pidFile := filepath.Join(tmp, ControllerPIDFileName)
+	// A distinct marker from the other tests' so a stray process from one cannot
+	// satisfy the other's assertions.
+	const marker = "987655"
+	// Stand in for a controller: record our pid where the real one does, then run a
+	// probe below 'timeout', which lands in its own process group.
+	fake := filepath.Join(tmp, "fake_controller.sh")
+	body := "#!/usr/bin/env bash\necho $$ > " + pidFile + "\ntimeout 600 sleep " + marker + "\n"
+	if err := os.WriteFile(fake, []byte(body), 0o700); err != nil { // #nosec G306
+		t.Fatalf("failed writing fake controller: %v", err)
+	}
+	controller := exec.Command("bash", fake) // #nosec G204
+	if err := controller.Start(); err != nil {
+		t.Fatalf("failed starting fake controller: %v", err)
+	}
+	defer func() { _ = controller.Wait() }()
+
+	// Wait for the tree to exist before trying to reap it.
+	deadline := time.Now().Add(10 * time.Second)
+	for !processCmdlineExists(t, "sleep "+marker) {
+		if time.Now().After(deadline) {
+			t.Fatal("fake controller never started its probe")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	cleanup := fmt.Sprintf(cleanupTemplate, descendantsOfShellFunc, pidFile)
+	out, err := exec.Command("bash", "-c", cleanup).CombinedOutput() // #nosec G204
+	if err != nil {
+		t.Fatalf("cleanup script failed: %v\noutput: %s", err, out)
+	}
+	if !strings.Contains(string(out), "cleaning up abandoned controller") {
+		t.Errorf("cleanup did not report what it was doing, got:\n%s", out)
+	}
+	if !strings.Contains(string(out), "sleep "+marker) {
+		t.Errorf("cleanup did not name the probe it killed, got:\n%s", out)
+	}
+	if processCmdlineExists(t, "sleep "+marker) {
+		t.Error("probe below timeout survived cleanup")
+	}
+	if _, err := os.Stat(pidFile); !os.IsNotExist(err) {
+		t.Errorf("cleanup left the pid file behind: %v", err)
+	}
+}
+
+// TestCleanupScriptIgnoresBogusPIDFile checks that a pid file holding something
+// other than a pid is refused rather than passed to kill.
+func TestCleanupScriptIgnoresBogusPIDFile(t *testing.T) {
+	tmp := t.TempDir()
+	pidFile := filepath.Join(tmp, ControllerPIDFileName)
+	for _, contents := range []string{"", "-1", "not-a-pid", "1234; rm -rf /tmp/should-not-happen"} {
+		if err := os.WriteFile(pidFile, []byte(contents), 0o600); err != nil {
+			t.Fatalf("failed writing pid file: %v", err)
+		}
+		cleanup := fmt.Sprintf(cleanupTemplate, descendantsOfShellFunc, pidFile)
+		out, err := exec.Command("bash", "-c", cleanup).CombinedOutput() // #nosec G204
+		if err != nil {
+			t.Errorf("cleanup script failed on pid file %q: %v\noutput: %s", contents, err, out)
+		}
+		if strings.Contains(string(out), "cleaning up") {
+			t.Errorf("cleanup acted on invalid pid file %q, output:\n%s", contents, out)
+		}
+	}
 }
 
 func TestControllerTimeout(t *testing.T) {

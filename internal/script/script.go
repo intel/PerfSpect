@@ -25,6 +25,29 @@ var Resources embed.FS
 
 const ControllerPIDFileName = "controller.pid"
 
+// descendantsOfShellFunc defines a shell function that prints a pid followed by
+// all of its descendants. A process-group filter is not sufficient: 'timeout'
+// puts itself and the command it runs into a new process group, so a probe run as
+// 'timeout 30 perf stat ...' is invisible to a PGID-based search and survives a
+// kill aimed at the script's group. It is shared by the controller script and by
+// the cleanup we run after abandoning a controller.
+const descendantsOfShellFunc = `descendants_of() {
+  local root="$1" snapshot frontier next depth=0
+  snapshot=$(ps -eo pid,ppid 2>/dev/null || true)
+  frontier="$root"
+  # The depth cap is a safety net only; a process tree cannot be deeper than this
+  # in practice, and without it a malformed snapshot could loop forever.
+  while [[ -n "$frontier" && "$depth" -lt 32 ]]; do
+    echo "$frontier"
+    next=$(awk -v parents="$frontier" '
+      BEGIN { n = split(parents, a, " "); for (i = 1; i <= n; i++) if (a[i] != "") P[a[i]] = 1 }
+      NR > 1 && ($2 in P) { printf "%s ", $1 }
+    ' <<< "$snapshot")
+    frontier="$next"
+    depth=$((depth + 1))
+  done
+}`
+
 type ScriptOutput struct {
 	ScriptDefinition
 	Stdout   string
@@ -154,6 +177,12 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, continueOnSc
 	if exitcode < 0 && timeout > 0 {
 		slog.Error("controller script did not finish within its deadline and was terminated",
 			slog.String("target", myTarget.GetName()), slog.Int("deadlineSeconds", timeout))
+		// Killing our end of the connection does not stop anything on the target: the
+		// controller and its probes keep running there, unattached and unbounded. On a
+		// shared or repeatedly tested machine those leftovers accumulate and contend
+		// for the resource the next run's probes need, so one hang turns into a run of
+		// them. Reap them before returning.
+		CleanupAbandonedController(myTarget)
 	}
 	if exitcode != 0 {
 		// If the controller was interrupted (e.g., by SIGINT) but still produced output,
@@ -225,6 +254,77 @@ func controllerTimeout(scripts []ScriptDefinition) int {
 		maxConcurrent += watchdogEscalationSeconds
 	}
 	return sequentialTotal + maxConcurrent + controllerTimeoutMargin
+}
+
+// cleanupTemplate kills a controller left running on a target, along with every
+// process below it, and reports anything that survives. Killing the local end of
+// the connection has no effect on the target, so without this a probe that
+// outlived its watchdog keeps running there indefinitely.
+const cleanupTemplate = `
+%s
+pidfile="%s"
+[ -r "$pidfile" ] || exit 0
+root=$(cat "$pidfile" 2>/dev/null || true)
+# Refuse anything that is not a plain pid: this string comes from a file, and it
+# is about to be handed to kill.
+case "$root" in ''|*[!0-9]*) exit 0 ;; esac
+ps -p "$root" > /dev/null 2>&1 || { rm -f "$pidfile"; exit 0; }
+# Capture the tree before signalling: the first kill orphans the descendants and
+# they can no longer be traced back to the controller.
+tree=$(descendants_of "$root")
+echo "cleaning up abandoned controller pid=$root"
+for p in $tree; do
+  cmd=$(tr '\0' ' ' < "/proc/$p/cmdline" 2>/dev/null || true)
+  [ -n "$cmd" ] && echo "  killing pid=$p cmd=$cmd"
+done
+# shellcheck disable=SC2086 # word splitting is intended: tree is a pid list
+kill -SIGKILL $tree 2>/dev/null || true
+sleep 1
+for p in $tree; do
+  if ps -p "$p" > /dev/null 2>&1; then
+    echo "  SURVIVED SIGKILL pid=$p state=$(ps -o stat= -p "$p" 2>/dev/null | tr -d ' ')" >&2
+  fi
+done
+rm -f "$pidfile"
+`
+
+// CleanupAbandonedController kills the controller script and its descendants on a
+// target after we have stopped waiting for them. It is best-effort: it reports
+// failures rather than returning them, because every caller is already on an error
+// path and cleanup failing must not mask the original problem.
+func CleanupAbandonedController(myTarget target.Target) {
+	pidFile := path.Join(myTarget.GetTempDirectory(), ControllerPIDFileName)
+	cleanupScript := fmt.Sprintf(cleanupTemplate, descendantsOfShellFunc, pidFile)
+	var cmd *exec.Cmd
+	if !myTarget.IsSuperUser() && myTarget.CanElevatePrivileges() {
+		// The controller runs under sudo, so its children are root-owned.
+		cmd = exec.Command("sudo", "bash", "-c", cleanupScript) // #nosec G204
+	} else {
+		cmd = exec.Command("bash", "-c", cleanupScript) // #nosec G204
+	}
+	stdout, stderr, exitcode, err := myTarget.RunCommandEx(cmd, 30, false, true)
+	if err != nil {
+		slog.Error("failed to clean up abandoned controller on target",
+			slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+		return
+	}
+	for _, line := range strings.Split(strings.TrimSpace(stdout), "\n") {
+		if line != "" {
+			slog.Warn("abandoned controller cleanup", slog.String("target", myTarget.GetName()), slog.String("detail", strings.TrimSpace(line)))
+		}
+	}
+	// A process that survives SIGKILL is blocked in the kernel and cannot be reaped
+	// from user space at all; it needs to be reported, not retried.
+	for _, line := range strings.Split(strings.TrimSpace(stderr), "\n") {
+		if strings.Contains(line, "SURVIVED SIGKILL") {
+			slog.Error("process on target survived SIGKILL and could not be reaped",
+				slog.String("target", myTarget.GetName()), slog.String("detail", strings.TrimSpace(line)))
+		}
+	}
+	if exitcode != 0 {
+		slog.Warn("abandoned controller cleanup returned non-zero exit code",
+			slog.String("target", myTarget.GetName()), slog.Int("exitcode", exitcode), slog.String("stderr", stderr))
+	}
 }
 
 // logControllerDiagnostics surfaces the controller's own reporting. The controller
@@ -334,6 +434,7 @@ func formControllerScript(targetTempDirectory string, concurrentScripts []Script
 	tplData := struct {
 		TargetTempDir         string
 		ControllerPIDFile     string
+		DescendantsFunc       string
 		ConcurrentScripts     []tplScript
 		SequentialScripts     []tplScript
 		ContinueOnScriptError bool
@@ -341,6 +442,7 @@ func formControllerScript(targetTempDirectory string, concurrentScripts []Script
 	// populate tplData
 	tplData.TargetTempDir = targetTempDirectory
 	tplData.ControllerPIDFile = ControllerPIDFileName
+	tplData.DescendantsFunc = descendantsOfShellFunc
 	tplData.ContinueOnScriptError = continueOnScriptError
 	needsElevated := false
 	for _, s := range concurrentScripts {
@@ -412,27 +514,7 @@ readonly WATCHDOG_KILL_AFTER=5
 # escalates to SIGKILL, during signal-triggered cleanup.
 readonly KILL_GRACE_SECONDS=5
 
-# descendants_of prints a pid followed by all of its descendants. A process-group
-# filter is not sufficient: 'timeout' puts itself and the command it runs into a
-# new process group, so a probe run as 'timeout 30 perf stat ...' is invisible to
-# a PGID-based search -- which hid the actual hung process behind the script's
-# shell -- and survives a kill aimed at the script's group.
-descendants_of() {
-  local root="$1" snapshot frontier next depth=0
-  snapshot=$(ps -eo pid,ppid 2>/dev/null || true)
-  frontier="$root"
-  # The depth cap is a safety net only; a process tree cannot be deeper than this
-  # in practice, and without it a malformed snapshot could loop forever.
-  while [[ -n "$frontier" && "$depth" -lt 32 ]]; do
-    echo "$frontier"
-    next=$(awk -v parents="$frontier" '
-      BEGIN { n = split(parents, a, " "); for (i = 1; i <= n; i++) if (a[i] != "") P[a[i]] = 1 }
-      NR > 1 && ($2 in P) { printf "%s ", $1 }
-    ' <<< "$snapshot")
-    frontier="$next"
-    depth=$((depth + 1))
-  done
-}
+{{.DescendantsFunc}}
 
 # dump_pid_states reports the kernel state of each given pid, skipping any that
 # have exited. Process state D is uninterruptible sleep: the process is blocked
