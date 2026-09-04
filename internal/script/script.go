@@ -187,9 +187,17 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, continueOnSc
 }
 
 // controllerTimeoutMargin is added to the sum of the script timeouts to allow for
-// the controller's own setup, the watchdogs' SIGTERM-then-SIGKILL escalation, and
-// reporting results back.
+// the controller's own setup and for reporting results back.
 const controllerTimeoutMargin = 60
+
+// watchdogEscalationSeconds is how much longer than its own budget a hung script
+// can occupy the controller: the watchdog waits WATCHDOG_KILL_AFTER seconds after
+// SIGTERM, the same again after SIGKILL, plus its 1-second polling granularity.
+// A deadline that omits this is guaranteed to fire during the escalation of a
+// hang -- exactly when the controller is producing the diagnosis of it -- and
+// killing the controller discards all of its output, because results are printed
+// only once every script has finished.
+const watchdogEscalationSeconds = 12
 
 // controllerTimeout returns a deadline in seconds for the whole controller run,
 // or 0 for no deadline. A deadline is only imposed when every script is itself
@@ -197,7 +205,9 @@ const controllerTimeoutMargin = 60
 // controller legitimately has no upper bound.
 //
 // Sequential scripts run one after another, so their budgets add up, whereas
-// concurrent scripts overlap and only the largest matters.
+// concurrent scripts overlap and only the largest matters. Each phase gets the
+// watchdog escalation allowance on top, since a script that hangs holds the
+// controller for its budget plus the time taken to force it out.
 func controllerTimeout(scripts []ScriptDefinition) int {
 	sequentialTotal := 0
 	maxConcurrent := 0
@@ -206,10 +216,13 @@ func controllerTimeout(scripts []ScriptDefinition) int {
 			return 0
 		}
 		if s.Sequential {
-			sequentialTotal += s.Timeout
+			sequentialTotal += s.Timeout + watchdogEscalationSeconds
 		} else if s.Timeout > maxConcurrent {
 			maxConcurrent = s.Timeout
 		}
+	}
+	if maxConcurrent > 0 {
+		maxConcurrent += watchdogEscalationSeconds
 	}
 	return sequentialTotal + maxConcurrent + controllerTimeoutMargin
 }
@@ -399,24 +412,84 @@ readonly WATCHDOG_KILL_AFTER=5
 # escalates to SIGKILL, during signal-triggered cleanup.
 readonly KILL_GRACE_SECONDS=5
 
-# dump_hung_process_state records why a script could not be stopped. Process
-# state D is uninterruptible sleep: the process is blocked inside a kernel call
-# and will not act on any signal -- not even SIGKILL -- until that call returns.
-# That is what distinguishes a probe wedged on a PMU access from a merely slow
-# command, and it is why signalling alone cannot always reap it. The kernel stack
-# names the exact call it is stuck in, and is readable because metadata scripts
-# run with elevated privileges.
-dump_hung_process_state() {
-  local s="$1" pid="$2" p st wch
-  echo "TIMEOUT DIAG: process group $pid for script '${orig_names[$s]}':" >&2
-  ps -eo pid,ppid,pgid,stat,etime,wchan:24,args 2>/dev/null | awk -v pg="$pid" 'NR==1 || $3==pg' >&2 || true
-  for p in $(ps -eo pid,pgid 2>/dev/null | awk -v pg="$pid" '$2==pg {print $1}'); do
-    st=$(awk '{print $3}' "/proc/$p/stat" 2>/dev/null || true)
+# descendants_of prints a pid followed by all of its descendants. A process-group
+# filter is not sufficient: 'timeout' puts itself and the command it runs into a
+# new process group, so a probe run as 'timeout 30 perf stat ...' is invisible to
+# a PGID-based search -- which hid the actual hung process behind the script's
+# shell -- and survives a kill aimed at the script's group.
+descendants_of() {
+  local root="$1" snapshot frontier next depth=0
+  snapshot=$(ps -eo pid,ppid 2>/dev/null || true)
+  frontier="$root"
+  # The depth cap is a safety net only; a process tree cannot be deeper than this
+  # in practice, and without it a malformed snapshot could loop forever.
+  while [[ -n "$frontier" && "$depth" -lt 32 ]]; do
+    echo "$frontier"
+    next=$(awk -v parents="$frontier" '
+      BEGIN { n = split(parents, a, " "); for (i = 1; i <= n; i++) if (a[i] != "") P[a[i]] = 1 }
+      NR > 1 && ($2 in P) { printf "%s ", $1 }
+    ' <<< "$snapshot")
+    frontier="$next"
+    depth=$((depth + 1))
+  done
+}
+
+# dump_pid_states reports the kernel state of each given pid, skipping any that
+# have exited. Process state D is uninterruptible sleep: the process is blocked
+# inside a kernel call and will not act on any signal -- not even SIGKILL -- until
+# that call returns. That is what distinguishes a probe wedged on a PMU access
+# from a merely slow command, and it is why signalling alone cannot always reap
+# it. The kernel stack names the exact call it is stuck in, and is readable
+# because metadata scripts run with elevated privileges.
+dump_pid_states() {
+  local label="$1"
+  shift
+  local p st wch cmd
+  for p in "$@"; do
+    ps -p "$p" > /dev/null 2>&1 || continue
+    # Read state via ps rather than parsing /proc/<pid>/stat: the comm field there
+    # is parenthesized and may contain spaces, which shifts the field positions.
+    st=$(ps -o stat= -p "$p" 2>/dev/null | tr -d ' ')
     wch=$(cat "/proc/$p/wchan" 2>/dev/null || true)
-    echo "TIMEOUT DIAG: pid=$p state=${st:-?} wchan=${wch:-?}" >&2
-    if [[ "$st" == "D" ]]; then
+    cmd=$(tr '\0' ' ' < "/proc/$p/cmdline" 2>/dev/null || true)
+    echo "TIMEOUT DIAG: $label pid=$p state=${st:-?} wchan=${wch:-?} cmd=${cmd:-?}" >&2
+    if [[ "$st" == D* ]]; then
       echo "TIMEOUT DIAG: pid=$p is in uninterruptible sleep and cannot be signalled; kernel stack:" >&2
       cat "/proc/$p/stack" 2>/dev/null >&2 || echo "TIMEOUT DIAG: (kernel stack unavailable)" >&2
+    fi
+  done
+}
+
+# dump_hung_process_state records why a script could not be stopped. The caller
+# passes a pid list captured before any signal was sent: once the script's shell
+# dies its children are reparented to init, so the tree cannot be recovered
+# afterwards.
+dump_hung_process_state() {
+  local s="$1" pid="$2" tree="$3"
+  echo "TIMEOUT DIAG: process tree for script '${orig_names[$s]}' (root pid $pid):" >&2
+  ps -eo pid,ppid,pgid,stat,etime,wchan:24,args 2>/dev/null | awk -v pids="$tree" '
+    BEGIN { n = split(pids, a, /[ \n]+/); for (i = 1; i <= n; i++) if (a[i] != "") P[a[i]] = 1 }
+    NR == 1 || ($1 in P)
+  ' >&2 || true
+  # shellcheck disable=SC2086 # word splitting is intended: tree is a pid list
+  dump_pid_states "in tree" $tree
+}
+
+# kill_tree signals a script's process group and then every process in the
+# previously captured tree individually. The group kill alone reaps the script's
+# shell but leaves a 'timeout'-wrapped probe running in its own group, orphaned
+# and still holding whatever it was stuck on. Descendants that lead a group get
+# the signal on their group too, so a probe forked below 'timeout' is covered.
+kill_tree() {
+  local pid="$1" sig="$2" tree="$3" p pg
+  kill "-$sig" -"$pid" 2>/dev/null || true
+  for p in $tree; do
+    [[ "$p" == "$pid" ]] && continue
+    pg=$(ps -o pgid= -p "$p" 2>/dev/null | tr -d ' ')
+    if [[ "$pg" == "$p" ]]; then
+      kill "-$sig" -"$p" 2>/dev/null || true
+    else
+      kill "-$sig" "$p" 2>/dev/null || true
     fi
   done
 }
@@ -444,17 +517,21 @@ start_watchdog() {
       waited=$((waited + 1))
     done
     ps -p "$pid" > /dev/null 2>&1 || exit 0
-    echo "TIMEOUT: script '${orig_names[$s]}' exceeded ${budget}s; sending SIGTERM to process group $pid" >&2
-    dump_hung_process_state "$s" "$pid"
-    kill -SIGTERM -"$pid" 2>/dev/null || true
+    echo "TIMEOUT: script '${orig_names[$s]}' exceeded ${budget}s; sending SIGTERM to process tree of $pid" >&2
+    # Capture the tree before signalling anything: the first kill orphans the
+    # descendants, and an orphan cannot be traced back to this script.
+    local tree
+    tree=$(descendants_of "$pid")
+    dump_hung_process_state "$s" "$pid" "$tree"
+    kill_tree "$pid" SIGTERM "$tree"
     local killwait=0
     while ps -p "$pid" > /dev/null 2>&1 && [[ "$killwait" -lt "$WATCHDOG_KILL_AFTER" ]]; do
       sleep 1
       killwait=$((killwait + 1))
     done
     if ps -p "$pid" > /dev/null 2>&1; then
-      echo "TIMEOUT: script '${orig_names[$s]}' ignored SIGTERM after ${WATCHDOG_KILL_AFTER}s; sending SIGKILL to process group $pid" >&2
-      kill -SIGKILL -"$pid" 2>/dev/null || true
+      echo "TIMEOUT: script '${orig_names[$s]}' ignored SIGTERM after ${WATCHDOG_KILL_AFTER}s; sending SIGKILL to process tree of $pid" >&2
+      kill_tree "$pid" SIGKILL "$tree"
       killwait=0
       while ps -p "$pid" > /dev/null 2>&1 && [[ "$killwait" -lt "$WATCHDOG_KILL_AFTER" ]]; do
         sleep 1
@@ -462,10 +539,16 @@ start_watchdog() {
       done
       if ps -p "$pid" > /dev/null 2>&1; then
         echo "TIMEOUT: script '${orig_names[$s]}' survived SIGKILL; abandoning it so collection can continue" >&2
-        dump_hung_process_state "$s" "$pid"
+        dump_hung_process_state "$s" "$pid" "$tree"
         touch "$script_dir/${s}.abandoned"
       fi
     fi
+    # Anything from the tree that is still alive here ignored SIGKILL, which only
+    # a process blocked in the kernel can do. Report it even when the script's own
+    # shell died: a leaked probe still holding a PMU resource is the most likely
+    # reason the scripts that ran after it also hung.
+    # shellcheck disable=SC2086 # word splitting is intended: tree is a pid list
+    dump_pid_states "survived SIGKILL" $tree
   ) &
   watchdog_pids[$s]=$!
 }
@@ -585,10 +668,13 @@ kill_script() {
   stop_watchdog "$s"
   [[ -z "$pid" ]] && return 0
   if ! ps -p "$pid" > /dev/null 2>&1; then return 0; fi
-  # Signal the process group (negative PID)
+  # Signal the process group and every descendant (see kill_tree: a
+  # 'timeout'-wrapped probe lives in its own group and outlives a group kill).
   # Bash background jobs ignore SIGINT by default, but they do not ignore SIGTERM.
   echo "Sending SIGTERM to script '${orig_names[$s]}' with PID $pid" >&2
-  kill -SIGTERM -"$pid" 2>/dev/null || true
+  local tree
+  tree=$(descendants_of "$pid")
+  kill_tree "$pid" SIGTERM "$tree"
   # Wait for the script to exit gracefully, in 1s intervals.
   # This budget is per-script and cleanup is serial, so it must stay small: the
   # signal handler in perfspect only allows ~20s for the whole controller to exit
@@ -605,7 +691,7 @@ kill_script() {
   # Force kill the process group if still alive
   if ps -p "$pid" > /dev/null 2>&1; then
     echo "Force killing script '${orig_names[$s]}' with PID $pid" >&2
-    kill -SIGKILL -"$pid" 2>/dev/null || true
+    kill_tree "$pid" SIGKILL "$tree"
     # Give SIGKILL a moment to land, then report if it did not. Do not 'wait'
     # here: a process in uninterruptible sleep survives SIGKILL until its kernel
     # call returns, and waiting on it would stall shutdown indefinitely -- past
@@ -613,7 +699,7 @@ kill_script() {
     sleep 1
     if ps -p "$pid" > /dev/null 2>&1; then
       echo "Script '${orig_names[$s]}' with PID $pid survived SIGKILL; abandoning it" >&2
-      dump_hung_process_state "$s" "$pid"
+      dump_hung_process_state "$s" "$pid" "$tree"
     fi
   fi
   echo "Done killing script '${orig_names[$s]}' with PID $pid" >&2

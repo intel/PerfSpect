@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -462,7 +463,7 @@ func TestFormMasterScriptReportsHungScriptDiagnostics(t *testing.T) {
 	}
 	// The per-process state line is the point of the diagnostics: without it there
 	// is no way to distinguish uninterruptible sleep from a slow command.
-	if !regexp.MustCompile(`TIMEOUT DIAG: pid=[0-9]+ state=\S+ wchan=\S+`).MatchString(out) {
+	if !regexp.MustCompile(`TIMEOUT DIAG: in tree pid=[0-9]+ state=\S+ wchan=\S+`).MatchString(out) {
 		t.Errorf("expected per-pid state/wchan lines in output:\n%s", out)
 	}
 }
@@ -530,6 +531,60 @@ func runController(t *testing.T, dir string, scripts []ScriptDefinition, limit t
 	return out
 }
 
+// TestFormMasterScriptReachesProcessOutsideScriptGroup covers what hid the real
+// failure on m6i.16xlarge. Metadata probes run as 'timeout 30 perf stat ...', and
+// timeout puts itself and the command it runs into a NEW process group. A search
+// or a kill scoped to the script's own group therefore sees only the script's
+// shell: the probe that actually hung is invisible, and it survives.
+func TestFormMasterScriptReachesProcessOutsideScriptGroup(t *testing.T) {
+	tmp := t.TempDir()
+	// A distinctive duration makes the leak check below unambiguous; matching on
+	// "sleep" alone would collide with unrelated processes on the machine.
+	const marker = "987654"
+	scripts := []ScriptDefinition{
+		{Name: "timeout wrapped probe", ScriptTemplate: "timeout 600 sleep " + marker, Timeout: 2},
+	}
+	out := runController(t, tmp, scripts, 60*time.Second)
+
+	// The probe must appear in the diagnostics by name, in a different process
+	// group from the script's shell.
+	if !strings.Contains(out, "sleep "+marker) {
+		t.Errorf("diagnostics did not name the process running below timeout, got:\n%s", out)
+	}
+	if matched, _ := regexp.MatchString(`TIMEOUT DIAG: in tree pid=[0-9]+ state=\S+ wchan=\S+ cmd=`, out); !matched {
+		t.Errorf("expected per-pid state lines for the tree, got:\n%s", out)
+	}
+	// And it must be gone. Before kill_tree, a group-scoped kill left this running
+	// and reparented to init.
+	if processCmdlineExists(t, "sleep "+marker) {
+		t.Errorf("process below timeout survived the watchdog kill")
+	}
+}
+
+// processCmdlineExists reports whether any process has needle in its command
+// line. It scans /proc rather than shelling out to pgrep, whose own command line
+// would match the needle and produce a false positive.
+func processCmdlineExists(t *testing.T, needle string) bool {
+	t.Helper()
+	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		t.Fatalf("failed reading /proc: %v", err)
+	}
+	for _, e := range entries {
+		if _, err := strconv.Atoi(e.Name()); err != nil {
+			continue // not a pid directory
+		}
+		raw, err := os.ReadFile(filepath.Join("/proc", e.Name(), "cmdline"))
+		if err != nil {
+			continue // the process exited while we were looking
+		}
+		if strings.Contains(strings.ReplaceAll(string(raw), "\x00", " "), needle) {
+			return true
+		}
+	}
+	return false
+}
+
 func TestControllerTimeout(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -546,18 +601,18 @@ func TestControllerTimeout(t *testing.T) {
 			// Concurrent scripts overlap, so only the largest budget matters.
 			name:    "concurrent scripts take the maximum",
 			scripts: []ScriptDefinition{{Name: "a", Timeout: 30}, {Name: "b", Timeout: 60}},
-			want:    60 + controllerTimeoutMargin,
+			want:    60 + watchdogEscalationSeconds + controllerTimeoutMargin,
 		},
 		{
 			// Sequential scripts run one after another, so their budgets add up.
 			name:    "sequential scripts accumulate",
 			scripts: []ScriptDefinition{{Name: "a", Timeout: 30, Sequential: true}, {Name: "b", Timeout: 45, Sequential: true}},
-			want:    75 + controllerTimeoutMargin,
+			want:    75 + 2*watchdogEscalationSeconds + controllerTimeoutMargin,
 		},
 		{
 			name:    "mixed adds sequential total to concurrent maximum",
 			scripts: []ScriptDefinition{{Name: "a", Timeout: 30, Sequential: true}, {Name: "b", Timeout: 60}, {Name: "c", Timeout: 20}},
-			want:    30 + 60 + controllerTimeoutMargin,
+			want:    30 + 60 + 2*watchdogEscalationSeconds + controllerTimeoutMargin,
 		},
 		{
 			name:    "no scripts means no deadline",
