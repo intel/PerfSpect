@@ -306,7 +306,14 @@ BEGIN {
 // a legitimate reason to run for long. Without a bound, a probe that wedges (e.g.
 // a perf event that hangs the PMU on some virtualized instance types) stalls
 // collection indefinitely, because the controller waits on it forever.
-const metadataScriptTimeout = 60
+//
+// The value sits deliberately between two limits. It must exceed the 'timeout 30'
+// that wraps the perf probes, so that when that inner timeout works the kill is
+// attributed to the probe rather than to this watchdog; and the whole phase --
+// this budget plus the watchdog's escalation plus the controller's own deadline --
+// must finish well inside the time a caller waits for collection to start, or the
+// caller kills perfspect before it can report which probe hung.
+const metadataScriptTimeout = 40
 
 // getMetadataScripts returns the list of scripts to run for metadata collection.
 // It copies the base definitions and applies template replacements, privilege
