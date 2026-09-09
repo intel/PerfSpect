@@ -331,18 +331,11 @@ func CleanupAbandonedController(myTarget target.Target) {
 	}
 }
 
-// logControllerDiagnostics surfaces the controller's own reporting. The controller
-// writes these to stderr, and when continuing on script error it still exits 0, so
-// without this a script that hung or was abandoned would not be logged anywhere.
-func logControllerDiagnostics(stderr string) {
-	for line := range strings.SplitSeq(stderr, "\n") {
-		logControllerDiagnosticLine(line)
-	}
-}
-
-// logControllerDiagnosticLine logs one line of the controller's stderr. It is split
-// out from logControllerDiagnostics so the same classification can be applied to
-// lines as they stream in, before the controller has exited.
+// logControllerDiagnosticLine surfaces one line of the controller's own reporting.
+// The controller writes these to stderr, and when continuing on script error it still
+// exits 0, so without this a script that hung or was abandoned would not be logged
+// anywhere. It classifies a single line rather than a whole stderr buffer because the
+// lines are consumed as they stream in, before the controller has exited.
 func logControllerDiagnosticLine(line string) {
 	switch {
 	case strings.HasPrefix(line, "TIMEOUT DIAG:"):
