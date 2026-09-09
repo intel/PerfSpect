@@ -38,6 +38,16 @@ func (t *LocalTarget) RunCommandEx(cmd *exec.Cmd, timeout int, newProcessGroup b
 	return runLocalCommandWithInputWithTimeout(cmd, input, timeout, newProcessGroup)
 }
 
+// RunCommandExLive is RunCommandEx with stderr additionally written to liveStderr as
+// it arrives, so a caller can observe a command's progress reports before it exits.
+func (t *LocalTarget) RunCommandExLive(cmd *exec.Cmd, timeout int, newProcessGroup bool, remoteReuseSSHConnection bool, liveStderr io.Writer) (stdout string, stderr string, exitCode int, err error) {
+	input := ""
+	if t.sudo != "" && len(cmd.Args) > 2 && cmd.Args[0] == "sudo" && strings.HasPrefix(cmd.Args[1], "-") && strings.Contains(cmd.Args[1], "S") { // 'sudo -S' gets password from stdin
+		input = t.sudo + "\n"
+	}
+	return runLocalCommandWithInputWithTimeoutLive(cmd, input, timeout, newProcessGroup, liveStderr)
+}
+
 // RunCommandStream runs the given command asynchronously on the target.
 // It sends the command to the cmdChannel and executes it with a timeout.
 // The output from the command is sent to the stdoutChannel and stderrChannel,

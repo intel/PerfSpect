@@ -5,6 +5,7 @@
 package script
 
 import (
+	"bytes"
 	"embed"
 	"fmt"
 	"log/slog"
@@ -162,14 +163,17 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, continueOnSc
 	// its child processes.
 	newProcessGroup := true
 	reuseSSHConnection := false // don't reuse ssh connection on long-running commands, makes it difficult to kill the command
-	stdout, stderr, exitcode, err := myTarget.RunCommandEx(cmd, timeout, newProcessGroup, reuseSSHConnection)
+	// Stream the controller's stderr rather than only reading it at the end. Its
+	// SCRIPT START/RESULT reports exist to name the script that hung, and a hung
+	// controller does not return, so parsing them only after it exits means they are
+	// missing from precisely the runs that need them.
+	progress := &controllerProgressLogger{}
+	stdout, stderr, exitcode, err := myTarget.RunCommandExLive(cmd, timeout, newProcessGroup, reuseSSHConnection, progress)
+	progress.flush()
 	if err != nil {
 		slog.Error("failed to execute controller script on target", slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitcode", exitcode), slog.String("error", err.Error()))
 		return nil, err
 	}
-	// Report what the controller told us before deciding whether its exit code is
-	// fatal, so a diagnosis is available even on the failure paths below.
-	logControllerDiagnostics(stderr)
 	// A negative exit code means the process was signalled rather than exiting on
 	// its own, which for a bounded run means our deadline killed it. Say so
 	// explicitly: the alternative is an unexplained failure that looks identical to
@@ -332,19 +336,67 @@ func CleanupAbandonedController(myTarget target.Target) {
 // without this a script that hung or was abandoned would not be logged anywhere.
 func logControllerDiagnostics(stderr string) {
 	for line := range strings.SplitSeq(stderr, "\n") {
-		switch {
-		case strings.HasPrefix(line, "TIMEOUT DIAG:"):
-			// Process state and kernel stack of a script that would not die.
-			slog.Warn("hung script diagnostics", slog.String("detail", strings.TrimPrefix(line, "TIMEOUT DIAG: ")))
-		case strings.HasPrefix(line, "TIMEOUT:"):
-			slog.Warn("script exceeded its timeout", slog.String("detail", strings.TrimPrefix(line, "TIMEOUT: ")))
-		case strings.Contains(line, "ABANDONED"):
-			slog.Warn("script could not be stopped and was abandoned", slog.String("detail", strings.TrimPrefix(line, "SCRIPT RESULT: ")))
-		case strings.HasPrefix(line, "SCRIPT RESULT:"):
-			slog.Debug("script result", slog.String("detail", strings.TrimPrefix(line, "SCRIPT RESULT: ")))
-		case strings.HasPrefix(line, "SCRIPT START:"):
-			slog.Debug("script started", slog.String("detail", strings.TrimPrefix(line, "SCRIPT START: ")))
+		logControllerDiagnosticLine(line)
+	}
+}
+
+// logControllerDiagnosticLine logs one line of the controller's stderr. It is split
+// out from logControllerDiagnostics so the same classification can be applied to
+// lines as they stream in, before the controller has exited.
+func logControllerDiagnosticLine(line string) {
+	switch {
+	case strings.HasPrefix(line, "TIMEOUT DIAG:"):
+		// Process state and kernel stack of a script that would not die.
+		slog.Warn("hung script diagnostics", slog.String("detail", strings.TrimPrefix(line, "TIMEOUT DIAG: ")))
+	case strings.HasPrefix(line, "TIMEOUT:"):
+		slog.Warn("script exceeded its timeout", slog.String("detail", strings.TrimPrefix(line, "TIMEOUT: ")))
+	case strings.Contains(line, "ABANDONED"):
+		slog.Warn("script could not be stopped and was abandoned", slog.String("detail", strings.TrimPrefix(line, "SCRIPT RESULT: ")))
+	case strings.HasPrefix(line, "SCRIPT RESULT:"):
+		slog.Debug("script result", slog.String("detail", strings.TrimPrefix(line, "SCRIPT RESULT: ")))
+	case strings.HasPrefix(line, "SCRIPT START:"):
+		slog.Debug("script started", slog.String("detail", strings.TrimPrefix(line, "SCRIPT START: ")))
+	}
+}
+
+// controllerProgressLogger logs the controller's progress reports as they arrive on
+// its stderr. Without it those reports are parsed only after the controller exits,
+// so a run that hangs -- the case they exist to explain -- produces none of them:
+// the log simply stops after "running controller script" and never names the script
+// that stalled. Writing them out as they stream means a stall identifies itself
+// while it is still stalled, from the local side, without needing the target to
+// answer anything.
+type controllerProgressLogger struct {
+	partial []byte
+}
+
+// maxControllerProgressLine bounds how much unterminated output is buffered, so
+// stderr without newlines cannot grow this without limit.
+const maxControllerProgressLine = 64 * 1024
+
+func (l *controllerProgressLogger) Write(p []byte) (int, error) {
+	l.partial = append(l.partial, p...)
+	for {
+		i := bytes.IndexByte(l.partial, '\n')
+		if i < 0 {
+			break
 		}
+		logControllerDiagnosticLine(string(l.partial[:i]))
+		l.partial = l.partial[i+1:]
+	}
+	if len(l.partial) > maxControllerProgressLine {
+		logControllerDiagnosticLine(string(l.partial))
+		l.partial = nil
+	}
+	return len(p), nil
+}
+
+// flush logs a final report that arrived without a trailing newline, which is what
+// a controller killed mid-write leaves behind.
+func (l *controllerProgressLogger) flush() {
+	if len(l.partial) > 0 {
+		logControllerDiagnosticLine(string(l.partial))
+		l.partial = nil
 	}
 }
 

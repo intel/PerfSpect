@@ -7,6 +7,7 @@ Package target provides a way to interact with local and remote systems.
 package target
 
 import (
+	"io"
 	"os"
 	"os/exec"
 )
@@ -79,6 +80,13 @@ type Target interface {
 	// - remoteReuseSSHConnection: whether to reuse the SSH connection for the command (only relevant for RemoteTarget)
 	// It returns the standard output, standard error, exit code, and any error that occurred.
 	RunCommandEx(cmd *exec.Cmd, timeout int, newProcessGroup bool, remoteReuseSSHConnection bool) (stdout string, stderr string, exitCode int, err error)
+
+	// RunCommandExLive is RunCommandEx with one addition: liveStderr, if non-nil,
+	// receives the command's standard error as it is produced instead of only after
+	// the command returns. Use it for commands that report their own progress on
+	// stderr and may hang: a hung command never returns, so its reports are
+	// otherwise unavailable at the one time they matter.
+	RunCommandExLive(cmd *exec.Cmd, timeout int, newProcessGroup bool, remoteReuseSSHConnection bool, liveStderr io.Writer) (stdout string, stderr string, exitCode int, err error)
 
 	// RunCommandStream runs the specified command on the target and streams the output to the provided channels.
 	// Arguments:
