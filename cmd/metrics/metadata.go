@@ -275,19 +275,28 @@ fi
 		Vendors:        []string{cpus.AMDVendor},
 		Depends:        []string{"perf"},
 	},
+	// The three probes below ask for one more copy of an event than there are general
+	// purpose counters, so the group fits only if one copy can be placed on a fixed
+	// counter. That deliberate over-subscription makes the kernel's counter assignment
+	// search do real work, and it is scoped to a single CPU rather than system-wide
+	// (-a) because of it: on a virtualized guest with an emulated PMU, running the
+	// same over-subscribed group on every CPU at once has been observed to wedge the
+	// whole machine past the point where even SIGKILL reaches perf. One CPU answers
+	// the question just as well -- see getSupportsFixedEvent, which reads only the
+	// exit code, "<not counted>"/"<not supported" and a zero count.
 	{
 		Name:           scriptPerfStatFixedInstr,
-		ScriptTemplate: "timeout --kill-after=5 30 perf stat -a -e '{{{.InstructionsList}}}' sleep 1",
+		ScriptTemplate: "timeout --kill-after=5 30 perf stat -C 0 -e '{{{.InstructionsList}}}' sleep 1",
 		Depends:        []string{"perf"},
 	},
 	{
 		Name:           scriptPerfStatFixedCycles,
-		ScriptTemplate: "timeout --kill-after=5 30 perf stat -a -e '{{{.CpuCyclesList}}}' sleep 1",
+		ScriptTemplate: "timeout --kill-after=5 30 perf stat -C 0 -e '{{{.CpuCyclesList}}}' sleep 1",
 		Depends:        []string{"perf"},
 	},
 	{
 		Name:           scriptPerfStatFixedRefCycles,
-		ScriptTemplate: "timeout --kill-after=5 30 perf stat -a -e '{{{.RefCyclesList}}}' sleep 1",
+		ScriptTemplate: "timeout --kill-after=5 30 perf stat -C 0 -e '{{{.RefCyclesList}}}' sleep 1",
 		Depends:        []string{"perf"},
 	},
 	{
