@@ -52,7 +52,95 @@ const (
 	scriptARMSlots               = "arm slots"
 	scriptARMCPUID               = "arm cpuid"
 	scriptPerfStatAMDUncoreProbe = "perf stat amd uncore probe"
+	scriptPMUEnumerationSafety   = "pmu enumeration safety"
 )
+
+// Some virtualized guests are given a PMU that advertises a fixed counter the kernel
+// cannot use, and enumerating events on one faults the kernel outright. Observed on AWS
+// m6i.16xlarge (Ice Lake guest, kernel 6.14.0-1015-aws): the guest reports 4
+// fixed-purpose counters, which includes counter 3, TOPDOWN.SLOTS, while lacking
+// GLOBAL_CTRL_EN_PERF_METRICS -- so opening an event that lands on that counter gives
+//
+//	Oops: general protection fault, maybe for address 0x1
+//	x86_perf_event_update+0x48 <- intel_pmu_set_period <- x86_pmu_start
+//	  <- x86_pmu_enable <- __perf_event_enable <- _perf_ioctl
+//
+// The faulting task then dies inside x86_pmu_enable still holding perf's context lock
+// and parks in D state in perf_event_release_kernel, after which every perf_event_open
+// on the machine blocks in account_event/perf_event_alloc, in D state, ignoring SIGKILL.
+// RCU stalls and soft lockups follow and the instance leaves the network. No shell-level
+// timeout can contain that: a D-state task does not take signals.
+//
+// 'perf list' reaches the fault because it calls perf_event_open per candidate event to
+// test support, so it is metadata collection -- not metric collection -- that takes the
+// machine down. This probe decides whether that is a risk here, and it reads only dmesg
+// and sysfs: it opens no perf events, so it is safe on every target.
+//
+// The predicate is the incoherence itself, not a model or instance-type list: 4 or more
+// fixed-purpose counters advertised while the kernel exposes no slots/topdown event.
+// Every comparable cell is coherent one way or the other and is left alone -- bare-metal
+// Ice Lake exposes slots and passes, m7i.24xlarge advertises 2 fixed counters, and
+// m5.24xlarge is Skylake with no slots counter to advertise.
+var pmuEnumerationSafetyScript = script.ScriptDefinition{
+	Name: scriptPMUEnumerationSafety,
+	ScriptTemplate: `fixed=$(dmesg 2>/dev/null | grep -oE 'fixed-purpose events:[[:space:]]*[0-9]+' | grep -oE '[0-9]+$' | tail -1)
+slots=no
+# Unmatched globs stay literal here, and [[ -e ]] on a literal is false, so a machine
+# with no such event correctly reports "no" rather than matching the pattern itself.
+for event in /sys/bus/event_source/devices/cpu*/events/slots \
+	/sys/bus/event_source/devices/cpu*/events/topdown-*; do
+	[[ -e "$event" ]] && slots=yes
+done
+echo "fixed_purpose_counters=${fixed:-unknown}"
+echo "slots_event_exposed=$slots"
+`,
+	Architectures: []string{cpus.X86Architecture},
+}
+
+// Event enumeration from sysfs, for targets where asking perf to do it would fault the
+// kernel (see pmuEnumerationSafetyScript). Reading sysfs opens no events, so it cannot
+// fault, and it has a second property that matters more than being safe: sysfs is the
+// kernel's own list of events it will accept. Anything absent from it -- including the
+// topdown events at the root of the fault -- is then dropped from the metric definitions
+// by the existing IsCollectable checks, so metric collection cannot walk into the fault
+// later either. The event set is narrower than 'perf list' would report, which is the
+// price of collecting anything at all on such a target.
+//
+// Output must match the shape 'perf list --json' is parsed into: one event name per
+// line, core events bare and the rest as perf spells them, "pmu/event/".
+const sysfsEventEnumerationPreamble = `# See pmuEnumerationSafetyScript in cmd/metrics/metadata.go for why this reads sysfs
+# rather than asking perf to enumerate events.
+for events_dir in /sys/bus/event_source/devices/*/events; do
+	[[ -d "$events_dir" ]] || continue
+	pmu=${events_dir%/events}
+	pmu=${pmu##*/}
+	for event_path in "$events_dir"/*; do
+		[[ -f "$event_path" ]] || continue
+		event=${event_path##*/}
+		# Sibling metadata files, not events in their own right.
+		case "$event" in
+		*.scale | *.unit | *.snapshot | *.per-pkg) continue ;;
+		esac
+`
+
+// Hardware events plus cstate and power events: the same selection the awk filter makes
+// from 'perf list --json' output.
+const sysfsSupportedEventsScript = sysfsEventEnumerationPreamble + `		case "$pmu" in
+		cpu | cpu_core | cpu_atom) echo "$event" ;;
+		cstate_core | cstate_pkg | power) echo "$pmu/$event/" ;;
+		esac
+	done
+done
+`
+
+// Every event the kernel publishes, from every PMU, unfiltered.
+const sysfsAllSupportedEventsScript = sysfsEventEnumerationPreamble + `		case "$pmu" in
+		cpu | cpu_core | cpu_atom) echo "$event" ;;
+		*) echo "$pmu/$event/" ;;
+		esac
+	done
+done
+`
 
 // CommonMetadata -- common to all architectures
 type CommonMetadata struct {
@@ -302,13 +390,29 @@ BEGIN {
 
 // getMetadataScripts returns the list of scripts to run for metadata collection.
 // It copies the base definitions and applies template replacements and privilege settings.
-func getMetadataScripts(noRoot bool, noSystemSummary bool, numGPCounters int) ([]script.ScriptDefinition, error) {
+//
+// enumerateEventsFromSysfs replaces the two 'perf list --json' scripts with sysfs reads,
+// for targets where letting perf enumerate events would fault the kernel. Both are
+// replaced: they run in the same concurrent batch, so leaving either one is enough to
+// take the machine down. See pmuEnumerationSafetyScript.
+func getMetadataScripts(noRoot bool, noSystemSummary bool, numGPCounters int, enumerateEventsFromSysfs bool) ([]script.ScriptDefinition, error) {
 	metadataScripts := make([]script.ScriptDefinition, 0, len(baseMetadataScripts))
 
 	// Copy base scripts and apply settings
 	for _, baseDef := range baseMetadataScripts {
 		scriptDef := baseDef
 		scriptDef.Superuser = !noRoot
+
+		if enumerateEventsFromSysfs {
+			switch scriptDef.Name {
+			case scriptPerfSupportedEvents:
+				scriptDef.ScriptTemplate = sysfsSupportedEventsScript
+				scriptDef.Depends = nil // sysfs enumeration does not need perf
+			case scriptPerfAllSupportedEvents:
+				scriptDef.ScriptTemplate = sysfsAllSupportedEventsScript
+				scriptDef.Depends = nil
+			}
+		}
 
 		// Apply template replacements for fixed counter scripts
 		switch scriptDef.Name {
@@ -344,6 +448,61 @@ func getMetadataScripts(noRoot bool, noSystemSummary bool, numGPCounters int) ([
 	}
 
 	return metadataScripts, nil
+}
+
+// perfEnumerationFaultsKernel reports whether asking perf to enumerate events on this
+// target can be expected to fault the kernel, and if so a reason worth logging. It must
+// be called before the metadata scripts run, because the command that faults is one of
+// them. See pmuEnumerationSafetyScript for the fault itself.
+//
+// Fails open. When the answer cannot be established -- the probe did not run, dmesg is
+// restricted, the fields are missing -- this reports false and the caller keeps perf
+// enumeration, because wrongly reporting true would narrow a healthy target's event set
+// for no reason. The cost of failing open is that a target with restricted dmesg and this
+// specific broken PMU is still exposed, which is the narrower of the two risks.
+func perfEnumerationFaultsKernel(t target.Target, localTempDir string, noRoot bool) (bool, string) {
+	scriptDef := pmuEnumerationSafetyScript
+	scriptDef.Superuser = !noRoot
+	scriptOutput, err := script.RunScript(t, scriptDef, localTempDir)
+	if err != nil {
+		slog.Debug("could not check whether perf event enumeration is safe; assuming it is",
+			slog.String("error", err.Error()))
+		return false, ""
+	}
+	return perfEnumerationFaultsKernelFromOutput(scriptOutput.Stdout)
+}
+
+// perfEnumerationFaultsKernelFromOutput holds the decision itself, separately from
+// running the probe, so it can be tested against the capability data from real targets.
+func perfEnumerationFaultsKernelFromOutput(stdout string) (bool, string) {
+	var fixedCounters, slotsExposed string
+	for _, line := range strings.Split(stdout, "\n") {
+		key, value, found := strings.Cut(strings.TrimSpace(line), "=")
+		if !found {
+			continue
+		}
+		switch key {
+		case "fixed_purpose_counters":
+			fixedCounters = value
+		case "slots_event_exposed":
+			slotsExposed = value
+		}
+	}
+	numFixedCounters, err := strconv.Atoi(fixedCounters)
+	if err != nil {
+		slog.Debug("PMU fixed counter count unavailable; assuming perf event enumeration is safe",
+			slog.String("fixed_purpose_counters", fixedCounters))
+		return false, ""
+	}
+	// Counter 3 is TOPDOWN.SLOTS, so a count of 4 or more advertises it. The kernel
+	// exposing no slots or topdown event means it knows the counter is unusable here --
+	// while perf will still happily program it from its own event tables.
+	if numFixedCounters >= 4 && slotsExposed == "no" {
+		return true, fmt.Sprintf("PMU advertises %d fixed-purpose counters, including TOPDOWN.SLOTS, "+
+			"but the kernel exposes no slots or topdown event; enumerating events with perf would fault the kernel",
+			numFixedCounters)
+	}
+	return false, ""
 }
 
 // String provides a string representation of the Metadata structure.
