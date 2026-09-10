@@ -5,6 +5,7 @@
 package script
 
 import (
+	"bytes"
 	"embed"
 	"fmt"
 	"log/slog"
@@ -24,6 +25,29 @@ import (
 var Resources embed.FS
 
 const ControllerPIDFileName = "controller.pid"
+
+// descendantsOfShellFunc defines a shell function that prints a pid followed by
+// all of its descendants. A process-group filter is not sufficient: 'timeout'
+// puts itself and the command it runs into a new process group, so a probe run as
+// 'timeout 30 perf stat ...' is invisible to a PGID-based search and survives a
+// kill aimed at the script's group. It is shared by the controller script and by
+// the cleanup we run after abandoning a controller.
+const descendantsOfShellFunc = `descendants_of() {
+  local root="$1" snapshot frontier next depth=0
+  snapshot=$(ps -eo pid,ppid 2>/dev/null || true)
+  frontier="$root"
+  # The depth cap is a safety net only; a process tree cannot be deeper than this
+  # in practice, and without it a malformed snapshot could loop forever.
+  while [[ -n "$frontier" && "$depth" -lt 32 ]]; do
+    echo "$frontier"
+    next=$(awk -v parents="$frontier" '
+      BEGIN { n = split(parents, a, " "); for (i = 1; i <= n; i++) if (a[i] != "") P[a[i]] = 1 }
+      NR > 1 && ($2 in P) { printf "%s ", $1 }
+    ' <<< "$snapshot")
+    frontier="$next"
+    depth=$((depth + 1))
+  done
+}`
 
 type ScriptOutput struct {
 	ScriptDefinition
@@ -124,17 +148,45 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, continueOnSc
 	} else {
 		cmd = exec.Command("bash", path.Join(myTarget.GetTempDirectory(), controllerScriptName)) // #nosec G204
 	}
-	timeout := 0 // no timeout
+	// Bound the controller itself when every script is bounded. The per-script
+	// watchdogs normally end a hang, but they run on the target: if the target
+	// wedges hard enough, or the connection carrying the controller stops
+	// delivering, nothing comes back at all. A deadline here guarantees we regain
+	// control and can report the partial output and diagnostics collected so far.
+	// Scripts with no timeout (e.g. indefinite-duration collection) keep the
+	// controller unbounded, as before.
+	timeout := controllerTimeout(append(concurrentScripts, sequentialScripts...))
+	slog.Debug("running controller script", slog.String("target", myTarget.GetName()), slog.Int("timeout", timeout), slog.Int("scripts", len(concurrentScripts)+len(sequentialScripts)))
 	// We run controller in a new process group so that tty/terminal signals, e.g., Ctrl-C, are not sent to the command. This is
 	// necessary to allow the controller script to handle signals itself and propagate them to all child scripts as needed. The
 	// signal handler in perfspect will send the signal to the controller.sh script on each target so that it can clean up
 	// its child processes.
 	newProcessGroup := true
 	reuseSSHConnection := false // don't reuse ssh connection on long-running commands, makes it difficult to kill the command
-	stdout, stderr, exitcode, err := myTarget.RunCommandEx(cmd, timeout, newProcessGroup, reuseSSHConnection)
+	// Stream the controller's stderr rather than only reading it at the end. Its
+	// SCRIPT START/RESULT reports exist to name the script that hung, and a hung
+	// controller does not return, so parsing them only after it exits means they are
+	// missing from precisely the runs that need them.
+	progress := &controllerProgressLogger{}
+	stdout, stderr, exitcode, err := myTarget.RunCommandExLive(cmd, timeout, newProcessGroup, reuseSSHConnection, progress)
+	progress.flush()
 	if err != nil {
 		slog.Error("failed to execute controller script on target", slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitcode", exitcode), slog.String("error", err.Error()))
 		return nil, err
+	}
+	// A negative exit code means the process was signalled rather than exiting on
+	// its own, which for a bounded run means our deadline killed it. Say so
+	// explicitly: the alternative is an unexplained failure that looks identical to
+	// a crash. The SCRIPT START lines above name the scripts that never finished.
+	if exitcode < 0 && timeout > 0 {
+		slog.Error("controller script did not finish within its deadline and was terminated",
+			slog.String("target", myTarget.GetName()), slog.Int("deadlineSeconds", timeout))
+		// Killing our end of the connection does not stop anything on the target: the
+		// controller and its probes keep running there, unattached and unbounded. On a
+		// shared or repeatedly tested machine those leftovers accumulate and contend
+		// for the resource the next run's probes need, so one hang turns into a run of
+		// them. Reap them before returning.
+		CleanupAbandonedController(myTarget)
 	}
 	if exitcode != 0 {
 		// If the controller was interrupted (e.g., by SIGINT) but still produced output,
@@ -145,7 +197,11 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, continueOnSc
 			slog.Warn("controller script returned non-zero exit code, but output is available and will be processed", slog.Int("exitcode", exitcode), slog.String("stderr", stderr))
 		} else {
 			slog.Error("controller script returned non-zero exit code", slog.String("stdout", stdout), slog.String("stderr", stderr), slog.Int("exitcode", exitcode))
-			return nil, fmt.Errorf("controller script returned exit code %d", exitcode)
+			// Include stderr in the error itself. It carries the reason -- an ssh
+			// transport failure (exit 255) is otherwise indistinguishable from a
+			// failure in the scripts, and the distinction is not recoverable from
+			// the exit code alone.
+			return nil, fmt.Errorf("controller script returned exit code %d: %s", exitcode, lastLines(stderr, 5))
 		}
 	}
 	// parse output of controller script
@@ -161,6 +217,198 @@ func RunScripts(myTarget target.Target, scripts []ScriptDefinition, continueOnSc
 		}
 	}
 	return scriptOutputs, nil
+}
+
+// controllerTimeoutMargin is added to the sum of the script timeouts to allow for
+// the controller's own setup and for reporting results back.
+const controllerTimeoutMargin = 60
+
+// watchdogEscalationSeconds is how much longer than its own budget a hung script
+// can occupy the controller: the watchdog waits WATCHDOG_KILL_AFTER seconds after
+// SIGTERM, the same again after SIGKILL, plus its 1-second polling granularity.
+// A deadline that omits this is guaranteed to fire during the escalation of a
+// hang -- exactly when the controller is producing the diagnosis of it -- and
+// killing the controller discards all of its output, because results are printed
+// only once every script has finished.
+const watchdogEscalationSeconds = 12
+
+// controllerTimeout returns a deadline in seconds for the whole controller run,
+// or 0 for no deadline. A deadline is only imposed when every script is itself
+// bounded: a single unbounded script (indefinite-duration collection) means the
+// controller legitimately has no upper bound.
+//
+// Sequential scripts run one after another, so their budgets add up, whereas
+// concurrent scripts overlap and only the largest matters. Each phase gets the
+// watchdog escalation allowance on top, since a script that hangs holds the
+// controller for its budget plus the time taken to force it out.
+func controllerTimeout(scripts []ScriptDefinition) int {
+	sequentialTotal := 0
+	maxConcurrent := 0
+	for _, s := range scripts {
+		if s.Timeout <= 0 {
+			return 0
+		}
+		if s.Sequential {
+			sequentialTotal += s.Timeout + watchdogEscalationSeconds
+		} else if s.Timeout > maxConcurrent {
+			maxConcurrent = s.Timeout
+		}
+	}
+	if maxConcurrent > 0 {
+		maxConcurrent += watchdogEscalationSeconds
+	}
+	return sequentialTotal + maxConcurrent + controllerTimeoutMargin
+}
+
+// cleanupTemplate kills a controller left running on a target, along with every
+// process below it, and reports anything that survives. Killing the local end of
+// the connection has no effect on the target, so without this a probe that
+// outlived its watchdog keeps running there indefinitely.
+const cleanupTemplate = `
+%s
+pidfile="%s"
+[ -r "$pidfile" ] || exit 0
+root=$(cat "$pidfile" 2>/dev/null || true)
+# Refuse anything that is not a plain pid: this string comes from a file, and it
+# is about to be handed to kill.
+case "$root" in ''|*[!0-9]*) exit 0 ;; esac
+ps -p "$root" > /dev/null 2>&1 || { rm -f "$pidfile"; exit 0; }
+# Capture the tree before signalling: the first kill orphans the descendants and
+# they can no longer be traced back to the controller.
+tree=$(descendants_of "$root")
+echo "cleaning up abandoned controller pid=$root"
+for p in $tree; do
+  cmd=$(tr '\0' ' ' < "/proc/$p/cmdline" 2>/dev/null || true)
+  [ -n "$cmd" ] && echo "  killing pid=$p cmd=$cmd"
+done
+# shellcheck disable=SC2086 # word splitting is intended: tree is a pid list
+kill -SIGKILL $tree 2>/dev/null || true
+sleep 1
+for p in $tree; do
+  if ps -p "$p" > /dev/null 2>&1; then
+    echo "  SURVIVED SIGKILL pid=$p state=$(ps -o stat= -p "$p" 2>/dev/null | tr -d ' ')" >&2
+  fi
+done
+rm -f "$pidfile"
+`
+
+// CleanupAbandonedController kills the controller script and its descendants on a
+// target after we have stopped waiting for them. It is best-effort: it reports
+// failures rather than returning them, because every caller is already on an error
+// path and cleanup failing must not mask the original problem.
+func CleanupAbandonedController(myTarget target.Target) {
+	pidFile := path.Join(myTarget.GetTempDirectory(), ControllerPIDFileName)
+	cleanupScript := fmt.Sprintf(cleanupTemplate, descendantsOfShellFunc, pidFile)
+	var cmd *exec.Cmd
+	if !myTarget.IsSuperUser() && myTarget.CanElevatePrivileges() {
+		// The controller runs under sudo, so its children are root-owned.
+		cmd = exec.Command("sudo", "bash", "-c", cleanupScript) // #nosec G204
+	} else {
+		cmd = exec.Command("bash", "-c", cleanupScript) // #nosec G204
+	}
+	stdout, stderr, exitcode, err := myTarget.RunCommandEx(cmd, 30, false, true)
+	if err != nil {
+		slog.Error("failed to clean up abandoned controller on target",
+			slog.String("target", myTarget.GetName()), slog.String("error", err.Error()))
+		return
+	}
+	for _, line := range strings.Split(strings.TrimSpace(stdout), "\n") {
+		if line != "" {
+			slog.Warn("abandoned controller cleanup", slog.String("target", myTarget.GetName()), slog.String("detail", strings.TrimSpace(line)))
+		}
+	}
+	// A process that survives SIGKILL is blocked in the kernel and cannot be reaped
+	// from user space at all; it needs to be reported, not retried.
+	for _, line := range strings.Split(strings.TrimSpace(stderr), "\n") {
+		if strings.Contains(line, "SURVIVED SIGKILL") {
+			slog.Error("process on target survived SIGKILL and could not be reaped",
+				slog.String("target", myTarget.GetName()), slog.String("detail", strings.TrimSpace(line)))
+		}
+	}
+	if exitcode != 0 {
+		slog.Warn("abandoned controller cleanup returned non-zero exit code",
+			slog.String("target", myTarget.GetName()), slog.Int("exitcode", exitcode), slog.String("stderr", stderr))
+	}
+}
+
+// logControllerDiagnosticLine surfaces one line of the controller's own reporting.
+// The controller writes these to stderr, and when continuing on script error it still
+// exits 0, so without this a script that hung or was abandoned would not be logged
+// anywhere. It classifies a single line rather than a whole stderr buffer because the
+// lines are consumed as they stream in, before the controller has exited.
+func logControllerDiagnosticLine(line string) {
+	switch {
+	case strings.HasPrefix(line, "TIMEOUT DIAG:"):
+		// Process state and kernel stack of a script that would not die.
+		slog.Warn("hung script diagnostics", slog.String("detail", strings.TrimPrefix(line, "TIMEOUT DIAG: ")))
+	case strings.HasPrefix(line, "TIMEOUT:"):
+		slog.Warn("script exceeded its timeout", slog.String("detail", strings.TrimPrefix(line, "TIMEOUT: ")))
+	case strings.Contains(line, "ABANDONED"):
+		slog.Warn("script could not be stopped and was abandoned", slog.String("detail", strings.TrimPrefix(line, "SCRIPT RESULT: ")))
+	case strings.HasPrefix(line, "SCRIPT RESULT:"):
+		slog.Debug("script result", slog.String("detail", strings.TrimPrefix(line, "SCRIPT RESULT: ")))
+	case strings.HasPrefix(line, "SCRIPT START:"):
+		slog.Debug("script started", slog.String("detail", strings.TrimPrefix(line, "SCRIPT START: ")))
+	}
+}
+
+// controllerProgressLogger logs the controller's progress reports as they arrive on
+// its stderr. Without it those reports are parsed only after the controller exits,
+// so a run that hangs -- the case they exist to explain -- produces none of them:
+// the log simply stops after "running controller script" and never names the script
+// that stalled. Writing them out as they stream means a stall identifies itself
+// while it is still stalled, from the local side, without needing the target to
+// answer anything.
+type controllerProgressLogger struct {
+	partial []byte
+}
+
+// maxControllerProgressLine bounds how much unterminated output is buffered, so
+// stderr without newlines cannot grow this without limit.
+const maxControllerProgressLine = 64 * 1024
+
+func (l *controllerProgressLogger) Write(p []byte) (int, error) {
+	l.partial = append(l.partial, p...)
+	for {
+		i := bytes.IndexByte(l.partial, '\n')
+		if i < 0 {
+			break
+		}
+		logControllerDiagnosticLine(string(l.partial[:i]))
+		l.partial = l.partial[i+1:]
+	}
+	if len(l.partial) > maxControllerProgressLine {
+		logControllerDiagnosticLine(string(l.partial))
+		l.partial = nil
+	}
+	return len(p), nil
+}
+
+// flush logs a final report that arrived without a trailing newline, which is what
+// a controller killed mid-write leaves behind.
+func (l *controllerProgressLogger) flush() {
+	if len(l.partial) > 0 {
+		logControllerDiagnosticLine(string(l.partial))
+		l.partial = nil
+	}
+}
+
+// lastLines returns up to n trailing non-empty lines of s, joined by "; ", for
+// embedding in an error message.
+func lastLines(s string, n int) string {
+	var lines []string
+	for line := range strings.SplitSeq(s, "\n") {
+		if strings.TrimSpace(line) != "" {
+			lines = append(lines, strings.TrimSpace(line))
+		}
+	}
+	if len(lines) == 0 {
+		return "(no stderr)"
+	}
+	if len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+	return strings.Join(lines, "; ")
 }
 
 // RunScriptStream runs a script on the specified target and streams the output to the specified channels.
@@ -220,15 +468,18 @@ func formControllerScript(targetTempDirectory string, concurrentScripts []Script
 	// template that renders the shell controller script.
 	// Primarily carries the sanitized script name used for filenames and
 	// template keys (e.g., ${s}.sh, ${s}.stdout, pids[$s]), while the original
-	// Name is kept for readable summary output.
+	// Name is kept for readable summary output. Timeout is the script's
+	// watchdog budget in seconds; 0 means the script may run indefinitely.
 	type tplScript struct {
 		Name      string
 		Sanitized string
+		Timeout   int
 	}
 	// tplData holds all data passed into the controller script template.
 	tplData := struct {
 		TargetTempDir         string
 		ControllerPIDFile     string
+		DescendantsFunc       string
 		ConcurrentScripts     []tplScript
 		SequentialScripts     []tplScript
 		ContinueOnScriptError bool
@@ -236,6 +487,7 @@ func formControllerScript(targetTempDirectory string, concurrentScripts []Script
 	// populate tplData
 	tplData.TargetTempDir = targetTempDirectory
 	tplData.ControllerPIDFile = ControllerPIDFileName
+	tplData.DescendantsFunc = descendantsOfShellFunc
 	tplData.ContinueOnScriptError = continueOnScriptError
 	needsElevated := false
 	for _, s := range concurrentScripts {
@@ -243,7 +495,7 @@ func formControllerScript(targetTempDirectory string, concurrentScripts []Script
 			needsElevated = true
 		}
 		tplData.ConcurrentScripts = append(tplData.ConcurrentScripts, tplScript{
-			Name: s.Name, Sanitized: sanitizeScriptName(s.Name),
+			Name: s.Name, Sanitized: sanitizeScriptName(s.Name), Timeout: s.Timeout,
 		})
 	}
 	for _, s := range sequentialScripts {
@@ -251,7 +503,7 @@ func formControllerScript(targetTempDirectory string, concurrentScripts []Script
 			needsElevated = true
 		}
 		tplData.SequentialScripts = append(tplData.SequentialScripts, tplScript{
-			Name: s.Name, Sanitized: sanitizeScriptName(s.Name),
+			Name: s.Name, Sanitized: sanitizeScriptName(s.Name), Timeout: s.Timeout,
 		})
 	}
 	// define controller script template
@@ -270,8 +522,13 @@ declare -a sequential_scripts=()
 declare -A pids=()
 declare -A exitcodes=()
 declare -A orig_names=()
+declare -A timeouts=()
+declare -A watchdog_pids=()
+declare -A start_times=()
 current_seq_pid=""
 current_seq_script=""
+# set by wait_for_script: 1 when we stopped waiting on an unkillable script
+last_wait_abandoned=0
 
 continue_on_script_error={{if .ContinueOnScriptError}}1{{else}}0{{end}}
 
@@ -287,16 +544,215 @@ ensure_trailing_newline() {
 {{- range .ConcurrentScripts}}
 concurrent_scripts+=({{ .Sanitized }})
 orig_names[{{ .Sanitized }}]="{{ .Name }}"
+timeouts[{{ .Sanitized }}]={{ .Timeout }}
 {{ end }}
 {{- range .SequentialScripts}}
 sequential_scripts+=({{ .Sanitized }})
 orig_names[{{ .Sanitized }}]="{{ .Name }}"
+timeouts[{{ .Sanitized }}]={{ .Timeout }}
 {{ end }}
+
+# Grace period between the watchdog's SIGTERM and its follow-up SIGKILL.
+readonly WATCHDOG_KILL_AFTER=5
+
+# Grace period kill_script allows a script to exit after SIGTERM before it
+# escalates to SIGKILL, during signal-triggered cleanup.
+readonly KILL_GRACE_SECONDS=5
+
+{{.DescendantsFunc}}
+
+# dump_pid_states reports the kernel state of each given pid, skipping any that
+# have exited. Process state D is uninterruptible sleep: the process is blocked
+# inside a kernel call and will not act on any signal -- not even SIGKILL -- until
+# that call returns. That is what distinguishes a probe wedged on a PMU access
+# from a merely slow command, and it is why signalling alone cannot always reap
+# it. The kernel stack names the exact call it is stuck in, and is readable
+# because metadata scripts run with elevated privileges.
+dump_pid_states() {
+  local label="$1"
+  shift
+  local p st wch cmd
+  for p in "$@"; do
+    ps -p "$p" > /dev/null 2>&1 || continue
+    # Read state via ps rather than parsing /proc/<pid>/stat: the comm field there
+    # is parenthesized and may contain spaces, which shifts the field positions.
+    st=$(ps -o stat= -p "$p" 2>/dev/null | tr -d ' ')
+    wch=$(cat "/proc/$p/wchan" 2>/dev/null || true)
+    cmd=$(tr '\0' ' ' < "/proc/$p/cmdline" 2>/dev/null || true)
+    echo "TIMEOUT DIAG: $label pid=$p state=${st:-?} wchan=${wch:-?} cmd=${cmd:-?}" >&2
+    if [[ "$st" == D* ]]; then
+      echo "TIMEOUT DIAG: pid=$p is in uninterruptible sleep and cannot be signalled; kernel stack:" >&2
+      cat "/proc/$p/stack" 2>/dev/null >&2 || echo "TIMEOUT DIAG: (kernel stack unavailable)" >&2
+    fi
+  done
+}
+
+# dump_hung_process_state records why a script could not be stopped. The caller
+# passes a pid list captured before any signal was sent: once the script's shell
+# dies its children are reparented to init, so the tree cannot be recovered
+# afterwards.
+dump_hung_process_state() {
+  local s="$1" pid="$2" tree="$3"
+  echo "TIMEOUT DIAG: process tree for script '${orig_names[$s]}' (root pid $pid):" >&2
+  ps -eo pid,ppid,pgid,stat,etime,wchan:24,args 2>/dev/null | awk -v pids="$tree" '
+    BEGIN { n = split(pids, a, /[ \n]+/); for (i = 1; i <= n; i++) if (a[i] != "") P[a[i]] = 1 }
+    NR == 1 || ($1 in P)
+  ' >&2 || true
+  # shellcheck disable=SC2086 # word splitting is intended: tree is a pid list
+  dump_pid_states "in tree" $tree
+}
+
+# kill_tree signals a script's process group and then every process in the
+# previously captured tree individually. The group kill alone reaps the script's
+# shell but leaves a 'timeout'-wrapped probe running in its own group, orphaned
+# and still holding whatever it was stuck on. Descendants that lead a group get
+# the signal on their group too, so a probe forked below 'timeout' is covered.
+kill_tree() {
+  local pid="$1" sig="$2" tree="$3" p pg
+  kill "-$sig" -"$pid" 2>/dev/null || true
+  for p in $tree; do
+    [[ "$p" == "$pid" ]] && continue
+    pg=$(ps -o pgid= -p "$p" 2>/dev/null | tr -d ' ')
+    if [[ "$pg" == "$p" ]]; then
+      kill "-$sig" -"$p" 2>/dev/null || true
+    else
+      kill "-$sig" "$p" 2>/dev/null || true
+    fi
+  done
+}
+
+# start_watchdog starts a background timer for a script. Each script runs via
+# setsid, so it leads its own process group; the watchdog signals the whole
+# group (negative PID). This is what makes the timeout forceful: signalling only
+# the script's direct child would leave a wedged grandchild (e.g. a perf stuck in
+# the kernel) running, and the controller's 'wait' would block on it forever.
+#
+# If the group survives even SIGKILL it is abandoned: a marker file tells the
+# waiter to stop waiting on it. Otherwise an unkillable probe would block the
+# controller forever, and none of the diagnostics below would ever be reported,
+# because the caller only reads our output once we exit.
+start_watchdog() {
+  local s="$1" pid="$2" budget="${timeouts[$1]:-0}"
+  [[ "$budget" -le 0 ]] && return 0
+  (
+    # Poll rather than 'sleep $budget' so the watchdog exits promptly once the
+    # script finishes, instead of lingering for the full budget.
+    local waited=0
+    while [[ "$waited" -lt "$budget" ]]; do
+      ps -p "$pid" > /dev/null 2>&1 || exit 0
+      sleep 1
+      waited=$((waited + 1))
+    done
+    ps -p "$pid" > /dev/null 2>&1 || exit 0
+    echo "TIMEOUT: script '${orig_names[$s]}' exceeded ${budget}s; sending SIGTERM to process tree of $pid" >&2
+    # Capture the tree before signalling anything: the first kill orphans the
+    # descendants, and an orphan cannot be traced back to this script.
+    local tree
+    tree=$(descendants_of "$pid")
+    dump_hung_process_state "$s" "$pid" "$tree"
+    kill_tree "$pid" SIGTERM "$tree"
+    local killwait=0
+    while ps -p "$pid" > /dev/null 2>&1 && [[ "$killwait" -lt "$WATCHDOG_KILL_AFTER" ]]; do
+      sleep 1
+      killwait=$((killwait + 1))
+    done
+    if ps -p "$pid" > /dev/null 2>&1; then
+      echo "TIMEOUT: script '${orig_names[$s]}' ignored SIGTERM after ${WATCHDOG_KILL_AFTER}s; sending SIGKILL to process tree of $pid" >&2
+      kill_tree "$pid" SIGKILL "$tree"
+      killwait=0
+      while ps -p "$pid" > /dev/null 2>&1 && [[ "$killwait" -lt "$WATCHDOG_KILL_AFTER" ]]; do
+        sleep 1
+        killwait=$((killwait + 1))
+      done
+      if ps -p "$pid" > /dev/null 2>&1; then
+        echo "TIMEOUT: script '${orig_names[$s]}' survived SIGKILL; abandoning it so collection can continue" >&2
+        dump_hung_process_state "$s" "$pid" "$tree"
+        touch "$script_dir/${s}.abandoned"
+      fi
+    fi
+    # Anything from the tree that is still alive here ignored SIGKILL, which only
+    # a process blocked in the kernel can do. Report it even when the script's own
+    # shell died: a leaked probe still holding a PMU resource is the most likely
+    # reason the scripts that ran after it also hung.
+    # shellcheck disable=SC2086 # word splitting is intended: tree is a pid list
+    dump_pid_states "survived SIGKILL" $tree
+  ) &
+  watchdog_pids[$s]=$!
+}
+
+# wait_for_script waits for a script to exit, but gives up if its watchdog has
+# abandoned it as unkillable. Sets last_wait_abandoned=1 in that case, and
+# otherwise returns the script's real exit status. A plain 'wait' cannot be used
+# here: it blocks forever on a process stuck in uninterruptible sleep.
+wait_for_script() {
+  local s="$1" pid="$2"
+  last_wait_abandoned=0
+  while ps -p "$pid" > /dev/null 2>&1; do
+    if [[ -f "$script_dir/${s}.abandoned" ]]; then
+      last_wait_abandoned=1
+      return 0
+    fi
+    sleep 1
+  done
+  # The process has exited, so this returns immediately with its real status.
+  wait "$pid"
+}
+
+# stop_watchdog cancels a script's watchdog once the script has exited.
+stop_watchdog() {
+  local s="$1" wpid="${watchdog_pids[$1]:-}"
+  [[ -z "$wpid" ]] && return 0
+  kill -SIGKILL "$wpid" 2>/dev/null || true
+  wait "$wpid" 2>/dev/null || true
+  unset 'watchdog_pids[$s]'
+}
+
+# report_script_result logs a script's exit code and elapsed time, and on a
+# timeout kill (SIGTERM=143, SIGKILL=137) or generic failure also emits a tail of
+# its stderr. This identifies exactly which probe hung, rather than leaving a
+# silent stall.
+report_script_result() {
+  local s="$1" ec="$2"
+  local elapsed=$(( $(date +%s) - ${start_times[$s]:-0} ))
+  echo "SCRIPT RESULT: '${orig_names[$s]}' exit=$ec elapsed=${elapsed}s" >&2
+  if [[ "$ec" -ne 0 ]]; then
+    if [[ "$ec" -eq 143 || "$ec" -eq 137 ]]; then
+      echo "SCRIPT RESULT: '${orig_names[$s]}' was killed by the watchdog (likely hung)" >&2
+    fi
+    if [[ -s "$script_dir/${s}.stderr" ]]; then
+      echo "SCRIPT RESULT: '${orig_names[$s]}' stderr tail:" >&2
+      tail -n 20 "$script_dir/${s}.stderr" >&2 || true
+    fi
+  fi
+}
+
+# report_abandoned_script records a script we gave up waiting for. The exit code
+# is synthetic: the process is still alive, so there is no real status to report.
+report_abandoned_script() {
+  local s="$1"
+  local elapsed=$(( $(date +%s) - ${start_times[$s]:-0} ))
+  echo "SCRIPT RESULT: '${orig_names[$s]}' ABANDONED after ${elapsed}s (unkillable, still running)" >&2
+  if [[ -s "$script_dir/${s}.stderr" ]]; then
+    echo "SCRIPT RESULT: '${orig_names[$s]}' stderr tail:" >&2
+    tail -n 20 "$script_dir/${s}.stderr" >&2 || true
+  fi
+  exitcodes[$s]=137
+}
+
+# announce_script names a script as it starts. Without this, a controller that
+# dies or is killed before producing results gives no indication of which script
+# it had reached.
+announce_script() {
+  echo "SCRIPT START: '${orig_names[$1]}' pid=$2 budget=${timeouts[$1]:-0}s" >&2
+}
 
 start_concurrent_scripts() {
   for s in "${concurrent_scripts[@]}"; do
     setsid bash "$script_dir/${s}.sh" > "$script_dir/${s}.stdout" 2> "$script_dir/${s}.stderr" &
     pids[$s]=$!
+    start_times[$s]=$(date +%s)
+    announce_script "$s" "${pids[$s]}"
+    start_watchdog "$s" "${pids[$s]}"
   done
 }
 
@@ -307,11 +763,22 @@ run_sequential_scripts() {
     setsid bash "$script_dir/${s}.sh" > "$script_dir/${s}.stdout" 2> "$script_dir/${s}.stderr" &
     current_seq_pid=$!
     pids[$s]=$current_seq_pid
-    if wait "$current_seq_pid"; then
-      exitcodes[$s]=0
+    start_times[$s]=$(date +%s)
+    announce_script "$s" "$current_seq_pid"
+    start_watchdog "$s" "$current_seq_pid"
+    if wait_for_script "$s" "$current_seq_pid"; then
+      stop_watchdog "$s"
+      if [[ "$last_wait_abandoned" -eq 1 ]]; then
+        report_abandoned_script "$s"
+      else
+        exitcodes[$s]=0
+        report_script_result "$s" 0
+      fi
     else
       ec=$?
       exitcodes[$s]=$ec
+      stop_watchdog "$s"
+      report_script_result "$s" "$ec"
       if [ "$continue_on_script_error" -eq 0 ]; then
         echo "Script '${orig_names[$s]}' failed with exit code $ec; stopping further sequential scripts." >&2
         exit $ec
@@ -325,16 +792,24 @@ run_sequential_scripts() {
 kill_script() {
   local s="$1"
   local pid="${pids[$s]:-}"
+  stop_watchdog "$s"
   [[ -z "$pid" ]] && return 0
   if ! ps -p "$pid" > /dev/null 2>&1; then return 0; fi
-  # Signal the process group (negative PID)
+  # Signal the process group and every descendant (see kill_tree: a
+  # 'timeout'-wrapped probe lives in its own group and outlives a group kill).
   # Bash background jobs ignore SIGINT by default, but they do not ignore SIGTERM.
   echo "Sending SIGTERM to script '${orig_names[$s]}' with PID $pid" >&2
-  kill -SIGTERM -"$pid" 2>/dev/null || true
-  # Wait up to 1 minute in 1s intervals
+  local tree
+  tree=$(descendants_of "$pid")
+  kill_tree "$pid" SIGTERM "$tree"
+  # Wait for the script to exit gracefully, in 1s intervals.
+  # This budget is per-script and cleanup is serial, so it must stay small: the
+  # signal handler in perfspect only allows ~20s for the whole controller to exit
+  # before it escalates to SIGKILL. A long budget here (it was 60s) makes a single
+  # hung script stall shutdown well past that deadline.
   local waited=0
   echo "Waiting for script '${orig_names[$s]}' with PID $pid to exit gracefully" >&2
-  while ps -p "$pid" > /dev/null 2>&1 && [ "$waited" -lt 60 ]; do
+  while ps -p "$pid" > /dev/null 2>&1 && [ "$waited" -lt "$KILL_GRACE_SECONDS" ]; do
     echo -n "." >&2
     sleep 1
     waited=$((waited + 1))
@@ -343,10 +818,18 @@ kill_script() {
   # Force kill the process group if still alive
   if ps -p "$pid" > /dev/null 2>&1; then
     echo "Force killing script '${orig_names[$s]}' with PID $pid" >&2
-    kill -SIGKILL -"$pid" 2>/dev/null || true
+    kill_tree "$pid" SIGKILL "$tree"
+    # Give SIGKILL a moment to land, then report if it did not. Do not 'wait'
+    # here: a process in uninterruptible sleep survives SIGKILL until its kernel
+    # call returns, and waiting on it would stall shutdown indefinitely -- past
+    # the ~20s the perfspect signal handler allows before it escalates.
+    sleep 1
+    if ps -p "$pid" > /dev/null 2>&1; then
+      echo "Script '${orig_names[$s]}' with PID $pid survived SIGKILL; abandoning it" >&2
+      dump_hung_process_state "$s" "$pid" "$tree"
+    fi
   fi
-  wait "$pid" 2>/dev/null || true
-  echo "Script '${orig_names[$s]}' with PID $pid has been killed" >&2
+  echo "Done killing script '${orig_names[$s]}' with PID $pid" >&2
   if [[ -z "${exitcodes[$s]:-}" ]]; then
     echo "Setting exit code for script '${orig_names[$s]}' to 143 (terminated by SIGTERM)" >&2
     exitcodes[$s]=143
@@ -355,11 +838,22 @@ kill_script() {
 
 wait_for_concurrent_scripts() {
   for s in "${concurrent_scripts[@]}"; do
-    if wait "${pids[$s]}"; then
-      exitcodes[$s]=0
+    local abandoned=0
+    if wait_for_script "$s" "${pids[$s]}"; then
+      if [[ "$last_wait_abandoned" -eq 1 ]]; then
+        abandoned=1
+      else
+        exitcodes[$s]=0
+      fi
     else
       ec=$?
       exitcodes[$s]=$ec
+    fi
+    stop_watchdog "$s"
+    if [[ "$abandoned" -eq 1 ]]; then
+      report_abandoned_script "$s"
+    else
+      report_script_result "$s" "${exitcodes[$s]}"
     fi
   done
 }

@@ -5,6 +5,7 @@ package target
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -32,6 +33,13 @@ func (t *RemoteTarget) RunCommand(cmd *exec.Cmd) (stdout string, stderr string, 
 func (t *RemoteTarget) RunCommandEx(cmd *exec.Cmd, timeout int, newProcessGroup bool, reuseSSHConnection bool) (stdout string, stderr string, exitCode int, err error) {
 	localCommand := t.prepareLocalCommand(cmd, reuseSSHConnection)
 	return runLocalCommandWithInputWithTimeout(localCommand, "", timeout, newProcessGroup)
+}
+
+// RunCommandExLive is RunCommandEx with stderr additionally written to liveStderr as
+// it arrives, so a caller can observe a command's progress reports before it exits.
+func (t *RemoteTarget) RunCommandExLive(cmd *exec.Cmd, timeout int, newProcessGroup bool, reuseSSHConnection bool, liveStderr io.Writer) (stdout string, stderr string, exitCode int, err error) {
+	localCommand := t.prepareLocalCommand(cmd, reuseSSHConnection)
+	return runLocalCommandWithInputWithTimeoutLive(localCommand, "", timeout, newProcessGroup, liveStderr)
 }
 
 // RunCommandStream executes a command asynchronously on a remote target.

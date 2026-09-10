@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os/exec"
 	"strings"
@@ -106,6 +107,16 @@ func uninstallLkms(t Target, lkms []string) (err error) {
 //   - exitCode: The exit code of the command. If the command fails to execute, this may be undefined.
 //   - err: An error object if the command fails to execute or times out.
 func runLocalCommandWithInputWithTimeout(cmd *exec.Cmd, input string, timeout int, newProcessGroup bool) (stdout string, stderr string, exitCode int, err error) {
+	return runLocalCommandWithInputWithTimeoutLive(cmd, input, timeout, newProcessGroup, nil)
+}
+
+// runLocalCommandWithInputWithTimeoutLive is runLocalCommandWithInputWithTimeout with
+// an additional liveStderr writer, which receives the command's standard error as it
+// is produced rather than only after the command returns. A command that hangs never
+// returns, so anything it reported on stderr about its own progress is unavailable
+// exactly when it is needed; a caller that passes a writer here can act on those
+// reports while the command is still running. liveStderr may be nil.
+func runLocalCommandWithInputWithTimeoutLive(cmd *exec.Cmd, input string, timeout int, newProcessGroup bool, liveStderr io.Writer) (stdout string, stderr string, exitCode int, err error) {
 	logInput := ""
 	if input != "" {
 		logInput = "******"
@@ -124,7 +135,11 @@ func runLocalCommandWithInputWithTimeout(cmd *exec.Cmd, input string, timeout in
 	}
 	var outbuf, errbuf strings.Builder
 	cmd.Stdout = &outbuf
-	cmd.Stderr = &errbuf
+	if liveStderr != nil {
+		cmd.Stderr = io.MultiWriter(&errbuf, liveStderr)
+	} else {
+		cmd.Stderr = &errbuf
+	}
 	if newProcessGroup {
 		// isolate the command in its own process group, so that signals sent to perfspect don't affect it
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}

@@ -93,14 +93,20 @@ endif
 	tar -xf async-profiler-$(ASYNC_PROFILER_VERSION)-linux-arm64.tar.gz && mv async-profiler-$(ASYNC_PROFILER_VERSION)-linux-arm64 async-profiler-aarch64
 endif
 
-AVX_TURBO_VERSION := 9cfe8bf
+# Must be the full 40-character SHA: the pinned commit is fetched by name below, and
+# the git wire protocol will not resolve an abbreviated SHA.
+AVX_TURBO_VERSION := 9cfe8bf3089636b98d9a7eaa97b9fef268004a1b
 avx-turbo:
 ifeq ("$(wildcard avx-turbo)","")
-	git clone $(GIT_CLONE_OPTS) https://github.com/travisdowns/avx-turbo.git
-else
-	cd avx-turbo && git fetch && git checkout $(AVX_TURBO_VERSION)
+	# Deliberately not GIT_CLONE_OPTS: a --depth 1 clone contains only the tip of the
+	# default branch, so checking out any other commit fails as soon as upstream pushes
+	# past the pin. Fetching the pinned commit itself stays shallow and stays valid.
+	git init -q avx-turbo
+	cd avx-turbo && git remote add origin https://github.com/travisdowns/avx-turbo.git
 endif
-	cd avx-turbo && git checkout $(AVX_TURBO_VERSION)
+	cd avx-turbo && git fetch --depth 1 origin $(AVX_TURBO_VERSION)
+	# -f discards the patches a previous run applied, so this target is re-runnable
+	cd avx-turbo && git checkout -f --detach $(AVX_TURBO_VERSION)
 	# apply our patches to avx-turbo, aperf/mperf first because it doesn't add/remove any lines
 	cd avx-turbo && git apply ../avx-turbo-patches/0001-use-fixed-CPU-number-to-determine-if-APERF-MPERF-are.patch
 	cd avx-turbo && git apply ../avx-turbo-patches/0001-Add-CPU-ID-pinning-option.patch

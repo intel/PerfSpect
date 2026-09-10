@@ -5,6 +5,8 @@
 /debug_out
 /tools/bin
 /tools/bin-aarch64
+# source tarballs the tools build downloads and reuses as a local cache
+/tools/*.tar.gz
 /tools-cache
 /dist
 /internal/script/resources/x86_64

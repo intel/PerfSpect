@@ -4,13 +4,16 @@
 package script
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"perfspect/internal/target"
 )
@@ -333,6 +336,392 @@ func TestFormMasterScriptExecutionIntegration(t *testing.T) {
 		}
 		if !strings.Contains(p.Stderr, "STDERR-"+sanitizeScriptName(p.Name)) {
 			t.Errorf("stderr mismatch for %s: %q", p.Name, p.Stderr)
+		}
+	}
+}
+
+// TestFormMasterScriptNoTimeoutRunsToCompletion confirms that a script with
+// Timeout unset (0) is left to run without a watchdog, so indefinite-duration
+// collection is unaffected.
+func TestFormMasterScriptNoTimeoutRunsToCompletion(t *testing.T) {
+	tmp := t.TempDir()
+	scripts := []ScriptDefinition{{Name: "untimed", ScriptTemplate: "sleep 2\necho done\n"}}
+	writeChildScripts(t, tmp, scripts)
+	master, _, err := formControllerScript(tmp, scripts, nil, true)
+	if err != nil {
+		t.Fatalf("error forming master script: %v", err)
+	}
+	masterPath := filepath.Join(tmp, "controller.sh")
+	if err := os.WriteFile(masterPath, []byte(master), 0o700); err != nil {
+		t.Fatalf("failed writing master script: %v", err)
+	}
+	out, err := runLocalBash(masterPath)
+	if err != nil {
+		t.Fatalf("error executing master script: %v\noutput: %s", err, out)
+	}
+	if strings.Contains(out, "TIMEOUT:") {
+		t.Errorf("script with no timeout should not be killed by a watchdog:\n%s", out)
+	}
+	parsed := parseControllerScriptOutput(out)
+	if len(parsed) != 1 || parsed[0].Exitcode != 0 {
+		t.Fatalf("expected one successful script output, got %+v", parsed)
+	}
+	if !strings.Contains(parsed[0].Stdout, "done") {
+		t.Errorf("expected script to run to completion, stdout: %q", parsed[0].Stdout)
+	}
+}
+
+// TestFormMasterScriptWatchdogKillsHungScript confirms that a script exceeding
+// its Timeout has its whole process group killed, and that the controller keeps
+// going instead of blocking on it forever.
+//
+// The hung script leaves a grandchild sleeping and waits on it. That is the shape
+// of a wedged probe (e.g. a perf that hangs the PMU), and the case a plain
+// 'timeout' wrapped around the inner command does not cover, because signalling
+// only the direct child leaves the grandchild -- and therefore the wait -- alive.
+func TestFormMasterScriptWatchdogKillsHungScript(t *testing.T) {
+	tmp := t.TempDir()
+	scripts := []ScriptDefinition{
+		{Name: "hung probe", ScriptTemplate: "sleep 600 &\nwait\n", Timeout: 3},
+		{Name: "fast probe", ScriptTemplate: "echo alive\n", Timeout: 3},
+	}
+	writeChildScripts(t, tmp, scripts)
+	master, _, err := formControllerScript(tmp, scripts, nil, true)
+	if err != nil {
+		t.Fatalf("error forming master script: %v", err)
+	}
+	masterPath := filepath.Join(tmp, "controller.sh")
+	if err := os.WriteFile(masterPath, []byte(master), 0o700); err != nil {
+		t.Fatalf("failed writing master script: %v", err)
+	}
+
+	start := time.Now()
+	out, err := runLocalBash(masterPath)
+	if err != nil {
+		t.Fatalf("error executing master script: %v\noutput: %s", err, out)
+	}
+	elapsed := time.Since(start)
+	// Without the watchdog the controller waits on the hung script indefinitely.
+	if elapsed > 30*time.Second {
+		t.Fatalf("controller did not recover from hung script: took %v", elapsed)
+	}
+
+	// The timeout must be reported clearly enough to identify which probe hung.
+	for _, want := range []string{"TIMEOUT:", "exceeded 3s", "killed by the watchdog", "SCRIPT RESULT: 'hung probe'"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing timeout diagnostic %q in output:\n%s", want, out)
+		}
+	}
+
+	byName := make(map[string]ScriptOutput)
+	for _, p := range parseControllerScriptOutput(out) {
+		byName[p.Name] = p
+	}
+	// The hung script is reported as signal-killed, not as a success.
+	if ec := byName["hung probe"].Exitcode; ec != 143 && ec != 137 {
+		t.Errorf("expected hung script to exit via signal (143/137), got %d", ec)
+	}
+	// A hung script must not prevent the other scripts' results from being collected.
+	if got := byName["fast probe"]; got.Exitcode != 0 || !strings.Contains(got.Stdout, "alive") {
+		t.Errorf("expected fast probe to succeed, got exit=%d stdout=%q", got.Exitcode, got.Stdout)
+	}
+}
+
+// TestFormMasterScriptReportsHungScriptDiagnostics confirms that when the
+// watchdog fires, the controller names the script and records the process state of
+// its whole group -- the evidence needed to tell a probe wedged in the kernel
+// (state D) from one that is merely slow.
+//
+// The script ignores SIGTERM so it outlives the grace period and forces the
+// escalation path. SIGKILL cannot be trapped, so it does get reaped here; the
+// case where even SIGKILL fails is covered by
+// TestFormMasterScriptAbandonsUnkillableScript.
+func TestFormMasterScriptReportsHungScriptDiagnostics(t *testing.T) {
+	tmp := t.TempDir()
+	scripts := []ScriptDefinition{
+		{Name: "stubborn probe", ScriptTemplate: "trap '' TERM\nsleep 600 &\nwait\n", Timeout: 2},
+		{Name: "good probe", ScriptTemplate: "echo alive\n", Timeout: 2},
+	}
+	out := runController(t, tmp, scripts, 60*time.Second)
+
+	// The good probe's result must survive the other script's misbehaviour.
+	byName := make(map[string]ScriptOutput)
+	for _, p := range parseControllerScriptOutput(out) {
+		byName[p.Name] = p
+	}
+	if got := byName["good probe"]; got.Exitcode != 0 || !strings.Contains(got.Stdout, "alive") {
+		t.Errorf("expected good probe to succeed, got exit=%d stdout=%q", got.Exitcode, got.Stdout)
+	}
+	for _, want := range []string{
+		"SCRIPT START: 'stubborn probe'", // names the script even if we never finish
+		"exceeded 2s",
+		"ignored SIGTERM",
+		"TIMEOUT DIAG:", // process state of the group
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing diagnostic %q in output:\n%s", want, out)
+		}
+	}
+	// The per-process state line is the point of the diagnostics: without it there
+	// is no way to distinguish uninterruptible sleep from a slow command.
+	if !regexp.MustCompile(`TIMEOUT DIAG: in tree pid=[0-9]+ state=\S+ wchan=\S+`).MatchString(out) {
+		t.Errorf("expected per-pid state/wchan lines in output:\n%s", out)
+	}
+}
+
+// TestFormMasterScriptAbandonsUnkillableScript confirms the controller stops
+// waiting on a script that cannot be killed, reports it, and still returns the
+// other scripts' results.
+//
+// A process wedged in uninterruptible sleep cannot be created on demand, so the
+// watchdog's "gave up" marker is pre-seeded to drive the same code path. This is
+// the case that previously produced total silence: the controller blocked on
+// 'wait' forever, so no diagnostics were ever reported, because the caller only
+// reads the controller's output once it exits.
+func TestFormMasterScriptAbandonsUnkillableScript(t *testing.T) {
+	tmp := t.TempDir()
+	scripts := []ScriptDefinition{
+		// No watchdog on this one (Timeout 0); the marker alone drives the path.
+		{Name: "wedged probe", ScriptTemplate: "sleep 600\n"},
+		{Name: "good probe", ScriptTemplate: "echo alive\n"},
+	}
+	marker := filepath.Join(tmp, sanitizeScriptName("wedged probe")+".abandoned")
+	if err := os.WriteFile(marker, nil, 0o600); err != nil {
+		t.Fatalf("failed seeding abandoned marker: %v", err)
+	}
+	// Without the bypass this blocks for the full 600s sleep.
+	out := runController(t, tmp, scripts, 60*time.Second)
+
+	if !strings.Contains(out, "ABANDONED") {
+		t.Errorf("expected the abandoned script to be reported:\n%s", out)
+	}
+	byName := make(map[string]ScriptOutput)
+	for _, p := range parseControllerScriptOutput(out) {
+		byName[p.Name] = p
+	}
+	// A synthetic kill code, since the process is still running and has no status.
+	if got := byName["wedged probe"].Exitcode; got != 137 {
+		t.Errorf("expected abandoned script to report exit 137, got %d", got)
+	}
+	if got := byName["good probe"]; got.Exitcode != 0 || !strings.Contains(got.Stdout, "alive") {
+		t.Errorf("expected good probe to succeed, got exit=%d stdout=%q", got.Exitcode, got.Stdout)
+	}
+}
+
+// runController writes the child scripts and controller for the given definitions,
+// runs it, and fails if it does not finish within limit.
+func runController(t *testing.T, dir string, scripts []ScriptDefinition, limit time.Duration) string {
+	t.Helper()
+	writeChildScripts(t, dir, scripts)
+	master, _, err := formControllerScript(dir, scripts, nil, true)
+	if err != nil {
+		t.Fatalf("error forming controller script: %v", err)
+	}
+	masterPath := filepath.Join(dir, "controller.sh")
+	if err := os.WriteFile(masterPath, []byte(master), 0o700); err != nil {
+		t.Fatalf("failed writing controller script: %v", err)
+	}
+	start := time.Now()
+	out, err := runLocalBash(masterPath)
+	if err != nil {
+		t.Fatalf("error executing controller script: %v\noutput: %s", err, out)
+	}
+	if elapsed := time.Since(start); elapsed > limit {
+		t.Fatalf("controller did not return promptly: took %v (limit %v)\noutput: %s", elapsed, limit, out)
+	}
+	return out
+}
+
+// TestFormMasterScriptReachesProcessOutsideScriptGroup covers what hid the real
+// failure on m6i.16xlarge. Metadata probes run as 'timeout 30 perf stat ...', and
+// timeout puts itself and the command it runs into a NEW process group. A search
+// or a kill scoped to the script's own group therefore sees only the script's
+// shell: the probe that actually hung is invisible, and it survives.
+func TestFormMasterScriptReachesProcessOutsideScriptGroup(t *testing.T) {
+	tmp := t.TempDir()
+	// A distinctive duration makes the leak check below unambiguous; matching on
+	// "sleep" alone would collide with unrelated processes on the machine.
+	const marker = "987654"
+	scripts := []ScriptDefinition{
+		{Name: "timeout wrapped probe", ScriptTemplate: "timeout 600 sleep " + marker, Timeout: 2},
+	}
+	out := runController(t, tmp, scripts, 60*time.Second)
+
+	// The probe must appear in the diagnostics by name, in a different process
+	// group from the script's shell.
+	if !strings.Contains(out, "sleep "+marker) {
+		t.Errorf("diagnostics did not name the process running below timeout, got:\n%s", out)
+	}
+	if matched, _ := regexp.MatchString(`TIMEOUT DIAG: in tree pid=[0-9]+ state=\S+ wchan=\S+ cmd=`, out); !matched {
+		t.Errorf("expected per-pid state lines for the tree, got:\n%s", out)
+	}
+	// And it must be gone. Before kill_tree, a group-scoped kill left this running
+	// and reparented to init.
+	if processCmdlineExists(t, "sleep "+marker) {
+		t.Errorf("process below timeout survived the watchdog kill")
+	}
+}
+
+// processCmdlineExists reports whether any process has needle in its command
+// line. It scans /proc rather than shelling out to pgrep, whose own command line
+// would match the needle and produce a false positive.
+func processCmdlineExists(t *testing.T, needle string) bool {
+	t.Helper()
+	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		t.Fatalf("failed reading /proc: %v", err)
+	}
+	for _, e := range entries {
+		if _, err := strconv.Atoi(e.Name()); err != nil {
+			continue // not a pid directory
+		}
+		raw, err := os.ReadFile(filepath.Join("/proc", e.Name(), "cmdline"))
+		if err != nil {
+			continue // the process exited while we were looking
+		}
+		if strings.Contains(strings.ReplaceAll(string(raw), "\x00", " "), needle) {
+			return true
+		}
+	}
+	return false
+}
+
+// TestCleanupScriptKillsControllerTree exercises the shell that reaps a
+// controller we stopped waiting for. Killing the local end of the connection has
+// no effect on the target, so this is what actually stops leaked probes from
+// accumulating there across runs.
+func TestCleanupScriptKillsControllerTree(t *testing.T) {
+	tmp := t.TempDir()
+	pidFile := filepath.Join(tmp, ControllerPIDFileName)
+	// A distinct marker from the other tests' so a stray process from one cannot
+	// satisfy the other's assertions.
+	const marker = "987655"
+	// Stand in for a controller: record our pid where the real one does, then run a
+	// probe below 'timeout', which lands in its own process group.
+	fake := filepath.Join(tmp, "fake_controller.sh")
+	body := "#!/usr/bin/env bash\necho $$ > " + pidFile + "\ntimeout 600 sleep " + marker + "\n"
+	if err := os.WriteFile(fake, []byte(body), 0o700); err != nil { // #nosec G306
+		t.Fatalf("failed writing fake controller: %v", err)
+	}
+	controller := exec.Command("bash", fake) // #nosec G204
+	if err := controller.Start(); err != nil {
+		t.Fatalf("failed starting fake controller: %v", err)
+	}
+	defer func() { _ = controller.Wait() }()
+
+	// Wait for the tree to exist before trying to reap it.
+	deadline := time.Now().Add(10 * time.Second)
+	for !processCmdlineExists(t, "sleep "+marker) {
+		if time.Now().After(deadline) {
+			t.Fatal("fake controller never started its probe")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	cleanup := fmt.Sprintf(cleanupTemplate, descendantsOfShellFunc, pidFile)
+	out, err := exec.Command("bash", "-c", cleanup).CombinedOutput() // #nosec G204
+	if err != nil {
+		t.Fatalf("cleanup script failed: %v\noutput: %s", err, out)
+	}
+	if !strings.Contains(string(out), "cleaning up abandoned controller") {
+		t.Errorf("cleanup did not report what it was doing, got:\n%s", out)
+	}
+	if !strings.Contains(string(out), "sleep "+marker) {
+		t.Errorf("cleanup did not name the probe it killed, got:\n%s", out)
+	}
+	if processCmdlineExists(t, "sleep "+marker) {
+		t.Error("probe below timeout survived cleanup")
+	}
+	if _, err := os.Stat(pidFile); !os.IsNotExist(err) {
+		t.Errorf("cleanup left the pid file behind: %v", err)
+	}
+}
+
+// TestCleanupScriptIgnoresBogusPIDFile checks that a pid file holding something
+// other than a pid is refused rather than passed to kill.
+func TestCleanupScriptIgnoresBogusPIDFile(t *testing.T) {
+	tmp := t.TempDir()
+	pidFile := filepath.Join(tmp, ControllerPIDFileName)
+	for _, contents := range []string{"", "-1", "not-a-pid", "1234; rm -rf /tmp/should-not-happen"} {
+		if err := os.WriteFile(pidFile, []byte(contents), 0o600); err != nil {
+			t.Fatalf("failed writing pid file: %v", err)
+		}
+		cleanup := fmt.Sprintf(cleanupTemplate, descendantsOfShellFunc, pidFile)
+		out, err := exec.Command("bash", "-c", cleanup).CombinedOutput() // #nosec G204
+		if err != nil {
+			t.Errorf("cleanup script failed on pid file %q: %v\noutput: %s", contents, err, out)
+		}
+		if strings.Contains(string(out), "cleaning up") {
+			t.Errorf("cleanup acted on invalid pid file %q, output:\n%s", contents, out)
+		}
+	}
+}
+
+func TestControllerTimeout(t *testing.T) {
+	cases := []struct {
+		name    string
+		scripts []ScriptDefinition
+		want    int
+	}{
+		{
+			// An unbounded script means the run has no legitimate upper bound.
+			name:    "any unbounded script disables the deadline",
+			scripts: []ScriptDefinition{{Name: "a", Timeout: 30}, {Name: "b", Timeout: 0}},
+			want:    0,
+		},
+		{
+			// Concurrent scripts overlap, so only the largest budget matters.
+			name:    "concurrent scripts take the maximum",
+			scripts: []ScriptDefinition{{Name: "a", Timeout: 30}, {Name: "b", Timeout: 60}},
+			want:    60 + watchdogEscalationSeconds + controllerTimeoutMargin,
+		},
+		{
+			// Sequential scripts run one after another, so their budgets add up.
+			name:    "sequential scripts accumulate",
+			scripts: []ScriptDefinition{{Name: "a", Timeout: 30, Sequential: true}, {Name: "b", Timeout: 45, Sequential: true}},
+			want:    75 + 2*watchdogEscalationSeconds + controllerTimeoutMargin,
+		},
+		{
+			name:    "mixed adds sequential total to concurrent maximum",
+			scripts: []ScriptDefinition{{Name: "a", Timeout: 30, Sequential: true}, {Name: "b", Timeout: 60}, {Name: "c", Timeout: 20}},
+			want:    30 + 60 + 2*watchdogEscalationSeconds + controllerTimeoutMargin,
+		},
+		{
+			name:    "no scripts means no deadline",
+			scripts: nil,
+			want:    controllerTimeoutMargin,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := controllerTimeout(tc.scripts); got != tc.want {
+				t.Errorf("controllerTimeout() = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestLastLines(t *testing.T) {
+	if got := lastLines("", 5); got != "(no stderr)" {
+		t.Errorf("expected placeholder for empty input, got %q", got)
+	}
+	if got := lastLines("a\n\nb\nc\n", 2); got != "b; c" {
+		t.Errorf("expected trailing non-empty lines, got %q", got)
+	}
+	if got := lastLines("only\n", 5); got != "only" {
+		t.Errorf("expected the single line, got %q", got)
+	}
+}
+
+// writeChildScripts writes each script definition's template to the directory
+// the controller script expects to find it in.
+func writeChildScripts(t *testing.T, dir string, scripts []ScriptDefinition) {
+	t.Helper()
+	for _, s := range scripts {
+		p := filepath.Join(dir, scriptNameToFilename(s.Name))
+		content := "#!/usr/bin/env bash\n" + s.ScriptTemplate
+		if err := os.WriteFile(p, []byte(content), 0o700); err != nil {
+			t.Fatalf("failed writing child script %s: %v", p, err)
 		}
 	}
 }

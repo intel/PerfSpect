@@ -138,6 +138,11 @@ func configureSignalHandler(myTargets []target.Target, statusFunc progress.Multi
 						if err != nil {
 							slog.Error("failed to send SIGKILL signal to target controller", slog.String("target", tgt.GetName()), slog.String("error", err.Error()))
 						}
+						// SIGKILL to the controller alone leaves its probes running: they are
+						// in their own process groups and are not its children's children by
+						// the time it dies. The controller is past cleaning up after itself
+						// here, so reap the whole tree directly.
+						script.CleanupAbandonedController(tgt)
 						break
 					}
 					// sleep for a short time before checking again

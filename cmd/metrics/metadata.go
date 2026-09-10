@@ -147,7 +147,7 @@ var baseMetadataScripts = []script.ScriptDefinition{
 	{
 		Name: scriptPerfSupportedEvents,
 		ScriptTemplate: `# Parse perf list JSON output to extract Hardware events and cstate/power events
-perf list --json 2>/dev/null | awk '
+timeout --kill-after=5 30 perf list --json 2>/dev/null | awk '
 BEGIN {
     in_hardware_event = 0
     event_name = ""
@@ -182,6 +182,14 @@ BEGIN {
     event_name = ""
 }
 ' # end of awk
+# The pipeline's exit status is awk's, so a perf that timed out or failed would
+# otherwise look like success with an empty event list -- a silently wrong result
+# rather than a reported failure.
+perf_status=${PIPESTATUS[0]}
+if [[ "$perf_status" -ne 0 ]]; then
+  echo "perf list failed or timed out (exit $perf_status)" >&2
+  exit "$perf_status"
+fi
 `,
 		Depends: []string{"perf"},
 	},
@@ -192,7 +200,7 @@ BEGIN {
 	{
 		Name: scriptPerfAllSupportedEvents,
 		ScriptTemplate: `# Parse perf list JSON output to extract Hardware events and cstate/power events
-perf list --json 2>/dev/null | awk '
+timeout --kill-after=5 30 perf list --json 2>/dev/null | awk '
 BEGIN {
     event_name = ""
 }
@@ -216,6 +224,14 @@ BEGIN {
     event_name = ""
 }
 ' # end of awk
+# The pipeline's exit status is awk's, so a perf that timed out or failed would
+# otherwise look like success with an empty event list -- a silently wrong result
+# rather than a reported failure.
+perf_status=${PIPESTATUS[0]}
+if [[ "$perf_status" -ne 0 ]]; then
+  echo "perf list failed or timed out (exit $perf_status)" >&2
+  exit "$perf_status"
+fi
 `,
 		Depends: []string{"perf"},
 	},
@@ -226,52 +242,61 @@ BEGIN {
 	},
 	{
 		Name:           scriptPerfStatInstructions,
-		ScriptTemplate: "perf stat -a -e instructions sleep 1",
+		ScriptTemplate: "timeout --kill-after=5 30 perf stat -a -e instructions sleep 1",
 		Depends:        []string{"perf"},
 	},
 	{
 		Name:           scriptPerfStatRefCycles,
-		ScriptTemplate: "perf stat -a -e ref-cycles sleep 1",
+		ScriptTemplate: "timeout --kill-after=5 30 perf stat -a -e ref-cycles sleep 1",
 		Depends:        []string{"perf"},
 	},
 	{
 		Name:           scriptPerfStatPEBS,
-		ScriptTemplate: "perf stat -a -e INT_MISC.UNKNOWN_BRANCH_CYCLES sleep 1",
+		ScriptTemplate: "timeout --kill-after=5 30 perf stat -a -e INT_MISC.UNKNOWN_BRANCH_CYCLES sleep 1",
 		Architectures:  []string{cpus.X86Architecture},
 		Depends:        []string{"perf"},
 	},
 	{
 		Name:           scriptPerfStatOCR,
-		ScriptTemplate: "perf stat -a -e OCR.READS_TO_CORE.LOCAL_DRAM sleep 1",
+		ScriptTemplate: "timeout --kill-after=5 30 perf stat -a -e OCR.READS_TO_CORE.LOCAL_DRAM sleep 1",
 		Architectures:  []string{cpus.X86Architecture},
 		Depends:        []string{"perf"},
 	},
 	{
 		Name:           scriptPerfStatTMA,
-		ScriptTemplate: "perf stat -a -e '{topdown.slots, topdown-bad-spec}' sleep 1",
+		ScriptTemplate: "timeout --kill-after=5 30 perf stat -a -e '{topdown.slots, topdown-bad-spec}' sleep 1",
 		Architectures:  []string{cpus.X86Architecture},
 		Depends:        []string{"perf"},
 	},
 	{
 		Name:           scriptPerfStatAMDUncoreProbe,
-		ScriptTemplate: `perf stat -a -e "l3/event=0x4,umask=0xff,enallcores=0x1,enallslices=0x1,threadmask=0x3,name='l3_lookup_state.all_coherent_accesses_to_l3'/" sleep 1`,
+		ScriptTemplate: `timeout --kill-after=5 30 perf stat -a -e "l3/event=0x4,umask=0xff,enallcores=0x1,enallslices=0x1,threadmask=0x3,name='l3_lookup_state.all_coherent_accesses_to_l3'/" sleep 1`,
 		Architectures:  []string{cpus.X86Architecture},
 		Vendors:        []string{cpus.AMDVendor},
 		Depends:        []string{"perf"},
 	},
+	// The three probes below ask for one more copy of an event than there are general
+	// purpose counters, so the group fits only if one copy can be placed on a fixed
+	// counter. That deliberate over-subscription makes the kernel's counter assignment
+	// search do real work, and it is scoped to a single CPU rather than system-wide
+	// (-a) because of it: on a virtualized guest with an emulated PMU, running the
+	// same over-subscribed group on every CPU at once has been observed to wedge the
+	// whole machine past the point where even SIGKILL reaches perf. One CPU answers
+	// the question just as well -- see getSupportsFixedEvent, which reads only the
+	// exit code, "<not counted>"/"<not supported" and a zero count.
 	{
 		Name:           scriptPerfStatFixedInstr,
-		ScriptTemplate: "perf stat -a -e '{{{.InstructionsList}}}' sleep 1",
+		ScriptTemplate: "timeout --kill-after=5 30 perf stat -C 0 -e '{{{.InstructionsList}}}' sleep 1",
 		Depends:        []string{"perf"},
 	},
 	{
 		Name:           scriptPerfStatFixedCycles,
-		ScriptTemplate: "perf stat -a -e '{{{.CpuCyclesList}}}' sleep 1",
+		ScriptTemplate: "timeout --kill-after=5 30 perf stat -C 0 -e '{{{.CpuCyclesList}}}' sleep 1",
 		Depends:        []string{"perf"},
 	},
 	{
 		Name:           scriptPerfStatFixedRefCycles,
-		ScriptTemplate: "perf stat -a -e '{{{.RefCyclesList}}}' sleep 1",
+		ScriptTemplate: "timeout --kill-after=5 30 perf stat -C 0 -e '{{{.RefCyclesList}}}' sleep 1",
 		Depends:        []string{"perf"},
 	},
 	{
@@ -300,8 +325,24 @@ BEGIN {
 	},
 }
 
+// metadataScriptTimeout bounds how long any single metadata script may run.
+// Metadata collection is a bounded probing phase -- every script here reads a
+// sysfs/procfs value, runs a tool, or runs 'perf stat ... sleep 1' -- so none has
+// a legitimate reason to run for long. Without a bound, a probe that wedges (e.g.
+// a perf event that hangs the PMU on some virtualized instance types) stalls
+// collection indefinitely, because the controller waits on it forever.
+//
+// The value sits deliberately between two limits. It must exceed the 30s
+// 'timeout' that wraps the perf probes, so that when that inner timeout works the kill is
+// attributed to the probe rather than to this watchdog; and the whole phase --
+// this budget plus the watchdog's escalation plus the controller's own deadline --
+// must finish well inside the time a caller waits for collection to start, or the
+// caller kills perfspect before it can report which probe hung.
+const metadataScriptTimeout = 40
+
 // getMetadataScripts returns the list of scripts to run for metadata collection.
-// It copies the base definitions and applies template replacements and privilege settings.
+// It copies the base definitions and applies template replacements, privilege
+// settings, and the metadata script timeout.
 func getMetadataScripts(noRoot bool, noSystemSummary bool, numGPCounters int) ([]script.ScriptDefinition, error) {
 	metadataScripts := make([]script.ScriptDefinition, 0, len(baseMetadataScripts))
 
@@ -309,6 +350,7 @@ func getMetadataScripts(noRoot bool, noSystemSummary bool, numGPCounters int) ([
 	for _, baseDef := range baseMetadataScripts {
 		scriptDef := baseDef
 		scriptDef.Superuser = !noRoot
+		scriptDef.Timeout = metadataScriptTimeout
 
 		// Apply template replacements for fixed counter scripts
 		switch scriptDef.Name {
@@ -339,6 +381,10 @@ func getMetadataScripts(noRoot bool, noSystemSummary bool, numGPCounters int) ([
 	if !noSystemSummary {
 		for _, scriptName := range app.TableDefinitions[app.SystemSummaryTableName].ScriptNames {
 			scriptDef := script.GetScriptByName(scriptName)
+			// Only tighten the budget; never loosen one a script set for itself.
+			if scriptDef.Timeout == 0 || scriptDef.Timeout > metadataScriptTimeout {
+				scriptDef.Timeout = metadataScriptTimeout
+			}
 			metadataScripts = append(metadataScripts, scriptDef)
 		}
 	}
