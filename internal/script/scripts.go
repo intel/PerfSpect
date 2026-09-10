@@ -1534,11 +1534,30 @@ finalize() {
     
     # kill the processwatch pipeline if it is still running
     if [ -n "${pw_pid:-}" ] && [ "$pw_pid" -gt 0 ]; then
+        # pw_pid is the subshell wrapping the pipeline below, not processwatch itself,
+        # and signalling a shell does not signal its children -- SIGKILL least of all.
+        # Killing pw_pid alone therefore reaps the wrapper and orphans processwatch,
+        # which is root-owned, holds perf_event fds, and is given no -n count when
+        # duration is 0, so it never exits on its own and keeps running on the target
+        # after this script is long gone.
+        #
+        # Collect the tree before signalling anything: the first kill orphans everything
+        # below pw_pid, after which the children can no longer be traced back to it.
+        pw_tree=""
+        for p in $(pgrep -P "$pw_pid" 2>/dev/null); do
+            # The list is expanded once, so appending here is safe and picks up any
+            # grandchildren without re-entering the loop.
+            pw_tree="$pw_tree $p $(pgrep -P "$p" 2>/dev/null | tr '\n' ' ')"
+        done
         # Try SIGTERM first
-        kill -TERM "$pw_pid" 2>/dev/null || true
+        for p in $pw_pid $pw_tree; do
+            kill -TERM "$p" 2>/dev/null || true
+        done
         sleep 0.1
         # Then SIGKILL if needed
-        kill -KILL "$pw_pid" 2>/dev/null || true
+        for p in $pw_pid $pw_tree; do
+            kill -KILL "$p" 2>/dev/null || true
+        done
     fi
 }
 trap finalize INT TERM EXIT
