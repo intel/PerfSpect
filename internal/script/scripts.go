@@ -1749,8 +1749,20 @@ cleanup() {
 }
 trap cleanup INT TERM
 
-# Enumerate syscall enter events dynamically
-EVENTS=$(perf list | awk '/^[[:space:]]*syscalls:sys_enter_/ {print $1}' | paste -sd,)
+# Enumerate syscall enter events dynamically.
+#
+# 'perf list tracepoint', not a bare 'perf list'. The unqualified form also lists hardware
+# events, and it decides what to list by calling perf_event_open on each candidate -- which
+# on a guest whose PMU advertises a fixed counter the kernel cannot use faults the kernel,
+# strands every later perf_event_open in D state, and takes the machine off the network.
+# See the pmuEnumerationSafetyScript comment in cmd/metrics/metadata.go for that fault.
+#
+# Tracepoints come from tracefs and open no events, so this form cannot trip it. Measured
+# on an affected AWS m6i.16xlarge guest: 'perf list tracepoint' returns in 0.01s even after
+# the kernel has already faulted and every perf_event_open is blocking, while a bare
+# 'perf list' is what killed the instance. It is also strictly less work for the same
+# answer, since only syscalls:sys_enter_* is wanted here.
+EVENTS=$(perf list tracepoint | awk '/^[[:space:]]*syscalls:sys_enter_/ {print $1}' | paste -sd,)
 
 if [[ -z "$EVENTS" ]]; then
   echo "No syscalls:sys_enter_* events found" >&2
