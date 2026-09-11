@@ -83,7 +83,12 @@ const (
 // m5.24xlarge is Skylake with no slots counter to advertise.
 var pmuEnumerationSafetyScript = script.ScriptDefinition{
 	Name: scriptPMUEnumerationSafety,
-	ScriptTemplate: `fixed=$(dmesg 2>/dev/null | grep -oE 'fixed-purpose events:[[:space:]]*[0-9]+' | grep -oE '[0-9]+$' | tail -1)
+	// Both spellings are required. The Intel PMU driver renamed its boot lines in 6.15:
+	// through 6.14 it prints "fixed-purpose events: 4", from 6.15 on "fixed-purpose
+	// counters: 4" (verified on 6.14.0-1015-aws and 7.0.0-1012-aws). Matching only the
+	// older wording makes this probe find nothing on a current kernel, which fails open
+	// and silently stops protecting exactly the targets it exists for.
+	ScriptTemplate: `fixed=$(dmesg 2>/dev/null | grep -oE 'fixed-purpose (events|counters):[[:space:]]*[0-9]+' | grep -oE '[0-9]+$' | tail -1)
 slots=no
 # Unmatched globs stay literal here, and [[ -e ]] on a literal is false, so a machine
 # with no such event correctly reports "no" rather than matching the pattern itself.
