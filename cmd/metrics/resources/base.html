@@ -169,7 +169,31 @@
       const description = <<.DESCRIPTION>>
       const metadata = <<.METADATA>>
       const system_summary = <<.SYSTEMSUMMARY>>
-      
+      // per-group (per-socket, per-CPU, or per-cgroup) mean metric values. These are
+      // empty when metrics were collected at system scope and system granularity.
+      const group_by_field = <<.GROUPBYFIELD>>
+      const groups = <<.GROUPS>>
+      const group_means = <<.GROUPMEANS>>
+      const hasGroups = groups.length > 0 && group_means.length > 0;
+      // labels for the per-group metrics tab, by the field the metrics are grouped by
+      const groupLabels = {
+        SKT: { tab: "Per-Socket Metrics", plural: "sockets" },
+        CPU: { tab: "Per-CPU Metrics", plural: "CPUs" },
+        CID: { tab: "Per-Cgroup Metrics", plural: "cgroups" },
+      }[group_by_field] || { tab: "Per-Group Metrics", plural: "groups" };
+      // Tab indexes. The per-group metrics tab is present only when there is per-group
+      // data to present, so the tabs that follow it shift accordingly.
+      const tabIndex = {
+        tmam: 0,
+        cpu: 1,
+        memory: 2,
+        power: 3,
+        allMetrics: 4,
+        groupMetrics: hasGroups ? 5 : -1,
+        systemSummary: hasGroups ? 6 : 5,
+        metadata: hasGroups ? 7 : 6,
+      };
+
       // Check for highlighted metrics whenever current_metrics changes
       React.useEffect(() => {
         // Look for any metrics that exceed their thresholds
@@ -177,8 +201,59 @@
         setHasHighlightedMetrics(hasHighlighted);
       }, [current_metrics]);
 
+      // the common style for informational tooltips
+      const infoTooltipProps = {
+        tooltip: {
+          sx: {
+            fontSize: '1.0rem',
+            padding: '8px 12px',
+            bgcolor: 'rgba(97, 97, 97, 0.92)',
+            color: '#ffffff',
+            fontWeight: 400,
+            boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.2)'
+          }
+        }
+      };
+
+      // MetricName component - the metric's name, preceded by an info button carrying the
+      // metric's description and, for TMA metrics, indentation indicating the metric's level
+      const MetricName = ({ name, level }) => {
+        const indentationLevel = level > 1 ? level - 1 : 0;
+        return (
+          <React.Fragment>
+            <Tooltip
+              title={description.hasOwnProperty(name) ? description[name] : ""}
+              componentsProps={infoTooltipProps}
+            >
+              <IconButton sx={{ padding: "0 8px 0 0" }} disabled={!description.hasOwnProperty(name)}>
+                <Icon>info</Icon>
+              </IconButton>
+            </Tooltip>
+            {indentationLevel > 0 &&
+              <span style={{
+                paddingLeft: `${indentationLevel * 16}px`,
+                borderLeft: '1px dotted #aaa',
+                marginLeft: '4px',
+              }}>
+                <Icon
+                  sx={{
+                    fontSize: '0.8rem',
+                    verticalAlign: 'middle',
+                    color: '#666',
+                    marginRight: '4px'
+                  }}
+                >
+                  subdirectory_arrow_right
+                </Icon>
+              </span>
+            }
+            {name}
+          </React.Fragment>
+        );
+      };
+
       // MetricsTable component
-      const MetricsTable = ({ 
+      const MetricsTable = ({
         data, 
         filterPrefix = null, 
         showComparison = false, 
@@ -251,54 +326,7 @@
                         }}
                       >
                         <TableCell sx={{ fontFamily: 'Monospace' }} component="th" scope="row">
-                          <Tooltip 
-                            title={description.hasOwnProperty(row[0]) ? description[row[0]] : ""} 
-                            componentsProps={{
-                              tooltip: {
-                                sx: {
-                                  fontSize: '1.0rem',
-                                  padding: '8px 12px',
-                                  bgcolor: 'rgba(97, 97, 97, 0.92)',
-                                  color: '#ffffff',
-                                  fontWeight: 400,
-                                  boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.2)'
-                                }
-                              }
-                            }}
-                          >
-                            <IconButton sx={{ padding: "0 8px 0 0" }} disabled={!description.hasOwnProperty(row[0])}>
-                              <Icon>info</Icon>
-                            </IconButton>
-                          </Tooltip>
-                          {(() => {
-                            const level = row[7] ? Number(row[7]) : 1;
-                            const indentationLevel = level > 1 ? level - 1 : 0;
-                            
-                            const indentation = indentationLevel > 0 ? 
-                              <span style={{
-                                paddingLeft: `${indentationLevel * 16}px`,
-                                borderLeft: indentationLevel > 0 ? '1px dotted #aaa' : 'none',
-                                marginLeft: indentationLevel > 0 ? '4px' : '0',
-                              }}>
-                                {indentationLevel > 0 && <Icon 
-                                  sx={{ 
-                                    fontSize: '0.8rem', 
-                                    verticalAlign: 'middle',
-                                    color: '#666',
-                                    marginRight: '4px'
-                                  }}
-                                >
-                                  subdirectory_arrow_right
-                                </Icon>}
-                              </span> : null;
-                            
-                            return (
-                              <React.Fragment>
-                                {indentation}
-                                {row[0]}
-                              </React.Fragment>
-                            );
-                          })()}
+                          <MetricName name={row[0]} level={row[7] ? Number(row[7]) : 1} />
                         </TableCell>
                         <TableCell 
                           sx={{ 
@@ -359,6 +387,67 @@
               </Table>
             </TableContainer>
           </div>
+        );
+      };
+      // GroupMeansTable component - one row per metric and one column per group, e.g., per
+      // cgroup, holding the mean value of the metric for that group over the collection period
+      const GroupMeansTable = () => {
+        // group values can be long, e.g., cgroup paths, so shorten them for the column
+        // headers. The full value is available in the header's tooltip.
+        const shortGroupName = (value) => {
+          const leaf = value.split("/").filter(Boolean).pop() || value;
+          return leaf.length > 28 ? leaf.slice(0, 25) + "..." : leaf;
+        };
+        // keep the metric name visible while scrolling the group columns horizontally
+        const stickyCell = {
+          position: "sticky",
+          left: 0,
+          backgroundColor: "background.paper",
+        };
+        return (
+          <TableContainer component={Paper} sx={{ maxHeight: "80vh", overflow: "auto" }}>
+            <Table size="small" stickyHeader style={{ tableLayout: 'auto', width: "auto" }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ ...stickyCell, zIndex: 3 }}>Metric</TableCell>
+                  {groups.map(([value, sampleCount]) => (
+                    <TableCell key={value} align="right">
+                      <Tooltip
+                        title={`${value} (${sampleCount} sample${sampleCount === "1" ? "" : "s"})`}
+                        componentsProps={infoTooltipProps}
+                      >
+                        <span style={{ fontFamily: 'Monospace', cursor: "help" }}>
+                          {shortGroupName(value)}
+                        </span>
+                      </Tooltip>
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {group_means.map((row) => (
+                  <TableRow
+                    hover={true}
+                    key={row[0]}
+                    sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                  >
+                    <TableCell
+                      sx={{ ...stickyCell, zIndex: 2, fontFamily: 'Monospace' }}
+                      component="th"
+                      scope="row"
+                    >
+                      <MetricName name={row[0]} level={row[1] ? Number(row[1]) : 1} />
+                    </TableCell>
+                    {groups.map(([value], idx) => (
+                      <TableCell key={value} sx={{ fontFamily: 'Monospace' }} align="right">
+                        {row[idx + 2] === "" ? "—" : Number(row[idx + 2]).toFixed(4)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
         );
       };
       // Define consistent colors for TMA categories with child variations
@@ -701,6 +790,7 @@
               <Tab label="Memory" />
               <Tab label="Power" />
               <Tab label="All Metrics" />
+              {hasGroups && <Tab label={groupLabels.tab} />}
               <Tab label="System Summary" />
               <Tab label="Metadata" />
             </Tabs>
@@ -708,7 +798,7 @@
           <div style={{ padding: "80px 24px 24px 24px" }}>
             <TabPanel
               value={systemTabs}
-              index={0}
+              index={tabIndex.tmam}
             >
               <Grid container style={{ padding: "0px 0px 24px 0px", borderBottom: "1px solid rgba(0, 0, 0, 0.1)" }}>
                 <Grid item xs={5}>
@@ -790,7 +880,7 @@
             </TabPanel>
             <TabPanel
               value={systemTabs}
-              index={1}
+              index={tabIndex.cpu}
             >
               <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
                 <Grid item xs={5}>
@@ -847,7 +937,7 @@
             </TabPanel>
             <TabPanel
               value={systemTabs}
-              index={2}
+              index={tabIndex.memory}
             >
               <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
                 <Grid item xs={5}>
@@ -891,7 +981,7 @@
             </TabPanel>
             <TabPanel
               value={systemTabs}
-              index={3}
+              index={tabIndex.power}
             >
               <Grid container style={{ borderBottom: "1px solid rgba(0, 0, 0, 0.1)", paddingBottom: "24px" }}>
                 <Grid item xs={5}>
@@ -935,7 +1025,7 @@
             </TabPanel>
             <TabPanel
               value={systemTabs}
-              index={4}
+              index={tabIndex.allMetrics}
             >
               <TextField 
                 id="outlined-basic" 
@@ -954,9 +1044,20 @@
                 containerStyle={{ width: "fit-content" }}
               />
             </TabPanel>
+            {hasGroups &&
+              <TabPanel
+                value={systemTabs}
+                index={tabIndex.groupMetrics}
+              >
+                <Typography variant="body1" sx={{ paddingBottom: "16px" }}>
+                  {`Mean value of each metric for each of the ${groups.length} ${groupLabels.plural} monitored during the collection period. Hover over a column heading for its full name and the number of samples collected for it. A dash indicates that no valid samples were collected for the metric.`}
+                </Typography>
+                <GroupMeansTable />
+              </TabPanel>
+            }
             <TabPanel
               value={systemTabs}
-              index={5}
+              index={tabIndex.systemSummary}
             >
             <TableContainer component={Paper} sx={{ width: "fit-content" }}>
                 <Table size="small" style={{ tableLayout: 'auto' }}>
@@ -983,7 +1084,7 @@
             </TabPanel>
             <TabPanel
               value={systemTabs}
-              index={6}
+              index={tabIndex.metadata}
             >
             <TableContainer component={Paper} sx={{ width: "fit-content" }}>
                 <Table size="small" style={{ tableLayout: 'auto' }}>

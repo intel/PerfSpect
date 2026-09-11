@@ -383,16 +383,31 @@ func (mc MetricCollection) aggregate() (m *MetricGroup, err error) {
 	return
 }
 
-// getHTML - generate a string containing HTML representing the metrics
-func (mg *MetricGroup) getHTML(metadata Metadata, metricDefinitions []MetricDefinition) (out string, err error) {
+// getHTML - generate a string containing HTML representing the metrics. The report's
+// charts and All Metrics tab present the aggregate of all metric groups. When the
+// collection holds more than one group, e.g., one per cgroup, the report additionally
+// presents the mean value of each metric for each group.
+func (mc MetricCollection) getHTML(metadata Metadata, metricDefinitions []MetricDefinition) (out string, err error) {
+	if len(mc) == 0 {
+		err = fmt.Errorf("no metrics to summarize")
+		return
+	}
+	aggregated, err := mc.aggregate()
+	if err != nil {
+		return
+	}
+	templateVals, err := aggregated.loadHTMLTemplateValues(metadata, metricDefinitions)
+	if err != nil {
+		slog.Error("failed to load template values", slog.String("error", err.Error()))
+		return
+	}
+	if err = mc.addGroupTemplateValues(templateVals, metricDefinitions); err != nil {
+		slog.Error("failed to load per-group template values", slog.String("error", err.Error()))
+		return
+	}
 	var htmlTemplateBytes []byte
 	if htmlTemplateBytes, err = resources.ReadFile("resources/base.html"); err != nil {
 		slog.Error("failed to read base.html template", slog.String("error", err.Error()))
-		return
-	}
-	templateVals, err := mg.loadHTMLTemplateValues(metadata, metricDefinitions)
-	if err != nil {
-		slog.Error("failed to load template values", slog.String("error", err.Error()))
 		return
 	}
 	fg := texttemplate.Must(texttemplate.New("metricsSummaryTemplate").Delims("<<", ">>").Parse(string(htmlTemplateBytes)))
@@ -404,20 +419,85 @@ func (mg *MetricGroup) getHTML(metadata Metadata, metricDefinitions []MetricDefi
 	return buf.String(), nil
 }
 
-func (mc MetricCollection) getHTML(metadata Metadata, metricDefinitions []MetricDefinition) (out string, err error) {
-	if len(mc) == 0 {
-		err = fmt.Errorf("no metrics to summarize")
-		return
+// addGroupTemplateValues adds the template values that describe the mean value of each
+// metric for each group in the collection, i.e., for each socket, CPU, or cgroup. These
+// drive the report's per-group metrics tab.
+//
+// When the collection holds a single group, i.e., system scope and system granularity,
+// the values are empty and the report does not present the per-group tab. The values are
+// always set, since an unset template value renders as nothing, which would produce
+// invalid JavaScript in the report.
+func (mc MetricCollection) addGroupTemplateValues(templateVals map[string]string, metricDefinitions []MetricDefinition) error {
+	// defaults, used when there is no per-group data to present
+	templateVals["GROUPBYFIELD"] = `""`
+	templateVals["GROUPS"] = "[]"
+	templateVals["GROUPMEANS"] = "[]"
+	if len(mc) < 2 {
+		return nil
 	}
-	if len(mc) == 1 {
-		return mc[0].getHTML(metadata, metricDefinitions)
+	// all groups must present the same metrics, in the same order, for the values to line
+	// up with the metric names in the report's table
+	metricNames := mc[0].names
+	for idx, mg := range mc[1:] {
+		if !slices.Equal(mg.names, metricNames) {
+			slog.Warn("metric groups have different metric names or order, omitting per-group metrics from report",
+				slog.Int("group", idx+1), slog.String("groupByValue", mg.groupByValue))
+			return nil
+		}
 	}
-	metrics, err := mc.aggregate()
+	// the group values, e.g., the cgroup IDs, along with the number of samples collected
+	// for each. Groups can come and go during collection, e.g., when the list of "hot"
+	// cgroups is refreshed, so the sample counts provide context for the mean values.
+	groups := make([][]string, 0, len(mc))
+	allStats := make([]map[string]metricStats, 0, len(mc))
+	for idx, mg := range mc {
+		if mg.groupByValue == "" {
+			slog.Warn("metric group has no group value, omitting per-group metrics from report", slog.Int("group", idx))
+			return nil
+		}
+		groups = append(groups, []string{mg.groupByValue, fmt.Sprintf("%d", len(mg.rows))})
+		stats, err := mg.getStats()
+		if err != nil {
+			return fmt.Errorf("failed to get stats for metric group %d: %w", idx, err)
+		}
+		allStats = append(allStats, stats)
+	}
+	// one row per metric: the metric name, the metric level, then the mean value from
+	// each group, in the same order as the groups
+	groupMeans := make([][]string, 0, len(metricNames))
+	for _, name := range metricNames {
+		level := 1
+		if metricDef := findMetricDefinitionByName(name, metricDefinitions); metricDef != nil {
+			level = max(metricDef.Level, 1)
+		}
+		metricVals := []string{name, fmt.Sprintf("%d", level)}
+		for _, stats := range allStats {
+			mean := stats[name].mean
+			if math.IsNaN(mean) || math.IsInf(mean, 0) {
+				// no valid samples for this metric in this group
+				metricVals = append(metricVals, "")
+			} else {
+				metricVals = append(metricVals, fmt.Sprintf("%f", mean))
+			}
+		}
+		groupMeans = append(groupMeans, metricVals)
+	}
+	groupByFieldBytes, err := json.Marshal(mc[0].groupByField)
 	if err != nil {
-		return
+		return err
 	}
-	out, err = metrics.getHTML(metadata, metricDefinitions)
-	return
+	groupsBytes, err := json.Marshal(groups)
+	if err != nil {
+		return err
+	}
+	groupMeansBytes, err := json.Marshal(groupMeans)
+	if err != nil {
+		return err
+	}
+	templateVals["GROUPBYFIELD"] = string(groupByFieldBytes)
+	templateVals["GROUPS"] = string(groupsBytes)
+	templateVals["GROUPMEANS"] = string(groupMeansBytes)
+	return nil
 }
 
 type tmaTip struct {
