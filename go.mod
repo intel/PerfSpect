@@ -1,6 +1,6 @@
 module perfspect
 
-go 1.26
+go 1.26.0
 
 replace (
 	perfspect/internal/app => ./internal/app
@@ -25,7 +25,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/xuri/excelize/v2 v2.11.0
 	golang.org/x/term v0.45.0
-	golang.org/x/text v0.41.0
+	golang.org/x/text v0.42.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
