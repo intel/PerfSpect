@@ -99,7 +99,8 @@ ifeq ("$(wildcard avx-turbo)","")
 	git clone https://github.com/travisdowns/avx-turbo.git
 	cd avx-turbo && git checkout $(AVX_TURBO_VERSION)
 else
-	cd avx-turbo && git fetch && git checkout $(AVX_TURBO_VERSION)
+	# -f discards the patches applied by a previous run so they can be re-applied below
+	cd avx-turbo && git fetch && git checkout -f $(AVX_TURBO_VERSION)
 endif
 	# apply our patches to avx-turbo, aperf/mperf first because it doesn't add/remove any lines
 	cd avx-turbo && git apply ../avx-turbo-patches/0001-use-fixed-CPU-number-to-determine-if-APERF-MPERF-are.patch
