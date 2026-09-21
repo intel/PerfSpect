@@ -93,14 +93,14 @@ endif
 	tar -xf async-profiler-$(ASYNC_PROFILER_VERSION)-linux-arm64.tar.gz && mv async-profiler-$(ASYNC_PROFILER_VERSION)-linux-arm64 async-profiler-aarch64
 endif
 
-AVX_TURBO_VERSION := 9cfe8bf
+AVX_TURBO_VERSION := 9cfe8bf # a commit, not a tag, so the clone can't be shallow
 avx-turbo:
 ifeq ("$(wildcard avx-turbo)","")
-	git clone $(GIT_CLONE_OPTS) https://github.com/travisdowns/avx-turbo.git
+	git clone https://github.com/travisdowns/avx-turbo.git
+	cd avx-turbo && git checkout $(AVX_TURBO_VERSION)
 else
 	cd avx-turbo && git fetch && git checkout $(AVX_TURBO_VERSION)
 endif
-	cd avx-turbo && git checkout $(AVX_TURBO_VERSION)
 	# apply our patches to avx-turbo, aperf/mperf first because it doesn't add/remove any lines
 	cd avx-turbo && git apply ../avx-turbo-patches/0001-use-fixed-CPU-number-to-determine-if-APERF-MPERF-are.patch
 	cd avx-turbo && git apply ../avx-turbo-patches/0001-Add-CPU-ID-pinning-option.patch
