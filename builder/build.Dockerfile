@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y jq
 RUN git config --global --add safe.directory /localrepo
 # pre-install Go tools used by make check
 RUN go install honnef.co/go/tools/cmd/staticcheck@latest && \
-    go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest && \
+    go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest && \
     go install golang.org/x/vuln/cmd/govulncheck@latest && \
     go install github.com/securego/gosec/v2/cmd/gosec@latest
 # copy the tools binaries and source from the previous stage
