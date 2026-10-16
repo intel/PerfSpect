@@ -1364,6 +1364,14 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 				_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
 				break
 			}
+			// the cgroups' static configuration, for context in the report. The monitored
+			// set can change on refresh, so accumulate across refreshes.
+			cgroupConfigs, configErr := GetCgroupConfigs(myTarget, cids, localTempDir)
+			if configErr != nil {
+				// supplementary information, so don't fail the collection
+				slog.Warn("failed to get cgroup configuration", slog.String("error", configErr.Error()))
+			}
+			targetContext.metadata.CgroupConfigs = mergeCgroupConfigs(targetContext.metadata.CgroupConfigs, cgroupConfigs)
 		}
 		perfCommand, err := getPerfCommand(targetContext.groupDefinitions, pids, cids, flagCpuRange)
 		if err != nil {
