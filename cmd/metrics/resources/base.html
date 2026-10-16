@@ -175,8 +175,7 @@
       const groups = <<.GROUPS>>
       const group_means = <<.GROUPMEANS>>
       // the groups' static configuration, e.g., a cgroup's CPU and memory limits. One row
-      // per configuration field: a label followed by one value per group. Empty unless the
-      // groups are cgroups and their configuration was collected.
+      // per field: label, source file, then one value per group. Empty unless collected.
       const group_configs = <<.GROUPCONFIGS>>
       const hasGroups = groups.length > 0 && group_means.length > 0;
       // labels for the per-group metrics tab, by the field the metrics are grouped by
@@ -219,8 +218,8 @@
         }
       };
 
-      // MetricName component - the metric's name, preceded by an info button carrying the
-      // metric's description and, for TMA metrics, indentation indicating the metric's level
+      // MetricName component - the name, preceded by an info button with its description
+      // and, for TMA metrics, indentation showing the metric's level
       const MetricName = ({ name, level }) => {
         const indentationLevel = level > 1 ? level - 1 : 0;
         return (
@@ -393,11 +392,10 @@
           </div>
         );
       };
-      // GroupMeansTable component - one row per metric and one column per group, e.g., per
-      // cgroup, holding the mean value of the metric for that group over the collection period
+      // GroupMeansTable component - one row per metric, one column per group, e.g., per
+      // cgroup, holding that group's mean over the collection
       const GroupMeansTable = () => {
-        // group values can be long, e.g., cgroup paths, so shorten them for the column
-        // headers. The full value is available in the header's tooltip.
+        // group values can be long, e.g., cgroup paths; the full value is in the tooltip
         const shortGroupName = (value) => {
           const leaf = value.split("/").filter(Boolean).pop() || value;
           return leaf.length > 28 ? leaf.slice(0, 25) + "..." : leaf;
@@ -429,9 +427,8 @@
                 </TableRow>
               </TableHead>
               <TableBody>
-                {/* configuration rows, pinned above the metrics. These are settings, not
-                    measurements, so they are shaded and the last one carries a heavier
-                    bottom border to separate them from the metric values below. */}
+                {/* configuration rows, pinned above the metrics. Settings, not
+                    measurements, so shaded and separated by a heavier bottom border. */}
                 {group_configs.map((row, rowIdx) => (
                   <TableRow
                     hover={true}
@@ -454,9 +451,8 @@
                       scope="row"
                     >
                       {row[0]}
-                      {/* the cgroup v2 file the value is read from, so the reader can go
-                          look at it directly. Subordinate to the label, not a column of
-                          its own, since it is a reference rather than data. */}
+                      {/* the cgroup v2 file the value is read from. Subordinate to the
+                          label, not its own column, being a reference rather than data. */}
                       <Box
                         component="span"
                         sx={{

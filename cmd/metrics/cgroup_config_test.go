@@ -23,8 +23,8 @@ func TestCountCPUList(t *testing.T) {
 		{name: "whole machine", list: "0-191", expected: 192},
 		{name: "reversed range", list: "7-0", expected: 0},
 		{name: "unparsable", list: "a-b", expected: 0},
-		// a malformed entry rejects the whole list rather than reporting a count that is
-		// quietly short, since a wrong CPU count would misrepresent every metric beside it
+		// a malformed entry rejects the whole list: a short count would misrepresent
+		// every metric beside it
 		{name: "partially malformed", list: "0-3,bogus", expected: 0},
 	}
 	for _, test := range tests {
@@ -80,8 +80,7 @@ func TestFormatBytesIEC(t *testing.T) {
 	assert.Equal(t, "1.0 TiB", formatBytesIEC(1099511627776))
 }
 
-// parseCgroupConfigs is given the script's output verbatim, in which each cgroup's IOmax
-// and IOweight records follow its CG record.
+// The script's output verbatim: each cgroup's IOmax and IOweight records follow its CG record.
 func TestParseCgroupConfigs(t *testing.T) {
 	out := `CG /system.slice/docker-aaa.scope|0-3,96-99|0|max 100000|68719476736|/system.slice|max|0
 IOmax /system.slice/docker-aaa.scope|8:0|rbps=1048576 wbps=max riops=max wiops=500
@@ -135,16 +134,15 @@ IOweight /a.scope|default|notanumber
 	assert.Len(t, configs, 1)
 	assert.Equal(t, "a.scope", configs[0].Name)
 	assert.Equal(t, 2, configs[0].CPUCount)
-	// an IO record naming a cgroup with no CG record is dropped rather than misattributed,
-	// and an unparsable weight leaves the weight unset
+	// an IO record with no CG record is dropped, not misattributed; a bad weight stays unset
 	assert.Equal(t, 0, configs[0].IOWeight)
 }
 
 func TestSummarizeIOLimits(t *testing.T) {
 	// "unlimited" only when io.max names no device at all
 	assert.Equal(t, "unlimited", summarizeIOLimits(nil))
-	// a device named in io.max is kept even when none of its fields are set, and every
-	// field is shown, so the rendering has the same shape whatever is configured
+	// a device in io.max is kept with no fields set, and every field shows, so the
+	// rendering keeps its shape whatever is configured
 	assert.Equal(t, "8:0 rbps=max wbps=max riops=max wiops=max", summarizeIOLimits([]IODeviceLimit{
 		{Device: "8:0", RBPS: unlimited, WBPS: unlimited, RIOPS: unlimited, WIOPS: unlimited},
 	}))
@@ -174,8 +172,7 @@ func TestSummarizeIOWeight(t *testing.T) {
 
 func TestMergeCgroupConfigs(t *testing.T) {
 	existing := []CgroupConfig{{Name: "a", CPUCount: 4}, {Name: "b", CPUCount: 8}}
-	// "b" is refreshed and "c" is newly monitored; "a" is no longer hot but is retained
-	// because the report still presents its metrics
+	// "b" refreshed, "c" new; "a" is no longer hot but is kept, its metrics still shown
 	merged := mergeCgroupConfigs(existing, []CgroupConfig{{Name: "b", CPUCount: 16}, {Name: "c", CPUCount: 2}})
 	assert.Len(t, merged, 3)
 	assert.Equal(t, 4, merged[0].CPUCount)
@@ -232,8 +229,8 @@ func TestCgroupConfigRows(t *testing.T) {
 	assert.Equal(t, []string{"IO weight", "io.weight", "100 (8:0=200)", "50"}, rows[7])
 }
 
-// A CPU quota is an exact quota/period ratio, so it is rendered without rounding. A fixed
-// precision would misstate the limit, e.g., 12.5 CPUs as "12" and 100 CPUs as "1e+02".
+// A quota is an exact quota/period ratio, so it is not rounded: a fixed precision would
+// misstate it, e.g., 12.5 CPUs as "12" and 100 CPUs as "1e+02".
 func TestCgroupConfigRowsCPUQuotaPrecision(t *testing.T) {
 	configs := []CgroupConfig{
 		{Name: "a", CPUQuota: 12.5, MemoryLimit: unlimited, MemoryHigh: unlimited, SwapLimit: unlimited},
@@ -244,19 +241,16 @@ func TestCgroupConfigRowsCPUQuotaPrecision(t *testing.T) {
 	assert.Equal(t, []string{"CPU quota", "cpu.max", "12.5 CPUs", "100 CPUs", "0.125 CPUs"}, rows[1])
 }
 
-// A cgroup present in the report but absent from the collected configuration, e.g., one
-// that went away before its configuration could be read, leaves blank cells rather than
-// shifting the remaining values into the wrong columns.
+// A cgroup in the report but absent from the configuration, e.g., one that went away,
+// leaves blank cells rather than shifting values into the wrong columns.
 func TestCgroupConfigRowsMissingCgroup(t *testing.T) {
 	configs := []CgroupConfig{{Name: "cg2", CPUs: "0-1", CPUCount: 2, CPUQuota: float64(unlimited), MemoryLimit: unlimited, MemoryHigh: unlimited, SwapLimit: unlimited}}
 	rows := cgroupConfigRows(configs, []string{"cg1", "cg2"})
 	assert.Equal(t, []string{"CPUs", "cpuset.cpus.effective", "", "0-1 (2)"}, rows[0])
 }
 
-// No configuration at all, e.g., a cgroup v1 host, still produces every row, with every
-// cell blank. Suppressing the configuration entirely in that case is the caller's job; see
-// addGroupTemplateValues, which only sets the template value when a configuration was
-// collected.
+// No configuration at all, e.g., a cgroup v1 host, still produces every row, blank.
+// Suppressing it entirely is addGroupTemplateValues' job.
 func TestCgroupConfigRowsNoConfigs(t *testing.T) {
 	rows := cgroupConfigRows(nil, []string{"cg1", "cg2"})
 	assert.Len(t, rows, 8)
@@ -265,8 +259,8 @@ func TestCgroupConfigRowsNoConfigs(t *testing.T) {
 	assert.Equal(t, []string{"IO weight", "io.weight", "", ""}, rows[7])
 }
 
-// The report's template must always receive a GROUPCONFIGS value: an unset template value
-// renders as nothing, which would produce invalid JavaScript in the report.
+// GROUPCONFIGS must always be set: an unset template value renders as nothing, which
+// would produce invalid JavaScript.
 func TestGetHTMLRendersCgroupConfigs(t *testing.T) {
 	names := []string{"CPU utilization %"}
 	mc := MetricCollection{

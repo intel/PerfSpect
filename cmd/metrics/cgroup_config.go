@@ -3,10 +3,8 @@
 
 package metrics
 
-// Static configuration of the cgroups monitored at cgroup scope. These are the limits and
-// affinities set on the cgroup, not measurements of its behavior, and they give the report's
-// per-cgroup metrics the context needed to interpret them, e.g., how many CPUs a metric's
-// value is spread across.
+// Static configuration of the cgroups monitored at cgroup scope: the limits and affinities
+// set on them, not measurements, giving the report's per-cgroup metrics their context.
 
 import (
 	"fmt"
@@ -21,13 +19,13 @@ import (
 	"perfspect/internal/workflow"
 )
 
-// unlimited is the value used for a limit that is not set, i.e., the cgroup file holds "max"
+// unlimited marks a limit that is not set, i.e., the cgroup file holds "max"
 const unlimited = int64(-1)
 
-// CgroupConfig holds the static configuration of one cgroup. Limit fields hold 'unlimited'
-// when the corresponding cgroup file holds "max", and 0 is a real limit of zero.
+// CgroupConfig holds one cgroup's static configuration. Limits are 'unlimited' when the
+// cgroup file holds "max"; 0 is a real limit of zero.
 type CgroupConfig struct {
-	Name string `json:"name"` // cgroup path as it appears in the report's CID field, i.e., no leading slash
+	Name string `json:"name"` // cgroup path as in the report's CID field, no leading slash
 	// CPU
 	CPUs     string  `json:"cpus"`     // cpuset.cpus.effective, e.g., "0-3,96-99"
 	CPUCount int     `json:"cpuCount"` // number of CPUs in CPUs
@@ -35,7 +33,7 @@ type CgroupConfig struct {
 	// memory
 	NUMANodes       string `json:"numaNodes"`       // cpuset.mems.effective, e.g., "0"
 	MemoryLimit     int64  `json:"memoryLimit"`     // lowest memory.max in this cgroup's ancestry
-	MemoryLimitFrom string `json:"memoryLimitFrom"` // the cgroup that imposes MemoryLimit, when not this one
+	MemoryLimitFrom string `json:"memoryLimitFrom"` // cgroup imposing MemoryLimit, when not this one
 	MemoryHigh      int64  `json:"memoryHigh"`      // this cgroup's memory.high
 	SwapLimit       int64  `json:"swapLimit"`       // this cgroup's memory.swap.max
 	// block IO
@@ -44,8 +42,8 @@ type CgroupConfig struct {
 	IOWeightDevices []IODeviceWeight `json:"ioWeightDevices"` // io.weight's per-device overrides
 }
 
-// IODeviceLimit holds one device's io.max throttling limits. Each field holds 'unlimited'
-// when it is not set, which is the case for every field of a device absent from io.max.
+// IODeviceLimit holds one device's io.max throttling limits. A field is 'unlimited' when
+// it is not set.
 type IODeviceLimit struct {
 	Device string `json:"device"` // block device as the kernel reports it, i.e., "major:minor"
 	RBPS   int64  `json:"rbps"`   // read bytes per second
@@ -54,19 +52,15 @@ type IODeviceLimit struct {
 	WIOPS  int64  `json:"wiops"`  // write IOs per second
 }
 
-// IODeviceWeight holds one device's io.weight override, i.e., a line of io.weight other
-// than its "default" line
+// IODeviceWeight holds one device's io.weight override, i.e., a non-"default" line
 type IODeviceWeight struct {
 	Device string `json:"device"` // block device as the kernel reports it, i.e., "major:minor"
 	Weight int    `json:"weight"`
 }
 
-// GetCgroupConfigs reads the static configuration of each of the given cgroups from the
-// target's cgroup v2 filesystem. The cgroups are named as they are passed to perf, i.e.,
-// relative to the cgroup mount point.
-//
-// A cgroup whose configuration cannot be read is omitted rather than failing the
-// collection; this information is supplementary to the metrics.
+// GetCgroupConfigs reads each cgroup's static configuration from the target's cgroup v2
+// filesystem. Cgroups are named as passed to perf, relative to the cgroup mount point.
+// An unreadable cgroup is omitted rather than failing the collection.
 func GetCgroupConfigs(myTarget target.Target, cgroups []string, localTempDir string) ([]CgroupConfig, error) {
 	if len(cgroups) == 0 {
 		return nil, nil
@@ -76,9 +70,8 @@ func GetCgroupConfigs(myTarget target.Target, cgroups []string, localTempDir str
 		// single-quote for the shell, escaping any embedded single quotes
 		quoted = append(quoted, "'"+strings.ReplaceAll(cgroup, "'", `'\''`)+"'")
 	}
-	// memory.max is not resolved across the hierarchy by the kernel the way
-	// cpuset.cpus.effective is, so the effective limit is the lowest memory.max from the
-	// cgroup up to the root.
+	// the kernel does not resolve memory.max across the hierarchy as it does
+	// cpuset.cpus.effective, so take the lowest from the cgroup up to the root
 	cgroupConfigScript := script.ScriptDefinition{
 		Name: "cgroup_config",
 		ScriptTemplate: fmt.Sprintf(`
@@ -111,11 +104,9 @@ for rel in %s; do
         dd=$(dirname "$dd")
     done
     printf 'CG %%s|%%s|%%s|%%s|%%s|%%s|%%s|%%s\n' "$rel" "$cpus" "$mems" "$cpumax" "$lim" "$src" "$memhigh" "$swapmax"
-    # io.max and io.weight are keyed by "major:minor", except for io.weight's "default"
-    # line. The device is reported as the kernel spells it: resolving it to a name like
-    # "sda" would need readlink, which is not part of every Linux userland. io.max is empty
-    # when no throttling is configured, and io.weight is absent unless the IO controller
-    # supports weights.
+    # io.max and io.weight are keyed by "major:minor"; io.weight also has a "default" line.
+    # The device is left as the kernel spells it: a name like "sda" would need readlink,
+    # which not every Linux userland has. io.max is empty unthrottled; io.weight may be absent.
     for which in max weight; do
         if [ ! -f "$d/io.$which" ]; then
             continue
@@ -138,10 +129,9 @@ done
 	return parseCgroupConfigs(output.Stdout), nil
 }
 
-// mergeCgroupConfigs adds the newly collected cgroup configurations to those already
-// collected, replacing the configuration of a cgroup that is already present. The
-// monitored cgroups can change when the "hot" cgroup list is refreshed, and the report
-// presents every cgroup that was monitored, so the configurations accumulate.
+// mergeCgroupConfigs adds newly collected configurations, replacing any already present.
+// The "hot" cgroup list can change mid-collection and the report presents every cgroup
+// monitored, so they accumulate.
 func mergeCgroupConfigs(existing []CgroupConfig, collected []CgroupConfig) []CgroupConfig {
 	for _, config := range collected {
 		idx := slices.IndexFunc(existing, func(e CgroupConfig) bool { return e.Name == config.Name })
@@ -227,7 +217,7 @@ func parseCgroupConfigs(out string) []CgroupConfig {
 	return configs
 }
 
-// parseIOFields parses the "key=value key=value ..." portion of an io.max or io.stat line
+// parseIOFields parses the "key=value ..." portion of an io.max or io.weight line
 func parseIOFields(fields string) map[string]string {
 	values := make(map[string]string)
 	for field := range strings.FieldsSeq(fields) {
@@ -249,8 +239,8 @@ func ioLimit(values map[string]string, key string) int64 {
 	return parseCgroupLimit(value)
 }
 
-// parseCgroupLimit parses a cgroup limit file's value, which is either a number of bytes
-// or "max". An empty or unparsable value is reported as unlimited.
+// parseCgroupLimit parses a cgroup limit file: a byte count, or "max". An empty or
+// unparsable value reads as unlimited.
 func parseCgroupLimit(value string) int64 {
 	value = strings.TrimSpace(value)
 	if value == "" || value == "max" {
@@ -263,8 +253,8 @@ func parseCgroupLimit(value string) int64 {
 	return bytes
 }
 
-// parseCPUMax converts a cpu.max value, "$quota $period" in microseconds, into a count of
-// CPUs. A quota of "max" is reported as unlimited.
+// parseCPUMax converts cpu.max, "$quota $period" in microseconds, to a count of CPUs.
+// A quota of "max" is unlimited.
 func parseCPUMax(value string) float64 {
 	fields := strings.Fields(value)
 	if len(fields) != 2 || fields[0] == "max" {
@@ -281,8 +271,8 @@ func parseCPUMax(value string) float64 {
 	return quota / period
 }
 
-// countCPUList counts the CPUs in a cpuset list, e.g., "0-3,96-99" is 8 CPUs. An empty
-// list, which is how a cgroup with no cpuset of its own reads, is no CPUs.
+// countCPUList counts CPUs in a cpuset list, e.g., "0-3,96-99" is 8. An empty list, how a
+// cgroup with no cpuset of its own reads, is 0.
 func countCPUList(list string) int {
 	list = strings.TrimSpace(list)
 	if list == "" {
@@ -311,11 +301,9 @@ func formatBytesIEC(bytes int64) string {
 	return fmt.Sprintf("%.1f EiB", value/1024)
 }
 
-// summarizeIOLimits renders the configured io.max limits, one entry per device named in
-// io.max, e.g., "sda rbps=1.0 MiB/s wbps=max riops=max wiops=500". Every field is shown
-// whether or not it is set, using io.max's own spelling of "max" for a field with no
-// limit, and no device is omitted. The result is "unlimited" only when io.max names no
-// device at all, which is the common case.
+// summarizeIOLimits renders io.max, one entry per device named there, e.g.,
+// "8:0 rbps=1.0 MiB/s wbps=max riops=max wiops=500". Every field and device is shown, so
+// "unlimited" means only that io.max names no device, which is the common case.
 func summarizeIOLimits(limits []IODeviceLimit) string {
 	if len(limits) == 0 {
 		return "unlimited"
@@ -346,9 +334,8 @@ func ioCountLimit(value int64) string {
 	return strconv.FormatInt(value, 10)
 }
 
-// summarizeIOWeight renders the io.weight configuration: the default weight, followed by
-// any per-device overrides. It is empty when io.weight is absent, which is the case unless
-// the IO controller supports weights.
+// summarizeIOWeight renders io.weight: the default weight plus any per-device overrides.
+// Empty when io.weight is absent, i.e., the IO controller has no weight support.
 func summarizeIOWeight(weight int, overrides []IODeviceWeight) string {
 	if weight == 0 && len(overrides) == 0 {
 		return ""
@@ -364,18 +351,9 @@ func summarizeIOWeight(weight int, overrides []IODeviceWeight) string {
 	return fmt.Sprintf("%s (%s)", out, strings.Join(entries, ", "))
 }
 
-// cgroupConfigRows arranges the cgroup configurations into table rows for the report: a
-// label followed by one value per cgroup, in the order the cgroups appear in the report.
-//
-// Each row is a label, the cgroup v2 file the value is read from, then one value per
-// cgroup. Naming the file makes the value traceable and resolves ambiguity the label
-// cannot, e.g., that the CPU list comes from cpuset.cpus.effective rather than
-// cpuset.cpus, which usually reads empty.
-//
-// Every row is always returned, including rows that are blank or "unlimited" for every
-// cgroup, so that the report presents the same fields in the same order regardless of how
-// the cgroups happen to be configured. Omitting the configuration altogether, e.g., on a
-// cgroup v1 host where none of it can be read, is the caller's decision.
+// cgroupConfigRows builds the report's rows: a label, the cgroup v2 file the value comes
+// from, then one value per cgroup in report order. Every row is always returned, blank or
+// not, so the fields stay constant; suppressing them entirely is the caller's job.
 func cgroupConfigRows(configs []CgroupConfig, names []string) [][]string {
 	byName := make(map[string]CgroupConfig, len(configs))
 	for _, config := range configs {
@@ -391,8 +369,7 @@ func cgroupConfigRows(configs []CgroupConfig, names []string) [][]string {
 			return formatBytesIEC(value)
 		}
 	}
-	// label, then the cgroup v2 file the value comes from. memory.max is marked as walked
-	// because the value is the lowest in the cgroup's ancestry, not just its own file.
+	// memory.max is marked walked: the value is the lowest in the ancestry, not its own file
 	rows := [][]string{
 		{"CPUs", "cpuset.cpus.effective"},
 		{"CPU quota", "cpu.max"},
@@ -417,8 +394,7 @@ func cgroupConfigRows(configs []CgroupConfig, names []string) [][]string {
 		}
 		quota := "unlimited"
 		if config.CPUQuota != float64(unlimited) {
-			// %g rather than a fixed precision: a quota is an exact quota/period ratio, and
-			// rounding it would misstate the limit, e.g., 12.5 CPUs as 12
+			// %g, not fixed precision: rounding would misstate the limit, e.g., 12.5 as 12
 			quota = fmt.Sprintf("%g CPUs", config.CPUQuota)
 		}
 		memLimit := limit(config.MemoryLimit)

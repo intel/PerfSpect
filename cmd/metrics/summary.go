@@ -383,10 +383,9 @@ func (mc MetricCollection) aggregate() (m *MetricGroup, err error) {
 	return
 }
 
-// getHTML - generate a string containing HTML representing the metrics. The report's
-// charts and All Metrics tab present the aggregate of all metric groups. When the
-// collection holds more than one group, e.g., one per cgroup, the report additionally
-// presents the mean value of each metric for each group.
+// getHTML - generate a string containing HTML representing the metrics. Charts and the
+// All Metrics tab show the aggregate of all groups; with more than one group, e.g., one
+// per cgroup, the report also shows each metric's mean per group.
 func (mc MetricCollection) getHTML(metadata Metadata, metricDefinitions []MetricDefinition) (out string, err error) {
 	if len(mc) == 0 {
 		err = fmt.Errorf("no metrics to summarize")
@@ -419,14 +418,9 @@ func (mc MetricCollection) getHTML(metadata Metadata, metricDefinitions []Metric
 	return buf.String(), nil
 }
 
-// addGroupTemplateValues adds the template values that describe the mean value of each
-// metric for each group in the collection, i.e., for each socket, CPU, or cgroup. These
-// drive the report's per-group metrics tab.
-//
-// When the collection holds a single group, i.e., system scope and system granularity,
-// the values are empty and the report does not present the per-group tab. The values are
-// always set, since an unset template value renders as nothing, which would produce
-// invalid JavaScript in the report.
+// addGroupTemplateValues adds the template values driving the per-group metrics tab: each
+// metric's mean per socket, CPU, or cgroup. They are empty for a single group, and always
+// set, since an unset template value renders as nothing and breaks the report's JavaScript.
 func (mc MetricCollection) addGroupTemplateValues(templateVals map[string]string, metricDefinitions []MetricDefinition, metadata Metadata) error {
 	// defaults, used when there is no per-group data to present
 	templateVals["GROUPBYFIELD"] = `""`
@@ -436,8 +430,7 @@ func (mc MetricCollection) addGroupTemplateValues(templateVals map[string]string
 	if len(mc) < 2 {
 		return nil
 	}
-	// all groups must present the same metrics, in the same order, for the values to line
-	// up with the metric names in the report's table
+	// all groups need the same metrics in the same order to line up with the table's names
 	metricNames := mc[0].names
 	for idx, mg := range mc[1:] {
 		if !slices.Equal(mg.names, metricNames) {
@@ -446,9 +439,8 @@ func (mc MetricCollection) addGroupTemplateValues(templateVals map[string]string
 			return nil
 		}
 	}
-	// the group values, e.g., the cgroup IDs, along with the number of samples collected
-	// for each. Groups can come and go during collection, e.g., when the list of "hot"
-	// cgroups is refreshed, so the sample counts provide context for the mean values.
+	// the group values, e.g., cgroup IDs, with each one's sample count. Groups come and go
+	// as the "hot" list refreshes, so the counts give the means context.
 	groups := make([][]string, 0, len(mc))
 	allStats := make([]map[string]metricStats, 0, len(mc))
 	for idx, mg := range mc {
@@ -463,8 +455,7 @@ func (mc MetricCollection) addGroupTemplateValues(templateVals map[string]string
 		}
 		allStats = append(allStats, stats)
 	}
-	// one row per metric: the metric name, the metric level, then the mean value from
-	// each group, in the same order as the groups
+	// one row per metric: name, level, then each group's mean, in group order
 	groupMeans := make([][]string, 0, len(metricNames))
 	for _, name := range metricNames {
 		level := 1
@@ -498,8 +489,7 @@ func (mc MetricCollection) addGroupTemplateValues(templateVals map[string]string
 	templateVals["GROUPBYFIELD"] = string(groupByFieldBytes)
 	templateVals["GROUPS"] = string(groupsBytes)
 	templateVals["GROUPMEANS"] = string(groupMeansBytes)
-	// the cgroups' static configuration, presented above the metrics so that the per-cgroup
-	// values can be read in the context of the cgroup's CPU and memory limits
+	// the cgroups' static configuration, shown above the metrics to give them context
 	if len(metadata.CgroupConfigs) > 0 {
 		groupNames := make([]string, 0, len(groups))
 		for _, group := range groups {
