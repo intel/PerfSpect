@@ -401,7 +401,7 @@ func (mc MetricCollection) getHTML(metadata Metadata, metricDefinitions []Metric
 		slog.Error("failed to load template values", slog.String("error", err.Error()))
 		return
 	}
-	if err = mc.addGroupTemplateValues(templateVals, metricDefinitions); err != nil {
+	if err = mc.addGroupTemplateValues(templateVals, metricDefinitions, metadata); err != nil {
 		slog.Error("failed to load per-group template values", slog.String("error", err.Error()))
 		return
 	}
@@ -427,11 +427,12 @@ func (mc MetricCollection) getHTML(metadata Metadata, metricDefinitions []Metric
 // the values are empty and the report does not present the per-group tab. The values are
 // always set, since an unset template value renders as nothing, which would produce
 // invalid JavaScript in the report.
-func (mc MetricCollection) addGroupTemplateValues(templateVals map[string]string, metricDefinitions []MetricDefinition) error {
+func (mc MetricCollection) addGroupTemplateValues(templateVals map[string]string, metricDefinitions []MetricDefinition, metadata Metadata) error {
 	// defaults, used when there is no per-group data to present
 	templateVals["GROUPBYFIELD"] = `""`
 	templateVals["GROUPS"] = "[]"
 	templateVals["GROUPMEANS"] = "[]"
+	templateVals["GROUPCONFIGS"] = "[]"
 	if len(mc) < 2 {
 		return nil
 	}
@@ -497,6 +498,19 @@ func (mc MetricCollection) addGroupTemplateValues(templateVals map[string]string
 	templateVals["GROUPBYFIELD"] = string(groupByFieldBytes)
 	templateVals["GROUPS"] = string(groupsBytes)
 	templateVals["GROUPMEANS"] = string(groupMeansBytes)
+	// the cgroups' static configuration, presented above the metrics so that the per-cgroup
+	// values can be read in the context of the cgroup's CPU and memory limits
+	if len(metadata.CgroupConfigs) > 0 {
+		groupNames := make([]string, 0, len(groups))
+		for _, group := range groups {
+			groupNames = append(groupNames, group[0])
+		}
+		groupConfigsBytes, err := json.Marshal(cgroupConfigRows(metadata.CgroupConfigs, groupNames))
+		if err != nil {
+			return err
+		}
+		templateVals["GROUPCONFIGS"] = string(groupConfigsBytes)
+	}
 	return nil
 }
 

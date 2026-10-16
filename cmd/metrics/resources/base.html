@@ -174,6 +174,10 @@
       const group_by_field = <<.GROUPBYFIELD>>
       const groups = <<.GROUPS>>
       const group_means = <<.GROUPMEANS>>
+      // the groups' static configuration, e.g., a cgroup's CPU and memory limits. One row
+      // per configuration field: a label followed by one value per group. Empty unless the
+      // groups are cgroups and their configuration was collected.
+      const group_configs = <<.GROUPCONFIGS>>
       const hasGroups = groups.length > 0 && group_means.length > 0;
       // labels for the per-group metrics tab, by the field the metrics are grouped by
       const groupLabels = {
@@ -425,6 +429,53 @@
                 </TableRow>
               </TableHead>
               <TableBody>
+                {/* configuration rows, pinned above the metrics. These are settings, not
+                    measurements, so they are shaded and the last one carries a heavier
+                    bottom border to separate them from the metric values below. */}
+                {group_configs.map((row, rowIdx) => (
+                  <TableRow
+                    hover={true}
+                    key={`config-${row[0]}`}
+                    sx={{
+                      backgroundColor: "action.hover",
+                      ...(rowIdx === group_configs.length - 1 && {
+                        '& td, & th': { borderBottom: 2, borderBottomColor: "divider" },
+                      }),
+                    }}
+                  >
+                    <TableCell
+                      sx={{
+                        ...stickyCell,
+                        zIndex: 2,
+                        fontFamily: 'Monospace',
+                        backgroundColor: "action.hover",
+                      }}
+                      component="th"
+                      scope="row"
+                    >
+                      {row[0]}
+                      {/* the cgroup v2 file the value is read from, so the reader can go
+                          look at it directly. Subordinate to the label, not a column of
+                          its own, since it is a reference rather than data. */}
+                      <Box
+                        component="span"
+                        sx={{
+                          display: "block",
+                          fontFamily: 'Monospace',
+                          fontSize: "0.72rem",
+                          color: "text.secondary",
+                        }}
+                      >
+                        {row[1]}
+                      </Box>
+                    </TableCell>
+                    {groups.map(([value], idx) => (
+                      <TableCell key={value} sx={{ fontFamily: 'Monospace' }} align="right">
+                        {row[idx + 2] === "" || row[idx + 2] === undefined ? "—" : row[idx + 2]}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
                 {group_means.map((row) => (
                   <TableRow
                     hover={true}
