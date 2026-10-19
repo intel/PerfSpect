@@ -15,14 +15,14 @@ ARG TOOLS_IMAGE=${REGISTRY}${PREFIX}perfspect-tools:${TAG}
 FROM ${TOOLS_IMAGE} AS tools
 
 # STAGE 2 - image contains perfspect's Go components build environment
-FROM golang:1.26.6@sha256:0d1d3a794be25f809dd2cb3160d8c73276c4056a9f8242a138e908ddeee7b6b6
+FROM golang:1.27.2@sha256:007a316059246276cb214df93950be77837545dc78007a73e0291a4963d5d3bf
 # install system dependencies
 RUN apt-get update && apt-get install -y jq
 # allow git to operate in the mounted repository regardless of the user
 RUN git config --global --add safe.directory /localrepo
 # pre-install Go tools used by make check
 RUN go install honnef.co/go/tools/cmd/staticcheck@latest && \
-    go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest && \
+    go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest && \
     go install golang.org/x/vuln/cmd/govulncheck@latest && \
     go install github.com/securego/gosec/v2/cmd/gosec@latest
 # copy the tools binaries and source from the previous stage

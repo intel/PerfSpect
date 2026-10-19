@@ -144,7 +144,7 @@ check_license:
 .PHONY: check_lint
 check_lint:
 	@echo "Running golangci-lint to check for style issues..."
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 	golangci-lint run
 
 .PHONY: check_vuln
