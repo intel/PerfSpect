@@ -55,39 +55,13 @@ const (
 	scriptPMUEnumerationSafety   = "pmu enumeration safety"
 )
 
-// Some virtualized guests are given a PMU that advertises a fixed counter the kernel
-// cannot use, and enumerating events on one faults the kernel outright. Observed on AWS
-// m6i.16xlarge (Ice Lake guest, kernel 6.14.0-1015-aws): the guest reports 4
-// fixed-purpose counters, which includes counter 3, TOPDOWN.SLOTS, while lacking
-// GLOBAL_CTRL_EN_PERF_METRICS -- so opening an event that lands on that counter gives
-//
-//	Oops: general protection fault, maybe for address 0x1
-//	x86_perf_event_update+0x48 <- intel_pmu_set_period <- x86_pmu_start
-//	  <- x86_pmu_enable <- __perf_event_enable <- _perf_ioctl
-//
-// The faulting task then dies inside x86_pmu_enable still holding perf's context lock
-// and parks in D state in perf_event_release_kernel, after which every perf_event_open
-// on the machine blocks in account_event/perf_event_alloc, in D state, ignoring SIGKILL.
-// RCU stalls and soft lockups follow and the instance leaves the network. No shell-level
-// timeout can contain that: a D-state task does not take signals.
-//
-// 'perf list' reaches the fault because it calls perf_event_open per candidate event to
-// test support, so it is metadata collection -- not metric collection -- that takes the
-// machine down. This probe decides whether that is a risk here, and it reads only dmesg
-// and sysfs: it opens no perf events, so it is safe on every target.
-//
-// The predicate is the incoherence itself, not a model or instance-type list: 4 or more
-// fixed-purpose counters advertised while the kernel exposes no slots/topdown event.
-// Every comparable cell is coherent one way or the other and is left alone -- bare-metal
-// Ice Lake exposes slots and passes, m7i.24xlarge advertises 2 fixed counters, and
-// m5.24xlarge is Skylake with no slots counter to advertise.
+// Checks whether fixed purpose counters are exposed and that the slots event is exposed
+// Prevents kernel faults when trying to access virtualized PMUs
+// So far only seen on AWS m6i.16xl instance
 var pmuEnumerationSafetyScript = script.ScriptDefinition{
 	Name: scriptPMUEnumerationSafety,
-	// Both spellings are required. The Intel PMU driver renamed its boot lines in 6.15:
-	// through 6.14 it prints "fixed-purpose events: 4", from 6.15 on "fixed-purpose
-	// counters: 4" (verified on 6.14.0-1015-aws and 7.0.0-1012-aws). Matching only the
-	// older wording makes this probe find nothing on a current kernel, which fails open
-	// and silently stops protecting exactly the targets it exists for.
+	// Need both "fixed-purpose events" and "fixed-purpose counters" to be recognized.
+	// It changed in kernel 6.15.
 	ScriptTemplate: `fixed=$(dmesg 2>/dev/null | grep -oE 'fixed-purpose (events|counters):[[:space:]]*[0-9]+' | grep -oE '[0-9]+$' | tail -1)
 slots=no
 # Unmatched globs stay literal here, and [[ -e ]] on a literal is false, so a machine
@@ -104,15 +78,9 @@ echo "slots_event_exposed=$slots"
 
 // Event enumeration from sysfs, for targets where asking perf to do it would fault the
 // kernel (see pmuEnumerationSafetyScript). Reading sysfs opens no events, so it cannot
-// fault, and it has a second property that matters more than being safe: sysfs is the
-// kernel's own list of events it will accept. Anything absent from it -- including the
-// topdown events at the root of the fault -- is then dropped from the metric definitions
+// fault. Anything absent from it is then dropped from the metric definitions
 // by the existing IsCollectable checks, so metric collection cannot walk into the fault
-// later either. The event set is narrower than 'perf list' would report, which is the
-// price of collecting anything at all on such a target.
-//
-// Output must match the shape 'perf list --json' is parsed into: one event name per
-// line, core events bare and the rest as perf spells them, "pmu/event/".
+// later either. Output must match the shape 'perf list --json' is parsed into.
 const sysfsEventEnumerationPreamble = `# See pmuEnumerationSafetyScript in cmd/metrics/metadata.go for why this reads sysfs
 # rather than asking perf to enumerate events.
 for events_dir in /sys/bus/event_source/devices/*/events; do
@@ -397,9 +365,7 @@ BEGIN {
 // It copies the base definitions and applies template replacements and privilege settings.
 //
 // enumerateEventsFromSysfs replaces the two 'perf list --json' scripts with sysfs reads,
-// for targets where letting perf enumerate events would fault the kernel. Both are
-// replaced: they run in the same concurrent batch, so leaving either one is enough to
-// take the machine down. See pmuEnumerationSafetyScript.
+// for targets where letting perf enumerate events would fault the kernel.
 func getMetadataScripts(noRoot bool, noSystemSummary bool, numGPCounters int, enumerateEventsFromSysfs bool) ([]script.ScriptDefinition, error) {
 	metadataScripts := make([]script.ScriptDefinition, 0, len(baseMetadataScripts))
 
