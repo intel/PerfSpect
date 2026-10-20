@@ -91,8 +91,18 @@ func (c *X86MetadataCollector) CollectMetadata(t target.Target, noRoot bool, noS
 		return Metadata{}, fmt.Errorf("failed to get number of general purpose counters: %v", err)
 	}
 
+	// Whether perf can safely enumerate this target's events. Decided before the metadata
+	// scripts rather than from their output, because the command that faults the kernel on
+	// an affected target is one of those scripts.
+	enumerateEventsFromSysfs, reason := perfEnumerationFaultsKernel(t, localTempDir, noRoot)
+	if enumerateEventsFromSysfs {
+		slog.Warn("enumerating perf events from sysfs instead of with perf; the event set, and so the "+
+			"set of metrics that can be collected, will be narrower than usual on this target",
+			slog.String("reason", reason))
+	}
+
 	// Run metadata scripts concurrently
-	metadataScripts, err := getMetadataScripts(noRoot, noSystemSummary, metadata.NumGeneralPurposeCounters)
+	metadataScripts, err := getMetadataScripts(noRoot, noSystemSummary, metadata.NumGeneralPurposeCounters, enumerateEventsFromSysfs)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to get metadata scripts: %v", err)
 	}
