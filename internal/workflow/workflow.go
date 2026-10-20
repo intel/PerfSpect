@@ -219,7 +219,9 @@ func (rc *ReportingCommand) Run() error {
 		}
 		// wait for all adhoc actions to complete, errors were reported by the AdhocFunc
 		for range myTargets {
-			<-adhocErrorChannel
+			if adhocErr := <-adhocErrorChannel; adhocErr != nil {
+				slog.Debug("adhoc function error", slog.String("error", adhocErr.Error()))
+			}
 		}
 		// stop the progress indicator
 		multiSpinner.Finish()
