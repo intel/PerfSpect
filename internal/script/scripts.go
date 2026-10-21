@@ -1749,11 +1749,8 @@ cleanup() {
 }
 trap cleanup INT TERM
 
-# Enumerate syscall enter events dynamically.
-#
-# Uses 'perf list tracepoint' to enumerate events safely. Bare 'perf list' will fault the
-# kernel on affected targets leaving it in D state and unreachable.
-EVENTS=$(perf list tracepoint | awk '/^[[:space:]]*syscalls:sys_enter_/ {print $1}' | paste -sd,)
+# Enumerate syscall enter events dynamically
+EVENTS=$(perf list | awk '/^[[:space:]]*syscalls:sys_enter_/ {print $1}' | paste -sd,)
 
 if [[ -z "$EVENTS" ]]; then
   echo "No syscalls:sys_enter_* events found" >&2

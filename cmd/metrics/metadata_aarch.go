@@ -93,9 +93,7 @@ func (c *ARMMetadataCollector) CollectMetadata(t target.Target, noRoot bool, noS
 	}
 
 	// Run metadata scripts concurrently
-	// The PMU incoherence that makes perf enumeration fault has only been observed on
-	// virtualized x86 guests, so ARM keeps perf enumeration unconditionally.
-	metadataScripts, err := getMetadataScripts(noRoot, noSystemSummary, metadata.NumGeneralPurposeCounters, false)
+	metadataScripts, err := getMetadataScripts(noRoot, noSystemSummary, metadata.NumGeneralPurposeCounters)
 	if err != nil {
 		return Metadata{}, fmt.Errorf("failed to get metadata scripts: %v", err)
 	}
