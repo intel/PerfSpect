@@ -4,6 +4,8 @@
 package workflow
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -178,6 +180,21 @@ func TestSanitizeTargetName(t *testing.T) {
 			input:    "valid@name#123!.txt",
 			expected: "valid_name_123_.txt",
 		},
+		{
+			name:     "Name referring to the current directory",
+			input:    ".",
+			expected: "_",
+		},
+		{
+			name:     "Name referring to the parent directory",
+			input:    "..",
+			expected: "__",
+		},
+		{
+			name:     "Name attempting path traversal",
+			input:    "../../etc",
+			expected: ".._.._etc",
+		},
 	}
 
 	for _, tt := range tests {
@@ -186,4 +203,120 @@ func TestSanitizeTargetName(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+// TestValidateTargetHost confirms the host name rules. A host name becomes an argument of the local
+// ssh process and, when a target is not named, a component of the target's output path, so a leading
+// dash and a path separator must both be rejected. See validateTargetHost for the reasoning.
+func TestValidateTargetHost(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{name: "Empty host", input: "", wantErr: false},
+		{name: "Host name", input: "my-host.example.com", wantErr: false},
+		{name: "IPv4 address", input: "192.168.1.1", wantErr: false},
+		{name: "Single character host", input: "h", wantErr: false},
+		{name: "Host beginning with a dash", input: "-host", wantErr: true},
+		{name: "Host ending with a dash", input: "host-", wantErr: true},
+		{name: "Host with a path separator", input: "../../etc", wantErr: true},
+		{name: "Host with a space", input: "host name", wantErr: true},
+		{name: "Host with a semicolon", input: "host;name", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateTargetHost(tt.input)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateTargetFromFile(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   targetFromYAML
+		wantErr bool
+	}{
+		{
+			name:    "Valid target",
+			input:   targetFromYAML{Name: "target1", Host: "host1", Port: "22", User: "user1"},
+			wantErr: false,
+		},
+		{
+			name:    "Valid target with only a host",
+			input:   targetFromYAML{Host: "host1"},
+			wantErr: false,
+		},
+		{
+			name:    "Missing host",
+			input:   targetFromYAML{Name: "target1", User: "user1"},
+			wantErr: true,
+		},
+		{
+			name:    "Port is not a number",
+			input:   targetFromYAML{Host: "host1", Port: "notanumber"},
+			wantErr: true,
+		},
+		{
+			name:    "Port is out of range",
+			input:   targetFromYAML{Host: "host1", Port: "65536"},
+			wantErr: true,
+		},
+		{
+			name:    "Key file does not exist",
+			input:   targetFromYAML{Host: "host1", Key: "/no/such/key/file"},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateTargetFromFile(tt.input)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+// TestGetTargetsFromFileRejectsInvalidTargets confirms that an entry with invalid connection details
+// yields a target error rather than a usable target, and that the returned targets and errors stay
+// parallel, which the callers of GetTargets require.
+func TestGetTargetsFromFileRejectsInvalidTargets(t *testing.T) {
+	tempDir := t.TempDir()
+	// every entry is invalid, so that no connection is attempted and the test cannot hang on name
+	// resolution; the second entry is unnamed, so its name comes from its host
+	yaml := `targets:
+  - name: target1
+    host: "host name with a space"
+    port:
+    user:
+    key:
+    pwd:
+  - host: host2
+    port: 65536
+`
+	targetsFilePath := filepath.Join(tempDir, "targets.yaml")
+	if err := os.WriteFile(targetsFilePath, []byte(yaml), 0600); err != nil {
+		t.Fatalf("failed to write targets file: %v", err)
+	}
+
+	targets, targetErrs, err := getTargetsFromFile(targetsFilePath, tempDir)
+	assert.NoError(t, err)
+	// the targets and their errors remain parallel, as the caller requires
+	assert.Len(t, targets, 2)
+	assert.Len(t, targetErrs, 2)
+	// both targets are rejected, and both keep a usable name for display
+	assert.Error(t, targetErrs[0])
+	assert.Equal(t, "target1", targets[0].GetName())
+	assert.Error(t, targetErrs[1])
+	assert.Equal(t, "host2", targets[1].GetName())
 }
