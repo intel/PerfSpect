@@ -166,6 +166,7 @@ type Metadata struct {
 	PerfSpectVersion    string
 	WithWorkload        bool // true if metrics were collected with a user-provided workload application
 	CollectionInterval  time.Duration
+	CgroupConfigs       []CgroupConfig // static configuration of the monitored cgroups, when collecting at cgroup scope
 }
 
 // MetadataCollector defines the interface for architecture-specific metadata collection.
