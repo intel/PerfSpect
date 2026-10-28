@@ -1,0 +1,156 @@
+ Percent |	Source code & Disassembly of workload for cycles:upp (838 samples, percent: local period)
+---------------------------------------------------------------------------------------------------------
+         :
+         :
+         :
+         : 3    Disassembly of section .text:
+         :
+         : 5    0000000000001330 <gp_pressure>:
+    0.00 :   1330:   endbr64
+    0.00 :   1334:   push   %rbp
+    0.00 :   1335:   mov    $0x6b,%eax
+    0.00 :   133a:   mov    %rsp,%rbp
+    0.00 :   133d:   push   %r15
+    0.00 :   133f:   push   %r14
+    0.00 :   1341:   push   %r13
+    0.00 :   1343:   push   %r12
+    0.00 :   1345:   push   %rbx
+    0.00 :   1346:   mov    %rdi,-0x88(%rbp)
+    0.00 :   134d:   mov    %rsi,-0x90(%rbp)
+    0.00 :   1354:   mov    %edx,-0x80(%rbp)
+    0.00 :   1357:   test   %edx,%edx
+    0.00 :   1359:   je     1570 <gp_pressure+0x240>
+    0.00 :   135f:   mov    -0x90(%rbp),%rbx
+    0.00 :   1366:   mov    $0xd,%ecx
+    0.00 :   136b:   mov    -0x88(%rbp),%rax
+    0.00 :   1372:   movq   $0x3b,-0x70(%rbp)
+    0.00 :   137a:   movq   $0x2f,-0x68(%rbp)
+    0.00 :   1382:   xor    %r15d,%r15d
+    0.00 :   1385:   mov    $0x1d,%edi
+    0.00 :   138a:   mov    $0x7,%r12d
+    0.00 :   1390:   lea    (%rax,%rbx,8),%rax
+    0.00 :   1394:   movq   $0x29,-0x60(%rbp)
+    0.00 :   139c:   mov    $0x3,%r11d
+    0.00 :   13a2:   mov    $0x1,%r9d
+    0.00 :   13a8:   movq   $0x1f,-0x58(%rbp)
+    0.00 :   13b0:   mov    $0x43,%r14d
+    0.00 :   13b6:   mov    $0x3d,%r13d
+    0.00 :   13bc:   mov    $0x35,%ebx
+    0.00 :   13c1:   movq   $0x17,-0x50(%rbp)
+    0.00 :   13c9:   mov    $0x2b,%r10d
+    0.00 :   13cf:   mov    $0x25,%r8d
+    0.00 :   13d5:   mov    $0x13,%esi
+    0.00 :   13da:   movq   $0x11,-0x48(%rbp)
+    0.00 :   13e2:   movq   $0xb,-0x40(%rbp)
+    0.00 :   13ea:   movq   $0x5,-0x38(%rbp)
+    0.00 :   13f2:   movq   $0x2,-0x30(%rbp)
+    0.00 :   13fa:   mov    %rax,-0x78(%rbp)
+    0.00 :   13fe:   mov    %rcx,%rax
+    0.00 :   1401:   mov    %r9,%rcx
+    0.00 :   1404:   mov    %r11,%r9
+    0.00 :   1407:   mov    %r12,%r11
+    0.00 :   140a:   mov    %rax,%r12
+    0.00 :   140d:   nopl   (%rax)
+    0.00 :   1410:   cmpq   $0x0,-0x90(%rbp)
+    0.00 :   1418:   mov    -0x88(%rbp),%rdx
+    0.00 :   141f:   je     14f6 <gp_pressure+0x1c6>
+    0.00 :   1425:   mov    %r15d,-0x7c(%rbp)
+    0.00 :   1429:   nopl   0x0(%rax)
+    0.00 :   1430:   mov    (%rdx),%rax
+    0.00 :   1433:   add    $0x8,%rdx
+    1.91 :   1437:   mov    %rax,%r15
+    0.00 :   143a:   xor    %r14,%r15
+    2.27 :   143d:   add    %r15,%rcx
+    0.24 :   1440:   lea    (%rax,%rcx,1),%r15
+    4.04 :   1444:   xor    %r15,-0x30(%rbp)
+    1.54 :   1448:   mov    -0x30(%rbp),%r15
+    1.90 :   144c:   xor    %rax,%r15
+    0.84 :   144f:   add    %r15,%r9
+    0.83 :   1452:   lea    (%rax,%r9,1),%r15
+    2.75 :   1456:   xor    %r15,-0x38(%rbp)
+    2.86 :   145a:   mov    -0x38(%rbp),%r15
+    0.83 :   145e:   xor    %rax,%r15
+    0.97 :   1461:   add    %r15,%r11
+    1.21 :   1464:   lea    (%rax,%r11,1),%r15
+    3.27 :   1468:   xor    %r15,-0x40(%rbp)
+    2.98 :   146c:   mov    -0x40(%rbp),%r15
+    2.38 :   1470:   xor    %rax,%r15
+    1.19 :   1473:   add    %r15,%r12
+    1.31 :   1476:   lea    (%rax,%r12,1),%r15
+    3.34 :   147a:   xor    %r15,-0x48(%rbp)
+    2.74 :   147e:   mov    -0x48(%rbp),%r15
+    1.30 :   1482:   xor    %rax,%r15
+    0.72 :   1485:   add    %r15,%rsi
+    1.32 :   1488:   lea    (%rax,%rsi,1),%r15
+    4.54 :   148c:   xor    %r15,-0x50(%rbp)
+    2.28 :   1490:   mov    -0x50(%rbp),%r15
+    1.67 :   1494:   xor    %rax,%r15
+    1.18 :   1497:   add    %r15,%rdi
+    1.43 :   149a:   lea    (%rax,%rdi,1),%r15
+    4.42 :   149e:   xor    %r15,-0x58(%rbp)
+    2.66 :   14a2:   mov    -0x58(%rbp),%r15
+    1.56 :   14a6:   xor    %rax,%r15
+    1.54 :   14a9:   add    %r15,%r8
+    1.55 :   14ac:   lea    (%rax,%r8,1),%r15
+    3.23 :   14b0:   xor    %r15,-0x60(%rbp)
+    3.10 :   14b4:   mov    -0x60(%rbp),%r15
+    1.30 :   14b8:   xor    %rax,%r15
+    2.15 :   14bb:   add    %r15,%r10
+    1.32 :   14be:   lea    (%rax,%r10,1),%r15
+    3.33 :   14c2:   xor    %r15,-0x68(%rbp)
+    2.84 :   14c6:   mov    -0x68(%rbp),%r15
+    2.15 :   14ca:   xor    %rax,%r15
+    0.94 :   14cd:   add    %r15,%rbx
+    0.83 :   14d0:   lea    (%rax,%rbx,1),%r15
+    4.42 :   14d4:   xor    %r15,-0x70(%rbp)
+    3.69 :   14d8:   mov    -0x70(%rbp),%r15
+    1.07 :   14dc:   xor    %rax,%r15
+    2.13 :   14df:   add    %r15,%r13
+    0.85 :   14e2:   add    %r13,%rax
+    1.07 :   14e5:   xor    %rax,%r14
+    0.00 :   14e8:   cmp    %rdx,-0x78(%rbp)
+    0.00 :   14ec:   jne    1430 <gp_pressure+0x100>
+    0.00 :   14f2:   mov    -0x7c(%rbp),%r15d
+    0.00 :   14f6:   add    $0x1,%r15d
+    0.00 :   14fa:   cmp    %r15d,-0x80(%rbp)
+    0.00 :   14fe:   jne    1410 <gp_pressure+0xe0>
+    0.00 :   1504:   mov    %r12,%rax
+    0.00 :   1507:   mov    %r11,%r12
+    0.00 :   150a:   mov    %r9,%r11
+    0.00 :   150d:   mov    %rcx,%r9
+    0.00 :   1510:   mov    %rax,%rcx
+    0.00 :   1513:   mov    -0x30(%rbp),%rax
+    0.00 :   1517:   mov    -0x38(%rbp),%rdx
+    0.00 :   151b:   xor    %r9,%rax
+    0.00 :   151e:   xor    %r11,%rax
+    0.00 :   1521:   xor    %rdx,%rax
+    0.00 :   1524:   mov    -0x40(%rbp),%rdx
+    0.00 :   1528:   xor    %r12,%rax
+    0.00 :   152b:   xor    %rdx,%rax
+    0.00 :   152e:   xor    %rcx,%rax
+    0.00 :   1531:   mov    -0x48(%rbp),%rcx
+    0.00 :   1535:   xor    %rcx,%rax
+    0.00 :   1538:   mov    -0x50(%rbp),%rcx
+    0.00 :   153c:   xor    %rsi,%rax
+    0.00 :   153f:   mov    -0x58(%rbp),%rsi
+    0.00 :   1543:   xor    %rcx,%rax
+    0.00 :   1546:   mov    -0x68(%rbp),%rcx
+    0.00 :   154a:   xor    %rdi,%rax
+    0.00 :   154d:   mov    -0x60(%rbp),%rdi
+    0.00 :   1551:   xor    %rsi,%rax
+    0.00 :   1554:   xor    %r8,%rax
+    0.00 :   1557:   xor    %rdi,%rax
+    0.00 :   155a:   xor    %r10,%rax
+    0.00 :   155d:   xor    %rcx,%rax
+    0.00 :   1560:   xor    %rbx,%rax
+    0.00 :   1563:   mov    -0x70(%rbp),%rbx
+    0.00 :   1567:   xor    %rbx,%rax
+    0.00 :   156a:   xor    %r13,%rax
+    0.00 :   156d:   xor    %r14,%rax
+    0.00 :   1570:   pop    %rbx
+    0.00 :   1571:   pop    %r12
+    0.00 :   1573:   pop    %r13
+    0.00 :   1575:   pop    %r14
+    0.00 :   1577:   pop    %r15
+    0.00 :   1579:   pop    %rbp
+    0.00 :   157a:   ret

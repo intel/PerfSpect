@@ -1,0 +1,34 @@
+ Percent |	Source code & Disassembly of workload for cycles:upp (45 samples, percent: local period)
+--------------------------------------------------------------------------------------------------------
+         :
+         :
+         :
+         : 3    Disassembly of section .text:
+         :
+         : 5    0000000000001970 <light_loop>:
+    0.00 :   1970:   endbr64
+    0.00 :   1974:   test   %edx,%edx
+    0.00 :   1976:   je     19c1 <light_loop+0x51>
+    0.00 :   1978:   lea    (%rdi,%rsi,8),%r9
+    0.00 :   197c:   xor    %r10d,%r10d
+    0.00 :   197f:   xor    %eax,%eax
+    0.00 :   1981:   movabs $0x5851f42d4c957f2d,%r8
+    0.00 :   198b:   test   %rsi,%rsi
+    0.00 :   198e:   je     19b8 <light_loop+0x48>
+    0.00 :   1990:   mov    %rdi,%rcx
+    0.00 :   1993:   nopl   0x0(%rax,%rax,1)
+   82.40 :   1998:   imul   %r8,%rax
+    0.00 :   199c:   add    $0x8,%rcx
+   17.60 :   19a0:   add    -0x8(%rcx),%rax
+    0.00 :   19a4:   cmp    %r9,%rcx
+    0.00 :   19a7:   jne    1998 <light_loop+0x28>
+    0.00 :   19a9:   add    $0x1,%r10d
+    0.00 :   19ad:   cmp    %r10d,%edx
+    0.00 :   19b0:   jne    1990 <light_loop+0x20>
+    0.00 :   19b2:   ret
+    0.00 :   19b3:   nopl   0x0(%rax,%rax,1)
+    0.00 :   19b8:   add    $0x1,%r10d
+    0.00 :   19bc:   cmp    %r10d,%edx
+    0.00 :   19bf:   jne    19b8 <light_loop+0x48>
+    0.00 :   19c1:   xor    %eax,%eax
+    0.00 :   19c3:   ret
