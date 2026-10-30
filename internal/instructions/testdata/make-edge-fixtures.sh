@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright (C) 2021-2025 Intel Corporation
+# SPDX-License-Identifier: BSD-3-Clause
+
 # Generate synthetic perf-annotate fixtures that exercise classifier branches the real
 # workload never reaches, for differential testing of the register-pressure analyzer.
 set -euo pipefail
