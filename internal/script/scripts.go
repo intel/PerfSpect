@@ -1628,28 +1628,106 @@ pdu="{{.PDUHost}}"           # PDU hostname or IP address (must not start with p
 pdu_ip=$(echo "$pdu" | awk -F/ '{print $NF}' | awk -F: '{print $1}') # remove http:// or https:// and port if present
 pdu_username="{{.PDUUser}}"
 pdu_password="{{.PDUPassword}}"
-outletgroup="{{.PDUOutlet}}"
+# The request body for the PDU's performBulk method, built by PerfSpect. It contains no
+# single quotes, so single quoting it here is safe.
+bulk_request='{{.PDUBulkRequest}}'
+# PDU model resource paths read individually when performBulk is unavailable.
+read_paths=({{.PDUReadPaths}})
+expected={{.PDUReadings}}   # number of readings that make up one sample
+if [ "$expected" -lt 1 ]; then
+    echo "ERROR: No PDU readings configured" >&2
+    exit 1
+fi
+# curl and jq are not among the tools PerfSpect copies to the target, so they must
+# already be installed there
+for tool in curl jq; do
+    if ! command -v "$tool" > /dev/null 2>&1; then
+        echo "ERROR: $tool is required for PDU telemetry but was not found on the target" >&2
+        exit 1
+    fi
+done
 count=$((duration / interval))
+
+# Arguments for reading each resource individually. --next separates the requests so
+# that one curl invocation reuses a single connection for all of them, which matters
+# because PDU controllers negotiate TLS slowly and serialize handshakes.
+individual_args=()
+for idx in "${!read_paths[@]}"; do
+    if [ "$idx" -gt 0 ]; then
+        individual_args+=(--next)
+    fi
+    individual_args+=(--max-time "$interval" -sS -k -u "$pdu_username:$pdu_password"
+        -d "{'jsonrpc':'2.0','method':'getReading'}"
+        "https://${pdu}/model/${read_paths[$idx]}/activePower")
+done
+
+# sum_readings totals the reading values on stdin, but only once every expected reading
+# is present and numeric, because a partial sum would silently under-report the power
+# drawn. A single reading is passed through exactly as the PDU returned it.
+sum_readings() {
+    if [ "$expected" -eq 1 ]; then
+        cat
+    else
+        awk -v n="$expected" '{s+=$1; c++} END {if (c == n) printf "%.3f", s}'
+    fi
+}
+
+# read_total_bulk reads every value in one request, and echoes nothing if the PDU does
+# not answer with the expected number of readings.
+read_total_bulk() {
+    no_proxy=$pdu_ip curl --max-time $interval -sS -k -u "$pdu_username:$pdu_password" \
+        -H 'Content-Type: application/json' \
+        -d "$bulk_request" \
+        "https://${pdu}/bulk" |
+        jq -r '.result.responses[].json.result._ret_.value | numbers' 2> /dev/null |
+        sum_readings
+}
+
+# read_total_individual reads each value with its own request, for PDUs that do not
+# implement performBulk.
+read_total_individual() {
+    no_proxy=$pdu_ip curl "${individual_args[@]}" |
+        jq -rs '.[] | .result._ret_.value | numbers' 2> /dev/null |
+        sum_readings
+}
+
+# Probe once, up front, so that the collection loop uses a single method throughout and
+# a misconfigured or unreachable PDU is reported immediately rather than after the full
+# duration has elapsed.
+read_total=read_total_bulk
+if [ -z "$(read_total_bulk)" ]; then
+    if [ -n "$(read_total_individual)" ]; then
+        echo "WARNING: The PDU did not answer a performBulk request, falling back to one request per reading" >&2
+        read_total=read_total_individual
+    else
+        echo "ERROR: Failed to retrieve a PDU reading, check the PDU host, credentials, outlet group and outlet list" >&2
+        exit 1
+    fi
+fi
+
 echo "Timestamp,ActivePower(W)"
+skipped=0
+next=$(date +%s)
 for ((i=0; i<count; i++)); do
     timestamp=$(date +%H:%M:%S)
-    response=$(no_proxy=$pdu_ip curl --max-time $interval -sS -k -u "$pdu_username:$pdu_password" \
-        -d "{'jsonrpc':'2.0','method':'getReading'}" \
-        "https://${pdu}/model/outletgroup/${outletgroup}/activePower")
-    # Check if curl succeeded
-    if [ $? -ne 0 ] || [ -z "$response" ]; then
-        echo "ERROR: Failed to retrieve data from PDU" >&2
-        exit 1
+    total=$($read_total)
+    if [ -n "$total" ]; then
+        echo "$timestamp,$total"
+    else
+        skipped=$((skipped + 1))
+        echo "WARNING: Skipping PDU sample at ${timestamp}, fewer than ${expected} readings were returned" >&2
     fi
-    # Try to parse the value using jq
-    w=$(echo "$response" | jq -r '.result._ret_.value // empty')
-    if [ -z "$w" ]; then
-        echo "ERROR: Invalid response format or missing value" >&2
-        exit 1
+    # sleep to the next deadline rather than for a fixed interval, so that the time
+    # spent reading the PDU does not accumulate as drift across the collection
+    next=$((next + interval))
+    now=$(date +%s)
+    if [ "$now" -lt "$next" ]; then
+        sleep $((next - now))
     fi
-    echo "$timestamp,$w"
-    sleep $interval
 done
+if [ "$skipped" -gt 0 ]; then
+    echo "WARNING: Skipped ${skipped} of ${count} PDU samples because at least one reading failed" >&2
+fi
 `,
 		Superuser: false,
 	},

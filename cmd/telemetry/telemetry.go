@@ -291,13 +291,17 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		slog.Info("Gaudi telemetry enabled", slog.String("hlsmi_path", gaudiHlsmiPath))
 		tables = append(tables, tableDefinitions[GaudiTelemetryTableName])
 	}
-	// hidden feature - PDU telemetry, only enabled when four environment variables are set
-	pduHost := os.Getenv("PERFSPECT_PDU_HOST")
-	pduUser := os.Getenv("PERFSPECT_PDU_USER")
-	pduPassword := os.Getenv("PERFSPECT_PDU_PASSWORD")
-	pduOutlet := os.Getenv("PERFSPECT_PDU_OUTLET")
-	if pduHost != "" && pduUser != "" && pduPassword != "" && pduOutlet != "" {
-		slog.Info("PDU telemetry enabled", slog.String("host", pduHost), slog.String("outlet", pduOutlet))
+	// hidden feature - PDU telemetry, only enabled when the PDU environment variables are set
+	pdu, err := pduConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	pduBulkRequest := ""
+	if pdu.enabled() {
+		pdu.logSummary()
+		if pduBulkRequest, err = pdu.bulkRequest(); err != nil {
+			return err
+		}
 		tables = append(tables, tableDefinitions[PDUTelemetryTableName])
 	}
 	// include telemetry summary table if all telemetry options are selected
@@ -319,10 +323,12 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			"InstrMixPID":       strconv.Itoa(flagInstrMixPid),
 			"InstrMixFrequency": strconv.Itoa(flagInstrMixFrequency),
 			"GaudiHlsmiPath":    gaudiHlsmiPath,
-			"PDUHost":           pduHost,
-			"PDUUser":           pduUser,
-			"PDUPassword":       pduPassword,
-			"PDUOutlet":         pduOutlet,
+			"PDUHost":           pdu.host,
+			"PDUUser":           pdu.user,
+			"PDUPassword":       pdu.password,
+			"PDUBulkRequest":    pduBulkRequest,
+			"PDUReadPaths":      strings.Join(pdu.readPaths, " "),
+			"PDUReadings":       strconv.Itoa(pdu.readings()),
 		},
 		Tables:                 tables,
 		SummaryFunc:            summaryFunc,

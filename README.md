@@ -146,10 +146,14 @@ The following optional telemetry sources can be enabled via environment variable
 | Environment Variable | Description |
 | -------------------- | ----------- |
 | `PERFSPECT_GAUDI_HLSMI_PATH` | Full path to the Gaudi `hl-smi` binary. When set, enables collection of Intel Gaudi accelerator telemetry (temperature, utilization, memory, power). |
-| `PERFSPECT_PDU_HOST` | Raritan PDU hostname or IP address for power telemetry. Requires all four PDU variables to be set. |
+| `PERFSPECT_PDU_HOST` | Raritan PDU hostname or IP address for power telemetry, optionally including a port. Must not include a `http://` or `https://` prefix. Requires `PERFSPECT_PDU_USER`, `PERFSPECT_PDU_PASSWORD`, and one of the two outlet variables below to be set. |
 | `PERFSPECT_PDU_USER` | Username for PDU authentication. |
 | `PERFSPECT_PDU_PASSWORD` | Password for PDU authentication. |
-| `PERFSPECT_PDU_OUTLET` | PDU outlet group identifier to monitor. |
+| `PERFSPECT_PDU_OUTLET` | PDU outlet group identifier to monitor, e.g. `3`. |
+| `PERFSPECT_PDU_OUTLET_LIST` | Individual PDU outlets to monitor, as a comma-separated list of outlet numbers and/or inclusive ranges, e.g. `1,2,5`, `1-8`, or `1,4-6,9`. Outlet numbers are 1-based, matching the labels on the PDU. The readings from the listed outlets are summed and reported as a single value. Takes precedence over `PERFSPECT_PDU_OUTLET` if both are set. |
+
+> [!NOTE]
+> PDU telemetry requires `curl` and `jq` to be installed on the target, and the target must be able to reach the PDU over the network. Readings are retrieved with the PDU's `performBulk` method, which answers them in a single request; if the PDU does not implement it, PerfSpect logs a warning and falls back to reading each outlet individually. If any outlet reading in a sample fails, that sample is dropped rather than reported as a partial sum that would under-report the power drawn, and a warning is logged. Collection stops with an error if no reading can be retrieved at all, so that a misconfiguration is reported immediately rather than after the full duration has elapsed.
 
 #### Flamegraph Command
 
