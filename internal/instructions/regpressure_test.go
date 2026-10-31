@@ -296,3 +296,13 @@ func loadFixture(t *testing.T, name string) []Instruction {
 	}
 	return insns
 }
+
+// readFixture returns a testdata file's contents as a string.
+func readFixture(t *testing.T, name string) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join("testdata", name))
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	return string(b)
+}

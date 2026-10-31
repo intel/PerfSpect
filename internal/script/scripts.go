@@ -132,6 +132,8 @@ const (
 	FlameGraphScriptName = "flamegraph"
 	// lock scripts
 	ProfileKernelLockScriptName = "profile kernel lock"
+	// instruction analysis scripts
+	HotCodeAnnotateScriptName = "hot code annotate"
 )
 
 // GetScriptByName returns the script definition with the given name. It will panic if the script is not found.
@@ -2124,5 +2126,165 @@ fi
 `,
 		Superuser: true,
 		Depends:   []string{"perf", "perf-archive"},
+	},
+	// instruction analysis scripts
+	HotCodeAnnotateScriptName: {
+		Name: HotCodeAnnotateScriptName,
+		ScriptTemplate: `# Two-pass hot-code collection for instruction analysis.
+# Pass 1: perf record + perf report  -> the hot symbols
+# Pass 2: perf annotate per symbol   -> sample-weighted disassembly
+# Only text is emitted; all classification happens host-side.
+duration={{.Duration}}
+frequency={{.Frequency}}
+pids={{.PIDs}}
+top={{.TopSymbols}}
+jobs={{.Jobs}}
+include_kernel={{.IncludeKernel}}
+
+# Prefer system installed perf over bundled perf to avoid kernel incompatibilities.
+# See the flamegraph script for the full rationale.
+PERF_CMD="perf"
+if type -P -a perf >/dev/null 2>&1; then
+    for p in $(type -P -a perf); do
+        if [[ "$p" != "$PWD/"* ]] && [[ "$p" != "./"* ]] && [[ "$p" != "perf" ]]; then
+            if "$p" --version >/dev/null 2>&1; then
+                PERF_CMD="$p"
+                break
+            fi
+        fi
+    done
+fi
+
+PERF_EVENT_PARANOID=$( cat /proc/sys/kernel/perf_event_paranoid )
+echo -1 >/proc/sys/kernel/perf_event_paranoid
+KPTR_RESTRICT=$( cat /proc/sys/kernel/kptr_restrict )
+echo 0 >/proc/sys/kernel/kptr_restrict
+
+restore_settings() {
+    echo "$PERF_EVENT_PARANOID" > /proc/sys/kernel/perf_event_paranoid
+    echo "$KPTR_RESTRICT" > /proc/sys/kernel/kptr_restrict
+}
+trap restore_settings EXIT
+
+WORKDIR=$(mktemp -d)
+PERF_DATA="$WORKDIR/perf.data"
+
+# Pick the most precise cycles event the hardware will accept. Precise IP matters here:
+# attributing samples to the wrong instruction would misattribute spill traffic.
+# Userspace-only unless kernel symbols were requested.
+if [ "$include_kernel" = "true" ]; then
+    SUFFIXES="pp p ''"
+    BASE="cycles"
+else
+    SUFFIXES="upp up u"
+    BASE="cycles:"
+fi
+PERF_EVENT=""
+for sfx in $SUFFIXES; do
+    sfx="${sfx//\'/}"
+    candidate="${BASE}${sfx}"
+    if "$PERF_CMD" record -e "$candidate" -F "$frequency" -o "$WORKDIR/probe.data" -- sleep 0.1 >/dev/null 2>&1; then
+        PERF_EVENT="$candidate"
+        break
+    fi
+done
+rm -f "$WORKDIR/probe.data"
+if [ -z "$PERF_EVENT" ]; then
+    echo "Error: no usable cycles event; cannot sample on this host" >&2
+    exit 1
+fi
+echo "########## perf_event ##########"
+echo "$PERF_EVENT"
+
+# Pass 1 - record
+if [ -n "$pids" ]; then
+    "$PERF_CMD" record -e "$PERF_EVENT" -F "$frequency" -p "$pids" -o "$PERF_DATA" -- sleep "$duration" >/dev/null 2>&1 || true
+else
+    "$PERF_CMD" record -e "$PERF_EVENT" -F "$frequency" -a -o "$PERF_DATA" -- sleep "$duration" >/dev/null 2>&1 || true
+fi
+if [ ! -s "$PERF_DATA" ]; then
+    echo "Error: perf record produced no data" >&2
+    exit 1
+fi
+
+# Pass 1 - hot symbols
+REPORT_OUT="$WORKDIR/report.txt"
+"$PERF_CMD" report -i "$PERF_DATA" --stdio --no-children --sort comm,dso,sym > "$REPORT_OUT" 2>/dev/null
+echo "########## perf_report ##########"
+cat "$REPORT_OUT"
+
+# Select the top N symbols. The symbol name is everything after perf's level marker, so
+# it is taken by offset rather than by field split: C++ names contain spaces.
+#
+# A symbol perf could not resolve appears as a raw address, which means its binary is
+# stripped. Those cannot be annotated, but they must NOT be dropped silently: they are
+# often the bulk of the profile, and omitting them would make a report covering only the
+# instrumented libraries look complete. They are reported separately with their weight so
+# the user is told which binaries need symbols.
+SYMLIST="$WORKDIR/symlist.tsv"
+UNRESOLVED="$WORKDIR/unresolved.tsv"
+: > "$SYMLIST"
+: > "$UNRESOLVED"
+awk -v top="$top" -v symlist="$SYMLIST" -v unresolved="$UNRESOLVED" '
+    /^[[:space:]]*[0-9]+\.[0-9]+%/ {
+        if (n >= top) exit
+        idx = index($0, "] ")
+        if (idx == 0) next
+        sym = substr($0, idx + 2)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", sym)
+        if (sym == "") next
+        pct = $1
+        sub(/%$/, "", pct)
+        if (sym ~ /^0x[0-9a-fA-F]+$/) {
+            print pct "\t" $3 "\t" sym > unresolved
+        } else {
+            print $3 "\t" sym > symlist
+        }
+        n++
+    }' "$REPORT_OUT"
+
+if [ -s "$UNRESOLVED" ]; then
+    echo "########## unresolved ##########"
+    cat "$UNRESOLVED"
+fi
+
+# Pass 2 - annotate each hot symbol. Workers write to their own file so that output
+# cannot interleave, then results are emitted in rank order.
+annotate_one() {
+    local idx="$1" dso="$2" sym="$3"
+    {
+        echo "sym=$sym"
+        echo "dso=$dso"
+        DEBUGINFOD_URLS="" timeout 60 "$PERF_CMD" annotate -i "$PERF_DATA" --stdio --no-source \
+            --symbol="$sym" --dso="$dso" 2>/dev/null || true
+    } > "$WORKDIR/ann_$idx.txt"
+}
+
+i=0
+while IFS=$'\t' read -r dso sym; do
+    annotate_one "$i" "$dso" "$sym" &
+    i=$((i+1))
+    if [ "$jobs" -gt 0 ] && [ $((i % jobs)) -eq 0 ]; then
+        wait
+    fi
+done < "$SYMLIST"
+wait
+
+total=$i
+j=0
+while [ "$j" -lt "$total" ]; do
+    if [ -s "$WORKDIR/ann_$j.txt" ]; then
+        echo "########## annotate_$j ##########"
+        cat "$WORKDIR/ann_$j.txt"
+    fi
+    j=$((j+1))
+done
+
+rm -rf "$WORKDIR"
+`,
+		Architectures: []string{"x86_64"},
+		Superuser:     true,
+		Sequential:    true,
+		Depends:       []string{"perf"},
 	},
 }

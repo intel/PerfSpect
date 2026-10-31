@@ -1,0 +1,85 @@
+// Copyright (C) 2021-2025 Intel Corporation
+// SPDX-License-Identifier: BSD-3-Clause
+
+package instructions
+
+import (
+	htmltemplate "html/template"
+	"strings"
+
+	"perfspect/internal/report"
+	"perfspect/internal/table"
+)
+
+// Tier cell styling. Pressure tiers are the one judgement the table makes, so they are the
+// only thing colored; everything else stays neutral so the numbers remain readable.
+const (
+	tierHighStyle = "background-color:#f8d7da;font-weight:bold"
+	tierMedStyle  = "background-color:#fff3cd"
+	tierLowStyle  = ""
+)
+
+// Columns rendered in a monospace face, because they hold symbol names or assembly.
+var monospaceColumns = map[string]bool{
+	"Symbol": true,
+}
+
+// registerPressureHTMLRenderer renders the per-symbol register-pressure table.
+//
+// The default row renderer would work, but two things need custom handling: the hot
+// stack instructions cell holds newline-separated assembly that must keep its line breaks,
+// and the pressure tier is worth highlighting so HIGH rows are findable by eye.
+func registerPressureHTMLRenderer(tableValues table.TableValues, targetName string) string {
+	if len(tableValues.Fields) == 0 || len(tableValues.Fields[0].Values) == 0 {
+		return `<p>` + htmltemplate.HTMLEscapeString(tableValues.NoDataFound) + `</p>`
+	}
+
+	headers := make([]string, 0, len(tableValues.Fields))
+	for _, field := range tableValues.Fields {
+		headers = append(headers, field.Name)
+	}
+
+	var (
+		values           [][]string
+		tableValueStyles [][]string
+	)
+	for row := range tableValues.Fields[0].Values {
+		rowValues := make([]string, 0, len(tableValues.Fields))
+		rowStyles := make([]string, 0, len(tableValues.Fields))
+		for _, field := range tableValues.Fields {
+			value := field.Values[row]
+			escaped := htmltemplate.HTMLEscapeString(value)
+
+			style := ""
+			switch {
+			case field.Name == "PRES":
+				style = tierStyle(value)
+			case field.Name == "Hot Stack Instructions":
+				// Stored on one line for the text formats; expand to one instruction per
+				// line here. Replacing after escaping is safe: the separator contains no
+				// characters that HTML escaping alters.
+				escaped = strings.ReplaceAll(escaped, topOpsSeparator, "\n")
+				style = "font-family:monospace;white-space:pre-wrap"
+			case monospaceColumns[field.Name]:
+				style = "font-family:monospace"
+			}
+			rowValues = append(rowValues, escaped)
+			rowStyles = append(rowStyles, style)
+		}
+		values = append(values, rowValues)
+		tableValueStyles = append(tableValueStyles, rowStyles)
+	}
+
+	return report.RenderHTMLTable(headers, values, "pure-table pure-table-striped", tableValueStyles)
+}
+
+func tierStyle(tier string) string {
+	switch strings.TrimSpace(tier) {
+	case "HIGH":
+		return tierHighStyle
+	case "MED":
+		return tierMedStyle
+	default:
+		return tierLowStyle
+	}
+}

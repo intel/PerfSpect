@@ -36,6 +36,7 @@ Usage:
 | [`telemetry`](#telemetry-command) | System telemetry | [options](docs/perfspect_telemetry.md) |
 | [`flamegraph`](#flamegraph-command) | Software call-stacks as flamegraphs | [options](docs/perfspect_flamegraph.md) |
 | [`lock`](#lock-command) | Software hot spot, cache-to-cache and lock contention | [options](docs/perfspect_lock.md) |
+| [`instructions`](#instructions-command) | Register pressure and instruction mix in hot code | [options](docs/perfspect_instructions.md) |
 | [`config`](#config-command) | Modify system configuration | [options](docs/perfspect_config.md) |
 
 > [!TIP]
@@ -173,6 +174,25 @@ Software flamegraphs are useful in diagnosing software performance bottlenecks. 
 #### Lock Command
 
 As systems contain more and more cores, it can be useful to analyze the Linux kernel lock overhead and potential false-sharing that impacts system scalability. Run `perfspect lock` to collect system-wide hot spot, cache-to-cache and lock contention information. Experienced performance engineers can analyze the collected information to identify bottlenecks. See [`perfspect lock -h`](docs/perfspect_lock.md) for all options.
+
+#### Instructions Command
+
+Where `flamegraph` answers "which code is hot", the `instructions` command answers "what is that code
+actually doing". It samples the target, disassembles the hottest symbols, and classifies every
+instruction to report how much of the hot code is register spill and reload traffic, split by
+general-purpose versus vector registers. Run `perfspect instructions` (or `perfspect insn`). See
+[`perfspect instructions -h`](docs/perfspect_instructions.md) for all options.
+
+Results are ranked by `GSTK%`, the share of total profile time a symbol spends on stack-memory
+instructions. That is deliberately not the same ordering as `HOT%`: a symbol can be very hot while
+spilling almost nothing, or carry dense spill code while being too cold to matter.
+
+> [!NOTE]
+> Two caveats worth understanding before acting on the output. First, `STACK%` is weighted by samples
+> rather than by instruction count, so a symbol can contain a lot of spill code and still report a
+> low `STACK%` when something else in it is the real bottleneck. Second, this analysis needs symbols:
+> stripped binaries cannot be disassembled per symbol, and the report says how much of the profile
+> was lost to them rather than quietly covering only the libraries that do have symbols.
 
 #### Config Command
 

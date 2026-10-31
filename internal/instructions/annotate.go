@@ -26,14 +26,20 @@ type Instruction struct {
 	Raw string
 }
 
-// Symbol is the annotated disassembly of a single hot symbol.
+// Symbol is one hot symbol: its identity and overall weight from pass 1 (perf report),
+// plus its annotated disassembly from pass 2 (perf annotate) once that has been read.
 type Symbol struct {
 	Name string
 	DSO  string
 	Comm string
+	Kind SymbolKind
 	// HotPct is the symbol's share of all samples in the profile, from pass 1.
 	HotPct float64
-	Insns  []Instruction
+	// Insns is the symbol's disassembly, empty until pass 2 has been parsed for it.
+	Insns []Instruction
+	// Annotated records whether pass 2 produced any disassembly. A symbol can be hot but
+	// unannotatable, most often because its binary is stripped.
+	Annotated bool
 }
 
 var (
