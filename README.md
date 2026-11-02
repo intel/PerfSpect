@@ -168,6 +168,8 @@ Software flamegraphs are useful in diagnosing software performance bottlenecks. 
 > e.g. `./perfspect extract --output resources && docker cp resources/x86_64/async-profiler/lib/libasyncProfiler.so ${CONT_NAME}:/tmp/ && ./perfspect flamegraph --asprof-args "--libpath /tmp/libasyncProfiler.so"`
 >
 > Note that if PerfSpect is being run remotely, then the async profiler library will need to be copied to the test system and then into the test system's containers.
+>
+> This applies to `flamegraph` only. [Instruction analysis of containerized Java](#containerized-java-spark-flink-kafka-any-jvm-in-docker) needs a different agent, because async-profiler reports call stacks but does not make the JIT-compiled machine code available to disassemble.
 
 ![screenshot of a flamegraph from the HTML output of the flamegraph command](docs/images/flamegraph.png)
 
@@ -221,6 +223,12 @@ spill/reload analysis possible at all.
 
 This is the common deployment shape, and it needs care: the JVM is in a container but
 `perf` must run on the host, and the two disagree about what paths mean.
+
+The mechanism differs from the one the [`flamegraph` command uses for containerized
+Java](#flamegraph-command). A flamegraph needs call stacks, which async-profiler supplies;
+instruction analysis needs the machine code of each JIT-compiled method, which only the
+perf JVMTI agent writes out. The two are not interchangeable, and neither can be attached
+to a JVM that is already running.
 
 Profile from the **host**, not inside the container. A container typically lacks
 `CAP_PERFMON`, so `perf_event_open` is denied, and distro `perf` wrappers often cannot
@@ -305,7 +313,7 @@ number.
 The `config` command provides a method to view and change various system configuration parameters. Run [`perfspect config -h`](docs/perfspect_config.md) to view the parameters that can be modified.
 
 > [!WARNING]
-> Misconfiguring the system may cause it to stop functionining. In some cases, a reboot may be required to restore default settings.
+> Misconfiguring the system may cause it to stop functioning. In some cases, a reboot may be required to restore default settings.
 
 Example:
 
