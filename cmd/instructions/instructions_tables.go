@@ -156,8 +156,7 @@ func collectionInfoTableValues(outputs map[string]script.ScriptOutput) []table.F
 		// One entry per line, weight first: the list routinely runs to dozens of
 		// binaries on a JVM workload, and as a single run-on line it is unreadable.
 		// The remedy differs per binary, so advice is given per entry rather than as
-		// one blanket instruction: telling someone to rebuild JIT code with -g would
-		// send them down a dead end.
+		// one blanket instruction.
 		lines := []string{fmt.Sprintf("%.2f%% of sampled weight could not be annotated:", lost)}
 		dsos := result.UnannotatedDSOs()
 		// Entries that round to 0.00% carry no information and would otherwise fill the
@@ -261,10 +260,6 @@ func formatTopOps(ops []instructions.HotOp) string {
 }
 
 // apxEstimateTableValues projects what Intel APX might recover from the profiled code.
-//
-// The caveat field is not decoration. This is a model with hand-chosen coefficients,
-// carried over from the reference implementation and not validated against APX hardware
-// with an APX toolchain. Reported without that context, "~3.20%" reads like a measurement.
 func apxEstimateTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	result := analyze(outputs)
 	e := instructions.EstimateAPX(result.Analyzed)

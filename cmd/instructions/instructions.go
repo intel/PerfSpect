@@ -261,11 +261,15 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 // selectedTables resolves the analysis flags to the tables to include. Naming any analysis
 // explicitly turns off the implicit --all.
 func selectedTables() []table.TableDefinition {
-	var explicit bool
-	for _, a := range analyses {
-		if *a.FlagVar {
-			explicit = true
-			break
+	// Naming any analysis explicitly clears the implicit --all, which is how the report
+	// command resolves its categories. Consulting flagAll here rather than a local is
+	// what makes --all=false mean anything.
+	if flagAll {
+		for _, a := range analyses {
+			if *a.FlagVar {
+				flagAll = false
+				break
+			}
 		}
 	}
 
@@ -274,7 +278,7 @@ func selectedTables() []table.TableDefinition {
 		tables = append(tables, app.TableDefinitions[app.SystemSummaryTableName])
 	}
 	for _, a := range analyses {
-		if !explicit || *a.FlagVar {
+		if *a.FlagVar || flagAll {
 			tables = append(tables, a.Tables...)
 		}
 	}
