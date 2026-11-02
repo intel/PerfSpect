@@ -27,7 +27,7 @@ const (
 const (
 	RegisterPressureMenuLabel         = "Register Pressure"
 	RegisterPressureBySymbolMenuLabel = "Register Pressure by Symbol"
-	APXEstimateMenuLabel              = "APX Estimate"
+	APXEstimateMenuLabel              = "APX Benefit Estimate"
 )
 
 // topOpsPerSymbol is how many hot stack instructions are retained per symbol for display.
