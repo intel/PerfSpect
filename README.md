@@ -164,7 +164,7 @@ Software flamegraphs are useful in diagnosing software performance bottlenecks. 
 > 1. Extract PerfSpect's embedded resources with `./perfspect extract --output resources`
 > 2. For each container you would like to profile Java code: `docker cp resources/${ARCH}/async-profiler/lib/libasyncProfiler.so ${CONT_NAME}:/dest/path/`
 > 3. When running PerfSpect flamegraph, add this flag: `--asprof-args "--libpath /dest/path/libasyncProfiler.so"`
-> 
+>
 > e.g. `./perfspect extract --output resources && docker cp resources/x86_64/async-profiler/lib/libasyncProfiler.so ${CONT_NAME}:/tmp/ && ./perfspect flamegraph --asprof-args "--libpath /tmp/libasyncProfiler.so"`
 >
 > Note that if PerfSpect is being run remotely, then the async profiler library will need to be copied to the test system and then into the test system's containers.
@@ -237,20 +237,21 @@ docker cp /usr/lib/linux-tools-$(uname -r | cut -d- -f1-2)/libperf-jvmti.so \
           <container>:/opt/libperf-jvmti.so
 ```
 
-**2. Load it at JVM launch and pick a jitdump directory.** For Spark, edit
-`spark-defaults.conf` inside the container — append to the existing options line rather
-than adding a second one, since Spark keeps only the last occurrence of a key:
+**2. Load it at JVM launch and pick a jitdump directory.** Using Apache Spark as an example,
+edit the configuration to include the following entries. Append to any existing JVM options
+rather than adding a second entry for the same key — many frameworks keep only the last
+value, so a duplicate entry silently discards the options already configured:
 
 ```properties
 spark.executor.extraJavaOptions  <existing flags> -XX:+UnlockDiagnosticVMOptions -XX:+DumpPerfMapAtExit -agentpath:/opt/libperf-jvmti.so
 spark.executorEnv.JITDUMPDIR     /opt/jit
 ```
 
-The agent cannot be attached to an already-running JVM, so executors must be restarted.
-For YARN that means restarting the application, not the container.
+The agent cannot be attached to an already-running JVM, so your Java application must be
+restarted.
 
 **3. Make the jitdump readable on the host at the *same absolute path*.** `perf inject`
-opens the path recorded in the mmap event verbatim, so a different host path will not do.
+opens the path recorded in the mmap event verbatim, so a different host path will not work.
 Symlink the container's directory into place:
 
 ```bash
@@ -271,12 +272,10 @@ files, and the report's **JIT Analysis** row should say how many methods were an
 > [!WARNING]
 > **Do not combine `--jit` with `--symfs`.** `perf inject` writes its per-method ELF
 > images to host paths, while `--symfs` makes perf prefix every lookup with the container
-> root, so those images are never found. On a Spark workload this took analyzed JIT
-> methods from 106 to zero while the run still looked successful, leaving a report of cold
-> libc symbols. `perfspect` warns when both are passed and says so in the report, but the
-> two cannot be combined in one collection. Use `--jit` for JIT-compiled code, and a
-> separate `--symfs` run for native libraries inside the image — which is the case that
-> matters for native engines such as Gluten or Velox.
+> root, so those images are never found. PerfSpect warns when both are passed and says so
+> in the report rather than appearing to succeed. If you need both views, collect twice:
+> `--jit` for JIT-compiled code, and a separate `--symfs` run for native libraries that
+> exist only inside the image.
 
 A JVM also generates thousands of individually tiny symbols, so raise `--top` well above
 the default for Java workloads; 200 is a reasonable starting point.
@@ -285,9 +284,7 @@ Two register-pressure tables are produced. **Register Pressure** has one row per
 instance, which is the ground truth. **Register Pressure by Symbol** collapses those into
 one row per symbol, which matters for JIT workloads: each process compiles its own copy of
 a method, and a tiered JIT recompiles hot methods, so a single Java method can occupy a
-dozen rows that each look unremarkable. On a two-executor Spark run, 199 instance rows
-collapsed to 121 symbols, and one codegen method that appeared 10 times at ~2% HOT each
-turned out to be 6.16% of the profile in total.
+dozen rows that each look unremarkable.
 
 The two metric families combine differently in that view: `HOT%` and `GSTK%` are shares of
 the whole profile and are summed, while `STACK%`, `SPILL%` and the rest are shares of an
