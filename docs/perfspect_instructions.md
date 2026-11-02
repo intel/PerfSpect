@@ -17,11 +17,13 @@ Examples:
   Instruction analysis of remote target: $ perfspect instructions --target 192.168.1.1 --user fred --key fred_key
   Analyze specific processes:            $ perfspect instructions --pids 1234,5678
   Register pressure only:                $ perfspect instructions --register-pressure
+  With an Intel APX benefit estimate:    $ perfspect instructions --apx-estimate
 
 Flags:
   Analyses:
     --all                  run all analyses (default: true)
     --register-pressure    Register spill/reload pressure in hot symbols (default: false)
+    --apx-estimate         estimate the benefit of Intel APX (heuristic projection, not a measurement) (default: false)
   Options:
     --duration             number of seconds to run the collection (default: 10)
     --frequency            number of samples taken per second (default: 500)

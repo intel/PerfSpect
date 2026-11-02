@@ -194,6 +194,14 @@ spilling almost nothing, or carry dense spill code while being too cold to matte
 > stripped binaries cannot be disassembled per symbol, and the report says how much of the profile
 > was lost to them rather than quietly covering only the libraries that do have symbols.
 
+`--apx-estimate` adds a projection of what Intel APX might recover, by scaling the observed
+GP spill cost and adding an uplift for code patterns APX encodes more compactly (NDD, CCMP,
+PUSH2/POP2). It is off by default and should stay that way in casual use: the coefficients
+are heuristics carried over from the original register-pressure tool and have **not** been
+validated on APX hardware with an APX toolchain. Read it as a signal of whether a workload
+is worth investigating, not as a predicted speedup. The report states this alongside the
+number.
+
 #### Config Command
 
 The `config` command provides a method to view and change various system configuration parameters. Run [`perfspect config -h`](docs/perfspect_config.md) to view the parameters that can be modified.

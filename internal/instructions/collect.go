@@ -19,10 +19,11 @@ const (
 	sectionUnresolved     = "unresolved"
 )
 
-// AnalyzedSymbol pairs a hot symbol with its register-pressure profile.
+// AnalyzedSymbol pairs a hot symbol with its register-pressure profile and APX signals.
 type AnalyzedSymbol struct {
 	Symbol
 	Pressure RegPressure
+	APX      APXSignals
 	// GlobalStackPct is HotPct scaled by the symbol-local StackPct: the share of total
 	// profile weight this symbol spends on stack-memory instructions.
 	GlobalStackPct float64
@@ -125,7 +126,7 @@ func Analyze(scriptStdout string, topOps int) (Result, error) {
 		if err != nil {
 			return result, err
 		}
-		pressure := AnalyzeRegPressure(insns, topOps)
+		pressure, apx := analyzeInstructions(insns, topOps)
 		if pressure.InsnCount == 0 {
 			// Selected as hot but nothing to classify: stripped, or annotation failed.
 			result.Unannotated = append(result.Unannotated, s)
@@ -136,6 +137,7 @@ func Analyze(scriptStdout string, topOps int) (Result, error) {
 		result.Analyzed = append(result.Analyzed, AnalyzedSymbol{
 			Symbol:         s,
 			Pressure:       pressure,
+			APX:            apx,
 			GlobalStackPct: GlobalStackPct(s.HotPct, pressure),
 		})
 	}

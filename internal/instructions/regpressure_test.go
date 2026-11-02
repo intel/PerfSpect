@@ -306,3 +306,8 @@ func readFixture(t *testing.T, name string) string {
 	}
 	return string(b)
 }
+
+// newFixtureReader wraps inline annotate text for tests that do not need a file.
+func newFixtureReader(s string) *strings.Reader {
+	return strings.NewReader(s)
+}

@@ -18,12 +18,14 @@ import (
 // instruction analysis table names
 const (
 	RegisterPressureTableName = "Register Pressure"
+	APXEstimateTableName      = "APX Benefit Estimate"
 	CollectionInfoTableName   = "Instruction Analysis Collection"
 )
 
 // Menu labels
 const (
 	RegisterPressureMenuLabel = "Register Pressure"
+	APXEstimateMenuLabel      = "APX Estimate"
 )
 
 // topOpsPerSymbol is how many hot stack instructions are retained per symbol for display.
@@ -41,6 +43,16 @@ var tableDefinitions = map[string]table.TableDefinition{
 		NoDataFound: "No annotatable hot symbols were found. If the profiled binaries are " +
 			"stripped, rebuild them with symbols or install their debug symbol packages.",
 		FieldsFunc: registerPressureTableValues,
+	},
+	APXEstimateTableName: {
+		Name:          APXEstimateTableName,
+		MenuLabel:     APXEstimateMenuLabel,
+		Architectures: []string{cpus.X86Architecture},
+		ScriptNames: []string{
+			script.HotCodeAnnotateScriptName,
+		},
+		NoDataFound: "No annotatable hot symbols were found, so there is nothing to project.",
+		FieldsFunc:  apxEstimateTableValues,
 	},
 	CollectionInfoTableName: {
 		Name:          CollectionInfoTableName,
@@ -163,4 +175,43 @@ func formatTopOps(ops []instructions.HotOp) string {
 		parts = append(parts, fmt.Sprintf("%.1f%% %s", op.Pct, text))
 	}
 	return strings.Join(parts, topOpsSeparator)
+}
+
+// apxEstimateTableValues projects what Intel APX might recover from the profiled code.
+//
+// The caveat field is not decoration. This is a model with hand-chosen coefficients,
+// carried over from the reference implementation and not validated against APX hardware
+// with an APX toolchain. Reported without that context, "~3.20%" reads like a measurement.
+func apxEstimateTableValues(outputs map[string]script.ScriptOutput) []table.Field {
+	result := analyze(outputs)
+	e := instructions.EstimateAPX(result.Analyzed)
+
+	headline := fmt.Sprintf("%.2f%%", e.RealisticPct)
+	if e.AlreadyUsesAPX {
+		headline = fmt.Sprintf("%.2f%% (note: this code already uses r16-r31, so the "+
+			"register file is not doubling and most of this projection does not apply)",
+			e.RealisticPct)
+	}
+
+	avgRegs := "n/a"
+	if e.AvgGPRegistersUsed >= 0 {
+		avgRegs = fmt.Sprintf("%.0f of %d", e.AvgGPRegistersUsed, e.MaxGPRegisters)
+	}
+
+	return []table.Field{
+		{Name: "Estimated Gain (realistic)", Description: "headline projection: GP spill cost x realization factor x secondary-feature lift", Values: []string{headline}},
+		{Name: "Estimated Gain (upper bound)", Description: "if every GP spill were eliminated", Values: []string{fmt.Sprintf("%.2f%%", e.UpperBoundPct)}},
+		{Name: "GP Spill/Reload Cost", Description: "share of total profile weight spent on general-purpose spill and reload; the ceiling this model works from", Values: []string{fmt.Sprintf("%.2f%%", e.GPStackPct)}},
+		{Name: "GP Register Utilization", Description: "spill-weighted mean of distinct GP registers per symbol", Values: []string{avgRegs}},
+		{Name: "Realization Factor", Description: "assumed fraction of GP spill traffic APX recovers, interpolated from register-file utilization", Values: []string{fmt.Sprintf("%.3f", e.GPRFactor)}},
+		{Name: "Secondary Feature Lift", Description: "multiplier from NDD, CCMP and PUSH2/POP2 together", Values: []string{fmt.Sprintf("%.3f", e.Lift)}},
+		{Name: "Attribution", Description: "how the realistic estimate splits across features", Values: []string{fmt.Sprintf(
+			"GP registers %.2f%%, NDD %.2f%%, CCMP %.2f%%, PUSH2 %.2f%%",
+			e.GPRContribPct, e.NDDContribPct, e.CCMPContribPct, e.Push2ContribPct)}},
+		{Name: "Symbols Included", Description: fmt.Sprintf("symbols below %.1f%% HOT%% are excluded as too cold to be meaningful", instructions.APXMinSamplePct), Values: []string{fmt.Sprintf("%d (%d excluded)", e.SymbolsIncluded, e.SymbolsSkipped)}},
+		{Name: "Caveat", Values: []string{"This is a projection from a heuristic model, not a measurement. " +
+			"Its coefficients are judgement calls inherited from the reference tool and have " +
+			"not been validated on APX hardware with an APX toolchain. Treat it as an " +
+			"indication of whether this workload is worth investigating, not as a predicted speedup."}},
+	}
 }

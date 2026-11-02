@@ -79,7 +79,25 @@ var (
 // disassembly. topOps caps the number of hot stack instructions returned; pass 0 to skip
 // collecting them.
 func AnalyzeRegPressure(insns []Instruction, topOps int) RegPressure {
+	p, _ := analyzeInstructions(insns, topOps)
+	return p
+}
+
+// AnalyzeAPX counts the APX opportunity signals in one symbol's annotated disassembly.
+func AnalyzeAPX(insns []Instruction) APXSignals {
+	_, a := analyzeInstructions(insns, 0)
+	return a
+}
+
+// analyzeInstructions walks a symbol's disassembly once, deriving both the
+// register-pressure profile and the APX signals.
+//
+// The two share a single pass deliberately: they must agree on exactly which lines count
+// as instructions, since both divide by that population. Splitting the filtering across
+// two loops would let them drift apart.
+func analyzeInstructions(insns []Instruction, topOps int) (RegPressure, APXSignals) {
 	useRBP := detectFramePointer(insns)
+	apx := newAPXState()
 
 	var (
 		annTotal  float64
@@ -107,7 +125,9 @@ func AnalyzeRegPressure(insns []Instruction, topOps int) RegPressure {
 			continue
 		}
 		if reSectionHead.MatchString(raw) {
-			// A new function or section header. Nothing to carry across the boundary.
+			// A new function or section header. Multi-instruction APX patterns must not
+			// straddle it, so the lookahead is cleared.
+			apx.reset()
 			continue
 		}
 		if !strings.Contains(raw, ":") {
@@ -148,6 +168,7 @@ func AnalyzeRegPressure(insns []Instruction, topOps int) RegPressure {
 		annTotal += w
 		insnCount++
 		collectRegs(text, useRBP, gpSeen, simdSeen)
+		apx.observe(text, mn, w, in.Addr, in.HasAddr)
 
 		if !hasStackMem(text, useRBP) {
 			continue
@@ -214,7 +235,7 @@ func AnalyzeRegPressure(insns []Instruction, topOps int) RegPressure {
 	if topOps > 0 {
 		p.TopOps = rankOps(opWeight, annTotal, topOps)
 	}
-	return p
+	return p, apx.signals(annTotal, insnCount)
 }
 
 // rankOps returns the heaviest ops, descending by weight, with percentages relative to

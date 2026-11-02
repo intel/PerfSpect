@@ -30,6 +30,7 @@ var examples = []string{
 	fmt.Sprintf("  Instruction analysis of remote target: $ %s %s --target 192.168.1.1 --user fred --key fred_key", app.Name, cmdName),
 	fmt.Sprintf("  Analyze specific processes:            $ %s %s --pids 1234,5678", app.Name, cmdName),
 	fmt.Sprintf("  Register pressure only:                $ %s %s --register-pressure", app.Name, cmdName),
+	fmt.Sprintf("  With an Intel APX benefit estimate:    $ %s %s --apx-estimate", app.Name, cmdName),
 }
 
 var Cmd = &cobra.Command{
@@ -63,6 +64,7 @@ var (
 	flagIncludeKernel    bool
 	flagNoSystemSummary  bool
 	flagRegisterPressure bool
+	flagAPXEstimate      bool
 	flagAll              bool
 )
 
@@ -75,6 +77,7 @@ const (
 	flagIncludeKernelName    = "kernel"
 	flagNoSystemSummaryName  = "no-summary"
 	flagRegisterPressureName = "register-pressure"
+	flagAPXEstimateName      = "apx-estimate"
 	flagAllName              = "all"
 )
 
@@ -95,6 +98,9 @@ func init() {
 	for _, a := range analyses {
 		Cmd.Flags().BoolVar(a.FlagVar, a.FlagName, a.DefaultValue, a.Help)
 	}
+	// Not part of --all: this is a projection from a heuristic model rather than an
+	// observation, so it is opt-in, matching the reference tool's default.
+	Cmd.Flags().BoolVar(&flagAPXEstimate, flagAPXEstimateName, false, "")
 	Cmd.Flags().BoolVar(&flagAll, flagAllName, true, "")
 	Cmd.Flags().StringVar(&flagInput, app.FlagInputName, "", "")
 	Cmd.Flags().StringSliceVar(&flagFormat, app.FlagFormatName, []string{report.FormatAll}, "")
@@ -145,6 +151,10 @@ func getFlagGroups() []app.FlagGroup {
 	for _, a := range analyses {
 		analysisFlags = append(analysisFlags, app.Flag{Name: a.FlagName, Help: a.Help})
 	}
+	analysisFlags = append(analysisFlags, app.Flag{
+		Name: flagAPXEstimateName,
+		Help: "estimate the benefit of Intel APX (heuristic projection, not a measurement)",
+	})
 	groups = append(groups, app.FlagGroup{GroupName: "Analyses", Flags: analysisFlags})
 
 	groups = append(groups, app.FlagGroup{
@@ -251,6 +261,9 @@ func selectedTables() []table.TableDefinition {
 		if !explicit || *a.FlagVar {
 			tables = append(tables, a.Tables...)
 		}
+	}
+	if flagAPXEstimate {
+		tables = append(tables, tableDefinitions[APXEstimateTableName])
 	}
 	tables = append(tables, tableDefinitions[CollectionInfoTableName])
 	return tables
