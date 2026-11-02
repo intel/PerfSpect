@@ -165,6 +165,11 @@ func getHtmlReportBegin() string {
 		.field-description .tooltip-text {
 			visibility: hidden;
 			width: 250px;
+			/* Do not inherit text layout from the cell the tooltip sits in. A cell
+			   styled white-space:nowrap would otherwise force the tooltip onto one
+			   line and overflow its fixed width, and a bold cell would bold it. */
+			white-space: normal;
+			font-weight: normal;
 			background-color: #333;
 			color: #fff;
 			text-align: left;
