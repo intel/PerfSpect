@@ -30,7 +30,6 @@ var examples = []string{
 	fmt.Sprintf("  Instruction analysis of remote target: $ %s %s --target 192.168.1.1 --user fred --key fred_key", app.Name, cmdName),
 	fmt.Sprintf("  Analyze specific processes:            $ %s %s --pids 1234,5678", app.Name, cmdName),
 	fmt.Sprintf("  Register pressure only:                $ %s %s --register-pressure", app.Name, cmdName),
-	fmt.Sprintf("  With an Intel APX benefit estimate:    $ %s %s --apx-estimate", app.Name, cmdName),
 	fmt.Sprintf("  Java / JIT-compiled code:              $ %s %s --jit --pids $(pgrep -x java)", app.Name, cmdName),
 }
 
@@ -67,7 +66,6 @@ var (
 	flagSymfs            string
 	flagNoSystemSummary  bool
 	flagRegisterPressure bool
-	flagAPXEstimate      bool
 	flagAll              bool
 )
 
@@ -82,31 +80,25 @@ const (
 	flagSymfsName            = "symfs"
 	flagNoSystemSummaryName  = "no-summary"
 	flagRegisterPressureName = "register-pressure"
-	flagAPXEstimateName      = "apx-estimate"
 	flagAllName              = "all"
 )
 
 // analyses maps a selection flag to the tables it enables, mirroring how the report
 // command groups its categories.
-var analyses = []app.Category{
-	{
-		FlagName: flagRegisterPressureName,
-		FlagVar:  &flagRegisterPressure,
-		Help:     "Register spill/reload pressure in hot symbols",
-		Tables: []table.TableDefinition{
-			tableDefinitions[RegisterPressureTableName],
-			tableDefinitions[RegisterPressureBySymbolName],
-		},
-	},
+// analysisTables are always reported together. The APX estimate is derived from the same
+// per-symbol spill figures as the register-pressure tables, so it is part of that analysis
+// rather than something to opt into.
+var analysisTables = []table.TableDefinition{
+	tableDefinitions[RegisterPressureTableName],
+	tableDefinitions[RegisterPressureBySymbolName],
+	tableDefinitions[APXEstimateTableName],
 }
 
 func init() {
-	for _, a := range analyses {
-		Cmd.Flags().BoolVar(a.FlagVar, a.FlagName, a.DefaultValue, a.Help)
-	}
-	// Not part of --all: this is a projection from a heuristic model rather than an
-	// observation, so it is opt-in, matching the reference tool's default.
-	Cmd.Flags().BoolVar(&flagAPXEstimate, flagAPXEstimateName, false, "")
+	// Both are accepted and inert: every analysis is currently reported unconditionally.
+	// They are kept so the selection surface does not have to change when further
+	// analyses are added, and their help text says as much.
+	Cmd.Flags().BoolVar(&flagRegisterPressure, flagRegisterPressureName, false, "")
 	Cmd.Flags().BoolVar(&flagAll, flagAllName, true, "")
 	Cmd.Flags().StringVar(&flagInput, app.FlagInputName, "", "")
 	Cmd.Flags().StringSliceVar(&flagFormat, app.FlagFormatName, []string{report.FormatAll}, "")
@@ -155,14 +147,10 @@ func usageFunc(cmd *cobra.Command) error {
 func getFlagGroups() []app.FlagGroup {
 	var groups []app.FlagGroup
 
-	analysisFlags := []app.Flag{{Name: flagAllName, Help: "run all analyses"}}
-	for _, a := range analyses {
-		analysisFlags = append(analysisFlags, app.Flag{Name: a.FlagName, Help: a.Help})
+	analysisFlags := []app.Flag{
+		{Name: flagAllName, Help: "run all analyses. Reserved: every analysis already runs unconditionally"},
+		{Name: flagRegisterPressureName, Help: "register spill/reload pressure, and the Intel APX benefit it implies. Reserved: this already runs unconditionally"},
 	}
-	analysisFlags = append(analysisFlags, app.Flag{
-		Name: flagAPXEstimateName,
-		Help: "estimate the benefit of Intel APX (heuristic projection, not a measurement)",
-	})
 	groups = append(groups, app.FlagGroup{GroupName: "Analyses", Flags: analysisFlags})
 
 	groups = append(groups, app.FlagGroup{
@@ -258,33 +246,17 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// selectedTables resolves the analysis flags to the tables to include. Naming any analysis
-// explicitly turns off the implicit --all.
+// selectedTables resolves which tables to include.
+//
+// Every analysis table is reported unconditionally today. --all and --register-pressure
+// are accepted and reserved for when there are several analyses to choose between; see
+// their help text.
 func selectedTables() []table.TableDefinition {
-	// Naming any analysis explicitly clears the implicit --all, which is how the report
-	// command resolves its categories. Consulting flagAll here rather than a local is
-	// what makes --all=false mean anything.
-	if flagAll {
-		for _, a := range analyses {
-			if *a.FlagVar {
-				flagAll = false
-				break
-			}
-		}
-	}
-
 	var tables []table.TableDefinition
 	if !flagNoSystemSummary {
 		tables = append(tables, app.TableDefinitions[app.SystemSummaryTableName])
 	}
-	for _, a := range analyses {
-		if *a.FlagVar || flagAll {
-			tables = append(tables, a.Tables...)
-		}
-	}
-	if flagAPXEstimate {
-		tables = append(tables, tableDefinitions[APXEstimateTableName])
-	}
+	tables = append(tables, analysisTables...)
 	tables = append(tables, tableDefinitions[CollectionInfoTableName])
 	return tables
 }

@@ -262,6 +262,20 @@ func formatTopOps(ops []instructions.HotOp) string {
 // apxEstimateTableValues projects what Intel APX might recover from the profiled code.
 func apxEstimateTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	result := analyze(outputs)
+
+	// With nothing annotatable there is nothing to project from, and the model would
+	// otherwise report a 0.00% gain alongside a realization factor and a register
+	// utilization figure - which reads as a measurement saying APX would not help, rather
+	// than as an absence of data. Say so instead.
+	if len(result.Analyzed) == 0 {
+		return []table.Field{{
+			Name: "Estimate",
+			Values: []string{"not available: no annotatable hot symbols were found, so there " +
+				"is nothing to project from. See the collection section for which binaries " +
+				"could not be annotated."},
+		}}
+	}
+
 	e := instructions.EstimateAPX(result.Analyzed)
 
 	headline := fmt.Sprintf("%.2f%%", e.RealisticPct)

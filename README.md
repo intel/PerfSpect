@@ -300,13 +300,18 @@ individual instance's own weight and are averaged, weighted by how hot each inst
 Summing ten instances at ~10% `STACK%` would otherwise claim 100% stack traffic for a
 symbol that has nothing of the sort.
 
-`--apx-estimate` adds a projection of what Intel APX might recover, by scaling the observed
-GP spill cost and adding an uplift for code patterns APX encodes more compactly (NDD, CCMP,
-PUSH2/POP2). It is off by default and should stay that way in casual use: the coefficients
-are heuristics carried over from the original register-pressure tool and have **not** been
-validated on APX hardware with an APX toolchain. Read it as a signal of whether a workload
-is worth investigating, not as a predicted speedup. The report states this alongside the
-number.
+An **APX Benefit Estimate** section is reported alongside them, projecting what Intel APX
+might recover by scaling the observed GP spill cost and adding an uplift for code patterns
+APX encodes more compactly (NDD, CCMP, PUSH2/POP2). It is derived from the same per-symbol
+spill figures, so it needs no separate flag.
+
+> [!NOTE]
+> The estimate is a projection from a heuristic model, not a measurement. Its coefficients
+> are carried over from the original register-pressure tool and have **not** been validated
+> on APX hardware with an APX toolchain. Read it as a signal of whether a workload is worth
+> investigating, not as a predicted speedup — the report states this alongside the number.
+> When nothing could be annotated there is nothing to project from, and the section says so
+> rather than reporting a 0% gain.
 
 #### Config Command
 
