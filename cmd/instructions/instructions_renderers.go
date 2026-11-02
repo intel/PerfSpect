@@ -35,8 +35,10 @@ func registerPressureHTMLRenderer(tableValues table.TableValues, targetName stri
 	}
 
 	headers := make([]string, 0, len(tableValues.Fields))
+	descriptions := make([]string, 0, len(tableValues.Fields))
 	for _, field := range tableValues.Fields {
 		headers = append(headers, field.Name)
+		descriptions = append(descriptions, field.Description)
 	}
 
 	var (
@@ -70,7 +72,9 @@ func registerPressureHTMLRenderer(tableValues table.TableValues, targetName stri
 		tableValueStyles = append(tableValueStyles, rowStyles)
 	}
 
-	return report.RenderHTMLTable(headers, values, "pure-table pure-table-striped", tableValueStyles)
+	// Descriptions must be passed explicitly: RenderHTMLTable supplies none, which would
+	// drop every column's hover text that this table takes care to define.
+	return report.RenderHTMLTableWithDescriptions(headers, descriptions, values, "pure-table pure-table-striped", tableValueStyles)
 }
 
 func tierStyle(tier string) string {

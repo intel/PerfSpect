@@ -607,6 +607,16 @@ func RenderHTMLTable(tableHeaders []string, tableValues [][]string, class string
 	return renderHTMLTableWithDescriptions(tableHeaders, nil, tableValues, class, valuesStyle)
 }
 
+// RenderHTMLTableWithDescriptions renders an HTML table whose column headers carry the
+// hover descriptions in headerDescriptions, positionally matched to tableHeaders.
+//
+// Custom table renderers need this. RenderHTMLTable passes no descriptions, so a renderer
+// written to control cell styling would otherwise silently drop the per-field Description
+// text that the default renderer displays.
+func RenderHTMLTableWithDescriptions(tableHeaders []string, headerDescriptions []string, tableValues [][]string, class string, valuesStyle [][]string) string {
+	return renderHTMLTableWithDescriptions(tableHeaders, headerDescriptions, tableValues, class, valuesStyle)
+}
+
 // renderHTMLTableWithDescriptions renders an HTML table with optional header descriptions
 func renderHTMLTableWithDescriptions(tableHeaders []string, headerDescriptions []string, tableValues [][]string, class string, valuesStyle [][]string) string {
 	var sb strings.Builder
