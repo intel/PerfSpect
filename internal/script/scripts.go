@@ -2141,6 +2141,7 @@ top={{.TopSymbols}}
 jobs={{.Jobs}}
 include_kernel={{.IncludeKernel}}
 jit={{.JIT}}
+symfs={{.Symfs}}
 
 # Prefer system installed perf over bundled perf to avoid kernel incompatibilities.
 # See the flamegraph script for the full rationale.
@@ -2185,6 +2186,13 @@ fi
 JIT_CLOCK=""
 if [ "$jit" = "true" ]; then
     JIT_CLOCK="-k 1"
+fi
+
+# A container's binaries are not at the recorded paths when viewed from the host, so
+# perf is pointed at a filesystem root to resolve them under.
+SYMFS_ARG=""
+if [ -n "$symfs" ]; then
+    SYMFS_ARG="--symfs $symfs"
 fi
 
 PERF_EVENT=""
@@ -2233,11 +2241,15 @@ fi
 
 # Pass 1 - hot symbols
 REPORT_OUT="$WORKDIR/report.txt"
-"$PERF_CMD" report -i "$PERF_DATA" --stdio --no-children --sort comm,dso,sym > "$REPORT_OUT" 2>/dev/null
+# -t '|' makes perf delimit the fields explicitly. Without it the columns are only
+# space-aligned, and comm, dso and symbol can all contain spaces: Spark names threads
+# "GC Thread#5" and "task l", perf names JIT regions "[JIT] tid <n>", and C++ symbols
+# are full signatures. Splitting on whitespace mis-assigns them.
+"$PERF_CMD" report -i "$PERF_DATA" --stdio --no-children --sort comm,dso,sym -t '|' $SYMFS_ARG > "$REPORT_OUT" 2>/dev/null
 echo "########## perf_report ##########"
 cat "$REPORT_OUT"
 
-# Select the top N symbols. The symbol name is everything after perf's level marker, so
+# Select the top N symbols from the delimited report, so that
 # it is taken by offset rather than by field split: C++ names contain spaces.
 #
 # A symbol perf could not resolve appears as a raw address, which means its binary is
@@ -2249,39 +2261,32 @@ SYMLIST="$WORKDIR/symlist.tsv"
 UNRESOLVED="$WORKDIR/unresolved.tsv"
 : > "$SYMLIST"
 : > "$UNRESOLVED"
-awk -v top="$top" -v symlist="$SYMLIST" -v unresolved="$UNRESOLVED" '
-    /^[[:space:]]*[0-9]+\.[0-9]+%/ {
+awk -F'|' -v top="$top" -v symlist="$SYMLIST" -v unresolved="$UNRESOLVED" '
+    # Fields from perf report -t "|" are: " <pct>% ", comm, dso, "[x] <symbol>".
+    NF >= 4 && $1 ~ /[0-9]+\.[0-9]+%/ {
         # --top caps symbols actually sent for disassembly. Rows that can never be
         # disassembled do not consume that budget: a JVM emits thousands of tiny
-        # per-method rows, and counting them would starve the annotatable code of slots
-        # entirely. Their weight is still recorded so coverage stays honest.
+        # per-method rows, and counting them would starve annotatable code of slots.
+        # Their weight is still recorded so coverage stays honest.
         if (n >= top && unres_n >= top * 4) exit
 
-        # Anchor on the single-character level marker " [.] ", not on the first "] ":
-        # perf names JIT regions "[JIT] tid <n>", so the DSO field itself can contain
-        # "] " and can contain spaces. Field splitting cannot be used for the DSO.
-        if (match($0, /[[:space:]]\[[a-zA-Z.?]\][[:space:]]/) == 0) next
-        sym = substr($0, RSTART + RLENGTH)
-        gsub(/^[[:space:]]+|[[:space:]]+$/, "", sym)
-        if (sym == "") next
-
-        # Everything before the marker is "<pct>% <comm> <dso>"; drop the first two
-        # fields and what remains is the DSO, spaces included.
-        prefix = substr($0, 1, RSTART - 1)
-        sub(/^[[:space:]]+/, "", prefix)
-        sub(/^[^[:space:]]+[[:space:]]+/, "", prefix)
-        sub(/^[^[:space:]]+[[:space:]]+/, "", prefix)
-        dso = prefix
-        gsub(/[[:space:]]+$/, "", dso)
-
         pct = $1
-        sub(/%$/, "", pct)
+        gsub(/[^0-9.]/, "", pct)
 
-        # Pseudo-DSOs with no on-disk image, and symbols perf could not resolve to a
-        # name. Kernel mappings are excluded from this list: perf can annotate those
+        dso = $3
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", dso)
+
+        # The symbol field keeps the perf level marker, e.g. "[.] main". Drop it.
+        sym = $4
+        sub(/^[[:space:]]*\[[a-zA-Z.?]\][[:space:]]*/, "", sym)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", sym)
+        if (sym == "" || dso == "") next
+
+        # Pseudo-DSOs with no on-disk image, mappings whose file is gone, and symbols
+        # perf could not resolve. Kernel mappings are excluded: perf can annotate those
         # when kallsyms or a vmlinux is available.
         unannotatable = (dso == "[vdso]" || dso == "[vsyscall]" || dso == "[unknown]" || \
-                         dso ~ /^\[JIT\]/ || sym ~ /^0x[0-9a-fA-F]+$/)
+                         dso ~ /^\[JIT\]/ || dso ~ /\(deleted\)$/ || sym ~ /^0x[0-9a-fA-F]+$/)
         if (unannotatable) {
             if (unres_n < top * 4) {
                 print pct "\t" dso "\t" sym > unresolved
@@ -2308,7 +2313,7 @@ annotate_one() {
         echo "sym=$sym"
         echo "dso=$dso"
         DEBUGINFOD_URLS="" timeout 60 "$PERF_CMD" annotate -i "$PERF_DATA" --stdio --no-source \
-            --symbol="$sym" --dso="$dso" 2>/dev/null || true
+            --symbol="$sym" --dso="$dso" $SYMFS_ARG 2>/dev/null || true
     } > "$WORKDIR/ann_$idx.txt"
 }
 

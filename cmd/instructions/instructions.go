@@ -64,6 +64,7 @@ var (
 	flagJobs             int
 	flagIncludeKernel    bool
 	flagJIT              bool
+	flagSymfs            string
 	flagNoSystemSummary  bool
 	flagRegisterPressure bool
 	flagAPXEstimate      bool
@@ -78,6 +79,7 @@ const (
 	flagJobsName             = "jobs"
 	flagIncludeKernelName    = "kernel"
 	flagJITName              = "jit"
+	flagSymfsName            = "symfs"
 	flagNoSystemSummaryName  = "no-summary"
 	flagRegisterPressureName = "register-pressure"
 	flagAPXEstimateName      = "apx-estimate"
@@ -116,6 +118,7 @@ func init() {
 	Cmd.Flags().IntVar(&flagJobs, flagJobsName, 4, "")
 	Cmd.Flags().BoolVar(&flagIncludeKernel, flagIncludeKernelName, false, "")
 	Cmd.Flags().BoolVar(&flagJIT, flagJITName, false, "")
+	Cmd.Flags().StringVar(&flagSymfs, flagSymfsName, "", "")
 	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
 
 	workflow.AddTargetFlags(Cmd)
@@ -207,6 +210,10 @@ func getFlagGroups() []app.FlagGroup {
 		GroupName: "Advanced Options",
 		Flags: []app.Flag{
 			{
+				Name: flagSymfsName,
+				Help: "filesystem root to resolve binaries under. Needed when profiling containers from the host, where the recorded paths do not exist: pass the container's merged overlay directory",
+			},
+			{
 				Name: app.FlagInputName,
 				Help: "\".raw\" file, or directory containing \".raw\" files. Will skip data collection and use raw data for reports.",
 			},
@@ -289,6 +296,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			"Jobs":          strconv.Itoa(flagJobs),
 			"IncludeKernel": strconv.FormatBool(flagIncludeKernel),
 			"JIT":           strconv.FormatBool(flagJIT),
+			"Symfs":         flagSymfs,
 		},
 		Tables:  selectedTables(),
 		Input:   flagInput,

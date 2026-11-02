@@ -8,17 +8,15 @@ import (
 	"testing"
 )
 
+// Rows as "perf report -t '|'" emits them.
 const sampleReport = `# To display the perf.data header info, please use --header/--header-only options.
 #
 # Samples: 40K of event 'cycles:upp'
 #
-# Overhead  Command        Shared Object  Symbol
-# ........  .............  .............  .....................
-#
-    12.20%  stress-ng-cpu  stress-ng      [.] ccitt_crc16
-     5.74%  stress-ng-cpu  libm.so.6      [.] __kernel_rem_pio2
-     0.30%  stress-ng-cpu  [kernel.kallsyms]  [k] native_write_msr
-     0.01%  stress-ng      [unknown]      [.] 0xffffffff9120124c
+ 12.20% |stress-ng-cpu|stress-ng        |[.] ccitt_crc16
+ 5.74%  |stress-ng-cpu|libm.so.6        |[.] __kernel_rem_pio2
+ 0.30%  |stress-ng-cpu|[kernel.kallsyms]|[k] native_write_msr
+ 0.01%  |stress-ng    |[unknown]        |[.] 0xffffffff9120124c
 `
 
 func TestParseReport(t *testing.T) {
@@ -95,7 +93,7 @@ func buildScriptOutput(t *testing.T, annotateFixture string) string {
 	sb.WriteString("########## perf_event ##########\ncycles:upp\n")
 	sb.WriteString("########## perf_report ##########\n")
 	sb.WriteString("# Overhead  Command   Shared Object  Symbol\n")
-	sb.WriteString("    23.43%  workload  workload       [.] gp_pressure\n")
+	sb.WriteString(" 23.43% |workload|workload|[.] gp_pressure\n")
 	sb.WriteString("########## annotate_0 ##########\n")
 	sb.WriteString("sym=gp_pressure\ndso=workload\n")
 	sb.WriteString(body)
@@ -145,7 +143,7 @@ func TestAnalyzeReportsStrippedSymbols(t *testing.T) {
 		"cycles:upp",
 		"########## perf_report ##########",
 		"# Overhead  Command        Shared Object  Symbol",
-		"    99.00%  stress-ng-cpu  stress-ng      [.] ccitt_crc16",
+		" 99.00% |stress-ng-cpu|stress-ng|[.] ccitt_crc16",
 		"########## annotate_0 ##########",
 		"sym=ccitt_crc16",
 		"dso=stress-ng",
@@ -183,8 +181,8 @@ func TestAnalyzeRanksByGlobalStackPct(t *testing.T) {
 		"########## perf_event ##########", "cycles:upp",
 		"########## perf_report ##########",
 		"# Overhead  Command   Shared Object  Symbol",
-		"    75.27%  workload  workload       [.] simd_pressure",
-		"    23.43%  workload  workload       [.] gp_pressure",
+		" 75.27% |workload|workload|[.] simd_pressure",
+		" 23.43% |workload|workload|[.] gp_pressure",
 		"########## annotate_0 ##########", "sym=simd_pressure", "dso=workload", simd,
 		"########## annotate_1 ##########", "sym=gp_pressure", "dso=workload", gp,
 	}, "\n")
@@ -238,7 +236,7 @@ func TestAnalyzeReportsUnresolvedSymbols(t *testing.T) {
 		"########## perf_event ##########", "cycles:upp",
 		"########## perf_report ##########",
 		"# Overhead  Command        Shared Object  Symbol",
-		"     5.83%  stress-ng-cpu  stress-ng      [.] 0x0000000000072292",
+		" 5.83%  |stress-ng-cpu|stress-ng|[.] 0x0000000000072292",
 		"########## unresolved ##########",
 		"5.83\tstress-ng\t0x0000000000072292",
 		"4.26\tstress-ng\t0x000000000007228a",
@@ -288,11 +286,11 @@ func TestParseUnresolvedIgnoresMalformedRows(t *testing.T) {
 func TestParseReportHandlesSpacesInDSO(t *testing.T) {
 	in := strings.Join([]string{
 		"# Overhead  Command  Shared Object  Symbol",
-		"     7.49%  java             [JIT] tid 4029471      [.] 0x000077a2dc2e16eb",
-		"     1.64%  java             [vdso]                 [.] 0x0000000000000b00",
-		"     0.30%  java             [kernel.kallsyms]      [k] native_write_msr",
-		"    12.20%  stress-ng-cpu    stress-ng              [.] ccitt_crc16",
-		"     0.10%  prog             libfoo.so              [.] Ns::C::m(int, long) const",
+		" 7.49%  |java         |[JIT] tid 4029471|[.] 0x000077a2dc2e16eb",
+		" 1.64%  |java         |[vdso]           |[.] 0x0000000000000b00",
+		" 0.30%  |GC Thread#5  |[kernel.kallsyms]|[k] native_write_msr",
+		" 12.20% |stress-ng-cpu|stress-ng        |[.] ccitt_crc16",
+		" 0.10%  |task l       |libfoo.so        |[.] Ns::C::m(int, long) const",
 	}, "\n")
 
 	syms, err := ParseReport(strings.NewReader(in))
@@ -304,17 +302,23 @@ func TestParseReportHandlesSpacesInDSO(t *testing.T) {
 	}
 
 	want := []struct {
-		dso, name string
-		kind      SymbolKind
+		comm, dso, name string
+		kind            SymbolKind
 	}{
-		{"[JIT] tid 4029471", "0x000077a2dc2e16eb", SymbolKindUser},
-		{"[vdso]", "0x0000000000000b00", SymbolKindUser},
-		{"[kernel.kallsyms]", "native_write_msr", SymbolKindKernel},
-		{"stress-ng", "ccitt_crc16", SymbolKindUser},
+		{"java", "[JIT] tid 4029471", "0x000077a2dc2e16eb", SymbolKindUser},
+		{"java", "[vdso]", "0x0000000000000b00", SymbolKindUser},
+		// A comm can contain spaces too: Spark names threads "GC Thread#5" and "task l".
+		// Assuming otherwise fused the comm into the DSO, which then matched no --dso
+		// and mis-classified JIT regions as merely stripped.
+		{"GC Thread#5", "[kernel.kallsyms]", "native_write_msr", SymbolKindKernel},
+		{"stress-ng-cpu", "stress-ng", "ccitt_crc16", SymbolKindUser},
 		// A C++ signature contains spaces and must survive intact.
-		{"libfoo.so", "Ns::C::m(int, long) const", SymbolKindUser},
+		{"task l", "libfoo.so", "Ns::C::m(int, long) const", SymbolKindUser},
 	}
 	for i, w := range want {
+		if syms[i].Comm != w.comm {
+			t.Errorf("row %d Comm = %q, want %q", i, syms[i].Comm, w.comm)
+		}
 		if syms[i].DSO != w.dso {
 			t.Errorf("row %d DSO = %q, want %q", i, syms[i].DSO, w.dso)
 		}
@@ -353,7 +357,7 @@ func TestJITStatusReporting(t *testing.T) {
 			"########## perf_event ##########", "cycles:upp",
 			"########## jit_inject ##########", "ok",
 			"########## perf_report ##########",
-			"    50.00%  java  libjvm.so  [.] os::javaTimeNanos()",
+			" 50.00% |java|libjvm.so|[.] os::javaTimeNanos()",
 			"########## annotate_0 ##########", "sym=os::javaTimeNanos()", "dso=libjvm.so", jitBody,
 		}, "\n")
 		r, err := Analyze(out, 0)
@@ -374,7 +378,7 @@ func TestJITStatusReporting(t *testing.T) {
 			"########## perf_event ##########", "cycles:upp",
 			"########## jit_inject ##########", "ok",
 			"########## perf_report ##########",
-			"    43.72%  java  jitted-4148375-749.so  [.] CryptoBench.crypt(java.lang.String)",
+			" 43.72% |java|jitted-4148375-749.so|[.] CryptoBench.crypt(java.lang.String)",
 			"########## annotate_0 ##########",
 			"sym=CryptoBench.crypt(java.lang.String)", "dso=jitted-4148375-749.so", jitBody,
 		}, "\n")

@@ -23,19 +23,20 @@ const (
 	SymbolKindOther SymbolKind = "other"
 )
 
-// perf report --stdio --no-children --sort comm,dso,sym emits rows shaped:
+// Rows from "perf report -t '|'" are pipe-delimited:
 //
-//	12.20%  stress-ng-cpu  stress-ng          [.] ccitt_crc16
-//	 7.49%  java           [JIT] tid 4029471  [.] 0x000077a2dc2e16eb
+//	12.20% |stress-ng-cpu|stress-ng            |[.] ccitt_crc16
+//	42.02% |java         |jitted-4148375-749.so|[.] CryptoBench.crypt(java.lang.String)
+//	 0.26% |GC Thread#5  |libjvm.so            |[.] G1ParScanThreadState::trim_queue(...)
 //
-// Neither the DSO nor the symbol can be taken as a whitespace-delimited field: perf names
-// JIT regions "[JIT] tid <n>", which contains spaces, and C++ symbols contain spaces too.
-// The single-character level marker is the only reliable anchor, so the DSO is matched
-// lazily up to it and the symbol greedily after it. Bracketed pseudo-DSOs such as
-// "[kernel.kallsyms]" cannot be mistaken for the marker, which holds exactly one
-// character between its brackets.
-var reReportRow = regexp.MustCompile(
-	`^[[:space:]]*([0-9]+\.[0-9]+)%[[:space:]]+(\S+)[[:space:]]+(.+?)[[:space:]]+\[([a-zA-Z.?])\][[:space:]]+(.+?)[[:space:]]*$`)
+// An explicit separator is essential rather than convenient. Every one of the three
+// name fields can contain spaces: Spark names threads "GC Thread#5" and "task l", perf
+// names JIT regions "[JIT] tid <n>", and C++ symbols are full signatures. Column
+// alignment alone cannot be split reliably, and guessing mis-assigns the DSO.
+var reReportRow = regexp.MustCompile(`^[[:space:]]*([0-9]+\.[0-9]+)%`)
+
+// reLevelMarker strips perf's level marker from the head of the symbol field.
+var reLevelMarker = regexp.MustCompile(`^[[:space:]]*\[([a-zA-Z.?])\][[:space:]]*`)
 
 // ParseReport reads "perf report --stdio --no-children --sort comm,dso,sym" output and
 // returns the hot symbols it lists, in the order perf emitted them (descending by
@@ -53,7 +54,11 @@ func ParseReport(r io.Reader) ([]Symbol, error) {
 		if strings.HasPrefix(strings.TrimSpace(line), "#") {
 			continue
 		}
-		m := reReportRow.FindStringSubmatch(line)
+		fields := strings.Split(line, "|")
+		if len(fields) < 4 {
+			continue
+		}
+		m := reReportRow.FindStringSubmatch(fields[0])
 		if m == nil {
 			continue
 		}
@@ -61,12 +66,24 @@ func ParseReport(r io.Reader) ([]Symbol, error) {
 		if err != nil {
 			continue
 		}
+
+		kind := SymbolKindOther
+		sym := fields[3]
+		if mk := reLevelMarker.FindStringSubmatch(sym); mk != nil {
+			kind = symbolKindFromMarker(mk[1])
+			sym = sym[len(mk[0]):]
+		}
+		sym = strings.TrimSpace(sym)
+		if sym == "" {
+			continue
+		}
+
 		symbols = append(symbols, Symbol{
 			HotPct: pct,
-			Comm:   m[2],
-			DSO:    m[3],
-			Kind:   symbolKindFromMarker(m[4]),
-			Name:   m[5],
+			Comm:   strings.TrimSpace(fields[1]),
+			DSO:    strings.TrimSpace(fields[2]),
+			Kind:   kind,
+			Name:   sym,
 		})
 	}
 	if err := scanner.Err(); err != nil {

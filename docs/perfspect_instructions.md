@@ -42,6 +42,7 @@ Flags:
     --key                  private key file for SSH to remote target
     --targets              file with remote target(s) connection details. See targets.yaml for format.
   Advanced Options:
+    --symfs                filesystem root to resolve binaries under. Needed when profiling containers from the host, where the recorded paths do not exist: pass the container's merged overlay directory
     --input                ".raw" file, or directory containing ".raw" files. Will skip data collection and use raw data for reports.
 
 Global Flags:
