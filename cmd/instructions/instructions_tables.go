@@ -31,6 +31,11 @@ const (
 // topOpsPerSymbol is how many hot stack instructions are retained per symbol for display.
 const topOpsPerSymbol = 5
 
+// maxUnannotatedListed caps how many unannotatable binaries are named individually. A JVM
+// workload can produce dozens; beyond this they are summarized as a remainder so the
+// field stays readable without hiding the total weight.
+const maxUnannotatedListed = 15
+
 var tableDefinitions = map[string]table.TableDefinition{
 	RegisterPressureTableName: {
 		Name:          RegisterPressureTableName,
@@ -135,19 +140,42 @@ func collectionInfoTableValues(outputs map[string]script.ScriptOutput) []table.F
 
 	strippedNote := "none"
 	if lost := result.LostHotPct(); lost > 0 {
-		// The remedy depends on why each DSO failed, so advice is given per binary
-		// rather than as one blanket instruction: telling someone to rebuild JIT code
-		// with -g would send them down a dead end.
-		var parts []string
-		for _, d := range result.UnannotatedDSOs() {
-			if advice := d.Reason.Advice(); advice != "" {
-				parts = append(parts, fmt.Sprintf("%s (%.2f%% of samples, %s)", d.DSO, d.HotPct, advice))
-			} else {
-				parts = append(parts, fmt.Sprintf("%s (%.2f%% of samples)", d.DSO, d.HotPct))
+		// One entry per line, weight first: the list routinely runs to dozens of
+		// binaries on a JVM workload, and as a single run-on line it is unreadable.
+		// The remedy differs per binary, so advice is given per entry rather than as
+		// one blanket instruction: telling someone to rebuild JIT code with -g would
+		// send them down a dead end.
+		lines := []string{fmt.Sprintf("%.2f%% of sampled weight could not be annotated:", lost)}
+		dsos := result.UnannotatedDSOs()
+		// Entries that round to 0.00% carry no information and would otherwise fill the
+		// list: a JVM contributes one per thread that briefly ran JIT code. They are
+		// folded into the remainder instead of being named.
+		named := 0
+		for _, d := range dsos {
+			if d.HotPct < 0.005 {
+				break // sorted descending, so everything after this is negligible too
 			}
+			named++
 		}
-		strippedNote = fmt.Sprintf("%.2f%% of sampled weight could not be annotated: %s",
-			lost, strings.Join(parts, "; "))
+		shown := dsos[:named]
+		if len(shown) > maxUnannotatedListed {
+			shown = shown[:maxUnannotatedListed]
+		}
+		for _, d := range shown {
+			line := fmt.Sprintf("  %6.2f%%  %s", d.HotPct, d.DSO)
+			if advice := d.Reason.Advice(); advice != "" {
+				line += " - " + advice
+			}
+			lines = append(lines, line)
+		}
+		if rest := len(dsos) - len(shown); rest > 0 {
+			var restPct float64
+			for _, d := range dsos[len(shown):] {
+				restPct += d.HotPct
+			}
+			lines = append(lines, fmt.Sprintf("  %6.2f%%  (+%d more binaries)", restPct, rest))
+		}
+		strippedNote = strings.Join(lines, "\n")
 	}
 
 	jitNote := "not requested"

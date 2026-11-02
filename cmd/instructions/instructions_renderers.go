@@ -83,3 +83,31 @@ func tierStyle(tier string) string {
 		return tierLowStyle
 	}
 }
+
+// collectionInfoHTMLRenderer renders the collection summary as name/value rows.
+//
+// It exists only to preserve line breaks. Several of these fields are multi-line - the
+// list of unannotatable binaries, and the JIT diagnostics - and the default renderer
+// escapes the value into a cell without pre-wrap, so HTML collapses the newlines into one
+// unreadable run-on line.
+func collectionInfoHTMLRenderer(tableValues table.TableValues, targetName string) string {
+	var (
+		values           [][]string
+		tableValueStyles [][]string
+	)
+	for _, field := range tableValues.Fields {
+		value := ""
+		if len(field.Values) > 0 {
+			value = field.Values[0]
+		}
+		values = append(values, []string{
+			report.CreateFieldNameWithDescription(field.Name, field.Description),
+			htmltemplate.HTMLEscapeString(value),
+		})
+		tableValueStyles = append(tableValueStyles, []string{
+			"font-weight:bold;white-space:nowrap",
+			"white-space:pre-wrap;font-family:monospace",
+		})
+	}
+	return report.RenderHTMLTable([]string{}, values, "pure-table pure-table-striped", tableValueStyles)
+}

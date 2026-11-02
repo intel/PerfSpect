@@ -314,6 +314,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	report.RegisterHTMLRenderer(RegisterPressureTableName, registerPressureHTMLRenderer)
+	report.RegisterHTMLRenderer(CollectionInfoTableName, collectionInfoHTMLRenderer)
 
 	return reportingCommand.Run()
 }
