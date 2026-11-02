@@ -135,13 +135,19 @@ func collectionInfoTableValues(outputs map[string]script.ScriptOutput) []table.F
 
 	strippedNote := "none"
 	if lost := result.LostHotPct(); lost > 0 {
+		// The remedy depends on why each DSO failed, so advice is given per binary
+		// rather than as one blanket instruction: telling someone to rebuild JIT code
+		// with -g would send them down a dead end.
 		var parts []string
 		for _, d := range result.UnannotatedDSOs() {
-			parts = append(parts, fmt.Sprintf("%s (%.2f%% of samples)", d.DSO, d.HotPct))
+			if advice := d.Reason.Advice(); advice != "" {
+				parts = append(parts, fmt.Sprintf("%s (%.2f%% of samples, %s)", d.DSO, d.HotPct, advice))
+			} else {
+				parts = append(parts, fmt.Sprintf("%s (%.2f%% of samples)", d.DSO, d.HotPct))
+			}
 		}
-		strippedNote = fmt.Sprintf("%.2f%% of sampled weight could not be annotated: %s. "+
-			"Rebuild these with symbols (-g) or install their debug symbol packages to get "+
-			"per-symbol detail.", lost, strings.Join(parts, ", "))
+		strippedNote = fmt.Sprintf("%.2f%% of sampled weight could not be annotated: %s",
+			lost, strings.Join(parts, "; "))
 	}
 
 	return []table.Field{

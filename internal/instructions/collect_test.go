@@ -280,3 +280,53 @@ func TestParseUnresolvedIgnoresMalformedRows(t *testing.T) {
 		t.Errorf("row = %+v, want 5.0/dso/sym", got[0])
 	}
 }
+
+// TestParseReportHandlesSpacesInDSO covers perf's JIT and pseudo-DSO naming. A JIT region
+// is named "[JIT] tid <n>", so neither the DSO nor the symbol can be taken as a
+// whitespace-delimited field. Getting this wrong silently drops every JIT row, which makes
+// a Java profile look like it lost no weight at all.
+func TestParseReportHandlesSpacesInDSO(t *testing.T) {
+	in := strings.Join([]string{
+		"# Overhead  Command  Shared Object  Symbol",
+		"     7.49%  java             [JIT] tid 4029471      [.] 0x000077a2dc2e16eb",
+		"     1.64%  java             [vdso]                 [.] 0x0000000000000b00",
+		"     0.30%  java             [kernel.kallsyms]      [k] native_write_msr",
+		"    12.20%  stress-ng-cpu    stress-ng              [.] ccitt_crc16",
+		"     0.10%  prog             libfoo.so              [.] Ns::C::m(int, long) const",
+	}, "\n")
+
+	syms, err := ParseReport(strings.NewReader(in))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(syms) != 5 {
+		t.Fatalf("parsed %d rows, want 5", len(syms))
+	}
+
+	want := []struct {
+		dso, name string
+		kind      SymbolKind
+	}{
+		{"[JIT] tid 4029471", "0x000077a2dc2e16eb", SymbolKindUser},
+		{"[vdso]", "0x0000000000000b00", SymbolKindUser},
+		{"[kernel.kallsyms]", "native_write_msr", SymbolKindKernel},
+		{"stress-ng", "ccitt_crc16", SymbolKindUser},
+		// A C++ signature contains spaces and must survive intact.
+		{"libfoo.so", "Ns::C::m(int, long) const", SymbolKindUser},
+	}
+	for i, w := range want {
+		if syms[i].DSO != w.dso {
+			t.Errorf("row %d DSO = %q, want %q", i, syms[i].DSO, w.dso)
+		}
+		if syms[i].Name != w.name {
+			t.Errorf("row %d Name = %q, want %q", i, syms[i].Name, w.name)
+		}
+		if syms[i].Kind != w.kind {
+			t.Errorf("row %d Kind = %q, want %q", i, syms[i].Kind, w.kind)
+		}
+	}
+	// The JIT row must be recognized as unresolved so its weight is accounted for.
+	if !syms[0].IsUnresolved() {
+		t.Error("JIT row IsUnresolved() = false, want true")
+	}
+}

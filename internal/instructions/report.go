@@ -25,12 +25,17 @@ const (
 
 // perf report --stdio --no-children --sort comm,dso,sym emits rows shaped:
 //
-//	12.20%  stress-ng-cpu  stress-ng   [.] ccitt_crc16
+//	12.20%  stress-ng-cpu  stress-ng          [.] ccitt_crc16
+//	 7.49%  java           [JIT] tid 4029471  [.] 0x000077a2dc2e16eb
 //
-// The symbol is everything after the level marker, so it may legitimately contain
-// spaces (C++ signatures) and is therefore captured greedily rather than split.
+// Neither the DSO nor the symbol can be taken as a whitespace-delimited field: perf names
+// JIT regions "[JIT] tid <n>", which contains spaces, and C++ symbols contain spaces too.
+// The single-character level marker is the only reliable anchor, so the DSO is matched
+// lazily up to it and the symbol greedily after it. Bracketed pseudo-DSOs such as
+// "[kernel.kallsyms]" cannot be mistaken for the marker, which holds exactly one
+// character between its brackets.
 var reReportRow = regexp.MustCompile(
-	`^[[:space:]]*([0-9]+\.[0-9]+)%[[:space:]]+(\S+)[[:space:]]+(\S+)[[:space:]]+\[([a-zA-Z.?])\][[:space:]]+(.+?)[[:space:]]*$`)
+	`^[[:space:]]*([0-9]+\.[0-9]+)%[[:space:]]+(\S+)[[:space:]]+(.+?)[[:space:]]+\[([a-zA-Z.?])\][[:space:]]+(.+?)[[:space:]]*$`)
 
 // ParseReport reads "perf report --stdio --no-children --sort comm,dso,sym" output and
 // returns the hot symbols it lists, in the order perf emitted them (descending by

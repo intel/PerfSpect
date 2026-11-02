@@ -2228,17 +2228,29 @@ UNRESOLVED="$WORKDIR/unresolved.tsv"
 awk -v top="$top" -v symlist="$SYMLIST" -v unresolved="$UNRESOLVED" '
     /^[[:space:]]*[0-9]+\.[0-9]+%/ {
         if (n >= top) exit
-        idx = index($0, "] ")
-        if (idx == 0) next
-        sym = substr($0, idx + 2)
+        # Anchor on the single-character level marker " [.] ", not on the first "] ":
+        # perf names JIT regions "[JIT] tid <n>", so the DSO field itself can contain
+        # "] " and can contain spaces. Field splitting cannot be used for the DSO.
+        if (match($0, /[[:space:]]\[[a-zA-Z.?]\][[:space:]]/) == 0) next
+        sym = substr($0, RSTART + RLENGTH)
         gsub(/^[[:space:]]+|[[:space:]]+$/, "", sym)
         if (sym == "") next
+
+        # Everything before the marker is "<pct>% <comm> <dso>"; drop the first two
+        # fields and what remains is the DSO, spaces included.
+        prefix = substr($0, 1, RSTART - 1)
+        sub(/^[[:space:]]+/, "", prefix)
+        sub(/^[^[:space:]]+[[:space:]]+/, "", prefix)
+        sub(/^[^[:space:]]+[[:space:]]+/, "", prefix)
+        dso = prefix
+        gsub(/[[:space:]]+$/, "", dso)
+
         pct = $1
         sub(/%$/, "", pct)
         if (sym ~ /^0x[0-9a-fA-F]+$/) {
-            print pct "\t" $3 "\t" sym > unresolved
+            print pct "\t" dso "\t" sym > unresolved
         } else {
-            print $3 "\t" sym > symlist
+            print dso "\t" sym > symlist
         }
         n++
     }' "$REPORT_OUT"

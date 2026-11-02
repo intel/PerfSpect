@@ -50,7 +50,7 @@ func (r Result) UnannotatedDSOs() []DSOWeight {
 	}
 	out := make([]DSOWeight, 0, len(byDSO))
 	for dso, pct := range byDSO {
-		out = append(out, DSOWeight{DSO: dso, HotPct: pct})
+		out = append(out, DSOWeight{DSO: dso, HotPct: pct, Reason: classifyDSO(dso)})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].HotPct != out[j].HotPct {
@@ -65,6 +65,60 @@ func (r Result) UnannotatedDSOs() []DSOWeight {
 type DSOWeight struct {
 	DSO    string
 	HotPct float64
+	Reason UnannotatableReason
+}
+
+// UnannotatableReason explains why a DSO produced no disassembly. The remedies differ
+// completely, so telling a user to rebuild with -g when the code is JIT-compiled, or
+// kernel-resident, is worse than saying nothing.
+type UnannotatableReason string
+
+const (
+	// ReasonStripped is an ordinary binary built without a symbol table.
+	ReasonStripped UnannotatableReason = "stripped"
+	// ReasonJIT is code generated at runtime by a JIT such as the JVM or V8. Annotating
+	// it requires the runtime to emit a jitdump and "perf inject --jit" to fold the
+	// resulting ELF images into the recording, which this command does not yet do.
+	ReasonJIT UnannotatableReason = "jit"
+	// ReasonKernel is kernel-resident code, which needs kernel symbols enabled.
+	ReasonKernel UnannotatableReason = "kernel"
+	// ReasonPseudoDSO is a kernel-provided mapping such as [vdso], which has no
+	// on-disk image to disassemble and is normally too small to matter.
+	ReasonPseudoDSO UnannotatableReason = "pseudo-dso"
+	// ReasonUnknown is a mapping perf could not attribute at all.
+	ReasonUnknown UnannotatableReason = "unknown"
+)
+
+// Advice returns the remedy that applies to this reason, or "" when none does.
+func (r UnannotatableReason) Advice() string {
+	switch r {
+	case ReasonStripped:
+		return "rebuild with symbols (-g) or install the matching debug symbol package"
+	case ReasonJIT:
+		return "JIT-compiled code; per-symbol analysis of it is not supported yet"
+	case ReasonKernel:
+		return "pass --kernel, and provide a vmlinux with debug info"
+	case ReasonPseudoDSO:
+		return "kernel-provided mapping with no on-disk image; normally safe to ignore"
+	default:
+		return ""
+	}
+}
+
+// classifyDSO infers why a DSO could not be annotated from the name perf gave it.
+func classifyDSO(dso string) UnannotatableReason {
+	switch {
+	case strings.HasPrefix(dso, "[JIT]"):
+		return ReasonJIT
+	case dso == "[unknown]":
+		return ReasonUnknown
+	case strings.HasPrefix(dso, "[kernel"), strings.HasPrefix(dso, "[guest"):
+		return ReasonKernel
+	case strings.HasPrefix(dso, "["):
+		return ReasonPseudoDSO
+	default:
+		return ReasonStripped
+	}
 }
 
 // LostHotPct is the total profile weight in symbols that could not be annotated.
