@@ -18,6 +18,7 @@ Examples:
   Analyze specific processes:            $ perfspect instructions --pids 1234,5678
   Register pressure only:                $ perfspect instructions --register-pressure
   With an Intel APX benefit estimate:    $ perfspect instructions --apx-estimate
+  Java / JIT-compiled code:              $ perfspect instructions --jit --pids $(pgrep -x java)
 
 Flags:
   Analyses:
@@ -31,6 +32,7 @@ Flags:
     --top                  number of hottest symbols to disassemble and analyze (default: 50)
     --jobs                 number of parallel disassembly workers (default: 4)
     --kernel               include kernel symbols (userspace only by default) (default: false)
+    --jit                  analyze JIT-compiled code (Java, Node.js). The runtime must emit a jitdump; for the JVM add -agentpath:<path>/libperf-jvmti.so (default: false)
     --format               choose output format(s) from: all, html, txt, json (default: [all])
     --no-summary           do not include system summary table in report (default: false)
   Remote Target Options:

@@ -194,6 +194,29 @@ spilling almost nothing, or carry dense spill code while being too cold to matte
 > stripped binaries cannot be disassembled per symbol, and the report says how much of the profile
 > was lost to them rather than quietly covering only the libraries that do have symbols.
 
+For JIT runtimes, pass `--jit`. PerfSpect then records with the monotonic clock and folds
+the runtime's jitdump into the recording, so each JIT-compiled method becomes an ordinary
+annotatable binary and appears in the table under its real name:
+
+```text
+GSTK%  HOT%   STACK%  SPILL%  RELD%  GP%    PRES  Symbol
+9.44   43.72  21.59   10.55   11.05  21.59  HIGH  CryptoBench.crypt(java.lang.String)
+2.18   19.80  11.02   5.51    5.51   0.00   MED   RandomStringUtils.generate()
+```
+
+The runtime has to emit that jitdump, which **cannot be enabled on an already-running
+process**. For the JVM, launch it with:
+
+```bash
+JVMTI=/usr/lib/linux-tools/$(uname -r)/libperf-jvmti.so
+java -XX:+UnlockDiagnosticVMOptions -XX:+DumpPerfMapAtExit -agentpath:$JVMTI -jar app.jar
+```
+
+Without the agent, `--jit` reports that no JIT-compiled code was found rather than
+appearing to succeed. Note that `-XX:+DumpPerfMapAtExit` alone only yields method *names*;
+the `-agentpath` agent is what makes the machine code available, and therefore what makes
+spill/reload analysis possible at all.
+
 `--apx-estimate` adds a projection of what Intel APX might recover, by scaling the observed
 GP spill cost and adding an uplift for code patterns APX encodes more compactly (NDD, CCMP,
 PUSH2/POP2). It is off by default and should stay that way in casual use: the coefficients

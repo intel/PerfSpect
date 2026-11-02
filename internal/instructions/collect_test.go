@@ -330,3 +330,80 @@ func TestParseReportHandlesSpacesInDSO(t *testing.T) {
 		t.Error("JIT row IsUnresolved() = false, want true")
 	}
 }
+
+// TestJITStatusReporting covers the three JIT outcomes. The important case is the middle
+// one: "perf inject --jit" exits 0 when there is no jitdump to fold in, so its exit status
+// cannot be trusted to mean JIT analysis worked. Whether any jitted-* DSO appeared is the
+// only reliable signal.
+func TestJITStatusReporting(t *testing.T) {
+	jitBody := readFixture(t, "annotate_gp_pressure.stdio")
+
+	t.Run("not requested", func(t *testing.T) {
+		r, err := Analyze("########## perf_event ##########\ncycles:upp\n", 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r.JITInjected != nil {
+			t.Errorf("JITInjected = %v, want nil when --jit was not used", *r.JITInjected)
+		}
+	})
+
+	t.Run("inject ran but found nothing", func(t *testing.T) {
+		out := strings.Join([]string{
+			"########## perf_event ##########", "cycles:upp",
+			"########## jit_inject ##########", "ok",
+			"########## perf_report ##########",
+			"    50.00%  java  libjvm.so  [.] os::javaTimeNanos()",
+			"########## annotate_0 ##########", "sym=os::javaTimeNanos()", "dso=libjvm.so", jitBody,
+		}, "\n")
+		r, err := Analyze(out, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r.JITInjected == nil || !*r.JITInjected {
+			t.Fatal("JITInjected should be true: the inject step itself succeeded")
+		}
+		// No jitted-* DSO, so no JIT method was actually analyzed.
+		if got := r.JITMethodCount(); got != 0 {
+			t.Errorf("JITMethodCount = %d, want 0", got)
+		}
+	})
+
+	t.Run("inject folded in real methods", func(t *testing.T) {
+		out := strings.Join([]string{
+			"########## perf_event ##########", "cycles:upp",
+			"########## jit_inject ##########", "ok",
+			"########## perf_report ##########",
+			"    43.72%  java  jitted-4148375-749.so  [.] CryptoBench.crypt(java.lang.String)",
+			"########## annotate_0 ##########",
+			"sym=CryptoBench.crypt(java.lang.String)", "dso=jitted-4148375-749.so", jitBody,
+		}, "\n")
+		r, err := Analyze(out, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := r.JITMethodCount(); got != 1 {
+			t.Errorf("JITMethodCount = %d, want 1", got)
+		}
+		if len(r.Analyzed) != 1 {
+			t.Fatalf("Analyzed = %d, want 1", len(r.Analyzed))
+		}
+		// A Java method name contains dots and parentheses and must survive intact.
+		if got := r.Analyzed[0].Name; got != "CryptoBench.crypt(java.lang.String)" {
+			t.Errorf("Name = %q, want the full Java signature", got)
+		}
+		if got := r.Analyzed[0].HotPct; got != 43.72 {
+			t.Errorf("HotPct = %.2f, want 43.72", got)
+		}
+	})
+
+	t.Run("inject failed", func(t *testing.T) {
+		r, err := Analyze("########## jit_inject ##########\nfailed\n", 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r.JITInjected == nil || *r.JITInjected {
+			t.Error("JITInjected should be false when the inject step failed")
+		}
+	})
+}

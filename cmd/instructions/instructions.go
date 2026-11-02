@@ -31,6 +31,7 @@ var examples = []string{
 	fmt.Sprintf("  Analyze specific processes:            $ %s %s --pids 1234,5678", app.Name, cmdName),
 	fmt.Sprintf("  Register pressure only:                $ %s %s --register-pressure", app.Name, cmdName),
 	fmt.Sprintf("  With an Intel APX benefit estimate:    $ %s %s --apx-estimate", app.Name, cmdName),
+	fmt.Sprintf("  Java / JIT-compiled code:              $ %s %s --jit --pids $(pgrep -x java)", app.Name, cmdName),
 }
 
 var Cmd = &cobra.Command{
@@ -62,6 +63,7 @@ var (
 	flagTopSymbols       int
 	flagJobs             int
 	flagIncludeKernel    bool
+	flagJIT              bool
 	flagNoSystemSummary  bool
 	flagRegisterPressure bool
 	flagAPXEstimate      bool
@@ -75,6 +77,7 @@ const (
 	flagTopSymbolsName       = "top"
 	flagJobsName             = "jobs"
 	flagIncludeKernelName    = "kernel"
+	flagJITName              = "jit"
 	flagNoSystemSummaryName  = "no-summary"
 	flagRegisterPressureName = "register-pressure"
 	flagAPXEstimateName      = "apx-estimate"
@@ -112,6 +115,7 @@ func init() {
 	Cmd.Flags().IntVar(&flagTopSymbols, flagTopSymbolsName, 50, "")
 	Cmd.Flags().IntVar(&flagJobs, flagJobsName, 4, "")
 	Cmd.Flags().BoolVar(&flagIncludeKernel, flagIncludeKernelName, false, "")
+	Cmd.Flags().BoolVar(&flagJIT, flagJITName, false, "")
 	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
 
 	workflow.AddTargetFlags(Cmd)
@@ -183,6 +187,10 @@ func getFlagGroups() []app.FlagGroup {
 			{
 				Name: flagIncludeKernelName,
 				Help: "include kernel symbols (userspace only by default)",
+			},
+			{
+				Name: flagJITName,
+				Help: "analyze JIT-compiled code (Java, Node.js). The runtime must emit a jitdump; for the JVM add -agentpath:<path>/libperf-jvmti.so",
 			},
 			{
 				Name: app.FlagFormatName,
@@ -280,6 +288,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			"TopSymbols":    strconv.Itoa(flagTopSymbols),
 			"Jobs":          strconv.Itoa(flagJobs),
 			"IncludeKernel": strconv.FormatBool(flagIncludeKernel),
+			"JIT":           strconv.FormatBool(flagJIT),
 		},
 		Tables:  selectedTables(),
 		Input:   flagInput,

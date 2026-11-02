@@ -2140,6 +2140,7 @@ pids={{.PIDs}}
 top={{.TopSymbols}}
 jobs={{.Jobs}}
 include_kernel={{.IncludeKernel}}
+jit={{.JIT}}
 
 # Prefer system installed perf over bundled perf to avoid kernel incompatibilities.
 # See the flamegraph script for the full rationale.
@@ -2179,6 +2180,13 @@ else
     SUFFIXES="upp up u"
     BASE="cycles:"
 fi
+# perf inject --jit correlates jitdump timestamps against sample timestamps, which
+# requires the monotonic clock. Without -k 1 the injection silently resolves nothing.
+JIT_CLOCK=""
+if [ "$jit" = "true" ]; then
+    JIT_CLOCK="-k 1"
+fi
+
 PERF_EVENT=""
 for sfx in $SUFFIXES; do
     sfx="${sfx//\'/}"
@@ -2198,13 +2206,29 @@ echo "$PERF_EVENT"
 
 # Pass 1 - record
 if [ -n "$pids" ]; then
-    "$PERF_CMD" record -e "$PERF_EVENT" -F "$frequency" -p "$pids" -o "$PERF_DATA" -- sleep "$duration" >/dev/null 2>&1 || true
+    "$PERF_CMD" record -e "$PERF_EVENT" -F "$frequency" $JIT_CLOCK -p "$pids" -o "$PERF_DATA" -- sleep "$duration" >/dev/null 2>&1 || true
 else
-    "$PERF_CMD" record -e "$PERF_EVENT" -F "$frequency" -a -o "$PERF_DATA" -- sleep "$duration" >/dev/null 2>&1 || true
+    "$PERF_CMD" record -e "$PERF_EVENT" -F "$frequency" $JIT_CLOCK -a -o "$PERF_DATA" -- sleep "$duration" >/dev/null 2>&1 || true
 fi
 if [ ! -s "$PERF_DATA" ]; then
     echo "Error: perf record produced no data" >&2
     exit 1
+fi
+
+# Fold JIT-compiled code into the recording. perf writes one synthetic ELF image per
+# compiled method, so afterwards JIT methods are ordinary annotatable DSOs with resolved
+# names. This needs the runtime to have emitted a jitdump: for the JVM that means
+# launching it with -agentpath:libperf-jvmti.so, which cannot be done retroactively.
+if [ "$jit" = "true" ]; then
+    INJECTED="$WORKDIR/perf.jit.data"
+    echo "########## jit_inject ##########"
+    if "$PERF_CMD" inject --jit -i "$PERF_DATA" -o "$INJECTED" >/dev/null 2>&1 && [ -s "$INJECTED" ]; then
+        mv "$INJECTED" "$PERF_DATA"
+        echo "ok"
+    else
+        rm -f "$INJECTED"
+        echo "failed"
+    fi
 fi
 
 # Pass 1 - hot symbols
@@ -2227,7 +2251,12 @@ UNRESOLVED="$WORKDIR/unresolved.tsv"
 : > "$UNRESOLVED"
 awk -v top="$top" -v symlist="$SYMLIST" -v unresolved="$UNRESOLVED" '
     /^[[:space:]]*[0-9]+\.[0-9]+%/ {
-        if (n >= top) exit
+        # --top caps symbols actually sent for disassembly. Rows that can never be
+        # disassembled do not consume that budget: a JVM emits thousands of tiny
+        # per-method rows, and counting them would starve the annotatable code of slots
+        # entirely. Their weight is still recorded so coverage stays honest.
+        if (n >= top && unres_n >= top * 4) exit
+
         # Anchor on the single-character level marker " [.] ", not on the first "] ":
         # perf names JIT regions "[JIT] tid <n>", so the DSO field itself can contain
         # "] " and can contain spaces. Field splitting cannot be used for the DSO.
@@ -2247,12 +2276,23 @@ awk -v top="$top" -v symlist="$SYMLIST" -v unresolved="$UNRESOLVED" '
 
         pct = $1
         sub(/%$/, "", pct)
-        if (sym ~ /^0x[0-9a-fA-F]+$/) {
-            print pct "\t" dso "\t" sym > unresolved
-        } else {
-            print dso "\t" sym > symlist
+
+        # Pseudo-DSOs with no on-disk image, and symbols perf could not resolve to a
+        # name. Kernel mappings are excluded from this list: perf can annotate those
+        # when kallsyms or a vmlinux is available.
+        unannotatable = (dso == "[vdso]" || dso == "[vsyscall]" || dso == "[unknown]" || \
+                         dso ~ /^\[JIT\]/ || sym ~ /^0x[0-9a-fA-F]+$/)
+        if (unannotatable) {
+            if (unres_n < top * 4) {
+                print pct "\t" dso "\t" sym > unresolved
+                unres_n++
+            }
+            next
         }
-        n++
+        if (n < top) {
+            print dso "\t" sym > symlist
+            n++
+        }
     }' "$REPORT_OUT"
 
 if [ -s "$UNRESOLVED" ]; then

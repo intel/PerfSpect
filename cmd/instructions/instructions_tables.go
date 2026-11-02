@@ -150,8 +150,30 @@ func collectionInfoTableValues(outputs map[string]script.ScriptOutput) []table.F
 			lost, strings.Join(parts, "; "))
 	}
 
+	jitNote := "not requested"
+	if result.JITInjected != nil {
+		jitMethods := result.JITMethodCount()
+		switch {
+		case !*result.JITInjected:
+			// Almost always the runtime emitted no jitdump, which for the JVM means the
+			// JVMTI agent was not loaded at launch. Say so, because the run otherwise
+			// looks like a successful one that simply found no JIT code.
+			jitNote = "perf inject --jit failed; JIT-compiled code was not analyzed"
+		case jitMethods > 0:
+			jitNote = fmt.Sprintf("%d JIT-compiled methods analyzed", jitMethods)
+		default:
+			// inject succeeds trivially with nothing to fold in, so this is the common
+			// case of the runtime never having emitted a jitdump.
+			jitNote = "no JIT-compiled code was found. The runtime must emit a jitdump: " +
+				"for the JVM, launch it with -XX:+UnlockDiagnosticVMOptions " +
+				"-XX:+DumpPerfMapAtExit -agentpath:<linux-tools>/libperf-jvmti.so. " +
+				"This cannot be enabled on an already-running process."
+		}
+	}
+
 	return []table.Field{
 		{Name: "Sampling Event", Values: []string{result.PerfEvent}},
+		{Name: "JIT Analysis", Description: "whether JIT-compiled code was folded into the recording for analysis", Values: []string{jitNote}},
 		{Name: "Symbols Analyzed", Values: []string{strconv.Itoa(len(result.Analyzed))}},
 		{Name: "Symbols Not Annotatable", Values: []string{strconv.Itoa(len(result.Unannotated))}},
 		{Name: "Unannotatable Binaries", Values: []string{strippedNote}},

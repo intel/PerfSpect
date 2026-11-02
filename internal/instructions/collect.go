@@ -17,6 +17,7 @@ const (
 	sectionPerfReport     = "perf_report"
 	sectionAnnotatePrefix = "annotate_"
 	sectionUnresolved     = "unresolved"
+	sectionJITInject      = "jit_inject"
 )
 
 // AnalyzedSymbol pairs a hot symbol with its register-pressure profile and APX signals.
@@ -38,6 +39,10 @@ type Result struct {
 	// Unannotated holds symbols that were hot enough to select but produced no
 	// disassembly, almost always because their binary is stripped.
 	Unannotated []Symbol
+	// JITInjected reports whether JIT analysis was requested and, if so, whether
+	// folding the runtime's jitdump into the recording succeeded. Nil when --jit was
+	// not used.
+	JITInjected *bool
 }
 
 // UnannotatedDSOs lists the distinct DSOs that could not be annotated, with the share of
@@ -121,6 +126,28 @@ func classifyDSO(dso string) UnannotatableReason {
 	}
 }
 
+// JITMethodCount returns the number of symbols that came from JIT-compiled code, i.e.
+// whose DSO is one of the synthetic ELF images perf writes per compiled method.
+//
+// This, not the exit status of "perf inject --jit", is what says whether JIT analysis
+// actually worked: that command succeeds trivially when there is no jitdump to fold in,
+// so a run with no JVMTI agent loaded would otherwise look like a success that happened
+// to find no JIT code.
+func (r Result) JITMethodCount() int {
+	var n int
+	for _, s := range r.Analyzed {
+		if strings.HasPrefix(s.DSO, "jitted-") {
+			n++
+		}
+	}
+	for _, s := range r.Unannotated {
+		if strings.HasPrefix(s.DSO, "jitted-") {
+			n++
+		}
+	}
+	return n
+}
+
 // LostHotPct is the total profile weight in symbols that could not be annotated.
 func (r Result) LostHotPct() float64 {
 	var total float64
@@ -140,6 +167,10 @@ func Analyze(scriptStdout string, topOps int) (Result, error) {
 
 	var result Result
 	result.PerfEvent = strings.TrimSpace(sections[sectionPerfEvent])
+	if status, ok := sections[sectionJITInject]; ok {
+		injected := strings.TrimSpace(status) == "ok"
+		result.JITInjected = &injected
+	}
 
 	reported, err := ParseReport(strings.NewReader(sections[sectionPerfReport]))
 	if err != nil {
