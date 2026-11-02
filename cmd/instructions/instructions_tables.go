@@ -17,15 +17,17 @@ import (
 
 // instruction analysis table names
 const (
-	RegisterPressureTableName = "Register Pressure"
-	APXEstimateTableName      = "APX Benefit Estimate"
-	CollectionInfoTableName   = "Instruction Analysis Collection"
+	RegisterPressureTableName    = "Register Pressure"
+	RegisterPressureBySymbolName = "Register Pressure by Symbol"
+	APXEstimateTableName         = "APX Benefit Estimate"
+	CollectionInfoTableName      = "Instruction Analysis Collection"
 )
 
 // Menu labels
 const (
-	RegisterPressureMenuLabel = "Register Pressure"
-	APXEstimateMenuLabel      = "APX Estimate"
+	RegisterPressureMenuLabel         = "Register Pressure"
+	RegisterPressureBySymbolMenuLabel = "Register Pressure by Symbol"
+	APXEstimateMenuLabel              = "APX Estimate"
 )
 
 // topOpsPerSymbol is how many hot stack instructions are retained per symbol for display.
@@ -48,6 +50,17 @@ var tableDefinitions = map[string]table.TableDefinition{
 		NoDataFound: "No annotatable hot symbols were found. If the profiled binaries are " +
 			"stripped, rebuild them with symbols or install their debug symbol packages.",
 		FieldsFunc: registerPressureTableValues,
+	},
+	RegisterPressureBySymbolName: {
+		Name:          RegisterPressureBySymbolName,
+		MenuLabel:     RegisterPressureBySymbolMenuLabel,
+		HasRows:       true,
+		Architectures: []string{cpus.X86Architecture},
+		ScriptNames: []string{
+			script.HotCodeAnnotateScriptName,
+		},
+		NoDataFound: "No annotatable hot symbols were found.",
+		FieldsFunc:  registerPressureBySymbolTableValues,
 	},
 	APXEstimateTableName: {
 		Name:          APXEstimateTableName,
@@ -284,4 +297,73 @@ func apxEstimateTableValues(outputs map[string]script.ScriptOutput) []table.Fiel
 			"not been validated on APX hardware with an APX toolchain. Treat it as an " +
 			"indication of whether this workload is worth investigating, not as a predicted speedup."}},
 	}
+}
+
+// maxDSOsListed caps how many DSOs are named per aggregated symbol.
+const maxDSOsListed = 4
+
+// registerPressureBySymbolTableValues collapses every instance of a symbol into one row.
+//
+// The per-instance table above is the ground truth, but it over-counts symbols in any JIT
+// profile: each process compiles its own copy, and a tiered JIT recompiles hot methods, so
+// one Java method can occupy a dozen rows that each look unremarkable. This view answers
+// "which method costs the most overall", which the per-instance table cannot show.
+func registerPressureBySymbolTableValues(outputs map[string]script.ScriptOutput) []table.Field {
+	result := analyze(outputs)
+	aggregates := instructions.AggregateBySymbol(result.Analyzed)
+
+	var (
+		gstk, hot, stack, spill, reload []string
+		gp, simd, unknown, tier         []string
+		symbol, instances, dsos         []string
+		gpRegs, insnCount               []string
+	)
+	for _, a := range aggregates {
+		p := a.Pressure
+		gstk = append(gstk, pct(a.GlobalStackPct))
+		hot = append(hot, pct(a.HotPct))
+		stack = append(stack, pct(p.StackPct))
+		spill = append(spill, pct(p.SpillPct))
+		reload = append(reload, pct(p.ReloadPct))
+		gp = append(gp, pct(p.GPPct))
+		simd = append(simd, pct(p.SIMDPct))
+		unknown = append(unknown, pct(p.UnknownPct))
+		tier = append(tier, p.Tier())
+		symbol = append(symbol, a.Name)
+		instances = append(instances, strconv.Itoa(a.Instances))
+		dsos = append(dsos, formatDSOs(a.DSOs))
+		gpRegs = append(gpRegs, strconv.Itoa(p.GPRegsUsed))
+		insnCount = append(insnCount, strconv.Itoa(p.InsnCount))
+	}
+
+	return []table.Field{
+		{Name: "GSTK%", Description: "combined share of total profile weight this symbol spends on stack-memory instructions, summed over every instance", Values: gstk},
+		{Name: "HOT%", Description: "combined share of all profile samples in this symbol, summed over every instance", Values: hot},
+		{Name: "STACK%", Description: "share of this symbol's weight on stack-memory instructions, averaged over instances weighted by how hot each one was", Values: stack},
+		{Name: "SPILL%", Description: "weighted-average share of weight storing registers to the frame", Values: spill},
+		{Name: "RELD%", Description: "weighted-average share of weight loading registers back from the frame", Values: reload},
+		{Name: "GP%", Description: "weighted-average portion of stack traffic attributed to general-purpose registers", Values: gp},
+		{Name: "SIMD%", Description: "weighted-average portion of stack traffic attributed to vector registers", Values: simd},
+		{Name: "UNK%", Description: "weighted-average stack traffic whose direction could not be determined", Values: unknown},
+		{Name: "PRES", Description: "pressure tier, recomputed from the combined STACK%", Values: tier},
+		{Name: "Symbol", Values: symbol},
+		{Name: "Instances", Description: "compiled copies analyzed. Greater than one when several processes each compiled the method, or a tiered JIT recompiled it", Values: instances},
+		{Name: "DSOs", Description: "binaries the instances came from, heaviest first", Values: dsos},
+		{Name: "GP Regs", Description: "largest number of distinct general-purpose registers seen in any instance", Values: gpRegs},
+		{Name: "Instructions", Description: "largest instruction count seen in any instance", Values: insnCount},
+	}
+}
+
+// formatDSOs renders the contributing binaries on one line, capped so a method compiled
+// across many executors does not produce an unreadable cell.
+func formatDSOs(names []string) string {
+	if len(names) == 0 {
+		return ""
+	}
+	if len(names) <= maxDSOsListed {
+		return strings.Join(names, topOpsSeparator)
+	}
+	shown := append([]string{}, names[:maxDSOsListed]...)
+	shown = append(shown, fmt.Sprintf("(+%d more)", len(names)-maxDSOsListed))
+	return strings.Join(shown, topOpsSeparator)
 }

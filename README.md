@@ -281,6 +281,20 @@ files, and the report's **JIT Analysis** row should say how many methods were an
 A JVM also generates thousands of individually tiny symbols, so raise `--top` well above
 the default for Java workloads; 200 is a reasonable starting point.
 
+Two register-pressure tables are produced. **Register Pressure** has one row per compiled
+instance, which is the ground truth. **Register Pressure by Symbol** collapses those into
+one row per symbol, which matters for JIT workloads: each process compiles its own copy of
+a method, and a tiered JIT recompiles hot methods, so a single Java method can occupy a
+dozen rows that each look unremarkable. On a two-executor Spark run, 199 instance rows
+collapsed to 121 symbols, and one codegen method that appeared 10 times at ~2% HOT each
+turned out to be 6.16% of the profile in total.
+
+The two metric families combine differently in that view: `HOT%` and `GSTK%` are shares of
+the whole profile and are summed, while `STACK%`, `SPILL%` and the rest are shares of an
+individual instance's own weight and are averaged, weighted by how hot each instance was.
+Summing ten instances at ~10% `STACK%` would otherwise claim 100% stack traffic for a
+symbol that has nothing of the sort.
+
 `--apx-estimate` adds a projection of what Intel APX might recover, by scaling the observed
 GP spill cost and adding an uplift for code patterns APX encodes more compactly (NDD, CCMP,
 PUSH2/POP2). It is off by default and should stay that way in casual use: the coefficients

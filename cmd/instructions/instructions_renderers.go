@@ -54,7 +54,7 @@ func registerPressureHTMLRenderer(tableValues table.TableValues, targetName stri
 			switch {
 			case field.Name == "PRES":
 				style = tierStyle(value)
-			case field.Name == "Hot Stack Instructions":
+			case field.Name == "Hot Stack Instructions", field.Name == "DSOs":
 				// Stored on one line for the text formats; expand to one instruction per
 				// line here. Replacing after escaping is safe: the separator contains no
 				// characters that HTML escaping alters.

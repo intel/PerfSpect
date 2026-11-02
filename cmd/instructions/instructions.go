@@ -95,6 +95,7 @@ var analyses = []app.Category{
 		Help:     "Register spill/reload pressure in hot symbols",
 		Tables: []table.TableDefinition{
 			tableDefinitions[RegisterPressureTableName],
+			tableDefinitions[RegisterPressureBySymbolName],
 		},
 	},
 }
@@ -314,6 +315,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	report.RegisterHTMLRenderer(RegisterPressureTableName, registerPressureHTMLRenderer)
+	report.RegisterHTMLRenderer(RegisterPressureBySymbolName, registerPressureHTMLRenderer)
 	report.RegisterHTMLRenderer(CollectionInfoTableName, collectionInfoHTMLRenderer)
 
 	return reportingCommand.Run()
