@@ -217,6 +217,70 @@ appearing to succeed. Note that `-XX:+DumpPerfMapAtExit` alone only yields metho
 the `-agentpath` agent is what makes the machine code available, and therefore what makes
 spill/reload analysis possible at all.
 
+##### Containerized Java (Spark, Flink, Kafka, any JVM in Docker)
+
+This is the common deployment shape, and it needs care: the JVM is in a container but
+`perf` must run on the host, and the two disagree about what paths mean.
+
+Profile from the **host**, not inside the container. A container typically lacks
+`CAP_PERFMON`, so `perf_event_open` is denied, and distro `perf` wrappers often cannot
+find a build matching the host kernel. Container processes are visible from the host
+anyway.
+
+Three things must be arranged, none of which require rebuilding or recreating the
+container:
+
+**1. Get the agent into the container.** Use the host's agent, matched to the host `perf`:
+
+```bash
+docker cp /usr/lib/linux-tools-$(uname -r | cut -d- -f1-2)/libperf-jvmti.so \
+          <container>:/opt/libperf-jvmti.so
+```
+
+**2. Load it at JVM launch and pick a jitdump directory.** For Spark, edit
+`spark-defaults.conf` inside the container — append to the existing options line rather
+than adding a second one, since Spark keeps only the last occurrence of a key:
+
+```properties
+spark.executor.extraJavaOptions  <existing flags> -XX:+UnlockDiagnosticVMOptions -XX:+DumpPerfMapAtExit -agentpath:/opt/libperf-jvmti.so
+spark.executorEnv.JITDUMPDIR     /opt/jit
+```
+
+The agent cannot be attached to an already-running JVM, so executors must be restarted.
+For YARN that means restarting the application, not the container.
+
+**3. Make the jitdump readable on the host at the *same absolute path*.** `perf inject`
+opens the path recorded in the mmap event verbatim, so a different host path will not do.
+Symlink the container's directory into place:
+
+```bash
+MERGED=$(docker inspect -f '{{.GraphDriver.Data.MergedDir}}' <container>)
+sudo ln -s "$MERGED/opt/jit" /opt/jit
+```
+
+Reading through the overlay is live, so methods compiled during the profiling window are
+picked up. Then:
+
+```bash
+perfspect instructions --jit --duration 30 --top 200
+```
+
+Verify before trusting the output — `ls /opt/jit/.debug/jit/*/jit-*.dump` should list
+files, and the report's **JIT Analysis** row should say how many methods were analyzed.
+
+> [!WARNING]
+> **Do not combine `--jit` with `--symfs`.** `perf inject` writes its per-method ELF
+> images to host paths, while `--symfs` makes perf prefix every lookup with the container
+> root, so those images are never found. On a Spark workload this took analyzed JIT
+> methods from 106 to zero while the run still looked successful, leaving a report of cold
+> libc symbols. `perfspect` warns when both are passed and says so in the report, but the
+> two cannot be combined in one collection. Use `--jit` for JIT-compiled code, and a
+> separate `--symfs` run for native libraries inside the image — which is the case that
+> matters for native engines such as Gluten or Velox.
+
+A JVM also generates thousands of individually tiny symbols, so raise `--top` well above
+the default for Java workloads; 200 is a reasonable starting point.
+
 `--apx-estimate` adds a projection of what Intel APX might recover, by scaling the observed
 GP spill cost and adding an uplift for code patterns APX encodes more compactly (NDD, CCMP,
 PUSH2/POP2). It is off by default and should stay that way in casual use: the coefficients

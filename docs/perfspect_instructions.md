@@ -32,7 +32,7 @@ Flags:
     --top                  number of hottest symbols to disassemble and analyze (default: 50)
     --jobs                 number of parallel disassembly workers (default: 4)
     --kernel               include kernel symbols (userspace only by default) (default: false)
-    --jit                  analyze JIT-compiled code (Java, Node.js). The runtime must emit a jitdump; for the JVM add -agentpath:<path>/libperf-jvmti.so (default: false)
+    --jit                  analyze JIT-compiled code (Java, Node.js). The runtime must emit a jitdump; for the JVM add -agentpath:<path>/libperf-jvmti.so. Cannot be combined with --symfs (default: false)
     --format               choose output format(s) from: all, html, txt, json (default: [all])
     --no-summary           do not include system summary table in report (default: false)
   Remote Target Options:
@@ -42,7 +42,7 @@ Flags:
     --key                  private key file for SSH to remote target
     --targets              file with remote target(s) connection details. See targets.yaml for format.
   Advanced Options:
-    --symfs                filesystem root to resolve binaries under. Needed when profiling containers from the host, where the recorded paths do not exist: pass the container's merged overlay directory
+    --symfs                filesystem root to resolve binaries under. Needed when profiling containers from the host, where the recorded paths do not exist: pass the container's merged overlay directory. Cannot be combined with --jit
     --input                ".raw" file, or directory containing ".raw" files. Will skip data collection and use raw data for reports.
 
 Global Flags:

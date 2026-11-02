@@ -152,15 +152,29 @@ func collectionInfoTableValues(outputs map[string]script.ScriptOutput) []table.F
 
 	jitNote := "not requested"
 	if result.JITInjected != nil {
-		jitMethods := result.JITMethodCount()
+		jitSeen := result.JITMethodCount()
+		jitOK := result.JITMethodsAnalyzed()
 		switch {
 		case !*result.JITInjected:
 			// Almost always the runtime emitted no jitdump, which for the JVM means the
 			// JVMTI agent was not loaded at launch. Say so, because the run otherwise
 			// looks like a successful one that simply found no JIT code.
 			jitNote = "perf inject --jit failed; JIT-compiled code was not analyzed"
-		case jitMethods > 0:
-			jitNote = fmt.Sprintf("%d JIT-compiled methods analyzed", jitMethods)
+		case jitSeen > 0 && jitOK == 0 && result.Symfs != "":
+			// --jit and --symfs are mutually exclusive in practice. perf inject writes
+			// the per-method ELF images to host paths, but --symfs makes perf prefix
+			// every lookup with the given root, so it looks for them in the wrong place
+			// and finds nothing. The run otherwise looks successful, reporting whatever
+			// cold symbols did resolve, which is why this is called out explicitly.
+			jitNote = fmt.Sprintf("BROKEN BY --symfs: %d JIT methods were found but none "+
+				"could be annotated. perf inject writes per-method images to host paths, "+
+				"which --symfs=%s prevents perf from finding. Re-run without --symfs to "+
+				"analyze JIT code; the two cannot be combined in one collection.",
+				jitSeen, result.Symfs)
+		case jitSeen > 0 && jitOK == 0:
+			jitNote = fmt.Sprintf("%d JIT methods were found but none could be annotated", jitSeen)
+		case jitOK > 0:
+			jitNote = fmt.Sprintf("%d JIT-compiled methods analyzed", jitOK)
 		default:
 			// inject succeeds trivially with nothing to fold in, so this is the common
 			// case of the runtime never having emitted a jitdump.

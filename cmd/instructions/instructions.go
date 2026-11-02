@@ -193,7 +193,7 @@ func getFlagGroups() []app.FlagGroup {
 			},
 			{
 				Name: flagJITName,
-				Help: "analyze JIT-compiled code (Java, Node.js). The runtime must emit a jitdump; for the JVM add -agentpath:<path>/libperf-jvmti.so",
+				Help: "analyze JIT-compiled code (Java, Node.js). The runtime must emit a jitdump; for the JVM add -agentpath:<path>/libperf-jvmti.so. Cannot be combined with --symfs",
 			},
 			{
 				Name: app.FlagFormatName,
@@ -211,7 +211,7 @@ func getFlagGroups() []app.FlagGroup {
 		Flags: []app.Flag{
 			{
 				Name: flagSymfsName,
-				Help: "filesystem root to resolve binaries under. Needed when profiling containers from the host, where the recorded paths do not exist: pass the container's merged overlay directory",
+				Help: "filesystem root to resolve binaries under. Needed when profiling containers from the host, where the recorded paths do not exist: pass the container's merged overlay directory. Cannot be combined with --jit",
 			},
 			{
 				Name: app.FlagInputName,
@@ -301,6 +301,16 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		Tables:  selectedTables(),
 		Input:   flagInput,
 		Formats: flagFormat,
+	}
+
+	// Warn before collecting rather than only in the report: the two are mutually
+	// exclusive and the failure is silent, yielding a plausible-looking table of
+	// whatever cold symbols happened to resolve.
+	if flagJIT && flagSymfs != "" {
+		cmd.PrintErrln("WARNING: --jit and --symfs cannot be combined. perf inject writes " +
+			"per-method JIT images to host paths, which --symfs prevents perf from finding, " +
+			"so no JIT-compiled code will be analyzed. Drop --symfs to analyze JIT code, or " +
+			"drop --jit to analyze binaries inside a container image.")
 	}
 
 	report.RegisterHTMLRenderer(RegisterPressureTableName, registerPressureHTMLRenderer)

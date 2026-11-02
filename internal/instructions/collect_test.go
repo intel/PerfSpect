@@ -411,3 +411,56 @@ func TestJITStatusReporting(t *testing.T) {
 		}
 	})
 }
+
+// TestJITBrokenBySymfs covers the combination that silently produces a useless report:
+// --jit and --symfs together. perf inject writes per-method ELF images to host paths,
+// while --symfs makes perf prefix every lookup with the container root, so the images are
+// never found. Measured on a containerized Spark workload, this took analyzed JIT methods
+// from 106 to 0 while the run still appeared to succeed.
+func TestJITBrokenBySymfs(t *testing.T) {
+	jitBody := readFixture(t, "annotate_gp_pressure.stdio")
+
+	// With --symfs: the jitted DSO is seen in the report but produces no disassembly.
+	broken := strings.Join([]string{
+		"########## perf_event ##########", "cycles:upp",
+		"########## jit_inject ##########", "ok",
+		"########## symfs ##########", "/var/lib/docker/overlay2/abc/merged",
+		"########## perf_report ##########",
+		" 42.02% |java|jitted-4148375-749.so|[.] CryptoBench.crypt(java.lang.String)",
+		"########## annotate_0 ##########",
+		"sym=CryptoBench.crypt(java.lang.String)", "dso=jitted-4148375-749.so", "",
+	}, "\n")
+	r, err := Analyze(broken, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Symfs != "/var/lib/docker/overlay2/abc/merged" {
+		t.Errorf("Symfs = %q, want the reported root", r.Symfs)
+	}
+	if got := r.JITMethodCount(); got != 1 {
+		t.Errorf("JITMethodCount = %d, want 1 (it was seen)", got)
+	}
+	if got := r.JITMethodsAnalyzed(); got != 0 {
+		t.Errorf("JITMethodsAnalyzed = %d, want 0 (it could not be annotated)", got)
+	}
+
+	// Without --symfs: the same symbol annotates successfully.
+	working := strings.Join([]string{
+		"########## perf_event ##########", "cycles:upp",
+		"########## jit_inject ##########", "ok",
+		"########## perf_report ##########",
+		" 42.02% |java|jitted-4148375-749.so|[.] CryptoBench.crypt(java.lang.String)",
+		"########## annotate_0 ##########",
+		"sym=CryptoBench.crypt(java.lang.String)", "dso=jitted-4148375-749.so", jitBody,
+	}, "\n")
+	r2, err := Analyze(working, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r2.Symfs != "" {
+		t.Errorf("Symfs = %q, want empty", r2.Symfs)
+	}
+	if got := r2.JITMethodsAnalyzed(); got != 1 {
+		t.Errorf("JITMethodsAnalyzed = %d, want 1", got)
+	}
+}

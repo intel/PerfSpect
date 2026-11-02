@@ -18,6 +18,7 @@ const (
 	sectionAnnotatePrefix = "annotate_"
 	sectionUnresolved     = "unresolved"
 	sectionJITInject      = "jit_inject"
+	sectionSymfs          = "symfs"
 )
 
 // AnalyzedSymbol pairs a hot symbol with its register-pressure profile and APX signals.
@@ -39,6 +40,9 @@ type Result struct {
 	// Unannotated holds symbols that were hot enough to select but produced no
 	// disassembly, almost always because their binary is stripped.
 	Unannotated []Symbol
+	// Symfs is the filesystem root perf was told to resolve binaries under, empty if
+	// --symfs was not used.
+	Symfs string
 	// JITInjected reports whether JIT analysis was requested and, if so, whether
 	// folding the runtime's jitdump into the recording succeeded. Nil when --jit was
 	// not used.
@@ -148,6 +152,18 @@ func (r Result) JITMethodCount() int {
 	return n
 }
 
+// JITMethodsAnalyzed returns how many JIT-compiled methods were successfully
+// classified, as opposed to merely seen.
+func (r Result) JITMethodsAnalyzed() int {
+	var n int
+	for _, s := range r.Analyzed {
+		if strings.HasPrefix(s.DSO, "jitted-") {
+			n++
+		}
+	}
+	return n
+}
+
 // LostHotPct is the total profile weight in symbols that could not be annotated.
 func (r Result) LostHotPct() float64 {
 	var total float64
@@ -167,6 +183,7 @@ func Analyze(scriptStdout string, topOps int) (Result, error) {
 
 	var result Result
 	result.PerfEvent = strings.TrimSpace(sections[sectionPerfEvent])
+	result.Symfs = strings.TrimSpace(sections[sectionSymfs])
 	if status, ok := sections[sectionJITInject]; ok {
 		injected := strings.TrimSpace(status) == "ok"
 		result.JITInjected = &injected

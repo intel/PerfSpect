@@ -2193,6 +2193,8 @@ fi
 SYMFS_ARG=""
 if [ -n "$symfs" ]; then
     SYMFS_ARG="--symfs $symfs"
+    echo "########## symfs ##########"
+    echo "$symfs"
 fi
 
 PERF_EVENT=""
