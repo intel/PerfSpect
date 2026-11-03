@@ -121,6 +121,13 @@ func TestJccForwardDisp(t *testing.T) {
 		{"je     1570 <gp_pressure+0x240>", 0x1550, 0x20}, // objdump annotation stripped
 		{"je     .L123", 0x1550, -1},                      // symbolic target cannot be decoded
 		{"je", 0x1550, -1},                                // malformed
+		// Kernel text addresses exceed MaxInt64 and are legitimate. The difference must
+		// be taken unsigned: narrowing each operand first wraps the result.
+		{"je     ffffffff81000020", 0xffffffff81000000, 0x20},
+		{"je     ffffffff81000000", 0xffffffff81000020, -0x20},
+		// A difference too large for int64 is rejected rather than wrapped.
+		{"je     ffffffffffffffff", 0x0, -1},
+		{"je     0", 0xffffffffffffffff, -1},
 	}
 	for _, tc := range tests {
 		if got := jccForwardDisp(tc.insn, tc.curAddr); got != tc.want {

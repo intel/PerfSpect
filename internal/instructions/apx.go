@@ -4,6 +4,7 @@
 package instructions
 
 import (
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -134,7 +135,18 @@ func jccForwardDisp(s string, curAddr uint64) int64 {
 	if err != nil {
 		return -1
 	}
-	return int64(val) - int64(curAddr)
+	// Kernel text addresses exceed MaxInt64, so the difference is taken unsigned and
+	// narrowed only once it is known to fit.
+	if val >= curAddr {
+		if d := val - curAddr; d <= math.MaxInt64 {
+			return int64(d)
+		}
+		return -1
+	}
+	if d := curAddr - val; d <= math.MaxInt64 {
+		return -int64(d)
+	}
+	return -1
 }
 
 // hasStackMemAny reports whether the instruction references rsp- or rbp-relative memory,
