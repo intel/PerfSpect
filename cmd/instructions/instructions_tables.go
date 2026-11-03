@@ -219,8 +219,7 @@ func collectionInfoTableValues(outputs map[string]script.ScriptOutput) []table.F
 			// inject succeeds trivially with nothing to fold in, so this is the common
 			// case of the runtime never having emitted a jitdump.
 			jitNote = "no JIT-compiled code was found. The runtime must emit a jitdump: " +
-				"for the JVM, launch it with -XX:+UnlockDiagnosticVMOptions " +
-				"-XX:+DumpPerfMapAtExit -agentpath:<linux-tools>/libperf-jvmti.so. " +
+				"for the JVM, launch it with -agentpath:<linux-tools>/libperf-jvmti.so. " +
 				"This cannot be enabled on an already-running process."
 		}
 	}

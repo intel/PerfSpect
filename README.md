@@ -211,13 +211,18 @@ process**. For the JVM, launch it with:
 
 ```bash
 JVMTI=/usr/lib/linux-tools/$(uname -r)/libperf-jvmti.so
-java -XX:+UnlockDiagnosticVMOptions -XX:+DumpPerfMapAtExit -agentpath:$JVMTI -jar app.jar
+java -agentpath:$JVMTI -jar app.jar
 ```
 
 Without the agent, `--jit` reports that no JIT-compiled code was found rather than
-appearing to succeed. Note that `-XX:+DumpPerfMapAtExit` alone only yields method *names*;
-the `-agentpath` agent is what makes the machine code available, and therefore what makes
-spill/reload analysis possible at all.
+appearing to succeed.
+
+> [!NOTE]
+> The agent is the only requirement, and it is not version-gated: this is verified working
+> on OpenJDK 8 and 21. Do **not** add `-XX:+DumpPerfMapAtExit`. That flag writes a
+> `/tmp/perf-<pid>.map` giving method *names* only, which the injected jitdump already
+> provides, and it does not exist on older JVMs — OpenJDK 8 refuses to start with
+> `Unrecognized VM option 'DumpPerfMapAtExit'`.
 
 ##### Containerized Java (Spark, Flink, Kafka, any JVM in Docker)
 
@@ -251,7 +256,7 @@ rather than adding a second entry for the same key — many frameworks keep only
 value, so a duplicate entry silently discards the options already configured:
 
 ```properties
-spark.executor.extraJavaOptions  <existing flags> -XX:+UnlockDiagnosticVMOptions -XX:+DumpPerfMapAtExit -agentpath:/opt/libperf-jvmti.so
+spark.executor.extraJavaOptions  <existing flags> -agentpath:/opt/libperf-jvmti.so
 spark.executorEnv.JITDUMPDIR     /opt/jit
 ```
 
