@@ -5,13 +5,9 @@ package instructions
 
 import "sort"
 
-// SymbolAggregate combines every instance of one symbol across the profile.
-//
-// The same symbol appears many times in a JIT profile for two reasons: each process has
-// its own compiled copy, so a Spark job with N executors yields N instances; and a tiered
-// JIT recompiles a hot method repeatedly, each compilation landing in its own DSO. A
-// method can therefore appear a dozen times while each instance looks individually
-// unremarkable.
+// SymbolAggregate combines every instance of one symbol across the profile. JIT profiles
+// repeat symbols: each process has its own compiled copy, and a tiered JIT recompiles hot
+// methods into new DSOs, so a method can appear a dozen times, each unremarkable alone.
 type SymbolAggregate struct {
 	Name string
 	// Instances is how many separate compiled copies were analyzed.
@@ -26,16 +22,9 @@ type SymbolAggregate struct {
 	Pressure RegPressure
 }
 
-// AggregateBySymbol groups instances of the same symbol, returning them ranked by combined
-// global stack impact.
-//
-// The two families of metric cannot be combined the same way. HotPct and GlobalStackPct
-// are fractions of total profile weight, so they add up. StackPct and the rest are
-// fractions of an individual symbol's own annotated weight, so they are combined as a
-// HotPct-weighted mean: adding ten instances each around 10% would otherwise report 100%
-// stack traffic for a symbol that has nothing of the sort. Register counts and the
-// instruction count describe the code rather than the samples, and are near-identical
-// between recompilations, so the maximum is taken.
+// AggregateBySymbol groups instances of a symbol, ranked by combined GlobalStackPct.
+// Profile-wide shares (HotPct, GlobalStackPct) sum; per-symbol shares are HotPct-weighted
+// means; register and instruction counts describe the code, so the maximum is taken.
 func AggregateBySymbol(symbols []AnalyzedSymbol) []SymbolAggregate {
 	type acc struct {
 		agg SymbolAggregate

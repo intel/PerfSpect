@@ -14,14 +14,9 @@ import (
 // tolerance for comparing against the reference implementation, which prints 4 decimals.
 const tolerance = 1e-4
 
-// TestAnalyzeRegPressureAgainstReference checks the port against regpressure.awk run over
-// the same fixtures. Expected values are that implementation's full-precision output:
-//
-//	gawk -v mode=annotate -v show_ops=0 -f regpressure.awk < annotate_<sym>.stdio
-//
-// The fixtures come from a purpose-built workload whose register pressure is known
-// independently: gp_pressure spills general-purpose registers, simd_pressure spills
-// vector registers, and light_loop has no stack traffic at all.
+// TestAnalyzeRegPressureAgainstReference diffs against regpressure.awk's full-precision
+// output on fixtures of known pressure: gp_pressure spills GP registers, simd_pressure
+// spills vector registers, and light_loop has no stack traffic.
 func TestAnalyzeRegPressureAgainstReference(t *testing.T) {
 	tests := []struct {
 		fixture   string
@@ -84,13 +79,8 @@ func TestAnalyzeRegPressureAgainstReference(t *testing.T) {
 	}
 }
 
-// TestAnalyzeRegPressureEdgeCases covers classifier branches the real workload never
-// reaches: frame-pointer-less code, stack canaries, push/pop, lea exclusion,
-// read-modify-write double counting, vector widths, immediate sources and zero-sample
-// symbols. Fixtures are synthetic; expected values were produced by running the reference
-// implementation over the same files, so this is a differential test against it rather
-// than an assertion of what the numbers ought to be.
-//
+// TestAnalyzeRegPressureEdgeCases differentially tests classifier branches the real
+// workload never reaches, on synthetic fixtures scored by the reference implementation.
 // Regenerate the fixtures with: testdata/make-edge-fixtures.sh testdata
 func TestAnalyzeRegPressureEdgeCases(t *testing.T) {
 	tests := []struct {

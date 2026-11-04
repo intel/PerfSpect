@@ -8,14 +8,9 @@ import (
 	"testing"
 )
 
-// TestAggregateBySymbolCombinesCorrectly uses figures taken from a real Spark profile,
-// where org.apache...GeneratedIteratorForCodegenStage16.processNext() appeared 10 times
-// across 2 executors because a tiered JIT recompiles hot methods.
-//
-// The two metric families must combine differently, which is the whole point of this
-// function: HotPct is a share of the entire profile and sums, while StackPct is a share of
-// one instance's own weight and must be averaged. Summing ten instances of ~10% StackPct
-// would claim 100% stack traffic for a symbol that has nothing like that.
+// TestAggregateBySymbolCombinesCorrectly uses figures from a real JIT profile in which one
+// method recompiled into many instances. HotPct is a profile-wide share and sums; StackPct
+// is a per-instance share and must be averaged, or ten ~10% instances would claim 100%.
 func TestAggregateBySymbolCombinesCorrectly(t *testing.T) {
 	symbols := []AnalyzedSymbol{
 		{

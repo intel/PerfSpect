@@ -50,11 +50,9 @@ var (
 	reLeadingNum = regexp.MustCompile(`^[0-9]+(\.[0-9]+)?`)
 )
 
-// ParseAnnotate reads "perf annotate --stdio --no-source" output for one symbol.
-//
-// Every line is retained, including headers and blanks: the register-pressure analysis
-// needs the raw sequence to detect the frame-pointer prologue and to track section
-// boundaries. Filtering happens during analysis, not here.
+// ParseAnnotate reads "perf annotate --stdio --no-source" output for one symbol. Every
+// line is kept, headers and blanks included: analysis needs the raw sequence to detect
+// the frame-pointer prologue and section boundaries.
 func ParseAnnotate(r io.Reader) ([]Instruction, error) {
 	var insns []Instruction
 	scanner := bufio.NewScanner(r)
@@ -83,11 +81,8 @@ func ParseAnnotate(r io.Reader) ([]Instruction, error) {
 	return insns, nil
 }
 
-// parsePercent extracts the leading sample percentage from an annotate line.
-//
-// Lines are shaped "  12.34 :   4a1b:   mov ...". Splitting on whitespace runs yields an
-// empty first field for the usual leading-space case, so the second field is used as the
-// fallback. A line whose first token is not numeric carries no samples and weighs 0.
+// parsePercent extracts the leading sample percentage from a line shaped
+// "  12.34 :   4a1b:   mov ...". A line whose first token is not numeric weighs 0.
 func parsePercent(raw string) float64 {
 	fields := reSplitSpace.Split(raw, -1)
 	pct := ""

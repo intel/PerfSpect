@@ -1,15 +1,9 @@
 // Copyright (C) 2021-2025 Intel Corporation
 // SPDX-License-Identifier: BSD-3-Clause
 
-// Package instructions analyzes the sample-weighted disassembly of hot code produced by
-// "perf annotate --stdio", classifying individual instructions to answer questions about
-// generated-code quality and instruction-set headroom.
-//
-// The register-pressure analysis is a port of the regpressure tool by Vaibhav Shankar,
-// used with the author's permission. The classification rules below intentionally mirror
-// that implementation, including its quirks, so results can be diffed against it.
-//
-// Assumes x86-64 AT&T syntax, which is what "perf annotate" emits by default.
+// Package instructions classifies the sample-weighted x86-64 AT&T disassembly from "perf
+// annotate --stdio". Register-pressure rules port Vaibhav Shankar's regpressure tool, used
+// with permission, and mirror its quirks so results can be diffed against it.
 package instructions
 
 import (

@@ -277,13 +277,9 @@ const (
 	apxEGPRRegisters   = 32
 )
 
-// APXEstimate projects what Intel APX might recover from the profiled code.
-//
-// This is a model, not a measurement. It scales observed GP spill traffic by an assumed
-// realization factor and applies a small uplift for secondary APX features, using
-// coefficients carried over from the reference tool. It has not been validated against APX
-// hardware with an APX toolchain, and should be read as an indication of whether a
-// workload is worth investigating rather than as a predicted speedup.
+// APXEstimate projects what Intel APX might recover from the profiled code. It is a model
+// scaling observed GP spill traffic by assumed coefficients, not validated on APX hardware:
+// read it as whether a workload is worth investigating, not as a predicted speedup.
 type APXEstimate struct {
 	// MaxGPRegisters is the register file the profiled code currently targets: 32 if it
 	// already uses r16-r31, otherwise 16.

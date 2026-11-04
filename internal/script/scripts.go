@@ -2225,10 +2225,8 @@ if [ ! -s "$PERF_DATA" ]; then
     exit 1
 fi
 
-# Fold JIT-compiled code into the recording. perf writes one synthetic ELF image per
-# compiled method, so afterwards JIT methods are ordinary annotatable DSOs with resolved
-# names. This needs the runtime to have emitted a jitdump: for the JVM that means
-# launching it with -agentpath:libperf-jvmti.so, which cannot be done retroactively.
+# Fold JIT code into the recording as one annotatable ELF image per method. This needs a
+# jitdump from the runtime (for the JVM, -agentpath:libperf-jvmti.so at launch).
 if [ "$jit" = "true" ]; then
     INJECTED="$WORKDIR/perf.jit.data"
     echo "########## jit_inject ##########"
@@ -2243,22 +2241,15 @@ fi
 
 # Pass 1 - hot symbols
 REPORT_OUT="$WORKDIR/report.txt"
-# -t '|' makes perf delimit the fields explicitly. Without it the columns are only
-# space-aligned, and comm, dso and symbol can all contain spaces: Spark names threads
-# "GC Thread#5" and "task l", perf names JIT regions "[JIT] tid <n>", and C++ symbols
-# are full signatures. Splitting on whitespace mis-assigns them.
+# -t '|' delimits fields explicitly: comm, dso and symbol can all contain spaces (JVM
+# thread names, "[JIT] tid <n>", C++ signatures), so whitespace splitting mis-assigns them.
 "$PERF_CMD" report -i "$PERF_DATA" --stdio --no-children --sort comm,dso,sym -t '|' $SYMFS_ARG > "$REPORT_OUT" 2>/dev/null
 echo "########## perf_report ##########"
 cat "$REPORT_OUT"
 
-# Select the top N symbols from the delimited report, so that
-# it is taken by offset rather than by field split: C++ names contain spaces.
-#
-# A symbol perf could not resolve appears as a raw address, which means its binary is
-# stripped. Those cannot be annotated, but they must NOT be dropped silently: they are
-# often the bulk of the profile, and omitting them would make a report covering only the
-# instrumented libraries look complete. They are reported separately with their weight so
-# the user is told which binaries need symbols.
+# Select the top N symbols, taken by offset rather than field split. Unresolved (stripped)
+# symbols cannot be annotated but are reported with their weight, not dropped, so the
+# user sees which binaries need symbols.
 SYMLIST="$WORKDIR/symlist.tsv"
 UNRESOLVED="$WORKDIR/unresolved.tsv"
 : > "$SYMLIST"
@@ -2266,10 +2257,8 @@ UNRESOLVED="$WORKDIR/unresolved.tsv"
 awk -F'|' -v top="$top" -v symlist="$SYMLIST" -v unresolved="$UNRESOLVED" '
     # Fields from perf report -t "|" are: " <pct>% ", comm, dso, "[x] <symbol>".
     NF >= 4 && $1 ~ /[0-9]+\.[0-9]+%/ {
-        # --top caps symbols actually sent for disassembly. Rows that can never be
-        # disassembled do not consume that budget: a JVM emits thousands of tiny
-        # per-method rows, and counting them would starve annotatable code of slots.
-        # Their weight is still recorded so coverage stays honest.
+        # --top caps symbols sent for disassembly. Unannotatable rows (a JVM emits thousands)
+        # do not consume that budget, but their weight is still recorded for coverage.
         if (n >= top && unres_n >= top * 4) exit
 
         pct = $1

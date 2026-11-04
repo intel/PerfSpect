@@ -93,11 +93,8 @@ func analyze(outputs map[string]script.ScriptOutput) instructions.Result {
 	return result
 }
 
-// registerPressureTableValues renders one row per annotated symbol.
-//
-// Rows are ordered by GSTK%, not HOT%: a symbol can be very hot with little stack traffic,
-// or carry dense spill code while being too cold to matter. GSTK% is HOT% x STACK% / 100,
-// so it ranks by the share of total profile time actually spent on spill and reload.
+// registerPressureTableValues renders one row per annotated symbol, ordered by GSTK%
+// (HOT% x STACK% / 100): the share of total profile time spent on spill and reload.
 func registerPressureTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	result := analyze(outputs)
 
@@ -153,10 +150,8 @@ func collectionInfoTableValues(outputs map[string]script.ScriptOutput) []table.F
 
 	strippedNote := "none"
 	if lost := result.LostHotPct(); lost > 0 {
-		// One entry per line, weight first: the list routinely runs to dozens of
-		// binaries on a JVM workload, and as a single run-on line it is unreadable.
-		// The remedy differs per binary, so advice is given per entry rather than as
-		// one blanket instruction.
+		// One entry per line, weight first: JVM workloads list dozens of binaries. Advice
+		// is given per entry because the remedy differs per binary.
 		lines := []string{fmt.Sprintf("%.2f%% of sampled weight could not be annotated:", lost)}
 		dsos := result.UnannotatedDSOs()
 		// Entries that round to 0.00% carry no information and would otherwise fill the
@@ -201,11 +196,8 @@ func collectionInfoTableValues(outputs map[string]script.ScriptOutput) []table.F
 			// looks like a successful one that simply found no JIT code.
 			jitNote = "perf inject --jit failed; JIT-compiled code was not analyzed"
 		case jitSeen > 0 && jitOK == 0 && result.Symfs != "":
-			// --jit and --symfs are mutually exclusive in practice. perf inject writes
-			// the per-method ELF images to host paths, but --symfs makes perf prefix
-			// every lookup with the given root, so it looks for them in the wrong place
-			// and finds nothing. The run otherwise looks successful, reporting whatever
-			// cold symbols did resolve, which is why this is called out explicitly.
+			// --jit and --symfs conflict: --symfs prefixes every lookup with its root, so
+			// the host-path JIT images are never found, yet the run otherwise looks fine.
 			jitNote = fmt.Sprintf("BROKEN BY --symfs: %d JIT methods were found but none "+
 				"could be annotated. perf inject writes per-method images to host paths, "+
 				"which --symfs=%s prevents perf from finding. Re-run without --symfs to "+
@@ -237,10 +229,8 @@ func pct(v float64) string {
 	return fmt.Sprintf("%.2f", v)
 }
 
-// topOpsSeparator joins the hot stack instructions into one line. It must stay on a
-// single line so the txt, json and xlsx tables keep their row alignment; the HTML renderer
-// splits on it again to show one instruction per line. A pipe cannot appear in x86 AT&T
-// operands, so it is unambiguous.
+// topOpsSeparator joins the hot stack instructions onto one line so txt, json and xlsx
+// rows stay aligned; the HTML renderer splits on it. A pipe never appears in AT&T operands.
 const topOpsSeparator = " | "
 
 // formatTopOps renders the hot stack instructions for one symbol as a single-line cell.
@@ -262,10 +252,8 @@ func formatTopOps(ops []instructions.HotOp) string {
 func apxEstimateTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	result := analyze(outputs)
 
-	// With nothing annotatable there is nothing to project from, and the model would
-	// otherwise report a 0.00% gain alongside a realization factor and a register
-	// utilization figure - which reads as a measurement saying APX would not help, rather
-	// than as an absence of data. Say so instead.
+	// With nothing annotatable the model would report a 0.00% gain, which reads as "APX
+	// would not help" rather than "no data". Say so instead.
 	if len(result.Analyzed) == 0 {
 		return []table.Field{{
 			Name: "Estimate",
@@ -311,11 +299,8 @@ func apxEstimateTableValues(outputs map[string]script.ScriptOutput) []table.Fiel
 const maxDSOsListed = 4
 
 // registerPressureBySymbolTableValues collapses every instance of a symbol into one row.
-//
-// The per-instance table above is the ground truth, but it over-counts symbols in any JIT
-// profile: each process compiles its own copy, and a tiered JIT recompiles hot methods, so
-// one Java method can occupy a dozen rows that each look unremarkable. This view answers
-// "which method costs the most overall", which the per-instance table cannot show.
+// JIT profiles over-count otherwise: each process compiles its own copy and a tiered JIT
+// recompiles hot methods, so one method can spread across a dozen unremarkable rows.
 func registerPressureBySymbolTableValues(outputs map[string]script.ScriptOutput) []table.Field {
 	result := analyze(outputs)
 	aggregates := instructions.AggregateBySymbol(result.Analyzed)
@@ -363,7 +348,7 @@ func registerPressureBySymbolTableValues(outputs map[string]script.ScriptOutput)
 }
 
 // formatDSOs renders the contributing binaries on one line, capped so a method compiled
-// across many executors does not produce an unreadable cell.
+// across many processes does not produce an unreadable cell.
 func formatDSOs(names []string) string {
 	if len(names) == 0 {
 		return ""

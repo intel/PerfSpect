@@ -130,13 +130,9 @@ func classifyDSO(dso string) UnannotatableReason {
 	}
 }
 
-// JITMethodCount returns the number of symbols that came from JIT-compiled code, i.e.
-// whose DSO is one of the synthetic ELF images perf writes per compiled method.
-//
-// This, not the exit status of "perf inject --jit", is what says whether JIT analysis
-// actually worked: that command succeeds trivially when there is no jitdump to fold in,
-// so a run with no JVMTI agent loaded would otherwise look like a success that happened
-// to find no JIT code.
+// JITMethodCount returns the number of symbols from perf's per-method JIT ELF images. This,
+// not the exit status of "perf inject --jit", says whether JIT analysis worked: that
+// command succeeds even when there was no jitdump to fold in.
 func (r Result) JITMethodCount() int {
 	var n int
 	for _, s := range r.Analyzed {
@@ -173,11 +169,9 @@ func (r Result) LostHotPct() float64 {
 	return total
 }
 
-// Analyze parses the hot-code collection script's output and classifies every symbol it
-// annotated. topOps caps the hot stack instructions retained per symbol; pass 0 to skip.
-//
-// Symbols are returned ranked by GlobalStackPct, which is the ordering that reflects
-// actual time spent on spill and reload rather than either hotness or local density alone.
+// Analyze parses the hot-code collection script's output and classifies every annotated
+// symbol, ranked by GlobalStackPct. topOps caps the hot stack instructions kept per
+// symbol; pass 0 to skip.
 func Analyze(scriptStdout string, topOps int) (Result, error) {
 	sections := extract.GetSectionsFromOutput(scriptStdout)
 

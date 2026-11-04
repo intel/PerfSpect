@@ -83,11 +83,8 @@ const (
 	flagAllName              = "all"
 )
 
-// analyses maps a selection flag to the tables it enables, mirroring how the report
-// command groups its categories.
-// analysisTables are always reported together. The APX estimate is derived from the same
-// per-symbol spill figures as the register-pressure tables, so it is part of that analysis
-// rather than something to opt into.
+// analysisTables are always reported together. The APX estimate derives from the same
+// per-symbol spill figures as the register-pressure tables, so it is not opt-in.
 var analysisTables = []table.TableDefinition{
 	tableDefinitions[RegisterPressureTableName],
 	tableDefinitions[RegisterPressureBySymbolName],
@@ -246,11 +243,8 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// selectedTables resolves which tables to include.
-//
-// Every analysis table is reported unconditionally today. --all and --register-pressure
-// are accepted and reserved for when there are several analyses to choose between; see
-// their help text.
+// selectedTables resolves which tables to include. Every analysis table is reported today;
+// --all and --register-pressure are reserved for when there are analyses to choose between.
 func selectedTables() []table.TableDefinition {
 	var tables []table.TableDefinition
 	if !flagNoSystemSummary {

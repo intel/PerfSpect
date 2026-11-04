@@ -226,11 +226,9 @@ func TestSplitAnnotateSection(t *testing.T) {
 	}
 }
 
-// TestAnalyzeReportsUnresolvedSymbols covers the stripped-binary case as it actually
-// arrives: perf cannot resolve the symbol at all and reports a raw address, so the
-// collection script lists it as unresolved rather than attempting to annotate it. These
-// must be counted against coverage, not dropped, or a report covering only the
-// symbol-bearing libraries would look complete.
+// TestAnalyzeReportsUnresolvedSymbols covers stripped binaries, which perf reports as raw
+// addresses. They must count against coverage, not be dropped, or a report covering only
+// the symbol-bearing libraries would look complete.
 func TestAnalyzeReportsUnresolvedSymbols(t *testing.T) {
 	out := strings.Join([]string{
 		"########## perf_event ##########", "cycles:upp",
@@ -279,10 +277,8 @@ func TestParseUnresolvedIgnoresMalformedRows(t *testing.T) {
 	}
 }
 
-// TestParseReportHandlesSpacesInDSO covers perf's JIT and pseudo-DSO naming. A JIT region
-// is named "[JIT] tid <n>", so neither the DSO nor the symbol can be taken as a
-// whitespace-delimited field. Getting this wrong silently drops every JIT row, which makes
-// a Java profile look like it lost no weight at all.
+// TestParseReportHandlesSpacesInDSO covers JIT and pseudo-DSO names like "[JIT] tid <n>".
+// Splitting on whitespace silently drops every JIT row, hiding the lost weight.
 func TestParseReportHandlesSpacesInDSO(t *testing.T) {
 	in := strings.Join([]string{
 		"# Overhead  Command  Shared Object  Symbol",
@@ -307,7 +303,7 @@ func TestParseReportHandlesSpacesInDSO(t *testing.T) {
 	}{
 		{"java", "[JIT] tid 4029471", "0x000077a2dc2e16eb", SymbolKindUser},
 		{"java", "[vdso]", "0x0000000000000b00", SymbolKindUser},
-		// A comm can contain spaces too: Spark names threads "GC Thread#5" and "task l".
+		// A comm can contain spaces too, as JVM thread names like "GC Thread#5" do.
 		// Assuming otherwise fused the comm into the DSO, which then matched no --dso
 		// and mis-classified JIT regions as merely stripped.
 		{"GC Thread#5", "[kernel.kallsyms]", "native_write_msr", SymbolKindKernel},
@@ -335,10 +331,8 @@ func TestParseReportHandlesSpacesInDSO(t *testing.T) {
 	}
 }
 
-// TestJITStatusReporting covers the three JIT outcomes. The important case is the middle
-// one: "perf inject --jit" exits 0 when there is no jitdump to fold in, so its exit status
-// cannot be trusted to mean JIT analysis worked. Whether any jitted-* DSO appeared is the
-// only reliable signal.
+// TestJITStatusReporting covers the three JIT outcomes. The middle one matters: "perf
+// inject --jit" exits 0 with no jitdump, so only the presence of jitted-* DSOs is reliable.
 func TestJITStatusReporting(t *testing.T) {
 	jitBody := readFixture(t, "annotate_gp_pressure.stdio")
 
@@ -412,11 +406,9 @@ func TestJITStatusReporting(t *testing.T) {
 	})
 }
 
-// TestJITBrokenBySymfs covers the combination that silently produces a useless report:
-// --jit and --symfs together. perf inject writes per-method ELF images to host paths,
-// while --symfs makes perf prefix every lookup with the container root, so the images are
-// never found. Measured on a containerized Spark workload, this took analyzed JIT methods
-// from 106 to 0 while the run still appeared to succeed.
+// TestJITBrokenBySymfs covers --jit with --symfs: --symfs prefixes lookups with the
+// container root, so the host-path JIT images are never found. On a real containerized
+// workload this took analyzed JIT methods from 106 to 0 while the run appeared to succeed.
 func TestJITBrokenBySymfs(t *testing.T) {
 	jitBody := readFixture(t, "annotate_gp_pressure.stdio")
 

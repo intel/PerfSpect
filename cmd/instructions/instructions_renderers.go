@@ -24,11 +24,8 @@ var monospaceColumns = map[string]bool{
 	"Symbol": true,
 }
 
-// registerPressureHTMLRenderer renders the per-symbol register-pressure table.
-//
-// The default row renderer would work, but two things need custom handling: the hot
-// stack instructions cell holds newline-separated assembly that must keep its line breaks,
-// and the pressure tier is worth highlighting so HIGH rows are findable by eye.
+// registerPressureHTMLRenderer renders the per-symbol register-pressure table, keeping
+// line breaks in the hot stack instructions cell and highlighting the pressure tier.
 func registerPressureHTMLRenderer(tableValues table.TableValues, targetName string) string {
 	if len(tableValues.Fields) == 0 || len(tableValues.Fields[0].Values) == 0 {
 		return `<p>` + htmltemplate.HTMLEscapeString(tableValues.NoDataFound) + `</p>`
@@ -88,12 +85,8 @@ func tierStyle(tier string) string {
 	}
 }
 
-// collectionInfoHTMLRenderer renders the collection summary as name/value rows.
-//
-// It exists only to preserve line breaks. Several of these fields are multi-line - the
-// list of unannotatable binaries, and the JIT diagnostics - and the default renderer
-// escapes the value into a cell without pre-wrap, so HTML collapses the newlines into one
-// unreadable run-on line.
+// collectionInfoHTMLRenderer renders the collection summary as name/value rows. It exists
+// to preserve line breaks in multi-line fields, which the default renderer collapses.
 func collectionInfoHTMLRenderer(tableValues table.TableValues, targetName string) string {
 	var (
 		values           [][]string

@@ -30,13 +30,9 @@ type HotOp struct {
 	Pct      float64
 }
 
-// RegPressure is the register-pressure profile of one symbol.
-//
-// All percentages are shares of the symbol's annotated sample weight. Note that StackPct
-// can exceed the sum of SpillPct and ReloadPct would suggest, and can exceed 100: a
-// read-modify-write instruction such as "xor %r15,-0x50(%rbp)" both spills and reloads,
-// so it is counted in both and contributes twice to StackPct. This matches the reference
-// implementation.
+// RegPressure is the register-pressure profile of one symbol, as shares of its annotated
+// sample weight. StackPct can exceed 100: a read-modify-write such as "xor %r15,-0x50(%rbp)"
+// both spills and reloads, so it counts twice, matching the reference implementation.
 type RegPressure struct {
 	StackPct   float64 // share of weight on stack-memory instructions
 	SpillPct   float64 // share of weight on stores to the frame
@@ -89,12 +85,8 @@ func AnalyzeAPX(insns []Instruction) APXSignals {
 	return a
 }
 
-// analyzeInstructions walks a symbol's disassembly once, deriving both the
-// register-pressure profile and the APX signals.
-//
-// The two share a single pass deliberately: they must agree on exactly which lines count
-// as instructions, since both divide by that population. Splitting the filtering across
-// two loops would let them drift apart.
+// analyzeInstructions derives the register-pressure profile and APX signals in one pass,
+// so both agree on which lines count as instructions, the population both divide by.
 func analyzeInstructions(insns []Instruction, topOps int) (RegPressure, APXSignals) {
 	useRBP := detectFramePointer(insns)
 	apx := newAPXState()

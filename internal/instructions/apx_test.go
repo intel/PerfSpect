@@ -8,11 +8,8 @@ import (
 	"testing"
 )
 
-// TestAnalyzeAPXAgainstReference checks the APX signal counters against regpressure.awk
-// run over the same fixtures. Expected values are fields 9-11 of that implementation's
-// annotate-mode output:
-//
-//	gawk -v mode=annotate -v show_ops=0 -f regpressure.awk < annotate_<sym>.stdio
+// TestAnalyzeAPXAgainstReference checks the APX signal counters against fields 9-11 of
+// the reference output: gawk -v mode=annotate -v show_ops=0 -f regpressure.awk < <fixture>
 func TestAnalyzeAPXAgainstReference(t *testing.T) {
 	tests := []struct {
 		fixture    string
@@ -136,14 +133,9 @@ func TestJccForwardDisp(t *testing.T) {
 	}
 }
 
-// TestEstimateAPXAgainstReference reproduces the reference tool's printed estimate for a
-// real stress-ng profile. Those figures were:
-//
-//	GP spill/reload cost = 5.71%, GP register utilization = 11/16,
-//	upper bound = ~5.96%, realistic = ~3.20%, 59 of 150 symbols excluded
-//
-// Rather than carry 150 fixtures, this reconstructs the aggregate inputs that produce the
-// same arithmetic and checks the model's clamps and coefficients end to end.
+// TestEstimateAPX reproduces the reference tool's estimate for a real stress-ng profile
+// (GP cost 5.71%, 11/16 regs, upper ~5.96%, realistic ~3.20%, 59 of 150 excluded) from
+// reconstructed aggregate inputs, checking the model's clamps and coefficients end to end.
 func TestEstimateAPX(t *testing.T) {
 	// One symbol carrying all the weight, chosen so the derived values are checkable.
 	symbols := []AnalyzedSymbol{{

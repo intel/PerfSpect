@@ -10,13 +10,9 @@ import (
 	"perfspect/internal/script"
 )
 
-// TestAPXEstimateWithNothingAnalyzable covers the case where the collection produced no
-// annotatable symbols, which happens whenever the hot code is stripped or JIT-compiled
-// without an agent.
-//
-// The model would otherwise report a 0.00% gain next to a realization factor and a
-// register-utilization figure, all derived from no data. That reads as a measurement
-// saying APX would not help here, rather than as an absence of evidence.
+// TestAPXEstimateWithNothingAnalyzable covers a collection with no annotatable symbols
+// (stripped or agentless JIT code). A 0.00% gain derived from no data would read as a
+// measurement saying APX would not help, rather than as an absence of evidence.
 func TestAPXEstimateWithNothingAnalyzable(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
