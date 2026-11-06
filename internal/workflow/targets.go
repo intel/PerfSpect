@@ -92,36 +92,100 @@ func ValidateTargetFlags(cmd *cobra.Command) error {
 		}
 	}
 	// confirm that port is a positive integer
-	if flagTargetPort != "" {
-		var port int
-		var err error
-		if port, err = strconv.Atoi(flagTargetPort); err != nil || port <= 0 {
-			return fmt.Errorf("port %s is not a positive integer", flagTargetPort)
-		}
+	if err := validateTargetPort(flagTargetPort); err != nil {
+		return err
 	}
 	// confirm that the key file exists
-	if flagTargetKeyFile != "" {
-		if _, err := os.Stat(flagTargetKeyFile); os.IsNotExist(err) {
-			return fmt.Errorf("key file %s does not exist", flagTargetKeyFile)
-		}
+	if err := validateTargetKeyFile(flagTargetKeyFile); err != nil {
+		return err
 	}
 	// confirm that user is a valid user name
-	if flagTargetUser != "" {
-		userNameRegex := `^[a-z_][a-z0-9_.-]{0,63}$`
-		re := regexp.MustCompile(userNameRegex)
-		if !re.MatchString(flagTargetUser) {
-			return fmt.Errorf("user name %s does not match the user name regex '%s'", flagTargetUser, userNameRegex)
-		}
+	if err := validateTargetUser(flagTargetUser); err != nil {
+		return err
 	}
 	// confirm that host is a valid host name or IP address
-	if flagTargetHost != "" {
-		hostNameRegex := `^([a-zA-Z0-9.-]+)$`
-		re := regexp.MustCompile(hostNameRegex)
-		if !re.MatchString(flagTargetHost) {
-			return fmt.Errorf("host name %s does not match the host name regex '%s'", flagTargetHost, hostNameRegex)
-		}
+	if err := validateTargetHost(flagTargetHost); err != nil {
+		return err
 	}
 	return nil
+}
+
+// Connection details arrive from the command line and from the targets file. They are placed
+// directly into the argument vector of the local ssh/scp process, so a value that begins with a
+// dash would be interpreted by ssh as an option, e.g., -oProxyCommand=<arbitrary command>, which
+// ssh runs on the local host. The host name additionally becomes a path component of the target's
+// output directory when no target name is given. The regular expressions below therefore exclude
+// both leading dashes and path separators. They are deliberately strict; note that IPv6 literals
+// are not accepted (a limitation that predates this validation).
+const (
+	hostNameRegex = `^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$`
+	userNameRegex = `^[a-z_][a-z0-9_.-]{0,63}$`
+)
+
+// validateTargetHost confirms that host is a valid host name or IP address. An empty host is
+// valid; callers that require a host check for it separately.
+func validateTargetHost(host string) error {
+	if host == "" {
+		return nil
+	}
+	if !regexp.MustCompile(hostNameRegex).MatchString(host) {
+		return fmt.Errorf("host name %s does not match the host name regex '%s'", host, hostNameRegex)
+	}
+	return nil
+}
+
+// validateTargetUser confirms that user is a valid user name. An empty user is valid; ssh falls
+// back to the local user name.
+func validateTargetUser(user string) error {
+	if user == "" {
+		return nil
+	}
+	if !regexp.MustCompile(userNameRegex).MatchString(user) {
+		return fmt.Errorf("user name %s does not match the user name regex '%s'", user, userNameRegex)
+	}
+	return nil
+}
+
+// validateTargetPort confirms that port is a positive integer. An empty port is valid; ssh uses
+// its default port.
+func validateTargetPort(port string) error {
+	if port == "" {
+		return nil
+	}
+	portNum, err := strconv.Atoi(port)
+	if err != nil || portNum <= 0 || portNum > 65535 {
+		return fmt.Errorf("port %s is not a valid port number", port)
+	}
+	return nil
+}
+
+// validateTargetKeyFile confirms that the key file exists. An empty key file is valid; ssh uses
+// its default keys or a password.
+func validateTargetKeyFile(keyFile string) error {
+	if keyFile == "" {
+		return nil
+	}
+	if _, err := os.Stat(keyFile); os.IsNotExist(err) {
+		return fmt.Errorf("key file %s does not exist", keyFile)
+	}
+	return nil
+}
+
+// validateTargetFromFile validates the connection details of one target read from a targets file.
+func validateTargetFromFile(t targetFromYAML) error {
+	if t.Host == "" {
+		return fmt.Errorf("target in targets file has no host")
+	}
+	if err := validateTargetHost(t.Host); err != nil {
+		return err
+	}
+	if err := validateTargetUser(t.User); err != nil {
+		return err
+	}
+	if err := validateTargetPort(t.Port); err != nil {
+		return err
+	}
+	return validateTargetKeyFile(t.Key)
 }
 
 // GetTargets retrieves the list of targets based on the provided command and parameters. It creates
@@ -313,6 +377,8 @@ type targetsFile struct {
 }
 
 // sanitizeTargetName sanitizes the target name by removing any invalid characters.
+// The result is used as a file and directory name, so names that would refer to another directory
+// are replaced entirely.
 func sanitizeTargetName(targetName string) string {
 	// remove any invalid characters from the target name
 	// this is needed for the report file names
@@ -333,6 +399,10 @@ func sanitizeTargetName(targetName string) string {
 		}
 		return '_'
 	}, targetName)
+	// "." and ".." survive the mapping above but refer to a directory rather than naming one
+	if sanitizedTargetName == "." || sanitizedTargetName == ".." {
+		return strings.Repeat("_", len(sanitizedTargetName))
+	}
 	return sanitizedTargetName
 }
 
@@ -356,7 +426,7 @@ func getTargetsFromFile(targetsFilePath string, localTempDir string) (targets []
 		return
 	}
 	targetNameUsed := make(map[string]bool)
-	for _, t := range targetsFile.Targets {
+	for targetIdx, t := range targetsFile.Targets {
 		// create a target object
 		// target name is not required, but if it is provided there must not be duplicate names
 		var targetName string
@@ -367,6 +437,22 @@ func getTargetsFromFile(targetsFilePath string, localTempDir string) (targets []
 				return
 			}
 			targetNameUsed[targetName] = true
+		} else {
+			// without a name, the target is identified by its host name, which is also used to
+			// name the target's output directory and files, so it must be sanitized
+			targetName = sanitizeTargetName(t.Host)
+		}
+		if targetName == "" { // neither a name nor a host was provided
+			targetName = fmt.Sprintf("target %d", targetIdx+1)
+		}
+		// the connection details are used to build the local ssh/scp command line, so they must be
+		// validated before they are used, see validateTargetHost for details
+		if targetErr := validateTargetFromFile(t); targetErr != nil {
+			// retain a placeholder target, without connection details, so that the caller's
+			// targets and errors remain parallel and the invalid details are never used
+			targets = append(targets, target.NewRemoteTarget(targetName, "", "", "", ""))
+			targetErrs = append(targetErrs, targetErr)
+			continue
 		}
 		newTarget := target.NewRemoteTarget(targetName, t.Host, t.Port, t.User, t.Key)
 		newTarget.SetSshPass(t.Pwd)

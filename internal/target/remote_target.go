@@ -397,12 +397,16 @@ func (t *RemoteTarget) prepareSSHCommand(command []string, useControlMaster bool
 	var cmd []string
 	cmd = append(cmd, "ssh")
 	cmd = append(cmd, t.prepareSSHFlags(false, useControlMaster, prompt)...)
+	// end ssh's option parsing before the destination so that a destination beginning with a dash
+	// cannot be interpreted as an ssh option, e.g., -oProxyCommand=<command to run locally>
+	cmd = append(cmd, "--")
 	if t.user != "" {
 		cmd = append(cmd, t.user+"@"+t.host)
 	} else {
 		cmd = append(cmd, t.host)
 	}
-	cmd = append(cmd, "--")
+	// note: no "--" separator before the remote command; option parsing already ended above and ssh
+	// would pass a second separator to the remote shell as part of the command
 	cmd = append(cmd, command...)
 	return cmd
 }
@@ -420,6 +424,8 @@ func (t *RemoteTarget) prepareSCPCommand(src string, dstDir string, push bool) [
 		if fileInfo.IsDir() {
 			cmd = append(cmd, "-r")
 		}
+		// end scp's option parsing before the paths, see prepareSSHCommand
+		cmd = append(cmd, "--")
 		cmd = append(cmd, src)
 		dst := t.host + ":" + dstDir
 		if t.user != "" {
@@ -431,6 +437,8 @@ func (t *RemoteTarget) prepareSCPCommand(src string, dstDir string, push bool) [
 		if t.user != "" {
 			s = t.user + "@" + s
 		}
+		// end scp's option parsing before the paths, see prepareSSHCommand
+		cmd = append(cmd, "--")
 		cmd = append(cmd, s)
 		cmd = append(cmd, dstDir)
 	}
