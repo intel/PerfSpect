@@ -1,0 +1,12 @@
+ Percent |	Source code & Disassembly of x for cycles:upp (100 samples, percent: local period)
+---------------------------------------------------------------
+         :
+         : 5    0000000000001000 <pushpop>:
+    0.00 :   1000:   endbr64
+    0.00 :   1004:   push   %rbp
+    0.00 :   1005:   mov    %rsp,%rbp
+   25.00 :   1008:   push   %r15
+   25.00 :   100a:   pop    %r14
+   25.00 :   100c:   lea    -0x10(%rbp),%rsi
+   25.00 :   1010:   lea    0x8(%rsp),%rdi
+    0.00 :   1015:   ret

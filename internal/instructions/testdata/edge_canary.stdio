@@ -1,0 +1,13 @@
+ Percent |	Source code & Disassembly of x for cycles:upp (100 samples, percent: local period)
+---------------------------------------------------------------
+         :
+         : 5    0000000000001000 <canary>:
+    0.00 :   1000:   endbr64
+    0.00 :   1004:   push   %rbp
+    0.00 :   1005:   mov    %rsp,%rbp
+   10.00 :   1008:   mov    %fs:0x28,%rax
+   10.00 :   1011:   mov    %rax,-0x8(%rsp)
+   40.00 :   1015:   mov    %r12,-0x20(%rbp)
+   40.00 :   101a:   mov    -0x28(%rbp),%r13
+   10.00 :   101f:   sub    -0x8(%rsp),%rax
+    0.00 :   1024:   ret

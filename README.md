@@ -36,6 +36,7 @@ Usage:
 | [`telemetry`](#telemetry-command) | System telemetry | [options](docs/perfspect_telemetry.md) |
 | [`flamegraph`](#flamegraph-command) | Software call-stacks as flamegraphs | [options](docs/perfspect_flamegraph.md) |
 | [`lock`](#lock-command) | Software hot spot, cache-to-cache and lock contention | [options](docs/perfspect_lock.md) |
+| [`instructions`](#instructions-command) | Register pressure and instruction mix in hot code | [options](docs/perfspect_instructions.md) |
 | [`config`](#config-command) | Modify system configuration | [options](docs/perfspect_config.md) |
 
 > [!TIP]
@@ -163,10 +164,12 @@ Software flamegraphs are useful in diagnosing software performance bottlenecks. 
 > 1. Extract PerfSpect's embedded resources with `./perfspect extract --output resources`
 > 2. For each container you would like to profile Java code: `docker cp resources/${ARCH}/async-profiler/lib/libasyncProfiler.so ${CONT_NAME}:/dest/path/`
 > 3. When running PerfSpect flamegraph, add this flag: `--asprof-args "--libpath /dest/path/libasyncProfiler.so"`
-> 
+>
 > e.g. `./perfspect extract --output resources && docker cp resources/x86_64/async-profiler/lib/libasyncProfiler.so ${CONT_NAME}:/tmp/ && ./perfspect flamegraph --asprof-args "--libpath /tmp/libasyncProfiler.so"`
 >
 > Note that if PerfSpect is being run remotely, then the async profiler library will need to be copied to the test system and then into the test system's containers.
+>
+> This applies to `flamegraph` only. [Instruction analysis of containerized Java](#containerized-java-spark-flink-kafka-any-jvm-in-docker) needs a different agent, because async-profiler reports call stacks but does not make the JIT-compiled machine code available to disassemble.
 
 ![screenshot of a flamegraph from the HTML output of the flamegraph command](docs/images/flamegraph.png)
 
@@ -174,12 +177,153 @@ Software flamegraphs are useful in diagnosing software performance bottlenecks. 
 
 As systems contain more and more cores, it can be useful to analyze the Linux kernel lock overhead and potential false-sharing that impacts system scalability. Run `perfspect lock` to collect system-wide hot spot, cache-to-cache and lock contention information. Experienced performance engineers can analyze the collected information to identify bottlenecks. See [`perfspect lock -h`](docs/perfspect_lock.md) for all options.
 
+#### Instructions Command
+
+Where `flamegraph` answers "which code is hot", the `instructions` command answers "what is that code
+actually doing". It samples the target, disassembles the hottest symbols, and classifies every
+instruction to report how much of the hot code is register spill and reload traffic, split by
+general-purpose versus vector registers. Run `perfspect instructions` (or `perfspect insn`). See
+[`perfspect instructions -h`](docs/perfspect_instructions.md) for all options.
+
+Results are ranked by `GSTK%`, the share of total profile time a symbol spends on stack-memory
+instructions. That is deliberately not the same ordering as `HOT%`: a symbol can be very hot while
+spilling almost nothing, or carry dense spill code while being too cold to matter.
+
+> [!NOTE]
+> Two caveats worth understanding before acting on the output. First, `STACK%` is weighted by samples
+> rather than by instruction count, so a symbol can contain a lot of spill code and still report a
+> low `STACK%` when something else in it is the real bottleneck. Second, this analysis needs symbols:
+> stripped binaries cannot be disassembled per symbol, and the report says how much of the profile
+> was lost to them rather than quietly covering only the libraries that do have symbols.
+
+For JIT runtimes, pass `--jit`. PerfSpect then records with the monotonic clock and folds
+the runtime's jitdump into the recording, so each JIT-compiled method becomes an ordinary
+annotatable binary and appears in the table under its real name:
+
+```text
+GSTK%  HOT%   STACK%  SPILL%  RELD%  GP%    PRES  Symbol
+9.44   43.72  21.59   10.55   11.05  21.59  HIGH  CryptoBench.crypt(java.lang.String)
+2.18   19.80  11.02   5.51    5.51   0.00   MED   RandomStringUtils.generate()
+```
+
+The runtime has to emit that jitdump, which **cannot be enabled on an already-running
+process**. For the JVM, launch it with:
+
+```bash
+JVMTI=/usr/lib/linux-tools/$(uname -r)/libperf-jvmti.so
+java -agentpath:$JVMTI -jar app.jar
+```
+
+Without the agent, `--jit` reports that no JIT-compiled code was found rather than
+appearing to succeed.
+
+> [!NOTE]
+> The agent is the only requirement, and it is not version-gated: this is verified working
+> on OpenJDK 8 and 21. Do **not** add `-XX:+DumpPerfMapAtExit`. That flag writes a
+> `/tmp/perf-<pid>.map` giving method *names* only, which the injected jitdump already
+> provides, and it does not exist on older JVMs — OpenJDK 8 refuses to start with
+> `Unrecognized VM option 'DumpPerfMapAtExit'`.
+
+##### Containerized Java (Spark, Flink, Kafka, any JVM in Docker)
+
+This is the common deployment shape, and it needs care: the JVM is in a container but
+`perf` must run on the host, and the two disagree about what paths mean.
+
+The mechanism differs from the one the [`flamegraph` command uses for containerized
+Java](#flamegraph-command). A flamegraph needs call stacks, which async-profiler supplies;
+instruction analysis needs the machine code of each JIT-compiled method, which only the
+perf JVMTI agent writes out. The two are not interchangeable, and neither can be attached
+to a JVM that is already running.
+
+Profile from the **host**, not inside the container. A container typically lacks
+`CAP_PERFMON`, so `perf_event_open` is denied, and distro `perf` wrappers often cannot
+find a build matching the host kernel. Container processes are visible from the host
+anyway.
+
+Three things must be arranged, none of which require rebuilding or recreating the
+container:
+
+**1. Get the agent into the container.** Use the host's agent, matched to the host `perf`:
+
+```bash
+docker cp /usr/lib/linux-tools-$(uname -r | cut -d- -f1-2)/libperf-jvmti.so \
+          <container>:/opt/libperf-jvmti.so
+```
+
+**2. Load it at JVM launch and pick a jitdump directory.** Using Apache Spark as an example,
+edit the configuration to include the following entries. Append to any existing JVM options
+rather than adding a second entry for the same key — many frameworks keep only the last
+value, so a duplicate entry silently discards the options already configured:
+
+```properties
+spark.executor.extraJavaOptions  <existing flags> -agentpath:/opt/libperf-jvmti.so
+spark.executorEnv.JITDUMPDIR     /opt/jit
+```
+
+The agent cannot be attached to an already-running JVM, so your Java application must be
+restarted.
+
+**3. Make the jitdump readable on the host at the *same absolute path*.** `perf inject`
+opens the path recorded in the mmap event verbatim, so a different host path will not work.
+Symlink the container's directory into place:
+
+```bash
+MERGED=$(docker inspect -f '{{.GraphDriver.Data.MergedDir}}' <container>)
+sudo ln -s "$MERGED/opt/jit" /opt/jit
+```
+
+Reading through the overlay is live, so methods compiled during the profiling window are
+picked up. Then:
+
+```bash
+perfspect instructions --jit --duration 30 --top 200
+```
+
+Verify before trusting the output — `ls /opt/jit/.debug/jit/*/jit-*.dump` should list
+files, and the report's **JIT Analysis** row should say how many methods were analyzed.
+
+> [!WARNING]
+> **Do not combine `--jit` with `--symfs`.** `perf inject` writes its per-method ELF
+> images to host paths, while `--symfs` makes perf prefix every lookup with the container
+> root, so those images are never found. PerfSpect warns when both are passed and says so
+> in the report rather than appearing to succeed. If you need both views, collect twice:
+> `--jit` for JIT-compiled code, and a separate `--symfs` run for native libraries that
+> exist only inside the image.
+
+A JVM also generates thousands of individually tiny symbols, so raise `--top` well above
+the default for Java workloads; 200 is a reasonable starting point.
+
+Two register-pressure tables are produced. **Register Pressure** has one row per compiled
+instance, which is the ground truth. **Register Pressure by Symbol** collapses those into
+one row per symbol, which matters for JIT workloads: each process compiles its own copy of
+a method, and a tiered JIT recompiles hot methods, so a single Java method can occupy a
+dozen rows that each look unremarkable.
+
+The two metric families combine differently in that view: `HOT%` and `GSTK%` are shares of
+the whole profile and are summed, while `STACK%`, `SPILL%` and the rest are shares of an
+individual instance's own weight and are averaged, weighted by how hot each instance was.
+Summing ten instances at ~10% `STACK%` would otherwise claim 100% stack traffic for a
+symbol that has nothing of the sort.
+
+An **APX Benefit Estimate** section is reported alongside them, projecting what Intel APX
+might recover by scaling the observed GP spill cost and adding an uplift for code patterns
+APX encodes more compactly (NDD, CCMP, PUSH2/POP2). It is derived from the same per-symbol
+spill figures, so it needs no separate flag.
+
+> [!NOTE]
+> The estimate is a projection from a heuristic model, not a measurement. Its coefficients
+> are carried over from the original register-pressure tool and have **not** been validated
+> on APX hardware with an APX toolchain. Read it as a signal of whether a workload is worth
+> investigating, not as a predicted speedup — the report states this alongside the number.
+> When nothing could be annotated there is nothing to project from, and the section says so
+> rather than reporting a 0% gain.
+
 #### Config Command
 
 The `config` command provides a method to view and change various system configuration parameters. Run [`perfspect config -h`](docs/perfspect_config.md) to view the parameters that can be modified.
 
 > [!WARNING]
-> Misconfiguring the system may cause it to stop functionining. In some cases, a reboot may be required to restore default settings.
+> Misconfiguring the system may cause it to stop functioning. In some cases, a reboot may be required to restore default settings.
 
 Example:
 
