@@ -65,6 +65,7 @@ const (
 	UarchBergamo    = "Bergamo"
 	UarchTurinZen5  = "Turin (Zen 5)"
 	UarchTurinZen5c = "Turin (Zen 5c)"
+	UarchVenice     = "Venice"
 	// ARM CPUs
 	UarchGraviton2       = "Graviton2"
 	UarchGraviton3       = "Graviton3"
@@ -151,6 +152,7 @@ var cpuCharacteristicsMap = map[string]CPUCharacteristics{
 	UarchBergamo:    {MicroArchitecture: UarchBergamo, MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 0},    // Bergamo
 	UarchTurinZen5:  {MicroArchitecture: UarchTurinZen5, MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 0},  // Turin (Zen 5)
 	UarchTurinZen5c: {MicroArchitecture: UarchTurinZen5c, MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 0}, // Turin (Zen 5c)
+	UarchVenice:     {MicroArchitecture: UarchVenice, MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 0},     // Venice, family 26 model 81
 	// ARM CPUs
 	UarchGraviton2:       {MicroArchitecture: UarchGraviton2, MemoryChannelCount: 8, LogicalThreadCount: 1},        // AWS Graviton 2 ([m|c|r]6g) Neoverse-N1
 	UarchGraviton3:       {MicroArchitecture: UarchGraviton3, MemoryChannelCount: 8, LogicalThreadCount: 1},        // AWS Graviton 3 ([m|c|r]7g) Neoverse-V1
@@ -201,6 +203,7 @@ var cpuIdentifiersX86 = []struct {
 	{CPUIdentifierX86{Family: "25", Model: "(16[0-9]|17[0-5])", Stepping: "", Capid4: "", Devices: ""}, UarchBergamo},   // Bergamo, model 160-175
 	{CPUIdentifierX86{Family: "26", Model: "2", Stepping: "", Capid4: "", Devices: ""}, UarchTurinZen5},                 // Turin (Zen 5)
 	{CPUIdentifierX86{Family: "26", Model: "17", Stepping: "", Capid4: "", Devices: ""}, UarchTurinZen5c},               // Turin (Zen 5c)
+	{CPUIdentifierX86{Family: "26", Model: "81", Stepping: "", Capid4: "", Devices: ""}, UarchVenice},                   // Venice
 }
 
 // cpuIdentifiersARM maps ARM CPU identification to microarchitecture names
