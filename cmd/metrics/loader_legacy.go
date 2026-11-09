@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"perfspect/internal/cpus"
 	"perfspect/internal/util"
 	"strings"
 
@@ -123,6 +124,9 @@ func (l *LegacyLoader) loadEventGroups(eventDefinitionOverridePath string, metad
 		}
 		// check if the event is collectable
 		if isCollectableEvent(event, metadata) {
+			if metadata.Vendor == cpus.AMDVendor && (event.Device == "l3" || event.Device == "df") {
+				event.Raw = "amd_" + event.Raw
+			}
 			group = append(group, event)
 		} else {
 			uncollectable.Add(event.Name)
