@@ -1,0 +1,35 @@
+# Copyright (C) 2021-2025 Intel Corporation
+# SPDX-License-Identifier: BSD-3-Clause
+
+# golangci-lint v2 configuration
+#
+# golangci-lint v1 enabled a set of exclusion patterns implicitly (the
+# `issues.exclude-use-default: true` default) and did not run staticcheck's
+# QF (quickfix) checks. v2 dropped both behaviors, so they are restored
+# explicitly here to keep the linter's scope unchanged. The preset list is the
+# one golangci-lint's own `migrate` command produces for v1's defaults.
+version: "2"
+
+linters:
+  settings:
+    staticcheck:
+      # v2 default, plus QF (quickfix) checks, which v1 did not run. These are
+      # stylistic refactor suggestions rather than correctness problems.
+      checks:
+        - all
+        - -ST1000
+        - -ST1003
+        - -ST1016
+        - -ST1020
+        - -ST1021
+        - -ST1022
+        - -QF1001
+        - -QF1004
+        - -QF1006
+        - -QF1008
+  exclusions:
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
