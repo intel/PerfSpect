@@ -7,11 +7,11 @@ This document describes the high-level architecture of PerfSpect to help new con
 PerfSpect is a performance analysis tool for Linux systems. It collects system configuration data, hardware performance metrics, and generates reports. The tool supports both local execution and remote targets via SSH.
 
 ```text
-┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                        CLI (cmd/root.go)                                         │
-│  report │ benchmark │ telemetry │ flamegraph │ lock │ metrics │ config │ update │ extract        │
-│                                                         └ trim   └ restore                       │
-└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                             CLI (cmd/root.go)                                             │
+│  report │ benchmark │ telemetry │ flamegraph │ lock │ instructions │ metrics │ config │ update │ extract  │
+│                                                                      └ trim    └ restore                  │
+└───────────────────────────────────────────────────────────────────────────────────────────────────────────┘
           │                                                    │
           │                                                    │
           ▼                                                    ▼
@@ -20,7 +20,8 @@ PerfSpect is a performance analysis tool for Linux systems. It collects system c
 │       (internal/workflow/)            │    │                            │
 │                                       │    │  metrics: Loader pattern,  │
 │  Used by: report, benchmark,          │    │    perf event collection,  │
-│    telemetry, flamegraph, lock        │    │    real-time processing    │
+│    telemetry, flamegraph, lock,       │    │    real-time processing    │
+│    instructions                       │    │                            │
 │                                       │    │                            │
 │  - Target setup and validation        │    │  config: System tuning,    │
 │  - Parallel data collection           │    │    set/restore operations  │
@@ -64,11 +65,13 @@ perfspect/
 │   ├── telemetry/       # System telemetry collection
 │   ├── flamegraph/      # CPU flamegraph generation
 │   ├── lock/            # Lock contention analysis
+│   ├── instructions/    # Instruction-level analysis of hot code
 │   └── config/          # System configuration commands
 │       └── restore.go   # 'config restore' subcommand: restore system config from file
 ├── internal/            # Internal packages
 │   ├── app/             # Application context and shared types
 │   ├── extract/         # Data extraction functions from script outputs
+│   ├── instructions/    # Disassembly parsing and instruction classification
 │   ├── workflow/        # Workflow orchestration for reporting commands
 │   ├── target/          # Target abstraction (local/remote)
 │   ├── script/          # Script execution framework
@@ -105,7 +108,7 @@ type Target interface {
 
 ### 2. ReportingCommand (`internal/workflow/workflow.go`)
 
-Most commands (`report`, `telemetry`, `flamegraph`, `lock`) follow the same workflow. The `ReportingCommand` struct encapsulates this common flow:
+Most commands (`report`, `telemetry`, `flamegraph`, `lock`, `instructions`) follow the same workflow. The `ReportingCommand` struct encapsulates this common flow:
 
 ```go
 type ReportingCommand struct {
