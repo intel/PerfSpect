@@ -348,3 +348,13 @@ func TestGetCPU_AMD_Genoa(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, UarchGenoa, cpu.MicroArchitecture)
 }
+
+func TestGetCPU_AMD_Venice(t *testing.T) {
+	// Test AMD Venice - Family 26, Model 81
+	id := NewX86Identifier("26", "81", "0", "", "")
+	cpu, err := GetCPU(id)
+	require.NoError(t, err)
+	assert.Equal(t, UarchVenice, cpu.MicroArchitecture)
+	assert.Equal(t, 12, cpu.MemoryChannelCount)
+	assert.Equal(t, 2, cpu.LogicalThreadCount)
+}
