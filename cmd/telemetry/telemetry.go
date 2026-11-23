@@ -16,6 +16,7 @@ import (
 	"perfspect/internal/report"
 	"perfspect/internal/script"
 	"perfspect/internal/table"
+	"perfspect/internal/util"
 	"perfspect/internal/workflow"
 
 	"github.com/spf13/cobra"
@@ -291,17 +292,28 @@ func runCmd(cmd *cobra.Command, args []string) error {
 		slog.Info("Gaudi telemetry enabled", slog.String("hlsmi_path", gaudiHlsmiPath))
 		tables = append(tables, tableDefinitions[GaudiTelemetryTableName])
 	}
-	// hidden feature - PDU telemetry, only enabled when the PDU environment variables are set
-	pdu, err := pduConfigFromEnv()
-	if err != nil {
-		return err
-	}
-	pduBulkRequest := ""
-	if pdu.enabled() {
-		pdu.logSummary()
-		if pduBulkRequest, err = pdu.bulkRequest(); err != nil {
-			return err
+	// hidden feature - PDU telemetry, only enabled when host, user, password, and an outlet group or outlet list are set
+	pduHost := os.Getenv("PERFSPECT_PDU_HOST")
+	pduUser := os.Getenv("PERFSPECT_PDU_USER")
+	pduPassword := os.Getenv("PERFSPECT_PDU_PASSWORD")
+	pduOutlet := os.Getenv("PERFSPECT_PDU_OUTLET")
+	// outlet range list (e.g., "1-3,19,20") is passed to the script as a space separated list
+	var pduOutletList string
+	if outletSpec := strings.ReplaceAll(os.Getenv("PERFSPECT_PDU_OUTLET_LIST"), " ", ""); outletSpec != "" {
+		outlets, err := util.SelectiveIntRangeToIntList(outletSpec)
+		if err != nil {
+			return fmt.Errorf("invalid PERFSPECT_PDU_OUTLET_LIST %q, expected outlet numbers and ranges (e.g., 1-3,19,20): %w", outletSpec, err)
 		}
+		if slices.Min(outlets) < 1 {
+			return fmt.Errorf("invalid PERFSPECT_PDU_OUTLET_LIST %q, outlet numbers start at 1", outletSpec)
+		}
+		// remove duplicates from overlapping ranges so no outlet is summed twice
+		slices.Sort(outlets)
+		outlets = slices.Compact(outlets)
+		pduOutletList = strings.Join(util.IntSliceToStringSlice(outlets), " ")
+	}
+	if pduHost != "" && pduUser != "" && pduPassword != "" && (pduOutlet != "" || pduOutletList != "") {
+		slog.Info("PDU telemetry enabled", slog.String("host", pduHost), slog.String("outlet", pduOutlet), slog.String("outlet_list", pduOutletList))
 		tables = append(tables, tableDefinitions[PDUTelemetryTableName])
 	}
 	// include telemetry summary table if all telemetry options are selected
@@ -323,12 +335,11 @@ func runCmd(cmd *cobra.Command, args []string) error {
 			"InstrMixPID":       strconv.Itoa(flagInstrMixPid),
 			"InstrMixFrequency": strconv.Itoa(flagInstrMixFrequency),
 			"GaudiHlsmiPath":    gaudiHlsmiPath,
-			"PDUHost":           pdu.host,
-			"PDUUser":           pdu.user,
-			"PDUPassword":       pdu.password,
-			"PDUBulkRequest":    pduBulkRequest,
-			"PDUReadPaths":      strings.Join(pdu.readPaths, " "),
-			"PDUReadings":       strconv.Itoa(pdu.readings()),
+			"PDUHost":           pduHost,
+			"PDUUser":           pduUser,
+			"PDUPassword":       pduPassword,
+			"PDUOutlet":         pduOutlet,
+			"PDUOutletList":     pduOutletList,
 		},
 		Tables:                 tables,
 		SummaryFunc:            summaryFunc,
