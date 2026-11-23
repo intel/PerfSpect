@@ -1651,7 +1651,7 @@ for ((i=0; i<count; i++)); do
         # for each outlet in the outlet list, construct the bulk request
         bulk_requests=""
         for outlet in $pdu_outletlist; do
-            rid="/model/outlet/${outlet}/activePower"
+            rid="/model/outlet/$((outlet - 1))/activePower"  # PDU model index is 0-based, outlet labels are 1-based
             json="{\"id\":$outlet,\"jsonrpc\":\"2.0\",\"method\":\"getReading\"}"
             bulk_requests+="{\"rid\":\"$rid\",\"json\":$json},"
         done
