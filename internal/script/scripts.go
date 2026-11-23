@@ -1660,8 +1660,13 @@ for ((i=0; i<count; i++)); do
             -d "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"performBulk\",\"params\":{\"requests\":[$bulk_requests]}}" \
             "https://${pdu}/bulk")
     fi
-    # Check if curl succeeded
-    if [ $? -ne 0 ] || [ -z "$raw" ]; then
+    # Check if curl succeeded, a timeout (curl exit 28) is logged as a blank sample
+    rc=$?
+    if [ $rc -eq 28 ]; then
+        echo "$timestamp,"
+        continue  # curl already waited the full interval
+    fi
+    if [ $rc -ne 0 ] || [ -z "$raw" ]; then
         echo "ERROR: Failed to retrieve data from PDU" >&2
         exit 1
     fi
@@ -1674,6 +1679,10 @@ for ((i=0; i<count; i++)); do
     if [ -z "$response" ]; then
         echo "ERROR: Invalid response format or missing value" >&2
         exit 1
+    fi
+    # a zero reading is logged as a blank sample
+    if awk -v v="$response" 'BEGIN {exit !(v == 0)}'; then
+        response=""
     fi
     echo "$timestamp,$response"
     sleep $interval

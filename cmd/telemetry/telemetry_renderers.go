@@ -6,6 +6,7 @@ package telemetry
 import (
 	"fmt"
 	"log/slog"
+	"math"
 	"perfspect/internal/report"
 	"perfspect/internal/table"
 	"perfspect/internal/util"
@@ -21,7 +22,11 @@ import (
 func computeAxisMax(data [][]float64) string {
 	var all []float64
 	for _, dataset := range data {
-		all = append(all, dataset...)
+		for _, v := range dataset {
+			if !math.IsNaN(v) { // NaN marks a missing sample
+				all = append(all, v)
+			}
+		}
 	}
 	if len(all) < 4 {
 		return ""
@@ -76,6 +81,10 @@ func renderLineChart(xAxisLabels []string, data [][]float64, datasetNames []stri
 	for dataIdx := range data {
 		formattedPoints := []string{}
 		for _, point := range data[dataIdx] {
+			if math.IsNaN(point) {
+				formattedPoints = append(formattedPoints, "null") // chart leaves a gap for missing samples
+				continue
+			}
 			formattedPoints = append(formattedPoints, fmt.Sprintf("%f", point))
 		}
 		allFormattedPoints = append(allFormattedPoints, strings.Join(formattedPoints, ","))
@@ -753,8 +762,10 @@ func pduTelemetryTableHTMLRenderer(tableValues table.TableValues, targetName str
 	for _, field := range tableValues.Fields[1:] {
 		points := []float64{}
 		for _, val := range field.Values {
+			// blank samples (PDU timeout or zero reading) keep their position so later points stay aligned
 			if val == "" {
-				break
+				points = append(points, math.NaN())
+				continue
 			}
 			stat, err := strconv.ParseFloat(val, 64)
 			if err != nil {
