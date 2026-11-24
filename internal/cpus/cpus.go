@@ -152,7 +152,7 @@ var cpuCharacteristicsMap = map[string]CPUCharacteristics{
 	UarchBergamo:    {MicroArchitecture: UarchBergamo, MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 0},    // Bergamo
 	UarchTurinZen5:  {MicroArchitecture: UarchTurinZen5, MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 0},  // Turin (Zen 5)
 	UarchTurinZen5c: {MicroArchitecture: UarchTurinZen5c, MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 0}, // Turin (Zen 5c)
-	UarchVenice:     {MicroArchitecture: UarchVenice, MemoryChannelCount: 12, LogicalThreadCount: 2, CacheWayCount: 0},     // Venice, family 26 model 81
+	UarchVenice:     {MicroArchitecture: UarchVenice, MemoryChannelCount: 16, LogicalThreadCount: 2, CacheWayCount: 0},     // Venice, family 26 model 81
 	// ARM CPUs
 	UarchGraviton2:       {MicroArchitecture: UarchGraviton2, MemoryChannelCount: 8, LogicalThreadCount: 1},        // AWS Graviton 2 ([m|c|r]6g) Neoverse-N1
 	UarchGraviton3:       {MicroArchitecture: UarchGraviton3, MemoryChannelCount: 8, LogicalThreadCount: 1},        // AWS Graviton 3 ([m|c|r]7g) Neoverse-V1

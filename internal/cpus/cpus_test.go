@@ -355,6 +355,6 @@ func TestGetCPU_AMD_Venice(t *testing.T) {
 	cpu, err := GetCPU(id)
 	require.NoError(t, err)
 	assert.Equal(t, UarchVenice, cpu.MicroArchitecture)
-	assert.Equal(t, 12, cpu.MemoryChannelCount)
+	assert.Equal(t, 16, cpu.MemoryChannelCount)
 	assert.Equal(t, 2, cpu.LogicalThreadCount)
 }
