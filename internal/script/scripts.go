@@ -1640,7 +1640,8 @@ sum_readings() {
         awk -v n="$expected" '{s+=$1; c++} END {if (c == n) printf "%.3f", s}'
     fi
 }
-for ((i=0; i<count; i++)); do
+trap 'exit 0' INT TERM
+for ((i=0; duration == 0 || i < count; i++)); do  # duration 0 runs until interrupted
     timestamp=$(date +%H:%M:%S)
     # if no outletlist is provided, use the outlet group instead
     if [ -z "$pdu_outletlist" ]; then
