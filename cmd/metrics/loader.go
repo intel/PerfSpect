@@ -86,7 +86,7 @@ func NewLoader(uarch string, useLegacyLoader bool) (Loader, error) {
 		return newLegacyLoader(), nil
 	}
 	switch uarch {
-	case cpus.UarchCLX, cpus.UarchSKX, cpus.UarchBDX, cpus.UarchBergamo, cpus.UarchGenoa, cpus.UarchTurinZen5, cpus.UarchTurinZen5c:
+	case cpus.UarchCLX, cpus.UarchSKX, cpus.UarchBDX, cpus.UarchBergamo, cpus.UarchGenoa, cpus.UarchTurinZen5, cpus.UarchTurinZen5c, cpus.UarchVenice:
 		slog.Debug("Using legacy loader for microarchitecture", slog.String("uarch", uarch))
 		return newLegacyLoader(), nil
 	case cpus.UarchCWF, cpus.UarchGNR, cpus.UarchGNR_X1, cpus.UarchGNR_X2, cpus.UarchGNR_X3, cpus.UarchGNR_D, cpus.UarchSRF, cpus.UarchSRF_SP, cpus.UarchSRF_AP, cpus.UarchEMR, cpus.UarchEMR_MCC, cpus.UarchEMR_XCC, cpus.UarchSPR, cpus.UarchSPR_MCC, cpus.UarchSPR_XCC, cpus.UarchICX:
