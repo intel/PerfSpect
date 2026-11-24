@@ -1628,26 +1628,64 @@ pdu="{{.PDUHost}}"           # PDU hostname or IP address (must not start with p
 pdu_ip=$(echo "$pdu" | awk -F/ '{print $NF}' | awk -F: '{print $1}') # remove http:// or https:// and port if present
 pdu_username="{{.PDUUser}}"
 pdu_password="{{.PDUPassword}}"
-outletgroup="{{.PDUOutlet}}"
+pdu_outletgroup="{{.PDUOutlet}}"
+pdu_outletlist="{{.PDUOutletList}}"  # space separated outlet numbers, takes precedence over outlet group
 count=$((duration / interval))
 echo "Timestamp,ActivePower(W)"
-for ((i=0; i<count; i++)); do
+expected=$(echo $pdu_outletlist | wc -w)  # number of outlets to sum
+sum_readings() {
+    if [ "$expected" -eq 1 ]; then
+        cat
+    else
+        awk -v n="$expected" '{s+=$1; c++} END {if (c == n) printf "%.3f", s}'
+    fi
+}
+trap 'exit 0' INT TERM
+for ((i=0; duration == 0 || i < count; i++)); do  # duration 0 runs until interrupted
     timestamp=$(date +%H:%M:%S)
-    response=$(no_proxy=$pdu_ip curl --max-time $interval -sS -k -u "$pdu_username:$pdu_password" \
-        -d "{'jsonrpc':'2.0','method':'getReading'}" \
-        "https://${pdu}/model/outletgroup/${outletgroup}/activePower")
-    # Check if curl succeeded
-    if [ $? -ne 0 ] || [ -z "$response" ]; then
+    # if no outletlist is provided, use the outlet group instead
+    if [ -z "$pdu_outletlist" ]; then
+        raw=$(no_proxy=$pdu_ip curl --max-time $interval -sS -k -u "$pdu_username:$pdu_password" \
+            -d "{'jsonrpc':'2.0','method':'getReading'}" \
+            "https://${pdu}/model/outletgroup/${pdu_outletgroup}/activePower")
+    else
+        # for each outlet in the outlet list, construct the bulk request
+        bulk_requests=""
+        for outlet in $pdu_outletlist; do
+            rid="/model/outlet/$((outlet - 1))/activePower"  # PDU model index is 0-based, outlet labels are 1-based
+            json="{\"id\":$outlet,\"jsonrpc\":\"2.0\",\"method\":\"getReading\"}"
+            bulk_requests+="{\"rid\":\"$rid\",\"json\":$json},"
+        done
+        bulk_requests=${bulk_requests%,}  # remove trailing comma
+        raw=$(no_proxy=$pdu_ip curl --max-time $interval -sS -k -u "$pdu_username:$pdu_password" -H 'Content-Type: application/json' \
+            -d "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"performBulk\",\"params\":{\"requests\":[$bulk_requests]}}" \
+            "https://${pdu}/bulk")
+    fi
+    # Check if curl succeeded, a timeout (curl exit 28) is logged as a blank sample
+    rc=$?
+    if [ $rc -eq 28 ]; then
+        echo "$timestamp,"
+        continue  # curl already waited the full interval
+    fi
+    if [ $rc -ne 0 ] || [ -z "$raw" ]; then
         echo "ERROR: Failed to retrieve data from PDU" >&2
         exit 1
     fi
-    # Try to parse the value using jq
-    w=$(echo "$response" | jq -r '.result._ret_.value // empty')
-    if [ -z "$w" ]; then
+    # Parse the value(s); bulk responses are summed and must include every outlet
+    if [ -z "$pdu_outletlist" ]; then
+        response=$(echo "$raw" | jq -r '.result._ret_.value // empty' 2> /dev/null)
+    else
+        response=$(echo "$raw" | jq -r '.result.responses[].json.result._ret_.value | numbers' 2> /dev/null | sum_readings)
+    fi
+    if [ -z "$response" ]; then
         echo "ERROR: Invalid response format or missing value" >&2
         exit 1
     fi
-    echo "$timestamp,$w"
+    # a zero reading is logged as a blank sample
+    if awk -v v="$response" 'BEGIN {exit !(v == 0)}'; then
+        response=""
+    fi
+    echo "$timestamp,$response"
     sleep $interval
 done
 `,

@@ -146,10 +146,11 @@ The following optional telemetry sources can be enabled via environment variable
 | Environment Variable | Description |
 | -------------------- | ----------- |
 | `PERFSPECT_GAUDI_HLSMI_PATH` | Full path to the Gaudi `hl-smi` binary. When set, enables collection of Intel Gaudi accelerator telemetry (temperature, utilization, memory, power). |
-| `PERFSPECT_PDU_HOST` | Raritan PDU hostname or IP address for power telemetry. Requires all four PDU variables to be set. |
+| `PERFSPECT_PDU_HOST` | Raritan PDU hostname or IP address for power telemetry. Requires `PERFSPECT_PDU_USER`, `PERFSPECT_PDU_PASSWORD`, and either `PERFSPECT_PDU_OUTLET` or `PERFSPECT_PDU_OUTLET_LIST` to be set. |
 | `PERFSPECT_PDU_USER` | Username for PDU authentication. |
 | `PERFSPECT_PDU_PASSWORD` | Password for PDU authentication. |
 | `PERFSPECT_PDU_OUTLET` | PDU outlet group identifier to monitor. |
+| `PERFSPECT_PDU_OUTLET_LIST` | Comma-separated list of PDU outlet numbers and ranges to monitor (e.g. `19,20` or `1-3,19`). Readings from the listed outlets are summed. Takes precedence over `PERFSPECT_PDU_OUTLET` if both are set. |
 
 #### Flamegraph Command
 
