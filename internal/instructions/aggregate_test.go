@@ -123,11 +123,11 @@ func TestAggregateBySymbolEmpty(t *testing.T) {
 func TestAggregateBySymbolOnRealFixtures(t *testing.T) {
 	gp := AnalyzedSymbol{
 		Symbol:   Symbol{Name: "gp_pressure", DSO: "workload", HotPct: 23.43},
-		Pressure: AnalyzeRegPressure(loadFixture(t, "annotate_gp_pressure.stdio"), 0),
+		Pressure: analyzeRegPressure(loadFixture(t, "annotate_gp_pressure.stdio"), 0),
 	}
 	simd := AnalyzedSymbol{
 		Symbol:   Symbol{Name: "simd_pressure", DSO: "workload", HotPct: 75.27},
-		Pressure: AnalyzeRegPressure(loadFixture(t, "annotate_simd_pressure.stdio"), 0),
+		Pressure: analyzeRegPressure(loadFixture(t, "annotate_simd_pressure.stdio"), 0),
 	}
 	gp.GlobalStackPct = GlobalStackPct(gp.HotPct, gp.Pressure)
 	simd.GlobalStackPct = GlobalStackPct(simd.HotPct, simd.Pressure)

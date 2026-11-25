@@ -203,6 +203,8 @@ func (st *apxState) observe(text, mn string, w float64, addr uint64, hasAddr boo
 		st.nddPendingReg = ""
 		st.nddPendingW = 0
 	}
+	// Arm the lookahead on a sampled reg-to-reg copy. rsp/rbp copies are stack and frame
+	// setup, not value copies NDD could fold away.
 	if dst := nddMovDst(text); dst != "" && dst != "rsp" && dst != "rbp" && w > 0 {
 		st.nddPendingReg = dst
 		st.nddPendingW = w

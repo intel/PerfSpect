@@ -30,8 +30,8 @@ const (
 	APXEstimateMenuLabel              = "APX Benefit Estimate"
 )
 
-// topOpsPerSymbol is how many hot stack instructions are retained per symbol for display.
-const topOpsPerSymbol = 5
+// hotInstructionsPerSymbol caps the hot stack instructions kept per symbol for display.
+const hotInstructionsPerSymbol = 5
 
 // maxUnannotatedListed caps how many unannotatable binaries are named individually. A JVM
 // workload can produce dozens; beyond this they are summarized as a remainder so the
@@ -85,7 +85,7 @@ var tableDefinitions = map[string]table.TableDefinition{
 // analyze runs the shared parse-and-classify step over the collection script's output.
 func analyze(outputs map[string]script.ScriptOutput) instructions.Result {
 	stdout := outputs[script.HotCodeAnnotateScriptName].Stdout
-	result, err := instructions.Analyze(stdout, topOpsPerSymbol)
+	result, err := instructions.Analyze(stdout, hotInstructionsPerSymbol)
 	if err != nil {
 		slog.Error("failed to analyze hot code", slog.String("error", err.Error()))
 		return instructions.Result{}
@@ -102,7 +102,7 @@ func registerPressureTableValues(outputs map[string]script.ScriptOutput) []table
 		gstk, hot, stack, spill, reload []string
 		gp, simd, unknown, tier         []string
 		symbol, dso, gpRegs, simdRegs   []string
-		insnCount, topOps               []string
+		insnCount, hotInsns             []string
 	)
 	for _, s := range result.Analyzed {
 		p := s.Pressure
@@ -120,7 +120,7 @@ func registerPressureTableValues(outputs map[string]script.ScriptOutput) []table
 		gpRegs = append(gpRegs, strconv.Itoa(p.GPRegsUsed))
 		simdRegs = append(simdRegs, strconv.Itoa(p.SIMDRegsUsed))
 		insnCount = append(insnCount, strconv.Itoa(p.InsnCount))
-		topOps = append(topOps, formatTopOps(p.TopOps))
+		hotInsns = append(hotInsns, formatHotInstructions(p.HotInstructions))
 	}
 
 	return []table.Field{
@@ -138,7 +138,7 @@ func registerPressureTableValues(outputs map[string]script.ScriptOutput) []table
 		{Name: "GP Regs", Description: "distinct general-purpose registers referenced in this symbol", Values: gpRegs},
 		{Name: "SIMD Regs", Description: "distinct vector registers referenced in this symbol", Values: simdRegs},
 		{Name: "Instructions", Description: "instructions considered, excluding headers and stack-canary traffic", Values: insnCount},
-		{Name: "Hot Stack Instructions", Description: "heaviest stack-memory instructions in this symbol", Values: topOps},
+		{Name: "Hot Stack Instructions", Description: "heaviest stack-memory instructions in this symbol", Values: hotInsns},
 	}
 }
 
@@ -187,8 +187,7 @@ func collectionInfoTableValues(outputs map[string]script.ScriptOutput) []table.F
 
 	jitNote := "not requested"
 	if result.JITInjected != nil {
-		jitSeen := result.JITMethodCount()
-		jitOK := result.JITMethodsAnalyzed()
+		jitSeen, jitOK := result.JITMethods()
 		switch {
 		case !*result.JITInjected:
 			// Almost always the runtime emitted no jitdump, which for the JVM means the
@@ -229,23 +228,24 @@ func pct(v float64) string {
 	return fmt.Sprintf("%.2f", v)
 }
 
-// topOpsSeparator joins the hot stack instructions onto one line so txt, json and xlsx
-// rows stay aligned; the HTML renderer splits on it. A pipe never appears in AT&T operands.
-const topOpsSeparator = " | "
+// cellListSeparator joins a list (hot instructions, DSOs) onto one line so txt, json and
+// xlsx rows stay aligned; the HTML renderer splits on it. A pipe never appears in AT&T
+// operands.
+const cellListSeparator = " | "
 
-// formatTopOps renders the hot stack instructions for one symbol as a single-line cell.
-func formatTopOps(ops []instructions.HotOp) string {
-	if len(ops) == 0 {
+// formatHotInstructions renders one symbol's hot stack instructions as a single-line cell.
+func formatHotInstructions(hot []instructions.HotInstruction) string {
+	if len(hot) == 0 {
 		return ""
 	}
-	parts := make([]string, 0, len(ops))
-	for _, op := range ops {
+	parts := make([]string, 0, len(hot))
+	for _, h := range hot {
 		// Collapse internal whitespace: perf pads mnemonics out to a fixed column, which
 		// looks wrong once several instructions share a cell.
-		text := strings.Join(strings.Fields(op.Text), " ")
-		parts = append(parts, fmt.Sprintf("%.1f%% %s", op.Pct, text))
+		text := strings.Join(strings.Fields(h.Text), " ")
+		parts = append(parts, fmt.Sprintf("%.1f%% %s", h.Pct, text))
 	}
-	return strings.Join(parts, topOpsSeparator)
+	return strings.Join(parts, cellListSeparator)
 }
 
 // apxEstimateTableValues projects what Intel APX might recover from the profiled code.
@@ -354,9 +354,9 @@ func formatDSOs(names []string) string {
 		return ""
 	}
 	if len(names) <= maxDSOsListed {
-		return strings.Join(names, topOpsSeparator)
+		return strings.Join(names, cellListSeparator)
 	}
 	shown := append([]string{}, names[:maxDSOsListed]...)
 	shown = append(shown, fmt.Sprintf("(+%d more)", len(names)-maxDSOsListed))
-	return strings.Join(shown, topOpsSeparator)
+	return strings.Join(shown, cellListSeparator)
 }

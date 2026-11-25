@@ -2247,20 +2247,16 @@ REPORT_OUT="$WORKDIR/report.txt"
 echo "########## perf_report ##########"
 cat "$REPORT_OUT"
 
-# Select the top N symbols, taken by offset rather than field split. Unresolved (stripped)
-# symbols cannot be annotated but are reported with their weight, not dropped, so the
-# user sees which binaries need symbols.
+# Select the top N symbols by HOT% summed across comms, as perf lists a symbol once per
+# comm. Unresolved (stripped) symbols cannot be annotated but are reported with their
+# weight, not dropped, so the user sees which binaries need symbols.
 SYMLIST="$WORKDIR/symlist.tsv"
 UNRESOLVED="$WORKDIR/unresolved.tsv"
 : > "$SYMLIST"
 : > "$UNRESOLVED"
-awk -F'|' -v top="$top" -v symlist="$SYMLIST" -v unresolved="$UNRESOLVED" '
+LC_ALL=C awk -F'|' -v top="$top" -v unresolved="$UNRESOLVED" '
     # Fields from perf report -t "|" are: " <pct>% ", comm, dso, "[x] <symbol>".
     NF >= 4 && $1 ~ /[0-9]+\.[0-9]+%/ {
-        # --top caps symbols sent for disassembly. Unannotatable rows (a JVM emits thousands)
-        # do not consume that budget, but their weight is still recorded for coverage.
-        if (n >= top && unres_n >= top * 4) exit
-
         pct = $1
         gsub(/[^0-9.]/, "", pct)
 
@@ -2278,6 +2274,8 @@ awk -F'|' -v top="$top" -v symlist="$SYMLIST" -v unresolved="$UNRESOLVED" '
         # when kallsyms or a vmlinux is available.
         unannotatable = (dso == "[vdso]" || dso == "[vsyscall]" || dso == "[unknown]" || \
                          dso ~ /^\[JIT\]/ || dso ~ /\(deleted\)$/ || sym ~ /^0x[0-9a-fA-F]+$/)
+        # Unannotatable rows (a JVM emits thousands) do not consume the --top budget, but
+        # their weight is still recorded for coverage.
         if (unannotatable) {
             if (unres_n < top * 4) {
                 print pct "\t" dso "\t" sym > unresolved
@@ -2285,11 +2283,12 @@ awk -F'|' -v top="$top" -v symlist="$SYMLIST" -v unresolved="$UNRESOLVED" '
             }
             next
         }
-        if (n < top) {
-            print dso "\t" sym > symlist
-            n++
-        }
-    }' "$REPORT_OUT"
+        k = dso "\t" sym
+        if (!(k in hot)) order[++n] = k
+        hot[k] += pct
+    }
+    END { for (i = 1; i <= n; i++) printf "%.4f\t%s\n", hot[order[i]], order[i] }
+' "$REPORT_OUT" | LC_ALL=C sort -s -t "$(printf '\t')" -k1,1nr | head -n "$top" | cut -f2- > "$SYMLIST"
 
 if [ -s "$UNRESOLVED" ]; then
     echo "########## unresolved ##########"

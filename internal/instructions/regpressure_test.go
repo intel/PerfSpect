@@ -54,7 +54,7 @@ func TestAnalyzeRegPressureAgainstReference(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.fixture, func(t *testing.T) {
 			insns := loadFixture(t, tc.fixture)
-			got := AnalyzeRegPressure(insns, 5)
+			got := analyzeRegPressure(insns, 5)
 
 			checkPct(t, "StackPct", got.StackPct, tc.stack)
 			checkPct(t, "SpillPct", got.SpillPct, tc.spill)
@@ -156,7 +156,7 @@ func TestAnalyzeRegPressureEdgeCases(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.fixture, func(t *testing.T) {
-			got := AnalyzeRegPressure(loadFixture(t, tc.fixture), 0)
+			got := analyzeRegPressure(loadFixture(t, tc.fixture), 0)
 
 			checkPct(t, "StackPct", got.StackPct, tc.stack)
 			checkPct(t, "SpillPct", got.SpillPct, tc.spill)
@@ -182,7 +182,7 @@ func TestAnalyzeRegPressureEdgeCases(t *testing.T) {
 // GP-heavy symbol must attribute its pressure entirely to GP registers and the SIMD-heavy
 // symbol entirely to vector registers, with no leakage either way.
 func TestGPSIMDDiscrimination(t *testing.T) {
-	gp := AnalyzeRegPressure(loadFixture(t, "annotate_gp_pressure.stdio"), 0)
+	gp := analyzeRegPressure(loadFixture(t, "annotate_gp_pressure.stdio"), 0)
 	if gp.SIMDPct != 0 {
 		t.Errorf("gp_pressure leaked %.4f%% into SIMDPct, want 0", gp.SIMDPct)
 	}
@@ -190,7 +190,7 @@ func TestGPSIMDDiscrimination(t *testing.T) {
 		t.Errorf("gp_pressure GPPct = %.4f, want > 0", gp.GPPct)
 	}
 
-	simd := AnalyzeRegPressure(loadFixture(t, "annotate_simd_pressure.stdio"), 0)
+	simd := analyzeRegPressure(loadFixture(t, "annotate_simd_pressure.stdio"), 0)
 	if simd.GPPct != 0 {
 		t.Errorf("simd_pressure leaked %.4f%% into GPPct, want 0", simd.GPPct)
 	}
@@ -199,50 +199,50 @@ func TestGPSIMDDiscrimination(t *testing.T) {
 	}
 }
 
-// TestTopOpsIdentifiesSpillInstructions checks that the heaviest stack instructions are
+// TestHotInstructionsAreSpills checks that the heaviest stack instructions are
 // the expected spill forms: GP spills through rbp for one symbol, movsd of xmm registers
 // for the other.
-func TestTopOpsIdentifiesSpillInstructions(t *testing.T) {
-	gp := AnalyzeRegPressure(loadFixture(t, "annotate_gp_pressure.stdio"), 5)
-	if len(gp.TopOps) == 0 {
-		t.Fatal("gp_pressure returned no TopOps")
+func TestHotInstructionsAreSpills(t *testing.T) {
+	gp := analyzeRegPressure(loadFixture(t, "annotate_gp_pressure.stdio"), 5)
+	if len(gp.HotInstructions) == 0 {
+		t.Fatal("gp_pressure returned no HotInstructions")
 	}
-	for _, op := range gp.TopOps {
-		if !strings.Contains(op.Text, "(%rbp)") {
-			t.Errorf("gp_pressure TopOp %q does not reference the frame", op.Text)
+	for _, h := range gp.HotInstructions {
+		if !strings.Contains(h.Text, "(%rbp)") {
+			t.Errorf("gp_pressure hot instruction %q does not reference the frame", h.Text)
 		}
-		if strings.Contains(op.Text, "xmm") {
-			t.Errorf("gp_pressure TopOp %q references a vector register", op.Text)
+		if strings.Contains(h.Text, "xmm") {
+			t.Errorf("gp_pressure hot instruction %q references a vector register", h.Text)
 		}
 	}
 	// Weights must be ordered descending.
-	for i := 1; i < len(gp.TopOps); i++ {
-		if gp.TopOps[i].Pct > gp.TopOps[i-1].Pct {
-			t.Errorf("TopOps not sorted descending at %d: %.4f > %.4f",
-				i, gp.TopOps[i].Pct, gp.TopOps[i-1].Pct)
+	for i := 1; i < len(gp.HotInstructions); i++ {
+		if gp.HotInstructions[i].Pct > gp.HotInstructions[i-1].Pct {
+			t.Errorf("HotInstructions not sorted descending at %d: %.4f > %.4f",
+				i, gp.HotInstructions[i].Pct, gp.HotInstructions[i-1].Pct)
 		}
 	}
 
-	simd := AnalyzeRegPressure(loadFixture(t, "annotate_simd_pressure.stdio"), 5)
-	if len(simd.TopOps) == 0 {
-		t.Fatal("simd_pressure returned no TopOps")
+	simd := analyzeRegPressure(loadFixture(t, "annotate_simd_pressure.stdio"), 5)
+	if len(simd.HotInstructions) == 0 {
+		t.Fatal("simd_pressure returned no HotInstructions")
 	}
-	for _, op := range simd.TopOps {
-		if !strings.Contains(op.Text, "xmm") {
-			t.Errorf("simd_pressure TopOp %q does not reference a vector register", op.Text)
+	for _, h := range simd.HotInstructions {
+		if !strings.Contains(h.Text, "xmm") {
+			t.Errorf("simd_pressure hot instruction %q does not reference a vector register", h.Text)
 		}
 	}
 }
 
 // TestLightLoopHasNoStackTraffic is the negative control: a loop with few live values must
-// report no stack traffic and no TopOps at all.
+// report no stack traffic and no HotInstructions at all.
 func TestLightLoopHasNoStackTraffic(t *testing.T) {
-	got := AnalyzeRegPressure(loadFixture(t, "annotate_light_loop.stdio"), 5)
+	got := analyzeRegPressure(loadFixture(t, "annotate_light_loop.stdio"), 5)
 	if got.StackPct != 0 {
 		t.Errorf("StackPct = %.4f, want 0", got.StackPct)
 	}
-	if len(got.TopOps) != 0 {
-		t.Errorf("TopOps = %v, want none", got.TopOps)
+	if len(got.HotInstructions) != 0 {
+		t.Errorf("HotInstructions = %v, want none", got.HotInstructions)
 	}
 }
 
@@ -257,7 +257,7 @@ func TestFramePointerDetection(t *testing.T) {
 }
 
 func TestAnalyzeRegPressureEmptyInput(t *testing.T) {
-	got := AnalyzeRegPressure(nil, 5)
+	got := analyzeRegPressure(nil, 5)
 	if got.StackPct != 0 || got.InsnCount != 0 {
 		t.Errorf("empty input produced %+v, want zero value", got)
 	}
@@ -300,4 +300,16 @@ func readFixture(t *testing.T, name string) string {
 // newFixtureReader wraps inline annotate text for tests that do not need a file.
 func newFixtureReader(s string) *strings.Reader {
 	return strings.NewReader(s)
+}
+
+// analyzeRegPressure runs the shared pass and keeps only the register-pressure profile.
+func analyzeRegPressure(insns []Instruction, maxHot int) RegPressure {
+	p, _ := analyzeInstructions(insns, maxHot)
+	return p
+}
+
+// analyzeAPX runs the shared pass and keeps only the APX signals.
+func analyzeAPX(insns []Instruction) APXSignals {
+	_, a := analyzeInstructions(insns, 0)
+	return a
 }

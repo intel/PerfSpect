@@ -57,7 +57,7 @@ func registerPressureHTMLRenderer(tableValues table.TableValues, targetName stri
 				// Stored on one line for the text formats; expand to one instruction per
 				// line here. Replacing after escaping is safe: the separator contains no
 				// characters that HTML escaping alters.
-				escaped = strings.ReplaceAll(escaped, topOpsSeparator, "\n")
+				escaped = strings.ReplaceAll(escaped, cellListSeparator, "\n")
 				style = "font-family:monospace;white-space:pre-wrap"
 			case monospaceColumns[field.Name]:
 				style = "font-family:monospace"

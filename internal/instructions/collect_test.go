@@ -56,22 +56,6 @@ func TestParseReportIgnoresHeadersAndJunk(t *testing.T) {
 	}
 }
 
-func TestSymbolIsUnresolved(t *testing.T) {
-	tests := []struct {
-		sym  Symbol
-		want bool
-	}{
-		{Symbol{Name: "ccitt_crc16", DSO: "stress-ng"}, false},
-		{Symbol{Name: "0xffffffff9120124c", DSO: "stress-ng"}, true},
-		{Symbol{Name: "something", DSO: "[unknown]"}, true},
-	}
-	for _, tc := range tests {
-		if got := tc.sym.IsUnresolved(); got != tc.want {
-			t.Errorf("IsUnresolved(%+v) = %v, want %v", tc.sym, got, tc.want)
-		}
-	}
-}
-
 func TestGlobalStackPct(t *testing.T) {
 	// A hot symbol with little stack traffic must rank below a cooler one that is dense
 	// with it; this is the whole reason GSTK% exists.
@@ -203,6 +187,35 @@ func TestAnalyzeRanksByGlobalStackPct(t *testing.T) {
 	}
 }
 
+func TestAnalyzeDedupesSymbolAcrossComms(t *testing.T) {
+	// perf reports a symbol once per comm. Older collections annotated each row, so the
+	// same symbol arrives twice; it must be counted once, with the merged weight.
+	gp := readFixture(t, "annotate_gp_pressure.stdio")
+	out := strings.Join([]string{
+		"########## perf_event ##########", "cycles:upp",
+		"########## perf_report ##########",
+		" 30.00% |java       |workload|[.] gp_pressure",
+		" 20.00% |GC Thread#1|workload|[.] gp_pressure",
+		"########## annotate_0 ##########", "sym=gp_pressure", "dso=workload", gp,
+		"########## annotate_1 ##########", "sym=gp_pressure", "dso=workload", gp,
+	}, "\n")
+
+	result, err := Analyze(out, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Analyzed) != 1 {
+		t.Fatalf("analyzed %d, want 1", len(result.Analyzed))
+	}
+	if got := result.Analyzed[0].HotPct; got != 50 {
+		t.Errorf("HotPct = %v, want 50 (merged across comms)", got)
+	}
+	agg := AggregateBySymbol(result.Analyzed)
+	if len(agg) != 1 || agg[0].HotPct != 50 || agg[0].Instances != 1 {
+		t.Errorf("aggregate = %+v, want one instance at 50%%", agg)
+	}
+}
+
 func TestAnalyzeEmptyInput(t *testing.T) {
 	result, err := Analyze("", 0)
 	if err != nil {
@@ -326,8 +339,8 @@ func TestParseReportHandlesSpacesInDSO(t *testing.T) {
 		}
 	}
 	// The JIT row must be recognized as unresolved so its weight is accounted for.
-	if !syms[0].IsUnresolved() {
-		t.Error("JIT row IsUnresolved() = false, want true")
+	if got := classifyDSO(syms[0].DSO); got != ReasonJIT {
+		t.Errorf("classifyDSO(%q) = %v, want ReasonJIT", syms[0].DSO, got)
 	}
 }
 
@@ -362,8 +375,8 @@ func TestJITStatusReporting(t *testing.T) {
 			t.Fatal("JITInjected should be true: the inject step itself succeeded")
 		}
 		// No jitted-* DSO, so no JIT method was actually analyzed.
-		if got := r.JITMethodCount(); got != 0 {
-			t.Errorf("JITMethodCount = %d, want 0", got)
+		if seen, _ := r.JITMethods(); seen != 0 {
+			t.Errorf("JITMethods seen = %d, want 0", seen)
 		}
 	})
 
@@ -380,8 +393,8 @@ func TestJITStatusReporting(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := r.JITMethodCount(); got != 1 {
-			t.Errorf("JITMethodCount = %d, want 1", got)
+		if seen, _ := r.JITMethods(); seen != 1 {
+			t.Errorf("JITMethods seen = %d, want 1", seen)
 		}
 		if len(r.Analyzed) != 1 {
 			t.Fatalf("Analyzed = %d, want 1", len(r.Analyzed))
@@ -429,11 +442,12 @@ func TestJITBrokenBySymfs(t *testing.T) {
 	if r.Symfs != "/var/lib/docker/overlay2/abc/merged" {
 		t.Errorf("Symfs = %q, want the reported root", r.Symfs)
 	}
-	if got := r.JITMethodCount(); got != 1 {
-		t.Errorf("JITMethodCount = %d, want 1 (it was seen)", got)
+	seen, analyzed := r.JITMethods()
+	if seen != 1 {
+		t.Errorf("JITMethods seen = %d, want 1 (it was seen)", seen)
 	}
-	if got := r.JITMethodsAnalyzed(); got != 0 {
-		t.Errorf("JITMethodsAnalyzed = %d, want 0 (it could not be annotated)", got)
+	if analyzed != 0 {
+		t.Errorf("JITMethods analyzed = %d, want 0 (it could not be annotated)", analyzed)
 	}
 
 	// Without --symfs: the same symbol annotates successfully.
@@ -452,7 +466,7 @@ func TestJITBrokenBySymfs(t *testing.T) {
 	if r2.Symfs != "" {
 		t.Errorf("Symfs = %q, want empty", r2.Symfs)
 	}
-	if got := r2.JITMethodsAnalyzed(); got != 1 {
-		t.Errorf("JITMethodsAnalyzed = %d, want 1", got)
+	if _, analyzed := r2.JITMethods(); analyzed != 1 {
+		t.Errorf("JITMethods analyzed = %d, want 1", analyzed)
 	}
 }

@@ -93,12 +93,6 @@ func symbolKindFromMarker(marker string) SymbolKind {
 	}
 }
 
-// IsUnresolved reports whether perf failed to attribute the symbol to a name, leaving a
-// raw instruction address instead. Such entries cannot be annotated.
-func (s Symbol) IsUnresolved() bool {
-	return strings.HasPrefix(s.Name, "0x") || s.DSO == "[unknown]"
-}
-
 // GlobalStackPct is the symbol's share of total profile weight on stack-memory instructions
 // (HotPct scaled by StackPct). Rank by it: neither HotPct nor StackPct alone orders symbols
 // by total time spent on spill and reload.

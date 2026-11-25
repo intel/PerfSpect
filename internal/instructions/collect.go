@@ -130,34 +130,22 @@ func classifyDSO(dso string) UnannotatableReason {
 	}
 }
 
-// JITMethodCount returns the number of symbols from perf's per-method JIT ELF images. This,
-// not the exit status of "perf inject --jit", says whether JIT analysis worked: that
-// command succeeds even when there was no jitdump to fold in.
-func (r Result) JITMethodCount() int {
-	var n int
+// JITMethods returns how many symbols came from perf's per-method JIT ELF images (seen)
+// and how many of those were classified (analyzed). seen, not the exit status of "perf
+// inject --jit", says whether JIT analysis worked: that succeeds even with no jitdump.
+func (r Result) JITMethods() (seen, analyzed int) {
 	for _, s := range r.Analyzed {
 		if strings.HasPrefix(s.DSO, "jitted-") {
-			n++
+			analyzed++
 		}
 	}
+	seen = analyzed
 	for _, s := range r.Unannotated {
 		if strings.HasPrefix(s.DSO, "jitted-") {
-			n++
+			seen++
 		}
 	}
-	return n
-}
-
-// JITMethodsAnalyzed returns how many JIT-compiled methods were successfully
-// classified, as opposed to merely seen.
-func (r Result) JITMethodsAnalyzed() int {
-	var n int
-	for _, s := range r.Analyzed {
-		if strings.HasPrefix(s.DSO, "jitted-") {
-			n++
-		}
-	}
-	return n
+	return seen, analyzed
 }
 
 // LostHotPct is the total profile weight in symbols that could not be annotated.
@@ -170,9 +158,9 @@ func (r Result) LostHotPct() float64 {
 }
 
 // Analyze parses the hot-code collection script's output and classifies every annotated
-// symbol, ranked by GlobalStackPct. topOps caps the hot stack instructions kept per
+// symbol, ranked by GlobalStackPct. maxHot caps the hot stack instructions kept per
 // symbol; pass 0 to skip.
-func Analyze(scriptStdout string, topOps int) (Result, error) {
+func Analyze(scriptStdout string, maxHot int) (Result, error) {
 	sections := extract.GetSectionsFromOutput(scriptStdout)
 
 	var result Result
@@ -202,6 +190,9 @@ func Analyze(scriptStdout string, topOps int) (Result, error) {
 	// nothing to disassemble, but their weight still counts against coverage.
 	result.Unannotated = append(result.Unannotated, parseUnresolved(sections[sectionUnresolved])...)
 
+	// Collections made before the script deduped symbols annotate one per comm. Each copy
+	// would carry the full merged hotPct, so keep only the first.
+	seen := make(map[key]bool)
 	for name, body := range sections {
 		if !strings.HasPrefix(name, sectionAnnotatePrefix) {
 			continue
@@ -211,6 +202,10 @@ func Analyze(scriptStdout string, topOps int) (Result, error) {
 			continue
 		}
 		k := key{sym, dso}
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
 		s := Symbol{
 			Name:   sym,
 			DSO:    dso,
@@ -222,7 +217,7 @@ func Analyze(scriptStdout string, topOps int) (Result, error) {
 		if err != nil {
 			return result, err
 		}
-		pressure, apx := analyzeInstructions(insns, topOps)
+		pressure, apx := analyzeInstructions(insns, maxHot)
 		if pressure.InsnCount == 0 {
 			// Selected as hot but nothing to classify: stripped, or annotation failed.
 			result.Unannotated = append(result.Unannotated, s)

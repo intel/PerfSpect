@@ -79,7 +79,7 @@ func AggregateBySymbol(symbols []AnalyzedSymbol) []SymbolAggregate {
 
 		if s.HotPct >= a.topHot {
 			a.topHot = s.HotPct
-			a.agg.Pressure.TopOps = p.TopOps
+			a.agg.Pressure.HotInstructions = p.HotInstructions
 		}
 	}
 

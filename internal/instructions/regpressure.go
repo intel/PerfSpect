@@ -23,8 +23,8 @@ const (
 	TierLow  = "LOW"
 )
 
-// HotOp is a single stack-memory instruction and the sample weight attributed to it.
-type HotOp struct {
+// HotInstruction is a stack-memory instruction and the sample weight attributed to it.
+type HotInstruction struct {
 	Mnemonic string
 	Text     string
 	Pct      float64
@@ -49,8 +49,8 @@ type RegPressure struct {
 	// rbp-relative accesses are not treated as stack traffic.
 	UsesFramePointer bool
 
-	// TopOps lists the heaviest stack-memory instructions, descending by weight.
-	TopOps []HotOp
+	// HotInstructions lists the heaviest stack-memory instructions, descending by weight.
+	HotInstructions []HotInstruction
 }
 
 // Tier classifies the symbol's register pressure for display.
@@ -71,23 +71,9 @@ var (
 	reBlank       = regexp.MustCompile(`^[[:space:]]*$`)
 )
 
-// AnalyzeRegPressure computes the register-pressure profile of one symbol's annotated
-// disassembly. topOps caps the number of hot stack instructions returned; pass 0 to skip
-// collecting them.
-func AnalyzeRegPressure(insns []Instruction, topOps int) RegPressure {
-	p, _ := analyzeInstructions(insns, topOps)
-	return p
-}
-
-// AnalyzeAPX counts the APX opportunity signals in one symbol's annotated disassembly.
-func AnalyzeAPX(insns []Instruction) APXSignals {
-	_, a := analyzeInstructions(insns, 0)
-	return a
-}
-
 // analyzeInstructions derives the register-pressure profile and APX signals in one pass,
 // so both agree on which lines count as instructions, the population both divide by.
-func analyzeInstructions(insns []Instruction, topOps int) (RegPressure, APXSignals) {
+func analyzeInstructions(insns []Instruction, maxHot int) (RegPressure, APXSignals) {
 	useRBP := detectFramePointer(insns)
 	apx := newAPXState()
 
@@ -103,7 +89,7 @@ func analyzeInstructions(insns []Instruction, topOps int) (RegPressure, APXSigna
 	)
 	gpSeen := make(map[string]struct{})
 	simdSeen := make(map[string]struct{})
-	opWeight := make(map[HotOp]float64)
+	hotWeight := make(map[HotInstruction]float64)
 
 	// Stack-canary state. The canary is loaded via a segment override, stashed at a fixed
 	// frame slot, and compared on exit. None of that is allocator spill traffic, so the
@@ -113,21 +99,13 @@ func analyzeInstructions(insns []Instruction, topOps int) (RegPressure, APXSigna
 
 	for _, in := range insns {
 		raw := in.Raw
-		if reBlank.MatchString(raw) || reSkipHeader.MatchString(raw) {
-			continue
-		}
 		if reSectionHead.MatchString(raw) {
 			// A new function or section header. Multi-instruction APX patterns must not
 			// straddle it, so the lookahead is cleared.
 			apx.reset()
 			continue
 		}
-		if !strings.Contains(raw, ":") {
-			continue
-		}
-
-		text := in.Text
-		if text == "" || startsWithComment(text) {
+		if skipLine(in) {
 			continue
 		}
 
@@ -138,6 +116,7 @@ func analyzeInstructions(insns []Instruction, topOps int) (RegPressure, APXSigna
 			continue
 		}
 
+		text := in.Text
 		mn := mnemonic(text)
 		if mn == unknownMnemonic {
 			continue
@@ -162,6 +141,8 @@ func analyzeInstructions(insns []Instruction, topOps int) (RegPressure, APXSigna
 		collectRegs(text, useRBP, gpSeen, simdSeen)
 		apx.observe(text, mn, w, in.Addr, in.HasAddr)
 
+		// Spills and reloads target the stack frame. Heap and global accesses are ordinary
+		// data traffic, so only stack-relative instructions are classified below.
 		if !hasStackMem(text, useRBP) {
 			continue
 		}
@@ -202,8 +183,8 @@ func analyzeInstructions(insns []Instruction, topOps int) (RegPressure, APXSigna
 			unkTot += w
 		}
 
-		if topOps > 0 {
-			opWeight[HotOp{Mnemonic: mn, Text: text}] += w
+		if maxHot > 0 {
+			hotWeight[HotInstruction{Mnemonic: mn, Text: text}] += w
 		}
 	}
 
@@ -224,36 +205,36 @@ func analyzeInstructions(insns []Instruction, topOps int) (RegPressure, APXSigna
 		InsnCount:        insnCount,
 		UsesFramePointer: useRBP,
 	}
-	if topOps > 0 {
-		p.TopOps = rankOps(opWeight, annTotal, topOps)
+	if maxHot > 0 {
+		p.HotInstructions = rankHot(hotWeight, annTotal, maxHot)
 	}
 	return p, apx.signals(annTotal, insnCount)
 }
 
-// rankOps returns the heaviest ops, descending by weight, with percentages relative to
-// the symbol's total annotated weight.
-func rankOps(weights map[HotOp]float64, annTotal float64, limit int) []HotOp {
+// rankHot returns the heaviest instructions, descending by weight, with percentages
+// relative to the symbol's total annotated weight.
+func rankHot(weights map[HotInstruction]float64, annTotal float64, limit int) []HotInstruction {
 	if len(weights) == 0 {
 		return nil
 	}
-	ops := make([]HotOp, 0, len(weights))
-	for op, w := range weights {
+	hot := make([]HotInstruction, 0, len(weights))
+	for h, w := range weights {
 		if annTotal > 0 {
-			op.Pct = w / annTotal * 100
+			h.Pct = w / annTotal * 100
 		}
-		ops = append(ops, op)
+		hot = append(hot, h)
 	}
 	// Sort by weight descending, then by text so equal weights order deterministically.
-	sort.Slice(ops, func(i, j int) bool {
-		if ops[i].Pct != ops[j].Pct {
-			return ops[i].Pct > ops[j].Pct
+	sort.Slice(hot, func(i, j int) bool {
+		if hot[i].Pct != hot[j].Pct {
+			return hot[i].Pct > hot[j].Pct
 		}
-		return ops[i].Text < ops[j].Text
+		return hot[i].Text < hot[j].Text
 	})
-	if len(ops) > limit {
-		ops = ops[:limit]
+	if len(hot) > limit {
+		hot = hot[:limit]
 	}
-	return ops
+	return hot
 }
 
 // detectFramePointer reports whether the symbol establishes rbp as a frame pointer, by
@@ -296,6 +277,18 @@ func collectRegs(s string, useRBP bool, gpSeen, simdSeen map[string]struct{}) {
 		}
 		gpSeen[norm] = struct{}{}
 	}
+}
+
+// skipLine reports whether an annotate line carries no instruction: blank lines,
+// perf headers, lines without an address colon, and comments or labels.
+func skipLine(in Instruction) bool {
+	if reBlank.MatchString(in.Raw) || reSkipHeader.MatchString(in.Raw) {
+		return true
+	}
+	if !strings.Contains(in.Raw, ":") {
+		return true
+	}
+	return in.Text == "" || startsWithComment(in.Text)
 }
 
 // startsWithComment reports whether the text is a comment or label rather than an

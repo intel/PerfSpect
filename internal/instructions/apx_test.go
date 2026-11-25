@@ -26,7 +26,7 @@ func TestAnalyzeAPXAgainstReference(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.fixture, func(t *testing.T) {
-			got := AnalyzeAPX(loadFixture(t, tc.fixture))
+			got := analyzeAPX(loadFixture(t, tc.fixture))
 			checkPct(t, "NDDPct", got.NDDPct, tc.nddPct)
 			checkPct(t, "CCMPPct", got.CCMPPct, tc.ccmpPct)
 			if got.Push2Pairs != tc.push2Pairs {
@@ -40,7 +40,7 @@ func TestAnalyzeAPXAgainstReference(t *testing.T) {
 // counters must not change any register-pressure figure.
 func TestAnalyzeAPXDoesNotPerturbRegPressure(t *testing.T) {
 	insns := loadFixture(t, "annotate_gp_pressure.stdio")
-	p := AnalyzeRegPressure(insns, 0)
+	p := analyzeRegPressure(insns, 0)
 	if d := p.StackPct - 91.3791; math.Abs(d) > tolerance {
 		t.Errorf("StackPct = %.4f, want 91.3791 (unchanged by the APX pass)", p.StackPct)
 	}
@@ -227,7 +227,7 @@ func TestAPXSignalsDetectEGPRFromDisassembly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !AnalyzeAPX(insns).UsesEGPR {
+	if !analyzeAPX(insns).UsesEGPR {
 		t.Error("UsesEGPR = false for code referencing r20/r21, want true")
 	}
 
@@ -236,7 +236,33 @@ func TestAPXSignalsDetectEGPRFromDisassembly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if AnalyzeAPX(insns).UsesEGPR {
+	if analyzeAPX(insns).UsesEGPR {
 		t.Error("UsesEGPR = true for legacy registers, want false")
+	}
+}
+
+// TestAPXLookaheadResetsAtSectionHead checks that a copy-then-modify pair split by a
+// section header is not counted, so patterns cannot straddle two functions.
+func TestAPXLookaheadResetsAtSectionHead(t *testing.T) {
+	const mov = "  10.00 :   1000:   mov    %rax,%rbx\n"
+	const add = "  10.00 :   1004:   add    %rcx,%rbx\n"
+	tests := []struct {
+		name    string
+		input   string
+		wantNDD bool
+	}{
+		{"adjacent", mov + add, true},
+		{"split by section head", mov + "<next>:\n" + add, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			insns, err := ParseAnnotate(newFixtureReader(tc.input))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := analyzeAPX(insns).NDDPct > 0; got != tc.wantNDD {
+				t.Errorf("NDD pair counted = %v, want %v", got, tc.wantNDD)
+			}
+		})
 	}
 }
