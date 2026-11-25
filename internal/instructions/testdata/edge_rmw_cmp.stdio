@@ -1,0 +1,12 @@
+ Percent |	Source code & Disassembly of x for cycles:upp (100 samples, percent: local period)
+---------------------------------------------------------------
+         :
+         : 5    0000000000001000 <rmw>:
+    0.00 :   1000:   endbr64
+    0.00 :   1004:   push   %rbp
+    0.00 :   1005:   mov    %rsp,%rbp
+   25.00 :   1008:   add    %rax,-0x18(%rbp)
+   25.00 :   100c:   xor    %r15,-0x50(%rbp)
+   25.00 :   1010:   cmpl   $0x0,-0x8(%rbp)
+   25.00 :   1014:   testb  $0x1,-0x9(%rbp)
+    0.00 :   1018:   ret

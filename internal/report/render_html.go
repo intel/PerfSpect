@@ -165,6 +165,11 @@ func getHtmlReportBegin() string {
 		.field-description .tooltip-text {
 			visibility: hidden;
 			width: 250px;
+			/* Do not inherit text layout from the cell the tooltip sits in. A cell
+			   styled white-space:nowrap would otherwise force the tooltip onto one
+			   line and overflow its fixed width, and a bold cell would bold it. */
+			white-space: normal;
+			font-weight: normal;
 			background-color: #333;
 			color: #fff;
 			text-align: left;
@@ -605,6 +610,12 @@ func CreateFieldNameWithDescription(fieldName, description string) string {
 
 func RenderHTMLTable(tableHeaders []string, tableValues [][]string, class string, valuesStyle [][]string) string {
 	return renderHTMLTableWithDescriptions(tableHeaders, nil, tableValues, class, valuesStyle)
+}
+
+// RenderHTMLTableWithDescriptions is RenderHTMLTable with header hover descriptions,
+// positionally matched to tableHeaders, so custom renderers keep each field's Description.
+func RenderHTMLTableWithDescriptions(tableHeaders []string, headerDescriptions []string, tableValues [][]string, class string, valuesStyle [][]string) string {
+	return renderHTMLTableWithDescriptions(tableHeaders, headerDescriptions, tableValues, class, valuesStyle)
 }
 
 // renderHTMLTableWithDescriptions renders an HTML table with optional header descriptions

@@ -25,6 +25,7 @@ import (
 	"perfspect/cmd/benchmark"
 	"perfspect/cmd/config"
 	"perfspect/cmd/flamegraph"
+	"perfspect/cmd/instructions"
 	"perfspect/cmd/lock"
 	"perfspect/cmd/metrics"
 	"perfspect/cmd/report"
@@ -112,6 +113,7 @@ Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
 	rootCmd.AddCommand(telemetry.Cmd)
 	rootCmd.AddCommand(flamegraph.Cmd)
 	rootCmd.AddCommand(lock.Cmd)
+	rootCmd.AddCommand(instructions.Cmd)
 	rootCmd.AddCommand(config.Cmd)
 	rootCmd.AddGroup([]*cobra.Group{{ID: "other", Title: "Other Commands:"}}...)
 	rootCmd.AddCommand(updateCmd)

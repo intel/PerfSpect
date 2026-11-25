@@ -1,0 +1,200 @@
+ Percent |	Source code & Disassembly of workload for cycles:upp (2702 samples, percent: local period)
+----------------------------------------------------------------------------------------------------------
+         :
+         :
+         :
+         : 3    Disassembly of section .text:
+         :
+         : 5    0000000000001580 <simd_pressure>:
+    0.00 :   1580:   endbr64
+    0.00 :   1584:   test   %edx,%edx
+    0.00 :   1586:   je     1962 <simd_pressure+0x3e2>
+    0.00 :   158c:   push   %rbp
+    0.00 :   158d:   mov    %edx,%r8d
+    0.00 :   1590:   xor    %ecx,%ecx
+    0.00 :   1592:   lea    (%rdi,%rsi,8),%rdx
+    0.00 :   1596:   mov    %rsp,%rbp
+    0.00 :   1599:   movsd  0xabf(%rip),%xmm6        # 2060 <_IO_stdin_used+0x60>
+    0.00 :   15a1:   movsd  0xabf(%rip),%xmm4        # 2068 <_IO_stdin_used+0x68>
+    0.00 :   15a9:   movsd  0xabf(%rip),%xmm5        # 2070 <_IO_stdin_used+0x70>
+    0.00 :   15b1:   movsd  0xac7(%rip),%xmm3        # 2080 <_IO_stdin_used+0x80>
+    0.00 :   15b9:   movsd  %xmm6,-0x48(%rbp)
+    0.00 :   15be:   movsd  0xab2(%rip),%xmm6        # 2078 <_IO_stdin_used+0x78>
+    0.00 :   15c6:   movsd  0xa59(%rip),%xmm13        # 2028 <_IO_stdin_used+0x28>
+    0.00 :   15cf:   movsd  %xmm4,-0x40(%rbp)
+    0.00 :   15d4:   movsd  0xaac(%rip),%xmm4        # 2088 <_IO_stdin_used+0x88>
+    0.00 :   15dc:   movsd  0xa4b(%rip),%xmm12        # 2030 <_IO_stdin_used+0x30>
+    0.00 :   15e5:   movsd  %xmm5,-0x38(%rbp)
+    0.00 :   15ea:   movsd  0xa9e(%rip),%xmm5        # 2090 <_IO_stdin_used+0x90>
+    0.00 :   15f2:   movsd  0xa3d(%rip),%xmm11        # 2038 <_IO_stdin_used+0x38>
+    0.00 :   15fb:   movsd  %xmm6,-0x30(%rbp)
+    0.00 :   1600:   movsd  0xa90(%rip),%xmm6        # 2098 <_IO_stdin_used+0x98>
+    0.00 :   1608:   movsd  0xa2f(%rip),%xmm10        # 2040 <_IO_stdin_used+0x40>
+    0.00 :   1611:   movsd  %xmm3,-0x28(%rbp)
+    0.00 :   1616:   movsd  0xa82(%rip),%xmm3        # 20a0 <_IO_stdin_used+0xa0>
+    0.00 :   161e:   movsd  0xa21(%rip),%xmm9        # 2048 <_IO_stdin_used+0x48>
+    0.00 :   1627:   movsd  %xmm4,-0x20(%rbp)
+    0.00 :   162c:   movsd  0xa1b(%rip),%xmm8        # 2050 <_IO_stdin_used+0x50>
+    0.00 :   1635:   movsd  0xa1b(%rip),%xmm7        # 2058 <_IO_stdin_used+0x58>
+    0.00 :   163d:   movsd  %xmm5,-0x18(%rbp)
+    0.00 :   1642:   movsd  0xa6e(%rip),%xmm4        # 20b8 <_IO_stdin_used+0xb8>
+    0.00 :   164a:   movsd  0xa5e(%rip),%xmm5        # 20b0 <_IO_stdin_used+0xb0>
+    0.00 :   1652:   movsd  %xmm6,-0x10(%rbp)
+    0.00 :   1657:   movsd  0xa49(%rip),%xmm6        # 20a8 <_IO_stdin_used+0xa8>
+    0.00 :   165f:   movsd  %xmm3,-0x8(%rbp)
+    0.00 :   1664:   movsd  0xa54(%rip),%xmm1        # 20c0 <_IO_stdin_used+0xc0>
+    0.00 :   166c:   movsd  0xa64(%rip),%xmm2        # 20d8 <_IO_stdin_used+0xd8>
+    0.00 :   1674:   movapd %xmm1,%xmm3
+    0.00 :   1678:   nopl   0x0(%rax,%rax,1)
+    0.00 :   1680:   mov    %rdi,%rax
+    0.00 :   1683:   test   %rsi,%rsi
+    0.00 :   1686:   je     18f5 <simd_pressure+0x375>
+    0.00 :   168c:   nopl   0x0(%rax)
+    0.00 :   1690:   movsd  0xa38(%rip),%xmm0        # 20d0 <_IO_stdin_used+0xd0>
+    0.00 :   1698:   mulsd  (%rax),%xmm0
+    0.48 :   169c:   add    $0x8,%rax
+    0.00 :   16a0:   mulsd  %xmm2,%xmm3
+    0.00 :   16a4:   mulsd  %xmm2,%xmm4
+    0.00 :   16a8:   mulsd  %xmm2,%xmm5
+    0.41 :   16ac:   mulsd  %xmm2,%xmm6
+    0.00 :   16b0:   mulsd  %xmm2,%xmm7
+    0.00 :   16b4:   movapd %xmm0,%xmm14
+    0.00 :   16b9:   movapd %xmm0,%xmm15
+    0.81 :   16be:   mulsd  %xmm13,%xmm14
+    0.00 :   16c3:   mulsd  %xmm2,%xmm8
+    0.00 :   16c8:   mulsd  %xmm2,%xmm9
+    0.00 :   16cd:   mulsd  %xmm2,%xmm10
+    0.55 :   16d2:   mulsd  %xmm2,%xmm11
+    1.34 :   16d7:   addsd  %xmm14,%xmm3
+    0.00 :   16dc:   mulsd  %xmm2,%xmm12
+    0.00 :   16e1:   movapd %xmm0,%xmm14
+    0.00 :   16e6:   mulsd  %xmm2,%xmm13
+    1.56 :   16eb:   addsd  %xmm1,%xmm3
+    1.55 :   16ef:   mulsd  %xmm3,%xmm14
+    1.82 :   16f4:   addsd  %xmm14,%xmm4
+    0.00 :   16f9:   movapd %xmm0,%xmm14
+    1.92 :   16fe:   addsd  %xmm1,%xmm4
+    1.63 :   1702:   mulsd  %xmm4,%xmm14
+    1.52 :   1707:   addsd  %xmm14,%xmm5
+    0.00 :   170c:   movapd %xmm0,%xmm14
+    1.63 :   1711:   addsd  %xmm1,%xmm5
+    1.85 :   1715:   mulsd  %xmm5,%xmm14
+    1.93 :   171a:   addsd  %xmm14,%xmm6
+    0.00 :   171f:   movsd  -0x8(%rbp),%xmm14
+    0.00 :   1725:   mulsd  %xmm2,%xmm14
+    1.48 :   172a:   addsd  %xmm1,%xmm6
+    1.59 :   172e:   mulsd  %xmm6,%xmm15
+    1.89 :   1733:   addsd  %xmm15,%xmm14
+    0.00 :   1738:   movapd %xmm14,%xmm15
+    0.00 :   173d:   movsd  -0x10(%rbp),%xmm14
+    1.78 :   1743:   addsd  %xmm1,%xmm15
+    0.00 :   1748:   mulsd  %xmm2,%xmm14
+    0.18 :   174d:   movsd  %xmm15,-0x8(%rbp)
+    1.26 :   1753:   mulsd  %xmm0,%xmm15
+    1.78 :   1758:   addsd  %xmm15,%xmm14
+    0.00 :   175d:   movapd %xmm14,%xmm15
+    0.00 :   1762:   movsd  -0x18(%rbp),%xmm14
+    1.93 :   1768:   addsd  %xmm1,%xmm15
+    0.00 :   176d:   mulsd  %xmm2,%xmm14
+    0.44 :   1772:   movsd  %xmm15,-0x10(%rbp)
+    1.63 :   1778:   mulsd  %xmm0,%xmm15
+    1.44 :   177d:   addsd  %xmm15,%xmm14
+    0.04 :   1782:   movapd %xmm14,%xmm15
+    0.00 :   1787:   movsd  -0x20(%rbp),%xmm14
+    1.85 :   178d:   addsd  %xmm1,%xmm15
+    0.00 :   1792:   mulsd  %xmm2,%xmm14
+    0.56 :   1797:   movsd  %xmm15,-0x18(%rbp)
+    1.85 :   179d:   mulsd  %xmm0,%xmm15
+    1.15 :   17a2:   addsd  %xmm15,%xmm14
+    0.00 :   17a7:   movapd %xmm14,%xmm15
+    0.00 :   17ac:   movsd  -0x28(%rbp),%xmm14
+    1.52 :   17b2:   addsd  %xmm1,%xmm15
+    0.00 :   17b7:   mulsd  %xmm2,%xmm14
+    0.37 :   17bc:   movsd  %xmm15,-0x20(%rbp)
+    1.25 :   17c2:   mulsd  %xmm0,%xmm15
+    2.03 :   17c7:   addsd  %xmm15,%xmm14
+    1.63 :   17cc:   addsd  %xmm1,%xmm14
+    0.00 :   17d1:   movapd %xmm14,%xmm15
+    0.37 :   17d6:   movsd  %xmm14,-0x28(%rbp)
+    0.00 :   17dc:   movsd  -0x30(%rbp),%xmm14
+    1.29 :   17e2:   mulsd  %xmm0,%xmm15
+    0.00 :   17e7:   mulsd  %xmm2,%xmm14
+    1.59 :   17ec:   addsd  %xmm15,%xmm14
+    1.34 :   17f1:   addsd  %xmm1,%xmm14
+    0.00 :   17f6:   movapd %xmm14,%xmm15
+    0.41 :   17fb:   movsd  %xmm14,-0x30(%rbp)
+    0.00 :   1801:   movsd  -0x38(%rbp),%xmm14
+    1.18 :   1807:   mulsd  %xmm0,%xmm15
+    0.00 :   180c:   mulsd  %xmm2,%xmm14
+    1.29 :   1811:   addsd  %xmm15,%xmm14
+    2.00 :   1816:   addsd  %xmm1,%xmm14
+    0.00 :   181b:   movapd %xmm14,%xmm15
+    0.52 :   1820:   movsd  %xmm14,-0x38(%rbp)
+    0.00 :   1826:   movsd  -0x40(%rbp),%xmm14
+    1.22 :   182c:   mulsd  %xmm0,%xmm15
+    0.00 :   1831:   mulsd  %xmm2,%xmm14
+    1.25 :   1836:   addsd  %xmm15,%xmm14
+    1.80 :   183b:   addsd  %xmm1,%xmm14
+    0.00 :   1840:   movapd %xmm14,%xmm15
+    0.48 :   1845:   movsd  %xmm14,-0x40(%rbp)
+    0.00 :   184b:   movsd  -0x48(%rbp),%xmm14
+    1.22 :   1851:   mulsd  %xmm0,%xmm15
+    0.00 :   1856:   mulsd  %xmm2,%xmm14
+    1.56 :   185b:   addsd  %xmm15,%xmm14
+    1.59 :   1860:   addsd  %xmm1,%xmm14
+    0.19 :   1865:   movsd  %xmm14,-0x48(%rbp)
+    1.52 :   186b:   mulsd  %xmm0,%xmm14
+    1.00 :   1870:   addsd  %xmm14,%xmm7
+    0.00 :   1875:   movapd %xmm0,%xmm14
+    1.77 :   187a:   addsd  %xmm1,%xmm7
+    2.22 :   187e:   mulsd  %xmm7,%xmm14
+    1.89 :   1883:   addsd  %xmm14,%xmm8
+    0.00 :   1888:   movapd %xmm0,%xmm14
+    1.92 :   188d:   addsd  %xmm1,%xmm8
+    1.59 :   1892:   mulsd  %xmm8,%xmm14
+    1.73 :   1897:   addsd  %xmm14,%xmm9
+    0.00 :   189c:   movapd %xmm0,%xmm14
+    1.63 :   18a1:   addsd  %xmm1,%xmm9
+    1.77 :   18a6:   mulsd  %xmm9,%xmm14
+    1.74 :   18ab:   addsd  %xmm14,%xmm10
+    0.00 :   18b0:   movapd %xmm0,%xmm14
+    1.40 :   18b5:   addsd  %xmm1,%xmm10
+    1.74 :   18ba:   mulsd  %xmm10,%xmm14
+    1.45 :   18bf:   addsd  %xmm14,%xmm11
+    0.00 :   18c4:   movapd %xmm0,%xmm14
+    1.53 :   18c9:   addsd  %xmm1,%xmm11
+    1.89 :   18ce:   mulsd  %xmm11,%xmm14
+    1.44 :   18d3:   addsd  %xmm14,%xmm12
+    1.45 :   18d8:   addsd  %xmm1,%xmm12
+    1.37 :   18dd:   mulsd  %xmm12,%xmm0
+    1.70 :   18e2:   addsd  %xmm0,%xmm13
+    1.30 :   18e7:   addsd  %xmm1,%xmm13
+    0.00 :   18ec:   cmp    %rax,%rdx
+    0.00 :   18ef:   jne    1690 <simd_pressure+0x110>
+    0.00 :   18f5:   add    $0x1,%ecx
+    0.00 :   18f8:   cmp    %ecx,%r8d
+    0.00 :   18fb:   jne    1680 <simd_pressure+0x100>
+    0.00 :   1901:   addsd  %xmm4,%xmm3
+    0.00 :   1905:   movsd  -0x10(%rbp),%xmm0
+    0.00 :   190a:   addsd  %xmm5,%xmm3
+    0.00 :   190e:   addsd  %xmm6,%xmm3
+    0.00 :   1912:   addsd  -0x8(%rbp),%xmm3
+    0.00 :   1917:   addsd  %xmm3,%xmm0
+    0.00 :   191b:   addsd  -0x18(%rbp),%xmm0
+    0.00 :   1920:   addsd  -0x20(%rbp),%xmm0
+    0.00 :   1925:   addsd  -0x28(%rbp),%xmm0
+    0.00 :   192a:   addsd  -0x30(%rbp),%xmm0
+    0.00 :   192f:   addsd  -0x38(%rbp),%xmm0
+    0.00 :   1934:   addsd  -0x40(%rbp),%xmm0
+    0.00 :   1939:   addsd  -0x48(%rbp),%xmm0
+    0.00 :   193e:   addsd  %xmm7,%xmm0
+    0.00 :   1942:   pop    %rbp
+    0.00 :   1943:   addsd  %xmm8,%xmm0
+    0.00 :   1948:   addsd  %xmm9,%xmm0
+    0.00 :   194d:   addsd  %xmm10,%xmm0
+    0.00 :   1952:   addsd  %xmm11,%xmm0
+    0.00 :   1957:   addsd  %xmm12,%xmm0
+    0.00 :   195c:   addsd  %xmm13,%xmm0
+    0.00 :   1961:   ret
+    0.00 :   1962:   movsd  0x75e(%rip),%xmm0        # 20c8 <_IO_stdin_used+0xc8>
+    0.00 :   196a:   ret

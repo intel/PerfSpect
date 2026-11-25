@@ -1,0 +1,13 @@
+ Percent |	Source code & Disassembly of x for cycles:upp (100 samples, percent: local period)
+---------------------------------------------------------------
+         :
+         : 5    0000000000001000 <simd>:
+    0.00 :   1000:   endbr64
+    0.00 :   1004:   push   %rbp
+    0.00 :   1005:   mov    %rsp,%rbp
+   20.00 :   1008:   movaps %xmm3,-0x30(%rbp)
+   20.00 :   100c:   movups -0x40(%rbp),%xmm7
+   20.00 :   1010:   vmovdqa %ymm2,-0x80(%rbp)
+   20.00 :   1018:   vmovdqu64 -0x100(%rbp),%zmm9
+   20.00 :   1020:   movsd  %xmm15,-0x18(%rbp,%rax,8)
+    0.00 :   1028:   ret

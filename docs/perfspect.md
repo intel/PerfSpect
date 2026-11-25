@@ -15,17 +15,18 @@ Examples:
 Use "perfspect [command] --help" for more information about a command.
 
 Commands:
-  report      Collect configuration data from target(s)
-  benchmark   Run performance benchmarks on target(s)
-  metrics     Collect performance metrics from target(s)
-  telemetry   Collect system telemetry from target(s)
-  flamegraph  Collect flamegraph data from target(s)
-  lock        Collect kernel lock data from target(s)
-  config      Modify system configuration on target(s)
+  report       Collect configuration data from target(s)
+  benchmark    Run performance benchmarks on target(s)
+  metrics      Collect performance metrics from target(s)
+  telemetry    Collect system telemetry from target(s)
+  flamegraph   Collect flamegraph data from target(s)
+  lock         Collect kernel lock data from target(s)
+  instructions Analyze instructions in hot code on target(s)
+  config       Modify system configuration on target(s)
 
 Other Commands:
-  update      Update the application (Intel network only)
-  extract     Extract the embedded resources (for developers)
+  update       Update the application (Intel network only)
+  extract      Extract the embedded resources (for developers)
 
 Flags:
       --debug            enable debug logging and retain temporary directories
@@ -38,5 +39,5 @@ Flags:
   -v, --version          version for perfspect
 
 Additional help topics:
-  perfspect            
+  perfspect              
 ```
