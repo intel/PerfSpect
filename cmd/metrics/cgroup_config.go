@@ -61,14 +61,13 @@ type IODeviceWeight struct {
 // GetCgroupConfigs reads each cgroup's static configuration from the target's cgroup v2
 // filesystem. Cgroups are named as passed to perf, relative to the cgroup mount point.
 // An unreadable cgroup is omitted rather than failing the collection.
-func GetCgroupConfigs(myTarget target.Target, cgroups []string, localTempDir string) ([]CgroupConfig, error) {
+func GetCgroupConfigs(myTarget target.Target, cgroups []string, localTempDir string, noRoot bool) ([]CgroupConfig, error) {
 	if len(cgroups) == 0 {
 		return nil, nil
 	}
 	quoted := make([]string, 0, len(cgroups))
 	for _, cgroup := range cgroups {
-		// single-quote for the shell, escaping any embedded single quotes
-		quoted = append(quoted, "'"+strings.ReplaceAll(cgroup, "'", `'\''`)+"'")
+		quoted = append(quoted, util.ShellSingleQuote(cgroup))
 	}
 	// the kernel does not resolve memory.max across the hierarchy as it does
 	// cpuset.cpus.effective, so take the lowest from the cgroup up to the root
@@ -120,9 +119,9 @@ for rel in %s; do
     done
 done
 `, strings.Join(quoted, " ")),
-		Superuser: true,
+		Superuser: !noRoot,
 	}
-	output, err := workflow.RunScript(myTarget, cgroupConfigScript, localTempDir, flagNoRoot)
+	output, err := workflow.RunScript(myTarget, cgroupConfigScript, localTempDir, noRoot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cgroup configuration: %v", err)
 	}

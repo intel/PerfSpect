@@ -880,3 +880,8 @@ func HasLineIgnoreCase(text string, str string) bool {
 	}
 	return false
 }
+
+// ShellSingleQuote wraps s in single quotes for POSIX shells, escaping any embedded single quotes.
+func ShellSingleQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}

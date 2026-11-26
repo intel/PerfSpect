@@ -6,6 +6,8 @@ package metrics
 import (
 	"fmt"
 	"strings"
+
+	"perfspect/internal/util"
 )
 
 // getPerfCommand is responsible for assembling the command that will be
@@ -68,7 +70,7 @@ func getPerfCommandArgs(pids []string, cgroups []string, timeout int, eventGroup
 	case scopeProcess:
 		args = append(args, "-p", strings.Join(pids, ",")) // collect only for these processes
 	case scopeCgroup:
-		args = append(args, "--for-each-cgroup", strings.Join(cgroups, ",")) // collect only for these cgroups
+		args = append(args, "--for-each-cgroup", util.ShellSingleQuote(strings.Join(cgroups, ","))) // collect only for these cgroups
 	}
 	// add event groups
 	for _, group := range eventGroups {

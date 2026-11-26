@@ -883,3 +883,25 @@ func TestHasLineIgnoreCase(t *testing.T) {
 		}
 	}
 }
+
+func TestShellSingleQuote(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{name: "empty", input: "", expected: "''"},
+		{name: "plain path", input: "/usr/bin/docker", expected: "'/usr/bin/docker'"},
+		{name: "spaces", input: "/path/with spaces/foo", expected: "'/path/with spaces/foo'"},
+		{name: "single quote", input: "a'b", expected: `'a'\''b'`},
+		{name: "only single quotes", input: "'''", expected: `''\'''\'''\'''`},
+		{name: "shell metacharacters", input: `$HOME "hi" $(id) ` + "`pwd`", expected: `'$HOME "hi" $(id) ` + "`pwd`'"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ShellSingleQuote(tt.input); got != tt.expected {
+				t.Errorf("ShellSingleQuote(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}

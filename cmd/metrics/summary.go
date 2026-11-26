@@ -427,7 +427,8 @@ func (mc MetricCollection) addGroupTemplateValues(templateVals map[string]string
 	templateVals["GROUPS"] = "[]"
 	templateVals["GROUPMEANS"] = "[]"
 	templateVals["GROUPCONFIGS"] = "[]"
-	if len(mc) < 2 {
+	isSingleCgroup := len(mc) == 1 && mc[0].groupByField == "CID" && len(metadata.CgroupConfigs) > 0
+	if len(mc) < 2 && !isSingleCgroup {
 		return nil
 	}
 	// all groups need the same metrics in the same order to line up with the table's names

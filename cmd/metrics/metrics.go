@@ -219,36 +219,39 @@ const (
 var formatOptions = []string{formatTxt, formatCSV, formatJSON, formatWide}
 
 func init() {
-	Cmd.Flags().IntVar(&flagDuration, flagDurationName, 0, "")
-	Cmd.Flags().StringVar(&flagScope, flagScopeName, scopeSystem, "")
-	Cmd.Flags().StringSliceVar(&flagPidList, flagPidListName, []string{}, "")
-	Cmd.Flags().StringSliceVar(&flagCidList, flagCidListName, []string{}, "")
-	Cmd.Flags().StringVar(&flagFilter, flagFilterName, "", "")
-	Cmd.Flags().IntVar(&flagCount, flagCountName, 5, "")
-	Cmd.Flags().IntVar(&flagRefresh, flagRefreshName, 30, "")
-	Cmd.Flags().StringVar(&flagCpuRange, flagCpuRangeName, "", "")
-
-	Cmd.Flags().StringVar(&flagGranularity, flagGranularityName, granularitySystem, "")
-	Cmd.Flags().StringSliceVar(&flagOutputFormat, flagOutputFormatName, []string{formatCSV}, "")
-	Cmd.Flags().BoolVar(&flagLive, flagLiveName, false, "")
-	Cmd.Flags().Float64Var(&flagTransactionRate, flagTransactionRateName, 0, "")
-
-	Cmd.Flags().BoolVar(&flagShowMetricNames, flagShowMetricNamesName, false, "")
-	Cmd.Flags().StringSliceVar(&flagMetricsList, flagMetricsListName, []string{}, "")
-	Cmd.Flags().StringVar(&flagEventFilePath, flagEventFilePathName, "", "")
-	Cmd.Flags().StringVar(&flagMetricFilePath, flagMetricFilePathName, "", "")
-	Cmd.Flags().IntVar(&flagPerfPrintInterval, flagPerfPrintIntervalName, 5, "")
-	Cmd.Flags().IntVar(&flagPerfMuxInterval, flagPerfMuxIntervalName, 125, "")
-	Cmd.Flags().BoolVar(&flagNoRoot, flagNoRootName, false, "")
-	Cmd.Flags().BoolVar(&flagWriteEventsToFile, flagWriteEventsToFileName, false, "")
-	Cmd.Flags().StringVar(&flagInput, flagInputName, "", "")
-	Cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
-	Cmd.Flags().BoolVar(&flagPrometheusServer, flagPrometheusServerName, false, "")
-	Cmd.Flags().StringVar(&flagPrometheusServerAddr, flagPrometheusServerAddrName, ":9090", "")
-
-	workflow.AddTargetFlags(Cmd)
-
+	registerMetricsFlags(Cmd)
 	Cmd.SetUsageFunc(usageFunc)
+}
+
+func registerMetricsFlags(cmd *cobra.Command) {
+	cmd.Flags().IntVar(&flagDuration, flagDurationName, 0, "")
+	cmd.Flags().StringVar(&flagScope, flagScopeName, scopeSystem, "")
+	cmd.Flags().StringSliceVar(&flagPidList, flagPidListName, []string{}, "")
+	cmd.Flags().StringSliceVar(&flagCidList, flagCidListName, []string{}, "")
+	cmd.Flags().StringVar(&flagFilter, flagFilterName, "", "")
+	cmd.Flags().IntVar(&flagCount, flagCountName, 5, "")
+	cmd.Flags().IntVar(&flagRefresh, flagRefreshName, 30, "")
+	cmd.Flags().StringVar(&flagCpuRange, flagCpuRangeName, "", "")
+
+	cmd.Flags().StringVar(&flagGranularity, flagGranularityName, granularitySystem, "")
+	cmd.Flags().StringSliceVar(&flagOutputFormat, flagOutputFormatName, []string{formatCSV}, "")
+	cmd.Flags().BoolVar(&flagLive, flagLiveName, false, "")
+	cmd.Flags().Float64Var(&flagTransactionRate, flagTransactionRateName, 0, "")
+
+	cmd.Flags().BoolVar(&flagShowMetricNames, flagShowMetricNamesName, false, "")
+	cmd.Flags().StringSliceVar(&flagMetricsList, flagMetricsListName, []string{}, "")
+	cmd.Flags().StringVar(&flagEventFilePath, flagEventFilePathName, "", "")
+	cmd.Flags().StringVar(&flagMetricFilePath, flagMetricFilePathName, "", "")
+	cmd.Flags().IntVar(&flagPerfPrintInterval, flagPerfPrintIntervalName, 5, "")
+	cmd.Flags().IntVar(&flagPerfMuxInterval, flagPerfMuxIntervalName, 125, "")
+	cmd.Flags().BoolVar(&flagNoRoot, flagNoRootName, false, "")
+	cmd.Flags().BoolVar(&flagWriteEventsToFile, flagWriteEventsToFileName, false, "")
+	cmd.Flags().StringVar(&flagInput, flagInputName, "", "")
+	cmd.Flags().BoolVar(&flagNoSystemSummary, flagNoSystemSummaryName, false, "")
+	cmd.Flags().BoolVar(&flagPrometheusServer, flagPrometheusServerName, false, "")
+	cmd.Flags().StringVar(&flagPrometheusServerAddr, flagPrometheusServerAddrName, ":9090", "")
+
+	workflow.AddTargetFlags(cmd)
 }
 
 func usageFunc(cmd *cobra.Command) error {
@@ -510,12 +513,12 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		if flagDuration > 0 {
 			return workflow.FlagValidationError(cmd, "cannot specify refresh when duration is set")
 		}
-		// if refresh is less than 1, error
+		// if refresh is less than 0, error
 		if flagRefresh < 0 {
 			return workflow.FlagValidationError(cmd, "refresh must be greater than or equal to 0")
 		}
 		// if refresh is less than perf print interval, error
-		if flagRefresh < flagPerfPrintInterval {
+		if flagRefresh != 0 && flagRefresh < flagPerfPrintInterval {
 			return workflow.FlagValidationError(cmd, fmt.Sprintf("refresh must be greater than or equal to the event collection interval (%d)", flagPerfPrintInterval))
 		}
 	}
@@ -791,12 +794,32 @@ func getLoaderConfig(loader Loader, selectedMetrics []string, metadata Metadata,
 	return loaderConfig
 }
 
-func processRawData(localOutputDir string) error {
+func resolveRawReplayFlags(metadata Metadata, scopeChanged bool, currentScope string, granularityChanged bool, currentGranularity string) (scope string, granularity string) {
+	scope = currentScope
+	if !scopeChanged {
+		switch {
+		case metadata.Scope != "":
+			scope = metadata.Scope
+		case len(metadata.CgroupConfigs) > 0:
+			scope = scopeCgroup
+		}
+	}
+	granularity = currentGranularity
+	if !granularityChanged && metadata.Granularity != "" {
+		granularity = metadata.Granularity
+	}
+	return scope, granularity
+}
+
+func processRawData(cmd *cobra.Command, localOutputDir string) error {
 	metadata, eventsFile, err := readRawData(flagInput)
 	if err != nil {
 		return err
 	}
 	defer eventsFile.Close()
+	scopeChanged := cmd != nil && cmd.Flags().Changed(flagScopeName)
+	granularityChanged := cmd != nil && cmd.Flags().Changed(flagGranularityName)
+	flagScope, flagGranularity = resolveRawReplayFlags(metadata, scopeChanged, flagScope, granularityChanged, flagGranularity)
 	// load metric and event group definitions
 	loader, err := NewLoader(metadata.Microarchitecture, flagMetricFilePath != "" && flagEventFilePath != "")
 	if err != nil {
@@ -863,7 +886,7 @@ func runCmd(cmd *cobra.Command, args []string) error {
 	// short circuit when --input flag is set
 	if flagInput != "" {
 		// skip data collection and use raw data for reports
-		err := processRawData(localOutputDir)
+		err := processRawData(cmd, localOutputDir)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			slog.Error(err.Error())
@@ -1232,6 +1255,8 @@ func prepareMetrics(targetContext *targetContext, localTempDir string, channelEr
 	}
 	// set the collection interval before loading metrics so that metric expressions using duration_time are compiled with the correct value
 	targetContext.metadata.CollectionInterval = time.Duration(flagPerfPrintInterval) * time.Second
+	targetContext.metadata.Scope = flagScope
+	targetContext.metadata.Granularity = flagGranularity
 	slog.Debug("metadata: " + targetContext.metadata.String())
 	if !targetContext.metadata.SupportsInstructions {
 		slog.Error("Target does not support instructions event collection", slog.String("target", myTarget.GetName()))
@@ -1307,9 +1332,9 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 	if targetContext.err != nil {
 		return
 	}
-	// only refresh if duration is 0, i.e., no timeout and pids/cids are not specified
+	// only refresh if duration is 0, i.e., no timeout, refresh > 0, and pids/cids are not specified
 	var needsRefresh bool
-	if flagDuration == 0 {
+	if flagDuration == 0 && flagRefresh > 0 {
 		switch flagScope {
 		case scopeProcess:
 			if len(flagPidList) == 0 {
@@ -1366,7 +1391,7 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 			}
 			// the cgroups' static configuration, for context in the report. The monitored
 			// set can change on refresh, so accumulate across refreshes.
-			cgroupConfigs, configErr := GetCgroupConfigs(myTarget, cids, localTempDir)
+			cgroupConfigs, configErr := GetCgroupConfigs(myTarget, cids, localTempDir, flagNoRoot)
 			if configErr != nil {
 				// supplementary information, so don't fail the collection
 				slog.Warn("failed to get cgroup configuration", slog.String("error", configErr.Error()))
@@ -1420,11 +1445,11 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, perfComma
 	slog.Debug("running perf stat", slog.String("command", perfCommand))
 	perfStatScript := script.ScriptDefinition{
 		Name:           "perf stat",
-		ScriptTemplate: perfCommand,
+		ScriptTemplate: "exec " + perfCommand,
 		Superuser:      !noRoot,
 	}
 	// start goroutine to run perf, output will be streamed back in provided channels
-	go workflow.RunScriptStream(myTarget, perfStatScript, localTempDir, stdoutChannel, stderrChannel, exitcodeChannel, scriptErrorChannel, cmdChannel, flagNoRoot)
+	go workflow.RunScriptStream(myTarget, perfStatScript, localTempDir, stdoutChannel, stderrChannel, exitcodeChannel, scriptErrorChannel, cmdChannel, noRoot)
 	// Drain stdout to avoid blocking if the workload writes to stdout.
 	// perf stat emits event lines on stderr; stdout is not used by our pipeline.
 	go func() {
@@ -1432,13 +1457,34 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, perfComma
 			// discard
 		}
 	}()
+	var localCmd *exec.Cmd
 	select {
-	case <-cmdChannel:
+	case localCmd = <-cmdChannel:
 	case err := <-scriptErrorChannel:
 		if err != nil {
 			errorChannel <- err // error running the script
 			return
 		}
+	}
+	var stopOnce sync.Once
+	stopIteration := func() {
+		stopOnce.Do(func() {
+			if localCmd == nil || localCmd.Process == nil {
+				return
+			}
+			if children, err := util.GetChildren(localCmd.Process.Pid); err == nil {
+				for _, childPID := range children {
+					if err := util.SignalProcess(childPID, syscall.SIGKILL); err != nil {
+						slog.Debug("failed to kill child process", slog.Int("pid", childPID), slog.String("error", err.Error()))
+					}
+				}
+			} else {
+				slog.Debug("failed to get child processes", slog.Int("pid", localCmd.Process.Pid), slog.String("error", err.Error()))
+			}
+			if err := localCmd.Process.Kill(); err != nil {
+				slog.Debug("failed to kill iteration command", slog.Int("pid", localCmd.Process.Pid), slog.String("error", err.Error()))
+			}
+		})
 	}
 	// must manually terminate perf in cgroup scope when a timeout is specified and/or need to refresh cgroups
 	startPerfTimestamp := time.Now()
@@ -1475,6 +1521,7 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, perfComma
 		frameChannel,
 		donePerfProcessingChannel,
 		signalMgr,
+		stopIteration,
 	)
 
 	// receive perf output and batch by interval
@@ -1541,9 +1588,9 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, perfComma
 // processPerfOutput processes perf output in a goroutine and supports cancellation via context.
 // This function must not return until the context is cancelled.
 // When context is cancelled, this function will close the done channel to signal that processing is complete.
-// there are two scenarios where this function will trigger a context cancellation by signalling the localCommand to terminate:
-//  1. when the number of consecutive errors processing events exceeds the maximum (2)
-//  2. when the cgroup refresh timeout is reached (in scope==cgroup mode)
+// there are two scenarios where this function will terminate perf:
+//  1. when the number of consecutive errors processing events exceeds the maximum (2), triggering a full shutdown
+//  2. when the cgroup refresh timeout is reached (in cgroup scope), stopping only this iteration's perf command
 func processPerfOutput(
 	ctx context.Context,
 	myTarget target.Target,
@@ -1558,6 +1605,7 @@ func processPerfOutput(
 	frameChannel chan []MetricFrame,
 	doneChannel chan struct{},
 	signalMgr *signalManager,
+	stopIteration func(),
 ) {
 	defer close(doneChannel) // close the done channel when the function returns to signal completion
 	var frameTimestamp float64
@@ -1608,7 +1656,9 @@ func processPerfOutput(
 		if flagScope == scopeCgroup && cgroupTimeout != 0 {
 			if int(time.Since(startPerfTimestamp).Seconds()) >= cgroupTimeout {
 				slog.Debug("cgroup refresh timeout reached")
-				signalMgr.triggerShutdown()
+				if stopIteration != nil {
+					stopIteration()
+				}
 			}
 		}
 	}
