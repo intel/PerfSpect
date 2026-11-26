@@ -402,6 +402,8 @@ func TestGetHTMLRendersContainerNames(t *testing.T) {
 		assert.Contains(t, out, `const group_by_field = "CONTAINER"`)
 		assert.Contains(t, out, `"nginx","1","system.slice/docker-aaa.scope"`)
 		assert.Contains(t, out, `"pod-1/webapp","1","kubepods.slice/pod-1/cri-containerd-bbb.scope"`)
+		assert.Contains(t, out, `const group_meta = [`)
+		assert.Contains(t, out, `"podName":"pod-1"`)
 		assert.Contains(t, out, `"64.0 GiB"`)
 		assert.Contains(t, out, `"32.0 GiB"`)
 	})
@@ -420,6 +422,7 @@ func TestGetHTMLRendersContainerNames(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, out, `const group_by_field = "CONTAINER"`)
 		assert.Contains(t, out, `"nginx","1","system.slice/docker-aaa.scope"`)
+		assert.Contains(t, out, `const group_meta = [{"displayName":"nginx","name":"nginx","cgroupPath":"system.slice/docker-aaa.scope"}]`)
 		assert.Contains(t, out, `"64.0 GiB"`)
 	})
 }

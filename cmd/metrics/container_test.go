@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -470,6 +471,120 @@ func TestAssignContainerDisplayNamesDisambiguation(t *testing.T) {
 		assert.Equal(t, "cache (8888bbbbbbbb)", assigned[2].DisplayName)
 		assert.Equal(t, "prod/api-0/api", assigned[3].DisplayName)
 	})
+}
+
+func TestInferKubernetesWorkload(t *testing.T) {
+	tests := []struct {
+		podName  string
+		expected string
+	}{
+		{podName: "webapp-788bd774ff-5spvq", expected: "webapp"},
+		{podName: "api-5f8b9-x2k4p", expected: "api"},
+		{podName: "my-web-api-6b9f8c7d4b-k9m2p", expected: "my-web-api"},
+		{podName: "redis-0", expected: "redis"},
+		{podName: "kube-state-metrics-12", expected: "kube-state-metrics"},
+		{podName: "fluentbit-x7k2p", expected: "fluentbit"},
+		{podName: "pdcsi-node-xct24", expected: "pdcsi-node"},
+		{podName: "nginx-pod", expected: "nginx-pod"},
+		{podName: "", expected: ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.podName, func(t *testing.T) {
+			assert.Equal(t, tc.expected, inferKubernetesWorkload(tc.podName))
+		})
+	}
+}
+
+func TestShortenKubernetesPodName(t *testing.T) {
+	tests := []struct {
+		podName  string
+		workload string
+		expected string
+	}{
+		{podName: "webapp-788bd774ff-5spvq", workload: "webapp", expected: "…-5spvq"},
+		{podName: "api-5f8b9-x2k4p", workload: "api", expected: "…-x2k4p"},
+		{podName: "fluentbit-x7k2p", workload: "fluentbit", expected: "…-x7k2p"},
+		{podName: "redis-0", workload: "redis", expected: "redis-0"},
+		{podName: "app-12345", workload: "app", expected: "app-12345"},
+		{podName: "nginx-pod", workload: "nginx-pod", expected: "nginx-pod"},
+		{podName: "very-long-bare-pod-name-0", workload: "very-long-bare-pod-name", expected: "very-long-…d-name-0"},
+		{podName: "αβγδεζηθικλμνξοπρστυφχψω", workload: "αβγδεζηθικλμνξοπρστυφχψω", expected: "αβγδεζηθικ…ρστυφχψω"},
+		{podName: "", workload: "", expected: ""},
+	}
+	for _, tc := range tests {
+		t.Run(tc.podName, func(t *testing.T) {
+			got := shortenKubernetesPodName(tc.podName, tc.workload)
+			assert.True(t, utf8.ValidString(got))
+			assert.Equal(t, tc.expected, got)
+		})
+	}
+}
+
+func TestInferContainerMetadataFromDisplayName(t *testing.T) {
+	t.Run("three-part namespace/pod/container", func(t *testing.T) {
+		cm := inferContainerMetadataFromDisplayName("prod/checkout-0/webapp", "kubepods.slice/p1/c1")
+		assert.Equal(t, ContainerMetadata{
+			DisplayName: "prod/checkout-0/webapp",
+			Name:        "webapp",
+			PodName:     "checkout-0",
+			ShortPod:    "checkout-0",
+			Namespace:   "prod",
+			Workload:    "checkout",
+			CgroupPath:  "kubepods.slice/p1/c1",
+		}, cm)
+	})
+
+	t.Run("two-part pod/container under kubepods", func(t *testing.T) {
+		cm := inferContainerMetadataFromDisplayName("webapp-788bd774ff-5spvq/webapp", "kubepods.slice/p2/c2")
+		assert.Equal(t, ContainerMetadata{
+			DisplayName: "webapp-788bd774ff-5spvq/webapp",
+			Name:        "webapp",
+			PodName:     "webapp-788bd774ff-5spvq",
+			ShortPod:    "…-5spvq",
+			Namespace:   "default",
+			Workload:    "webapp",
+			CgroupPath:  "kubepods.slice/p2/c2",
+		}, cm)
+	})
+
+	t.Run("one-part bare name leaves PodName empty even under kubepods", func(t *testing.T) {
+		cm := inferContainerMetadataFromDisplayName("nginx", "kubepods.slice/p3/c3")
+		assert.Equal(t, ContainerMetadata{
+			DisplayName: "nginx",
+			Name:        "nginx",
+			CgroupPath:  "kubepods.slice/p3/c3",
+		}, cm)
+	})
+
+	hexID := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	for _, tc := range []struct {
+		name       string
+		cgroupPath string
+	}{
+		{
+			name:       "infers 64-char hex ID from cri-containerd scope leaf",
+			cgroupPath: "kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod123.slice/cri-containerd-" + hexID + ".scope",
+		},
+		{
+			name:       "infers 64-char hex ID from docker scope leaf",
+			cgroupPath: "system.slice/docker-" + hexID + ".scope",
+		},
+		{
+			name:       "infers 64-char hex ID from crio scope leaf",
+			cgroupPath: "kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod456.slice/crio-" + hexID + ".scope",
+		},
+		{
+			name:       "infers 64-char hex ID from bare hex leaf",
+			cgroupPath: "docker/" + hexID + "/",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cm := inferContainerMetadataFromDisplayName("prod/web-788bd774ff-5spvq/app", tc.cgroupPath)
+			assert.Equal(t, hexID, cm.ID)
+			assert.Equal(t, "prod", cm.Namespace)
+			assert.Equal(t, "web", cm.Workload)
+		})
+	}
 }
 
 func TestSelectTopContainersDeterministicAndCapped(t *testing.T) {

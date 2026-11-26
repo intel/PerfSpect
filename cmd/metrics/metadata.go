@@ -156,6 +156,19 @@ type ARMMetadata struct {
 	ARMCPUID string
 }
 
+// ContainerMetadata holds structured identity fields for a monitored container.
+type ContainerMetadata struct {
+	ID          string `json:"id,omitempty"`
+	DisplayName string `json:"displayName"`
+	Name        string `json:"name"`
+	PodName     string `json:"podName,omitempty"`
+	ShortPod    string `json:"shortPod,omitempty"`
+	Namespace   string `json:"namespace,omitempty"`
+	Workload    string `json:"workload,omitempty"`
+	Runtime     string `json:"runtime,omitempty"`
+	CgroupPath  string `json:"cgroupPath,omitempty"`
+}
+
 // Metadata -- representation of the platform's state and capabilities
 type Metadata struct {
 	CommonMetadata
@@ -166,10 +179,11 @@ type Metadata struct {
 	PerfSpectVersion    string
 	WithWorkload        bool // true if metrics were collected with a user-provided workload application
 	CollectionInterval  time.Duration
-	Scope               string            `json:"scope,omitempty"`
-	Granularity         string            `json:"granularity,omitempty"`
-	CgroupConfigs       []CgroupConfig    // static configuration of the monitored cgroups, when collecting at cgroup scope
-	ContainerNames      map[string]string `json:"containerNames,omitempty"` // cgroup path (no leading slash) -> resolved container display name
+	Scope               string                       `json:"scope,omitempty"`
+	Granularity         string                       `json:"granularity,omitempty"`
+	CgroupConfigs       []CgroupConfig               // static configuration of the monitored cgroups, when collecting at cgroup scope
+	ContainerNames      map[string]string            `json:"containerNames,omitempty"` // cgroup path (no leading slash) -> resolved container display name
+	ContainerInfo       map[string]ContainerMetadata `json:"containerInfo,omitempty"`  // container display name -> structured container identity
 }
 
 // MetadataCollector defines the interface for architecture-specific metadata collection.

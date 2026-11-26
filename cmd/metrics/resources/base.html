@@ -149,8 +149,730 @@
       );
     }
 
+    function getGroupLabels(groupByField) {
+      return {
+        SKT: { tab: "Per-Socket Metrics", singular: "socket", plural: "sockets" },
+        CPU: { tab: "Per-CPU Metrics", singular: "CPU", plural: "CPUs" },
+        CID: { tab: "Per-Cgroup Metrics", singular: "cgroup", plural: "cgroups" },
+        CONTAINER: { tab: "Per-Container Metrics", singular: "container", plural: "containers" },
+      }[groupByField] || { tab: "Per-Group Metrics", singular: "group", plural: "groups" };
+    }
+
+    // MetricName component - the name, preceded by an info button with its description
+    // and, for TMA metrics, indentation showing the metric's level
+    function MetricName({ name, level, description, infoTooltipProps }) {
+      const indentationLevel = level > 1 ? level - 1 : 0;
+      const hasDesc = Boolean(description && Object.prototype.hasOwnProperty.call(description, name));
+      return (
+        <React.Fragment>
+          <Tooltip
+            title={hasDesc ? description[name] : ""}
+            componentsProps={infoTooltipProps}
+          >
+            <IconButton sx={{ padding: "0 8px 0 0" }} disabled={!hasDesc}>
+              <Icon>info</Icon>
+            </IconButton>
+          </Tooltip>
+          {indentationLevel > 0 &&
+            <span style={{
+              paddingLeft: `${indentationLevel * 16}px`,
+              borderLeft: '1px dotted #aaa',
+              marginLeft: '4px',
+            }}>
+              <Icon
+                sx={{
+                  fontSize: '0.8rem',
+                  verticalAlign: 'middle',
+                  color: '#666',
+                  marginRight: '4px'
+                }}
+              >
+                subdirectory_arrow_right
+              </Icon>
+            </span>
+          }
+          {name}
+        </React.Fragment>
+      );
+    }
+
+    // Group values can be long, e.g., cgroup paths; the full value is in the tooltip.
+    // Container display names preserve namespace/pod/name identity, so keep the full string.
+    function shortGroupName(groupByField, value) {
+      if (groupByField === "CONTAINER") {
+        return value.length > 28 ? value.slice(0, 25) + "..." : value;
+      }
+      const leaf = value.split("/").filter(Boolean).pop() || value;
+      return leaf.length > 28 ? leaf.slice(0, 25) + "..." : leaf;
+    }
+
+    function orderContainerGroupIndices(groups, groupMeta, hasPodInfo) {
+      const orderedIndices = [];
+      if (!hasPodInfo) {
+        for (let i = 0; i < groups.length; i++) {
+          orderedIndices.push(i);
+        }
+        return orderedIndices;
+      }
+      // Group contiguously by namespace first, then by workload within each namespace,
+      // preserving first-seen order at each level.
+      const nsOrder = [];
+      const wlOrderByNs = {};
+      const indicesByWl = {};
+      for (let i = 0; i < groups.length; i++) {
+        const m = groupMeta[i] || {};
+        const nsKey = m.podName ? ("ns|" + (m.namespace || "")) : "__standalone__";
+        const wlKey = m.podName
+          ? ((m.namespace || "") + "|" + (m.workload || m.podName))
+          : ("__standalone__|" + String(i));
+        if (!Object.prototype.hasOwnProperty.call(wlOrderByNs, nsKey)) {
+          wlOrderByNs[nsKey] = [];
+          nsOrder.push(nsKey);
+        }
+        if (!Object.prototype.hasOwnProperty.call(indicesByWl, wlKey)) {
+          indicesByWl[wlKey] = [];
+          wlOrderByNs[nsKey].push(wlKey);
+        }
+        indicesByWl[wlKey].push(i);
+      }
+      nsOrder.forEach(function(nsKey) {
+        wlOrderByNs[nsKey].forEach(function(wlKey) {
+          indicesByWl[wlKey].forEach(function(idx) {
+            orderedIndices.push(idx);
+          });
+        });
+      });
+      return orderedIndices;
+    }
+
+    function buildContainerRollupGroups(orderedIndices, groups, groupMeta) {
+      const rollupGroups = [];
+      const rollupByKey = {};
+      orderedIndices.forEach(function(idx) {
+        const m = groupMeta[idx] || {};
+        const cName = m.name || groups[idx][0];
+        const nsKey = m.podName ? ("ns|" + (m.namespace || "")) : "__standalone__";
+        const wlKey = m.podName
+          ? ((m.namespace || "") + "|" + (m.workload || m.podName))
+          : ("__standalone__|" + String(idx));
+        const rk = m.podName
+          ? ((m.namespace || "") + "|" + (m.workload || m.podName || cName) + "|" + cName)
+          : ("__standalone__|" + String(idx));
+        if (!Object.prototype.hasOwnProperty.call(rollupByKey, rk)) {
+          const entry = {
+            key: rk,
+            nsKey: nsKey,
+            wlKey: wlKey,
+            name: cName,
+            namespace: m.namespace || "",
+            workload: m.workload || m.podName || cName,
+            runtime: m.runtime || "",
+            hasPod: Boolean(m.podName),
+            memberIndices: [],
+          };
+          rollupByKey[rk] = entry;
+          rollupGroups.push(entry);
+        }
+        rollupByKey[rk].memberIndices.push(idx);
+      });
+      return rollupGroups;
+    }
+
+    function buildGroupDisplayColumns(groupByField, groups, groupMeta, orderedIndices, rollupGroups, hasPodInfo, isGroupedView) {
+      if (!hasPodInfo) {
+        return orderedIndices.map(function(idx) {
+          const g = groups[idx];
+          const value = g[0];
+          const sampleCount = g[1];
+          const cgroupPath = g[2];
+          return {
+            key: value,
+            nsKey: "",
+            nsLabel: "",
+            wlKey: "",
+            wlLabel: "",
+            isNsStart: false,
+            isSpanStart: false,
+            line1: shortGroupName(groupByField, value),
+            line2: "",
+            tooltip: cgroupPath
+              ? `${value} (${cgroupPath}, ${sampleCount} sample${sampleCount === "1" ? "" : "s"})`
+              : `${value} (${sampleCount} sample${sampleCount === "1" ? "" : "s"})`,
+            memberIndices: [idx],
+          };
+        });
+      }
+      if (isGroupedView) {
+        return rollupGroups.map(function(rg) {
+          const podCount = rg.memberIndices.length;
+          let totalSamples = 0;
+          const memberPods = [];
+          rg.memberIndices.forEach(function(idx) {
+            const s = Number(groups[idx][1]);
+            if (Number.isFinite(s)) {
+              totalSamples += s;
+            }
+            const mm = groupMeta[idx] || {};
+            memberPods.push(mm.podName || groups[idx][0]);
+          });
+          const nsLabel = rg.hasPod ? (rg.namespace || "—") : "standalone";
+          const wlLabel = rg.hasPod ? rg.workload : (rg.runtime || "standalone");
+          let line2 = "";
+          let tooltip = "";
+          if (podCount === 1) {
+            const idx = rg.memberIndices[0];
+            const g = groups[idx];
+            const mm = groupMeta[idx] || {};
+            const shortPod = mm.shortPod || mm.podName || "";
+            const cgroupPath = g[2] || mm.cgroupPath || "";
+            if (mm.podName) {
+              line2 = (shortPod && shortPod !== rg.workload) ? shortPod : "";
+              const fullName = mm.namespace ? `${mm.namespace}/${mm.podName}/${rg.name}` : `${mm.podName}/${rg.name}`;
+              tooltip = cgroupPath
+                ? `${fullName} (${cgroupPath}, ${g[1]} sample${g[1] === "1" ? "" : "s"})`
+                : `${fullName} (${g[1]} sample${g[1] === "1" ? "" : "s"})`;
+            } else {
+              line2 = "";
+              tooltip = cgroupPath
+                ? `${g[0]} (${cgroupPath}, ${g[1]} sample${g[1] === "1" ? "" : "s"})`
+                : `${g[0]} (${g[1]} sample${g[1] === "1" ? "" : "s"})`;
+            }
+          } else {
+            line2 = `${podCount} pods`;
+            const prefix = rg.namespace ? `${rg.namespace}/${rg.workload}/${rg.name}` : `${rg.workload}/${rg.name}`;
+            tooltip = `${prefix} (${podCount} pods: ${memberPods.join(", ")}; ${totalSamples} total sample${totalSamples === 1 ? "" : "s"})`;
+          }
+          return {
+            key: `grp-${rg.key}`,
+            nsKey: rg.nsKey,
+            nsLabel: nsLabel,
+            wlKey: rg.wlKey,
+            wlLabel: wlLabel,
+            isNsStart: false,
+            isSpanStart: false,
+            line1: rg.name,
+            line2: line2,
+            tooltip: tooltip,
+            memberIndices: rg.memberIndices,
+          };
+        });
+      }
+      return orderedIndices.map(function(idx) {
+        const g = groups[idx];
+        const value = g[0];
+        const sampleCount = g[1];
+        const mm = groupMeta[idx] || {};
+        const cName = mm.name || value;
+        const podName = mm.podName || "";
+        const shortPod = mm.shortPod || podName;
+        const ns = mm.namespace || "";
+        const wl = mm.workload || podName || cName;
+        const cgroupPath = g[2] || mm.cgroupPath || "";
+        const nsKey = podName ? ("ns|" + ns) : "__standalone__";
+        const nsLabel = podName ? (ns || "—") : "standalone";
+        const wlLabel = podName ? wl : (mm.runtime || "standalone");
+        const line2 = podName
+          ? ((shortPod && shortPod !== wl) ? shortPod : "")
+          : "";
+        const fullName = podName
+          ? (ns ? `${ns}/${podName}/${cName}` : `${podName}/${cName}`)
+          : value;
+        const tooltip = cgroupPath
+          ? `${fullName} (${cgroupPath}, ${sampleCount} sample${sampleCount === "1" ? "" : "s"})`
+          : `${fullName} (${sampleCount} sample${sampleCount === "1" ? "" : "s"})`;
+        return {
+          key: `ind-${idx}-${value}`,
+          nsKey: nsKey,
+          nsLabel: nsLabel,
+          wlKey: podName ? ((ns || "") + "|" + wl) : ("__standalone__|" + String(idx)),
+          wlLabel: wlLabel,
+          isNsStart: false,
+          isSpanStart: false,
+          line1: cName,
+          line2: line2,
+          tooltip: tooltip,
+          memberIndices: [idx],
+        };
+      });
+    }
+
+    function buildGroupHeaderSpans(displayColumns, hasPodInfo) {
+      const nsSpans = [];
+      const wlSpans = [];
+      if (!hasPodInfo) {
+        return { nsSpans: nsSpans, wlSpans: wlSpans };
+      }
+      displayColumns.forEach(function(col, idx) {
+        const lastNs = nsSpans.length > 0 ? nsSpans[nsSpans.length - 1] : null;
+        if (lastNs && lastNs.nsKey === col.nsKey) {
+          lastNs.count += 1;
+        } else {
+          col.isNsStart = true;
+          nsSpans.push({
+            nsKey: col.nsKey,
+            label: col.nsLabel,
+            count: 1,
+            key: `ns-${idx}-${col.nsKey}`,
+          });
+        }
+        const lastWl = wlSpans.length > 0 ? wlSpans[wlSpans.length - 1] : null;
+        if (lastWl && lastWl.wlKey === col.wlKey) {
+          lastWl.count += 1;
+        } else {
+          col.isSpanStart = true;
+          wlSpans.push({
+            wlKey: col.wlKey,
+            label: col.wlLabel,
+            isNsStart: col.isNsStart,
+            count: 1,
+            key: `wl-${idx}-${col.wlKey}`,
+          });
+        }
+      });
+      return { nsSpans: nsSpans, wlSpans: wlSpans };
+    }
+
+    function formatGroupConfigCell(row, col) {
+      if (col.memberIndices.length === 1) {
+        const v = row[col.memberIndices[0] + 2];
+        return v === "" || v === undefined ? "—" : v;
+      }
+      const distinct = [];
+      const seen = {};
+      col.memberIndices.forEach(function(idx) {
+        const v = row[idx + 2];
+        if (v === "" || v === undefined) {
+          return;
+        }
+        if (!Object.prototype.hasOwnProperty.call(seen, v)) {
+          seen[v] = true;
+          distinct.push(v);
+        }
+      });
+      if (distinct.length === 0) {
+        return "—";
+      }
+      if (distinct.length === 1) {
+        return distinct[0];
+      }
+      if (distinct.length <= 2) {
+        return distinct.join(", ");
+      }
+      return "mixed";
+    }
+
+    function formatGroupMetricCell(row, col, groups) {
+      if (col.memberIndices.length === 1) {
+        const v = row[col.memberIndices[0] + 2];
+        if (v === "" || v === undefined || !Number.isFinite(Number(v))) {
+          return "—";
+        }
+        return Number(v).toFixed(4);
+      }
+      let weightedSum = 0;
+      let totalWeight = 0;
+      col.memberIndices.forEach(function(idx) {
+        const raw = row[idx + 2];
+        if (raw === "" || raw === undefined) {
+          return;
+        }
+        const val = Number(raw);
+        if (!Number.isFinite(val)) {
+          return;
+        }
+        const rawCount = Number(groups[idx][1]);
+        const weight = Number.isFinite(rawCount) && rawCount > 0 ? rawCount : 1;
+        weightedSum += val * weight;
+        totalWeight += weight;
+      });
+      if (totalWeight === 0) {
+        return "—";
+      }
+      return (weightedSum / totalWeight).toFixed(4);
+    }
+
+    // GroupMeansTable component - one row per metric, one column per group, e.g., per
+    // cgroup or container, holding that group's mean over the collection
+    function GroupMeansTable({
+      groupByField,
+      groups,
+      groupMeans,
+      groupConfigs,
+      groupMeta,
+      description,
+      containerViewMode,
+      setContainerViewMode,
+      infoTooltipProps,
+    }) {
+      const nsRowRef = React.useRef(null);
+      const wlRowRef = React.useRef(null);
+      const [nsRowHeight, setNsRowHeight] = React.useState(30);
+      const [wlRowHeight, setWlRowHeight] = React.useState(30);
+
+      const groupLabels = getGroupLabels(groupByField);
+      const isContainerMode = groupByField === "CONTAINER" && Array.isArray(groupMeta) && groupMeta.length === groups.length;
+      const hasPodInfo = isContainerMode && groupMeta.some(function(m) { return Boolean(m && m.podName); });
+      const hasNamespace = hasPodInfo && groupMeta.some(function(m) { return Boolean(m && m.namespace); });
+
+      const orderedIndices = orderContainerGroupIndices(groups, groupMeta, hasPodInfo);
+      const rollupGroups = hasPodInfo ? buildContainerRollupGroups(orderedIndices, groups, groupMeta) : [];
+      const showToggle = hasPodInfo && rollupGroups.length < groups.length;
+      const isGroupedView = showToggle && containerViewMode === "grouped";
+
+      React.useEffect(() => {
+        if (nsRowRef.current) {
+          const h = nsRowRef.current.getBoundingClientRect().height;
+          if (h > 0) {
+            setNsRowHeight(h);
+          }
+        }
+        if (wlRowRef.current) {
+          const h = wlRowRef.current.getBoundingClientRect().height;
+          if (h > 0) {
+            setWlRowHeight(h);
+          }
+        }
+      }, [hasPodInfo, hasNamespace, isGroupedView, groups.length]);
+
+      const displayColumns = buildGroupDisplayColumns(groupByField, groups, groupMeta, orderedIndices, rollupGroups, hasPodInfo, isGroupedView);
+      const headerSpans = buildGroupHeaderSpans(displayColumns, hasPodInfo);
+      const nsSpans = headerSpans.nsSpans;
+      const wlSpans = headerSpans.wlSpans;
+      const wlRowTop = hasNamespace ? nsRowHeight : 0;
+      const colRowTop = wlRowTop + wlRowHeight;
+
+      const captionText = isGroupedView
+        ? `Mean value of each metric (weighted average per container across member pods, weighted by sample count) for ${groups.length} containers into ${displayColumns.length} workload container group${displayColumns.length === 1 ? "" : "s"}. Hover over a column heading for member pods and cgroup details. A dash indicates that no valid samples were collected for the metric.`
+        : (groups.length === 1
+          ? `Mean value of each metric for the ${groupLabels.singular} monitored during the collection period. Hover over a column heading for its full name and the number of samples collected for it. A dash indicates that no valid samples were collected for the metric.`
+          : `Mean value of each metric for each of the ${groups.length} ${groupLabels.plural} monitored during the collection period. Hover over a column heading for its full name and the number of samples collected for it. A dash indicates that no valid samples were collected for the metric.`);
+
+      // keep the metric name visible while scrolling the group columns horizontally
+      const stickyCell = {
+        position: "sticky",
+        left: 0,
+        backgroundColor: "background.paper",
+      };
+      return (
+        <React.Fragment>
+          <Typography variant="body1" sx={{ paddingBottom: showToggle ? "12px" : "16px" }}>
+            {captionText}
+          </Typography>
+          {showToggle && (
+            <Box sx={{ paddingBottom: "12px" }}>
+              <ButtonGroup size="small" aria-label="Container grouping mode">
+                <Button
+                  variant={containerViewMode === "individual" ? "contained" : "outlined"}
+                  onClick={() => setContainerViewMode("individual")}
+                >
+                  {`Individual (${groups.length})`}
+                </Button>
+                <Button
+                  variant={containerViewMode === "grouped" ? "contained" : "outlined"}
+                  onClick={() => setContainerViewMode("grouped")}
+                >
+                  {`Grouped by Workload (${rollupGroups.length})`}
+                </Button>
+              </ButtonGroup>
+            </Box>
+          )}
+          <TableContainer component={Paper} sx={{ maxHeight: "80vh", overflow: "auto" }}>
+            <Table size="small" stickyHeader style={{ tableLayout: 'auto', width: "auto" }}>
+              <TableHead>
+                {hasPodInfo ? (
+                  <React.Fragment>
+                    {hasNamespace && (
+                      <TableRow ref={nsRowRef}>
+                        <TableCell
+                          sx={{
+                            ...stickyCell,
+                            top: 0,
+                            zIndex: 4,
+                            height: 30,
+                            boxSizing: "border-box",
+                            lineHeight: "18px",
+                            backgroundColor: "grey.200",
+                            fontWeight: 600,
+                            fontSize: "0.78rem",
+                            color: "text.secondary",
+                            py: 0.5,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Namespace
+                        </TableCell>
+                        {nsSpans.map((span, idx) => (
+                          <TableCell
+                            key={span.key}
+                            colSpan={span.count}
+                            align="center"
+                            sx={{
+                              top: 0,
+                              zIndex: 3,
+                              height: 30,
+                              boxSizing: "border-box",
+                              lineHeight: "18px",
+                              backgroundColor: "grey.200",
+                              borderLeft: idx > 0 ? "2px solid" : "1px solid",
+                              borderColor: "divider",
+                              fontWeight: 600,
+                              fontFamily: "Monospace",
+                              fontSize: "0.78rem",
+                              py: 0.5,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {span.count > 1 ? `${span.label} (${span.count})` : span.label}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    )}
+                    <TableRow ref={wlRowRef}>
+                      <TableCell
+                        sx={{
+                          ...stickyCell,
+                          top: wlRowTop,
+                          zIndex: 4,
+                          height: 30,
+                          boxSizing: "border-box",
+                          lineHeight: "18px",
+                          backgroundColor: "grey.100",
+                          fontWeight: 600,
+                          fontSize: "0.78rem",
+                          color: "text.secondary",
+                          py: 0.5,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Workload
+                      </TableCell>
+                      {wlSpans.map((span, idx) => (
+                        <TableCell
+                          key={span.key}
+                          colSpan={span.count}
+                          align="center"
+                          sx={{
+                            top: wlRowTop,
+                            zIndex: 3,
+                            height: 30,
+                            boxSizing: "border-box",
+                            lineHeight: "18px",
+                            backgroundColor: "grey.100",
+                            borderLeft: (span.isNsStart && idx > 0) ? "2px solid" : "1px solid",
+                            borderColor: "divider",
+                            fontWeight: 600,
+                            fontFamily: "Monospace",
+                            fontSize: "0.78rem",
+                            py: 0.5,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {span.count > 1 ? `${span.label} (${span.count})` : span.label}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                    <TableRow>
+                      <TableCell sx={{ ...stickyCell, top: colRowTop, zIndex: 4, verticalAlign: "bottom" }}>
+                        Metric
+                      </TableCell>
+                      {displayColumns.map((col, idx) => (
+                        <TableCell
+                          key={col.key}
+                          align="right"
+                          sx={{
+                            top: colRowTop,
+                            zIndex: 3,
+                            backgroundColor: "background.paper",
+                            borderLeft: (col.isNsStart && idx > 0) ? "2px solid" : (col.isSpanStart ? "1px solid" : undefined),
+                            borderColor: col.isSpanStart ? "divider" : undefined,
+                            verticalAlign: "bottom",
+                          }}
+                        >
+                          <Tooltip title={col.tooltip} componentsProps={infoTooltipProps}>
+                            <Box sx={{ display: "inline-block", textAlign: "right", cursor: "help" }}>
+                              <Box
+                                component="span"
+                                sx={{
+                                  display: "block",
+                                  fontFamily: "Monospace",
+                                  fontWeight: 600,
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {col.line1}
+                              </Box>
+                              {col.line2 !== "" && (
+                                <Box
+                                  component="span"
+                                  sx={{
+                                    display: "block",
+                                    fontFamily: "Monospace",
+                                    fontSize: "0.72rem",
+                                    color: "text.secondary",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {col.line2}
+                                </Box>
+                              )}
+                            </Box>
+                          </Tooltip>
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  </React.Fragment>
+                ) : (
+                  <TableRow>
+                    <TableCell sx={{ ...stickyCell, zIndex: 4 }}>Metric</TableCell>
+                    {displayColumns.map((col) => (
+                      <TableCell key={col.key} align="right">
+                        <Tooltip title={col.tooltip} componentsProps={infoTooltipProps}>
+                          <span style={{ fontFamily: 'Monospace', cursor: "help" }}>
+                            {col.line1}
+                          </span>
+                        </Tooltip>
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                )}
+              </TableHead>
+              <TableBody>
+                {/* configuration rows, pinned above the metrics. Settings, not
+                    measurements, so shaded and separated by a heavier bottom border. */}
+                {groupConfigs.map((row, rowIdx) => (
+                  <TableRow
+                    hover={true}
+                    key={`config-${row[0]}`}
+                    sx={{
+                      backgroundColor: "grey.100",
+                      ...(rowIdx === groupConfigs.length - 1 && {
+                        '& td, & th': { borderBottom: 2, borderBottomColor: "divider" },
+                      }),
+                    }}
+                  >
+                    <TableCell
+                      sx={{
+                        ...stickyCell,
+                        zIndex: 2,
+                        fontFamily: 'Monospace',
+                        backgroundColor: "grey.100",
+                      }}
+                      component="th"
+                      scope="row"
+                    >
+                      {row[0]}
+                      {/* the cgroup v2 file the value is read from. Subordinate to the
+                          label, not its own column, being a reference rather than data. */}
+                      <Box
+                        component="span"
+                        sx={{
+                          display: "block",
+                          fontFamily: 'Monospace',
+                          fontSize: "0.72rem",
+                          color: "text.secondary",
+                        }}
+                      >
+                        {row[1]}
+                      </Box>
+                    </TableCell>
+                    {displayColumns.map((col, idx) => (
+                      <TableCell
+                        key={col.key}
+                        sx={{
+                          fontFamily: 'Monospace',
+                          borderLeft: (col.isNsStart && idx > 0) ? "2px solid" : (col.isSpanStart ? "1px solid" : undefined),
+                          borderColor: col.isSpanStart ? "divider" : undefined,
+                        }}
+                        align="right"
+                      >
+                        {formatGroupConfigCell(row, col)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+                {groupMeans.map((row) => (
+                  <TableRow
+                    hover={true}
+                    key={row[0]}
+                    sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                  >
+                    <TableCell
+                      sx={{ ...stickyCell, zIndex: 2, fontFamily: 'Monospace' }}
+                      component="th"
+                      scope="row"
+                    >
+                      <MetricName name={row[0]} level={row[1] ? Number(row[1]) : 1} description={description} infoTooltipProps={infoTooltipProps} />
+                    </TableCell>
+                    {displayColumns.map((col, idx) => (
+                      <TableCell
+                        key={col.key}
+                        sx={{
+                          fontFamily: 'Monospace',
+                          borderLeft: (col.isNsStart && idx > 0) ? "2px solid" : (col.isSpanStart ? "1px solid" : undefined),
+                          borderColor: col.isSpanStart ? "divider" : undefined,
+                        }}
+                        align="right"
+                      >
+                        {formatGroupMetricCell(row, col, groups)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          {isContainerMode && (
+            <React.Fragment>
+              <Typography variant="h6" sx={{ mt: 3, mb: 1 }}>
+                {`Monitored Containers (${groups.length})`}
+              </Typography>
+              <TableContainer component={Paper} sx={{ maxHeight: "40vh", overflow: "auto" }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Display Name</TableCell>
+                      {hasPodInfo && <TableCell>Namespace</TableCell>}
+                      {hasPodInfo && <TableCell>Workload</TableCell>}
+                      {hasPodInfo && <TableCell>Pod</TableCell>}
+                      {hasPodInfo && <TableCell>Container</TableCell>}
+                      <TableCell>Container ID</TableCell>
+                      <TableCell>Runtime</TableCell>
+                      <TableCell align="right">Samples</TableCell>
+                      <TableCell>Cgroup Path</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {orderedIndices.map((idx) => {
+                      const g = groups[idx];
+                      const m = groupMeta[idx] || {};
+                      const cgroupPath = g[2] || m.cgroupPath || "";
+                      const displayName = m.displayName || g[0];
+                      return (
+                        <TableRow hover={true} key={`ref-${idx}-${displayName}`}>
+                          <TableCell sx={{ fontFamily: "Monospace", whiteSpace: "nowrap" }}>{displayName}</TableCell>
+                          {hasPodInfo && <TableCell sx={{ fontFamily: "Monospace", whiteSpace: "nowrap" }}>{m.namespace || "—"}</TableCell>}
+                          {hasPodInfo && <TableCell sx={{ fontFamily: "Monospace", whiteSpace: "nowrap" }}>{m.workload || "—"}</TableCell>}
+                          {hasPodInfo && <TableCell sx={{ fontFamily: "Monospace", whiteSpace: "nowrap" }}>{m.podName || "—"}</TableCell>}
+                          {hasPodInfo && <TableCell sx={{ fontFamily: "Monospace", whiteSpace: "nowrap" }}>{m.name || "—"}</TableCell>}
+                          <TableCell sx={{ fontFamily: "Monospace", whiteSpace: "nowrap" }}>{m.id || "—"}</TableCell>
+                          <TableCell sx={{ whiteSpace: "nowrap" }}>{m.runtime || "—"}</TableCell>
+                          <TableCell sx={{ fontFamily: "Monospace", whiteSpace: "nowrap" }} align="right">{g[1]}</TableCell>
+                          <TableCell sx={{ fontFamily: "Monospace", whiteSpace: "nowrap" }}>{cgroupPath || "—"}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </React.Fragment>
+          )}
+        </React.Fragment>
+      );
+    }
+
     function App() {
       const [systemTabs, setSystemTabs] = React.useState(0);
+      const [containerViewMode, setContainerViewMode] = React.useState("individual");
       const [openlink, setOpenlink] = React.useState(true);
       const [maxdiff, set_maxdiff] = React.useState(0);
       const [mindiff, set_mindiff] = React.useState(0);
@@ -177,14 +899,10 @@
       // the groups' static configuration, e.g., a cgroup's CPU and memory limits. One row
       // per field: label, source file, then one value per group. Empty unless collected.
       const group_configs = <<.GROUPCONFIGS>>
+      const group_meta = <<.GROUPMETA>>
       const hasGroups = groups.length > 0 && group_means.length > 0;
       // labels for the per-group metrics tab, by the field the metrics are grouped by
-      const groupLabels = {
-        SKT: { tab: "Per-Socket Metrics", singular: "socket", plural: "sockets" },
-        CPU: { tab: "Per-CPU Metrics", singular: "CPU", plural: "CPUs" },
-        CID: { tab: "Per-Cgroup Metrics", singular: "cgroup", plural: "cgroups" },
-        CONTAINER: { tab: "Per-Container Metrics", singular: "container", plural: "containers" },
-      }[group_by_field] || { tab: "Per-Group Metrics", singular: "group", plural: "groups" };
+      const groupLabels = getGroupLabels(group_by_field);
       // Tab indexes. The per-group metrics tab is present only when there is per-group
       // data to present, so the tabs that follow it shift accordingly.
       const tabIndex = {
@@ -219,43 +937,6 @@
         }
       };
 
-      // MetricName component - the name, preceded by an info button with its description
-      // and, for TMA metrics, indentation showing the metric's level
-      const MetricName = ({ name, level }) => {
-        const indentationLevel = level > 1 ? level - 1 : 0;
-        return (
-          <React.Fragment>
-            <Tooltip
-              title={description.hasOwnProperty(name) ? description[name] : ""}
-              componentsProps={infoTooltipProps}
-            >
-              <IconButton sx={{ padding: "0 8px 0 0" }} disabled={!description.hasOwnProperty(name)}>
-                <Icon>info</Icon>
-              </IconButton>
-            </Tooltip>
-            {indentationLevel > 0 &&
-              <span style={{
-                paddingLeft: `${indentationLevel * 16}px`,
-                borderLeft: '1px dotted #aaa',
-                marginLeft: '4px',
-              }}>
-                <Icon
-                  sx={{
-                    fontSize: '0.8rem',
-                    verticalAlign: 'middle',
-                    color: '#666',
-                    marginRight: '4px'
-                  }}
-                >
-                  subdirectory_arrow_right
-                </Icon>
-              </span>
-            }
-            {name}
-          </React.Fragment>
-        );
-      };
-
       // MetricsTable component
       const MetricsTable = ({
         data, 
@@ -270,7 +951,7 @@
             })
           : data;
 
-        const hasOtherComparison = data.length > 0 && data[0].hasOwnProperty("other");
+        const hasOtherComparison = data.length > 0 && Object.prototype.hasOwnProperty.call(data[0], "other");
 
         // If filtering results in no data, show a message
         if (filterPrefix && filteredData.length === 0) {
@@ -330,7 +1011,7 @@
                         }}
                       >
                         <TableCell sx={{ fontFamily: 'Monospace' }} component="th" scope="row">
-                          <MetricName name={row[0]} level={row[7] ? Number(row[7]) : 1} />
+                          <MetricName name={row[0]} level={row[7] ? Number(row[7]) : 1} description={description} infoTooltipProps={infoTooltipProps} />
                         </TableCell>
                         <TableCell 
                           sx={{ 
@@ -371,12 +1052,12 @@
                         <TableCell sx={{ fontFamily: 'Monospace' }} align="right">
                           {Number(row[4]).toFixed(4)}
                         </TableCell>
-                        {showComparison && hasOtherComparison && row.hasOwnProperty("other") && (
+                        {showComparison && hasOtherComparison && Object.prototype.hasOwnProperty.call(row, "other") && (
                           <TableCell sx={{ fontFamily: 'Monospace', fontStyle: 'italic' }} align="right">
                             {Number(row["other"]).toFixed(4)}
                           </TableCell>
                         )}
-                        {showComparison && hasOtherComparison && row.hasOwnProperty("other") && (
+                        {showComparison && hasOtherComparison && Object.prototype.hasOwnProperty.call(row, "other") && (
                           <TableCell align="right" sx={{ 
                             fontFamily: 'Monospace', 
                             backgroundColor: (row.diff > 0 ? "rgba(255,0,0," + (row.diff / maxdiff * .5) + ")" : "rgba(0,0,255," + (row.diff / mindiff * .5) + ")") 
@@ -391,120 +1072,6 @@
               </Table>
             </TableContainer>
           </div>
-        );
-      };
-      // GroupMeansTable component - one row per metric, one column per group, e.g., per
-      // cgroup, holding that group's mean over the collection
-      const GroupMeansTable = () => {
-        // group values can be long, e.g., cgroup paths; the full value is in the tooltip.
-        // Container display names may use pod/name or ns/pod/name disambiguation, so keep
-        // the full string rather than stripping before '/'.
-        const shortGroupName = (value) => {
-          if (group_by_field === "CONTAINER") {
-            return value.length > 28 ? value.slice(0, 25) + "..." : value;
-          }
-          const leaf = value.split("/").filter(Boolean).pop() || value;
-          return leaf.length > 28 ? leaf.slice(0, 25) + "..." : leaf;
-        };
-        // keep the metric name visible while scrolling the group columns horizontally
-        const stickyCell = {
-          position: "sticky",
-          left: 0,
-          backgroundColor: "background.paper",
-        };
-        return (
-          <TableContainer component={Paper} sx={{ maxHeight: "80vh", overflow: "auto" }}>
-            <Table size="small" stickyHeader style={{ tableLayout: 'auto', width: "auto" }}>
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ ...stickyCell, zIndex: 3 }}>Metric</TableCell>
-                  {groups.map(([value, sampleCount, cgroupPath]) => (
-                    <TableCell key={value} align="right">
-                      <Tooltip
-                        title={
-                          cgroupPath
-                            ? `${value} (${cgroupPath}, ${sampleCount} sample${sampleCount === "1" ? "" : "s"})`
-                            : `${value} (${sampleCount} sample${sampleCount === "1" ? "" : "s"})`
-                        }
-                        componentsProps={infoTooltipProps}
-                      >
-                        <span style={{ fontFamily: 'Monospace', cursor: "help" }}>
-                          {shortGroupName(value)}
-                        </span>
-                      </Tooltip>
-                    </TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {/* configuration rows, pinned above the metrics. Settings, not
-                    measurements, so shaded and separated by a heavier bottom border. */}
-                {group_configs.map((row, rowIdx) => (
-                  <TableRow
-                    hover={true}
-                    key={`config-${row[0]}`}
-                    sx={{
-                      backgroundColor: "action.hover",
-                      ...(rowIdx === group_configs.length - 1 && {
-                        '& td, & th': { borderBottom: 2, borderBottomColor: "divider" },
-                      }),
-                    }}
-                  >
-                    <TableCell
-                      sx={{
-                        ...stickyCell,
-                        zIndex: 2,
-                        fontFamily: 'Monospace',
-                        backgroundColor: "action.hover",
-                      }}
-                      component="th"
-                      scope="row"
-                    >
-                      {row[0]}
-                      {/* the cgroup v2 file the value is read from. Subordinate to the
-                          label, not its own column, being a reference rather than data. */}
-                      <Box
-                        component="span"
-                        sx={{
-                          display: "block",
-                          fontFamily: 'Monospace',
-                          fontSize: "0.72rem",
-                          color: "text.secondary",
-                        }}
-                      >
-                        {row[1]}
-                      </Box>
-                    </TableCell>
-                    {groups.map(([value], idx) => (
-                      <TableCell key={value} sx={{ fontFamily: 'Monospace' }} align="right">
-                        {row[idx + 2] === "" || row[idx + 2] === undefined ? "—" : row[idx + 2]}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-                {group_means.map((row) => (
-                  <TableRow
-                    hover={true}
-                    key={row[0]}
-                    sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-                  >
-                    <TableCell
-                      sx={{ ...stickyCell, zIndex: 2, fontFamily: 'Monospace' }}
-                      component="th"
-                      scope="row"
-                    >
-                      <MetricName name={row[0]} level={row[1] ? Number(row[1]) : 1} />
-                    </TableCell>
-                    {groups.map(([value], idx) => (
-                      <TableCell key={value} sx={{ fontFamily: 'Monospace' }} align="right">
-                        {row[idx + 2] === "" ? "—" : Number(row[idx + 2]).toFixed(4)}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
         );
       };
       // Define consistent colors for TMA categories with child variations
@@ -1106,12 +1673,17 @@
                 value={systemTabs}
                 index={tabIndex.groupMetrics}
               >
-                <Typography variant="body1" sx={{ paddingBottom: "16px" }}>
-                  {groups.length === 1
-                    ? `Mean value of each metric for the ${groupLabels.singular} monitored during the collection period. Hover over a column heading for its full name and the number of samples collected for it. A dash indicates that no valid samples were collected for the metric.`
-                    : `Mean value of each metric for each of the ${groups.length} ${groupLabels.plural} monitored during the collection period. Hover over a column heading for its full name and the number of samples collected for it. A dash indicates that no valid samples were collected for the metric.`}
-                </Typography>
-                <GroupMeansTable />
+                <GroupMeansTable
+                  groupByField={group_by_field}
+                  groups={groups}
+                  groupMeans={group_means}
+                  groupConfigs={group_configs}
+                  groupMeta={group_meta}
+                  description={description}
+                  containerViewMode={containerViewMode}
+                  setContainerViewMode={setContainerViewMode}
+                  infoTooltipProps={infoTooltipProps}
+                />
               </TabPanel>
             }
             <TabPanel

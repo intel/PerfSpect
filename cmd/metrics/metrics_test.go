@@ -92,7 +92,7 @@ func TestResolveRawReplayFlags(t *testing.T) {
 	})
 }
 
-func TestApplyResolvedContainersStability(t *testing.T) {
+func TestApplyResolvedContainersStabilityAndID(t *testing.T) {
 	tc := &targetContext{}
 
 	cids1 := applyResolvedContainers(tc, []Container{
@@ -114,6 +114,8 @@ func TestApplyResolvedContainersStability(t *testing.T) {
 	assert.Equal(t, []string{"kubepods/pod-a/c1", "docker/2222"}, cids1)
 	assert.Equal(t, "default/web-0/webapp", tc.metadata.ContainerNames["kubepods/pod-a/c1"])
 	assert.Equal(t, "nginx", tc.metadata.ContainerNames["docker/2222"])
+	assert.Equal(t, "111111111111aaaa", tc.metadata.ContainerInfo["default/web-0/webapp"].ID)
+	assert.Equal(t, "222222222222bbbb", tc.metadata.ContainerInfo["nginx"].ID)
 
 	// On refresh: existing cgroup keeps its label even as new namespaces appear, and a
 	// recreated standalone container with a new cgroup path does not steal "nginx".
@@ -144,5 +146,7 @@ func TestApplyResolvedContainersStability(t *testing.T) {
 	assert.Equal(t, []string{"kubepods/pod-a/c1", "docker/3333", "kubepods/pod-b/c4"}, cids2)
 	assert.Equal(t, "default/web-0/webapp", tc.metadata.ContainerNames["kubepods/pod-a/c1"])
 	assert.Equal(t, "nginx (333333333333)", tc.metadata.ContainerNames["docker/3333"])
+	assert.Equal(t, "333333333333cccc", tc.metadata.ContainerInfo["nginx (333333333333)"].ID)
 	assert.Equal(t, "prod/api-0/api", tc.metadata.ContainerNames["kubepods/pod-b/c4"])
+	assert.Equal(t, "222222222222bbbb", tc.metadata.ContainerInfo["nginx"].ID)
 }

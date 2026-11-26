@@ -428,7 +428,8 @@ func (mc MetricCollection) addGroupTemplateValues(templateVals map[string]string
 	templateVals["GROUPS"] = "[]"
 	templateVals["GROUPMEANS"] = "[]"
 	templateVals["GROUPCONFIGS"] = "[]"
-	isSingleContainerOrCgroup := len(mc) == 1 && mc[0].groupByField == "CID" && (len(metadata.ContainerNames) > 0 || len(metadata.CgroupConfigs) > 0)
+	templateVals["GROUPMETA"] = "[]"
+	isSingleContainerOrCgroup := len(mc) == 1 && mc[0].groupByField == "CID" && (len(metadata.ContainerNames) > 0 || len(metadata.CgroupConfigs) > 0 || len(metadata.ContainerInfo) > 0)
 	if len(mc) < 2 && !isSingleContainerOrCgroup {
 		return nil
 	}
@@ -441,7 +442,12 @@ func (mc MetricCollection) addGroupTemplateValues(templateVals map[string]string
 			return nil
 		}
 	}
-	cgroupByDisplayName := make(map[string]string, len(metadata.ContainerNames)+len(metadata.CgroupConfigs))
+	cgroupByDisplayName := make(map[string]string, len(metadata.ContainerInfo)+len(metadata.ContainerNames)+len(metadata.CgroupConfigs))
+	for displayName, info := range metadata.ContainerInfo {
+		if displayName != "" && info.CgroupPath != "" {
+			cgroupByDisplayName[displayName] = info.CgroupPath
+		}
+	}
 	for _, cgroupPath := range slices.Sorted(maps.Keys(metadata.ContainerNames)) {
 		displayName := metadata.ContainerNames[cgroupPath]
 		if displayName != "" {
@@ -498,7 +504,7 @@ func (mc MetricCollection) addGroupTemplateValues(templateVals map[string]string
 		groupMeans = append(groupMeans, metricVals)
 	}
 	groupByField := mc[0].groupByField
-	if groupByField == "CID" && (len(metadata.ContainerNames) > 0 || len(cgroupByDisplayName) > 0) {
+	if groupByField == "CID" && (len(metadata.ContainerNames) > 0 || len(cgroupByDisplayName) > 0 || len(metadata.ContainerInfo) > 0) {
 		groupByField = "CONTAINER"
 	}
 	groupByFieldBytes, err := json.Marshal(groupByField)
@@ -516,6 +522,38 @@ func (mc MetricCollection) addGroupTemplateValues(templateVals map[string]string
 	templateVals["GROUPBYFIELD"] = string(groupByFieldBytes)
 	templateVals["GROUPS"] = string(groupsBytes)
 	templateVals["GROUPMEANS"] = string(groupMeansBytes)
+	if groupByField == "CONTAINER" {
+		groupMeta := make([]ContainerMetadata, 0, len(mc))
+		for _, mg := range mc {
+			cgroupPath := cgroupByDisplayName[mg.groupByValue]
+			var cm ContainerMetadata
+			if existing, ok := metadata.ContainerInfo[mg.groupByValue]; ok {
+				cm = existing
+				if cm.DisplayName == "" {
+					cm.DisplayName = mg.groupByValue
+				}
+				if cm.CgroupPath == "" {
+					cm.CgroupPath = cgroupPath
+				}
+			} else {
+				cm = inferContainerMetadataFromDisplayName(mg.groupByValue, cgroupPath)
+			}
+			if cm.PodName != "" {
+				if cm.Workload == "" {
+					cm.Workload = inferKubernetesWorkload(cm.PodName)
+				}
+				if cm.ShortPod == "" {
+					cm.ShortPod = shortenKubernetesPodName(cm.PodName, cm.Workload)
+				}
+			}
+			groupMeta = append(groupMeta, cm)
+		}
+		groupMetaBytes, err := json.Marshal(groupMeta)
+		if err != nil {
+			return err
+		}
+		templateVals["GROUPMETA"] = string(groupMetaBytes)
+	}
 	// the cgroups' static configuration, shown above the metrics to give them context
 	if len(metadata.CgroupConfigs) > 0 {
 		groupNames := make([]string, 0, len(groups))

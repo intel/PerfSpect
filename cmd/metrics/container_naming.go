@@ -5,11 +5,102 @@ package metrics
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 )
 
-var displayNameSanitizer = strings.NewReplacer(",", "_", `"`, "_", "|", "_", "\r", "_", "\n", "_", "\t", "_")
+var (
+	displayNameSanitizer = strings.NewReplacer(",", "_", `"`, "_", "|", "_", "\r", "_", "\n", "_", "\t", "_")
+
+	k8sDeploymentPodRe      = regexp.MustCompile(`^(.+)-[a-z0-9]{5,10}-[bcdfghjklmnpqrstvwxz2456789]{5}$`)
+	k8sStatefulSetPodRe     = regexp.MustCompile(`^(.+)-[0-9]+$`)
+	k8sHashPodRe            = regexp.MustCompile(`^(.+)-([bcdfghjklmnpqrstvwxz2456789]{5})$`)
+	cgroupLeafContainerIDRe = regexp.MustCompile(`^(?:.*[-:])?([0-9a-f]{64})(?:\.scope)?$`)
+)
+
+func inferKubernetesWorkload(podName string) string {
+	if podName == "" {
+		return ""
+	}
+	if m := k8sDeploymentPodRe.FindStringSubmatch(podName); m != nil {
+		return m[1]
+	}
+	if m := k8sStatefulSetPodRe.FindStringSubmatch(podName); m != nil {
+		return m[1]
+	}
+	if m := k8sHashPodRe.FindStringSubmatch(podName); m != nil {
+		return m[1]
+	}
+	return podName
+}
+
+func shortenKubernetesPodName(podName string, workload string) string {
+	if podName == "" {
+		return ""
+	}
+	if workload == "" {
+		workload = inferKubernetesWorkload(podName)
+	}
+	if m := k8sDeploymentPodRe.FindStringSubmatch(podName); m != nil && m[1] == workload {
+		if idx := strings.LastIndex(podName, "-"); idx != -1 {
+			return "…" + podName[idx:]
+		}
+	}
+	if !k8sStatefulSetPodRe.MatchString(podName) {
+		if m := k8sHashPodRe.FindStringSubmatch(podName); m != nil && m[1] == workload {
+			return "…-" + m[2]
+		}
+	}
+	runes := []rune(podName)
+	if len(runes) > 22 {
+		return string(runes[:10]) + "…" + string(runes[len(runes)-8:])
+	}
+	return podName
+}
+
+func inferContainerIDFromCgroupPath(cgroupPath string) string {
+	trimmed := strings.TrimRight(strings.TrimSpace(cgroupPath), "/")
+	if trimmed == "" {
+		return ""
+	}
+	leaf := trimmed
+	if idx := strings.LastIndex(trimmed, "/"); idx != -1 {
+		leaf = trimmed[idx+1:]
+	}
+	if m := cgroupLeafContainerIDRe.FindStringSubmatch(leaf); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
+func inferContainerMetadataFromDisplayName(displayName string, cgroupPath string) ContainerMetadata {
+	parts := strings.Split(displayName, "/")
+	meta := ContainerMetadata{
+		ID:          inferContainerIDFromCgroupPath(cgroupPath),
+		DisplayName: displayName,
+		CgroupPath:  cgroupPath,
+	}
+	switch len(parts) {
+	case 3:
+		meta.Namespace = parts[0]
+		meta.PodName = parts[1]
+		meta.Name = parts[2]
+	case 2:
+		meta.PodName = parts[0]
+		meta.Name = parts[1]
+		if strings.Contains(cgroupPath, "kubepods") {
+			meta.Namespace = "default"
+		}
+	default:
+		meta.Name = displayName
+	}
+	if meta.PodName != "" {
+		meta.Workload = inferKubernetesWorkload(meta.PodName)
+		meta.ShortPod = shortenKubernetesPodName(meta.PodName, meta.Workload)
+	}
+	return meta
+}
 
 func assignContainerDisplayNames(containers []Container, existingByCgroup map[string]string) []Container {
 	result := slices.Clone(containers)

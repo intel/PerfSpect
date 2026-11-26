@@ -838,7 +838,7 @@ func resolveRawReplayFlags(metadata Metadata, scopeChanged bool, currentScope st
 		switch {
 		case metadata.Scope != "":
 			scope = metadata.Scope
-		case len(metadata.ContainerNames) > 0:
+		case len(metadata.ContainerNames) > 0 || len(metadata.ContainerInfo) > 0:
 			scope = scopeContainer
 		case len(metadata.CgroupConfigs) > 0:
 			scope = scopeCgroup
@@ -1371,10 +1371,25 @@ func applyResolvedContainers(targetContext *targetContext, containers []Containe
 	if targetContext.metadata.ContainerNames == nil {
 		targetContext.metadata.ContainerNames = make(map[string]string, len(containers))
 	}
+	if targetContext.metadata.ContainerInfo == nil {
+		targetContext.metadata.ContainerInfo = make(map[string]ContainerMetadata, len(containers))
+	}
 	cids := make([]string, 0, len(containers))
 	for _, c := range containers {
 		cids = append(cids, c.CgroupPath)
 		targetContext.metadata.ContainerNames[c.CgroupPath] = c.DisplayName
+		workload := inferKubernetesWorkload(c.PodName)
+		targetContext.metadata.ContainerInfo[c.DisplayName] = ContainerMetadata{
+			ID:          c.ID,
+			DisplayName: c.DisplayName,
+			Name:        c.Name,
+			PodName:     c.PodName,
+			ShortPod:    shortenKubernetesPodName(c.PodName, workload),
+			Namespace:   c.Namespace,
+			Workload:    workload,
+			Runtime:     c.Runtime,
+			CgroupPath:  c.CgroupPath,
+		}
 	}
 	return cids
 }
@@ -1505,6 +1520,7 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 		targetContext.perfStartTime = time.Now()
 		metaSnapshot := targetContext.metadata
 		metaSnapshot.ContainerNames = maps.Clone(targetContext.metadata.ContainerNames)
+		metaSnapshot.ContainerInfo = maps.Clone(targetContext.metadata.ContainerInfo)
 		go runPerf(myTarget, flagNoRoot, processes, perfCommand, targetContext.groupDefinitions, targetContext.metricDefinitions, metaSnapshot, localTempDir, localOutputDir, frameChannel, errorChannel, signalMgr)
 		// wait for runPerf to finish
 		perfErr := <-errorChannel // capture and return all errors
