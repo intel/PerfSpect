@@ -4,6 +4,7 @@
 package metrics
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -308,4 +309,117 @@ func TestGetHTMLRendersWithoutCgroupConfigs(t *testing.T) {
 	out, err := mc.getHTML(Metadata{}, []MetricDefinition{{Name: names[0]}})
 	assert.NoError(t, err)
 	assert.Contains(t, out, "const group_configs = []")
+}
+
+func TestCgroupConfigRowsByContainerName(t *testing.T) {
+	configs := []CgroupConfig{
+		{
+			Name:          "system.slice/docker-aaa.scope",
+			ContainerName: "nginx",
+			CPUs:          "0-3",
+			CPUCount:      4,
+			CPUQuota:      2,
+			NUMANodes:     "0",
+			MemoryLimit:   68719476736,
+			MemoryHigh:    unlimited,
+			SwapLimit:     unlimited,
+		},
+		{
+			Name:          "kubepods.slice/pod-1/cri-containerd-bbb.scope",
+			ContainerName: "webapp",
+			CPUs:          "4-7",
+			CPUCount:      4,
+			CPUQuota:      float64(unlimited),
+			NUMANodes:     "0",
+			MemoryLimit:   unlimited,
+			MemoryHigh:    unlimited,
+			SwapLimit:     unlimited,
+		},
+	}
+	rows := cgroupConfigRows(configs, []string{"nginx", "webapp"})
+	assert.Equal(t, []string{"CPUs", "cpuset.cpus.effective", "0-3 (4)", "4-7 (4)"}, rows[0])
+	assert.Equal(t, []string{"CPU quota", "cpu.max", "2 CPUs", "unlimited"}, rows[1])
+	assert.Equal(t, []string{"Memory limit", "memory.max (incl. ancestors)", "64.0 GiB", "unlimited"}, rows[3])
+
+	// Latest merged config with the same ContainerName wins.
+	configsWithUpdate := append(slices.Clone(configs), CgroupConfig{
+		Name:          "system.slice/docker-new.scope",
+		ContainerName: "nginx",
+		CPUs:          "8-15",
+		CPUCount:      8,
+		CPUQuota:      4,
+		NUMANodes:     "1",
+		MemoryLimit:   34359738368,
+		MemoryHigh:    unlimited,
+		SwapLimit:     unlimited,
+	})
+	updatedRows := cgroupConfigRows(configsWithUpdate, []string{"nginx", "webapp"})
+	assert.Equal(t, []string{"CPUs", "cpuset.cpus.effective", "8-15 (8)", "4-7 (4)"}, updatedRows[0])
+	assert.Equal(t, []string{"CPU quota", "cpu.max", "4 CPUs", "unlimited"}, updatedRows[1])
+	assert.Equal(t, []string{"Memory limit", "memory.max (incl. ancestors)", "32.0 GiB", "unlimited"}, updatedRows[3])
+}
+
+func TestGetHTMLRendersContainerNames(t *testing.T) {
+	names := []string{"CPU utilization %"}
+	metadata := Metadata{
+		ContainerNames: map[string]string{
+			"system.slice/docker-aaa.scope":                 "nginx",
+			"kubepods.slice/pod-1/cri-containerd-bbb.scope": "pod-1/webapp",
+		},
+		CgroupConfigs: []CgroupConfig{
+			{
+				Name:          "system.slice/docker-aaa.scope",
+				ContainerName: "nginx",
+				CPUs:          "0-3",
+				CPUCount:      4,
+				CPUQuota:      float64(unlimited),
+				NUMANodes:     "0",
+				MemoryLimit:   68719476736,
+				MemoryHigh:    unlimited,
+				SwapLimit:     unlimited,
+			},
+			{
+				Name:          "kubepods.slice/pod-1/cri-containerd-bbb.scope",
+				ContainerName: "pod-1/webapp",
+				CPUs:          "4-7",
+				CPUCount:      4,
+				CPUQuota:      float64(unlimited),
+				NUMANodes:     "0",
+				MemoryLimit:   34359738368,
+				MemoryHigh:    unlimited,
+				SwapLimit:     unlimited,
+			},
+		},
+	}
+
+	t.Run("multi-container", func(t *testing.T) {
+		mc := MetricCollection{
+			{names: names, groupByField: "CID", groupByValue: "nginx", rows: []row{{timestamp: 5, cgroup: "nginx", metrics: map[string]float64{names[0]: 21.1}}}},
+			{names: names, groupByField: "CID", groupByValue: "pod-1/webapp", rows: []row{{timestamp: 5, cgroup: "pod-1/webapp", metrics: map[string]float64{names[0]: 54.1}}}},
+		}
+		out, err := mc.getHTML(metadata, []MetricDefinition{{Name: names[0]}})
+		assert.NoError(t, err)
+		assert.Contains(t, out, `const group_by_field = "CONTAINER"`)
+		assert.Contains(t, out, `"nginx","1","system.slice/docker-aaa.scope"`)
+		assert.Contains(t, out, `"pod-1/webapp","1","kubepods.slice/pod-1/cri-containerd-bbb.scope"`)
+		assert.Contains(t, out, `"64.0 GiB"`)
+		assert.Contains(t, out, `"32.0 GiB"`)
+	})
+
+	t.Run("single-container", func(t *testing.T) {
+		singleMeta := Metadata{
+			ContainerNames: map[string]string{
+				"system.slice/docker-aaa.scope": "nginx",
+			},
+			CgroupConfigs: []CgroupConfig{metadata.CgroupConfigs[0]},
+		}
+		mc := MetricCollection{
+			{names: names, groupByField: "CID", groupByValue: "nginx", rows: []row{{timestamp: 5, cgroup: "nginx", metrics: map[string]float64{names[0]: 21.1}}}},
+		}
+		out, err := mc.getHTML(singleMeta, []MetricDefinition{{Name: names[0]}})
+		assert.NoError(t, err)
+		assert.Contains(t, out, `const group_by_field = "CONTAINER"`)
+		assert.Contains(t, out, `"nginx","1","system.slice/docker-aaa.scope"`)
+		assert.Contains(t, out, `"64.0 GiB"`)
+	})
 }

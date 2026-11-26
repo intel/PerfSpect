@@ -164,8 +164,8 @@ func isCollectableEvent(event EventDefinition, metadata Metadata) bool {
 		if !(metadata.SupportsOCR && metadata.SupportsUncore) {
 			slog.Debug("Off-core response events not supported on target", slog.String("event", event.Name))
 			return false
-		} else if flagScope == scopeProcess || flagScope == scopeCgroup {
-			slog.Debug("Off-core response events not supported in process or cgroup scope", slog.String("event", event.Name))
+		} else if flagScope == scopeProcess || isCgroupBasedScope(flagScope) {
+			slog.Debug("Off-core response events not supported in process, cgroup, or container scope", slog.String("event", event.Name))
 			return false
 		}
 		return true
@@ -189,8 +189,8 @@ func isCollectableEvent(event EventDefinition, metadata Metadata) bool {
 			slog.Debug("Uncore events not supported on target", slog.String("event", event.Name))
 			return false
 		}
-		if flagScope == scopeProcess || flagScope == scopeCgroup {
-			slog.Debug("Uncore events not supported in process or cgroup scope", slog.String("event", event.Name))
+		if flagScope == scopeProcess || isCgroupBasedScope(flagScope) {
+			slog.Debug("Uncore events not supported in process, cgroup, or container scope", slog.String("event", event.Name))
 			return false
 		}
 		deviceExists := false
@@ -215,10 +215,10 @@ func isCollectableEvent(event EventDefinition, metadata Metadata) bool {
 		slog.Debug("ref-cycles not supported on target", slog.String("event", event.Name))
 		return false
 	}
-	// no cstate and power events when collecting at process or cgroup scope
-	if (flagScope == scopeProcess || flagScope == scopeCgroup) &&
+	// no cstate and power events when collecting at process, cgroup, or container scope
+	if (flagScope == scopeProcess || isCgroupBasedScope(flagScope)) &&
 		(strings.Contains(event.Name, "cstate_") || strings.Contains(event.Name, "power/energy")) {
-		slog.Debug("Cstate and power events not supported in process or cgroup scope", slog.String("event", event.Name))
+		slog.Debug("Cstate and power events not supported in process, cgroup, or container scope", slog.String("event", event.Name))
 		return false
 	}
 	// no system-level events when collecting at CPU granularity e.g. power, cstates

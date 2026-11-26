@@ -6,6 +6,7 @@ package metrics
 import (
 	"testing"
 
+	"github.com/casbin/govaluate"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -140,4 +141,78 @@ func TestExcludeFinalSampleEmptyRows(t *testing.T) {
 	}
 	mc.excludeFinalSample() // should not panic
 	assert.Equal(t, 0, len(mc[0].rows), "empty rows should remain empty")
+}
+
+func TestProcessEventsMapsContainerNames(t *testing.T) {
+	origScope := flagScope
+	origGranularity := flagGranularity
+	defer func() {
+		flagScope = origScope
+		flagGranularity = origGranularity
+	}()
+	flagScope = scopeContainer
+	flagGranularity = granularitySystem
+
+	expr, err := govaluate.NewEvaluableExpression("[instructions] / [cpu-cycles]")
+	assert.NoError(t, err)
+	metricDefs := []MetricDefinition{
+		{
+			Name:       "IPC",
+			LegacyName: "IPC",
+			Expression: "[instructions] / [cpu-cycles]",
+			Variables:  map[string]int{"instructions": -1, "cpu-cycles": -1},
+			Evaluable:  expr,
+		},
+	}
+	groupDefs := []GroupDefinition{
+		{
+			{Name: "instructions", Raw: "instructions"},
+			{Name: "cpu-cycles", Raw: "cpu-cycles"},
+		},
+	}
+	metadata := Metadata{
+		ContainerNames: map[string]string{
+			"system.slice/docker-aaa.scope": "nginx",
+		},
+	}
+	rawEvents := [][]byte{
+		[]byte(`{"interval" : 5.0, "counter-value" : "200.0", "cgroup" : "system.slice/docker-aaa.scope", "event" : "instructions", "pcnt-running" : 100.0}`),
+		[]byte(`{"interval" : 5.0, "counter-value" : "100.0", "cgroup" : "system.slice/docker-aaa.scope", "event" : "cpu-cycles", "pcnt-running" : 100.0}`),
+		[]byte(`{"interval" : 5.0, "counter-value" : "300.0", "cgroup" : "/system.slice/docker-unmapped.scope", "event" : "instructions", "pcnt-running" : 100.0}`),
+		[]byte(`{"interval" : 5.0, "counter-value" : "100.0", "cgroup" : "/system.slice/docker-unmapped.scope", "event" : "cpu-cycles", "pcnt-running" : 100.0}`),
+	}
+
+	frames, ts, err := ProcessEvents(rawEvents, groupDefs, metricDefs, nil, 0, metadata)
+	assert.NoError(t, err)
+	assert.Equal(t, 5.0, ts)
+	assert.Len(t, frames, 2)
+	assert.Equal(t, "nginx", frames[0].Cgroup)
+	assert.InDelta(t, 2.0, frames[0].Metrics[0].Value, 1e-6)
+	assert.Equal(t, "/system.slice/docker-unmapped.scope", frames[1].Cgroup)
+	assert.InDelta(t, 3.0, frames[1].Metrics[0].Value, 1e-6)
+}
+
+func TestMetricCollectionCSVWithContainerNames(t *testing.T) {
+	names := []string{"CPU utilization %"}
+
+	t.Run("multi-container", func(t *testing.T) {
+		mc := MetricCollection{
+			{names: names, groupByField: "CID", groupByValue: "pod-a/webapp", rows: []row{{timestamp: 5, cgroup: "pod-a/webapp", metrics: map[string]float64{names[0]: 20.0}}}},
+			{names: names, groupByField: "CID", groupByValue: "pod-b/webapp", rows: []row{{timestamp: 5, cgroup: "pod-b/webapp", metrics: map[string]float64{names[0]: 40.0}}}},
+		}
+		csvOut, err := mc.getCSV()
+		assert.NoError(t, err)
+		assert.Contains(t, csvOut, "metric,pod-a/webapp,pod-b/webapp\n")
+		assert.Contains(t, csvOut, "CPU utilization %,20.000000,40.000000\n")
+	})
+
+	t.Run("single-container", func(t *testing.T) {
+		mc := MetricCollection{
+			{names: names, groupByField: "CID", groupByValue: "nginx", rows: []row{{timestamp: 5, cgroup: "nginx", metrics: map[string]float64{names[0]: 25.0}}}},
+		}
+		csvOut, err := mc.getCSV()
+		assert.NoError(t, err)
+		assert.Contains(t, csvOut, "CID,metric,mean,min,max,stddev\n")
+		assert.Contains(t, csvOut, "nginx,CPU utilization %,25.000000,")
+	})
 }

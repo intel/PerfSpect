@@ -11,6 +11,9 @@ Examples:
   Metrics from remote host:                 $ perfspect metrics --target 192.168.1.1 --user fred --key fred_key
   Metrics for "hot" processes:              $ perfspect metrics --scope process
   Metrics for specified processes:          $ perfspect metrics --scope process --pids 1234,6789
+  Metrics for "hot" containers:             $ perfspect metrics --scope container
+  Metrics for filtered containers:          $ perfspect metrics --scope container --filter "(nginx|webapp|postgres)"
+  Metrics for containers via crictl:        $ perfspect metrics --scope container --container-runtime crictl --filter "(nginx|webapp)"
   Start workload and collect metrics:       $ perfspect metrics -- /path/to/workload arg1 arg2
   Metrics adjusted for transaction rate:    $ perfspect metrics --txnrate 100
   "Live" metrics:                           $ perfspect metrics --live
@@ -21,12 +24,13 @@ Arguments:
 Flags:
   Collection Options:
     --duration             number of seconds to run the collection. If 0, the collection will run indefinitely. (default: 0)
-    --scope                scope of collection, options: system, process, cgroup (default: system)
+    --scope                scope of collection, options: system, process, cgroup, container (default: system)
     --pids                 comma separated list of process ids. If not provided while collecting in process scope, "hot" processes will be monitored. (default: [])
     --cids                 comma separated list of cids. If not provided while collecting at cgroup scope, "hot" cgroups will be monitored. (default: [])
-    --filter               regular expression used to match process names or cgroup IDs when in process or cgroup scope and when --pids or --cids are not specified
-    --count                maximum number of "hot" or "filtered" processes or cgroups to monitor (default: 5)
-    --refresh              number of seconds to run before refreshing the "hot" or "filtered" process or cgroup list. If 0, the list will not be refreshed. (default: 30)
+    --container-runtime    container runtime CLI to use in container scope, options: auto, docker, crictl, ctr, nerdctl, or /path/to/<binary> (default: auto)
+    --filter               regular expression used to match process names, cgroup IDs, or container names when in process, cgroup, or container scope and when --pids or --cids are not specified
+    --count                maximum number of "hot" or "filtered" processes, cgroups, or containers to monitor (default: 5)
+    --refresh              number of seconds to run before refreshing the "hot" or "filtered" process, cgroup, or container list. If 0, the list will not be refreshed. (default: 30)
     --cpus                 range of CPUs to monitor. If not provided, all cores will be monitored.
   Output Options:
     --granularity          level of metric granularity. Only valid when collecting at system scope. Options: system, socket, cpu. (default: system)

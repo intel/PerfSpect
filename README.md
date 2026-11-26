@@ -55,6 +55,23 @@ The `metrics` command supports two modes -- default and "live". Default mode beh
 
 ![screenshot of live CSV metrics in a text terminal](docs/images/metrics_live.png)
 
+##### Container & Cgroup Metrics
+
+To monitor running containers across Docker, containerd, and CRI runtimes (including CRI-O and Kubernetes pods), use `--scope container`. PerfSpect automatically detects active container runtimes (`docker`, `crictl`, `ctr`, `nerdctl`), standard CLI locations (such as `/home/kubernetes/bin/crictl`), and common CRI/containerd socket paths (such as containerd and CRI-O sockets) on the target, or you can select a runtime explicitly with `--container-runtime`:
+
+```text
+# Monitor top 5 running containers by CPU usage (automatic runtime detection)
+$ ./perfspect metrics --scope container
+
+# Monitor containers whose names match a regular expression
+$ ./perfspect metrics --scope container --filter "(nginx|webapp|postgres)" --duration 30
+
+# Force a specific container runtime CLI or custom binary path
+$ ./perfspect metrics --scope container --container-runtime crictl --filter "(nginx|webapp)"
+$ ./perfspect metrics --scope container --container-runtime docker
+$ ./perfspect metrics --container-runtime /home/kubernetes/bin/crictl
+```
+
 ##### Metrics Without Root Permissions
 
 If neither sudo nor root access is available, an administrator must apply the following configuration to the target system(s):

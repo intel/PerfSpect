@@ -166,9 +166,10 @@ type Metadata struct {
 	PerfSpectVersion    string
 	WithWorkload        bool // true if metrics were collected with a user-provided workload application
 	CollectionInterval  time.Duration
-	Scope               string         `json:"scope,omitempty"`
-	Granularity         string         `json:"granularity,omitempty"`
-	CgroupConfigs       []CgroupConfig // static configuration of the monitored cgroups, when collecting at cgroup scope
+	Scope               string            `json:"scope,omitempty"`
+	Granularity         string            `json:"granularity,omitempty"`
+	CgroupConfigs       []CgroupConfig    // static configuration of the monitored cgroups, when collecting at cgroup scope
+	ContainerNames      map[string]string `json:"containerNames,omitempty"` // cgroup path (no leading slash) -> resolved container display name
 }
 
 // MetadataCollector defines the interface for architecture-specific metadata collection.

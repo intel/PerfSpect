@@ -4,79 +4,22 @@
 package metrics
 
 import (
-	"bytes"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func newTestMetricsCmd(t *testing.T) *cobra.Command {
-	t.Helper()
-	origDuration := flagDuration
-	origScope := flagScope
-	origPidList := flagPidList
-	origCidList := flagCidList
-	origFilter := flagFilter
-	origCount := flagCount
-	origRefresh := flagRefresh
-	origCpuRange := flagCpuRange
-	origGranularity := flagGranularity
-	origOutputFormat := flagOutputFormat
-	origLive := flagLive
-	origTxnRate := flagTransactionRate
-	origList := flagShowMetricNames
-	origMetrics := flagMetricsList
-	origEventFile := flagEventFilePath
-	origMetricFile := flagMetricFilePath
-	origInterval := flagPerfPrintInterval
-	origMuxInterval := flagPerfMuxInterval
-	origNoRoot := flagNoRoot
-	origWriteEvents := flagWriteEventsToFile
-	origInput := flagInput
-	origNoSummary := flagNoSystemSummary
-	origPromServer := flagPrometheusServer
-	origPromAddr := flagPrometheusServerAddr
-	origWorkload := argsWorkload
+func TestValidateFlagsRefresh(t *testing.T) {
+	t.Run("refresh 0 allowed in container scope", func(t *testing.T) {
+		testCmd := newTestMetricsCmd(t)
+		require.NoError(t, testCmd.Flags().Set(flagScopeName, scopeContainer))
+		require.NoError(t, testCmd.Flags().Set(flagRefreshName, "0"))
 
-	t.Cleanup(func() {
-		flagDuration = origDuration
-		flagScope = origScope
-		flagPidList = origPidList
-		flagCidList = origCidList
-		flagFilter = origFilter
-		flagCount = origCount
-		flagRefresh = origRefresh
-		flagCpuRange = origCpuRange
-		flagGranularity = origGranularity
-		flagOutputFormat = origOutputFormat
-		flagLive = origLive
-		flagTransactionRate = origTxnRate
-		flagShowMetricNames = origList
-		flagMetricsList = origMetrics
-		flagEventFilePath = origEventFile
-		flagMetricFilePath = origMetricFile
-		flagPerfPrintInterval = origInterval
-		flagPerfMuxInterval = origMuxInterval
-		flagNoRoot = origNoRoot
-		flagWriteEventsToFile = origWriteEvents
-		flagInput = origInput
-		flagNoSystemSummary = origNoSummary
-		flagPrometheusServer = origPromServer
-		flagPrometheusServerAddr = origPromAddr
-		argsWorkload = origWorkload
+		err := validateFlags(testCmd, nil)
+		assert.NoError(t, err)
 	})
 
-	testCmd := &cobra.Command{Use: "metrics"}
-	var stderr bytes.Buffer
-	testCmd.SetErr(&stderr)
-	registerMetricsFlags(testCmd)
-	argsWorkload = nil
-	return testCmd
-}
-
-func TestValidateFlagsRefresh(t *testing.T) {
 	t.Run("refresh 0 allowed in cgroup scope", func(t *testing.T) {
 		testCmd := newTestMetricsCmd(t)
 		require.NoError(t, testCmd.Flags().Set(flagScopeName, scopeCgroup))
@@ -88,7 +31,7 @@ func TestValidateFlagsRefresh(t *testing.T) {
 
 	t.Run("refresh 1 with interval 5 fails", func(t *testing.T) {
 		testCmd := newTestMetricsCmd(t)
-		require.NoError(t, testCmd.Flags().Set(flagScopeName, scopeCgroup))
+		require.NoError(t, testCmd.Flags().Set(flagScopeName, scopeContainer))
 		require.NoError(t, testCmd.Flags().Set(flagPerfPrintIntervalName, "5"))
 		require.NoError(t, testCmd.Flags().Set(flagRefreshName, "1"))
 
@@ -100,9 +43,9 @@ func TestValidateFlagsRefresh(t *testing.T) {
 
 func TestResolveRawReplayFlags(t *testing.T) {
 	t.Run("restores explicit metadata scope and granularity", func(t *testing.T) {
-		md := Metadata{Scope: scopeCgroup, Granularity: granularitySystem}
+		md := Metadata{Scope: scopeContainer, Granularity: granularitySystem}
 		scope, gran := resolveRawReplayFlags(md, false, scopeSystem, false, granularityCPU)
-		assert.Equal(t, scopeCgroup, scope)
+		assert.Equal(t, scopeContainer, scope)
 		assert.Equal(t, granularitySystem, gran)
 	})
 
@@ -111,6 +54,15 @@ func TestResolveRawReplayFlags(t *testing.T) {
 		scope, gran := resolveRawReplayFlags(md, false, scopeSystem, false, granularitySystem)
 		assert.Equal(t, scopeSystem, scope)
 		assert.Equal(t, granularityCPU, gran)
+	})
+
+	t.Run("infers container scope from legacy metadata", func(t *testing.T) {
+		md := Metadata{
+			ContainerNames: map[string]string{"kubepods/p1/c1": "default/pod-1/app"},
+		}
+		scope, gran := resolveRawReplayFlags(md, false, scopeSystem, false, granularitySystem)
+		assert.Equal(t, scopeContainer, scope)
+		assert.Equal(t, granularitySystem, gran)
 	})
 
 	t.Run("infers cgroup scope from legacy metadata", func(t *testing.T) {
@@ -124,11 +76,12 @@ func TestResolveRawReplayFlags(t *testing.T) {
 
 	t.Run("honors explicit user overrides", func(t *testing.T) {
 		md := Metadata{
-			Scope:       scopeCgroup,
-			Granularity: granularitySystem,
+			Scope:          scopeContainer,
+			Granularity:    granularitySystem,
+			ContainerNames: map[string]string{"kubepods/p1/c1": "default/pod-1/app"},
 		}
-		scope, gran := resolveRawReplayFlags(md, true, scopeSystem, true, granularitySocket)
-		assert.Equal(t, scopeSystem, scope)
+		scope, gran := resolveRawReplayFlags(md, true, scopeCgroup, true, granularitySocket)
+		assert.Equal(t, scopeCgroup, scope)
 		assert.Equal(t, granularitySocket, gran)
 	})
 
@@ -137,4 +90,59 @@ func TestResolveRawReplayFlags(t *testing.T) {
 		assert.Equal(t, scopeSystem, scope)
 		assert.Equal(t, granularitySystem, gran)
 	})
+}
+
+func TestApplyResolvedContainersStability(t *testing.T) {
+	tc := &targetContext{}
+
+	cids1 := applyResolvedContainers(tc, []Container{
+		{
+			ID:         "111111111111aaaa",
+			Name:       "webapp",
+			PodName:    "web-0",
+			Namespace:  "default",
+			Runtime:    "cri",
+			CgroupPath: "kubepods/pod-a/c1",
+		},
+		{
+			ID:         "222222222222bbbb",
+			Name:       "nginx",
+			Runtime:    "docker",
+			CgroupPath: "docker/2222",
+		},
+	})
+	assert.Equal(t, []string{"kubepods/pod-a/c1", "docker/2222"}, cids1)
+	assert.Equal(t, "default/web-0/webapp", tc.metadata.ContainerNames["kubepods/pod-a/c1"])
+	assert.Equal(t, "nginx", tc.metadata.ContainerNames["docker/2222"])
+
+	// On refresh: existing cgroup keeps its label even as new namespaces appear, and a
+	// recreated standalone container with a new cgroup path does not steal "nginx".
+	cids2 := applyResolvedContainers(tc, []Container{
+		{
+			ID:         "111111111111aaaa",
+			Name:       "webapp",
+			PodName:    "web-0",
+			Namespace:  "default",
+			Runtime:    "cri",
+			CgroupPath: "kubepods/pod-a/c1",
+		},
+		{
+			ID:         "333333333333cccc",
+			Name:       "nginx",
+			Runtime:    "docker",
+			CgroupPath: "docker/3333",
+		},
+		{
+			ID:         "444444444444dddd",
+			Name:       "api",
+			PodName:    "api-0",
+			Namespace:  "prod",
+			Runtime:    "cri",
+			CgroupPath: "kubepods/pod-b/c4",
+		},
+	})
+	assert.Equal(t, []string{"kubepods/pod-a/c1", "docker/3333", "kubepods/pod-b/c4"}, cids2)
+	assert.Equal(t, "default/web-0/webapp", tc.metadata.ContainerNames["kubepods/pod-a/c1"])
+	assert.Equal(t, "nginx (333333333333)", tc.metadata.ContainerNames["docker/3333"])
+	assert.Equal(t, "prod/api-0/api", tc.metadata.ContainerNames["kubepods/pod-b/c4"])
 }

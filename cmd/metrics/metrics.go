@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net"
 	"os"
 	"os/exec"
@@ -46,6 +47,9 @@ var examples = []string{
 	fmt.Sprintf("  Metrics from remote host:                 $ %s %s --target 192.168.1.1 --user fred --key fred_key", app.Name, cmdName),
 	fmt.Sprintf("  Metrics for \"hot\" processes:              $ %s %s --scope process", app.Name, cmdName),
 	fmt.Sprintf("  Metrics for specified processes:          $ %s %s --scope process --pids 1234,6789", app.Name, cmdName),
+	fmt.Sprintf("  Metrics for \"hot\" containers:             $ %s %s --scope container", app.Name, cmdName),
+	fmt.Sprintf("  Metrics for filtered containers:          $ %s %s --scope container --filter \"(nginx|webapp|postgres)\"", app.Name, cmdName),
+	fmt.Sprintf("  Metrics for containers via crictl:        $ %s %s --scope container --container-runtime crictl --filter \"(nginx|webapp)\"", app.Name, cmdName),
 	fmt.Sprintf("  Start workload and collect metrics:       $ %s %s -- /path/to/workload arg1 arg2", app.Name, cmdName),
 	fmt.Sprintf("  Metrics adjusted for transaction rate:    $ %s %s --txnrate 100", app.Name, cmdName),
 	fmt.Sprintf("  \"Live\" metrics:                           $ %s %s --live", app.Name, cmdName),
@@ -133,14 +137,15 @@ func (sm *signalManager) triggerShutdown() {
 
 var (
 	// collection options
-	flagDuration int
-	flagScope    string
-	flagPidList  []string
-	flagCidList  []string
-	flagFilter   string
-	flagCount    int
-	flagRefresh  int
-	flagCpuRange string
+	flagDuration         int
+	flagScope            string
+	flagPidList          []string
+	flagCidList          []string
+	flagContainerRuntime string
+	flagFilter           string
+	flagCount            int
+	flagRefresh          int
+	flagCpuRange         string
 	// output format options
 	flagGranularity     string
 	flagOutputFormat    []string
@@ -165,14 +170,15 @@ var (
 )
 
 const (
-	flagDurationName = "duration"
-	flagScopeName    = "scope"
-	flagPidListName  = "pids"
-	flagCidListName  = "cids"
-	flagFilterName   = "filter"
-	flagCountName    = "count"
-	flagRefreshName  = "refresh"
-	flagCpuRangeName = "cpus"
+	flagDurationName         = "duration"
+	flagScopeName            = "scope"
+	flagPidListName          = "pids"
+	flagCidListName          = "cids"
+	flagContainerRuntimeName = "container-runtime"
+	flagFilterName           = "filter"
+	flagCountName            = "count"
+	flagRefreshName          = "refresh"
+	flagCpuRangeName         = "cpus"
 
 	flagGranularityName     = "granularity"
 	flagOutputFormatName    = "format"
@@ -202,12 +208,17 @@ const (
 var granularityOptions = []string{granularitySystem, granularitySocket, granularityCPU}
 
 const (
-	scopeSystem  = "system"
-	scopeProcess = "process"
-	scopeCgroup  = "cgroup"
+	scopeSystem    = "system"
+	scopeProcess   = "process"
+	scopeCgroup    = "cgroup"
+	scopeContainer = "container"
 )
 
-var scopeOptions = []string{scopeSystem, scopeProcess, scopeCgroup}
+var scopeOptions = []string{scopeSystem, scopeProcess, scopeCgroup, scopeContainer}
+
+func isCgroupBasedScope(scope string) bool {
+	return scope == scopeCgroup || scope == scopeContainer
+}
 
 const (
 	formatTxt  = "txt"
@@ -228,6 +239,7 @@ func registerMetricsFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(&flagScope, flagScopeName, scopeSystem, "")
 	cmd.Flags().StringSliceVar(&flagPidList, flagPidListName, []string{}, "")
 	cmd.Flags().StringSliceVar(&flagCidList, flagCidListName, []string{}, "")
+	cmd.Flags().StringVar(&flagContainerRuntime, flagContainerRuntimeName, containerRuntimeAuto, "")
 	cmd.Flags().StringVar(&flagFilter, flagFilterName, "", "")
 	cmd.Flags().IntVar(&flagCount, flagCountName, 5, "")
 	cmd.Flags().IntVar(&flagRefresh, flagRefreshName, 30, "")
@@ -306,16 +318,20 @@ func getFlagGroups() []app.FlagGroup {
 			Help: "comma separated list of cids. If not provided while collecting at cgroup scope, \"hot\" cgroups will be monitored.",
 		},
 		{
+			Name: flagContainerRuntimeName,
+			Help: "container runtime CLI to use in container scope, options: auto, docker, crictl, ctr, nerdctl, or /path/to/<binary>",
+		},
+		{
 			Name: flagFilterName,
-			Help: "regular expression used to match process names or cgroup IDs when in process or cgroup scope and when --pids or --cids are not specified",
+			Help: "regular expression used to match process names, cgroup IDs, or container names when in process, cgroup, or container scope and when --pids or --cids are not specified",
 		},
 		{
 			Name: flagCountName,
-			Help: "maximum number of \"hot\" or \"filtered\" processes or cgroups to monitor",
+			Help: "maximum number of \"hot\" or \"filtered\" processes, cgroups, or containers to monitor",
 		},
 		{
 			Name: flagRefreshName,
-			Help: "number of seconds to run before refreshing the \"hot\" or \"filtered\" process or cgroup list. If 0, the list will not be refreshed.",
+			Help: "number of seconds to run before refreshing the \"hot\" or \"filtered\" process, cgroup, or container list. If 0, the list will not be refreshed.",
 		},
 		{
 			Name: flagCpuRangeName,
@@ -424,6 +440,9 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		if cmd.Flags().Lookup(flagCidListName).Changed {
 			return workflow.FlagValidationError(cmd, "cids are not supported with a workload")
 		}
+		if cmd.Flags().Lookup(flagContainerRuntimeName).Changed {
+			return workflow.FlagValidationError(cmd, "container-runtime is not supported with a workload")
+		}
 		if cmd.Flags().Lookup(flagFilterName).Changed {
 			return workflow.FlagValidationError(cmd, "filter is not supported with a workload")
 		}
@@ -444,6 +463,10 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	// confirm valid scope
 	if cmd.Flags().Lookup(flagScopeName).Changed && !slices.Contains(scopeOptions, flagScope) {
 		return workflow.FlagValidationError(cmd, fmt.Sprintf("invalid scope: %s, valid options are: %s", flagScope, strings.Join(scopeOptions, ", ")))
+	}
+	// confirm valid container runtime
+	if _, err := parseContainerRuntimeSpec(flagContainerRuntime); err != nil {
+		return workflow.FlagValidationError(cmd, err.Error())
 	}
 	// pids and cids are mutually exclusive
 	if len(flagPidList) > 0 && len(flagCidList) > 0 {
@@ -473,22 +496,36 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 		// if scope wasn't set, set it to cgroup
 		flagScope = scopeCgroup
 	}
+	// container runtime changed
+	if cmd.Flags().Changed(flagContainerRuntimeName) {
+		if len(flagPidList) > 0 || len(flagCidList) > 0 {
+			return workflow.FlagValidationError(cmd, "cannot specify container-runtime when pids or cids are specified")
+		}
+		if cmd.Flags().Changed(flagScopeName) && flagScope != scopeContainer {
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("cannot specify %s when scope is not %s", flagContainerRuntimeName, scopeContainer))
+		}
+		// if scope wasn't set, set it to container
+		flagScope = scopeContainer
+	}
 	// filter changed
 	if flagFilter != "" {
-		// if scope isn't process or cgroup, error
-		if flagScope != scopeProcess && flagScope != scopeCgroup {
-			return workflow.FlagValidationError(cmd, fmt.Sprintf("cannot specify filter when scope is not %s or %s", scopeProcess, scopeCgroup))
+		// if scope isn't process, cgroup, or container, error
+		if flagScope != scopeProcess && !isCgroupBasedScope(flagScope) {
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("cannot specify filter when scope is not %s, %s, or %s", scopeProcess, scopeCgroup, scopeContainer))
 		}
 		// if pids or cids are specified, error
 		if len(flagPidList) > 0 || len(flagCidList) > 0 {
 			return workflow.FlagValidationError(cmd, "cannot specify filter when pids or cids are specified")
 		}
+		if _, err := regexp.Compile(flagFilter); err != nil {
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("invalid filter regular expression: %v", err))
+		}
 	}
 	// count changed
 	if cmd.Flags().Lookup(flagCountName).Changed {
-		// if scope isn't process or cgroup, error
-		if flagScope != scopeProcess && flagScope != scopeCgroup {
-			return workflow.FlagValidationError(cmd, fmt.Sprintf("cannot specify count when scope is not %s or %s", scopeProcess, scopeCgroup))
+		// if scope isn't process, cgroup, or container, error
+		if flagScope != scopeProcess && !isCgroupBasedScope(flagScope) {
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("cannot specify count when scope is not %s, %s, or %s", scopeProcess, scopeCgroup, scopeContainer))
 		}
 		// if count is less than 1, error
 		if flagCount < 1 {
@@ -501,9 +538,9 @@ func validateFlags(cmd *cobra.Command, args []string) error {
 	}
 	// refresh changed
 	if cmd.Flags().Lookup(flagRefreshName).Changed {
-		// if scope isn't process or cgroup, error
-		if flagScope != scopeProcess && flagScope != scopeCgroup {
-			return workflow.FlagValidationError(cmd, fmt.Sprintf("cannot specify refresh when scope is not %s or %s", scopeProcess, scopeCgroup))
+		// if scope isn't process, cgroup, or container, error
+		if flagScope != scopeProcess && !isCgroupBasedScope(flagScope) {
+			return workflow.FlagValidationError(cmd, fmt.Sprintf("cannot specify refresh when scope is not %s, %s, or %s", scopeProcess, scopeCgroup, scopeContainer))
 		}
 		// if pidlist or cidlist is set, error
 		if len(flagPidList) > 0 || len(flagCidList) > 0 {
@@ -664,6 +701,7 @@ type targetContext struct {
 	target              target.Target
 	err                 error
 	metadata            Metadata
+	containerRuntimes   []DetectedRuntime
 	nmiDisabled         bool
 	perfMuxIntervalsSet bool
 	perfMuxIntervals    map[string]int
@@ -800,6 +838,8 @@ func resolveRawReplayFlags(metadata Metadata, scopeChanged bool, currentScope st
 		switch {
 		case metadata.Scope != "":
 			scope = metadata.Scope
+		case len(metadata.ContainerNames) > 0:
+			scope = scopeContainer
 		case len(metadata.CgroupConfigs) > 0:
 			scope = scopeCgroup
 		}
@@ -1326,11 +1366,34 @@ func getCidsForPerf(myTarget target.Target, cidList []string, count int, filter 
 	return cids, nil
 }
 
+func applyResolvedContainers(targetContext *targetContext, containers []Container) []string {
+	containers = assignContainerDisplayNames(containers, targetContext.metadata.ContainerNames)
+	if targetContext.metadata.ContainerNames == nil {
+		targetContext.metadata.ContainerNames = make(map[string]string, len(containers))
+	}
+	cids := make([]string, 0, len(containers))
+	for _, c := range containers {
+		cids = append(cids, c.CgroupPath)
+		targetContext.metadata.ContainerNames[c.CgroupPath] = c.DisplayName
+	}
+	return cids
+}
+
 func collectOnTarget(targetContext *targetContext, localTempDir string, localOutputDir string, wg *sync.WaitGroup, statusUpdate progress.MultiSpinnerUpdateFunc, signalMgr *signalManager) {
 	defer wg.Done()
 	myTarget := targetContext.target
 	if targetContext.err != nil {
 		return
+	}
+	if flagScope == scopeContainer {
+		var runtimeErr error
+		targetContext.containerRuntimes, runtimeErr = DetectContainerRuntimes(myTarget, flagContainerRuntime, localTempDir, flagNoRoot)
+		if runtimeErr != nil {
+			slog.Error("failed to detect container runtimes", slog.String("target", myTarget.GetName()), slog.String("error", runtimeErr.Error()))
+			_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", runtimeErr.Error()))
+			targetContext.err = runtimeErr
+			return
+		}
 	}
 	// only refresh if duration is 0, i.e., no timeout, refresh > 0, and pids/cids are not specified
 	var needsRefresh bool
@@ -1344,6 +1407,8 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 			if len(flagCidList) == 0 {
 				needsRefresh = true
 			}
+		case scopeContainer:
+			needsRefresh = true
 		}
 	}
 	errorChannel := make(chan error)
@@ -1397,6 +1462,38 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 				slog.Warn("failed to get cgroup configuration", slog.String("error", configErr.Error()))
 			}
 			targetContext.metadata.CgroupConfigs = mergeCgroupConfigs(targetContext.metadata.CgroupConfigs, cgroupConfigs)
+		} else if flagScope == scopeContainer {
+			var containers []Container
+			containers, err = GetHotContainers(myTarget, targetContext.containerRuntimes, flagCount, flagFilter, localTempDir, flagNoRoot)
+			if err != nil {
+				if targetContext.perfStartTime.Equal((time.Time{})) {
+					targetContext.perfStartTime = time.Now()
+				}
+				exceededDuration := flagDuration != 0 && time.Since(targetContext.perfStartTime) > time.Duration(flagDuration)*time.Second
+				if !exceededDuration && errors.Is(err, errNoContainersFound) {
+					err = nil // ignore this error, we'll try again
+					slog.Debug("no containers found, will try again in 5 seconds")
+					time.Sleep(5 * time.Second) // wait for 5 seconds before trying again
+					continue
+				}
+				err = fmt.Errorf("failed to get containers: %w", err)
+				_ = statusUpdate(myTarget.GetName(), fmt.Sprintf("Error: %s", err.Error()))
+				break
+			}
+			cids = applyResolvedContainers(targetContext, containers)
+			// the containers' cgroup static configuration, for context in the report. The monitored
+			// set can change on refresh, so accumulate across refreshes.
+			cgroupConfigs, configErr := GetCgroupConfigs(myTarget, cids, localTempDir, flagNoRoot)
+			if configErr != nil {
+				// supplementary information, so don't fail the collection
+				slog.Warn("failed to get cgroup configuration", slog.String("error", configErr.Error()))
+			}
+			for idx := range cgroupConfigs {
+				if name, ok := targetContext.metadata.ContainerNames[cgroupConfigs[idx].Name]; ok {
+					cgroupConfigs[idx].ContainerName = name
+				}
+			}
+			targetContext.metadata.CgroupConfigs = mergeCgroupConfigs(targetContext.metadata.CgroupConfigs, cgroupConfigs)
 		}
 		perfCommand, err := getPerfCommand(targetContext.groupDefinitions, pids, cids, flagCpuRange)
 		if err != nil {
@@ -1406,7 +1503,9 @@ func collectOnTarget(targetContext *targetContext, localTempDir string, localOut
 		}
 		// this timestamp is used to determine if we need to exit the loop, i.e., we've run long enough
 		targetContext.perfStartTime = time.Now()
-		go runPerf(myTarget, flagNoRoot, processes, perfCommand, targetContext.groupDefinitions, targetContext.metricDefinitions, targetContext.metadata, localTempDir, localOutputDir, frameChannel, errorChannel, signalMgr)
+		metaSnapshot := targetContext.metadata
+		metaSnapshot.ContainerNames = maps.Clone(targetContext.metadata.ContainerNames)
+		go runPerf(myTarget, flagNoRoot, processes, perfCommand, targetContext.groupDefinitions, targetContext.metricDefinitions, metaSnapshot, localTempDir, localOutputDir, frameChannel, errorChannel, signalMgr)
 		// wait for runPerf to finish
 		perfErr := <-errorChannel // capture and return all errors
 		if perfErr != nil {
@@ -1486,10 +1585,10 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, perfComma
 			}
 		})
 	}
-	// must manually terminate perf in cgroup scope when a timeout is specified and/or need to refresh cgroups
+	// must manually terminate perf in cgroup/container scope when a timeout is specified and/or need to refresh cgroups
 	startPerfTimestamp := time.Now()
 	cgroupTimeout := 0 // default to 0, which means no timeout
-	if flagScope == scopeCgroup {
+	if isCgroupBasedScope(flagScope) {
 		// if cids are specified, we don't need to refresh, but we do need to set a timeout
 		if len(flagCidList) > 0 {
 			cgroupTimeout = flagDuration
@@ -1590,7 +1689,7 @@ func runPerf(myTarget target.Target, noRoot bool, processes []Process, perfComma
 // When context is cancelled, this function will close the done channel to signal that processing is complete.
 // there are two scenarios where this function will terminate perf:
 //  1. when the number of consecutive errors processing events exceeds the maximum (2), triggering a full shutdown
-//  2. when the cgroup refresh timeout is reached (in cgroup scope), stopping only this iteration's perf command
+//  2. when the cgroup refresh timeout is reached (in cgroup/container scope), stopping only this iteration's perf command
 func processPerfOutput(
 	ctx context.Context,
 	myTarget target.Target,
@@ -1652,8 +1751,8 @@ func processPerfOutput(
 		if contextCancelled {
 			break
 		}
-		// for cgroup scope, terminate perf if refresh timeout is reached
-		if flagScope == scopeCgroup && cgroupTimeout != 0 {
+		// for cgroup/container scope, terminate perf if refresh timeout is reached
+		if isCgroupBasedScope(flagScope) && cgroupTimeout != 0 {
 			if int(time.Since(startPerfTimestamp).Seconds()) >= cgroupTimeout {
 				slog.Debug("cgroup refresh timeout reached")
 				if stopIteration != nil {

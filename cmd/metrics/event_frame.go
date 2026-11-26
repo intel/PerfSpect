@@ -103,7 +103,7 @@ func GetEventFrames(rawEvents [][]byte, eventGroupDefinitions []GroupDefinition,
 				case granularitySocket:
 					eventFrame.Socket = event.Socket
 				}
-				if flagScope == scopeCgroup {
+				if isCgroupBasedScope(flagScope) {
 					eventFrame.Cgroup = event.Cgroup
 				}
 			}
@@ -326,7 +326,7 @@ func bucketEvents(allEvents []Event, scope string, granularity string, metadata 
 	case scopeProcess:
 		bucketedEvents = append(bucketedEvents, allEvents)
 		return
-	case scopeCgroup:
+	case scopeCgroup, scopeContainer:
 		// expand events list to one list per cgroup
 		var allCgroupEvents [][]Event
 		var cgroups []string

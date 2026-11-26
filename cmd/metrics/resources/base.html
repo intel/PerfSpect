@@ -180,10 +180,11 @@
       const hasGroups = groups.length > 0 && group_means.length > 0;
       // labels for the per-group metrics tab, by the field the metrics are grouped by
       const groupLabels = {
-        SKT: { tab: "Per-Socket Metrics", plural: "sockets" },
-        CPU: { tab: "Per-CPU Metrics", plural: "CPUs" },
-        CID: { tab: "Per-Cgroup Metrics", plural: "cgroups" },
-      }[group_by_field] || { tab: "Per-Group Metrics", plural: "groups" };
+        SKT: { tab: "Per-Socket Metrics", singular: "socket", plural: "sockets" },
+        CPU: { tab: "Per-CPU Metrics", singular: "CPU", plural: "CPUs" },
+        CID: { tab: "Per-Cgroup Metrics", singular: "cgroup", plural: "cgroups" },
+        CONTAINER: { tab: "Per-Container Metrics", singular: "container", plural: "containers" },
+      }[group_by_field] || { tab: "Per-Group Metrics", singular: "group", plural: "groups" };
       // Tab indexes. The per-group metrics tab is present only when there is per-group
       // data to present, so the tabs that follow it shift accordingly.
       const tabIndex = {
@@ -395,8 +396,13 @@
       // GroupMeansTable component - one row per metric, one column per group, e.g., per
       // cgroup, holding that group's mean over the collection
       const GroupMeansTable = () => {
-        // group values can be long, e.g., cgroup paths; the full value is in the tooltip
+        // group values can be long, e.g., cgroup paths; the full value is in the tooltip.
+        // Container display names may use pod/name or ns/pod/name disambiguation, so keep
+        // the full string rather than stripping before '/'.
         const shortGroupName = (value) => {
+          if (group_by_field === "CONTAINER") {
+            return value.length > 28 ? value.slice(0, 25) + "..." : value;
+          }
           const leaf = value.split("/").filter(Boolean).pop() || value;
           return leaf.length > 28 ? leaf.slice(0, 25) + "..." : leaf;
         };
@@ -412,10 +418,14 @@
               <TableHead>
                 <TableRow>
                   <TableCell sx={{ ...stickyCell, zIndex: 3 }}>Metric</TableCell>
-                  {groups.map(([value, sampleCount]) => (
+                  {groups.map(([value, sampleCount, cgroupPath]) => (
                     <TableCell key={value} align="right">
                       <Tooltip
-                        title={`${value} (${sampleCount} sample${sampleCount === "1" ? "" : "s"})`}
+                        title={
+                          cgroupPath
+                            ? `${value} (${cgroupPath}, ${sampleCount} sample${sampleCount === "1" ? "" : "s"})`
+                            : `${value} (${sampleCount} sample${sampleCount === "1" ? "" : "s"})`
+                        }
                         componentsProps={infoTooltipProps}
                       >
                         <span style={{ fontFamily: 'Monospace', cursor: "help" }}>
@@ -1097,7 +1107,9 @@
                 index={tabIndex.groupMetrics}
               >
                 <Typography variant="body1" sx={{ paddingBottom: "16px" }}>
-                  {`Mean value of each metric for each of the ${groups.length} ${groupLabels.plural} monitored during the collection period. Hover over a column heading for its full name and the number of samples collected for it. A dash indicates that no valid samples were collected for the metric.`}
+                  {groups.length === 1
+                    ? `Mean value of each metric for the ${groupLabels.singular} monitored during the collection period. Hover over a column heading for its full name and the number of samples collected for it. A dash indicates that no valid samples were collected for the metric.`
+                    : `Mean value of each metric for each of the ${groups.length} ${groupLabels.plural} monitored during the collection period. Hover over a column heading for its full name and the number of samples collected for it. A dash indicates that no valid samples were collected for the metric.`}
                 </Typography>
                 <GroupMeansTable />
               </TabPanel>

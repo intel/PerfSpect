@@ -25,7 +25,8 @@ const unlimited = int64(-1)
 // CgroupConfig holds one cgroup's static configuration. Limits are 'unlimited' when the
 // cgroup file holds "max"; 0 is a real limit of zero.
 type CgroupConfig struct {
-	Name string `json:"name"` // cgroup path as in the report's CID field, no leading slash
+	Name          string `json:"name"`                    // cgroup path as in the report's CID field, no leading slash
+	ContainerName string `json:"containerName,omitempty"` // resolved container display name when collected in container scope
 	// CPU
 	CPUs     string  `json:"cpus"`     // cpuset.cpus.effective, e.g., "0-3,96-99"
 	CPUCount int     `json:"cpuCount"` // number of CPUs in CPUs
@@ -354,9 +355,14 @@ func summarizeIOWeight(weight int, overrides []IODeviceWeight) string {
 // from, then one value per cgroup in report order. Every row is always returned, blank or
 // not, so the fields stay constant; suppressing them entirely is the caller's job.
 func cgroupConfigRows(configs []CgroupConfig, names []string) [][]string {
-	byName := make(map[string]CgroupConfig, len(configs))
+	byName := make(map[string]CgroupConfig, len(configs)*2)
 	for _, config := range configs {
 		byName[config.Name] = config
+	}
+	for _, config := range configs {
+		if config.ContainerName != "" {
+			byName[config.ContainerName] = config
+		}
 	}
 	limit := func(value int64) string {
 		switch value {

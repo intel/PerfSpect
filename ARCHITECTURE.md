@@ -59,7 +59,12 @@ perfspect/
 │   ├── root.go          # CLI setup, global flags, app lifecycle, update & extract commands
 │   ├── report/          # System configuration reports
 │   ├── metrics/         # CPU performance counter collection
-│   │   └── trim.go      # 'metrics trim' subcommand: filter metrics to a time range
+│   │   ├── cgroup_config.go       # Cgroup configuration inspection
+│   │   ├── container_runtime.go   # Container runtime CLI and socket detection
+│   │   ├── container_discovery.go # Container runtime discovery and parsing
+│   │   ├── container_cgroup.go    # Cgroup path resolution, deduplication, and ranking
+│   │   ├── container_naming.go    # Container display naming and Kubernetes workload inference
+│   │   └── trim.go                # 'metrics trim' subcommand: filter metrics to a time range
 │   ├── benchmark/       # Performance micro-benchmarks
 │   ├── telemetry/       # System telemetry collection
 │   ├── flamegraph/      # CPU flamegraph generation
