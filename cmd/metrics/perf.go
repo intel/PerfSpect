@@ -6,6 +6,8 @@ package metrics
 import (
 	"fmt"
 	"strings"
+
+	"perfspect/internal/util"
 )
 
 // getPerfCommand is responsible for assembling the command that will be
@@ -21,7 +23,7 @@ func getPerfCommand(eventGroups []GroupDefinition, pids []string, cids []string,
 		} else if len(flagPidList) == 0 { // don't refresh if PIDs are specified
 			duration = flagRefresh // refresh hot processes every flagRefresh seconds
 		}
-	case scopeCgroup:
+	case scopeCgroup, scopeContainer:
 		duration = 0
 	}
 
@@ -67,8 +69,8 @@ func getPerfCommandArgs(pids []string, cgroups []string, timeout int, eventGroup
 		}
 	case scopeProcess:
 		args = append(args, "-p", strings.Join(pids, ",")) // collect only for these processes
-	case scopeCgroup:
-		args = append(args, "--for-each-cgroup", strings.Join(cgroups, ",")) // collect only for these cgroups
+	case scopeCgroup, scopeContainer:
+		args = append(args, "--for-each-cgroup", util.ShellSingleQuote(strings.Join(cgroups, ","))) // collect only for these cgroups
 	}
 	// add event groups
 	for _, group := range eventGroups {
@@ -83,7 +85,7 @@ func getPerfCommandArgs(pids []string, cgroups []string, timeout int, eventGroup
 		// add workload args
 		args = append(args, "--")
 		args = append(args, argsWorkload...)
-	} else if flagScope != scopeCgroup && timeout != 0 {
+	} else if !isCgroupBasedScope(flagScope) && timeout != 0 {
 		// add timeout
 		args = append(args, "sleep", fmt.Sprintf("%d", timeout))
 	}

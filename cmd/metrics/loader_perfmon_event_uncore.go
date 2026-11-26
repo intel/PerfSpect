@@ -85,8 +85,8 @@ func (event UncoreEvent) IsCollectable(metadata Metadata) bool {
 		slog.Debug("Uncore events not supported on target", slog.String("event", event.EventName))
 		return false // uncore events are not supported
 	}
-	if flagScope == scopeProcess || flagScope == scopeCgroup || flagGranularity == granularityCPU {
-		slog.Debug("Uncore events not supported in process scope, cgroup scope, or cpu granularity", slog.String("event", event.EventName))
+	if flagScope == scopeProcess || isCgroupBasedScope(flagScope) || flagGranularity == granularityCPU {
+		slog.Debug("Uncore events not supported in process scope, cgroup scope, container scope, or cpu granularity", slog.String("event", event.EventName))
 		return false
 	}
 	deviceExists := false

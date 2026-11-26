@@ -25,7 +25,8 @@ const unlimited = int64(-1)
 // CgroupConfig holds one cgroup's static configuration. Limits are 'unlimited' when the
 // cgroup file holds "max"; 0 is a real limit of zero.
 type CgroupConfig struct {
-	Name string `json:"name"` // cgroup path as in the report's CID field, no leading slash
+	Name          string `json:"name"`                    // cgroup path as in the report's CID field, no leading slash
+	ContainerName string `json:"containerName,omitempty"` // resolved container display name when collected in container scope
 	// CPU
 	CPUs     string  `json:"cpus"`     // cpuset.cpus.effective, e.g., "0-3,96-99"
 	CPUCount int     `json:"cpuCount"` // number of CPUs in CPUs
@@ -61,14 +62,13 @@ type IODeviceWeight struct {
 // GetCgroupConfigs reads each cgroup's static configuration from the target's cgroup v2
 // filesystem. Cgroups are named as passed to perf, relative to the cgroup mount point.
 // An unreadable cgroup is omitted rather than failing the collection.
-func GetCgroupConfigs(myTarget target.Target, cgroups []string, localTempDir string) ([]CgroupConfig, error) {
+func GetCgroupConfigs(myTarget target.Target, cgroups []string, localTempDir string, noRoot bool) ([]CgroupConfig, error) {
 	if len(cgroups) == 0 {
 		return nil, nil
 	}
 	quoted := make([]string, 0, len(cgroups))
 	for _, cgroup := range cgroups {
-		// single-quote for the shell, escaping any embedded single quotes
-		quoted = append(quoted, "'"+strings.ReplaceAll(cgroup, "'", `'\''`)+"'")
+		quoted = append(quoted, util.ShellSingleQuote(cgroup))
 	}
 	// the kernel does not resolve memory.max across the hierarchy as it does
 	// cpuset.cpus.effective, so take the lowest from the cgroup up to the root
@@ -120,9 +120,9 @@ for rel in %s; do
     done
 done
 `, strings.Join(quoted, " ")),
-		Superuser: true,
+		Superuser: !noRoot,
 	}
-	output, err := workflow.RunScript(myTarget, cgroupConfigScript, localTempDir, flagNoRoot)
+	output, err := workflow.RunScript(myTarget, cgroupConfigScript, localTempDir, noRoot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cgroup configuration: %v", err)
 	}
@@ -355,9 +355,14 @@ func summarizeIOWeight(weight int, overrides []IODeviceWeight) string {
 // from, then one value per cgroup in report order. Every row is always returned, blank or
 // not, so the fields stay constant; suppressing them entirely is the caller's job.
 func cgroupConfigRows(configs []CgroupConfig, names []string) [][]string {
-	byName := make(map[string]CgroupConfig, len(configs))
+	byName := make(map[string]CgroupConfig, len(configs)*2)
 	for _, config := range configs {
 		byName[config.Name] = config
+	}
+	for _, config := range configs {
+		if config.ContainerName != "" {
+			byName[config.ContainerName] = config
+		}
 	}
 	limit := func(value int64) string {
 		switch value {

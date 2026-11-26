@@ -48,7 +48,12 @@ func ProcessEvents(perfEvents [][]byte, eventGroupDefinitions []GroupDefinition,
 		metricFrame.Timestamp = eventFrame.Timestamp
 		metricFrame.Socket = eventFrame.Socket
 		metricFrame.CPU = eventFrame.CPU
-		metricFrame.Cgroup = eventFrame.Cgroup
+		cgroupKey := strings.TrimPrefix(eventFrame.Cgroup, "/")
+		if name, ok := metadata.ContainerNames[cgroupKey]; ok && name != "" {
+			metricFrame.Cgroup = name
+		} else {
+			metricFrame.Cgroup = eventFrame.Cgroup
+		}
 		var pidList []string
 		var cmdList []string
 		for _, process := range processes {

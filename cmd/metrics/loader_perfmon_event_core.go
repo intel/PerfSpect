@@ -115,9 +115,9 @@ func (event CoreEvent) IsCollectable(metadata Metadata) bool {
 			slog.Debug("Off-core response (OCR) events not supported", slog.String("event", event.EventName))
 			return false // Off-core response events are not supported
 		}
-		if flagScope == scopeProcess || flagScope == scopeCgroup {
-			slog.Debug("Off-core response (OCR) events not supported in process or cgroup scope", slog.String("event", event.EventName))
-			return false // Off-core response events are not supported in process or cgroup scope
+		if flagScope == scopeProcess || isCgroupBasedScope(flagScope) {
+			slog.Debug("Off-core response (OCR) events not supported in process, cgroup, or container scope", slog.String("event", event.EventName))
+			return false // Off-core response events are not supported in process, cgroup, or container scope
 		}
 	}
 	if !metadata.SupportsRefCycles && strings.Contains(event.EventName, "CPU_CLK_UNHALTED.REF_TSC") { // AKA ref-cycles

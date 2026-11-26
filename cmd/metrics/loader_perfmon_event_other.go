@@ -40,9 +40,9 @@ func (event OtherEvent) IsEmpty() bool {
 }
 
 func (event OtherEvent) IsCollectable(metadata Metadata) bool {
-	if flagScope == scopeProcess || flagScope == scopeCgroup {
-		slog.Debug("Other events not supported in process or cgroup scope", slog.String("event", event.EventName))
-		return false // other events are not supported in process or cgroup scope
+	if flagScope == scopeProcess || isCgroupBasedScope(flagScope) {
+		slog.Debug("Other events not supported in process, cgroup, or container scope", slog.String("event", event.EventName))
+		return false // other events are not supported in process, cgroup, or container scope
 	}
 	// no system-level events when collecting at CPU granularity e.g. power, cstates
 	if (flagGranularity == granularityCPU) &&
